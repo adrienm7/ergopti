@@ -790,7 +790,7 @@ end
 
 --- Records a single keypress event with app context.
 --- @param ch           string  The character typed.
---- @param timestamp_ms number  Wall-clock timestamp in ms.
+--- @param timestamp_ms number  Monotonic timestamp in ms.
 --- @param app_id       string|nil  The focused app identifier (from window_info).
 --- @param scancode     number|nil  Physical evdev code captured at keydown.
 local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
@@ -2178,7 +2178,7 @@ function M.export_session()
 	local wpm = 0.0
 	if Metrics then
 		stats = Metrics.get_session_stats()
-		wpm   = Metrics.get_wpm()
+		wpm   = Metrics.get_wpm(Monotonic.now_ms())
 	end
 	local apps  = M.get_app_stats()
 
@@ -2946,7 +2946,7 @@ end
 --- @return number
 function M.get_wpm()
 	if not Metrics then return 0.0 end
-	return Metrics.get_wpm()
+	return Metrics.get_wpm(Monotonic.now_ms())
 end
 
 --- The readouts' live numbers: { wpm, source, source_variant, source_time (s) }.

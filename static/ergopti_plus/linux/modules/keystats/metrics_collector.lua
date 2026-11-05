@@ -137,6 +137,7 @@ function M.init(config)
 		-- Session accumulators.
 		keystroke_count = 0,
 		session_start   = nil,   -- set on first keypress
+		last_key_at     = nil,   -- retained after the WPM window is pruned
 
 		-- Rolling ring-buffer of keypress timestamps (ms) for WPM calculation.
 		wpm_ring = {},
@@ -154,9 +155,9 @@ end
 
 --- Records a single keypress event.
 --- Should be called from the input reader's on_char callback with the current
---- wall-clock time in milliseconds.
+--- monotonic time in milliseconds.
 --- @param ch           string  The character typed (UTF-8, one codepoint).
---- @param timestamp_ms number  Wall-clock time of the keypress in milliseconds.
+--- @param timestamp_ms number  Monotonic time of the keypress in milliseconds.
 function M.on_keydown(ch, timestamp_ms)
 	if not require_state("on_keydown") then return end
 
@@ -170,6 +171,7 @@ function M.on_keydown(ch, timestamp_ms)
 	end
 
 	_state.keystroke_count = _state.keystroke_count + 1
+	_state.last_key_at = timestamp_ms
 
 	-- Update rolling WPM ring.
 	_state.wpm_ring[#_state.wpm_ring + 1] = timestamp_ms
@@ -188,10 +190,14 @@ end
 
 --- Returns the rolling words-per-minute estimate based on the sliding window.
 --- Returns 0.0 when there is insufficient data.
+--- @param now_ms number|nil Current timestamp in the same monotonic domain as input.
 --- @return number  WPM as a floating-point value.
-function M.get_wpm()
+function M.get_wpm(now_ms)
 	if not require_state("get_wpm") then return 0.0 end
 
+	-- The user may request an export long after the last input, without a
+	-- subsequent keydown to expire the old rolling window.
+	if type(now_ms) == "number" then prune_wpm_ring(now_ms) end
 	local wpm = Metrics.compute_wpm_from_ring(_state.wpm_ring, CHARS_PER_WORD)
 	Logger.debug(LOG, "get_wpm(): %.1f WPM from %d ring entries.", wpm, #_state.wpm_ring)
 	return wpm
@@ -204,7 +210,7 @@ function M.get_session_stats()
 		return { keystrokes = 0, words = 0, start_time = 0, duration_ms = 0 }
 	end
 
-	local now_ms     = _state.wpm_ring[#_state.wpm_ring] or (_state.session_start or 0)
+	local now_ms     = _state.last_key_at or (_state.session_start or 0)
 	local start_ms   = _state.session_start or now_ms
 	local duration   = now_ms - start_ms
 	local words      = math.floor(_state.keystroke_count / CHARS_PER_WORD)
@@ -238,6 +244,7 @@ function M.reset_session()
 
 	_state.keystroke_count = 0
 	_state.session_start   = nil
+	_state.last_key_at     = nil
 	_state.wpm_ring        = {}
 	_state.char_window     = {}
 	_state.ngrams          = {}
