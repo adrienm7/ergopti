@@ -105,6 +105,8 @@ local function native()
 		"typedef struct evp_md_st EVP_MD;",
 		"EVP_PKEY *d2i_PUBKEY(EVP_PKEY **a, const unsigned char **pp, long length);",
 		"void EVP_PKEY_free(EVP_PKEY *pkey);",
+		"int EVP_PKEY_is_a(const EVP_PKEY *pkey, const char *name);",
+		"int EVP_PKEY_get_group_name(const EVP_PKEY *pkey, char *name, size_t name_sz, size_t *name_len);",
 		"EVP_MD_CTX *EVP_MD_CTX_new(void);",
 		"void EVP_MD_CTX_free(EVP_MD_CTX *ctx);",
 		"const EVP_MD *EVP_sha256(void);",
@@ -127,7 +129,7 @@ function M.verify(spki_base64, record, signature_base64)
 	local der = raw and M.raw_to_der(raw)
 	if not der or Base64.encode(raw) ~= signature_base64 then return false, M.REFUSALS.malformed_signature end
 	local key = type(spki_base64) == "string" and spki_base64 ~= "" and Base64.decode(spki_base64) or nil
-	if not key or key == "" then return false, M.REFUSALS.bad_key end
+	if not key or key == "" or Base64.encode(key) ~= spki_base64 then return false, M.REFUSALS.bad_key end
 	local binding = native()
 	if not binding then return false, M.REFUSALS.no_native end
 	local ffi, crypto = binding.ffi, binding.library
@@ -137,6 +139,23 @@ function M.verify(spki_base64, record, signature_base64)
 	pointer[0] = key_buffer
 	local pkey = crypto.d2i_PUBKEY(nil, pointer, #key)
 	if pkey == nil then return false, M.REFUSALS.bad_key end
+	-- d2i_PUBKEY accepts a valid prefix; the policy names one complete SPKI.
+	if pointer[0] ~= key_buffer + #key then
+		crypto.EVP_PKEY_free(pkey)
+		return false, M.REFUSALS.bad_key
+	end
+	local inspected, valid_curve = pcall(function()
+		local group, length = ffi.new("char[80]"), ffi.new("size_t[1]")
+		if crypto.EVP_PKEY_is_a(pkey, "EC") ~= 1
+			or crypto.EVP_PKEY_get_group_name(pkey, group, 80, length) ~= 1
+			or tonumber(length[0]) >= 80 then return false end
+		local name = ffi.string(group, tonumber(length[0]))
+		return name == "prime256v1" or name == "secp256r1" or name == "P-256"
+	end)
+	if not inspected or not valid_curve then
+		crypto.EVP_PKEY_free(pkey)
+		return false, M.REFUSALS.bad_key
+	end
 	local context = crypto.EVP_MD_CTX_new()
 	local verdict
 	if context ~= nil and crypto.EVP_DigestVerifyInit(context, nil, crypto.EVP_sha256(), nil, pkey) == 1 then
