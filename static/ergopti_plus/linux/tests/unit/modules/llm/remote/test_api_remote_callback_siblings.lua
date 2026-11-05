@@ -164,6 +164,16 @@ local function check_outcome_delivery(delivered, outcome)
 end
 
 helpers.describe("api_remote_callback_siblings: protected public wrappers", function()
+	helpers.it("lists a Gemini model named alongside a null optional id", function()
+		isolated(function(remote, calls)
+			local listed
+			local entry = { provider = "gemini", model = "fixture-model", token = "fixture-key", base_url = "" }
+			helpers.assert_true(remote.list_models(entry, function(state) listed = state end))
+			calls[1].callback({ ok = true, status = 200,
+				body = '{"models":[{"id":null,"name":"models/gemini-2.0-flash"}]}' })
+			helpers.assert_eq(listed, { state = "listed", ids = { "gemini-2.0-flash" } })
+		end)
+	end)
 	helpers.it("withholds listing callback failures containing private output", function()
 		isolated(function(remote, calls, logs)
 			local secret = "private model listing token"

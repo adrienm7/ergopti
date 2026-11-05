@@ -52,6 +52,10 @@ end
 
 helpers.describe("api model listing replays the shared corpus", function()
 	local corpus = read_corpus()
+	helpers.it("uses the Gemini name when an optional id is null", function()
+		local body = assert(json.decode('{"models":[{"id":null,"name":"models/gemini-2.0-flash"}]}'))
+		helpers.assert_eq(Listing.model_ids("gemini", body), { "gemini-2.0-flash" })
+	end)
 
 	helpers.it("the corpus pins the bounds and holds both families", function()
 		helpers.assert_eq(Listing.MAX_MODELS, corpus.max_models)
