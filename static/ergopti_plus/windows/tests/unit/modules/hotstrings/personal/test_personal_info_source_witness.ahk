@@ -423,7 +423,7 @@ for _PIENC_ExtraKind in ["lone-surrogate-utf16", "embedded-nul-utf8"]
 
 ; The WebView bridge forwards JsonParse(...)["values"] directly to the public
 ; commit route. JSON string values may contain NUL, unlike native Map keys.
-_PIWS_Case(Kind) {
+_PIWS_Case(Kind, Direct := false) {
 	global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
 	global ScriptInformation, _TomlUnreadableFiles, HSE_RuntimeDecisionGeneration
 	Saved := {hadInfo: IsSet(PersonalInformation), hadLetters: IsSet(PersonalInformationLetters),
@@ -460,7 +460,13 @@ _PIWS_Case(Kind) {
 			AssertEqual(66, NumGet(StrPtr(Value), 4, "UShort"))
 		} else
 			AssertEqual('A\u0000B', Value, "literal backslash spelling is ordinary representable text")
-		Result := PersonalInfoCommitValues(Path, Payload["values"], 0, 0, 0, 0, Opening)
+		if Direct {
+			Candidate := PersonalInformation.Clone()
+			Candidate["first_name"] := Value
+			Result := WritePersonalInfoToml(Path, Candidate, PersonalInformationLetters,
+				0, 0, 0, 0, 0, 0, Opening)
+		} else
+			Result := PersonalInfoCommitValues(Path, Payload["values"], 0, 0, 0, 0, Opening)
 		After := FSReadBytesStrict(Path)
 		DiskAccepted := false
 		try {
@@ -514,3 +520,6 @@ _PIWS_Units(Value) {
 		Units .= Format("{:04X}", NumGet(StrPtr(Value), (A_Index - 1) * 2, "UShort")) . ","
 	return Units
 }
+
+Test("personal info direct writer scalar admission: nul (personal-info-write-scalar-direct)", _PIWS_Case.Bind("nul", true))
+Test("personal info direct writer scalar admission: control (personal-info-write-scalar-direct)", _PIWS_Case.Bind("control", true))
