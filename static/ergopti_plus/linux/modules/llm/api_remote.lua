@@ -1414,7 +1414,7 @@ local function list_models_now(entry, finish)
 			end
 			local decoded_ok, decoded = pcall(Json.decode_lossless, type(result.body) == "string" and result.body or "")
 			local list = type(decoded) == "table" and decoded[format == "gemini" and "models" or "data"] or nil
-			local ids = decoded_ok and not Json.is_null(list) and ApiModelListing.model_ids(format, decoded) or nil
+			local ids = decoded_ok and Json.is_array(list) and ApiModelListing.model_ids(format, decoded) or nil
 			if type(ids) ~= "table" then
 				Logger.warn(LOG, "Remote model listing could not be read (provider=%s).", provider_id)
 				finish({ state = "failed", reason = "unreadable" })
@@ -1488,7 +1488,7 @@ function M.refresh_capabilities(entry)
 				local decoded_ok, decoded = pcall(Json.decode_lossless, type(result.body) == "string" and result.body or "")
 				local list = type(decoded) == "table" and decoded[ModelCapabilities.LISTINGS[listing]] or nil
 				local records, reason
-				if Json.is_null(list) then reason = "unreadable"
+				if not Json.is_array(list) then reason = "unreadable"
 				else records, reason = ModelCapabilities.parse(listing, decoded_ok and decoded or nil) end
 				if not records then
 					Logger.warn(LOG, "Capability listing of provider %s could not be read (%s).", provider_id, tostring(reason))
