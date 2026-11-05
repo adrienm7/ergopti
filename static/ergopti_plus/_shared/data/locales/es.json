@@ -1136,6 +1136,7 @@
 	"linux_shell.launch.already_running": "Ergopti+ ya se está ejecutando en esta sesión ({1} está ocupado); se rechazó este inicio.",
 	"linux_shell.launch.authorization_failed": "La autorización del acceso a la entrada se canceló o falló.",
 	"linux_shell.launch.groups_unavailable": "La sesión no pudo obtener sus grupos de entrada configurados.",
+	"linux_shell.launch.session_lock_invalid": "La carpeta de bloqueo de la sesión debe ser una ruta absoluta.",
 	"linux_shell.layout_registry.not_found": "No se encuentra el registro de distribuciones junto a {1} ni en {2}.",
 	"linux_shell.permissions.identity_mismatch": "La identidad de la cuenta no coincide.",
 	"linux_shell.permissions.no_login_manager": "No hay ningún gestor de inicio de sesión en ejecución; la inscripción del usuario se aplaza al inicio gráfico.",

@@ -1136,6 +1136,7 @@
 	"linux_shell.launch.already_running": "Ergopti+ è già in esecuzione in questa sessione ({1} è occupato); questo avvio è stato rifiutato.",
 	"linux_shell.launch.authorization_failed": "L’autorizzazione all’accesso all’input è stata annullata o non è riuscita.",
 	"linux_shell.launch.groups_unavailable": "La sessione non è riuscita a ottenere i gruppi di input configurati.",
+	"linux_shell.launch.session_lock_invalid": "La cartella del blocco della sessione deve essere un percorso assoluto.",
 	"linux_shell.layout_registry.not_found": "Registro dei layout non trovato accanto a {1} né in {2}.",
 	"linux_shell.permissions.identity_mismatch": "L’identità dell’account non corrisponde.",
 	"linux_shell.permissions.no_login_manager": "Nessun gestore di accesso è in esecuzione; l’iscrizione dell’utente è rimandata all’avvio grafico.",

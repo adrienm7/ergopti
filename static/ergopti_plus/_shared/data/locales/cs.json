@@ -1136,6 +1136,7 @@
 	"linux_shell.launch.already_running": "Ergopti+ již v této relaci běží ({1} je obsazen); toto spuštění bylo odmítnuto.",
 	"linux_shell.launch.authorization_failed": "Autorizace přístupu ke vstupu byla zrušena nebo selhala.",
 	"linux_shell.launch.groups_unavailable": "Relace nemohla získat své nakonfigurované vstupní skupiny.",
+	"linux_shell.launch.session_lock_invalid": "Adresář zámku relace musí být absolutní cesta.",
 	"linux_shell.layout_registry.not_found": "Registr rozložení nebyl nalezen vedle {1} ani v {2}.",
 	"linux_shell.permissions.identity_mismatch": "Identita účtu nesouhlasí.",
 	"linux_shell.permissions.no_login_manager": "Neběží žádný správce přihlášení; zápis uživatele se odkládá na grafické spuštění.",

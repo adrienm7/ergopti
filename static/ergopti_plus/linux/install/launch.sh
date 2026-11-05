@@ -91,13 +91,13 @@ if "$DAEMON_LAUNCH"; then
 	lock_base="${XDG_RUNTIME_DIR:-}"
 	if [ -z "$lock_base" ]; then
 		if [[ "${HOME:-}" != /* ]]; then
-			printf '%s\n' '[session_lock] The session lock root must be absolute.' >&2
+			ergopti_msg launch.session_lock_invalid >&2
 			exit 78
 		fi
 		lock_base="$HOME/.cache"
 	fi
 	if [[ "$lock_base" != /* ]]; then
-		printf '%s\n' '[session_lock] The session lock root must be absolute.' >&2
+		ergopti_msg launch.session_lock_invalid >&2
 		exit 78
 	fi
 	lock_root="$lock_base/ergopti"

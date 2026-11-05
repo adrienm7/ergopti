@@ -87,6 +87,18 @@ class SessionLockTests(unittest.TestCase):
                         self.assertIn(b"absolute", result.stderr)
             self.assertFalse((root / "relative-runtime").exists(), "refusal precedes lock creation")
 
+            localized = dict(environment, LANG="fr_FR.UTF-8", LC_ALL="")
+            result = subprocess.run(
+                ["bash", str(driver / "install/launch.sh"), "--service"],
+                cwd=root,
+                env=localized,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            self.assertEqual(result.returncode, 78)
+            self.assertIn("chemin absolu", result.stderr)
+
     def test_inherited_marker_rejects_unrelated_descriptor(self):
         driver = pathlib.Path(__file__).resolve().parents[2]
         runtime = shutil.which("luajit")

@@ -1136,6 +1136,7 @@
 	"linux_shell.launch.already_running": "Ergopti+ 已在此会话中运行（{1} 已被占用）；本次启动被拒绝。",
 	"linux_shell.launch.authorization_failed": "输入访问授权已取消或失败。",
 	"linux_shell.launch.groups_unavailable": "会话无法获得已配置的输入组。",
+	"linux_shell.launch.session_lock_invalid": "会话锁定文件夹必须使用绝对路径。",
 	"linux_shell.layout_registry.not_found": "在 {1} 旁和 {2} 中均未找到布局注册表。",
 	"linux_shell.permissions.identity_mismatch": "账户身份不匹配。",
 	"linux_shell.permissions.no_login_manager": "没有运行中的登录管理器；用户注册推迟到图形界面启动时。",

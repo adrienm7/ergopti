@@ -1136,6 +1136,7 @@
 	"linux_shell.launch.already_running": "يعمل Ergopti+ بالفعل في هذه الجلسة ({1} محجوز)؛ رُفض هذا التشغيل.",
 	"linux_shell.launch.authorization_failed": "أُلغي تفويض الوصول إلى الإدخال أو فشل.",
 	"linux_shell.launch.groups_unavailable": "تعذّر على الجلسة الحصول على مجموعات الإدخال المكوّنة لها.",
+	"linux_shell.launch.session_lock_invalid": "يجب أن يكون مسار مجلد قفل الجلسة مطلقًا.",
 	"linux_shell.layout_registry.not_found": "لم يُعثر على سجل التخطيطات بجوار {1} ولا في {2}.",
 	"linux_shell.permissions.identity_mismatch": "هوية الحساب غير متطابقة.",
 	"linux_shell.permissions.no_login_manager": "لا يعمل أي مدير لتسجيل الدخول؛ أُرجئ تسجيل المستخدم إلى التشغيل الرسومي.",

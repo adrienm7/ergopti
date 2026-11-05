@@ -79,6 +79,7 @@ install.xdg_autostart=XDG 自动启动：{1}
 launch.already_running=Ergopti+ 已在此会话中运行（{1} 已被占用）；本次启动被拒绝。
 launch.authorization_failed=输入访问授权已取消或失败。
 launch.groups_unavailable=会话无法获得已配置的输入组。
+launch.session_lock_invalid=会话锁定文件夹必须使用绝对路径。
 launcher.dependencies_installed=依赖项已安装。
 launcher.driver_missing=错误：找不到 Linux 驱动目录：{1}
 launcher.install_deps_hint=运行：ergopti-hotstrings --install-deps
