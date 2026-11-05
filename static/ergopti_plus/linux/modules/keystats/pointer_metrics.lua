@@ -59,6 +59,28 @@ local KINDS = { [M.KIND_PRESS] = true, [M.KIND_MOTION] = true, [M.KIND_FRAME] = 
 function M.new()
 	local tracker = {}
 	local frames, dropping, default_source = {}, {}, {}
+	local fractions, fraction_database, fraction_device = {}, nil, nil
+
+	--- A new storage owner must not inherit another database's remainder.
+	function tracker.bind_fractions(database, device)
+		if database ~= fraction_database or device ~= fraction_device then
+			fractions = {}
+			fraction_database, fraction_device = database, device
+		end
+	end
+
+	--- Copies committed sub-unit distance by day and application. The flush
+	--- owner publishes a successor only after the matching SQLite COMMIT.
+	function tracker.snapshot_fractions()
+		local copy = {}
+		for date, apps in pairs(fractions) do
+			copy[date] = {}
+			for app, value in pairs(apps) do copy[date][app] = value end
+		end
+		return copy
+	end
+
+	function tracker.commit_fractions(value) fractions = value end
 
 	--- Forgets uncommitted movement without admitting a dropped packet.
 	function tracker.discard_frames()

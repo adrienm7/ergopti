@@ -669,6 +669,7 @@ function M.init(opts)
 	end
 	hostname = hostname:gsub("%s+", "")
 	_device_id = "linux-" .. hostname
+	_pointer.bind_fractions(_sqlite_path, _device_id)
 
 	-- A usable writer must also acknowledge migration and actual registration.
 	_sqlite_admitted = false
@@ -2298,6 +2299,7 @@ local function capture_flush(close_session)
 	-- 1. Compose buffered physical key events and their matching aggregates. This is
 	-- the canonical, replayable source shared with the macOS/AHK drivers.
 	local typing_batch = {}
+	local pointer_fractions = _pointer.snapshot_fractions()
 	-- The nine n-gram families, walked from the SAME buffered stream the raw
 	-- events are built from. Built here rather than accumulated per keystroke
 	-- because a sequence is only knowable in context — a bigram needs the
@@ -2312,6 +2314,13 @@ local function capture_flush(close_session)
 			-- Pointer activity alone is a row too, with no text, as macOS flushes it.
 			local mouse = pending.mouse
 			if #pending.events > 0 or mouse then
+				local distance = 0
+				if mouse then
+					pointer_fractions[date] = pointer_fractions[date] or {}
+					local exact = mouse.distance + (pointer_fractions[date][app_id] or 0)
+					distance = math.floor(exact)
+					pointer_fractions[date][app_id] = exact - distance
+				end
 				local total_time_ms = 0
 				for _, event in ipairs(pending.events) do total_time_ms = total_time_ms + (event[2] or 0) end
 				typing_batch[#typing_batch + 1] = {
@@ -2322,7 +2331,7 @@ local function capture_flush(close_session)
 					events_json = _to_json(pending.events),
 					mouse_clicks = mouse and mouse.clicks or 0,
 					mouse_scrolls = mouse and mouse.scrolls or 0,
-					mouse_distance_px = mouse and math.floor(mouse.distance) or 0,
+					mouse_distance_px = distance,
 				}
 			end
 			if #pending.events > 0 then
@@ -2553,6 +2562,7 @@ local function capture_flush(close_session)
 			totals = _flushed_app_totals, titles = _flushed_app_titles, holds = _flushed_app_holds,
 			ngrams = _flushed_app_ngrams, scancodes = _flushed_app_scancodes, sources = _flushed_app_sources,
 			walker = walker_contexts, open_walk = open_walk, recovered = recovered ~= nil,
+			pointer_fractions = pointer_fractions,
 		},
 	}
 end
@@ -2672,6 +2682,7 @@ function M.pump_flush()
 			local marks = state.snapshot.watermarks
 			_flushed_app_totals, _flushed_app_titles, _flushed_app_holds = marks.totals, marks.titles, marks.holds
 			_flushed_app_ngrams, _flushed_app_scancodes, _flushed_app_sources = marks.ngrams, marks.scancodes, marks.sources
+			_pointer.commit_fractions(marks.pointer_fractions)
 			_walker_contexts = marks.walker
 			_persisted_open_walk = marks.open_walk
 			if marks.recovered then _recovered_walks = nil end
