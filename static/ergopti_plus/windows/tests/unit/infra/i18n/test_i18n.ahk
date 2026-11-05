@@ -961,3 +961,5 @@ _IDN_RealUserUiControl() {
 	AssertEqual(Expected, Result.Locale, "real I18nInit follows the current user UI language")
 }
 Test("i18n: default native path follows current user UI language (i18n-native-ui-default)", _IDN_RealUserUiControl)
+
+#Include test_locale_cache_stage_custody.ahk
