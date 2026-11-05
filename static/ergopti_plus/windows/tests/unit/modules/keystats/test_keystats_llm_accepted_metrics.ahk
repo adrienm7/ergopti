@@ -225,7 +225,9 @@ _KLRLlmAccepted_SourceOwnsReservedIdOrdering() {
 	BuilderBody := _DriverFuncBody("KL_BuildInserts")
 	IdentityBody := _DriverFuncBody("KL_AssignStableEventId")
 	ReplayBody := _DriverFuncBody("KLR_RebuildWalkerAggregates")
-	Assert(InStr(FlushBody, "EventId: KL_AllocEventId()") > 0,
+	SnapshotBody := _DriverFuncBody("_KL_DetachBufferSnapshot")
+	Assert(SnapshotBody != "" && InStr(FlushBody, "_KL_DetachBufferSnapshot()") > 0
+		&& InStr(SnapshotBody, "EventId: KL_AllocEventId()") > 0,
 		"typing must reserve its id when the mutable buffer is detached")
 	Assert(InStr(BuilderBody, "KL_AssignStableEventId(entry)") > 0
 		and InStr(IdentityBody, 'entry.Has("_event_id")') > 0,

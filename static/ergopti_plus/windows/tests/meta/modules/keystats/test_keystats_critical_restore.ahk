@@ -27,7 +27,8 @@ _KCR_AssertPreservesCallerCritical(FuncName, RequiredFragment) {
 }
 
 _KCR_FlushSnapshotPreservesCritical() {
-	_KCR_AssertPreservesCallerCritical("KL_FlushBuffer", "Keystats.buffer_events    := []")
+	_KCR_AssertPreservesCallerCritical("KL_FlushBuffer", "_KL_DetachBufferSnapshot()")
+	_KCR_AssertPreservesCallerCritical("_KL_DetachBufferSnapshot", "Keystats.buffer_events    := []")
 }
 Test("keystats: flush snapshot restores caller Critical state (keystats-critical-restore)", _KCR_FlushSnapshotPreservesCritical)
 

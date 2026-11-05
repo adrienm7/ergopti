@@ -86,8 +86,9 @@ Test("keystats: the outgoing-context privacy re-check covers every entry type (k
 ; above would still hold but would no longer be guarding anything -- so pin the
 ; divergence that makes it load-bearing.
 _KPPF_PayloadStillCarriesTheLaggingContext() {
-	Flush := _DriverFuncBody("KL_FlushBuffer")
-	Assert(Flush != "", "KL_FlushBuffer must exist")
+	Caller := _DriverFuncBody("KL_FlushBuffer")
+	Flush := _DriverFuncBody("_KL_DetachBufferSnapshot")
+	Assert(Flush != "" && InStr(Caller, "_KL_DetachBufferSnapshot()") > 0, "The actual public flush must reach the real shared snapshot")
 	Assert(InStr(Flush, "Keystats.session_app") > 0 && InStr(Flush, "Keystats.session_title") > 0,
 		"prerequisite: the typing entry still stamps app/title from the session context")
 

@@ -55,20 +55,22 @@ _KLFA_FlushBufferCritical() {
 	Assert(InStr(Body, "Critical(" . Chr(34) . "On" . Chr(34) . ")") > 0,
 		"KL_FlushBuffer must open a Critical section before reading shared buffer state (keystats-flush-race-condition)")
 
-	Assert(InStr(Body, "snap_events") > 0,
-		"KL_FlushBuffer must snapshot buffer_events into snap_events before clearing (keystats-flush-race-condition)")
+	Snapshot := _DriverFuncBody("_KL_DetachBufferSnapshot")
+	Assert(Snapshot != "" && InStr(Snapshot, "snap_events") > 0
+		&& InStr(Snapshot, "Keystats.buffer_events    := []") > InStr(Snapshot, "snap_events"),
+		"KL_FlushBuffer must delegate to the actual shared snapshot which reads buffer_events before clearing (keystats-flush-race-condition)")
 
 	Assert(InStr(Body, "Critical(previous_critical)") > 0,
 		"KL_FlushBuffer must restore the caller Critical state after the atomic snapshot")
 
 	; Ordering: Critical(On) must precede the snapshot, which must precede Critical(Off)
 	PosOn   := InStr(Body, "Critical(" . Chr(34) . "On" . Chr(34) . ")")
-	PosSnap := InStr(Body, "snap_events")
+	PosSnap := InStr(Body, "_KL_DetachBufferSnapshot()")
 	PosOff  := InStr(Body, "Critical(previous_critical)")
 	Assert(PosOn < PosSnap,
-		"Critical(On) must appear before snap_events — snapshot must be taken inside the lock")
+		"Critical(On) must appear before the detach call — snapshot must be taken inside the lock")
 	Assert(PosSnap < PosOff,
-		"snap_events must appear before Critical(Off) — buffer reset must complete inside the lock")
+		"the detach call must appear before Critical restore — buffer reset must complete inside the lock")
 }
 Test("keystats: KL_FlushBuffer takes an atomic snapshot under Critical(On) before clearing (keystats-flush-race-condition)", _KLFA_FlushBufferCritical)
 

@@ -70,9 +70,13 @@ _KLWSP_FlushBeforeWindowSwitch() {
 	Assert(PreparePos > 0 && PublishPos > PreparePos,
 		"Every app/title frame must finish its genuine buffer preparation before publishing either switch")
 	FlushPos := InStr(Prepare, "KL_FlushBuffer(")
+	DetachPos := InStr(Prepare, "_KL_DetachBufferSnapshot()")
+	QueuePos := InStr(Prepare, "Keystats._retry_snapshots.Push(Snapshot)")
 	ProjectPos := InStr(Prepare, "Keystats.session_app := Frame.NewApp")
-	Assert(FlushPos > 0 && ProjectPos > FlushPos,
-		"Actual typing flush must precede destination context publication so outgoing typing keeps its owner")
+	PreparedPos := InStr(Prepare, "Frame.Prepared := true")
+	Assert(DetachPos > 0 && QueuePos > DetachPos && ProjectPos > QueuePos
+		&& FlushPos > ProjectPos && PreparedPos > FlushPos,
+		"Outgoing typing must be detached before the fresh destination is named; clock preparation still requires the real flush return")
 	Assert(InStr(Prepare, "Frame.App.Required || Frame.Title.Required") > 0,
 		"Title-only changes must require the same real typing drain as app changes")
 	Assert(InStr(Publish, "KL_LogWindowSwitch(Frame.OldApp, Frame.OldTitle,") > 0,

@@ -635,7 +635,7 @@ KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
 ; Queue a detached typing snapshot when its lifecycle owner was invalidated.
 ; It must stay separate from newer live input: merging would replay characters
 ; typed after an accepted completion under the older snapshot's reserved id.
-_KL_RestoreBufferSnapshot(Snapshot, AttemptFlushTick) {
+_KL_RestoreBufferSnapshot(Snapshot, AttemptFlushTick, PreviousFlushTime := unset) {
     PreviousCritical := Critical("On")
     try {
 		InsertAt := Keystats._retry_snapshots.Length + 1
@@ -647,11 +647,13 @@ _KL_RestoreBufferSnapshot(Snapshot, AttemptFlushTick) {
 		}
 		Keystats._retry_snapshots.InsertAt(InsertAt, Snapshot)
 		if (Keystats.last_flush_time == AttemptFlushTick)
-			Keystats.last_flush_time := Snapshot.LastFlushTime
+			Keystats.last_flush_time := IsSet(PreviousFlushTime) ? PreviousFlushTime : Snapshot.LastFlushTime
     } finally {
         Critical(PreviousCritical)
     }
 }
+
+#Include %A_LineFile%\..\keystats_buffer_snapshot.ahk
 
 KL_FlushBuffer(PublishGuard := unset, &DeferredByActiveFlush := false) {
 	DeferredByActiveFlush := false
@@ -670,6 +672,7 @@ KL_FlushBuffer(PublishGuard := unset, &DeferredByActiveFlush := false) {
 			DeferredByActiveFlush := true
 			return false
 		}
+		PreviousFlushTime := Keystats.last_flush_time
 		RetryingSnapshot := Keystats._retry_snapshots.Length > 0
 		if RetryingSnapshot {
 			Snapshot := Keystats._retry_snapshots.RemoveAt(1)
@@ -683,40 +686,9 @@ KL_FlushBuffer(PublishGuard := unset, &DeferredByActiveFlush := false) {
 
 		Keystats._flush_in_progress := true
 		AttemptFlushTick := A_TickCount
-		snap_events := Keystats.buffer_events
-		snap_text := Keystats.buffer_text
-		snap_rich := Keystats.rich_chunks
-		snap_clicks := Keystats.session_clicks
-		snap_scrolls := Keystats.session_scrolls
-		snap_dist := Keystats.mouse_distance
-		snap_last_time := Keystats.last_time
-		snap_last_flush_time := Keystats.last_flush_time
-		Snapshot := {
-			EventId: KL_AllocEventId(),
-			Events: snap_events,
-			Text: snap_text,
-			RichChunks: snap_rich,
-			Clicks: snap_clicks,
-			Scrolls: snap_scrolls,
-			Distance: snap_dist,
-			LastTime: snap_last_time,
-			LastFlushTime: snap_last_flush_time,
-			Pause: (snap_events.Length > 0) ? snap_events[1][2] : 0,
-			App: Keystats.session_app,
-			Title: Keystats.session_title,
-			Url: Keystats.session_url,
-			FieldRole: Keystats.session_field_role,
-			Layout: Keystats.session_layout
+		Snapshot := _KL_DetachBufferSnapshot()
 		}
-		Keystats.buffer_events    := []
-		Keystats.buffer_text := ""
-		Keystats.rich_chunks := []
-		Keystats.last_time := 0
-		Keystats.session_clicks := 0
-		Keystats.session_scrolls := 0
-		Keystats.mouse_distance := 0
 		Keystats.last_flush_time := AttemptFlushTick
-		}
 	} finally {
 		Critical(previous_critical)
 	}
@@ -724,7 +696,7 @@ KL_FlushBuffer(PublishGuard := unset, &DeferredByActiveFlush := false) {
 	Published := false
 	try {
 		Published := _KL_PublishBufferSnapshot(
-			Snapshot, AttemptFlushTick, PublishGuard?)
+			Snapshot, AttemptFlushTick, PublishGuard?, PreviousFlushTime)
 	} finally {
 		ReleaseCritical := Critical("On")
 		try Keystats._flush_in_progress := false
@@ -742,7 +714,7 @@ KL_FlushBuffer(PublishGuard := unset, &DeferredByActiveFlush := false) {
 ; owner is checked after classification and immediately before publication; a
 ; rejected owner restores the snapshot while the outer serialisation latch is
 ; still held.
-_KL_PublishBufferSnapshot(Snapshot, AttemptFlushTick, PublishGuard := unset) {
+_KL_PublishBufferSnapshot(Snapshot, AttemptFlushTick, PublishGuard := unset, PreviousFlushTime := unset) {
 	if (Snapshot.Events.Length = 0 && Snapshot.Clicks = 0 && Snapshot.Scrolls = 0 && Snapshot.Distance = 0)
 		return true
 	total_time_ms := 0
@@ -782,7 +754,7 @@ _KL_PublishBufferSnapshot(Snapshot, AttemptFlushTick, PublishGuard := unset) {
 		"events", Snapshot.Events
 	)
 	if IsSet(PublishGuard) && !PublishGuard.Call() {
-		_KL_RestoreBufferSnapshot(Snapshot, AttemptFlushTick)
+		_KL_RestoreBufferSnapshot(Snapshot, AttemptFlushTick, PreviousFlushTime?)
 		return false
 	}
 	Accepted := KL_AppendLog(entry, &RejectedBySuspend, PublishGuard?)
@@ -790,7 +762,7 @@ _KL_PublishBufferSnapshot(Snapshot, AttemptFlushTick, PublishGuard := unset) {
 	; also mean a privacy/validation drop; replaying that text after resume under a
 	; different foreground window would defeat the filter that rejected it.
 	if RejectedBySuspend {
-		_KL_RestoreBufferSnapshot(Snapshot, AttemptFlushTick)
+		_KL_RestoreBufferSnapshot(Snapshot, AttemptFlushTick, PreviousFlushTime?)
 		return false
 	}
 	return Accepted
