@@ -2295,10 +2295,19 @@ function M.ingest_once()
 	if ctx_snapshot_ok then saved_ngram_ctx_json = ctx_snapshot end
 
 	local statements = {}
-	for _, item in ipairs(entries) do
-		for _, sql in ipairs(SqliteWriter.build_inserts(item.entry)) do
-			table.insert(statements, sql)
+	local built = pcall(function()
+		for _, item in ipairs(entries) do
+			for _, sql in ipairs(SqliteWriter.build_inserts(item.entry)) do
+				table.insert(statements, sql)
+			end
 		end
+	end)
+	if not built then
+		-- No statement has run and the log offset still points at this batch.
+		SqliteWriter.set_next_event_id(saved_event_id)
+		Logger.error(LOG, "Cannot build the ingest batch; the log remains pending for retry.")
+		trace.finish()
+		return false
 	end
 	trace.mark("build")
 	trace.count("entries", #entries)
