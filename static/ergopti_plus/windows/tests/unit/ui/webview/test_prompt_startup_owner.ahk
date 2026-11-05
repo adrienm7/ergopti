@@ -54,7 +54,8 @@ _PRST_ChildSource() {
 	; The opening receipt covers the full persisted LLM projection. Keep the
 	; authored state initializer and genuine normalizers, not a three-field menu.
 	for Spec in [["_LLM_Menu_SyncToFeatures", _DriverDir], ["LLM_Option_TryNormalize", _DriverDir],
-		["ChordParse", _DriverDir], ["LLM_DisplayStreamingCapable", _SharedDir]] {
+		["ChordParse", _DriverDir], ["_LLM_RequestPlanRequireDelay", _DriverDir],
+		["LLM_DisplayStreamingCapable", _SharedDir]] {
 		Owner := _DriverProductionFileForSymbol(Spec[1], Spec[2])
 		AssertTrue(Owner != "", "The projection component requires its genuine owner: " . Spec[1])
 		if !Owners.Has(Owner) {

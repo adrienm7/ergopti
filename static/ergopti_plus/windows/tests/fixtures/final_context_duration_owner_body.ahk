@@ -17,11 +17,12 @@ _KFCD_Main() {
 		_KSD_Acquire(B)
 		_KSD_Require(KL_Hook_RefreshContext(true), "The real control must close A through a normal app switch.")
 	}
-	_KSD_Require(!KLHook.registered && !KLPasswordCache.focus_tracking_active
+	_KSD_Require((!KLHook.HasOwnProp("registered") || !KLHook.registered) && !KLPasswordCache.focus_tracking_active
 		&& !KLPasswordCache.focus_hook && !KLPasswordCache.focus_callback,
 		"No physical input/password hook is installed by this isolated fixture.")
 	KL_Hook_Stop()
-	_KSD_Require(KLHook.capture_stopping && !KLHook.registered && _KSD.FlushCalls > 0,
+	_KSD_Require(KLHook.capture_stopping && KLHook.HasOwnProp("registered")
+		&& !KLHook.registered && _KSD.FlushCalls > 0,
 		"The genuine public stop must invalidate capture and reach the real empty flush.")
 	_KSD_Require(_KSD.Errors == 0 && !IsObject(_KSD.Failure), "A hidden try cannot turn a dependency failure into success.")
 	Rows := 0

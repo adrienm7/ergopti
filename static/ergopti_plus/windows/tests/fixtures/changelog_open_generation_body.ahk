@@ -92,24 +92,14 @@ class _CWOC_Environment {
 ; Show was still on its stack; absence of that receipt is setup failure only.
 _CWOC_ShowCloseProbe(State, WParam, LParam, Msg, Hwnd) {
 	global _CLW_Gui, _CLW_WindowEpoch
-	if State.Fired || !WParam || !DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")
-		return
-	; WM_SHOWWINDOW also observes unrelated native windows and windows which
-	; disappeared before inspection. Neither belongs to this fixture's attempt.
-	try OwnerPid := WinGetPID("ahk_id " . Hwnd)
-	catch
-		return
-	if OwnerPid != ProcessExist()
-		return
-	try Caption := WinGetTitle("ahk_id " . Hwnd)
-	catch
-		return
-	if Caption != State.Caption
+	if State.Fired || !WParam || Hwnd != State.Hwnd
+			|| !DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")
 		return
 	try {
 		State.Fired := true
 		State.Hwnd := Hwnd
 		State.OwnerAbsent := !IsSet(_CLW_Gui)
+		State.CriticalAtShow := A_IsCritical
 		if !State.Close
 			return
 		Before := _CLW_WindowEpoch
@@ -123,6 +113,71 @@ _CWOC_ShowCloseProbe(State, WParam, LParam, Msg, Hwnd) {
 	}
 }
 
+; Bind the observer to the exact production GUI at its genuine Close
+; registration. Gui.Show itself and the original Close callback stay untouched.
+_CWOC_ShowRegister(State, Window, Name, Callback, Options*) {
+	Result := State.Register.Call(Window, Name, Callback, Options*)
+	if Name != "Close" || Callback != _CLW_OnClose || State.Hwnd
+		return Result
+	Hwnd := Window.Hwnd
+	_CWOC_Require(DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")
+		&& WinGetPID("ahk_id " . Hwnd) == ProcessExist(),
+		"The real Close registration must identify the exact new owned native GUI.")
+	State.Window := Window, State.Hwnd := Hwnd
+	; Fast callbacks preserve the caller's actual thread/Critical state; this
+	; observer must not manufacture a fresh interruptible AHK thread.
+	State.Subclass := CallbackCreate(_CWOC_ShowWndProc.Bind(State), "F", 6)
+	_CWOC_Require(DllCall("Comctl32\SetWindowSubclass", "Ptr", Hwnd,
+		"Ptr", State.Subclass, "UPtr", 0x43575348, "UPtr", 0, "Int") != 0,
+		"The exact pre-Show native GUI must accept its passive window-procedure observer.")
+	return Result
+}
+
+_CWOC_ShowWndProc(State, Hwnd, Message, WParam, LParam, Id, Data) {
+	State.ActiveCallbacks += 1
+	try {
+		; Delegate first: a reentrant Close below may destroy this window. Never
+		; call DefSubclassProc on its HWND after that destruction has completed.
+		Result := DllCall("Comctl32\DefSubclassProc", "Ptr", Hwnd, "UInt", Message,
+			"Ptr", WParam, "Ptr", LParam, "Ptr")
+		if Hwnd == State.Hwnd {
+			if Message == 0x10
+				State.NativeCloses += 1
+			if Message == 0x18 && WParam {
+				State.NativeShows += 1
+				_CWOC_ShowCloseProbe(State, WParam, LParam, Message, Hwnd)
+			}
+		}
+		return Result
+	} catch Any as Failure {
+		State.Failure := Failure
+		return 0
+	} finally State.ActiveCallbacks -= 1
+}
+
+_CWOC_RetireShowObserver(State) {
+	if !State.Subclass
+		return
+	if State.Hwnd && DllCall("User32\IsWindow", "Ptr", State.Hwnd, "Int")
+		State.Window.Destroy()
+	_CWOC_Require(!DllCall("User32\IsWindow", "Ptr", State.Hwnd, "Int")
+		&& State.ActiveCallbacks == 0,
+		"Only acknowledged native window and callback retirement may release the exact subclass thunk.")
+	CallbackFree(State.Subclass)
+	State.Subclass := 0
+}
+
+_CWOC_RecordNativeShow(State, Mode, Environment) {
+	global _CLW_Gui, _CLW_Controller
+	NativeAlive := State.Hwnd && DllCall("User32\IsWindow", "Ptr", State.Hwnd, "Int") != 0
+	FileAppend("DIAG changelog-show-close mode=" . Mode . " observed=" . State.Fired
+		. " owner_absent=" . State.OwnerAbsent . " close_entered=" . State.CloseEntered
+		. " native_alive=" . NativeAlive . " gui_global=" . IsSet(_CLW_Gui)
+		. " controller_global=" . IsSet(_CLW_Controller) . " factory_calls=" . Environment.Calls
+		. " native_shows=" . State.NativeShows . " native_closes=" . State.NativeCloses
+		. " active_native_callbacks=" . State.ActiveCallbacks . " critical_at_show=" . State.CriticalAtShow . "`n", "*")
+}
+
 _CWOC_OpenGeneration(Mode) {
 	global _WebView_SharedEnv, _WebView_SharedEnvRetired, _CLW_Gui, _CLW_Controller
 	global _CLW_WebView, _CLW_ResetDone, _CLW_WindowEpoch
@@ -132,27 +187,29 @@ _CWOC_OpenGeneration(Mode) {
 	Environment := _CWOC_Environment(Mode)
 	global _CWOC_CurrentEnvironment := Environment
 	_CWOC_Require(!_Updater_OpenChangelogWindow.HasOwnProp("Call") && !_CLW_FetchAndInject.HasOwnProp("Call"), "effect guards begin from the real functions")
-	ShowState := {Fired: false, Close: Mode == "show-close", Caption: WindowTitle(t("changelog_window.window_title")),
-		Hwnd: 0, OwnerAbsent: false, CloseEntered: false, Failure: 0}
-	ShowHook := _CWOC_ShowCloseProbe.Bind(ShowState)
+	PreviousRegister := Gui.Prototype.GetOwnPropDesc("OnEvent")
+	ShowState := {Fired: false, Close: Mode == "show-close", Register: PreviousRegister.Call,
+		Window: 0, Hwnd: 0, Subclass: 0, ActiveCallbacks: 0, NativeShows: 0, NativeCloses: 0,
+		OwnerAbsent: false, CloseEntered: false, CriticalAtShow: -1, Failure: 0}
 	if InStr(Mode, "show-") == 1
-		OnMessage(0x18, ShowHook)
+		Gui.Prototype.DefineProp("OnEvent", {Call: _CWOC_ShowRegister.Bind(ShowState)})
 	_Updater_OpenChangelogWindow.DefineProp("Call", {Call: _CWOC_NativeFallback})
 	_CLW_FetchAndInject.DefineProp("Call", {Call: _CWOC_RejectFetch})
 	try {
 		_WebView_SharedEnv := Environment, _WebView_SharedEnvRetired := false
 		_CWOC_Require(_CLW_WebView2Available(), "the genuine vendored SDK loader must be present")
 		Thread("Interrupt", 0)
-		_CWOC_PublicOpen()
+		try _CWOC_PublicOpen()
+		finally {
+			if InStr(Mode, "show-") == 1
+				_CWOC_RecordNativeShow(ShowState, Mode, Environment)
+		}
 		if InStr(Mode, "show-") == 1 {
 			if ShowState.Failure is Error
 				throw ShowState.Failure
 			_CWOC_Require(ShowState.Fired && ShowState.Hwnd != 0, "the exact public Gui.Show must deliver a native visibility notification")
 			NativeAlive := DllCall("User32\IsWindow", "Ptr", ShowState.Hwnd, "Int") != 0
-			FileAppend("DIAG changelog-show-close mode=" . Mode . " observed=" . ShowState.Fired
-				. " owner_absent=" . ShowState.OwnerAbsent . " close_entered=" . ShowState.CloseEntered
-				. " native_alive=" . NativeAlive . " gui_global=" . IsSet(_CLW_Gui)
-				. " controller_global=" . IsSet(_CLW_Controller) . " factory_calls=" . Environment.Calls . "`n", "*")
+
 			if ShowState.Close {
 				_CWOC_Require(ShowState.CloseEntered, "the genuine WM_CLOSE event must run before the Gui.Show callout returns")
 				_CWOC_Refuse(NativeAlive, "a native close during initial Show must retire that exact native window")
@@ -187,8 +244,9 @@ _CWOC_OpenGeneration(Mode) {
 		_CWOC_Equal(0, Environment.Fetches, "the constructor component must not fetch releases")
 	} finally {
 		if InStr(Mode, "show-") == 1
-			OnMessage(0x18, ShowHook, 0)
+			Gui.Prototype.DefineProp("OnEvent", PreviousRegister)
 		Changelog_Close()
+		_CWOC_RetireShowObserver(ShowState)
 		for Controller in Environment.Controllers
 			if !Controller.Closed
 				Controller.Close()

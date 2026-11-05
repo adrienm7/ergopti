@@ -89,6 +89,25 @@ _KPU_SendUnicode(Unit) {
 	_KSD_Require(DllCall("User32\SendInput", "UInt", 2, "Ptr", Inputs, "Int", Size, "UInt") == 2,
 		"The owned receiver must accept exactly one real Unicode down/up input pair.")
 }
+; AHK WantTab rewrites only named VK_TAB. A Unicode VK_PACKET takes
+; the dialog-message route instead: configure the real receiver to accept
+; native characters/all keys rather than treating Tab as dialog navigation.
+_KPU_DialogCode(WParam, LParam, Message, Hwnd) {
+	global _KID
+	if _KID.Active && Hwnd == _KID.Edit.Hwnd {
+		_KID.DialogRequests += 1
+		return 0x0086 ; DLGC_WANTCHARS | DLGC_WANTALLKEYS | DLGC_WANTTAB
+	}
+}
+
+_KPU_CharMessage(WParam, LParam, Message, Hwnd) {
+	global _KID
+	if _KID.Active && Hwnd == _KID.Edit.Hwnd {
+		_KID.ReceiverChars += 1
+		_KID.ReceiverUnits .= (_KID.ReceiverUnits == "" ? "" : ",") . WParam
+	}
+}
+
 _KID_Exercise() {
 	global _KID, _KSD
 	_KID.Window := Gui(, "Ergopti keystats native callback probe")
@@ -112,6 +131,8 @@ _KID_Exercise() {
 		Hook.OnKeyDown := _KID_Down
 		Hook.OnChar := _KID_Char
 		OnMessage(0x100, _KID_KeyMessage)
+		OnMessage(0x0087, _KPU_DialogCode)
+		OnMessage(0x0102, _KPU_CharMessage)
 		_KID.Active := true
 		Hook.Start()
 		_KSD_Require(Hook.InProgress, "The actual InputHook must own its active native hook.")
@@ -131,7 +152,17 @@ _KID_Exercise() {
 		_KSD_Require(_KID.NativeDown == 1 && _KID.TargetDown == 1 && _KSD.Errors == 0,
 			"Exactly one actual native receiver keydown and one InputHook keydown must arrive without swallowed errors.")
 		ExpectedText := _KID.Mode == "packet-lf" ? "`n" : "`t"
-		_KSD_Require(StrReplace(_KID.Edit.Value, "`r`n", "`n") == ExpectedText,
+		ObservedText := StrReplace(_KID.Edit.Value, "`r`n", "`n")
+		ObservedUnits := ""
+		for Character in StrSplit(ObservedText)
+			ObservedUnits .= (ObservedUnits == "" ? "" : ",") . Ord(Character)
+		FileAppend("RECEIVER unicode-packet mode=" . _KID.Mode . " receiver_chars=" . _KID.ReceiverChars
+			. " receiver_units=" . _KID.ReceiverUnits . " edit_units=" . ObservedUnits
+			. " dialog_requests=" . _KID.DialogRequests . " hook_chars=" . _KID.CharCalls
+			. " hook_units=" . _KID.CharUnits . "`n", "*", "UTF-8")
+		_KSD_Require(_KID.ReceiverChars == 1 && _KID.ReceiverUnits == (_KID.Mode == "packet-lf" ? "10" : "9"),
+			"One actual native WM_CHAR must reach the exact owned receiver with the sent Unicode code unit.")
+		_KSD_Require(ObservedText == ExpectedText,
 			"The exact native input must produce its independently expected receiver contents.")
 		Tokens := ""
 		for Event in Keystats.buffer_events
@@ -156,6 +187,8 @@ _KID_Exercise() {
 			_KSD_Require(!Hook.InProgress, "The exact native InputHook must retire before the receiver.")
 		}
 		OnMessage(0x100, _KID_KeyMessage, 0)
+		OnMessage(0x0087, _KPU_DialogCode, 0)
+		OnMessage(0x0102, _KPU_CharMessage, 0)
 		try _KID.Window.Destroy()
 		Keystats.initialized := false
 	}
@@ -167,7 +200,7 @@ if !(A_Args[1] == "packet-lf" || A_Args[1] == "packet-tab")
 	throw Error("Unknown native keyboard callback probe.")
 global _KSD := {Log: A_Args[2] . "\private.log", Errors: 0, Probes: 0, FlushCalls: 0, LogCalls: 0, Failure: 0}
 global _KID := {Mode: A_Args[1], Window: 0, Edit: 0, Active: false, NativeDown: 0, TargetDown: 0,
-	CharCalls: 0, CharUnits: "", LastCallback: 0, Failure: 0,
+	CharCalls: 0, CharUnits: "", LastCallback: 0, Failure: 0, ReceiverChars: 0, ReceiverUnits: "", DialogRequests: 0,
 	ExpectedVk: 0xE7}
 try {
 	_KID_Exercise()

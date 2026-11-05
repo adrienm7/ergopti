@@ -166,7 +166,7 @@ _WPMCO_RefusedConfig(Kind, Successor, SamePosition := false) {
 	RegistryPath := "HKCU\" . Subkey
 	Root := A_Temp . "\ergopti_wpm_compensation_" . Nonce
 	Path := Root . "\config.toml"
-	Handle := 0, OwnedKey := false, CreatedRoot := false, FileHold := 0
+	Handle := 0, OwnedKey := false, CreatedRoot := false, FileHold := 0, ProbeOwned := false
 	SuccessorX := SamePosition ? (Kind == "graph-toggle" ? -1 : 30) : 700
 	SuccessorY := SamePosition ? (Kind == "graph-toggle" ? -1 : 40) : 800
 	State := {notices: 0, bCalls: 0, bAck: false, bX: "unset", bY: "unset"}
@@ -211,11 +211,13 @@ _WPMCO_RefusedConfig(Kind, Successor, SamePosition := false) {
 			"UInt", 3, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
 		AssertTrue(FileHold != 0 && FileHold != -1, "acquire the genuine no-delete-share handle")
 		ProbeStage := Root . "\native-sharing-probe.tmp"
-		AssertTrue(FSWriteCreateDurable(ProbeStage, "owned probe"))
+		ProbeOwned := FSWriteCreateDurable(ProbeStage, Source)
+		AssertTrue(ProbeOwned, "acquire the exact probe artifact before the contention witness")
 		AssertFalse(FSAtomicMoveReplace(ProbeStage, Path, &LockError))
-		AssertEqual(32, LockError, "the actual native target replacement must produce ERROR_SHARING_VIOLATION")
+		AssertTrue(LockError == 5 || LockError == 32,
+			"the blocked rename must return a native access/sharing refusal, verified inversely after closing this exact hold")
+		AssertTrue(FSStrictExists(ProbeStage), "a refused native rename must retain this exact owned probe for the inverse control")
 		AssertEqual(Source, FSReadUtf8Exact(Path), "the native lock probe never replaced its private config source")
-		AssertTrue(FSDeleteStrict(ProbeStage))
 		AssertFalse(MenuCommandConfigBusy(), "no pre-existing config owner can prevent the actual menu action from entering")
 		if Kind == "graph-toggle"
 			Result := WPMWidget_ToggleGraphConfig(0, Notify)
@@ -247,17 +249,34 @@ _WPMCO_RefusedConfig(Kind, Successor, SamePosition := false) {
 	} finally {
 		_WPMWidget_PositionAuthority(SavedAuthority)
 		try {
-			if FileHold && FileHold != -1 {
-				DllCall("Kernel32\CloseHandle", "Ptr", FileHold, "Int")
-				FileHold := 0
-			}
-			ConfigurationFile := Saved.path, STORAGE_REG_BASE := Saved.store
-			WPMWidget.pos_x := Saved.x, WPMWidget.pos_y := Saved.y
-			WPMWidget.show_graph := Saved.graph, WPMWidget.use_colors := Saved.colors
-			WPMWidgetConst.STORE_X := Saved.keyX, WPMWidgetConst.STORE_Y := Saved.keyY
-			if CreatedRoot {
-				try _TOML_InvalidateParseCache(Path)
-				finally DirDelete(Root, true)
+			try {
+				if FileHold && FileHold != -1 {
+					ClosedHold := DllCall("Kernel32\CloseHandle", "Ptr", FileHold, "Int") != 0
+					if ClosedHold
+						FileHold := 0
+					AssertTrue(ClosedHold, "close this fixture's original exact no-delete-share handle")
+				}
+				if ProbeOwned {
+					; Run even when a business oracle above fails. Error5 alone never
+					; proves contention: this same stage/target/operation must now ACK.
+					AssertTrue(FSStrictExists(ProbeStage), "retain the exact refused probe until all business oracles finish")
+					Released := FSAtomicMoveReplace(ProbeStage, Path, &ReleasedError)
+					_TestPrint("# wpm-contention-inverse blocked-error=" . LockError
+						. " hold-closed=" . (FileHold == 0) . " released-ack=" . Released . " released-error=" . ReleasedError)
+					AssertTrue(Released, "the same actual native rename must succeed after this exact hold closes")
+					ProbeOwned := false
+					AssertFalse(FSStrictExists(ProbeStage), "the inverse ACK must consume the exact retained probe")
+					AssertEqual(Source, FSReadUtf8Exact(Path), "the inverse native control uses the original complete source image")
+				}
+			} finally {
+				ConfigurationFile := Saved.path, STORAGE_REG_BASE := Saved.store
+				WPMWidget.pos_x := Saved.x, WPMWidget.pos_y := Saved.y
+				WPMWidget.show_graph := Saved.graph, WPMWidget.use_colors := Saved.colors
+				WPMWidgetConst.STORE_X := Saved.keyX, WPMWidgetConst.STORE_Y := Saved.keyY
+				if CreatedRoot {
+					try _TOML_InvalidateParseCache(Path)
+					finally DirDelete(Root, true)
+				}
 			}
 		} finally {
 			if Handle
