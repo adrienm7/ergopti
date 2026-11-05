@@ -24,6 +24,8 @@ local SectionKeys = require("modules.keymap.section_keys")
 local LOG    = "keymap.registry"
 
 local _state = nil
+local _section_owner = nil
+local _section_serial = 0
 local _repeat_enabled = ManifestReader.default_for(ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED)
 
 --- Guard: verifies that M.setup() was called before any state-dependent public
@@ -213,7 +215,13 @@ end
 --- @param section_name string
 --- @return boolean
 function M.is_section_enabled(group_name, section_name)
-	local stored = Storage.get(M.section_setting_key(group_name, section_name))
+	local key = M.section_setting_key(group_name, section_name)
+	local owner = _section_owner
+	local previous = owner and owner.keep == false and not owner.released and owner.cells and owner.cells[key]
+	local stored
+	if previous then
+		if previous.present then stored = previous.value end
+	else stored = Storage.get(key) end
 	-- An underscore inside either component makes the old concatenation
 	-- ambiguous. Only the canonical preference projection can resolve it.
 	if stored == nil and not tostring(group_name):find("_", 1, true)
@@ -265,17 +273,112 @@ M.section_setting_key = SectionKeys.current
 
 local section_setting_key = M.section_setting_key
 
---- Writes one setting and verifies the stored postcondition.
---- `set` normally returns nil and `clear` may return false for an absent key,
---- so neither return value is a commitment; exact read-back is authoritative.
---- @param key string
---- @param value boolean|nil
---- @return boolean committed
-local function write_section_setting(key, value)
-	if value == nil then return Storage.delete_exact(key) == true end
-	if Storage.set(key, value) ~= true then return false end
-	local read_ok, stored = Storage.read_exact(key)
-	return read_ok == true and stored == value
+--- Settles one retained native cohort and its exact receipt.
+--- The backup stays on disk because its pathname does not prove inode ownership.
+--- A committed transaction keeps its publication even if cleanup must retry.
+local function settle_section_owner(owner)
+	if not rawequal(package.loaded["adapters.storage"], Storage) then return false end
+	for name, method in pairs(owner.storage_methods) do
+		if not rawequal(Storage[name], method) then return false end
+	end
+	if owner.receipt and owner.keep == false and not owner.restored then
+		if Storage.restore_owned(owner.token, owner.receipt) ~= true then return false end
+		owner.restored = true
+	end
+	-- The conditional writer cannot prove the current path is still its inode.
+	-- Preserve the durable backup, even after success, rather than unlink an
+	-- equal-byte replacement installed by another owner.
+	if not owner.released then
+		if Storage.release_owned(owner.token) ~= true then return false end
+		owner.released = true
+	end
+	if owner.receipt and not owner.forgotten then
+		if Storage.forget_owned(owner.token, owner.receipt) ~= true then return false end
+		owner.forgotten = true
+	end
+	if _section_owner == owner then _section_owner = nil end
+	return true
+end
+
+local function settle_sections()
+	if not _section_owner then return true end
+	if _section_owner.keep == nil then return false end
+	local ok, settled = pcall(settle_section_owner, _section_owner)
+	if not ok or settled ~= true then
+		Logger.error(LOG, "Section settings transaction cleanup remains pending: %s.", tostring(settled))
+		return false
+	end
+	return true
+end
+
+--- Acquires exact native aliases and publishes their complete requested cells.
+--- expected is the read-back used by the caller to plan registry reloads.
+local function publish_section_cells(keys, expected, updates)
+	if #keys == 0 then return true end
+	local owner = { token = {}, keep = nil, storage_methods = {}, cells = {} }
+	for _, key in ipairs(keys) do
+		local before = expected[key]
+		if type(before) ~= "table" then return false end
+		owner.cells[key] = { present = before.value ~= nil, value = before.value }
+	end
+	for _, name in ipairs({ "acquire_owned", "capture_owned", "validate_owned_capture", "publish_owned", "restore_owned", "release_owned", "forget_owned" }) do
+		if type(Storage[name]) ~= "function" then return false end
+		owner.storage_methods[name] = Storage[name]
+	end
+	if owner.storage_methods.acquire_owned(owner.token, keys) ~= true then return false end
+	_section_owner = owner
+	local captured, receipt, cells = pcall(owner.storage_methods.capture_owned, owner.token)
+	if captured and type(receipt) == "table" then owner.receipt = receipt end
+	local verified, admitted = false, false
+	if owner.receipt then
+		verified, admitted = pcall(owner.storage_methods.validate_owned_capture, owner.token, owner.receipt)
+	end
+	local planned = captured and type(receipt) == "table" and type(cells) == "table"
+		and verified and admitted == true
+	if planned then
+		for _, key in ipairs(keys) do
+			local cell, before = cells[key], expected[key]
+			if type(cell) ~= "table" or type(before) ~= "table"
+				or cell.present ~= (before.value ~= nil)
+				or (cell.present and cell.value ~= before.value) then planned = false; break end
+		end
+	end
+	-- A read-only cohort still fences reentrant writers during group and TOML
+	-- publication, but does not need a backup or a native settings write.
+	if planned and next(updates) == nil then return true end
+	if planned then
+		local ok, path, files = pcall(function()
+			local config = require("infra.config_paths").get("ConfigTomlPath")
+			assert(type(config) == "string" and config ~= "", "config path unavailable")
+			_section_serial = _section_serial + 1
+			local backup = config .. ".section-settings-" .. tostring(hs.timer.absoluteTime())
+				.. "-" .. tostring(_section_serial)
+			local adapter = require("adapters.file_system")
+			return backup, adapter
+		end)
+		if ok then
+			owner.backup_path, owner.files = path, files
+		else planned = false end
+	end
+	if planned then
+		local ok, accepted = pcall(owner.storage_methods.publish_owned, owner.token, receipt, updates, owner.backup_path, owner.files)
+		if ok and accepted == true then return true end
+	end
+	owner.keep = false
+	settle_sections()
+	return false
+end
+
+local function finish_section_cells(committed)
+	local owner = _section_owner
+	if not owner then return true end
+	owner.keep = committed == true
+	local settled = settle_sections()
+	if not settled then
+		Logger.error(LOG, "Section settings %s; exact cleanup is retained.",
+			committed and "committed" or "rollback is pending")
+	end
+	return settled
 end
 
 --- Copies only unambiguous historical entries after the complete inventory is
@@ -283,6 +386,7 @@ end
 --- @return boolean committed
 function M.migrate_legacy_section_settings()
 	if not require_state("migrate_legacy_section_settings") then return false end
+	if not settle_sections() then return false end
 	local owners = {}
 	for group, entry in pairs(_state.groups) do
 		for _, section in ipairs(entry.sections or {}) do
@@ -294,36 +398,26 @@ function M.migrate_legacy_section_settings()
 			end
 		end
 	end
-	local updates = {}
+	local keys, previous, cells, selected = {}, {}, {}, {}
 	for old, current in pairs(owners) do
 		if current then
 			local old_ok, value = Storage.read_exact(old)
 			local new_ok, existing = Storage.read_exact(current)
 			if not old_ok or not new_ok then return false end
-			if existing == nil and type(value) == "boolean" then updates[current] = { value = value } end
+			if existing == nil and type(value) == "boolean" then
+				-- The old key is a read dependency of this migration. Pin it too,
+				-- so a new writer cannot change its decision during publication.
+				for _, key in ipairs({ old, current }) do
+					if not selected[key] then keys[#keys + 1] = key; selected[key] = true end
+				end
+				previous[old], previous[current] = { value = value }, { value = nil }
+				cells[current] = { present = true, value = value }
+			end
 		end
 	end
-	local written = {}
-	for key, record in pairs(updates) do
-		if write_section_setting(key, record.value) ~= true then
-			for _, prior in ipairs(written) do Storage.delete_exact(prior) end
-			Storage.delete_exact(key)
-			return false
-		end
-		written[#written + 1] = key
-	end
+	if not publish_section_cells(keys, previous, cells) then return false end
+	finish_section_cells(true)
 	return true
-end
-
---- Restores settings captured before a failed mutation.
---- Values live inside records so an absent setting (`nil`) remains enumerable.
---- @param previous table Map of settings key to `{ value = boolean|nil }`.
-local function restore_section_settings(previous)
-	for key, record in pairs(previous) do
-		if write_section_setting(key, record.value) ~= true then
-			Logger.error(LOG, "Could not roll back section setting '%s'.", key)
-		end
-	end
 end
 
 --- Rejects holes and non-array keys before ipairs can silently skip work.
@@ -349,6 +443,7 @@ end
 --- @return boolean committed
 function M.set_groups_sections_enabled(changes, enabled, publish)
 	if not require_state("set_groups_sections_enabled") then return false end
+	if not settle_sections() then return false end
 	if not dense_list(changes) or type(enabled) ~= "boolean" then
 		Logger.error(LOG, "set_groups_sections_enabled: changes table and boolean enabled are required.")
 		return false
@@ -391,14 +486,15 @@ function M.set_groups_sections_enabled(changes, enabled, publish)
 
 	Logger.debug(LOG, "%s %d section setting(s) across %d group(s).",
 		enabled and "Enabling" or "Disabling", #keys, #changes)
-	local ok, committed = xpcall(function()
-		-- Both choices are written explicitly: an absent key means "the manifest's
-		-- shipped default", which is disabled for every bundled section, so clearing
-		-- the key would switch the section straight back off.
-		for _, key in ipairs(keys) do
-			if write_section_setting(key, enabled) ~= true then return false end
+	-- Both choices are explicit: an absent key follows the shipped default.
+	local cells = {}
+	for _, key in ipairs(keys) do
+		if previous[key].value ~= enabled then
+			cells[key] = { present = true, value = enabled }
 		end
-
+	end
+	if not publish_section_cells(keys, previous, cells) then return false end
+	local ok, committed = xpcall(function()
 		return Groups.transaction("set_groups_sections_enabled", function()
 			for _, change in ipairs(changes) do
 				if change.group_enabled == false then
@@ -416,10 +512,11 @@ function M.set_groups_sections_enabled(changes, enabled, publish)
 	end, debug.traceback)
 
 	if not ok or committed ~= true then
-		restore_section_settings(previous)
+		finish_section_cells(false)
 		Logger.error(LOG, "Section batch rolled back: %s.", tostring(committed))
 		return false
 	end
+	finish_section_cells(true)
 	return true
 end
 
@@ -482,6 +579,7 @@ end
 --- @return boolean committed Every selected setting and registry group acknowledged.
 function M.apply_hotstring_preferences(saved)
 	if not require_state("apply_hotstring_preferences") then return false end
+	if not settle_sections() then return false end
 	local projected, desired = pcall(require("infra.preferences").project_hotstring_preferences,
 		saved, Groups.list_groups(), M.get_sections)
 	if not projected then
@@ -501,12 +599,16 @@ function M.apply_hotstring_preferences(saved)
 		end
 	end
 	table.sort(names)
+	local keys, cells = {}, {}
+	for key, record in pairs(selected) do
+		keys[#keys + 1] = key
+		if previous[key].value ~= record.enabled then
+			cells[key] = { present = true, value = record.enabled }
+		end
+	end
+	if not publish_section_cells(keys, previous, cells) then return false end
 	local ok, committed = xpcall(function()
 		return Groups.transaction("canonical hotstring preferences", function()
-			for key, record in pairs(selected) do
-				if previous[key].value ~= record.enabled
-					and write_section_setting(key, record.enabled) ~= true then return false end
-			end
 			for _, name in ipairs(names) do
 				-- Rebuild changed groups once; a later menu sync must retain a settled corpus.
 				if M.is_group_enabled(name) and (changed[name] or not desired.hotstrings[name])
@@ -519,10 +621,11 @@ function M.apply_hotstring_preferences(saved)
 		end)
 	end, debug.traceback)
 	if not ok or committed ~= true then
-		restore_section_settings(previous)
+		finish_section_cells(false)
 		Logger.error(LOG, "Canonical hotstring preferences did not commit: %s.", tostring(committed))
 		return false
 	end
+	finish_section_cells(true)
 	return true
 end
 
