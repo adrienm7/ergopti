@@ -132,7 +132,7 @@ helpers.describe("AI agent automatic mode: a pause, a triage, then actions", fun
 
 	helpers.it("a stale agent pause cannot discard a newer pause", function()
 		Scenario.run({ stored = auto() }, function(world)
-			local original, refused = world.scheduler.cancel, true
+			local original, refused = world.scheduler.cancel, false
 			world.scheduler.cancel = function(handle)
 				if refused and handle.at and handle.at < 5 then return false end
 				return original(handle)
@@ -142,12 +142,33 @@ helpers.describe("AI agent automatic mode: a pause, a triage, then actions", fun
 			for _, timer in pairs(world.scheduler.pending) do if timer.at < 5 then old = timer end end
 			helpers.assert_not_nil(old)
 			world.type("b")
+			local successor
+			for _, timer in pairs(world.scheduler.pending) do if timer.at < 5 and timer ~= old then successor = timer end end
+			helpers.assert_not_nil(successor, "a successor pause must be armed")
 			world.scheduler.pending[old.id], old.armed, old.fired = nil, false, true
 			old.fn()
 			refused = false
 			world.engine.withdraw()
 			helpers.assert_eq(world.engine.runtime_pending(), false)
 			helpers.assert_eq(world.scheduler.activeCount(), 0, "the newer pause remains cancellable")
+		end)
+	end)
+
+
+	helpers.it("bounds agent timers when cancellation keeps failing", function()
+		Scenario.run({ stored = auto() }, function(world)
+			local original, refused = world.scheduler.cancel, true
+			world.scheduler.cancel = function(handle)
+				if refused and handle.at and handle.at < 5 then return false end
+				return original(handle)
+			end
+			world.type(SENTENCE)
+			local count = 0
+			for _, timer in pairs(world.scheduler.pending) do if timer.at < 5 then count = count + 1 end end
+			helpers.assert_eq(count, 1, "a refused pause must not spawn more native timers")
+			refused = false
+			world.engine.withdraw()
+			helpers.assert_eq(world.engine.runtime_pending(), false)
 		end)
 	end)
 

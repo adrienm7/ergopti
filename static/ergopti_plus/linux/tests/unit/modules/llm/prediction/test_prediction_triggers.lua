@@ -122,6 +122,22 @@ helpers.describe("prediction triggers: ordinary typing and word boundaries", fun
 		restore()
 	end)
 
+	helpers.it("does not allocate unbounded timers after persistent cancellation failure", function()
+		local engine, scheduler, fired = fixture({ instant_on_word_end = false })
+		local original, refused = scheduler.cancel, true
+		scheduler.cancel = function(handle) if refused then return false end; return original(handle) end
+		for index = 1, 20 do engine.on_char("a", string.rep("a", index), { app_id = "editor" }) end
+		helpers.assert_true(scheduler.activeCount() <= 1, "a rejected timer must block allocating successors")
+		refused = false
+		engine.on_char("b", "fresh text", { app_id = "editor" })
+		scheduler.test.advance(0.5)
+		helpers.assert_eq(#fired, 1, "prediction resumes after timer cleanup succeeds")
+		helpers.assert_eq(fired[1].context, "fresh text")
+		engine.withdraw()
+		helpers.assert_eq(engine.runtime_pending(), false)
+		restore()
+	end)
+
 	helpers.it("fires immediately when a boundary completes a word", function()
 		local engine, scheduler, fired = fixture()
 		engine.on_char(" ", "hello ", { app_id = "editor" })
