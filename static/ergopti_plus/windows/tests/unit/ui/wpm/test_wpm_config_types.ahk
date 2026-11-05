@@ -282,7 +282,7 @@ for _WPMCO_ABAKind in ["save-config", "graph-toggle"]
 ; not expose itself. No native/user-owned key or handle is retired.
 _WPMA_LocalStore(Mode) {
 	global STORAGE_REG_BASE, _SharedDir
-	Saved := {base: STORAGE_REG_BASE, x: WPMWidget.pos_x, y: WPMWidget.pos_y,
+	Saved := {storagePath: STORAGE_REG_BASE, x: WPMWidget.pos_x, y: WPMWidget.pos_y,
 		keyX: WPMWidgetConst.STORE_X, keyY: WPMWidgetConst.STORE_Y,
 		authority: _WPMWidget_PositionAuthority(), critical: A_IsCritical}
 	Subkey := "Software\Ergopti_WpmLocalAuthorityAudit_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
@@ -361,7 +361,7 @@ _WPMA_LocalStore(Mode) {
 	} finally {
 		Critical("Off")
 		_WPMWidget_PositionAuthority(Saved.authority)
-		STORAGE_REG_BASE := Saved.base
+		STORAGE_REG_BASE := Saved.storagePath
 		WPMWidget.pos_x := Saved.x, WPMWidget.pos_y := Saved.y
 		WPMWidgetConst.STORE_X := Saved.keyX, WPMWidgetConst.STORE_Y := Saved.keyY
 		try {

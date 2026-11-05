@@ -318,7 +318,7 @@ _WPMWidget_PositionOwnerIsCurrent(State, Token) {
 	PreviousCritical := Critical("On")
 	try return State == _WPMWidget_PositionAuthority() && State.active == Token
 		&& WPMWidgetConst.STORE_X == Token.keyX && WPMWidgetConst.STORE_Y == Token.keyY
-		&& (!Token.native || STORAGE_REG_BASE == Token.base)
+		&& (!Token.native || STORAGE_REG_BASE == Token.storagePath)
 	finally Critical(PreviousCritical)
 }
 
@@ -349,7 +349,7 @@ _WPMWidget_StorePosition(TargetX := unset, TargetY := unset, StoreFn := 0, Notif
 				|| WPMWidget.pos_x != ExpectedPublication.x || WPMWidget.pos_y != ExpectedPublication.y
 				|| WPMWidgetConst.STORE_X != ExpectedPublication.keyX
 				|| WPMWidgetConst.STORE_Y != ExpectedPublication.keyY
-				|| (ExpectedPublication.native && STORAGE_REG_BASE != ExpectedPublication.base))
+				|| (ExpectedPublication.native && STORAGE_REG_BASE != ExpectedPublication.storagePath))
 			return false
 		PreviousX := WPMWidget.pos_x, PreviousY := WPMWidget.pos_y
 		if !IsSet(TargetX)
@@ -357,7 +357,7 @@ _WPMWidget_StorePosition(TargetX := unset, TargetY := unset, StoreFn := 0, Notif
 		if !IsSet(TargetY)
 			TargetY := PreviousY
 		Token := {x: TargetX, y: TargetY, previousX: PreviousX, previousY: PreviousY, keyX: WPMWidgetConst.STORE_X,
-			keyY: WPMWidgetConst.STORE_Y, native: !HasMethod(StoreFn, "Call"), base: STORAGE_REG_BASE}
+			keyY: WPMWidgetConst.STORE_Y, native: !HasMethod(StoreFn, "Call"), storagePath: STORAGE_REG_BASE}
 		State.active := Token
 	} finally Critical(PreviousCritical)
 	try {
