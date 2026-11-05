@@ -464,7 +464,7 @@ FSWritePrivateRetained(Parent, DirectoryName, FileName, Content) {
 			throw ValueError("A private handoff requires literal leaf names")
 	}
 	Token := 0, SidText := 0, Descriptor := 0
-	Root := -1, Directory := -1, File := -1, Committed := false, Failure := 0
+	Root := -1, Directory := -1, FileHandle := -1, Committed := false, Failure := 0
 	try {
 		Process := DllCall("kernel32\GetCurrentProcess", "Ptr")
 		if !DllCall("advapi32\OpenProcessToken", "Ptr", Process, "UInt", 0x8, "Ptr*", &Token, "Int")
@@ -496,9 +496,9 @@ FSWritePrivateRetained(Parent, DirectoryName, FileName, Content) {
 			throw Error("the directory did not retain its private ACL")
 		; Assign the same explicit DACL rather than relying on the token's
 		; default owner or filesystem-specific ACE inheritance.
-		File := _FSNtCreateRelative(Directory, FileName, 0xC0010000,
+		FileHandle := _FSNtCreateRelative(Directory, FileName, 0xC0010000,
 			0x80, 0, 2, 0x40 | 0x2, Descriptor)
-		if !_FSPrivateRetainedSecurityMatches(File, Sid, true)
+		if !_FSPrivateRetainedSecurityMatches(FileHandle, Sid, true)
 			throw Error("the handoff file did not retain its private ACL")
 		Size := StrPut(Content, "UTF-8") - 1
 		Bytes := Buffer(Size + 1, 0)
@@ -507,22 +507,22 @@ FSWritePrivateRetained(Parent, DirectoryName, FileName, Content) {
 		Offset := 0
 		while Offset < Size {
 			Written := 0
-			if !_FSNativeWrite(File, Bytes.Ptr + Offset, Size - Offset, &Written)
+			if !_FSNativeWrite(FileHandle, Bytes.Ptr + Offset, Size - Offset, &Written)
 					|| Written <= 0 || Written > Size - Offset
 				throw OSError(A_LastError, "private handoff write")
 			Offset += Written
 		}
-		if !DllCall("kernel32\FlushFileBuffers", "Ptr", File, "Int")
+		if !DllCall("kernel32\FlushFileBuffers", "Ptr", FileHandle, "Int")
 			throw OSError(A_LastError, "private handoff flush")
 		Committed := true
 		Result := RTrim(Parent, "\/") . "\" . DirectoryName . "\" . FileName
 	} catch as Err {
 		Failure := Err
 	} finally {
-		if File != -1 {
-			if !Committed && !_FSPrivateRetainedDiscard(File) && IsObject(Failure)
+		if FileHandle != -1 {
+			if !Committed && !_FSPrivateRetainedDiscard(FileHandle) && IsObject(Failure)
 				Failure.Message .= "; owned handoff file cleanup failed"
-			DllCall("kernel32\CloseHandle", "Ptr", File, "Int")
+			DllCall("kernel32\CloseHandle", "Ptr", FileHandle, "Int")
 		}
 		if Directory != -1 {
 			if !Committed && !_FSPrivateRetainedDiscard(Directory) && IsObject(Failure)
@@ -1168,23 +1168,37 @@ FSCopyReplaceAtomic(Source, RootDir, Relative, &Detail := "") {
 ; @param Content {String} Complete UTF-8 text, without a BOM.
 ; @param StageSuffix {String} Non-empty leaf suffix reserved by this publisher.
 ; @param Detail {VarRef} Native failure and any retained-stage cleanup debt.
-; @return {Boolean} True only after the owned replacement was published/flushed.
-FSWriteReplaceOwned(Path, Content, StageSuffix, &Detail := "", StageFn := 0) {
+; @param StageFn {Callable|0} Optional acquisition of the owned relative stage.
+; @param BeforePublishFn {Callable|0} Preflight outside the final native span.
+; @param AdmissionFn {Callable|0} Pure final authority check beside native rename.
+; @param ReplaceExisting {Boolean} Whether the target may already exist.
+; @param Publication {VarRef} Structured renamed/durable receipt, including partial refusal.
+; @param FlushFn {Callable|0} Native flush boundary for stage and published phases.
+; @return {Boolean} True only after publication, flush and handle-close acknowledgement.
+FSWriteReplaceOwned(Path, Content, StageSuffix, &Detail := "", StageFn := 0,
+		BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true,
+		&Publication := 0, FlushFn := 0) {
 	Detail := ""
+	; This is a receipt of effects, not a parsed diagnostic. Never acknowledge
+	; durability until publication, its flush and both closes have completed.
+	Publication := {renamed: false, durable: false}
 	if !FSPathIsAdmissible(Path) || !(Content is String) || !FSPathIsAdmissible(StageSuffix)
 			|| InStr(StageSuffix, "\") || InStr(StageSuffix, "/") || InStr(StageSuffix, ":") {
 		Detail := "inadmissible text publication path or stage suffix"
 		return false
 	}
+	if !HasMethod(FlushFn, "Call") && !((FlushFn is Integer) && FlushFn == 0) {
+		Detail := "owned text flush adapter is not callable"
+		return false
+	}
+	Flush := HasMethod(FlushFn, "Call") ? FlushFn : _FSFlushOwnedText
 	SplitPath(Path, &Leaf, &Parent)
 	if Leaf == "" || Parent == "" || Leaf == "." || Leaf == ".." || InStr(Leaf, ":") {
 		Detail := "text publication requires an existing parent and target leaf"
 		return false
 	}
-	FolderHandle := -1, StageHandle := -1, Published := false
+	FolderHandle := -1, StageHandle := -1, Published := false, Succeeded := false
 	try {
-		; Relative create/rename need add-file and traverse, not directory
-		; enumeration or permission to create subdirectories.
 		FolderHandle := _FSHoldRootFolder(Parent, 0x2 | 0x20)
 		CreateStage := HasMethod(StageFn, "Call") ? StageFn : _FSCreateHeldStage
 		StageHandle := CreateStage.Call(FolderHandle, Leaf . StageSuffix, 0)
@@ -1200,30 +1214,54 @@ FSWriteReplaceOwned(Path, Content, StageSuffix, &Detail := "", StageFn := 0) {
 				throw OSError(A_LastError, "owned text stage write")
 			Offset += Written
 		}
-		if !DllCall("kernel32\FlushFileBuffers", "Ptr", StageHandle, "Int")
-			throw OSError(A_LastError, "owned text stage flush")
-		_FSHeldRename(StageHandle, FolderHandle, Leaf)
+		Flushed := Flush.Call(StageHandle, "stage")
+		if !(Flushed is Integer) || Flushed != 1
+			throw Error("owned text stage flush was not acknowledged")
+		if HasMethod(BeforePublishFn, "Call") {
+			Accepted := BeforePublishFn.Call()
+			if !(Accepted is Integer) || Accepted != 1
+				throw Error("owned text publication preflight refused")
+		} else if !((BeforePublishFn is Integer) && BeforePublishFn == 0)
+			throw TypeError("owned text publication preflight is not callable")
+		if (AdmissionFn is Integer) && AdmissionFn == 0
+			_FSHeldRename(StageHandle, FolderHandle, Leaf, ReplaceExisting)
+		else if !FSConfigHeldRename(StageHandle, FolderHandle, Leaf, ReplaceExisting, AdmissionFn)
+			throw Error("owned text publication final admission refused")
 		Published := true
-		if !DllCall("kernel32\FlushFileBuffers", "Ptr", StageHandle, "Int")
-			throw OSError(A_LastError, "published text flush")
-		return true
+		Publication.renamed := true
+		Flushed := Flush.Call(StageHandle, "published")
+		if !(Flushed is Integer) || Flushed != 1
+			throw Error("published text flush was not acknowledged")
+		Succeeded := true
 	} catch as Err {
-		; OSError.Message carries only the system message, not its What field.
-		; Keep the fixed write-operation label and numeric receipt without
-		; interpolating arbitrary error context into a diagnostic control message.
 		if (Err is OSError) && Err.What == "owned text stage write"
 			Detail := "owned text stage write (Win32 " . Err.Number . "): " . Err.Message
 		else
 			Detail := (Published ? "published, but " : "") . Err.Message
 		if !Published && StageHandle != -1
 			Detail .= _FSDiscardHeldStage(StageHandle)
-		return false
 	} finally {
-		if StageHandle != -1
-			DllCall("kernel32\CloseHandle", "Ptr", StageHandle, "Int")
-		if FolderHandle != -1
-			DllCall("kernel32\CloseHandle", "Ptr", FolderHandle, "Int")
+		for Entry in [{handle: StageHandle, kind: "stage"}, {handle: FolderHandle, kind: "folder"}] {
+			if Entry.handle == -1
+				continue
+			Closed := false
+			try Closed := _FSCloseOwnedText(Entry.handle, Entry.kind)
+			if !(Closed is Integer) || Closed != 1 {
+				Succeeded := false
+				Detail .= "; owned text " . Entry.kind . " close was not acknowledged"
+			}
+		}
 	}
+	Publication.durable := Succeeded
+	return Succeeded
+}
+
+_FSFlushOwnedText(Handle, Phase) {
+	return DllCall("kernel32\FlushFileBuffers", "Ptr", Handle, "Int") != 0
+}
+
+_FSCloseOwnedText(Handle, Kind) {
+	return DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int") != 0
 }
 
 ; Opens the anchor folder: the one pathname of a held copy.
@@ -1264,14 +1302,14 @@ _FSOpenHeldSource(Source) {
 }
 
 ; Creates the stage in its held folder, encrypted like its source as CopyFileW
-; does. Sharing nothing is the whole defence: no other handle can read, write,
-; rename or delete it, and FILE_CREATE never adopts an existing name or link.
-_FSCreateHeldStage(Folder, Name, SourceAttributes) {
+; does. The default shares nothing; an optional READ-only observer still cannot
+; write, rename or delete it. FILE_CREATE never adopts an existing name or link.
+_FSCreateHeldStage(Folder, Name, SourceAttributes, Share := 0) {
 	static GENERIC_READ := 0x80000000, GENERIC_WRITE := 0x40000000, DELETE := 0x10000
 	static FILE_CREATE := 2, FILE_NON_DIRECTORY_FILE := 0x40, FILE_WRITE_THROUGH := 0x2
 	static FILE_ATTRIBUTE_NORMAL := 0x80, FILE_ATTRIBUTE_ENCRYPTED := 0x4000
 	return _FSNtCreateRelative(Folder, Name, GENERIC_READ | GENERIC_WRITE | DELETE,
-		FILE_ATTRIBUTE_NORMAL | (SourceAttributes & FILE_ATTRIBUTE_ENCRYPTED), 0,
+		FILE_ATTRIBUTE_NORMAL | (SourceAttributes & FILE_ATTRIBUTE_ENCRYPTED), Share,
 		FILE_CREATE, FILE_NON_DIRECTORY_FILE | FILE_WRITE_THROUGH)
 }
 
@@ -1410,11 +1448,11 @@ _FSApplyCopyMetadata(Stage, Metadata) {
 ; The publication: the file behind this handle takes Name in that folder handle,
 ; replacing what is there, so neither side is a pathname anyone could swap.
 ; @throws {Error} Carrying the NTSTATUS on refusal; the destination is unchanged.
-_FSHeldRename(Stage, Folder, Name) {
+_FSHeldRename(Stage, Folder, Name, ReplaceExisting := true) {
 	static FileRenameInformation := 10
 	NameOffset := 2 * A_PtrSize + 4
 	Info := Buffer(NameOffset + StrLen(Name) * 2 + 2, 0)
-	NumPut("UChar", true, Info, 0)
+	NumPut("UChar", ReplaceExisting ? 1 : 0, Info, 0)
 	NumPut("Ptr", Folder, Info, A_PtrSize)
 	NumPut("UInt", StrLen(Name) * 2, Info, 2 * A_PtrSize)
 	StrPut(Name, Info.Ptr + NameOffset, "UTF-16")
@@ -1552,6 +1590,25 @@ FSNativeAcknowledge(AdmissionFn := 0) {
 			&& !Object.Prototype.HasOwnProp.Call(Accept, "Call")
 	}
 	finally Critical(PreviousCritical)
+}
+
+/** Final pure admission immediately followed by the retained held-file rename. */
+FSConfigHeldRename(Stage, Folder, Name, ReplaceExisting, AdmissionFn) {
+	static Accept := _FSNativeAdmissionAccepted, Rename := _FSHeldRename
+	PreviousCritical := Critical("On")
+	try {
+		for Owner in [Accept, Rename]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		if Accept != _FSNativeAdmissionAccepted || Rename != _FSHeldRename || !Accept.Call(AdmissionFn)
+				|| Accept != _FSNativeAdmissionAccepted || Rename != _FSHeldRename
+			return false
+		for Owner in [Accept, Rename]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		Rename.Call(Stage, Folder, Name, ReplaceExisting)
+		return true
+	} finally Critical(PreviousCritical)
 }
 
 /** Configuration replacement through the retained genuine write-through producer. */
