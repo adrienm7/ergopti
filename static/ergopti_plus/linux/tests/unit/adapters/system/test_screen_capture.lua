@@ -34,9 +34,10 @@ local function with_staging_receipt(receipt, body)
 	ShellRunner.run_async = function(executable, args, options, callback)
 		state.spawns = state.spawns + 1
 		state.executable, state.args, state.callback = executable, args, callback
-		return { cancel = function() return true end }
+		return { cancel = function() return true end, on_settled = function(fn) fn(); return true end }
 	end
 	local ok, err = xpcall(function() body(state) end, debug.traceback)
+	ScreenCapture.shutdown()
 	ShellRunner.exec_checked, ShellRunner.exec_line, ShellRunner.run_async = saved_checked, saved_line, saved_async
 	if not ok then error(err, 0) end
 end
@@ -118,6 +119,7 @@ helpers.it("linux-screen-refused-cleanup: retain private image until the refused
 	ShellRunner.run_async = function(_, args)
 		directory = args[4]:match("^(.*)/screen%.png$")
 		local image = assert(io.open(args[4], "wb")); image:write("private screenshot"); image:close()
+		local scaled = assert(io.open(args[4] .. ".scaled.png", "wb")); scaled:write("partial"); scaled:close()
 		return nil, "pipe activation failed", { on_settled = function(fn) listener = fn; return true end }
 	end
 	local ok, err = pcall(function()
@@ -150,6 +152,72 @@ helpers.it("linux-screen-refused-cleanup: retire an image after an already settl
 	assert(ok, err)
 end)
 
+helpers.it("retires a real completed capture after its image has been consumed", function()
+	local uv, original, handle, outcome = require("luv"), ScreenCapture.SCRIPT, nil, nil
+	local ok, detail = xpcall(function()
+		ScreenCapture.SCRIPT = 'printf private > "$1"'
+		handle = assert(ScreenCapture.capture("full", EDGE, function(value) outcome = value end))
+		local deadline = uv.hrtime() + 3000000000
+		while not outcome do
+			assert(uv.hrtime() < deadline, "controlled capture did not finish")
+			uv.run("nowait"); uv.sleep(1)
+		end
+		helpers.assert_eq(outcome.status, "ok")
+		local file = assert(io.open(handle.path, "rb")); helpers.assert_eq(file:read("*a"), "private"); file:close()
+		helpers.assert_true(ScreenCapture.cleanup_pending())
+		helpers.assert_true(handle.discard())
+		helpers.assert_nil(uv.fs_lstat(handle.dir))
+		helpers.assert_eq(ScreenCapture.cleanup_pending(), false)
+	end, debug.traceback)
+	ScreenCapture.SCRIPT = original
+	if handle and uv.fs_lstat(handle.dir) then
+		pcall(handle.cancel); pcall(handle.discard)
+		for _ = 1, 100 do uv.run("nowait"); uv.sleep(1) end
+	end
+	if not ok then error(detail, 0) end
+end)
+
+helpers.it("retires both staged images only after a real cancelled child settles", function()
+	local uv, original, handle = require("luv"), ScreenCapture.SCRIPT, nil
+	local finished, settled = false, false
+	local ok, detail = xpcall(function()
+		ScreenCapture.SCRIPT = 'printf private > "$1"; printf partial > "$1.scaled.png"; exec sleep 30'
+		handle = assert(ScreenCapture.capture("full", EDGE, function() finished = true end))
+		local deadline = uv.hrtime() + 3000000000
+		while not uv.fs_lstat(handle.path .. ".scaled.png") do
+			assert(uv.hrtime() < deadline, "controlled child did not reach its write")
+			uv.run("nowait"); uv.sleep(1)
+		end
+		helpers.assert_true(ScreenCapture.cleanup_pending(), "active captures retain cleanup ownership")
+		local loop_stopped = false
+		local shutdown = require("infra.shutdown_coordinator").new({
+			pre_wait = { { name = "screen capture cleanup", wait_for_ack = true,
+				stop = function() return ScreenCapture.shutdown() end } },
+			keyboard_hook = { isRunning = function() return false end, stop = function() end,
+				emergency_stop = function() end },
+			event_loop = { stop = function() loop_stopped = true end },
+		})
+		shutdown.request("quit")
+		helpers.assert_true(shutdown.is_pending() and not loop_stopped, "the loop must stay alive for child retirement")
+		helpers.assert_true(uv.fs_lstat(handle.path) ~= nil, "cleanup waits for native child retirement")
+		helpers.assert_true(uv.fs_lstat(handle.path .. ".scaled.png") ~= nil)
+		while uv.fs_lstat(handle.dir) do
+			assert(uv.hrtime() < deadline, "cancelled child cleanup did not settle")
+			uv.run("nowait"); uv.sleep(1)
+		end
+		settled = true
+		helpers.assert_eq(ScreenCapture.cleanup_pending(), false)
+		helpers.assert_true(shutdown.poll() and loop_stopped, "shutdown follows exact staging cleanup")
+		helpers.assert_eq(finished, false, "cancelled capture cannot publish a result")
+	end, debug.traceback)
+	ScreenCapture.SCRIPT = original
+	if handle and not settled then
+		pcall(handle.cancel); pcall(handle.discard)
+		for _ = 1, 100 do uv.run("nowait"); uv.sleep(1) end
+	end
+	if not ok then error(detail, 0) end
+end)
+
 -- The fake tools. Each logs its name and arguments; the behaviour is chosen
 -- per scenario.
 local BEHAVIOURS = {
@@ -161,7 +229,8 @@ local BEHAVIOURS = {
 	exit_ok_no_file = 'exit 0',
 	fail = 'exit 1',
 	maim_cancel = 'echo "Selection was cancelled by keystroke or right-click." >&2; exit 1',
-	magick_ok = 'exit 0',
+	magick_ok = 'for a; do last=$a; done; printf "scaled" > "$last"',
+	magick_partial = 'for a; do last=$a; done; printf "truncated" > "$last"; exit 1',
 }
 
 --- Runs the capture script with the given fake tools.
@@ -176,6 +245,7 @@ local function run(mode, tools, wayland)
 	local bin, log, out = root .. "/bin", root .. "/calls.log", root .. "/screen.png"
 	os.execute("mkdir " .. ShellRunner.quote(bin))
 	os.execute("ln -s /bin/rm " .. ShellRunner.quote(bin .. "/rm"))
+	os.execute("ln -s /bin/mv " .. ShellRunner.quote(bin .. "/mv"))
 	for tool, behaviour in pairs(tools) do
 		local path = bin .. "/" .. tool
 		local handle = assert(io.open(path, "w"))
@@ -200,12 +270,14 @@ local function run(mode, tools, wayland)
 		handle:close()
 	end
 	local image = io.open(out, "rb")
+	local bytes = image and image:read("*a")
 	if image then image:close() end
 	os.execute("rm -rf " .. ShellRunner.quote(root))
 	local outcome = ScreenCapture.classify(mode, code, output, nil)
 	outcome.calls = calls
 	outcome.code = code
 	outcome.wrote = image ~= nil
+	outcome.image = bytes
 	return outcome
 end
 
@@ -282,6 +354,13 @@ helpers.describe("screen capture: the whole screen falls through the tools", fun
 		helpers.assert_eq(outcome.scaled, true)
 	end)
 
+	helpers.it("keeps the original screenshot when resizing writes partial output and fails", function()
+		local outcome = run("full", { grim = "write_last", magick = "magick_partial" }, false)
+		helpers.assert_eq(outcome.status, "ok")
+		helpers.assert_eq(outcome.scaled, false)
+		helpers.assert_eq(outcome.image, "png", "a failed resize must not replace the original bytes")
+	end)
+
 	helpers.it("a tool that writes nothing is a failure, not a cancellation", function()
 		local outcome = run("full", { grim = "exit_ok_no_file" }, false)
 		helpers.assert_eq(outcome.status, "failed")
@@ -310,4 +389,42 @@ helpers.describe("screen capture: the whole screen falls through the tools", fun
 		helpers.assert_eq(failed.reason, Errors.SCREEN_CAPTURE_TOOL_FAILED)
 		helpers.assert_eq(failed.detail, 7)
 	end)
+end)
+
+helpers.it("independent: retry staging cleanup after real directory permissions recover", function()
+	local uv = require("luv")
+	local original_script, original_remove = ScreenCapture.SCRIPT, os.remove
+	local handle, attempts = nil, 0
+	local ok, detail = xpcall(function()
+		ScreenCapture.SCRIPT = 'printf private > "$1"; exec sleep 30'
+		handle = assert(ScreenCapture.capture("full", EDGE, function() end))
+		local deadline = uv.hrtime() + 5e9
+		while not uv.fs_lstat(handle.path) do assert(uv.hrtime() < deadline); uv.run("nowait"); uv.sleep(1) end
+		assert(uv.fs_chmod(handle.dir, 0))
+		assert(not uv.fs_open(handle.path, "r", 0), "the test identity must actually lack directory access")
+		os.remove = function(path) if path == handle.path then attempts = attempts + 1 end; return original_remove(path) end
+		assert(handle.discard()); handle.cancel()
+		while attempts == 0 do assert(uv.hrtime() < deadline, "child must physically settle"); uv.run("nowait"); uv.sleep(1) end
+		assert(uv.fs_chmod(handle.dir, 448))
+		os.remove = original_remove
+		helpers.assert_true(ScreenCapture.shutdown(), "retired files must be retried after permissions recover")
+		helpers.assert_nil(uv.fs_lstat(handle.dir))
+	end, debug.traceback)
+	os.remove = original_remove; ScreenCapture.SCRIPT = original_script
+	if handle then uv.fs_chmod(handle.dir, 448); original_remove(handle.path); original_remove(handle.path .. ".scaled.png"); original_remove(handle.dir) end
+	if not ok then error(detail, 0) end
+end)
+helpers.it("independent: retry refused settlement observation after failed capture admission", function()
+ local uv=require("luv"); local original=ShellRunner.run_async; local calls,listener,dir=0,nil,nil
+ ShellRunner.run_async=function(_,args)
+  dir=args[4]:match("^(.*)/screen%.png$");local f=assert(io.open(args[4],"w"));f:write("private");f:close()
+  return nil,"post-spawn refusal",{on_settled=function(fn) calls=calls+1;if calls==1 then return false end;listener=fn;return true end}
+ end
+ local ok,detail=xpcall(function()
+  helpers.assert_nil(ScreenCapture.capture("full",EDGE,function() end));helpers.assert_eq(calls,1)
+  helpers.assert_eq(ScreenCapture.shutdown(),false);helpers.assert_eq(calls,2,"retained child observer must be retried")
+  assert(listener);helpers.assert_eq(ScreenCapture.shutdown(),false);helpers.assert_eq(calls,2,"accepted observer must not be registered twice");listener();helpers.assert_true(ScreenCapture.shutdown());helpers.assert_nil(uv.fs_lstat(dir))
+ end,debug.traceback)
+ ShellRunner.run_async=original;if dir then os.remove(dir.."/screen.png");os.remove(dir) end
+ if not ok then error(detail,0) end
 end)

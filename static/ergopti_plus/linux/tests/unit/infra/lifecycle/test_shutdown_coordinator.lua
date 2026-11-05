@@ -529,6 +529,7 @@ helpers.describe("shutdown coordinator: daemon integration", function()
 		for _, owner in ipairs({
 			"updater background checks",
 			"LLM prediction request",
+			"screen capture cleanup",
 			"file watchers",
 			"process lifecycle",
 			"tooltip preview",

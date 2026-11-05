@@ -1637,21 +1637,16 @@ function M.shift_tone(direction, cycle)
 	return accepted == true and completed ~= false
 end
 
---- Deletes a capture's image and its private directory. A file that is still
---- there afterwards is an error: the screenshot may show private messages.
---- @param capture table { path, dir }
+--- Requests cleanup through the capture owner after physical child retirement.
+--- @param capture table Original capture handle with a discard receipt.
 local function discard_capture(capture)
-	for _, path in ipairs({ capture.path, capture.dir }) do
-		local removed, err = os.remove(path)
-		if not removed then
-			local checked, kind, _, code = pcall(function()
-				return require("infra.native_directory").target_kind(path)
-			end)
-			if not checked or kind ~= nil or code ~= "ENOENT" then
-				Logger.error(LOG, "A screenshot file could not be deleted: %s", tostring(err))
-			end
-		end
+	if type(capture) ~= "table" or type(capture.discard) ~= "function" then
+		Logger.error(LOG, "Screenshot cleanup owner is unavailable.")
+		return false
 	end
+	local called, accepted = pcall(capture.discard)
+	if not called or accepted ~= true then Logger.error(LOG, "Screenshot cleanup could not be registered.") end
+	return called and accepted == true
 end
 
 --- Drops the screen action in flight, if any: its capture is stopped and
@@ -2065,6 +2060,14 @@ function M.read_screen(action, value)
 		if not started or type(handle) ~= "table" then
 			if _vision_flow == flow then _vision_flow = nil end
 			Logger.error(LOG, "Screen capture could not start: %s", tostring(started and capture_err or handle))
+			show_notice(VISION_CAPTURE_FAILED_KEY, "capture_failed")
+			return false
+		end
+		if type(handle.cancel) ~= "function" or type(handle.discard) ~= "function"
+			or type(handle.path) ~= "string" or handle.path == "" then
+			if type(handle.cancel) == "function" then pcall(handle.cancel) end
+			if _vision_flow == flow then _vision_flow = nil end
+			Logger.error(LOG, "Screen capture returned no cleanup owner.")
 			show_notice(VISION_CAPTURE_FAILED_KEY, "capture_failed")
 			return false
 		end
