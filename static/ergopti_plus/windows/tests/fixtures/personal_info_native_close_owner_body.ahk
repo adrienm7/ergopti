@@ -8,7 +8,12 @@ _PINS_Require(Condition, Message := "") {
 }
 t(Key) => Key
 LoggerSuccess(*) => 0
-LoggerError(*) => 0
+LoggerError(*) {
+	global _PINS
+	if IsSet(_PINS) && IsObject(_PINS) && InStr(_PINS.Mode, "subscription-error-") == 1
+		_PINS.Errors += 1
+	return 0
+}
 LoggerWarn(*) => 0
 WebView_SharedEnvironment(Loader) => {Passive: true}
 Gui_Create(Options := "", Title := "") {
@@ -40,16 +45,26 @@ class _PINS_View {
 		this.Settings := {}, this.Subscriptions := 0, this.Navigations := 0
 	}
 	WebMessageReceived(Callback) {
-		global _PINS, _PiEdWeb_SessionEpoch
+		global _PINS, _PiEdWeb_SessionEpoch, _PiEdWeb_Gui
 		this.Subscriptions += 1
-		if _PINS.Mode == "subscription-close" {
+		if InStr(_PINS.Mode, "subscription-error-") == 1 && _PINS.Controllers.Length == 1
+			throw Error("private SDK add_Event refusal")
+		if _PINS.Mode == "subscription-close" || _PINS.Mode == "subscription-reset-close" || _PINS.Mode == "subscription-reset-retain" {
 			Window := _PINS.Windows[1], Hwnd := Window.Hwnd
 			Epoch := _PiEdWeb_SessionEpoch
 			NativePid := 0
 			_PINS_Require(DllCall("User32\GetWindowThreadProcessId", "Ptr", Hwnd, "UInt*", &NativePid, "UInt")
 				&& NativePid == ProcessExist(), "the real native close must target the exact private child window")
 			_PINS.AddEntered += 1
-			_PINS_Require(DllCall("User32\PostMessageW", "Ptr", Hwnd, "UInt", 0x10, "UPtr", 0, "Ptr", 0, "Int"), "real close must be posted to the private HWND")
+			if _PINS.Mode == "subscription-reset-close" || _PINS.Mode == "subscription-reset-retain" {
+				_PiEdWeb_Reset()
+				_PINS.ResetRetained := _PiEdWeb_Gui == Window && !!DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")
+				if _PINS.Mode == "subscription-reset-close" {
+					_PiEdWeb_Close(Window)
+					_PINS.ResetCloseDetached := !IsObject(_PiEdWeb_Gui)
+				}
+			} else
+				_PINS_Require(DllCall("User32\PostMessageW", "Ptr", Hwnd, "UInt", 0x10, "UPtr", 0, "Ptr", 0, "Int"), "real close must be posted to the private HWND")
 			Started := A_TickCount
 			while _PiEdWeb_SessionEpoch == Epoch && TickElapsed64(Started) < 1500
 				Sleep(10)
@@ -79,6 +94,10 @@ class _PINS_Controller {
 	Close() {
 		global _PINS
 		this.Closed += 1
+		if _PINS.Mode == "subscription-error-reopen" && !_PINS.CloseReopen && this == _PINS.Controllers[1] {
+			_PINS.CloseReopen := true
+			PersonalInformationEditor()
+		}
 		if InStr(_PINS.Mode, "subscription-") {
 			_PINS.HwndAtControllerClose := !!DllCall("User32\IsWindow", "Ptr", _PINS.Hwnds[1], "Int")
 			_PINS.RetiredAtControllerClose := _PINS.SubscriptionsRetired
@@ -127,9 +146,9 @@ _PINS_Main() {
 	if A_Args.Length != 5 || A_Args[1] != "personal-info"
 		ExitApp(2)
 	Mode := A_Args[2], Root := A_Args[3]
-	_PINS_Require(Mode == "current" || Mode == "destroy-reopen" || Mode == "reset-close" || Mode == "subscription-current" || Mode == "subscription-close")
+	_PINS_Require(Mode == "current" || Mode == "destroy-reopen" || Mode == "reset-close" || Mode == "subscription-current" || Mode == "subscription-close" || Mode == "subscription-reset-close" || Mode == "subscription-error-current" || Mode == "subscription-error-reopen" || Mode == "subscription-reset-retain")
 	_PINS := {Mode: Mode, AddEntered: 0, CloseAcknowledged: false, HwndAtAddReturn: false,
-		HwndAtControllerClose: false, RetiredAtControllerClose: 0, SubscriptionsRetired: 0,
+		HwndAtControllerClose: false, RetiredAtControllerClose: 0, SubscriptionsRetired: 0, ResetRetained: false, ResetCloseDetached: false, Errors: 0, CloseReopen: false,
 		Windows: [], Hwnds: [], Controllers: [], Callbacks: 0, Active: false,
 		Fired: false, Failure: 0, Reopens: 0, SeenBeforeReturn: false,
 		OldHwnd: 0, NewGui: 0, NewHwnd: 0, NewAliveBefore: false}
@@ -143,7 +162,50 @@ _PINS_Main() {
 	Subclass := 0, Primary := 0
 	Thread("Interrupt", 0)
 	try {
-		if InStr(Mode, "subscription-") {
+		if Mode == "subscription-reset-retain" {
+			OpenFailure := 0
+			try PersonalInformationEditor()
+			catch Any as OpenError
+				OpenFailure := OpenError
+			Ready := _PINS.Windows.Length == 1 && _PINS.Controllers.Length == 1
+				&& _PiEdWeb_Gui == _PINS.Windows[1]
+				&& DllCall("User32\IsWindow", "Ptr", _PINS.Hwnds[1], "Int")
+				&& _PINS.Controllers[1].Closed == 1 && _PINS.SubscriptionsRetired == 1
+				&& _PINS.RetiredAtControllerClose == 1 && _PINS.HwndAtControllerClose
+			FileAppend("RECEIPT personal-info-subscription mode=" . Mode . " ready=" . Ready
+				. " reset_retained=" . _PINS.ResetRetained . " add_alive=" . _PINS.HwndAtAddReturn
+				. " close_count=" . (_PINS.Controllers.Length ? _PINS.Controllers[1].Closed : -1)
+				. " retired=" . _PINS.SubscriptionsRetired . " error=" . IsObject(OpenFailure) . "`n", "*")
+			if IsObject(OpenFailure)
+				throw OpenFailure
+			_PINS_Require(Ready && _PINS.ResetRetained && _PINS.CloseAcknowledged && _PINS.HwndAtAddReturn,
+				"Reset during add must retain the exact GUI while retiring its handle and controller")
+			_PiEdWeb_Close(_PINS.Windows[1])
+			_PINS_Require(!IsObject(_PiEdWeb_Gui) && !DllCall("User32\IsWindow", "Ptr", _PINS.Hwnds[1], "Int")
+				&& _PINS.Controllers[1].Closed == 1, "the later Close must destroy the retained GUI without repeating controller close")
+		} else if Mode == "subscription-error-current" || Mode == "subscription-error-reopen" {
+			OpenFailure := 0, OpenResult := "unset"
+			try OpenResult := _PiEdWeb_TryOpen()
+			catch Any as OpenError
+				OpenFailure := OpenError
+			HwndAlive := _PINS.Hwnds.Length ? !!DllCall("User32\IsWindow", "Ptr", _PINS.Hwnds[1], "Int") : false
+			CloseCount := _PINS.Controllers.Length ? _PINS.Controllers[1].Closed : -1
+			FileAppend("RECEIPT personal-info-subscription mode=" . Mode . " result=" . OpenResult
+				. " error=" . IsObject(OpenFailure) . " logger_errors=" . _PINS.Errors . " close_count=" . CloseCount
+				. " hwnd_alive=" . HwndAlive . " gui=" . IsObject(_PiEdWeb_Gui) . "`n", "*")
+			if Mode == "subscription-error-current"
+				_PINS_Require(!IsObject(OpenFailure) && OpenResult is Integer && OpenResult == 0
+					&& _PINS.Errors == 1 && _PINS.Windows.Length == 1 && _PINS.Controllers.Length == 1
+					&& CloseCount == 1 && !HwndAlive && !IsObject(_PiEdWeb_Gui),
+					"a current SDK refusal must select the existing fallback and retire its exact native owner")
+			else
+				_PINS_Require(!IsObject(OpenFailure) && OpenResult is Integer && OpenResult == 1
+					&& _PINS.Errors == 1 && _PINS.CloseReopen && _PINS.Windows.Length == 2 && _PINS.Controllers.Length == 2
+					&& CloseCount == 1 && !HwndAlive && _PiEdWeb_Gui == _PINS.Windows[2]
+					&& _PiEdWeb_Controller == _PINS.Controllers[2] && _PINS.Controllers[2].Closed == 0
+					&& DllCall("User32\IsWindow", "Ptr", _PINS.Hwnds[2], "Int"),
+					"a newer real opening during cleanup must own its host and prevent the old fallback")
+		} else if InStr(Mode, "subscription-") {
 			OpenFailure := 0
 			try PersonalInformationEditor()
 			catch Any as OpenError
@@ -162,7 +224,7 @@ _PINS_Main() {
 			HwndAlive := _PINS.Hwnds.Length ? !!DllCall("User32\IsWindow", "Ptr", _PINS.Hwnds[1], "Int") : false
 			CloseCount := _PINS.Controllers.Length ? _PINS.Controllers[1].Closed : -1
 			FileAppend("RECEIPT personal-info-subscription mode=" . Mode . " ready=" . Ready
-				. " add_entered=" . _PINS.AddEntered . " close_ack=" . _PINS.CloseAcknowledged
+				. " add_entered=" . _PINS.AddEntered . " close_ack=" . _PINS.CloseAcknowledged . " reset_retained=" . _PINS.ResetRetained
 				. " hwnd_at_return=" . _PINS.HwndAtAddReturn . " hwnd_at_close=" . _PINS.HwndAtControllerClose
 				. " retired_at_close=" . _PINS.RetiredAtControllerClose . " retired=" . _PINS.SubscriptionsRetired
 				. " close_count=" . CloseCount . " hwnd_alive=" . HwndAlive . " error=" . IsObject(OpenFailure) . "`n", "*")
@@ -177,6 +239,9 @@ _PINS_Main() {
 				_PINS_Require(_PINS.AddEntered == 1 && _PINS.CloseAcknowledged && _PINS.HwndAtAddReturn
 					&& _PINS.HwndAtControllerClose && _PINS.SubscriptionsRetired == 1 && _PINS.RetiredAtControllerClose == 1,
 					"close during add must retain the native host until returned subscription is retired before controller close")
+			if Mode == "subscription-reset-close"
+				_PINS_Require(_PINS.ResetRetained && _PINS.ResetCloseDetached && !IsObject(_PiEdWeb_Gui),
+					"plumbing-only Reset must retain the exact GUI until a later Close detaches it")
 		} else {
 		PersonalInformationEditor()
 		_PINS_Require(_PINS.Windows.Length == 1 && _PINS.Controllers.Length == 1,
