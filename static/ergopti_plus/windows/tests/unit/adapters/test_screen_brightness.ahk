@@ -717,3 +717,56 @@ _SBT_OldTerminalMustNotDisarmSuccessor(Fake, Observed, Notices) {
 
 Test("screen brightness: old terminal cannot disarm successor timeout (brightness-timer-successor)",
 	() => _SBT_Owned("brightness_up", _SBT_OldTerminalMustNotDisarmSuccessor))
+
+
+; At the expired poll cutpoint, finish the exact old worker and let its normal
+; terminal callback admit B. The stale poll has no authority over that B.
+_SBT_PollReplace(State) {
+	State.First.callback.Call(1, "", "")
+}
+_SBT_PollReplaceDone(State, Result) {
+	State.FirstResults.Push(Result)
+	ScreenBrightnessOwner.spawn_fn := ObjBindMethod(State.Second, "spawn")
+	State.Started := ScreenBrightnessRequest("brightness_down", (Value) => State.SecondResults.Push(Value))
+	State.Successor := ScreenBrightnessOwner.job
+}
+_SBT_PollExactOwner() {
+	Saved := [ScreenBrightnessOwner.job, ScreenBrightnessOwner.generation,
+		ScreenBrightnessOwner.spawn_fn, ScreenBrightnessOwner.notify_fn, ScreenBrightnessOwner.data]
+	AssertFalse(IsObject(Saved[1]), "the isolated poll case cannot borrow a foreign worker")
+	State := {First: _SBT_Process(), Second: _SBT_Process(), FirstResults: [], SecondResults: [], Started: false, Successor: 0}
+	try {
+		ScreenBrightnessOwner.spawn_fn := ObjBindMethod(State.First, "spawn")
+		ScreenBrightnessOwner.data := _SBT_Data()
+		AssertTrue(ScreenBrightnessRequest("brightness_up", _SBT_PollReplaceDone.Bind(State)))
+		SetTimer(ScreenBrightnessPoll, 0)
+		Original := ScreenBrightnessOwner.job
+		Original["data"] := Original["data"].Clone()
+		Original["data"]["worker_timeout_ms"] := 1
+		; Explicitly expire the fixture job; no timer-resolution assumption.
+		Original["started"] := Max(0, A_TickCount - 100)
+		ScreenBrightnessPoll(_SBT_PollReplace.Bind(State))
+		_TestPrint("# brightness stale poll first_results=" . State.FirstResults.Length
+			. " successor_started=" . State.Started . " successor_retirements=" . State.Second.retirements
+			. " successor_current=" . (ScreenBrightnessOwner.job == State.Successor))
+		AssertEqual(1, State.FirstResults.Length, "the old terminal really ran before the stale cancellation")
+		AssertTrue(State.Started && IsObject(State.Successor), "the actual completion callback must start B")
+		AssertTrue(ScreenBrightnessOwner.job == State.Successor, "the old poll cannot retire B")
+		AssertEqual(0, State.Second.retirements)
+		AssertEqual(0, State.SecondResults.Length)
+		AssertTrue(ScreenBrightnessCancel("test-exact-successor", State.Successor["id"]))
+		AssertEqual(1, State.Second.retirements)
+		AssertEqual(1, State.SecondResults.Length)
+		AssertFalse(State.SecondResults[1])
+	} finally {
+		try ScreenBrightnessCancel("test-cleanup")
+		finally {
+			SetTimer(ScreenBrightnessPoll, 0)
+			State.Successor := 0
+			ScreenBrightnessOwner.job := Saved[1], ScreenBrightnessOwner.generation := Saved[2]
+			ScreenBrightnessOwner.spawn_fn := Saved[3], ScreenBrightnessOwner.notify_fn := Saved[4]
+			ScreenBrightnessOwner.data := Saved[5]
+		}
+	}
+}
+Test("screen brightness: an expired old poll cannot cancel a new owner (brightness-poll-successor)", _SBT_PollExactOwner)
