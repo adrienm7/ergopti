@@ -48,6 +48,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\adapters\system_time_zone.ahk
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include local_model_offer.ahk
 
@@ -755,16 +756,15 @@ _LLM_Agent_TimeZone(ClockProbe := 0, RegistryKey := unset) {
 	Key := IsSet(RegistryKey) ? RegistryKey : LLM_AGENT_TIMEZONE_KEY
 	if Reg_TryRead(Key, "TimeZoneKeyName", &Name) && (Name is String) && Name != ""
 		return Name
-	; Optional per-call clock port leaves the existing two native observations
-	; unchanged in production while allowing a boundary to be observed in tests.
-	if HasMethod(ClockProbe, "Local") && HasMethod(ClockProbe, "Utc") {
-		LocalStamp := ClockProbe.Local()
-		UtcStamp := ClockProbe.Utc()
-	} else {
-		LocalStamp := A_Now
-		UtcStamp := A_NowUTC
+	; One Windows time-zone observation supplies the active bias. Subtracting
+	; separately sampled local and UTC clock strings can lose a whole minute.
+	Minutes := ""
+	try Minutes := HasMethod(ClockProbe, "OffsetMinutesEast")
+		? ClockProbe.OffsetMinutesEast() : NativeTimeZoneOffsetMinutesEast()
+	if !(Minutes is Integer) {
+		LoggerDebug("LLM", "AI agent: neither a Windows time zone id nor an offset is available.")
+		return ""
 	}
-	Minutes := DateDiff(LocalStamp, UtcStamp, "Minutes")
 	LoggerDebug("LLM", "AI agent: no Windows time zone id, the UTC offset stands in.")
 	return Format("UTC{1}{2:02d}:{3:02d}", Minutes < 0 ? "-" : "+", Abs(Minutes) // 60, Mod(Abs(Minutes), 60))
 }
