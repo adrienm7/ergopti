@@ -417,3 +417,98 @@ for _SNR_Owner in ["one-shot", "dead-key"]
 	for _SNR_Mode in ["letter", "enter", "backspace"]
 		Test("scalar native nontext receiving: " . _SNR_Owner . " " . _SNR_Mode . " (scalar-native-nontext-receiving)",
 			_SNR_NativeCase.Bind(_SNR_Owner, _SNR_Mode))
+
+; Shared SPENT_UNSHIFTED distinguishes these controls from navigation/function
+; keys. Do not infer the native hook's ending behavior from the EndChars table:
+; the receiver and independent following letter are the business oracle.
+_OSPC_ChildSource() {
+	global _DriverDir
+	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
+	for Symbol in ["SIHO_StartOwned", "JsonParse", "_TextTailCodeUnits"] {
+		Owner := _DriverProductionFileForSymbol(Symbol)
+		AssertTrue(Owner != "", "The real one-shot/control dependency must exist: " . Symbol)
+		Code .= "#Include " . Owner . "`n"
+	}
+	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable",
+		"TapHoldOneShotResult", "TapHoldOneShotEndKeys", "_SendVerdictSucceeded", "_EmitReachedScreen", "_TextSenderAtSendLevel"] {
+		Definition := _DriverFuncBody(Name)
+		AssertTrue(Definition != "", "The unchanged one-shot owner must exist: " . Name)
+		Code .= Definition . "`n"
+	}
+	Body := _DriverFuncBody("SendNewResult")
+	AssertTrue(Body != "")
+	Masked := _DriverMaskNonCode(&Body)
+	Position := 1, Overlaid := "", Count := 0
+	while RegExMatch(Masked, "\bSendEvent(?=[ `t]*\()", &Site, Position) {
+		Overlaid .= SubStr(Body, Position, Site.Pos - Position) . "_OSPC_NativeReplay"
+		Position := Site.Pos + Site.Len
+		Count += 1
+	}
+	AssertEqual(2, Count, "Only the original native text/key SendEvent boundaries may receive owned-target guards")
+	Code .= Overlaid . SubStr(Body, Position) . "`n"
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\one_shot_spent_controls_body.ahk")
+}
+_OSPC_Case(Mode) {
+	global _SharedDir
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unretired native probe prevents another keyboard sender.")
+	Root := A_Temp . "\ergopti_one_shot_controls_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Script := Root . "\subject.ahk"
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}, Handle := 0, Primary := 0, Retired := false, Created := false
+	PreviousCritical := Critical("Off")
+	try {
+		Policy := FSReadStrict(_SharedDir . "\lua\tap_hold\one_shot_shift.lua")
+		DeclaredSpent := !!RegExMatch(Policy, "m)^local SPENT_UNSHIFTED\s*=\s*\{[^}\r\n]*\b" . Mode . "\s*=\s*true")
+		AssertEqual(Mode != "left", DeclaredSpent,
+			"The canonical policy must distinguish spent controls from native navigation which remains armed.")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The native one-shot fixture must exclusively acquire its own source directory.")
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _OSPC_ChildSource()))
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-one-shot-controls", Mode, _SharedDir], _SICS_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The genuine one-shot control child must start.")
+		Started := A_TickCount
+		while !State.Calls && TickElapsed(Started) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, State.Calls, "The owned one-shot control child must settle once.")
+		_TestPrint("# one-shot-spent-control " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+		AssertEqual(0, State.Code, "Native one-shot spent-control contract failed: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText, "Native diagnostics may not be hidden.")
+		AssertContains(State.Output, "PASS one-shot-spent-control " . Mode)
+	} catch as Err {
+		Primary := Err
+	}
+	try {
+		if !IsObject(Handle)
+			Retired := true
+		else {
+			Started := A_TickCount
+			loop {
+				Accepted := Handle.terminate()
+				Retired := Accepted is Integer && Accepted == 1
+				if Retired || TickElapsed(Started) >= 5000
+					break
+				_SR_TreePoll()
+				Sleep(10)
+			}
+		}
+	} catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	try {
+		if !Retired && Created
+			RetirementDebt := Handle
+		else if Retired && Created && !IsObject(Primary)
+			DirDelete(Root, true)
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The sender and actual InputHook must physically retire.")
+}
+for _OSPC_Mode in ["enter", "tab", "escape", "left"]
+	Test("one-shot native spent control: " . _OSPC_Mode . " retains its native control and following-letter policy (one-shot-native-spent-controls)",
+		_OSPC_Case.Bind(_OSPC_Mode))

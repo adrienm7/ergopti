@@ -34,7 +34,7 @@ OneShotShift() {
 				return
 		NamedKeys := "{BackSpace}{Enter}{Delete}"
 		ihvText := InputHook("L2 T" . TimeoutSec . " E C", _SIHO_ScalarEndKeys())
-		ihvText.KeyOpt(NamedKeys, "E") ; End keys to not swallow
+		ihvText.KeyOpt(NamedKeys, "ES") ; Own only ending controls; other nontext keys remain native.
 		OwnerToken := SIHO_StartOwned(ihvText, "one-shot-shift", true)
 		; Refusing a second exclusive capture must leave the admitted capture's
 		; latch alone, including an explicit OneShotShiftFix from a chord.
