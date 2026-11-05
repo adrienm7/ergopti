@@ -693,7 +693,7 @@ local function start_probes(session, state)
 				for key, value in pairs(values) do target[key] = value end
 			end
 			push(session, { type = "probe", id = id, result = result, sections = sections })
-		end, { local_only = snapshot.extensive ~= true })
+		end, { local_only = snapshot.extensive ~= true, current = current })
 	if current() then session.probes = probes else probes.cancel() end
 end
 

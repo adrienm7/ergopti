@@ -374,14 +374,12 @@ end
 --- @param paths table The snapshot's paths section.
 --- @param state table Daemon state.
 --- @param publish function(id, result, sections) Receives each answer once.
---- @param options table|nil { local_only = true runs only the probes that read
----   local files; overrides = test replacements for the configuration probe }
+--- @param options table|nil { local_only, overrides, current = function() -> boolean }
 --- @return table run { cancel = function() }
 function M.start(schema, paths, state, publish, options)
 	options = options or {}
 	local run = { cancelled = false, cancellers = {}, publish = publish }
 	local config = schema.probes
-	start_probe(run, "configuration", configuration(schema, run, options.overrides))
 	local function stop()
 		if run.cancelled then return end
 		run.cancelled = true
@@ -390,16 +388,29 @@ function M.start(schema, paths, state, publish, options)
 			if not ok then Logger.error(LOG, "A diagnostics probe could not be cancelled: %s.", tostring(err)) end
 		end
 	end
+	run.cancel = stop
+	local function admitted()
+		if type(options.current) == "function" then
+			local checked, current = pcall(options.current)
+			return checked and current == true
+		end
+		return true
+	end
+	local function launch(id, body)
+		if not admitted() then stop(); return false end
+		start_probe(run, id, body)
+		if not admitted() then stop(); return false end
+		return true
+	end
+	if not launch("configuration", configuration(schema, run, options.overrides)) then return run end
 	if options.local_only == true then
-		run.cancel = stop
 		return run
 	end
-	start_probe(run, "github_api", github_api(config.github_api, run))
-	start_probe(run, "ai_health", ai_health(config.ai_health, state, run))
-	start_probe(run, "system_details", system_details(config.system_details, paths.logs_dir, run))
-	start_probe(run, "cpu_load", cpu_load(config.cpu_load, run))
-	start_probe(run, "proxy_pac", proxy_pac(config.proxy_pac, run))
-	run.cancel = stop
+	if not launch("github_api", github_api(config.github_api, run)) then return run end
+	if not launch("ai_health", ai_health(config.ai_health, state, run)) then return run end
+	if not launch("system_details", system_details(config.system_details, paths.logs_dir, run)) then return run end
+	if not launch("cpu_load", cpu_load(config.cpu_load, run)) then return run end
+	launch("proxy_pac", proxy_pac(config.proxy_pac, run))
 	return run
 end
 
