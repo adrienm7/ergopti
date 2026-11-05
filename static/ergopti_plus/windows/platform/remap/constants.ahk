@@ -1269,34 +1269,47 @@ TapHoldSendWithOwnedKeyUp(Name, SendFn) {
 ; Press Name again after an output that lifted it, when a synthetic owner still
 ; holds it, or when the user held it down before the lift (UserHeld) and still
 ; holds it physically; the user's own release then passes through as usual.
-; The owner check and the Down share one Critical span so an owner cannot
-; release between them. The user's release is an OS event Critical cannot hold
-; back, so it is read again after the Down: one that landed in between would
-; otherwise leave the key logically down with nobody holding it.
+; The native attempt and recovery share one Critical span. Native user input
+; and an emission port can still change custody during that attempt, so current
+; counts and physical custody are checked again even when Down returned false.
 ; @param UserHeld {Boolean} _TH_UserHoldsDeliveredKey(Name) before the lift.
 ; @return {Boolean} False when a Down or Up could not be sent.
 TapHoldRestoreLiftedKey(Name, UserHeld := false) {
 	global _TH_SyntheticHeldKeys, _TapHoldKeyIsDown
 	PreviousCritical := Critical("On")
-	RacedRelease := false
+	ReleaseFailed := false
 	try {
 		Owned := _TH_SyntheticHeldKeys.Has(Name)
-		if !Owned and !(UserHeld and _TapHoldKeyIsDown.Call(Name, "P"))
+		if !Owned && !UserHeld
 			return true
-		Ok := TextPressKey(Name, "Down", false)
-		if (Ok and !Owned and !_TapHoldKeyIsDown.Call(Name, "P")) {
-			RacedRelease := true
-			Ok := TextPressKey(Name, "Up", false)
-			if !Ok
+		PhysicalBefore := !!_TapHoldKeyIsDown.Call(Name, "P")
+		if !Owned && !PhysicalBefore
+			return true
+		; The one-key transaction retains an uncertain Down even when its port
+		; reports failure after delivery. Its Boolean ACK remains unchanged.
+		Transition := { AttemptedKey: "", DeferRollback: true }
+		Ok := TextPressKey([Name], "Down", false, Transition)
+		if !_TH_SyntheticHeldKeys.Has(Name) {
+			PhysicalNow := !!_TapHoldKeyIsDown.Call(Name, "P")
+			UserStillHolds := PhysicalNow && (UserHeld || !PhysicalBefore)
+			; The sender or state port may have published a sibling owner. An
+			; old captured Owned Boolean cannot authorize releasing that key.
+			if !UserStillHolds && !_TH_SyntheticHeldKeys.Has(Name)
+					&& (Ok || Transition.AttemptedKey == Name) {
 				_TH_MarkSyntheticKeyReleasePending(Name)
+				Released := _TH_RetrySyntheticKeyRelease(Name)
+				ReleaseFailed := !Released
+				if Ok
+					Ok := Released
+			}
 		}
 	} finally {
 		Critical(PreviousCritical)
 	}
-	if (!Ok and RacedRelease) {
-		try LoggerError("TapHoldDispatch", "Could not release '{1}' after the user let go of it during its re-press; the balancing release remains pending for retry.", Name)
+	if ReleaseFailed {
+		try LoggerError("TapHoldDispatch", "Could not balance restoration of '{1}' after its holder released it; the exact Up remains pending for retry.", Name)
 	} else if !Ok {
-		try LoggerError("TapHoldDispatch", "Could not give '{1}' back to its holder after an output; it stays up until the key is pressed again.", Name)
+		try LoggerError("TapHoldDispatch", "Restoring '{1}' after an output was not acknowledged; any unowned attempted Down was reconciled through the synthetic release owner.", Name)
 	}
 	return Ok
 }
