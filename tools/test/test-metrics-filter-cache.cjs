@@ -4347,4 +4347,38 @@ for (const host of ['windows', 'macos', 'linux']) {
 	});
 }
 
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} activity calendar ignores hidden days for its colour scale`, () => {
+		const page = loadMetricsAppsPage(host);
+		page.elements.set('activity_calendar_container', page.context.document.createElement('div'));
+		vm.runInContext(
+			`Date = class extends Date { constructor(...args) { super(...(args.length ? args : ['2026-11-05T12:00:00'])); } static now() { return new Date('2026-11-05T12:00:00').getTime(); } };`,
+			page.context
+		);
+		const visible = { '2025-11-06': { Editor: { chars: 100 } } };
+		const colour = () => {
+			page.context.renderActivityCalendar();
+			const html = page.elements.get('activity_calendar_container').innerHTML;
+			const match = html.match(/fill="([^"]+)"><title>6\/11\/2025 — 100 car\.<\/title>/);
+			assert.ok(match, 'the visible day is rendered with its real count');
+			return match[1];
+		};
+		publishLoadedAppsData(page, host, visible);
+		const baseline = colour();
+		publishLoadedAppsData(
+			page,
+			host,
+			{ ...visible, '2025-11-05': { Editor: { chars: 100000 } } },
+			{},
+			2
+		);
+		assert.equal(vm.runInContext("manifestData['2025-11-05'].Editor.chars", page.context), 100000);
+		assert.equal(
+			colour(),
+			baseline,
+			'a masked day outside the year cannot alter the visible scale'
+		);
+	});
+}
+
 console.log(`${passed} passed, 0 failed.`);

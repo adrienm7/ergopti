@@ -1047,13 +1047,14 @@ function renderActivityCalendar() {
 		const key = formatMetricsDateKey(cursor.getTime());
 		const day = per_day[key];
 		const v = !day ? 0 : _calendarMode === 'time' ? day.time_ms || 0 : day.chars || 0;
-		if (v > max_v) max_v = v;
+		const inWindow = cursor >= start && cursor <= today;
+		if (inWindow && v > max_v) max_v = v;
 		cells.push({
 			key,
 			date: new Date(cursor),
 			weekday: (cursor.getUTCDay() + 6) % 7, // 0=Mon … 6=Sun
 			value: v,
-			in_window: cursor >= start && cursor <= today
+			in_window: inWindow
 		});
 		cursor.setUTCDate(cursor.getUTCDate() + 1);
 	}
