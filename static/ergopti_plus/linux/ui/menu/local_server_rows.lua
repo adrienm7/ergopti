@@ -20,9 +20,15 @@ end
 --- @return table options For llm.local_server_menu rows or page_rows.
 local function server_options(llm, dialogs, changed, context)
 	local function admit()
-		return type(context) == "table" and type(context.is_paused) == "function"
-			and context.paused ~= true and context.is_paused() ~= true
+		if type(context) ~= "table" or type(context.is_paused) ~= "function" then return false end
+		local function page_owned()
+			if context.page_current == nil then return true end
+			local ok, current = pcall(context.page_current)
+			return ok and current == true
+		end
+		return page_owned() and context.paused ~= true and context.is_paused() ~= true
 			and type(llm.can_configure_local_servers) == "function" and llm.can_configure_local_servers() == true
+			and page_owned()
 	end
 	local function ai_on()
 		return type(llm.is_enabled) == "function" and llm.is_enabled() == true
@@ -66,7 +72,7 @@ local function server_options(llm, dialogs, changed, context)
 			server.label, server.base_url)
 		local value = dialogs.prompt(I18n.get("menu.llm.local_servers.header"), text,
 			address and target.base_url or "", not address)
-		if value == nil then return false end
+		if value == nil or not admit() then return false end
 		if address and not Remote.normalize_base_url(value) then
 			dialogs.error(format("llm.local_servers.invalid_address", server.base_url), server.label)
 			return false
