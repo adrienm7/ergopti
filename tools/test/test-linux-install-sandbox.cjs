@@ -958,7 +958,7 @@ for (const kind of [
 }
 
 // An expected command in a duplicate key or action does not own the main entry.
-for (const kind of ['duplicate', 'key-space', 'key-tab', 'key-return', 'key-formfeed', 'group-space', 'action-decoy']) {
+for (const kind of ['duplicate', 'key-space', 'key-tab', 'key-return', 'key-formfeed', 'group-space', 'nul-comment', 'action-decoy']) {
 	let original;
 	const run = runInstaller({
 		desktopProvided: true,
@@ -972,7 +972,8 @@ for (const kind of ['duplicate', 'key-space', 'key-tab', 'key-return', 'key-form
 				'key-tab': 'Exec\t=/other/program',
 				'key-return': '\rExec=/other/program',
 				'key-formfeed': 'Exec\f=/other/program',
-				'group-space': ' [Desktop Entry] \nExec=/other/program'
+				'group-space': ' [Desktop Entry] \nExec=/other/program',
+				'nul-comment': '# user\0data'
 			};
 			original =
 				kind === 'action-decoy'
