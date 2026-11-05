@@ -79,6 +79,7 @@ install.xdg_autostart=início automático XDG: {1}
 launch.already_running=O Ergopti+ já está em execução nesta sessão ({1} está ocupado); esta inicialização foi recusada.
 launch.authorization_failed=A autorização de acesso à entrada foi cancelada ou falhou.
 launch.groups_unavailable=A sessão não conseguiu obter os seus grupos de entrada configurados.
+launch.session_lock_invalid=A pasta de bloqueio da sessão deve ser um caminho absoluto.
 launcher.dependencies_installed=Dependências instaladas.
 launcher.driver_missing=Erro: diretório do driver Linux não encontrado: {1}
 launcher.install_deps_hint=Execute: ergopti-hotstrings --install-deps

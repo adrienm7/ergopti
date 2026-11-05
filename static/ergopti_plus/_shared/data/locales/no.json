@@ -1136,6 +1136,7 @@
 	"linux_shell.launch.already_running": "Ergopti+ kjører allerede i denne økten ({1} er opptatt); denne oppstarten ble avvist.",
 	"linux_shell.launch.authorization_failed": "Godkjenningen av inndatatilgang ble avbrutt eller mislyktes.",
 	"linux_shell.launch.groups_unavailable": "Økten fikk ikke de konfigurerte inndatagruppene sine.",
+	"linux_shell.launch.session_lock_invalid": "Mappen for øktlåsen må være en absolutt sti.",
 	"linux_shell.layout_registry.not_found": "Fant ikke oppsettregisteret verken ved siden av {1} eller i {2}.",
 	"linux_shell.permissions.identity_mismatch": "Kontoens identitet stemmer ikke.",
 	"linux_shell.permissions.no_login_manager": "Ingen påloggingsbehandler kjører; brukerens innrullering utsettes til den grafiske oppstarten.",

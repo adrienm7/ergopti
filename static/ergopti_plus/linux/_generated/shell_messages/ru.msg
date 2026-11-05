@@ -79,6 +79,7 @@ install.xdg_autostart=автозапуск XDG: {1}
 launch.already_running=Ergopti+ уже запущен в этом сеансе ({1} занят); этот запуск отклонён.
 launch.authorization_failed=Авторизация доступа к вводу отменена или не удалась.
 launch.groups_unavailable=Сеанс не смог получить настроенные группы ввода.
+launch.session_lock_invalid=Папка блокировки сеанса должна задаваться абсолютным путём.
 launcher.dependencies_installed=Зависимости установлены.
 launcher.driver_missing=Ошибка: каталог драйвера Linux не найден: {1}
 launcher.install_deps_hint=Выполните: ergopti-hotstrings --install-deps

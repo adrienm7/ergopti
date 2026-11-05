@@ -1136,6 +1136,7 @@
 	"linux_shell.launch.already_running": "Ergopti+ już działa w tej sesji ({1} jest zajęty); to uruchomienie zostało odrzucone.",
 	"linux_shell.launch.authorization_failed": "Autoryzacja dostępu do wejścia została anulowana lub nie powiodła się.",
 	"linux_shell.launch.groups_unavailable": "Sesja nie mogła uzyskać skonfigurowanych grup wejścia.",
+	"linux_shell.launch.session_lock_invalid": "Katalog blokady sesji musi być ścieżką bezwzględną.",
 	"linux_shell.layout_registry.not_found": "Nie znaleziono rejestru układów obok {1} ani w {2}.",
 	"linux_shell.permissions.identity_mismatch": "Tożsamość konta się nie zgadza.",
 	"linux_shell.permissions.no_login_manager": "Nie działa żaden menedżer logowania; rejestracja użytkownika zostaje odłożona do uruchomienia graficznego.",

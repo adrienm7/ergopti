@@ -1136,6 +1136,7 @@
 	"linux_shell.launch.already_running": "Ergopti+ bu oturumda zaten çalışıyor ({1} kilitli); bu başlatma reddedildi.",
 	"linux_shell.launch.authorization_failed": "Giriş erişimi yetkilendirmesi iptal edildi veya başarısız oldu.",
 	"linux_shell.launch.groups_unavailable": "Oturum yapılandırılmış giriş gruplarını alamadı.",
+	"linux_shell.launch.session_lock_invalid": "Oturum kilidi klasörü mutlak bir yol olmalıdır.",
 	"linux_shell.layout_registry.not_found": "Düzen kaydı ne {1} yanında ne de {2} içinde bulundu.",
 	"linux_shell.permissions.identity_mismatch": "Hesap kimliği eşleşmiyor.",
 	"linux_shell.permissions.no_login_manager": "Çalışan bir oturum açma yöneticisi yok; kullanıcı kaydı grafik başlatmaya ertelendi.",

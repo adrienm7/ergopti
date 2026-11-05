@@ -1136,6 +1136,7 @@
 	"linux_shell.launch.already_running": "O Ergopti+ já está em execução nesta sessão ({1} está ocupado); esta inicialização foi recusada.",
 	"linux_shell.launch.authorization_failed": "A autorização de acesso à entrada foi cancelada ou falhou.",
 	"linux_shell.launch.groups_unavailable": "A sessão não conseguiu obter os seus grupos de entrada configurados.",
+	"linux_shell.launch.session_lock_invalid": "A pasta de bloqueio da sessão deve ser um caminho absoluto.",
 	"linux_shell.layout_registry.not_found": "Registo de layouts não encontrado ao lado de {1} nem em {2}.",
 	"linux_shell.permissions.identity_mismatch": "A identidade da conta não corresponde.",
 	"linux_shell.permissions.no_login_manager": "Nenhum gestor de início de sessão está em execução; a inscrição do utilizador fica para o início gráfico.",

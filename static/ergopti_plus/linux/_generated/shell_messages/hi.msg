@@ -79,6 +79,7 @@ install.xdg_autostart=XDG ऑटोस्टार्ट: {1}
 launch.already_running=Ergopti+ इस सत्र में पहले से चल रहा है ({1} लॉक है); यह लॉन्च अस्वीकार किया गया।
 launch.authorization_failed=इनपुट अनुमति प्राधिकरण रद्द हुआ या विफल रहा।
 launch.groups_unavailable=सत्र अपने कॉन्फ़िगर किए गए इनपुट समूह प्राप्त नहीं कर सका।
+launch.session_lock_invalid=सत्र लॉक का फ़ोल्डर एक निरपेक्ष पथ होना चाहिए।
 launcher.dependencies_installed=निर्भरताएँ इंस्टॉल हो गईं।
 launcher.driver_missing=त्रुटि: Linux ड्राइवर फ़ोल्डर नहीं मिला: {1}
 launcher.install_deps_hint=चलाएँ: ergopti-hotstrings --install-deps

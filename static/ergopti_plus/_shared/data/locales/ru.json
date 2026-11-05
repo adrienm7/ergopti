@@ -1136,6 +1136,7 @@
 	"linux_shell.launch.already_running": "Ergopti+ уже запущен в этом сеансе ({1} занят); этот запуск отклонён.",
 	"linux_shell.launch.authorization_failed": "Авторизация доступа к вводу отменена или не удалась.",
 	"linux_shell.launch.groups_unavailable": "Сеанс не смог получить настроенные группы ввода.",
+	"linux_shell.launch.session_lock_invalid": "Папка блокировки сеанса должна задаваться абсолютным путём.",
 	"linux_shell.layout_registry.not_found": "Реестр раскладок не найден ни рядом с {1}, ни в {2}.",
 	"linux_shell.permissions.identity_mismatch": "Идентификационные данные учётной записи не совпадают.",
 	"linux_shell.permissions.no_login_manager": "Диспетчер входа не запущен; регистрация пользователя откладывается до графического запуска.",

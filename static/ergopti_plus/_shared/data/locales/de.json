@@ -1136,6 +1136,7 @@
 	"linux_shell.launch.already_running": "Ergopti+ läuft bereits in dieser Sitzung ({1} ist belegt); dieser Start wurde abgelehnt.",
 	"linux_shell.launch.authorization_failed": "Die Freigabe des Eingabezugriffs wurde abgebrochen oder ist fehlgeschlagen.",
 	"linux_shell.launch.groups_unavailable": "Die Sitzung konnte ihre konfigurierten Eingabegruppen nicht erhalten.",
+	"linux_shell.launch.session_lock_invalid": "Das Verzeichnis der Sitzungssperre muss ein absoluter Pfad sein.",
 	"linux_shell.layout_registry.not_found": "Layout-Register weder neben {1} noch unter {2} gefunden.",
 	"linux_shell.permissions.identity_mismatch": "Die Kontoidentität stimmt nicht überein.",
 	"linux_shell.permissions.no_login_manager": "Es läuft kein Anmeldemanager; die Aufnahme des Benutzers wird auf den grafischen Start verschoben.",

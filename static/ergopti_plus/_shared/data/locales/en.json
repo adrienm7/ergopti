@@ -1131,6 +1131,7 @@
 	"linux_shell.launch.already_running": "Ergopti+ is already running in this session ({1} is held); this launch was refused.",
 	"linux_shell.launch.authorization_failed": "Input permission authorization was cancelled or failed.",
 	"linux_shell.launch.groups_unavailable": "The session could not acquire its configured input groups.",
+	"linux_shell.launch.session_lock_invalid": "The session lock root must be an absolute path.",
 	"linux_shell.layout_registry.not_found": "Layout registry not found beside {1} nor at {2}.",
 	"linux_shell.permissions.identity_mismatch": "Account identity mismatch.",
 	"linux_shell.permissions.no_login_manager": "No login manager is running; user enrollment is deferred to the graphical launch.",
