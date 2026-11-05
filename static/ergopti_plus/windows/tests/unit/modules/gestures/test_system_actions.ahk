@@ -1645,3 +1645,38 @@ _SCN_RejectOriginalArgument(Field) {
 for _SCN_Field in ["working-dir", "options"]
 	Test("SystemControl original NUL argument: " . _SCN_Field . " refuses before native ABI (system-control-original-nul-args)",
 		_SCN_RejectOriginalArgument.Bind(_SCN_Field))
+
+
+_SCN_WholeNativePath(Kind) {
+	Root := A_Temp . "\ergopti_native_path_nul_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	AssertTrue((Created is Integer) && Created == 1, "the path classifier fixture exclusively owns its real directory")
+	try {
+		FilePath := Root . "\réel😀.txt"
+		AssertEqual(1, FSWriteCreateDurable(FilePath, "owned classifier control"))
+		Path := Kind == "file" ? FilePath : Root
+		Encoded := JsonStringLiteral(Path)
+		Value := JsonParse(SubStr(Encoded, 1, StrLen(Encoded) - 1) . '\u0000trailer"')
+		Units := StrLen(Path) + 1 + StrLen("trailer")
+		AssertEqual(Units, StrLen(Value))
+		AssertEqual(0, NumGet(StrPtr(Value), StrLen(Path) * 2, "UShort"))
+		Adapter := SystemControl()
+		GoodFile := Adapter.IsExistingFile(Path), GoodDir := Adapter.IsDirectory(Path)
+		BadFile := Adapter.IsExistingFile(Value), BadDir := Adapter.IsDirectory(Value)
+		_TestPrint("# native path NUL kind=" . Kind . " original_units=" . StrLen(Value)
+			. " valid_file=" . GoodFile . " valid_dir=" . GoodDir
+			. " nul_file=" . BadFile . " nul_dir=" . BadDir)
+		AssertEqual(Kind == "file", GoodFile, "the actual adapter must recognize its private existing file")
+		AssertEqual(Kind == "directory", GoodDir, "the actual adapter must recognize its private existing directory")
+		AssertFalse(BadFile, "an original counted NUL path cannot be an existing file merely because its prefix is")
+		AssertFalse(BadDir, "an original counted NUL path cannot be an existing directory merely because its prefix is")
+		AssertEqual(Units, StrLen(Value), "classification preserves the complete unrepresentable String")
+		AssertEqual(0, NumGet(StrPtr(Value), StrLen(Path) * 2, "UShort"))
+	} finally {
+		if Created
+			DirDelete(Root, true)
+	}
+}
+for _SCN_Kind in ["file", "directory"]
+	Test("SystemControl whole native path: " . _SCN_Kind . " rejects NUL prefix identity (system-control-original-nul-predicates)",
+		_SCN_WholeNativePath.Bind(_SCN_Kind))
