@@ -1175,10 +1175,14 @@ class CallerInputControls(unittest.TestCase):
             ),
         ):
             result = self.subject.main()
-        # The reason is one fixed word the driver logs, never a path or a value.
+        # The reason is one fixed word the driver logs, never a path or a value,
+        # then the retained failures' path-free facts (serve_refusal_facts).
         self.assertRegex(
-            diagnostic.getvalue(), r"\AManaged Ollama daemon admission refused: [a-z_]+\.\n\Z"
+            diagnostic.getvalue(),
+            r"\AManaged Ollama daemon admission refused: [a-z_]+"
+            r"(, (primary|cleanup)=\w+ at [\w.]+:\d+ \w+( from [\w.]+:\d+ \w+)?(, \w+=[\w.:-]+)*)*\.\n\Z",
         )
+        self.assertNotIn("/", diagnostic.getvalue())
         return result
 
     def terminal_ack(self, stream, *, active):
