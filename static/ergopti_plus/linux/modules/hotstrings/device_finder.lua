@@ -323,8 +323,24 @@ end
 --- True when the device is software-synthesised rather than physical hardware.
 --- @param dev table Device descriptor.
 --- @return boolean
+-- Only an absolute, canonical sysfs path can prove kernel origin.
+local function qualified_sysfs(path)
+	if type(path) ~= "string" or path:sub(1, 9) ~= "/devices/"
+		or not path:match("/input/input%d+$") or path:sub(-1) == "/" or path:find("//", 1, true) or path:find("[%z\1-\31\127]") then return false end
+	for part in path:gmatch("[^/]+") do
+		if part == "." or part == ".." then return false end
+	end
+	return true
+end
+
 local function is_synthetic(dev)
-	return DeviceNames.is_virtual_sysfs(dev.sysfs) or DeviceNames.is_synthetic_name(dev.name)
+	-- A kernel sysfs path identifies the input owner; a physical HID name can
+	-- legitimately contain the same words as an injector.
+	if qualified_sysfs(dev.sysfs) then
+		return dev.sysfs == "/devices/virtual" or DeviceNames.is_virtual_sysfs(dev.sysfs)
+	end
+	if type(dev.sysfs) == "string" and dev.sysfs ~= "" then return true end
+	return DeviceNames.is_synthetic_name(dev.name)
 end
 
 
@@ -343,7 +359,7 @@ function M.physical_sources(paths, devices)
 	local sources = {}
 	for _, path in ipairs(paths) do
 		local dev = records[path]
-		local known = dev ~= nil and type(dev.sysfs) == "string" and dev.sysfs ~= ""
+		local known = dev ~= nil and qualified_sysfs(dev.sysfs)
 		sources[#sources + 1] = { path = path, sysfs = dev and dev.sysfs or "", name = dev and dev.name or "",
 			physical = known and has_bit(dev.ev_mask, EV_KEY_BIT) and not is_synthetic(dev) or false }
 	end
