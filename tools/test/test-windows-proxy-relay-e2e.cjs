@@ -994,7 +994,9 @@ async function main() {
 		await runRealDaemonCases({
 			check,
 			signedIn,
-			skip: (name, reason) => report(name, 'optional', reason),
+			skip: (name, reason) => {
+				if (!ONLY || name.includes(ONLY)) report(name, 'optional', reason);
+			},
 			relay: { relayPath, relaySha256, timings: TIMINGS },
 			netOnly: { good: GOOD_NETONLY, wrong: WRONG_NETONLY },
 			tlsRegistry: registry,
