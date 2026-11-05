@@ -382,6 +382,21 @@ FSListDirectoryStrict(Path, Directories := false) {
 	return Entries
 }
 
+/** Captures an absolute lexical path without reading the target or parent. */
+FSResolveAbsolutePath(Path) {
+	_FSRequirePath(Path, "An absolute path capture")
+	; Win32's Unicode path domain, including its terminating code unit.
+	static MAX_UNICODE_PATH_UNITS := 32768
+	Full := Buffer(MAX_UNICODE_PATH_UNITS * 2, 0)
+	Written := DllCall("kernel32\GetFullPathNameW", "Str", Path,
+		"UInt", MAX_UNICODE_PATH_UNITS, "Ptr", Full, "Ptr", 0, "UInt")
+	if !Written
+		throw OSError(A_LastError, A_ThisFunc)
+	if Written >= MAX_UNICODE_PATH_UNITS
+		throw Error("Absolute path capture did not complete")
+	return StrGet(Full, Written, "UTF-16")
+}
+
 /**
  * Resolves an existing directory to an absolute long path without recasing it.
  * @param {String} Path - Existing directory without wildcard characters.

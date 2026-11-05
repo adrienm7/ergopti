@@ -991,6 +991,17 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		if (!DocumentMode && !BuildOnly && Updates.Length = 0 and ExactSectionPrefixes.Length = 0)
 				return FSNativeAcknowledge(AdmissionFn)
 
+		; Keep logical schema/cache/refusal identity unchanged. Native I/O binds
+		; one absolute target before any source read can yield and change cwd.
+		SourcePath := Path
+		if !BuildOnly {
+			try SourcePath := FSResolveAbsolutePath(Path)
+			catch as Err {
+				try LoggerError("TomlWrite", "Cannot capture the native target for '{1}': {2}. No file was changed.", Path, Err.Message)
+				return false
+			}
+		}
+
 		; A config save is a full read-modify-write plus a canonicalisation pass, and
 		; it runs from menu callbacks — so a slow one blocks the tray menu while the
 		; user watches. It had no segment at all; the cost showed up only as a menu
@@ -1000,9 +1011,9 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		if IsSet(ProvidedPresence) && (!(ProvidedPresence is Integer)
 				|| (ProvidedPresence != 0 && ProvidedPresence != 1))
 				throw TypeError("Provided source presence must be Integer 0 or 1")
-		SourcePresent := IsSet(ProvidedPresence) ? ProvidedPresence : (FileExist(Path) ? 1 : 0)
+		SourcePresent := IsSet(ProvidedPresence) ? ProvidedPresence : (FileExist(SourcePath) ? 1 : 0)
 		SourceBytes := IsSet(ProvidedContent) ? ProvidedContent
-			: (SourcePresent ? FSReadUtf8Exact(Path) : "")
+			: (SourcePresent ? FSReadUtf8Exact(SourcePath) : "")
 		if !(SourceBytes is String) {
 				global _TomlReadFailures, _TomlUnreadableFiles
 				_TomlReadFailures[Path] := true
@@ -1160,7 +1171,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 					return false
 			}
 		}
-		if !_TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes) {
+		if !_TOML_WriteSourceMatches(SourcePath, SourcePresent, SourceBytes) {
 				; Detached builds never own the live reader cache. An ordinary
 				; write must retire its now-stale snapshot after actual source drift.
 				if !BuildOnly {
@@ -1211,7 +1222,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 
 		; A qualified image already on disk needs no stage or atomic replacement.
 		; Keep the generation acknowledgement while preserving its existing inode.
-		if FileExist(Path) && FSUtf8ExactMatches(Path, FinalCandidate) {
+		if FileExist(SourcePath) && FSUtf8ExactMatches(SourcePath, FinalCandidate) {
 				if !FSNativeAcknowledge(FinalAdmission) {
 					try LoggerError("TomlWrite", "Refusing unchanged-image acknowledgment: genuine native admission was withdrawn.")
 					return false
@@ -1227,11 +1238,11 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		static WriteSeq := 0
 		WriteSeq += 1
 		Suffix := "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
-		_TOML_ReapStaleTemps(Path, StaleTempAgeMs())
+		_TOML_ReapStaleTemps(SourcePath, StaleTempAgeMs())
 		Stage := {handle: -1}
-		Published := FSWriteReplaceOwned(Path, FinalCandidate, Suffix, &StageDetail,
+		Published := FSWriteReplaceOwned(SourcePath, FinalCandidate, Suffix, &StageDetail,
 			_TOML_CreateHeldStage.Bind(Stage),
-			_TOML_AdmitHeldStage.Bind(Stage, Path, SourcePresent, SourceBytes, FinalCandidate),
+			_TOML_AdmitHeldStage.Bind(Stage, SourcePath, SourcePresent, SourceBytes, FinalCandidate),
 			FinalAdmission, SourcePresent, &Publication, HeldFlushFn)
 		if !((Published is Integer) && Published == 1) {
 			_TOML_InvalidateParseCache(Path)
