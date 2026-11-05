@@ -29,6 +29,14 @@ CB_WriteTextWithReceipt(Text, &OwnedSequence := 0) {
 	_WRF.OwnToken := CBClipboardOwner.paste_transaction
 	return Published
 }
+CB_WritePlainSnapshot(Capture, Text, &OwnedSequence) {
+	global _WRF
+	Published := _WRF_ActualWritePlainSnapshot(Capture, Text, &OwnedSequence)
+	_WRF.OwnSequence := Published && OwnedSequence ? OwnedSequence : 0
+	_WRF.OwnToken := CBClipboardOwner.paste_transaction
+	return Published
+}
+
 _WRF_ObserveRestoreTimer(Callback, Delay) {
 	global _WRF
 	_WRF.RestoreCallback := Callback
@@ -46,7 +54,6 @@ _WRF_DisarmOwnedRestore() {
 	global _WRF
 	if IsObject(_WRF.RestoreCallback) && !_WRF.RestoreFired {
 		SetTimer(_WRF.RestoreCallback, 0)
-		_WRF.RestoreCallback := 0
 	}
 }
 _WRF_Require(Condition, Message) {
@@ -195,6 +202,11 @@ _WRF_Main() {
 		_WRF.Armed := false
 		try {
 			_WRF_DisarmOwnedRestore()
+			if IsObject(_WRF.RestoreCallback) && !_WRF.RestoreFired {
+				Callback := _WRF.RestoreCallback
+				_WRF.RestoreCallback := 0
+				Callback.Call()
+			}
 			if _WRF.Mutated && _WRF.OwnSequence {
 				Expected := _WRF.OwnSequence
 				; Current is a diagnostic comparison only, never cleanup authority.

@@ -471,7 +471,7 @@ SendFinalResult(Text, OnlyText := False, DeclareBufferEffect := false) {
 _SendInstant_RestoreClipboard(OldClip, OwnedSequence, OwnerToken) {
 	; A delayed restore owns exactly the payload sequence it wrote. The adapter
 	; retains both snapshot and owner if Windows temporarily locks the clipboard.
-	return CB_RestoreOwnedAllEventually(OldClip, OwnedSequence, OwnerToken,
+	return CB_RestorePlainSnapshotEventually(OldClip, OwnedSequence, OwnerToken,
 		"hotstring_send_instant")
 }
 
@@ -580,12 +580,20 @@ SendInstant(Text, Prefix := "", ExpectedTarget := unset) {
 			return false
 		}
 	}
-	OldClipboard := CB_SaveAll()
-	if (Type(OldClipboard) == "String" && OldClipboard == "__CB_SAVE_ERROR__") {
+	; Resolve a delayed text renderer before binding the opaque snapshot's
+	; generation. Its value is ignored: only Text is ever emitted.
+	CB_Read()
+	if !_SendInstantTargetCurrent(Target) {
 		CB_EndOwnedTransaction(OwnerToken)
-		try LoggerWarn("Hotstrings", "SendInstant: clipboard snapshot failed; expansion was not injected.")
 		return false
 	}
+	Captured := 0
+	if !CB_SavePlainSnapshot(OwnerToken, &Captured) {
+		CB_EndOwnedTransaction(OwnerToken)
+		try LoggerWarn("Hotstrings", "SendInstant: clipboard snapshot changed or was unavailable; expansion was not injected.")
+		return false
+	}
+	OldClipboard := Captured["saved"]
 	; ClipboardAll can synchronously render a foreign format and change focus.
 	; Refuse before replacing its clipboard when that target is already gone.
 	if !_SendInstantTargetCurrent(Target) {
@@ -594,9 +602,12 @@ SendInstant(Text, Prefix := "", ExpectedTarget := unset) {
 	}
 	RestoreCallback := false
 	RestoreTimerArmed := false
+	OwnedSequence := 0
 	try {
-		if !CB_WriteTextWithReceipt(Text, &OwnedSequence)
-			throw Error("clipboard write failed")
+		; This native CAS owns the complete old snapshot before EmptyClipboard.
+		; A later copy wins without any publication, paste or stale rollback.
+		if !CB_WritePlainSnapshot(Captured, Text, &OwnedSequence)
+			return false
 		if !OwnedSequence
 			throw Error("clipboard sequence unavailable")
 		; Arm every fallible post-paste stage before the irreversible injection. If
@@ -621,16 +632,20 @@ SendInstant(Text, Prefix := "", ExpectedTarget := unset) {
 	} catch as err {
 		; SendInput can fail after the restore timer was armed. Cancel that exact
 		; callback before doing the cleanup inline so ownership is ended once.
-		if RestoreTimerArmed
+		if RestoreTimerArmed {
 			try SetTimer(RestoreCallback, 0)
-		if IsSet(OwnedSequence) && OwnedSequence {
-			try CB_RestoreOwnedAllEventually(OldClipboard, OwnedSequence, OwnerToken,
-				"hotstring_send_instant_rollback")
-		} else {
-			CB_EndOwnedTransaction(OwnerToken)
+			RestoreTimerArmed := false
 		}
+		if OwnedSequence
+			try CB_RestorePlainSnapshotEventually(OldClipboard, OwnedSequence, OwnerToken,
+				"hotstring_send_instant_rollback")
 		try LoggerError("Hotstrings", "SendInstant: clipboard injection failed: {1}", err.Message)
 		return false
+	} finally {
+		; Unknown mutation/Close failures retain their exact native retry record.
+		; Only an owner with no armed restore and no debt can retire here.
+		if !RestoreTimerArmed && !CB_HasRestoreDebtForOwner(OwnerToken)
+			CB_EndOwnedTransaction(OwnerToken)
 	}
 }
 

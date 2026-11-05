@@ -1778,7 +1778,7 @@ SendInstant captures ClipboardAll A, then unconditionally publishes its payload 
 
 Run41971226185 authenticates the independent HWND, exact transferred HGLOBAL, full native UTF-16 bytes and stable sequences28/50 before the actual publication. Both real pastes succeed, yet final sequences39/61 have another owner and `clipboard_original_a=1`. Both different-text and same-payload-text copies are lost, including in inverse order; the stable control passes.
 
-A correction using the existing native snapshot/CAS/owned-restore primitives is in progress. Its original ClipboardAll, exact debt, prior097 attacks and receiving/cleanup oracles must remain. Post-fix qualification is pending.
+The correction using the existing native snapshot/CAS/owned-restore primitives is integrated. Its original ClipboardAll, exact debt, prior097 attacks and receiving/cleanup oracles must remain. Post-fix qualification is pending.
 
 ## AHK-109: Closing the initial changelog Show leaves its native window alive
 

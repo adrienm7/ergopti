@@ -1191,7 +1191,7 @@
 			"reproduction": "Capture genuine ClipboardAll A, then let an independently owned native publisher copy B before SendInstant publishes its own paste payload. Repeat with B text identical to the payload.",
 			"root_cause": "SendInstant saves A and later unconditionally writes its payload without a compare-and-set relationship to that saved clipboard generation; its eventual owned restoration can therefore overwrite the newer independent copy with A.",
 			"silent_failure": "Run41971226185 at639de1fcae98920d622bf345ee2e675d4c7b146b authenticates exact own HWND/HGLOBAL/raw text and sequences28/50 before and after the subject sample. Real paste succeeds, but final sequences39/61 belong to another owner and clipboard_original_a1; both newer copies are lost. Stable control passes and inverse reproduces both failures.",
-			"regression_test": "The proposed correction reuses the existing native plain-snapshot/CAS write/owned restore primitives, retaining their original opaque ClipboardAll and exact debt. It must preserve prior097 post-publication attacks and the actual receiver/cleanup oracles. Implementation and postfix qualification are pending."
+			"regression_test": "The integrated correction reuses the existing native plain-snapshot/CAS write/owned restore primitives, retaining their original opaque ClipboardAll and exact debt. It must preserve prior097 post-publication attacks and the actual receiver/cleanup oracles. Source and passive native-fixture migrations are integrated; native postfix qualification is pending."
 		},
 		{
 			"id": "AHK-109",
