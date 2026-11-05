@@ -2759,7 +2759,7 @@ function render_rhythm_kpi() {
 		max_chars > 0 ? `${format_number(max_chars)} ${escape_html(_t('ui_typing.col_chars'))}` : '—'
 	);
 	set('rhythm_count', format_number(total_bursts));
-	set('rhythm_mean_delay', mean_delay > 0 ? `${mean_delay.toFixed(0)} ms` : '—');
+	set('rhythm_mean_delay', inter_count > 0 ? `${mean_delay.toFixed(0)} ms` : '—');
 	set('rhythm_cv', inter_count > 0 ? cv.toFixed(2) : '—');
 
 	const loading = document.getElementById('rhythm_loading');

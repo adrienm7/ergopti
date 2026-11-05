@@ -429,6 +429,7 @@ function renderDashboard() {
 					density: density,
 					sessions: appData.session_count || 0,
 					focus_lat_mean: focus_lat_mean,
+					focus_lat_count: appData.focus_latency_count || 0,
 					hs_pct: hs_pct,
 					destinations: topDestinations.join(', ') || '-'
 				});
@@ -683,7 +684,7 @@ function renderDashboard() {
 		const flMs = (fl.count || 0) > 0 ? fl.sum_ms / fl.count : 0;
 		setText(
 			'kpi-tx-focus-lat',
-			flMs > 0 ? _t('ui_apps.value_ms').replace('{n}', flMs.toFixed(0)) : '—'
+			(fl.count || 0) > 0 ? _t('ui_apps.value_ms').replace('{n}', flMs.toFixed(0)) : '—'
 		);
 		setText(
 			'kpi-tx-focus-lat-detail',
@@ -1133,7 +1134,7 @@ function renderDashboard() {
 			const tdLat = document.createElement('td');
 			tdLat.className = 'app-time-cell';
 			tdLat.textContent =
-				app.focus_lat_mean > 0
+				app.focus_lat_count > 0
 					? _t('ui_apps.value_ms').replace('{n}', Math.round(app.focus_lat_mean))
 					: '—';
 			tr.appendChild(tdLat);
