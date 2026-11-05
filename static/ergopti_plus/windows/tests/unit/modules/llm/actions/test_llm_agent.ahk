@@ -972,3 +972,46 @@ Test("agent context: same-second timezone fallback (agent-timezone-native-fallba
 	_TZF_ContextCase.Bind("20261104140059", "same-second"))
 Test("agent context: timezone fallback across sampled second (agent-timezone-native-fallback-boundary)",
 	_TZF_ContextCase.Bind("20261104140100", "boundary"))
+
+; Independent native control: convert one UTC SYSTEMTIME to local time and
+; compare the resulting FILETIMEs, without changing the OS clock or zone.
+_TZF_ReferenceOffset() {
+	Utc := Buffer(16, 0), Local := Buffer(16, 0)
+	UtcFile := Buffer(8, 0), LocalFile := Buffer(8, 0)
+	DllCall("Kernel32\GetSystemTime", "Ptr", Utc)
+	if !DllCall("Kernel32\SystemTimeToTzSpecificLocalTime", "Ptr", 0, "Ptr", Utc, "Ptr", Local, "Int")
+		throw OSError(A_LastError, "native UTC-to-local conversion")
+	if !DllCall("Kernel32\SystemTimeToFileTime", "Ptr", Utc, "Ptr", UtcFile, "Int")
+		throw OSError(A_LastError, "native UTC SYSTEMTIME conversion")
+	if !DllCall("Kernel32\SystemTimeToFileTime", "Ptr", Local, "Ptr", LocalFile, "Int")
+		throw OSError(A_LastError, "native local SYSTEMTIME conversion")
+	Ticks := NumGet(LocalFile, 0, "Int64") - NumGet(UtcFile, 0, "Int64")
+	if Mod(Ticks, 600000000) != 0
+		throw Error("The native time-zone offset was not an integral minute.")
+	return Ticks // 600000000
+}
+_TZF_NativeOffsetControl() {
+	Before := _TZF_ReferenceOffset()
+	Actual := NativeTimeZoneOffsetMinutesEast()
+	After := _TZF_ReferenceOffset()
+	_TestAppendProgress("# agent timezone native-reference before=" . Before . " observed=" . Actual . " after=" . After)
+	AssertEqual(Before, After, "the system time zone must remain stable during this observation")
+	AssertTrue(Actual is Integer, "the native time-zone adapter must return an offset")
+	AssertEqual(Before, Actual, "active bias agrees with an independent same-instant conversion")
+}
+Test("agent context: native active bias agrees with UTC-to-local conversion (agent-timezone-native-bias)", _TZF_NativeOffsetControl)
+
+class _TZF_MissingOffset extends _TZF_ClockProbe {
+	OffsetMinutesEast() {
+		this.OffsetCalls += 1
+		return ""
+	}
+}
+_TZF_OffsetUnavailable() {
+	Probe := _TZF_MissingOffset("20261104140100")
+	Context := _TZF_ContextFromMissingRegistry(Probe)
+	AssertEqual(1, Probe.OffsetCalls)
+	AssertEqual(0, Probe.LocalCalls + Probe.UtcCalls, "an unavailable offset cannot fall back to torn samples")
+	AssertEqual("", Context["timezone"], "an unavailable offset is not fabricated")
+}
+Test("agent context: unavailable timezone offset is not fabricated (agent-timezone-offset-refusal)", _TZF_OffsetUnavailable)
