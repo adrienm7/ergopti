@@ -31,6 +31,29 @@ local function with_browser(body)
 end
 
 helpers.describe("model browser inventory document", function()
+	helpers.it("(model-selector-api-owner) passes the actual page lifetime to API callbacks", function()
+		local previous, current = package.loaded["ui.menu.llm_backend_rows"], nil
+		package.loaded["ui.menu.llm_backend_rows"] = {
+			api_page = function(_, _, _, _, _, owner)
+				current = owner
+				return { rows = {}, providers = {}, tools = {} }
+			end,
+		}
+		local ok, failure = pcall(with_browser, function(f, bridge)
+			bridge.bind({ dialogs = {}, delete_model = function() return true end,
+				ollama_state = function() return true end,
+				ollama_install_phase = function() return "idle" end,
+				install_ollama = function() return true end })
+			f.handshake()
+			helpers.assert_eq(type(current), "function")
+			helpers.assert_eq(current(), true)
+			bridge.on_window_acquiring(9999)
+			helpers.assert_eq(current(), false)
+		end)
+		package.loaded["ui.menu.llm_backend_rows"] = previous
+		assert(ok, failure)
+	end)
+
 	helpers.it("(linux-model-browser-owner) nonce ACK and physical timer retirement precede ready", function()
 		with_browser(function(f, _, seen)
 			helpers.assert_eq(f.send("ready"), nil)

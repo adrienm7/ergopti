@@ -127,7 +127,7 @@ local function setup(backend)
 	local Rows = helpers.load_module("ui.menu.llm_backend_rows")
 	local function build()
 		return require("tests.support.ui.menu.llm.api_page_rows").rows(Rows, llm, dialogs,
-			function() state.changed = (state.changed or 0) + 1 end)
+			function() state.changed = (state.changed or 0) + 1 end, nil, state.page_current)
 	end
 	return build, state, function()
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
