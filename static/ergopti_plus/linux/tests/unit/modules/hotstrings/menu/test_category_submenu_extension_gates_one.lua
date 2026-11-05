@@ -322,6 +322,17 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 		return config, calls
 	end
 	for _, kind in ipairs({ "global", "category" }) do
+		helpers.it(kind .. " delay rejects an overflowing numeric entry before invoking its owner", function()
+			local config, calls = receipt_config(kind, "true")
+			local changed = 0
+			local called, result, _, notices = observe(delay_action(config, kind,
+				function() changed = changed + 1 end), "1e999")
+			helpers.assert_true(called)
+			helpers.assert_eq(result, nil)
+			helpers.assert_eq(#calls, 0)
+			helpers.assert_eq(changed, 0)
+			helpers.assert_eq(#notices, 1)
+		end)
 		for _, outcome in ipairs({ "true", "false", "nil", "number", "text", "throw", "missing" }) do
 			helpers.it(kind .. " delay contains exact native setter receipt " .. outcome, function()
 				local config, calls = receipt_config(kind, outcome)
@@ -404,6 +415,20 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 		if not called then error(err, 0) end
 	end
 	for _, kind in ipairs({ "global", "category" }) do
+		helpers.it(kind .. " delay reports overflow as invalid with the actual persistent owner", function()
+			with_native_owner(function(c)
+				local changed = 0
+				local action = delay_action(c.config, kind, function() changed = changed + 1 end)
+				local called, result, _, notices = observe(action, "1e999")
+				helpers.assert_true(called)
+				helpers.assert_eq(result, nil)
+				helpers.assert_eq(changed, 0)
+				helpers.assert_eq(read(c.path), c.original)
+				helpers.assert_eq(read(c.config_path), c.config_original)
+				helpers.assert_eq(#notices, 1)
+				helpers.assert_not_nil(notices[1]:find(require("infra.i18n").get("menu.hotstrings.delay_invalid_body"), 1, true))
+			end)
+		end)
 		for _, outcome in ipairs({ "false", "nil", "number", "throw" }) do
 			helpers.it(kind .. " delay actual override refusal preserves source and permits an acknowledged retry " .. outcome, function()
 				with_native_owner(function(c)
