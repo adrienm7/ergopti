@@ -568,6 +568,7 @@ InstallSendNoOps()
 #Include unit/ui/wpm/test_wpm_drag_admission.ahk
 #Include unit/ui/wpm/test_wpm_region_target.ahk
 #Include unit/ui/wpm/test_wpm_canon.ahk
+#Include unit/ui/wpm/test_wpm_graph_native_reentry.ahk
 #Include unit/infra/config/persistence/test_features_manifest.ahk
 #Include unit/infra/config/persistence/test_apply_config_toml.ahk
 #Include unit/infra/config/persistence/test_config_semantic_snapshot.ahk
