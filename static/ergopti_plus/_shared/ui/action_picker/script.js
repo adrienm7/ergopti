@@ -722,6 +722,14 @@ function fillPromptChoices(value) {
 		appendOption(profile, choice.value, choice.label);
 		if (current && choice.value === current.profileId) selected = choice.value;
 	}
+	// A per-binding translation is valid even though it is not a catalogued profile.
+	if (
+		current?.translationTarget &&
+		!promptChoices.some((choice) => choice.value === current.profileId)
+	) {
+		appendOption(profile, current.profileId, current.profileId + ' — ' + current.translationTarget);
+		selected = current.profileId;
+	}
 	profile.value = selected;
 	const defaultLabel = (paramStrings.countDefault || '{1}').replace('{1}', String(defaultCount));
 	appendOption(count, '', defaultLabel);
@@ -787,7 +795,14 @@ function fillLanguageChoices(value) {
 // The value the prompt choices describe.
 function promptChoiceValue() {
 	const count = el('param-count').value;
-	return count === '' ? el('param-profile').value : el('param-profile').value + '|' + count;
+	const profile = el('param-profile').value;
+	const initial = parseLlmPrompt(editing?.parameterValue || '');
+	if (profile === 'translate' && initial?.profileId === profile && initial.translationTarget) {
+		// A target is representable only alongside an explicit count.
+		if (count === '') return null;
+		return profile + '|' + count + '|' + initial.translationTarget;
+	}
+	return count === '' ? profile : profile + '|' + count;
 }
 
 function openParamEditor(entry) {

@@ -307,6 +307,20 @@ helpers.describe("layout manager (macOS): installing", function()
 		helpers.assert_eq(LayoutRegistry.snapshot(deps).provided.ergopti, "bundle")
 	end)
 
+	helpers.it("refuses installation when bundle discovery fails", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files() })
+		deps.bundle_names = function() error("listing refused") end
+		local result = run(function(done) LayoutRegistry.install("ergopti", done, deps) end)
+		helpers.assert_true(result.ok == false)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_BUNDLE_SCAN)
+		helpers.assert_nil(state.files[LAYOUTS_DIR .. "ergopti.keylayout"])
+		helpers.assert_eq(#state.enabled, 0)
+		local local_result = run(function(done) LayoutRegistry.install_local(entry_of("ergopti"), "layout", done, deps) end)
+		helpers.assert_true(local_result.ok == false)
+		helpers.assert_eq(local_result.detail, LayoutRegistry.FAILURE_BUNDLE_SCAN)
+		helpers.assert_nil(state.files[LAYOUTS_DIR .. "ergopti.keylayout"])
+	end)
+
 	helpers.it("never overwrites a layout file it did not install (layout-registry-install)", function()
 		local files = shipped_files()
 		files[LAYOUTS_DIR .. "ergol.keylayout"] = "my own layout"

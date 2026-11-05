@@ -53,6 +53,7 @@ M.FAILURE_BUSY = "busy"
 M.FAILURE_UNKNOWN_LAYOUT = "unknown_layout"
 M.FAILURE_NOT_INSTALLED = "not_installed"
 M.FAILURE_PROVIDED_BY_BUNDLE = "provided_by_bundle"
+M.FAILURE_BUNDLE_SCAN = "bundle_scan_failed"
 M.FAILURE_FOREIGN_FILE = "foreign_file"
 M.FAILURE_UNSUPPORTED = "unsupported_platform"
 M.FAILURE_DOWNLOAD = "download_failed"
@@ -229,12 +230,12 @@ end
 
 --- Keyboard names the installed Ergopti bundles already provide.
 --- @param deps table
---- @return table Set { [name] = true }.
+--- @return table|nil Set { [name] = true }, or nil on listing failure.
 local function bundle_names(deps)
 	local ok, names = pcall(deps.bundle_names)
 	if not ok or type(names) ~= "table" then
 		Logger.warn(LOG, "The installed Ergopti bundles could not be listed: %s.", tostring(names))
-		return {}
+		return nil
 	end
 	return names
 end
@@ -359,7 +360,7 @@ function M.snapshot(deps)
 			snapshot.installed[entry.id] = entry
 		end
 	end
-	local provided = bundle_names(deps)
+	local provided = bundle_names(deps) or {}
 	local names, aliases = {}, {}
 	local InputSources = require("modules.keymap.input_sources")
 	--- Registers metadata aliases before the nonblocking TIS cache is populated.
@@ -545,7 +546,12 @@ function M.install(id, on_done, deps)
 			finish(false, M.FAILURE_FOREIGN_FILE, deps.layouts_dir .. id .. ".keylayout was not installed by ErgoptiPlus")
 			return
 		end
-		if type(entry.keyboard_name) == "string" and bundle_names(deps)[entry.keyboard_name] then
+		local provided = bundle_names(deps)
+		if not provided then
+			finish(false, M.FAILURE_BUNDLE_SCAN, "installed keyboard bundles could not be listed")
+			return
+		end
+		if type(entry.keyboard_name) == "string" and provided[entry.keyboard_name] then
 			finish(false, M.FAILURE_PROVIDED_BY_BUNDLE, "an installed Ergopti bundle already provides "
 				.. entry.keyboard_name)
 			return
@@ -725,7 +731,12 @@ function M.install_local(entry, text, on_done, deps)
 		finish(false, M.FAILURE_FOREIGN_FILE, deps.layouts_dir .. id .. ".keylayout was not installed by ErgoptiPlus")
 		return false
 	end
-	if type(entry.keyboard_name) == "string" and bundle_names(deps)[entry.keyboard_name] then
+	local provided = bundle_names(deps)
+	if not provided then
+		finish(false, M.FAILURE_BUNDLE_SCAN, "installed keyboard bundles could not be listed")
+		return false
+	end
+	if type(entry.keyboard_name) == "string" and provided[entry.keyboard_name] then
 		finish(false, M.FAILURE_PROVIDED_BY_BUNDLE, "an installed Ergopti bundle already provides "
 			.. entry.keyboard_name)
 		return false

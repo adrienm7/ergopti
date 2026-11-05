@@ -1511,22 +1511,24 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	end
 	stage("context_watchers")
 	observe_ignored_win_identity(win, app_name, title)
-	local secure = SecureFieldDetector.isSecureApp(app_name) == true and true
-		or SecureFieldDetector.inspectFocusedElement(app)
+	local secure, detail, element
+	if SecureFieldDetector.isSecureApp(app_name) == true then
+		secure = true
+	else
+		secure, detail, element = SecureFieldDetector.inspectFocusedElementWithReceipt(app)
+	end
 	if type(secure) ~= "boolean" then return stage("secure_field", true) end
 	stage("secure_field")
 	_secure_field_cache_value = secure
-	-- Retain an exact native destination off the HID path. Application names and
-	-- titles alone cannot distinguish two editor controls or a reused window.
-	local captured, destination = pcall(function()
-		local pid = app:pid()
-		local application_element = hs.axuielement.applicationElementForPID(pid)
-		local element = application_element:attributeValue("AXFocusedUIElement")
-		if not element then return nil end
-		return { pid = pid, app = app, window_id = win:id(), element = element,
-			generation = _ignored_win_context_generation }
-	end)
-	if captured then _text_destination = destination end
+	-- Bind the receipt to the exact AX element whose privacy was classified.
+	-- A second focused-element read could select another field between calls.
+	if not secure and element then
+		local captured, destination = pcall(function()
+			return { pid = app:pid(), app = app, window_id = win:id(), element = element,
+				generation = _ignored_win_context_generation }
+		end)
+		if captured then _text_destination = destination end
+	end
 	stage("destination")
 	report_slow_probe(probe_started, stage_ms)
 

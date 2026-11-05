@@ -448,7 +448,7 @@ helpers.describe("layout_install: fresh bundle resources", function()
 		local original_fs, original_dir = package.loaded["adapters.file_system"], package.loaded["infra.fs_dir"]
 		package.loaded["adapters.file_system"], package.loaded["infra.fs_dir"] = nil, nil
 		local ok, err = xpcall(function()
-			local scans, fail_stat = 0, false
+			local scans, fail_stat, fail_find = 0, false, false
 			io.popen = function()
 				scans = scans + 1
 				local delivered = false
@@ -456,7 +456,7 @@ helpers.describe("layout_install: fresh bundle resources", function()
 					if delivered then return nil end
 					delivered = true
 					return "/root/Fallback.bundle/Contents/Resources/fallback.keylayout"
-				end end, close = function() return true end }
+				end end, close = function() return not fail_find end }
 			end
 			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
 				fs = {
@@ -480,6 +480,8 @@ helpers.describe("layout_install: fresh bundle resources", function()
 			fail_stat = true
 			helpers.assert_true(install.bundle_keylayout_names().fallback)
 			helpers.assert_eq(scans, 4, "attribute errors must also retry via find")
+			fail_find = true
+			helpers.assert_nil(install.bundle_keylayout_names(), "a failed fallback cannot publish a partial index")
 		end, debug.traceback)
 		io.popen = original_popen
 		package.loaded["adapters.file_system"], package.loaded["infra.fs_dir"] = original_fs, original_dir
