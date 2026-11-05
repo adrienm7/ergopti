@@ -273,7 +273,9 @@ _EscapeTomlString(S) {
 }
 
 _HotstringsOverrideIdentifiersAreValid(CategoryName, SectionName := "") {
+		; The loader reserves bare ext for extension tables, never a category.
 		if !(CategoryName is String) || CategoryName == "__global__"
+				|| StrLower(CategoryName) == "ext"
 				|| !RegExMatch(CategoryName,
 					"^(?:ext\.[A-Za-z0-9_-]+|[A-Za-z0-9_-]+)$")
 				return false
