@@ -149,8 +149,16 @@ function Invoke-OllamaArchiveEntry {
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
+	# ShellRunner reads the physical stream through FileRead: its first bytes
+	# select decoding for every progressive and final JSON receipt. Emit one
+	# UTF-8 preamble before any operation, then use a no-preamble UTF-8 writer.
+	[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false, $true)
+	$stdout = [Console]::OpenStandardOutput()
+	$preamble = [Text.UTF8Encoding]::new($true).GetPreamble()
+	$stdout.Write($preamble, 0, $preamble.Length)
+	$stdout.Flush()
 	# Success is a JSON receipt, never an executable or daemon admission.
 	$result = Invoke-OllamaArchiveEntry
-	$result.receipt | ConvertTo-Json -Depth 12 -Compress
+	[Console]::Out.WriteLine(($result.receipt | ConvertTo-Json -Depth 12 -Compress))
 	exit $result.exit_code
 }
