@@ -55,7 +55,7 @@ local function with_action(session, action, change, body)
 			package.loaded["logger.shim"] = logger
 			local pending, changed = nil, false
 			local function retire(point)
-				if changed or change ~= point then return end
+				if changed or (change ~= point and not (change == "snapshot-copy" and point == "snapshot")) then return end
 				changed = true
 				if change == "privacy" then state.role = 40 else state.path = "/field/successor" end
 				if point == "key-down" then watch.barrier() end
@@ -65,7 +65,11 @@ local function with_action(session, action, change, body)
 				has_command = function() return true end,
 				exec_checked = function()
 					world.reads = world.reads + 1
-					if world.reads == 1 then retire("snapshot") end
+					local snapshot = world.clipboard
+					if world.reads == 1 then
+						retire("snapshot")
+						if change == "snapshot-copy" then world.clipboard = "new user copy"; return true, snapshot end
+					end
 					if action == "paste_plain" and world.reads == 1 then
 						retire("privacy")
 						if change == "read-refused" then return false, "", "controlled clipboard read refusal" end
@@ -145,7 +149,8 @@ local function with_action(session, action, change, body)
 			world.original_current = original.current()
 			-- During the copy wait, a different clipboard value has not yet been
 			-- observed as ours. Preserve it: it may be a concurrent user copy.
-			local expected_clipboard = change == "copy-wait" and "source selection" or "saved clipboard"
+			local expected_clipboard = change == "copy-wait" and "source selection"
+				or change == "snapshot-copy" and "new user copy" or "saved clipboard"
 			helpers.assert_eq(world.clipboard, expected_clipboard, "retirement must respect clipboard ownership")
 			helpers.assert_eq(next(world.held), nil, "retirement must still release every owned key")
 			body(world)
@@ -161,6 +166,16 @@ local function with_action(session, action, change, body)
 end
 
 helpers.describe("explicit selection actions retain the originating destination", function()
+	for _, session in ipairs({ "x11", "wayland" }) do
+		for _, action in ipairs({ "selection_uppercase", "wrap_selection" }) do
+			helpers.it("preserves a concurrent copy after destination retirement: " .. action .. " " .. session, function()
+				with_action(session, action, "snapshot-copy", function(world)
+					helpers.assert_eq(world.writes, {}, "no clipboard write is owed before the sentinel")
+					helpers.assert_eq(world.pasted, {})
+				end)
+			end)
+		end
+	end
 	for _, session in ipairs({ "x11", "wayland" }) do
 		for _, action in ipairs({ "selection_uppercase", "wrap_selection" }) do
 			helpers.it("selection-action-owner commits stable " .. session .. " " .. action, function()
