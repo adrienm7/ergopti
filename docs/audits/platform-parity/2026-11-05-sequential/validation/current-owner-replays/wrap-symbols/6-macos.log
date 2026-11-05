@@ -1,0 +1,37 @@
+input="(" decision=wrap consumed=true AXreads=1 writes=1 pastes=1 pasted="(é雪\
+line)" restores=1 all-types=restored
+paused admission control: no additional write or paste
+retired tap control: no additional clipboard mutation
+input="«" decision=passthrough consumed=false AXreads=0 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input="»" decision=passthrough consumed=false AXreads=0 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input="« " decision=passthrough consumed=false AXreads=0 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input=" »" decision=passthrough consumed=false AXreads=0 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input="« " decision=wrap consumed=true AXreads=1 writes=1 pastes=1 pasted="« é雪\
+line »" restores=1 all-types=restored
+retired tap control: no additional clipboard mutation
+input="(" decision=passthrough consumed=false AXreads=0 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input="(" decision=wrap consumed=false AXreads=1 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input="(" decision=passthrough consumed=false AXreads=0 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input="(" decision=wrap consumed=false AXreads=1 writes=1 pastes=0 pasted="" restores=1 all-types=restored
+retired tap control: no additional clipboard mutation
+input="(" decision=wrap consumed=true AXreads=1 writes=1 pastes=1 pasted="(é雪\
+line)" restores=2 all-types=restored
+retired tap control: no additional clipboard mutation
+input="⟦" decision=wrap consumed=true AXreads=1 writes=1 pastes=1 pasted="⟦é雪\
+line⟧" restores=1 all-types=restored
+retired tap control: no additional clipboard mutation
+input="“" decision=wrap consumed=true AXreads=1 writes=1 pastes=1 pasted="„é雪\
+line“" restores=1 all-types=restored
+retired tap control: no additional clipboard mutation
+input="“" decision=passthrough consumed=false AXreads=0 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input="”" decision=wrap consumed=true AXreads=1 writes=1 pastes=1 pasted="“é雪\
+line”" restores=1 all-types=restored
+retired tap control: no additional clipboard mutation
