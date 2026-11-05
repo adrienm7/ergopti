@@ -215,7 +215,8 @@ _MBPT_Case(Mode) {
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "An unsettled earlier model browser child must retire first")
 	Directory := A_Temp . "\ergopti_model_browser_close_pause_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
-	FSCreateDirectoryExclusiveStrict(Directory)
+	Creation := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue((Creation is Integer) && Creation == 1, "Only an exclusively acquired child root may be recursively removed")
 	Script := Directory . "\subject.ahk"
 	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }, Handle := 0, Primary := 0, Retired := false
 	AtDeadline := 0, ExportFailure := 0
@@ -291,3 +292,7 @@ _MBPT_Case(Mode) {
 for _MBPT_Mode in ["current", "during-close", "paused-entry", "native-refused", "native-paused", "native-sort"]
 	Test("Model browser selection: " . _MBPT_Mode . " preserves native pause ownership (model-browser-close-pause-owner)",
 		_MBPT_Case.Bind(_MBPT_Mode))
+
+for _MBBK_Mode in ["native-backend-current", "native-backend-api"]
+	Test("Native model browser activation: " . _MBBK_Mode . " activates the selected Ollama catalogue model (model-browser-native-backend)",
+		_MBPT_Case.Bind(_MBBK_Mode))
