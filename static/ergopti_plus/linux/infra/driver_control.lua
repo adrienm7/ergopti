@@ -44,6 +44,25 @@ Session.__index = Session
 -- ==========================
 -- ==========================
 
+--- Creates a control stage exclusively and retains its native custody receipts.
+--- @param path string Reserved adjacent stage.
+--- @param text string Complete protocol image.
+--- @return table|nil stage Creation-time current/discard callbacks.
+--- @return string|nil detail
+local function native_stage(path, text)
+	local opened, stream, detail, _, discard, current = pcall(require("infra.regular_file_writer").open, path, "wx")
+	if not opened or not stream then return nil, tostring(opened and detail or stream) end
+	local wrote_ok, wrote, write_err = pcall(stream.write, stream, text)
+	local close_ok, closed, close_err = pcall(stream.close, stream)
+	if not wrote_ok or not wrote or not close_ok or closed ~= true then
+		local removed_ok, removed = pcall(discard)
+		local failure = tostring(not wrote_ok and wrote or write_err or not close_ok and closed or close_err or "stage I/O refused")
+		if not removed_ok or removed ~= true then failure = failure .. "; owned stage cleanup remains pending" end
+		return nil, failure
+	end
+	return { current = current, discard = discard }
+end
+
 --- Native file operations, replaceable by tests.
 --- @return table ports
 local function native_ports()
@@ -51,7 +70,7 @@ local function native_ports()
 	local FileSystem = require("adapters.file_system")
 	return {
 		read = FileSystem.read,
-		write = FileSystem.write,
+		stage = native_stage,
 		remove = function(path)
 			local ok, _, code = uv.fs_unlink(path)
 			return ok ~= nil or code == "ENOENT"
@@ -116,10 +135,20 @@ end
 function Session:publish(kind, text)
 	local target = self:path(kind)
 	local stage = target .. ".tmp-" .. tostring(self.pid)
-	if not self.ports.write(stage, text) then error("the " .. kind .. " file could not be staged", 0) end
-	if not self.ports.rename(stage, target) then
-		self.ports.remove(stage)
-		error("the " .. kind .. " file could not be published", 0)
+	local owned, detail = self.ports.stage(stage, text)
+	if type(owned) ~= "table" or type(owned.current) ~= "function" or type(owned.discard) ~= "function" then
+		error("the " .. kind .. " file could not be staged: " .. tostring(detail), 0)
+	end
+	local checked, current = pcall(owned.current, text)
+	-- A refused image cannot authorize pathname cleanup of a possible replacement.
+	-- Exclusive birth fixes prior-stage collisions; the POSIX image check and
+	-- pathname rename remain separate operations, not an external-writer CAS.
+	if not checked or current ~= true then error("the " .. kind .. " staging image changed", 0) end
+	local renamed_ok, renamed = pcall(self.ports.rename, stage, target)
+	if not renamed_ok or renamed ~= true then
+		local removed_ok, removed = pcall(owned.discard)
+		local debt = removed_ok and removed == true and "" or "; owned stage cleanup remains pending"
+		error("the " .. kind .. " file could not be published" .. debt, 0)
 	end
 end
 
