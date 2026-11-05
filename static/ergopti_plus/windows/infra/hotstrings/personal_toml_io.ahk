@@ -717,7 +717,7 @@ _PersonalTomlAppendOverrides(Lines, Overrides) {
 ; reads and arbitrary authorization callbacks stay outside the native span.
 ; A missing owner is retained only for the existing direct atomic-helper API.
 _PersonalTomlNativeAdmission(FilePath, OwnerToken := 0, OpeningSource := 0,
-		PreservationSource := 0) {
+		PreservationSource := 0, PersonalInfoSource := 0) {
 	if OwnerToken is Object {
 		if !_PersonalTomlWriteLeaseOwns(OwnerToken, FilePath) || _PersonalWritesPaused()
 			return false
@@ -732,6 +732,72 @@ _PersonalTomlNativeAdmission(FilePath, OwnerToken := 0, OpeningSource := 0,
 		if !(Configured is String) || _ConfigWriteLeaseKey(Configured) != _ConfigWriteLeaseKey(FilePath)
 			return false
 	}
+	if PersonalInfoSource is Map
+		return _PersonalInfoWriteSourceCurrent(PersonalInfoSource, OwnerToken, FilePath)
+	return true
+}
+
+_PersonalTomlCreateHeldStage(State, Folder, Name, Attributes) {
+	State.handle := _FSCreateHeldStage(Folder, Name, Attributes)
+	return State.handle
+}
+
+; Read the exact held stage and original target before the final memory-only
+; native admission. Arbitrary authorization/cutpoints never run in that span.
+_PersonalTomlHeldPreflight(Stage, FilePath, PhysicalPath, Content, AuthorizeFn,
+		OpeningSource, OwnerToken, PreservationSource, BeforeNativeFn, PersonalInfoSource) {
+	_FSRewind(Stage.handle)
+	Readback := _FSReadUtf8ExactHandle(Stage.handle, 0, false)
+	if !(Readback is String) || StrLen(Readback) != StrLen(Content)
+		return false
+	Bytes := StrLen(Content) * 2
+	if Bytes && DllCall("ntdll\RtlCompareMemory", "Ptr", StrPtr(Readback),
+			"Ptr", StrPtr(Content), "UPtr", Bytes, "UPtr") != Bytes
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		try Authorized := HasMethod(AuthorizeFn, "Call") ? AuthorizeFn.Call() : true
+		catch
+			Authorized := false
+		Authorized := (Authorized is Integer) && Authorized != 0
+	} finally Critical(PreviousCritical)
+	if !Authorized
+		return false
+	if !((OpeningSource is Integer) && OpeningSource == 0) {
+		SourceMatches := _PersonalTomlOpeningImageMatches(OpeningSource, FilePath, OwnerToken)
+		PreviousCritical := Critical("On")
+		try SourceMatches := SourceMatches
+			&& _PersonalTomlOpeningAuthority(OpeningSource, FilePath, OwnerToken)
+		finally Critical(PreviousCritical)
+		if !SourceMatches
+			return false
+	}
+	if PreservationSource is Map {
+		Observed := _PersonalTomlReadOpeningImage(PhysicalPath)
+		SourceMatches := Observed["admitted"] && Observed["present"] == PreservationSource["present"]
+			&& (Observed["content"] == PreservationSource["content"])
+		PreviousCritical := Critical("On")
+		try SourceMatches := SourceMatches && _PersonalTomlWriteLeaseOwns(OwnerToken, FilePath)
+			&& !_PersonalWritesPaused() && _ConfigWriteLeaseKey(PersonalTomlPath()) == _ConfigWriteLeaseKey(FilePath)
+		finally Critical(PreviousCritical)
+		if !SourceMatches
+			return false
+	}
+	if PersonalInfoSource is Map {
+		Observed := _PersonalInfoReadWriteSource(PhysicalPath)
+		if !Observed["admitted"] || PersonalInfoSource["present"] != Observed["present"]
+				|| !_PersonalInfoSourceBytesEqual(PersonalInfoSource["bytes"], Observed["bytes"])
+			return false
+		PreviousCritical := Critical("On")
+		try Current := _PersonalInfoWriteSourceCurrent(PersonalInfoSource, OwnerToken, FilePath)
+		finally Critical(PreviousCritical)
+		if !Current
+			return false
+	}
+	if HasMethod(BeforeNativeFn, "Call")
+		BeforeNativeFn.Call()
+	else if !((BeforeNativeFn is Integer) && BeforeNativeFn == 0)
+		throw TypeError("The internal personal TOML native cutpoint must be callable or zero.")
 	return true
 }
 
@@ -740,7 +806,7 @@ _PersonalTomlNativeAdmission(FilePath, OwnerToken := 0, OpeningSource := 0,
 ; durable target: even a partial stage write is isolated under a unique name.
 _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 		DeleteFn := 0, AuthorizeFn := 0, PublishFn := 0,
-		OpeningSource := 0, OwnerToken := 0, PreservationSource := 0, BeforeNativeFn := 0) {
+		OpeningSource := 0, OwnerToken := 0, PreservationSource := 0, BeforeNativeFn := 0, PersonalInfoSource := 0) {
 	static WriteSeq := 0
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
@@ -748,7 +814,7 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 		; Critical state into stale-temp cleanup, staging or arbitrary replacement ports.
 		Critical("Off")
 		try return _PersonalTomlWriteAtomic(FilePath, Content, WriterFn,
-			ReplaceFn, DeleteFn, AuthorizeFn, PublishFn, OpeningSource, OwnerToken, PreservationSource, BeforeNativeFn)
+			ReplaceFn, DeleteFn, AuthorizeFn, PublishFn, OpeningSource, OwnerToken, PreservationSource, BeforeNativeFn, PersonalInfoSource)
 		finally Critical(InheritedCritical)
 	}
 	HasPublisher := !((PublishFn is Integer) && PublishFn == 0)
@@ -759,131 +825,152 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 		return false
 	}
 	LocalSeq := ++WriteSeq
-	StagePath := FilePath . "." . A_ScriptHwnd . "-" . LocalSeq . ".tmp"
-	_TOML_ReapStaleTemps(FilePath, StaleTempAgeMs())
-	_PersonalTomlCleanupStage(StagePath, DeleteFn)
-
-	Written := false
-	try Written := HasMethod(WriterFn, "Call")
-		? WriterFn.Call(StagePath, Content)
-		: FSWriteDurable(StagePath, Content)
-	catch as Err {
-		try LoggerError("PersonalToml",
-			"Writing staging file for '{1}' failed: {2}. The previous contents are intact.",
-			FilePath, Err.Message)
-		_PersonalTomlCleanupStage(StagePath, DeleteFn)
-		return false
-	}
-	Written := (Written is Integer) && Written == 1
-	if !Written {
-		try LoggerError("PersonalToml",
-			"Writing staging file for '{1}' was refused. The previous contents are intact.",
-			FilePath)
-		_PersonalTomlCleanupStage(StagePath, DeleteFn)
-		return false
-	}
-
-	Authorized := true
-	AuthorizeError := ""
-	PreviousCritical := Critical("On")
-	try {
-		try Authorized := HasMethod(AuthorizeFn, "Call")
-			? AuthorizeFn.Call() : true
+	NativeAdapters := (WriterFn is Integer) && WriterFn == 0
+		&& (ReplaceFn is Integer) && ReplaceFn == 0 && (DeleteFn is Integer) && DeleteFn == 0
+	if NativeAdapters {
+		try PhysicalPath := FSResolveAbsolutePath(FilePath)
 		catch as Err {
-			Authorized := false
-			AuthorizeError := Err.Message
+			try LoggerError("PersonalToml", "Cannot capture the personal publication target: {1}.", Err.Message)
+			return false
 		}
-		Authorized := (Authorized is Integer) && Authorized != 0
-	} finally {
-		Critical(PreviousCritical)
-	}
-	if !Authorized {
-		if (AuthorizeError != "") {
-			try LoggerError("PersonalToml",
-				"Authorization before publishing '{1}' failed: {2}. The previous contents are intact.",
-				FilePath, AuthorizeError)
-		} else {
-			try LoggerError("PersonalToml",
-				"Authorization before publishing '{1}' was refused. The previous contents are intact.",
-				FilePath)
+		_TOML_ReapStaleTemps(PhysicalPath, StaleTempAgeMs())
+		Stage := {handle: -1}
+		Suffix := "." . A_ScriptHwnd . "-" . LocalSeq . ".tmp"
+		Preflight := _PersonalTomlHeldPreflight.Bind(Stage, FilePath, PhysicalPath, Content,
+			AuthorizeFn, OpeningSource, OwnerToken, PreservationSource, BeforeNativeFn, PersonalInfoSource)
+		ReplaceExisting := PersonalInfoSource is Map ? PersonalInfoSource["present"]
+			: PreservationSource is Map ? PreservationSource["present"]
+			: OpeningSource is Map ? OpeningSource["present"] : true
+		Replaced := FSWriteReplaceOwned(PhysicalPath, Content, Suffix, &StageDetail,
+			_PersonalTomlCreateHeldStage.Bind(Stage), Preflight,
+			_PersonalTomlNativeAdmission.Bind(FilePath, OwnerToken, OpeningSource, PreservationSource, PersonalInfoSource),
+			ReplaceExisting, &Publication)
+		if !((Replaced is Integer) && Replaced == 1) {
+			if Publication.renamed && !Publication.durable
+				return ConfigReportPersistenceFailure("personal hotstring publication", 0,
+					"A native replacement occurred without complete durable acknowledgement. "
+					. "Verify the current image and reload its opening receipt if stale. " . StageDetail, false)
+			try LoggerError("PersonalToml", "Owned personal publication was refused: {1}. No target was replaced.", StageDetail)
+			return false
 		}
+	} else {
+		StagePath := FilePath . "." . A_ScriptHwnd . "-" . LocalSeq . ".tmp"
+		_TOML_ReapStaleTemps(FilePath, StaleTempAgeMs())
 		_PersonalTomlCleanupStage(StagePath, DeleteFn)
-		return false
-	}
 
-	if !((OpeningSource is Integer) && OpeningSource == 0) {
-		; Arbitrary authorization is complete and its Critical span has ended.
-		; Read the exact expected image now, then resample only pure authority.
-		SourceMatches := _PersonalTomlOpeningImageMatches(OpeningSource, FilePath, OwnerToken)
-		PreviousCritical := Critical("On")
-		try SourceMatches := SourceMatches
-			&& _PersonalTomlOpeningAuthority(OpeningSource, FilePath, OwnerToken)
-		finally Critical(PreviousCritical)
-		if !SourceMatches {
+		Written := false
+		try Written := HasMethod(WriterFn, "Call")
+			? WriterFn.Call(StagePath, Content)
+			: FSWriteDurable(StagePath, Content)
+		catch as Err {
+			try LoggerError("PersonalToml",
+				"Writing staging file for '{1}' failed: {2}. The previous contents are intact.",
+				FilePath, Err.Message)
 			_PersonalTomlCleanupStage(StagePath, DeleteFn)
 			return false
 		}
-	}
-
-	if PreservationSource is Map {
-		Observed := _PersonalTomlReadOpeningImage(FilePath)
-		SourceMatches := Observed["admitted"] && Observed["present"] == PreservationSource["present"]
-			&& (Observed["content"] == PreservationSource["content"])
-		PreviousCritical := Critical("On")
-		try SourceMatches := SourceMatches && _PersonalTomlWriteLeaseOwns(OwnerToken, FilePath)
-			&& !_PersonalWritesPaused() && _ConfigWriteLeaseKey(PersonalTomlPath()) == _ConfigWriteLeaseKey(FilePath)
-		finally Critical(PreviousCritical)
-		if !SourceMatches {
+		Written := (Written is Integer) && Written == 1
+		if !Written {
+			try LoggerError("PersonalToml",
+				"Writing staging file for '{1}' was refused. The previous contents are intact.",
+				FilePath)
 			_PersonalTomlCleanupStage(StagePath, DeleteFn)
 			return false
 		}
-	}
 
-	; Arbitrary replacement ports remain interruptible. Only the original native
-	; producer consumes pure final admission in its guarded rename span. The
-	; optional internal cutpoint models revocation after the earlier checks; it
-	; runs outside Critical and is never forwarded to an injected replacement.
-	Replaced := false
-	ReplaceError := ""
-	try {
-		if HasMethod(ReplaceFn, "Call")
-			Replaced := ReplaceFn.Call(StagePath, FilePath)
-		else {
-			if HasMethod(BeforeNativeFn, "Call")
-				BeforeNativeFn.Call()
-			else if !((BeforeNativeFn is Integer) && BeforeNativeFn == 0)
-				throw TypeError("The internal personal TOML native cutpoint must be callable or zero.")
-			Replaced := FSConfigAtomicMoveReplace(StagePath, FilePath, &NativeError,
-				_PersonalTomlNativeAdmission.Bind(FilePath, OwnerToken, OpeningSource, PreservationSource))
-		}
-	}
-	catch as Err {
-		Replaced := false
-		ReplaceError := Err.Message
-	}
-	Replaced := (Replaced is Integer) && Replaced == 1
-	if !Replaced {
-		if (ReplaceError != "") {
-			try LoggerError("PersonalToml",
-				"Atomic replace of '{1}' failed: {2}. The previous contents are intact.",
-				FilePath, ReplaceError)
-		} else {
-			try LoggerError("PersonalToml",
-				"Atomic replace of '{1}' was refused. The previous contents are intact.",
-				FilePath)
-		}
-		_PersonalTomlCleanupStage(StagePath, DeleteFn)
-		return false
-	}
-
-	if OpeningSource is Map {
-		; Advance from our exact acknowledged staged image, even when reload
-		; later refuses. Never treat a fresh arbitrary disk image as our own.
+		Authorized := true
+		AuthorizeError := ""
 		PreviousCritical := Critical("On")
 		try {
-			OpeningSource["present"] := true
-			OpeningSource["content"] := Content
-		} finally Critical(PreviousCritical)
+			try Authorized := HasMethod(AuthorizeFn, "Call")
+				? AuthorizeFn.Call() : true
+			catch as Err {
+				Authorized := false
+				AuthorizeError := Err.Message
+			}
+			Authorized := (Authorized is Integer) && Authorized != 0
+		} finally {
+			Critical(PreviousCritical)
+		}
+		if !Authorized {
+			if (AuthorizeError != "") {
+				try LoggerError("PersonalToml",
+					"Authorization before publishing '{1}' failed: {2}. The previous contents are intact.",
+					FilePath, AuthorizeError)
+			} else {
+				try LoggerError("PersonalToml",
+					"Authorization before publishing '{1}' was refused. The previous contents are intact.",
+					FilePath)
+			}
+			_PersonalTomlCleanupStage(StagePath, DeleteFn)
+			return false
+		}
+
+		if !((OpeningSource is Integer) && OpeningSource == 0) {
+			; Arbitrary authorization is complete and its Critical span has ended.
+			; Read the exact expected image now, then resample only pure authority.
+			SourceMatches := _PersonalTomlOpeningImageMatches(OpeningSource, FilePath, OwnerToken)
+			PreviousCritical := Critical("On")
+			try SourceMatches := SourceMatches
+				&& _PersonalTomlOpeningAuthority(OpeningSource, FilePath, OwnerToken)
+			finally Critical(PreviousCritical)
+			if !SourceMatches {
+				_PersonalTomlCleanupStage(StagePath, DeleteFn)
+				return false
+			}
+		}
+
+		if PreservationSource is Map {
+			Observed := _PersonalTomlReadOpeningImage(FilePath)
+			SourceMatches := Observed["admitted"] && Observed["present"] == PreservationSource["present"]
+				&& (Observed["content"] == PreservationSource["content"])
+			PreviousCritical := Critical("On")
+			try SourceMatches := SourceMatches && _PersonalTomlWriteLeaseOwns(OwnerToken, FilePath)
+				&& !_PersonalWritesPaused() && _ConfigWriteLeaseKey(PersonalTomlPath()) == _ConfigWriteLeaseKey(FilePath)
+			finally Critical(PreviousCritical)
+			if !SourceMatches {
+				_PersonalTomlCleanupStage(StagePath, DeleteFn)
+				return false
+			}
+		}
+
+		; Arbitrary replacement ports remain interruptible. Only the original native
+		; producer consumes pure final admission in its guarded rename span. The
+		; optional internal cutpoint models revocation after the earlier checks; it
+		; runs outside Critical and is never forwarded to an injected replacement.
+		Replaced := false
+		ReplaceError := ""
+		try {
+			if HasMethod(ReplaceFn, "Call")
+				Replaced := ReplaceFn.Call(StagePath, FilePath)
+			else {
+				if HasMethod(BeforeNativeFn, "Call")
+					BeforeNativeFn.Call()
+				else if !((BeforeNativeFn is Integer) && BeforeNativeFn == 0)
+					throw TypeError("The internal personal TOML native cutpoint must be callable or zero.")
+				Replaced := FSConfigAtomicMoveReplace(StagePath, FilePath, &NativeError,
+					_PersonalTomlNativeAdmission.Bind(FilePath, OwnerToken, OpeningSource, PreservationSource))
+			}
+		}
+		catch as Err {
+			Replaced := false
+			ReplaceError := Err.Message
+		}
+		Replaced := (Replaced is Integer) && Replaced == 1
+		if !Replaced {
+			if (ReplaceError != "") {
+				try LoggerError("PersonalToml",
+					"Atomic replace of '{1}' failed: {2}. The previous contents are intact.",
+					FilePath, ReplaceError)
+			} else {
+				try LoggerError("PersonalToml",
+					"Atomic replace of '{1}' was refused. The previous contents are intact.",
+					FilePath)
+			}
+			_PersonalTomlCleanupStage(StagePath, DeleteFn)
+			return false
+		}
+
 	}
 
 	; Publish only the already-validated memory projection in a second short
@@ -904,15 +991,27 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 	if !Published {
 		if (PublishError != "") {
 			try LoggerError("PersonalToml",
-				"Atomic replacement of '{1}' succeeded, but live publication failed: {2}. Reload is required to project the durable value.",
+				"Atomic replacement of '{1}' succeeded, but live publication failed: {2}. Verify the current image and reload if stale.",
 				FilePath, PublishError)
 		} else {
 			try LoggerError("PersonalToml",
-				"Atomic replacement of '{1}' succeeded, but live publication was refused. Reload is required to project the durable value.",
+				"Atomic replacement of '{1}' succeeded, but live publication was refused. Verify the current image and reload if stale.",
 				FilePath)
 		}
-		return false
+		return ConfigReportPersistenceFailure("personal TOML live publication", 0,
+			"The durable target was replaced, but live publication was not acknowledged. "
+			. "Verify the current image and reload if stale.", false)
 	}
+	if OpeningSource is Map {
+		; Advance only after durable and requested live publication acknowledge.
+		; Never treat a fresh arbitrary disk image as our own.
+		PreviousCritical := Critical("On")
+		try {
+			OpeningSource["present"] := true
+			OpeningSource["content"] := Content
+		} finally Critical(PreviousCritical)
+	}
+
 	return true
 }
 
@@ -1775,10 +1874,17 @@ WritePersonalInfoToml(FilePath, Information := unset, Letters := unset,
 			return false
 		}
 
-		Written := _PersonalTomlWriteAtomic(FilePath, Content,
-			WriterFn, _PersonalInfoReplaceUnchanged.Bind(Source, OwnerToken, ReplaceFn), DeleteFn,
-			_PersonalTomlAuthorizeOwnedWrite.Bind(
-				OwnerToken, FilePath, AuthorizeFn), PublishFn)
+		NativeAdapters := (WriterFn is Integer) && WriterFn == 0
+			&& (ReplaceFn is Integer) && ReplaceFn == 0 && (DeleteFn is Integer) && DeleteFn == 0
+		if NativeAdapters
+			Written := _PersonalTomlWriteAtomic(FilePath, Content, 0, 0, 0,
+				_PersonalTomlAuthorizeOwnedWrite.Bind(OwnerToken, FilePath, AuthorizeFn),
+				PublishFn, 0, OwnerToken, 0, 0, Source)
+		else
+			Written := _PersonalTomlWriteAtomic(FilePath, Content,
+				WriterFn, _PersonalInfoReplaceUnchanged.Bind(Source, OwnerToken, ReplaceFn), DeleteFn,
+				_PersonalTomlAuthorizeOwnedWrite.Bind(
+					OwnerToken, FilePath, AuthorizeFn), PublishFn)
 		if !((Written is Integer) && Written == 1)
 			return false
 		return true
