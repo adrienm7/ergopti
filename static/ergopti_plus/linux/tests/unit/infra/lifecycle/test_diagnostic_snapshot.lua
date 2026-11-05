@@ -177,6 +177,19 @@ end)
 
 describe("Diagnostic snapshot: Linux collector", function()
 	local Collector = require("infra.diagnostic_snapshot")
+	it("linux-os-release-quotes: decodes supported single and double quoted values", function()
+		local facts = Collector.system_facts({ read = function(path)
+			if path == "/etc/os-release" then
+				return [=[NAME='Example Linux'
+PRETTY_NAME="Example \"Workstation\""
+VERSION_ID='42'
+]=]
+			end
+		end })
+		assert_eq(facts.os_name, 'Example "Workstation"')
+		assert_eq(facts.os_short_name, "Example Linux")
+		assert_eq(facts.os_version_id, "42")
+	end)
 	local files = {
 		["/etc/os-release"] = 'NAME="Ubuntu"\nVERSION_ID="24.04"\n',
 		["/proc/sys/kernel/osrelease"] = "6.8.0-45-generic\n",
