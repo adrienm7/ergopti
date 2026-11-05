@@ -1293,13 +1293,19 @@ end
 --- tooltip must show; the time from the last key to the tooltip is named.
 --- Predictions the user turned off skip with `llm_disabled`: the check never
 --- turns them on, since that would start a model the run promises not to load.
---- A model that is not on this Mac and a tooltip that never showed each fail
---- with their own code.
+--- A remote backend skips with `remote_backend`: it has no model on this Mac,
+--- and calling it would send the run's text out (field report 2026-11-05
+--- failed it as a missing model). A local model that is not on this Mac and a
+--- tooltip that never showed each fail with their own code.
 function M.prediction_tooltip(ports, report, finish)
 	ports.prediction_readiness(function(facts)
 		report.step("prediction_backend", STATE.info, facts.backend or "unknown")
 		if not facts.enabled then
 			report.step("prediction_ready", STATE.skip, "llm_disabled")
+			return finish()
+		end
+		if facts.backend ~= "ollama" and facts.backend ~= "mlx" then
+			report.step("prediction_ready", STATE.skip, "remote_backend")
 			return finish()
 		end
 		if not facts.installed then
