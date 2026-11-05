@@ -60,7 +60,11 @@ if [ "v$installed" = "$tag" ] && [ "${ERGOPTI_REINSTALL:-0}" != 1 ]; then
 	log "$APP is already $tag."
 else
 	curl -fsSL --proto =https "$publication_url" -o "$work/publication.json" || fail "$tag publishes no macos-publication.json."
-	curl -fL --proto =https --progress-bar "$archive_url" -o "$work/app.zip" || fail "the macOS archive could not be downloaded."
+	# A company proxy cut the 27 MB archive at 56% (curl 18, field report
+	# 2026-11-05): each retry resumes where the transfer stopped; the size and
+	# SHA-256 checks below still admit only the published archive.
+	curl -fL --proto =https --progress-bar --retry 6 --retry-delay 5 --retry-all-errors -C - \
+		"$archive_url" -o "$work/app.zip" || fail "the macOS archive could not be downloaded."
 	expected="$(/usr/bin/python3 -c 'import json,sys
 for a in json.load(open(sys.argv[1]))["archives"]:
     if a["name"] == sys.argv[2]: print(a["size"], a["sha256"])' "$work/publication.json" "$ARCHIVE")" \
