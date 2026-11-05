@@ -700,6 +700,47 @@ for (const id of ['send_text', 'send_key', 'send_shortcut', 'llm_prompt_predicti
 	);
 }
 
+// Editing an existing translate prompt must preserve its per-binding target.
+for (const host of ['ahk', 'hs', 'linux']) {
+	const page = loadPage(host);
+	vm.runInContext(
+		`
+		entries.find((entry) => entry.id === 'llm_prompt_prediction').parameterValue = 'translate|2|Esperanto';
+		doConfirm('llm_prompt_prediction');
+	`,
+		page.context
+	);
+	check(
+		page.byId['param-profile'].value === 'translate',
+		`${host}: existing translation remains selectable`
+	);
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 && page.posted[0].parameter === 'translate|2|Esperanto',
+		`${host}: saving an unchanged translate prompt must retain the target`
+	);
+	page.posted.length = 0;
+	page.byId['param-count'].value = '5';
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 && page.posted[0].parameter === 'translate|5|Esperanto',
+		`${host}: changing the count must retain the target`
+	);
+	page.posted.length = 0;
+	page.byId['param-count'].value = '';
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 0 && page.byId['param-error'].hidden === false,
+		`${host}: the implicit count cannot represent an existing target`
+	);
+	page.byId['param-profile'].value = 'rewrite';
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 && page.posted[0].parameter === 'rewrite',
+		`${host}: switching profiles must not carry the translation target`
+	);
+}
+
 // 10. Free language entry belongs to the host's existing InputBox, on all drivers.
 // The page must not synthesize a locale or overwrite the stored binding value.
 for (const host of ['ahk', 'hs', 'linux']) {

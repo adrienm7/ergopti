@@ -166,18 +166,19 @@ local function inspect_focused_element(application_or_pid, observe)
 		return nil, "Accessibility element API is unavailable"
 	end
 
-	local ok, result, focus_refused = pcall(function()
+	local ok, result, focus_refused, focused_element = pcall(function()
 		local app_element = hs.axuielement.applicationElementForPID(pid)
 		if not app_element then return nil end
 		local focused, focused_error = app_element:attributeValue("AXFocusedUIElement")
 		if not focused then return nil, focused == nil and focused_error ~= nil end
-		return M.isElementSecure(focused, observe and function(complete) observe(complete, pid) end)
+		local secure = M.isElementSecure(focused, observe and function(complete) observe(complete, pid) end)
+		return secure, nil, focused
 	end)
 	if not ok then return nil, result end
 	if type(result) ~= "boolean" then
 		return nil, "focused Accessibility element is unavailable", focus_refused == true
 	end
-	return result, nil
+	return result, nil, nil, focused_element
 end
 
 --- Classifies the focused element for one exact application.
@@ -191,6 +192,17 @@ end
 function M.inspectFocusedElement(application_or_pid, observe)
 	local secure, detail = inspect_focused_element(application_or_pid, observe)
 	return secure, detail
+end
+
+
+--- Classifies and returns the exact same focused element for a destination receipt.
+--- @param application_or_pid table|userdata|number Application object or PID.
+--- @return boolean|nil secure
+--- @return any error_detail
+--- @return userdata|table|nil element The element that was classified.
+function M.inspectFocusedElementWithReceipt(application_or_pid)
+	local secure, detail, _, element = inspect_focused_element(application_or_pid)
+	return secure, detail, element
 end
 
 

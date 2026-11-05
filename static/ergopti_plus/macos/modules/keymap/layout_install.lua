@@ -266,9 +266,9 @@ end
 --- those directories with native calls each time, avoiding a shell subprocess on
 --- the normal Hammerspoon path and observing even same-second changes.
 --- @param dir string Keyboard Layouts directory.
---- @return table Map { [keylayout basename without extension] = bundle basename }.
+--- @return table|nil Map { [keylayout basename without extension] = bundle basename }, or nil on failure.
 local function keylayout_index(dir)
-	if type(dir) ~= "string" or dir == "" then return {} end
+	if type(dir) ~= "string" or dir == "" then return nil end
 	local index = {}
 	if type(FileSystem.classify_no_follow) == "function" then
 		local _, status = FileSystem.classify_no_follow(NativePath.without_trailing_separators(dir))
@@ -312,14 +312,14 @@ local function keylayout_index(dir)
 	local p = io.popen(cmd)
 	if not p then
 		Logger.warn(LOG, "Keylayout scan could not start in %s.", dir)
-		return index
+		return nil
 	end
 	for raw_line in p:lines() do
 		local line = raw_line:gsub("[\r\n]+$", "")
 		local bundle, layout = line:match("([^/]+%.bundle)/Contents/Resources/([^/]+)%.keylayout$")
 		if bundle and index[layout] == nil then index[layout] = bundle end
 	end
-	p:close()
+	if p:close() ~= true then return nil end
 	return index
 end
 
@@ -357,11 +357,13 @@ end
 
 --- Keyboard-layout names the installed bundles provide, in both scopes, so the
 --- layout manager never installs a second input source under one of them.
---- @return table Set { [name] = true }.
+--- @return table|nil Set { [name] = true }, or nil when a scope cannot be listed.
 local function bundle_keylayout_names()
 	local names = {}
 	for _, dir in ipairs({ SYSTEM_LAYOUTS_DIR, USER_LAYOUTS_DIR }) do
-		for name in pairs(keylayout_index(dir)) do names[name] = true end
+		local index = keylayout_index(dir)
+		if not index then return nil end
+		for name in pairs(index) do names[name] = true end
 	end
 	return names
 end
@@ -378,7 +380,8 @@ local function layout_version(kl_name)
 	-- A name is matched against file basenames only; a separator could never match.
 	if NativePath.has_separator(kl_name) then return nil end
 	for _, dir in ipairs({ SYSTEM_LAYOUTS_DIR, USER_LAYOUTS_DIR }) do
-		local bundle = keylayout_index(dir)[kl_name]
+		local index = keylayout_index(dir)
+		local bundle = index and index[kl_name]
 		if bundle then
 			local layouts_dir = NativePath.without_trailing_separators(dir)
 			return read_bundle_version(layouts_dir .. "/" .. bundle)

@@ -104,6 +104,11 @@ local function new_fixture()
 	}
 	package.loaded["adapters.secure_field_detector"] = {
 		isSecureApp = function() return state.secure_app == true end,
+		inspectFocusedElementWithReceipt = function()
+			state.secure_reads = state.secure_reads + 1
+			if state.secure_read_fail then return nil, "secure read refused" end
+			return state.secure, nil, {}
+		end,
 		inspectFocusedElement = function()
 			state.secure_reads = state.secure_reads + 1
 			if state.secure_read_fail then return nil, "secure read refused" end
@@ -157,6 +162,9 @@ local function new_fixture()
 		return make_ui_watcher("app", callback)
 	end
 
+	hs_stub.axuielement = { applicationElementForPID = function()
+		return { attributeValue = function() return {} end }
+	end }
 	hs_stub.timer.secondsSinceEpoch = function() return state.now end
 	hs_stub.window.focusedWindow = function()
 		state.ax_reads = state.ax_reads + 1

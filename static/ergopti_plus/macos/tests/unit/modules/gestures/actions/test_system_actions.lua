@@ -347,6 +347,16 @@ helpers.describe("macOS Finder selection actions", function()
 		end)
 	end)
 
+	for _, name in ipairs({ "remove_quarantine_selection", "make_executable_selection" }) do
+		helpers.it(name .. " refuses a malformed Finder list before changing any file", function()
+			with_system(function(System, record)
+				helpers.assert_true(System[name](PARENT))
+				complete(record.runs[1], true, '{"/Users/ana/file", }')
+				helpers.assert_eq(#record.runs, 1, "no command may act on a partial selection")
+			end)
+		end)
+	end
+
 	helpers.it("make_executable_selection runs chmod +x on the selected paths", function()
 		with_system(function(System, record)
 			System.make_executable_selection(PARENT)
