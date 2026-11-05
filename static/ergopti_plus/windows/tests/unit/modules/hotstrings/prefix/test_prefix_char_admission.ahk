@@ -120,6 +120,7 @@ _PCA_WithObserverFixture(Body) {
 	Schedule(Fn, Period) => State.Scheduled.Push({ Fn: Fn, Period: Period })
 	Focus() => State.Focus.Clone()
 	LLM_Bridge_CancelPrefixObserver()
+	Privacy := _LLM_TestPrivacyEnter(State.Focus)
 	try {
 		_LLM_Bridge_Active := true
 		_LLM_Bridge_Buffer := ""
@@ -127,6 +128,7 @@ _PCA_WithObserverFixture(Body) {
 		_LLM_Bridge_AgentFeeding := false
 		_LLM_Engine := Map("enabled", false, "request_id", 10,
 			"timer_active", false, "pending_timer", "")
+		AssertTrue(IsObject(_LLM_Bridge_BindTypingSource(Focus(), true)))
 		Body.Call(State, Schedule, Focus)
 	} finally {
 		LLM_Bridge_CancelPrefixObserver()
@@ -138,6 +140,7 @@ _PCA_WithObserverFixture(Body) {
 		_LLM_Engine := Saved.Engine
 		_PrefixDeferredGeneration := Saved.Lifecycle
 		_KS_PhysicalInputGeneration := Saved.Physical
+		_LLM_TestPrivacyExit(Privacy)
 	}
 }
 

@@ -142,7 +142,12 @@ _LLM_Engine_NormalizeAcceptSource(AcceptSource := unset) {
 	if !(Hwnd is Integer and Hwnd > 0
 			and ControlToken is Integer and ControlToken > 0)
 		return Map("hwnd", 0, "control", 0)
-	return Map("hwnd", Hwnd, "control", ControlToken)
+	Source := Map("hwnd", Hwnd, "control", ControlToken)
+	if AcceptSource.Has("source_secure") {
+		Secure := AcceptSource["source_secure"]
+		Source["source_secure"] := !(Secure is Integer) || Secure != 0
+	}
+	return Source
 }
 
 ; Resolve the source owned by the request whose tooltip is about to be painted.
@@ -341,8 +346,11 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		; caller must still fail closed if a future port implementation throws.
 		; Sending a password context is irreversible; suppressing one prediction
 		; until the next safe buffer is always the correct privacy outcome.
-		IsPw := true
-		try IsPw := SFD_IsSecureField()
+		IsPw := AcceptSource.Get("source_secure", false)
+		if !IsPw {
+			IsPw := true
+			try IsPw := SFD_IsSecureField()
+		}
 		if IsPw {
 			try LoggerInfo("LLM", "Prediction suppressed — password field detected.")
 			return

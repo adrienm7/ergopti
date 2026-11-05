@@ -722,6 +722,8 @@ _LDP_Native(Mode, Calls, Lines) {
     global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LDP_Debt, _LLM_Live
     global _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading, _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
     global SFD_FIELD_CACHE
+    global _LLM_Bridge_BufferSource, _LLM_Bridge_AgentBufferSource, _LLM_Bridge_AgentContentGeneration
+    global _LLM_Bridge_BufferAgentSafe, _LLM_Bridge_PrivacyAppCache
     Retyped := Mode == "excluded-switches-typed" || Mode == "password-switches-typed"
     PasswordProbe := Mode == "password-stays" || Mode == "password-switches" || Mode == "plain-stays" || Mode == "password-switches-typed"
     SecretOrigin := PasswordProbe && Mode != "plain-stays"
@@ -741,24 +743,25 @@ _LDP_Native(Mode, Calls, Lines) {
         Content: _LLM_Bridge_ContentGeneration, AgentBuffer: _LLM_Bridge_AgentBuffer,
         LogTick: _LLM_Bridge_LastLogTick, Observer: _LLM_Bridge_PrefixObserver,
         AgentGeneration: _LLM_Agent_Generation, AgentAuto: _LLM_Agent_Auto,
-        Hse: HSE_Buffer, Prefix: _PrefixBuffer, Live: _LLM_Live}
+        Hse: HSE_Buffer, Prefix: _PrefixBuffer, Live: _LLM_Live,
+        BufferSource: _LLM_Bridge_BufferSource, AgentSource: _LLM_Bridge_AgentBufferSource,
+        AgentContent: _LLM_Bridge_AgentContentGeneration, AgentSafe: _LLM_Bridge_BufferAgentSafe,
+        PrivacyCache: _LLM_Bridge_PrivacyAppCache}
     State := {Directory: "", DirectoryOwned: false, Peer: 0, PeerStop: "", App: 0, AppStop: "",
         GuiA: 0, Hook: 0, InputActive: false, InputChars: "", InputCallbacks: 0, InputDowns: 0,
         TypedHwnd: 0, TypedControl: 0, Failure: 0, Id: 0, Entry: 0, Engine: _LLM_Engine,
         Endpoint: "", OwnEntries: Map(), SfdOwned: false, SfdPrevious: 0, SfdCache: 0, SecureSource: -1, SecureFocus: -1}
     Primary := 0
     try {
-        if PasswordProbe {
-            AssertFalse(SFD_FIELD_CACHE.Get("focus_tracking_active", false), "do not borrow a live native secure-field observer")
-            AssertEqual(0, SFD_FIELD_CACHE.Get("focus_hook", 0))
-            AssertEqual(0, SFD_FIELD_CACHE.Get("focus_callback", 0))
-            AssertEqual(0, SFD_FIELD_CACHE.Get("pending_hwnd", 0), "do not borrow a pending UIA classification")
-            State.SfdPrevious := SFD_FIELD_CACHE
-            State.SfdCache := SFD_FIELD_CACHE.Clone()
-            SFD_FIELD_CACHE := State.SfdCache
-            State.SfdOwned := true
-            SFD_Refresh()
-        }
+        AssertFalse(SFD_FIELD_CACHE.Get("focus_tracking_active", false), "do not borrow a live native secure-field observer")
+        AssertEqual(0, SFD_FIELD_CACHE.Get("focus_hook", 0))
+        AssertEqual(0, SFD_FIELD_CACHE.Get("focus_callback", 0))
+        AssertEqual(0, SFD_FIELD_CACHE.Get("pending_hwnd", 0), "do not borrow a pending UIA classification")
+        State.SfdPrevious := SFD_FIELD_CACHE
+        State.SfdCache := SFD_FIELD_CACHE.Clone()
+        SFD_FIELD_CACHE := State.SfdCache
+        State.SfdOwned := true
+        SFD_Refresh()
         State.Directory := A_Temp . "\ergopti_llm_source_" . A_TickCount . "_" . Random(1, 1000000)
         Ack := FSCreateDirectoryExclusiveStrict(State.Directory)
         AssertTrue(Ack is Integer && Ack == 1)
@@ -810,6 +813,9 @@ _LDP_Native(Mode, Calls, Lines) {
         _LLM_Menu["api_entries"] := [Entry], _LLM_Menu["api_entry_id"] := "source-owned"
         _LLM_Menu["agent_mode"] := "off"
         _LLM_Bridge_Active := true, _LLM_Bridge_Buffer := "", _LLM_Bridge_AgentBuffer := ""
+        _LLM_Bridge_BufferSource := 0, _LLM_Bridge_AgentBufferSource := 0
+        _LLM_Bridge_AgentContentGeneration := 0, _LLM_Bridge_BufferAgentSafe := true
+        _LLM_Bridge_PrivacyAppCache := 0
         _LLM_Live := Map("active", false, "profile_id", "", "num_predictions", 0)
         _Stub_LlmTooltipVisible := false, _Stub_LlmTooltipLoading := false
         _Stub_LlmTooltipText := "", _Stub_LlmPresentedRecord := 0
@@ -834,6 +840,11 @@ _LDP_Native(Mode, Calls, Lines) {
             AssertEqual(State.TypedControl, SFD_FocusedHwnd(), "the real detector must identify the exact native source control")
             State.SecureSource := SFD_IsSecureField()
             AssertEqual(SecretOrigin, State.SecureSource, "the genuine native detector must independently classify the source before typing")
+        } else {
+            ; The source is a native plain Edit in every old app-only case.
+            ; Warm its genuine conclusive verdict before controlled injection.
+            State.SecureSource := SFD_IsSecureField()
+            AssertFalse(State.SecureSource)
         }
         Canary := AllowedOrigin ? "allowed_context_b_canary" : "private_context_a_canary"
         State.Hook := InputHook("V L0 I1")
@@ -850,7 +861,7 @@ _LDP_Native(Mode, Calls, Lines) {
             SendEvent("{Text}" . Canary)
         } finally SendLevel(PreviousSendLevel)
         Started := A_TickCount
-        while (State.InputChars != Canary || !_LLM_Engine["timer_active"]) && TickElapsed64(Started) < 2000
+        while State.InputChars != Canary && TickElapsed64(Started) < 2000
             Sleep(5)
         if IsObject(State.Failure)
             throw State.Failure
@@ -858,11 +869,19 @@ _LDP_Native(Mode, Calls, Lines) {
         AssertEqual(Canary, ControlGetText(State.TypedControl), "the same actual text is present in the original native Edit")
         SnapshotCritical := Critical("On")
         try {
-            AssertEqual(Canary, _LLM_Bridge_Buffer)
-            AssertEqual(Canary, _LLM_Engine["last_buffer"])
-            AssertTrue(_LLM_Engine["timer_active"] && IsObject(_LLM_Engine_Plan().Pending),
-                "the genuine callback must arm its unmodified native debounce timer while the original native app is active")
-            ArmToken := _LLM_Engine_Plan().Pending["token"]
+            PrivatePurged := !AllowedOrigin && _LLM_Bridge_Buffer == ""
+            if PrivatePurged {
+                AssertEqual("", _LLM_Engine["last_buffer"], "upstream rejection must leave no private engine context")
+                AssertFalse(_LLM_Engine["timer_active"])
+                AssertFalse(IsObject(_LLM_Engine_Plan().Pending))
+                ArmToken := 0
+            } else {
+                AssertEqual(Canary, _LLM_Bridge_Buffer)
+                AssertEqual(Canary, _LLM_Engine["last_buffer"])
+                AssertTrue(_LLM_Engine["timer_active"] && IsObject(_LLM_Engine_Plan().Pending),
+                    "admitted source text must own the genuine native debounce timer")
+                ArmToken := _LLM_Engine_Plan().Pending["token"]
+            }
             InputCount := State.InputCallbacks, DownCount := State.InputDowns
             BeforeCounter := _LLM_Remote_AsyncCounter
         } finally Critical(SnapshotCritical)
@@ -886,6 +905,7 @@ _LDP_Native(Mode, Calls, Lines) {
             State.TypedHwnd := BHwnd, State.TypedControl := BControl
             AllowedCanary := "allowed_context_b_canary"
             PriorCallbacks := State.InputCallbacks
+            AssertFalse(SFD_IsSecureField(), "the exact fresh B Edit has a conclusive genuine plain verdict before injection")
             PreviousSendLevel := A_SendLevel
             try {
                 SendLevel(2)
@@ -899,6 +919,8 @@ _LDP_Native(Mode, Calls, Lines) {
             AssertEqual(Canary . AllowedCanary, State.InputChars, "both actual I1 input bursts must be observed in order")
             AssertEqual(AllowedCanary, ControlGetText(BControl), "the fresh allowed context is genuinely present in native B")
             AssertEqual(PriorCallbacks + StrLen(AllowedCanary), State.InputCallbacks)
+            FreshBBufferExact := _LLM_Bridge_Buffer == AllowedCanary
+            FreshBEngineExact := _LLM_Engine["last_buffer"] == AllowedCanary
             AssertTrue(_LLM_Engine["timer_active"] && IsObject(_LLM_Engine_Plan().Pending))
             AssertTrue(_LLM_Engine_Plan().Pending["token"] != ArmToken, "fresh B input supersedes the original A arm through the real engine")
             InputCount := State.InputCallbacks, DownCount := State.InputDowns
@@ -945,12 +967,19 @@ _LDP_Native(Mode, Calls, Lines) {
             "source_app", SourceApp, "focus_app", FocusApp, "a_app", AApp, "b_app", BApp,
             "source_secure", State.SecureSource, "focus_secure", State.SecureFocus,
             "origin_hwnd", OriginHwnd, "origin_control", OriginControl, "fresh_b_input", Retyped,
+            "private_source_purged", PrivatePurged,
+            "fresh_b_buffer_exact", Retyped ? FreshBBufferExact : -1,
+            "fresh_b_engine_exact", Retyped ? FreshBEngineExact : -1,
             "typed_hwnd", State.TypedHwnd, "typed_control", State.TypedControl,
             "captured_source_hwnd", Source is Map ? Source.Get("hwnd", 0) : 0,
             "captured_source_control", Source is Map ? Source.Get("control", 0) : 0,
             "focus_hwnd", WIGetForegroundHwnd(),
             "native_request_delta", NativeDelta, "http_posts", Posts, "source_a_received", SourceA,
             "source_b_received", SourceB, "remaining_requests", _LLM_Remote_Async.Count)))
+        if Retyped {
+            AssertTrue(FreshBBufferExact, "the rolling context must contain exactly B, never retained private A")
+            AssertTrue(FreshBEngineExact, "the armed engine must contain exactly B")
+        }
         ExpectedPosts := (AllowedOrigin || Retyped) ? 1 : 0
         AssertEqual(ExpectedPosts, Posts, "only the genuinely allowed context may produce one HTTP request")
         if ExpectedPosts
@@ -979,6 +1008,9 @@ _LDP_Native(Mode, Calls, Lines) {
         _LLM_Bridge_LastLogTick := Saved.LogTick, _LLM_Bridge_PrefixObserver := Saved.Observer
         _LLM_Agent_Generation := Saved.AgentGeneration, _LLM_Agent_Auto := Saved.AgentAuto
         HSE_Buffer := Saved.Hse, _PrefixBuffer := Saved.Prefix, _LLM_Live := Saved.Live
+        _LLM_Bridge_BufferSource := Saved.BufferSource, _LLM_Bridge_AgentBufferSource := Saved.AgentSource
+        _LLM_Bridge_AgentContentGeneration := Saved.AgentContent, _LLM_Bridge_BufferAgentSafe := Saved.AgentSafe
+        _LLM_Bridge_PrivacyAppCache := Saved.PrivacyCache
     }
     if IsObject(Primary)
         throw Primary

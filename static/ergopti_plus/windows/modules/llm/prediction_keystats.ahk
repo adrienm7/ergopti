@@ -55,7 +55,7 @@ _LLM_Engine_CaptureAcceptSource() {
  * @param {string} buffer - Full typed context up to the caret.
  */
 LLM_Engine_OnKeystroke(buffer, delay_override_ms := "", ScheduleFn := SetTimer,
-		PublishGuard := unset) {
+		PublishGuard := unset, SourceReceipt := unset) {
 	global _LLM_Engine
 	local _c := Critical("On")
 	try {
@@ -81,7 +81,7 @@ LLM_Engine_OnKeystroke(buffer, delay_override_ms := "", ScheduleFn := SetTimer,
 		; another control from re-attributing this request before the timer fires.
 		; Live mode redirects this same trigger to its own prompt, count and
 		; debounce; the override is bound with the buffer like the focus origin.
-		AcceptSource := _LLM_Engine_CaptureAcceptSource()
+		AcceptSource := IsSet(SourceReceipt) ? _LLM_Engine_NormalizeAcceptSource(SourceReceipt) : _LLM_Engine_CaptureAcceptSource()
 		if IsSet(PublishGuard) && !PublishGuard.Call()
 			return false
 		_LLM_Engine["last_buffer"] := buffer
@@ -139,7 +139,7 @@ _LLM_Engine_FireArmed(Token, Buffer, AcceptSource, Override) {
  * @param {string} buffer - Optional context override captured at schedule time.
  */
 LLM_Engine_StartTimer(delaySec := "", buffer := "", PublishGuard := unset,
-		ScheduleFn := SetTimer) {
+		ScheduleFn := SetTimer, SourceReceipt := unset) {
 	global _LLM_Engine
 	if !_LLM_Engine["enabled"]
 		return false
@@ -155,7 +155,7 @@ LLM_Engine_StartTimer(delaySec := "", buffer := "", PublishGuard := unset,
 	; Focus capture and delay calculation may query adapters; perform them before
 	; the guarded mutation span. A token-aware caller rechecks only at the exact
 	; cancel/re-arm transaction, so a stale callback cannot cancel a newer timer.
-	AcceptSource := _LLM_Engine_CaptureAcceptSource()
+	AcceptSource := IsSet(SourceReceipt) ? _LLM_Engine_NormalizeAcceptSource(SourceReceipt) : _LLM_Engine_CaptureAcceptSource()
 	HasOverride := delaySec != "" and IsNumber(delaySec)
 	Override := LLM_Engine_LiveOverride()
 	PreviousCritical := Critical("On")
