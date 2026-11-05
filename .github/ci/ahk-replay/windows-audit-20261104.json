@@ -1,99 +1,155 @@
 {
-	"expected_count": 65,
-	"native_http_client_e2e": false,
-	"native_hotstring_e2e": false,
+	"expected_count": 177,
+	"native_http_client_e2e": true,
+	"native_hotstring_e2e": true,
 	"filters": [
 		{
-			"contains": "event-id-domain-owner",
+			"contains": "llm-debounce-source-privacy",
 			"expected_count": 3
 		},
 		{
-			"contains": "full-id-recovery",
+			"contains": "llm-debounce-password-source-privacy",
+			"expected_count": 3
+		},
+		{
+			"contains": "llm-debounce-private-retyped-context",
+			"expected_count": 2
+		},
+		{
+			"contains": "llm-typing-source-privacy",
+			"expected_count": 10
+		},
+		{
+			"contains": "prefix-char-admission",
+			"expected_count": 9
+		},
+		{
+			"contains": "prefix-scalar-framing",
+			"expected_count": 16
+		},
+		{
+			"contains": "prefix-bridge-idle-fragment",
 			"expected_count": 4
 		},
 		{
-			"contains": "state-fields-atomic",
-			"expected_count": 8
+			"contains": "bridge-shortcut-fragment",
+			"expected_count": 7
 		},
 		{
-			"contains": "keystats: journal identity number retains native row ownership",
-			"expected_count": 1
-		},
-		{
-			"contains": "keystats: journal identity boolean-true retains native row ownership",
-			"expected_count": 1
-		},
-		{
-			"contains": "roi-stale-owner",
-			"expected_count": 3
-		},
-		{
-			"contains": "roi-context-word-owner",
-			"expected_count": 6
-		},
-		{
-			"contains": "roi-prune-bounded",
-			"expected_count": 3
-		},
-		{
-			"contains": "storage-native-name-nul",
-			"expected_count": 6
-		},
-		{
-			"contains": "storage native enumeration receipt:",
-			"expected_count": 5
-		},
-		{
-			"contains": "storage: clear rejects registry enumeration failure",
-			"expected_count": 1
-		},
-		{
-			"contains": "storage: clear reports and stops on registry deletion failure",
-			"expected_count": 1
-		},
-		{
-			"contains": "hotstring-override-partial-publication",
+			"contains": "llm-buffer-cap-single-owner",
 			"expected_count": 2
 		},
 		{
-			"contains": "personal-info-native-close",
+			"contains": "llm unicode-context-cap:",
+			"expected_count": 4
+		},
+		{
+			"contains": "(F47)",
 			"expected_count": 2
+		},
+		{
+			"contains": "llm-failure-finalizer-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "llm-slot-display-stale-parser",
+			"expected_count": 2
+		},
+		{
+			"contains": "LLM live mode:",
+			"expected_count": 23
+		},
+		{
+			"contains": "agent-source1-custody",
+			"expected_count": 10
+		},
+		{
+			"contains": "public-prediction-requester-admission",
+			"expected_count": 18
+		},
+		{
+			"contains": "jev-native-requester",
+			"expected_count": 2
+		},
+		{
+			"contains": "profile-suffix-menu-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "personal-suffix-menu-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "llm-instant-word-end-trigger",
+			"expected_count": 1
+		},
+		{
+			"contains": "tooltip-teardown-on-keyboard-thread",
+			"expected_count": 1
+		},
+		{
+			"contains": "llm-bridge-deferred-hides",
+			"expected_count": 1
+		},
+		{
+			"contains": "corpus-request-plan",
+			"expected_count": 3
 		},
 		{
 			"contains": "storage-native-scalar-persistence",
 			"expected_count": 4
 		},
 		{
+			"contains": "storage-quoted-scalar-protocol",
+			"expected_count": 2
+		},
+		{
+			"contains": "storage-quoted-scalar-invalid",
+			"expected_count": 2
+		},
+		{
 			"contains": "storage-native-counted-inventory",
 			"expected_count": 2
 		},
 		{
-			"contains": "event-id-allocation-capacity",
-			"expected_count": 1
+			"contains": "storage-native-name-nul",
+			"expected_count": 6
 		},
 		{
 			"contains": "storage-native-name-coercion",
 			"expected_count": 2
 		},
 		{
-			"contains": "sticky-kana-native)",
-			"expected_count": 2
-		},
-		{
-			"contains": "sticky-kana-native-released",
-			"expected_count": 1
-		},
-		{
-			"contains": "sticky-kana-native-up-before",
-			"expected_count": 1
-		},
-		{
-			"contains": "sticky-custom-endpoint-receipt",
+			"contains": "storage native enumeration receipt:",
 			"expected_count": 5
 		},
 		{
-			"contains": "sticky-kana-capture-options",
+			"contains": "personal-info-native-close",
+			"expected_count": 3
+		},
+		{
+			"contains": "webview reset idempotent: _PiEdWeb_Reset checks",
 			"expected_count": 1
+		},
+		{
+			"contains": "personal-info-source-witness",
+			"expected_count": 5
+		},
+		{
+			"contains": "personal info source projection:",
+			"expected_count": 7
+		},
+		{
+			"contains": "storage-native-nested-float",
+			"expected_count": 4
+		},
+		{
+			"contains": "sticky-kana-native-preheld",
+			"expected_count": 1
+		},
+		{
+			"contains": "takenote-pause-lifecycle-owner",
+			"expected_count": 3
 		}
 	]
 }
