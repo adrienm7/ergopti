@@ -292,7 +292,13 @@ _KSD_Main() {
 		Probes: 0, LogCalls: 0, Errors: 0, TimerCalls: 0, BeforeTimer: false, Done: false,
 		CapturedGeneration: -1, Failure: 0}
 	Primary := 0
-	try _KSD_Exercise()
+	global _KSD_ExtraExercise
+	try {
+		if IsObject(_KSD_ExtraExercise)
+			_KSD_ExtraExercise.Call()
+		else
+			_KSD_Exercise()
+	}
 	catch Any as Failure
 		Primary := Failure
 	finally {
