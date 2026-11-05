@@ -76,12 +76,15 @@ _SNA_NativeCase(Mode) {
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "An unretired native probe prevents another keyboard sender.")
 	Root := A_Temp . "\ergopti_sticky_native_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
-	FSCreateDirectoryExclusiveStrict(Root)
 	Script := Root . "\subject.ahk"
-	AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _SNA_NativeChildSource()))
+	Created := false
 	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}, Handle := 0, Primary := 0, Retired := false
 	PreviousCritical := Critical("Off")
 	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The native sticky fixture must exclusively acquire its source directory before writing or cleanup.")
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _SNA_NativeChildSource()))
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-edit-sendevent", Mode], _SICS_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The genuine sticky child must start.")
@@ -117,9 +120,9 @@ _SNA_NativeCase(Mode) {
 			Primary := Err
 	}
 	try {
-		if !Retired
-			RetirementDebt := Handle
-		else if !IsObject(Primary)
+		if Created && !Retired
+			RetirementDebt := {Handle: Handle, Directory: Root}
+		else if Created && !IsObject(Primary)
 			DirDelete(Root, true)
 	} finally Critical(PreviousCritical)
 	if IsObject(Primary)
@@ -154,12 +157,15 @@ _SSM_Case(Mode) {
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "An unretired native sender prevents another probe.")
 	Root := A_Temp . "\ergopti_sticky_flags_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
-	FSCreateDirectoryExclusiveStrict(Root)
 	Script := Root . "\subject.ahk"
-	AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _SSM_ChildSource()))
+	Created := false
 	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}, Handle := 0, Primary := 0, Retired := false
 	PreviousCritical := Critical("Off")
 	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The native modifier fixture requires an exclusively acquired source directory before publication or cleanup.")
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _SSM_ChildSource()))
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-edit-native-modifiers", Mode], _SICS_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The exact native flags child must start.")
@@ -195,9 +201,9 @@ _SSM_Case(Mode) {
 			Primary := Err
 	}
 	try {
-		if !Retired
-			RetirementDebt := Handle
-		else if !IsObject(Primary)
+		if Created && !Retired
+			RetirementDebt := {Handle: Handle, Directory: Root}
+		else if Created && !IsObject(Primary)
 			DirDelete(Root, true)
 	} finally Critical(PreviousCritical)
 	if IsObject(Primary)

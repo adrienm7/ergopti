@@ -2344,6 +2344,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/shortcuts/test_run_program_actions.ahk
 #Include unit/modules/gestures/test_user_actions.ahk
 #Include unit/modules/gestures/test_sticky_and_navigation_actions.ahk
+#Include unit/modules/gestures/test_sticky_kana_native.ahk
 #Include unit/modules/gestures/test_display_mirror_toggle.ahk
 #Include unit/modules/shortcuts/test_run_program_actions_custody.ahk
 #Include unit/modules/shortcuts/test_program_providers.ahk
