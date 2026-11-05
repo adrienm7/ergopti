@@ -31,6 +31,35 @@ local function with_browser(body)
 end
 
 helpers.describe("model browser inventory document", function()
+	helpers.it("(linux-model-delete-owner) passes the page owner to the model deletion", function()
+		local previous = package.loaded["ui.menu.llm_backend_rows"]
+		package.loaded["ui.menu.llm_backend_rows"] = { api_page = function()
+			return { rows = {}, providers = {}, tools = {} }
+		end }
+		local ok, failure = pcall(with_browser, function(f, bridge)
+			local checked = false
+			bridge.bind({ dialogs = {}, delete_model = function(_, page_current)
+				helpers.assert_eq(type(page_current), "function")
+				helpers.assert_eq(page_current(), true)
+				bridge.on_window_acquiring(9999)
+				helpers.assert_eq(page_current(), false)
+				checked = true
+				return false
+			end, ollama_state = function() return true end,
+				ollama_install_phase = function() return "idle" end, install_ollama = function() return true end })
+			local ready = f.handshake()
+			local installed
+			for _, row in ipairs(ready.data.models) do
+				if row.runtime_name == "qwen3.5:0.8b" then installed = row end
+			end
+			helpers.assert_not_nil(installed)
+			f.send({ action = "delete_model", backend = "ollama", name = installed.name })
+			helpers.assert_eq(checked, true)
+		end)
+		package.loaded["ui.menu.llm_backend_rows"] = previous
+		assert(ok, failure)
+	end)
+
 	for _, refused in ipairs({ true, false }) do
 		helpers.it("(model-selector-download-receipt) reports request admission " .. tostring(not refused), function()
 			with_browser(function(f, _, seen)

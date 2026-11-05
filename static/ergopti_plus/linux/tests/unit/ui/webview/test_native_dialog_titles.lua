@@ -142,6 +142,35 @@ end)
 
 
 h.describe("native menu dialog captions", function()
+	h.it("(linux-model-delete-owner) refuses deletion if the page closes during confirmation", function()
+		local names = { "ui.menu.builder", "ui.menu.menu_llm", "ui.menu.llm_backend_rows", "ui.modal" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+		local previous_execute, options, deletions, live, paused = os.execute, nil, 0, true, false
+		package.loaded["ui.menu.llm_backend_rows"] = {
+			bind_page = function(_, bound) options = bound end,
+			caption = function() return "model" end,
+		}
+		package.loaded["ui.modal"] = { run = function(fn) return fn() end }
+		os.execute = function() live = false; return 0 end
+		local ok, err = xpcall(function()
+			require("ui.menu.builder").build({ _version = "9.9.9", paused = false,
+				is_paused = function() return paused end, on_quit = function() end,
+				llm = { is_enabled = function() return false end,
+					delete_model = function() deletions = deletions + 1; return true end } })
+			h.assert_type(options, "table")
+			h.assert_eq(options.delete_model("model:1", function() return live end), false)
+			h.assert_eq(deletions, 0)
+			live = true
+			os.execute = function() paused = true; return 0 end
+			h.assert_eq(options.delete_model("model:1", function() return live end), false)
+			h.assert_eq(deletions, 0)
+		end, debug.traceback)
+		os.execute = previous_execute
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(err, 0) end
+	end)
+
 	h.it("(linux-native-titles) real Uninstall callbacks brand confirmation and failure without changing body or refusal", function()
 		local names = { "ui.menu.builder", "ui.menu.uninstall", "infra.installation", "ui.modal", "ui.menu.llm_backend_rows" }
 		local saved = {}
