@@ -1,0 +1,12 @@
+accepted 144675226.608
+lease_fence_requested 144675226.918
+lease_fenced 144675227.417
+input_drain_started 144675227.625
+input_drained 144675228.456
+reload_marked 144675230.256
+teardown_attempt 144675230.516
+teardown_attempt 144675230.871
+teardown_pending 144675231.533
+reload_deadline 144687227.412
+hs_reload_called 144687227.815
+boot 144687367.489
