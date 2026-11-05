@@ -14,7 +14,7 @@ _WPMG_Source(Directory, Canon) {
 	Position := InStr(Source, Fixture, true, -1)
 	AssertTrue(Position > 0, "the actual boot component must expose its final fixture boundary")
 	Source := SubStr(Source, 1, Position - 1)
-	for Symbol in ["WPMWidget_ToggleGraphConfig", "WPMWidget_BuildGraph", "_ToggleWpmWidgetGraph"] {
+	for Symbol in ["WPMWidget_ToggleGraphConfig", "WPMWidget_BuildGraph", "_ToggleWpmWidgetGraph", "WMHandleOwnedByThisProcess"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(Owner != "", "every WPM configuration/window owner must exist")
 		Source .= "#Include " . Owner . "`n"

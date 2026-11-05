@@ -91,8 +91,8 @@ _WPMG_Main() {
 	FileAppend("PASS wpm-graph-native " . State.Mode . "`n", "*")
 }
 try _WPMG_Main()
-catch Any as Failure {
-	FileAppend("FAIL wpm-graph-native " . Failure.Message . " [" . Failure.File . ":" . Failure.Line . "]`n", "*")
+catch Any as _WPMG_ChildFailure {
+	FileAppend("FAIL wpm-graph-native " . _WPMG_ChildFailure.Message . " [" . _WPMG_ChildFailure.File . ":" . _WPMG_ChildFailure.Line . "]`n", "*")
 	ExitApp(1)
 }
 ExitApp(0)
