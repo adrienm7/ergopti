@@ -101,6 +101,11 @@ local function manager(options)
 		encode_json = Json.encode,
 		read = function(path) return state.files[path] end,
 		write = function(path, content) state.files[path] = content; return true end,
+		create = function(path, content)
+			if state.files[path] ~= nil then return false, "exists" end
+			state.files[path] = content
+			return true, "created"
+		end,
 		delete = function(path) state.files[path] = nil; state.deleted[#state.deleted + 1] = path; return true end,
 		exists = function(path) return state.files[path] ~= nil end,
 		prepare_parent = function() return true end,
@@ -329,6 +334,48 @@ helpers.describe("layout manager (macOS): installing", function()
 		helpers.assert_true(result.ok == false)
 		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_FOREIGN_FILE)
 		helpers.assert_eq(state.files[LAYOUTS_DIR .. "ergol.keylayout"], "my own layout")
+	end)
+
+	helpers.it("never overwrites an unregistered local layout copy", function()
+		local files = shipped_files()
+		files[LOCAL_DIR .. "ergol.keylayout"] = "personal data"
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = files })
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_FOREIGN_FILE)
+		helpers.assert_eq(state.files[LOCAL_DIR .. "ergol.keylayout"], "personal data")
+		helpers.assert_nil(state.files[LAYOUTS_DIR .. "ergol.keylayout"])
+		local entry = entry_of("ergol")
+		local local_result = run(function(done) LayoutRegistry.install_local(entry, registry_file(entry.file), done, deps) end)
+		helpers.assert_eq(local_result.ok, false)
+		helpers.assert_eq(local_result.detail, LayoutRegistry.FAILURE_FOREIGN_FILE)
+		helpers.assert_eq(state.files[LOCAL_DIR .. "ergol.keylayout"], "personal data")
+	end)
+
+	helpers.it("preserves an installed-path collision that appears before publication", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files() })
+		local create = deps.create
+		deps.create = function(path, text)
+			if path == LAYOUTS_DIR .. "ergol.keylayout" then state.files[path] = "concurrent file" end
+			return create(path, text)
+		end
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_FOREIGN_FILE)
+		helpers.assert_eq(state.files[LAYOUTS_DIR .. "ergol.keylayout"], "concurrent file")
+		helpers.assert_not_nil(state.files[LOCAL_DIR .. "ergol.keylayout"], "the earlier created copy is retained")
+		helpers.assert_contains(result.extra, LOCAL_DIR .. "ergol.keylayout")
+	end)
+
+	helpers.it("refuses a new layout when exclusive creation is unavailable", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files() })
+		deps.create = nil
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_WRITE)
+		helpers.assert_nil(state.files[LOCAL_DIR .. "ergol.keylayout"])
+		helpers.assert_nil(state.files[LAYOUTS_DIR .. "ergol.keylayout"])
+		helpers.assert_nil(LayoutRegistry.snapshot(deps).busy)
 	end)
 
 	helpers.it("writes nothing while the installed record is unreadable (layout-install-record-first)", function()
@@ -578,10 +625,10 @@ require("test.layout_installed_manager_contract")(helpers, Json, {
 	entry = entry_of("ergol"),
 	files = shipped_files,
 	local_dir = LOCAL_DIR,
-	-- Explicitly repair only the earlier controlled native-port copy. The
-	-- production foreign-file policy and the actual private record stay strict.
+	-- Explicitly repair both controlled copies left by the refused publication.
 	repair_partial_copy = function(state)
 		state.files[LAYOUTS_DIR .. "ergol.keylayout"] = nil
+		state.files[LOCAL_DIR .. "ergol.keylayout"] = nil
 	end,
 })
 
@@ -591,10 +638,10 @@ require("test.layout_installed_update_manager_contract")(helpers, Json, {
 	entry = entry_of("ergol"),
 	files = shipped_files,
 	local_dir = LOCAL_DIR,
-	-- Explicitly repair only the earlier controlled native-port copy. The
-	-- production foreign-file policy and the actual private record stay strict.
+	-- Explicitly repair both controlled copies left by the refused publication.
 	repair_partial_copy = function(state)
 		state.files[LAYOUTS_DIR .. "ergol.keylayout"] = nil
+		state.files[LOCAL_DIR .. "ergol.keylayout"] = nil
 	end,
 })
 
@@ -604,10 +651,10 @@ require("test.layout_installed_extension_manager_contract")(helpers, Json, {
 	entry = entry_of("ergol"),
 	files = shipped_files,
 	local_dir = LOCAL_DIR,
-	-- Explicitly repair only the earlier controlled native-port copy. The
-	-- production foreign-file policy and the actual private record stay strict.
+	-- Explicitly repair both controlled copies left by the refused publication.
 	repair_partial_copy = function(state)
 		state.files[LAYOUTS_DIR .. "ergol.keylayout"] = nil
+		state.files[LOCAL_DIR .. "ergol.keylayout"] = nil
 	end,
 })
 
