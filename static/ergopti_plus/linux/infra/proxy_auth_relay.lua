@@ -95,14 +95,26 @@ function M.probe(upstream, authority, options, callback)
 	end
 	local args = active.probe_args(upstream, authority, M.timings())
 	if not args then return nil, "proxy-auth-relay-arguments-invalid" end
+	local constructing, completion = true, nil
+	local function deliver(result)
+		callback(active.read_probe(type(result) == "table" and result.exit_code or nil,
+			type(result) == "table" and result.stdout or nil))
+	end
 	local operation = require("adapters.owned_process").start(executable, args, {
 		owner = options.owner, timeout_ms = options.timeout_ms, max_output_bytes = MAX_PROBE_OUTPUT_BYTES,
 		authorized = options.authorized,
 	}, function(result)
-		callback(active.read_probe(type(result) == "table" and result.exit_code or nil,
-			type(result) == "table" and result.stdout or nil))
+		if constructing then completion = result else deliver(result) end
 	end)
-	if type(operation) ~= "table" or operation.started ~= true then return nil, "proxy-auth-relay-probe-unavailable" end
+	constructing = false
+	if type(operation) ~= "table" then return nil, "proxy-auth-relay-probe-unavailable" end
+	-- A refused start can still own handles until their close callbacks. Keep
+	-- that operation and its eventual completion instead of publishing a second
+	-- refusal while cleanup is pending.
+	if operation.started ~= true and operation:is_settled() then
+		return nil, "proxy-auth-relay-probe-unavailable"
+	end
+	if completion then deliver(completion) end
 	return {
 		is_settled = function() return operation:is_settled() == true end,
 		on_settled = function(listener) return operation:on_settled(listener) end,
