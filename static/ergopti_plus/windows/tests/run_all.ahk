@@ -989,6 +989,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/modules/gestures/test_virtual_desktops.ahk
 #Include unit/modules/shortcuts/test_text_case_vectors.ahk
 #Include unit/modules/shortcuts/test_wrap_selection_action.ahk
+#Include unit/modules/shortcuts/test_uia_selection_native64_owner.ahk
 #Include unit/modules/gestures/test_system_actions.ahk
 #Include unit/modules/gestures/test_unblock_selected_root_reparse.ahk
 #Include unit/modules/gestures/test_unblock_selected_file_reparse.ahk
