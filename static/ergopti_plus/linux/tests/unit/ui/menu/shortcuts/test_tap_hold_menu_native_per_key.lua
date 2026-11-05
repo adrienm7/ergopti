@@ -54,6 +54,25 @@ helpers.describe("native per-key delay acknowledgement", function()
 			if not ok then error(err, 0) end
 		end)
 	end
+	helpers.it("(tap-hold-invalid-markup) escapes invalid text before showing the error", function()
+		local calls = {}
+		local section, Manager = build(calls, {})
+		local TextPrompt = require("ui.text_prompt")
+		local original_ask, original_execute = TextPrompt.ask, os.execute
+		local command
+		local ok, err = pcall(function()
+			TextPrompt.ask = function() return "<invalid & value>" end
+			os.execute = function(value) command = value; return 0 end
+			local key = assert(find(key_rows(section), require("infra.i18n").get("key_name.left_shift")))
+			helpers.assert_eq(key.menu[6].fn(), false)
+			helpers.assert_contains(command, "&lt;invalid &amp; value&gt;")
+			helpers.assert_eq(#calls, 0)
+		end)
+		TextPrompt.ask, os.execute = original_ask, original_execute
+		restore(Manager)
+		if not ok then error(err, 0) end
+	end)
+
 	for _, value in ipairs({ "0.49", "0", "-1", "1e309", "nan" }) do
 		helpers.it("refuses invalid " .. value .. " before the native threshold writer (tap-hold-key-delay)", function()
 			local calls = {}
