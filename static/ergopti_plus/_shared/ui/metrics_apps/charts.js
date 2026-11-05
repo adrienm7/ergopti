@@ -669,7 +669,7 @@ function renderDailyTrajectories(aggData) {
 				datasets: [
 					{
 						label: _t('ui_apps.ds_focus_h'),
-						data: dates.map((d) => +(byDate[d].time_ms / 3600000).toFixed(2)),
+						data: dates.map((d) => byDate[d].time_ms / 3600000),
 						borderColor: ThemeTokens.color('blue-dark'),
 						backgroundColor: 'rgba(10,132,255,0.15)',
 						tension: 0.25,
@@ -724,15 +724,16 @@ function renderDailyTrajectories(aggData) {
 	if (c30) {
 		const ratios = dates.map((d) => {
 			const eff = Math.max(0, (byDate[d].time_ms || 0) - (byDate[d].passive_ms || 0));
-			return eff > 0 ? +(((byDate[d].active_ms || 0) / eff) * 100).toFixed(1) : 0;
+			return eff > 0 ? ((byDate[d].active_ms || 0) / eff) * 100 : 0;
 		});
-		const colors = ratios.map((r) =>
-			r >= 60
+		const colors = ratios.map((value) => {
+			const r = +value.toFixed(1);
+			return r >= 60
 				? ThemeTokens.color('green-dark')
 				: r >= 30
 					? ThemeTokens.color('yellow-dark')
-					: ThemeTokens.color('red-dark')
-		);
+					: ThemeTokens.color('red-dark');
+		});
 		if (dailyActiveRatioChart) dailyActiveRatioChart.destroy();
 		dailyActiveRatioChart = new Chart(c30.getContext('2d'), {
 			type: 'bar',
@@ -750,7 +751,20 @@ function renderDailyTrajectories(aggData) {
 			options: {
 				responsive: true,
 				maintainAspectRatio: false,
-				plugins: { legend: { display: false } },
+				plugins: {
+					legend: { display: false },
+					tooltip: {
+						callbacks: {
+							label: (context) =>
+								Chart.defaults.plugins.tooltip.callbacks.label({
+									...context,
+									formattedValue: Number(context.parsed.y.toFixed(1)).toLocaleString(
+										context.chart?.options?.locale
+									)
+								})
+						}
+					}
+				},
 				scales: {
 					x: { grid: { display: false }, ticks: { color: ThemeTokens.color('grey-888') } },
 					y: {
@@ -772,7 +786,7 @@ function renderDailyTrajectories(aggData) {
 		const catList = [...allCats];
 		const datasets = catList.map((cat) => ({
 			label: cat,
-			data: dates.map((d) => +(((byDate[d].by_category || {})[cat] || 0) / 3600000).toFixed(2)),
+			data: dates.map((d) => ((byDate[d].by_category || {})[cat] || 0) / 3600000),
 			backgroundColor: getCategoryColor(cat, 0),
 			borderColor: getCategoryColor(cat, 0),
 			fill: true,
@@ -1159,7 +1173,7 @@ function renderCpmByHourChart(aggData) {
 		labels.push(`${hh}h`);
 		const slot = by_hour[hh] || { time_ms: 0, chars: 0 };
 		const minutes = slot.time_ms / 60000;
-		cpm.push(minutes > 0 ? Math.round(slot.chars / minutes) : 0);
+		cpm.push(minutes > 0 ? slot.chars / minutes : 0);
 		chars.push(slot.chars || 0);
 	}
 
@@ -1199,7 +1213,11 @@ function renderCpmByHourChart(aggData) {
 				legend: { labels: { color: ThemeTokens.color('grey-ddd'), font: { size: 11 } } },
 				tooltip: {
 					callbacks: {
-						title: (items) => (items[0] ? items[0].label : '')
+						title: (items) => (items[0] ? items[0].label : ''),
+						label: (context) =>
+							context.dataset.yAxisID === 'y_cpm'
+								? formatCpmTooltip(context)
+								: Chart.defaults.plugins.tooltip.callbacks.label(context)
 					}
 				}
 			},

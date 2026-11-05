@@ -25,7 +25,7 @@ function test(name, callback) {
 	console.log(`ok ${name}`);
 }
 
-function appsFixture() {
+function appsFixture(realRender = false) {
 	const context = vm.createContext({
 		window: {},
 		document: {
@@ -45,7 +45,12 @@ function appsFixture() {
 		assert.ok(index.includes(`src="${name}"`), `${name} must be loaded by the actual page`);
 		vm.runInContext(read(`metrics_apps/${name}`), context);
 	}
-	vm.runInContext('initDashboard = () => {}; renderDashboard = () => {};', context);
+	vm.runInContext(
+		realRender
+			? 'initDashboard = () => {};'
+			: 'initDashboard = () => {}; renderDashboard = () => {};',
+		context
+	);
 	return {
 		context,
 		set: (code) => vm.runInContext(code, context),
@@ -4425,4 +4430,191 @@ for (const host of ['windows', 'macos', 'linux']) {
 	});
 }
 
+test('apps daily charts retain sub-minute focus and category time', () => {
+	const fixture = appsFixture();
+	const context = fixture.context;
+	vm.runInContext(read('metrics_apps/charts.js'), context);
+	const canvases = {
+		daily_trio_chart: { getContext: () => 'trio' },
+		daily_categories_chart: { getContext: () => 'categories' }
+	};
+	context.document.getElementById = (id) => canvases[id] || null;
+	const charts = {};
+	context.Chart = class {
+		constructor(owner, config) {
+			charts[owner] = config;
+		}
+		destroy() {}
+	};
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': { Editor: { category: 'development', app_time_ms: 1000, chars: 1 } },
+			'2026-10-26': { Editor: { category: 'development', app_time_ms: 10000, chars: 1 } },
+			'2026-10-27': { Editor: { category: 'development', app_time_ms: 18000, chars: 1 } }
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	const aggregate = fixture.get();
+	context.renderDailyTrajectories(aggregate);
+	for (const [index, ms] of [1000, 10000, 18000].entries()) {
+		assert.equal(charts.trio.data.datasets[0].data[index], ms / 3600000);
+		assert.equal(charts.categories.data.datasets[0].data[index], ms / 3600000);
+	}
+});
+test('apps overview charts retain sub-minute durations', () => {
+	const fixture = appsFixture();
+	const context = fixture.context;
+	const canvases = {
+		apps_bar_chart: { getContext: () => 'apps' },
+		category_pie_chart: { getContext: () => 'categories' },
+		timeline_stacked_chart: { getContext: () => 'timeline' },
+		timeline_chart_title: {}
+	};
+	context.document.getElementById = (id) => canvases[id] || null;
+	const charts = {};
+	context.Chart = class {
+		constructor(owner, config) {
+			charts[owner] = config;
+		}
+		destroy() {}
+	};
+	context.window.bootstrapMetricsAppsData(
+		{ '2026-10-27': { Editor: { category: 'development', app_time_ms: 10000 } } },
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	const aggregate = fixture.get();
+	const apps = [
+		{ name: 'Editor', category: 'development', score: 0, timeMs: aggregate.apps.Editor.time_ms }
+	];
+	context.updateCharts(apps, aggregate);
+	assert.equal(charts.apps.data.datasets[0].data[0], 10000 / 3600000);
+	assert.equal(charts.categories.data.datasets[0].data[0], 10000 / 3600000);
+	assert.equal(charts.timeline.data.datasets[0].data[0], 10000 / 3600000);
+});
+test('apps hourly speed chart retains slow observed typing', () => {
+	const fixture = appsFixture();
+	const context = fixture.context;
+	vm.runInContext(read('metrics_apps/charts.js'), context);
+	context.document.getElementById = (id) =>
+		id === 'cpm_by_hour_chart' ? { getContext: () => 'hourly' } : null;
+	let chart;
+	context.Chart = class {
+		constructor(_owner, config) {
+			chart = config;
+		}
+		destroy() {}
+	};
+	const chartLibrary = vm.createContext({});
+	vm.runInContext(read('vendor/chart.umd.js'), chartLibrary);
+	context.Chart.defaults = chartLibrary.Chart.defaults;
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': { Editor: { chars: 1, app_time_ms: 180000, hourly: { 12: { c: 1 } } } }
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	context.renderCpmByHourChart(fixture.get());
+	assert.equal(chart.data.datasets[0].data[12], 1);
+	assert.equal(chart.data.datasets[1].data[12], 1 / 3);
+	const label = chart.options.plugins.tooltip.callbacks.label;
+	assert.equal(
+		label({ dataset: { label: 'CPM', yAxisID: 'y_cpm' }, parsed: { y: 1 / 3 } }),
+		'CPM: 0'
+	);
+});
+test('apps category speed chart retains slow observed typing', () => {
+	const fixture = appsFixture(true);
+	const context = fixture.context;
+	vm.runInContext(read('dom_utils.js'), context);
+	vm.runInContext(read('metrics_apps/modal.js'), context);
+	vm.runInContext(read('metrics_apps/charts.js'), context);
+	const elements = {
+		'kpi-switches': {},
+		'kpi-unlocks': {},
+		'kpi-wifi': {},
+		cpm_by_category_chart: { getContext: () => 'categories' },
+		'render-error-banner': {}
+	};
+	context.document.getElementById = (id) => elements[id] || null;
+	context.document.createElement = () => ({ style: {}, appendChild() {}, addEventListener() {} });
+	let chart;
+	context.Chart = class {
+		constructor(_owner, config) {
+			chart = config;
+		}
+		destroy() {}
+	};
+	const chartLibrary = vm.createContext({});
+	vm.runInContext(read('vendor/chart.umd.js'), chartLibrary);
+	context.Chart.defaults = chartLibrary.Chart.defaults;
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': {
+				Editor: { category: 'development', chars: 1, app_time_ms: 180000, hourly: { 12: { c: 1 } } }
+			}
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	context.renderDashboard();
+	assert.ok(
+		!elements['render-error-banner'].textContent,
+		elements['render-error-banner'].textContent
+	);
+	assert.equal(chart.data.datasets[0].data[0], 1 / 3);
+	assert.equal(
+		chart.options.plugins.tooltip.callbacks.label({
+			dataset: { label: 'CPM' },
+			parsed: { y: 1 / 3 }
+		}),
+		'CPM: 0'
+	);
+});
+test('apps daily active-ratio chart retains small observed ratios', () => {
+	const fixture = appsFixture();
+	const context = fixture.context;
+	vm.runInContext(read('metrics_apps/charts.js'), context);
+	context.document.getElementById = (id) =>
+		id === 'daily_active_ratio_chart' ? { getContext: () => 'ratio' } : null;
+	let chart;
+	context.Chart = class {
+		constructor(_owner, config) {
+			chart = config;
+		}
+		destroy() {}
+	};
+	const chartLibrary = vm.createContext({});
+	vm.runInContext(read('vendor/chart.umd.js'), chartLibrary);
+	context.Chart.defaults = chartLibrary.Chart.defaults;
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': { Editor: { chars: 2, time: 30, app_time_ms: 180000 } },
+			'2026-10-26': { Editor: { chars: 2, time: 5996, app_time_ms: 10000 } },
+			'2026-10-27': { Editor: { chars: 2, time: 6000, app_time_ms: 10000 } }
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	context.renderDailyTrajectories(fixture.get());
+	assert.equal(chart.data.datasets[0].data[0], (30 / 180000) * 100);
+	assert.equal(
+		chart.data.datasets[0].backgroundColor[1],
+		chart.data.datasets[0].backgroundColor[2]
+	);
+	assert.equal(
+		chart.options.plugins.tooltip.callbacks.label({
+			dataset: { label: 'Actif' },
+			parsed: { y: (30 / 180000) * 100 }
+		}),
+		'Actif: 0'
+	);
+});
 console.log(`${passed} passed, 0 failed.`);
