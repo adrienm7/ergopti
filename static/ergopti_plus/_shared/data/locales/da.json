@@ -340,6 +340,7 @@
 	"dialog.app_picker.active_suffix": " (aktiv)",
 	"dialog.app_picker.prompt": "Vælg programmer:",
 	"dialog.app_picker.running_count": "{n} kørende program(mer).",
+	"dialog.app_picker.selection_unverified": "Det valgte program kan ikke bekræftes, eller en anden post har forrang. Ingen binding blev gemt.",
 	"dialog.app_picker.stopped_suffix": " (stoppet)",
 	"dialog.app_picker.title": "Programvalg",
 	"dialog.bulk_toggle.save_failed": "Ændringen kunne ikke gemmes i konfigurationsfilen.\nDen er blevet fortrudt. Luk alle programmer, der holder filen åben, og prøv igen.",

@@ -340,6 +340,7 @@
 	"dialog.app_picker.active_suffix": " (активна)",
 	"dialog.app_picker.prompt": "Виберіть програми:",
 	"dialog.app_picker.running_count": "{n} запущених програм.",
+	"dialog.app_picker.selection_unverified": "Не вдалося перевірити вибрану програму або інший запис має пріоритет. Призначення не збережено.",
 	"dialog.app_picker.stopped_suffix": " (зупинена)",
 	"dialog.app_picker.title": "Вибір програм",
 	"dialog.bulk_toggle.save_failed": "Не вдалося зберегти зміну у файлі конфігурації.\nЇї скасовано. Закрийте всі програми, що утримують файл, і повторіть спробу.",

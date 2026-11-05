@@ -99,7 +99,9 @@ h.describe("native dialog captions (linux-native-titles)", function()
 	h.it("(linux-native-titles) the application chooser keeps its filter and id", function()
 		scenario(function(observed, shell)
 			observed.answer, observed.status = "/usr/share/applications/org.example.Native.desktop", 0
-			h.assert_eq(require("ui.app_chooser").pick(shell, "Choose application"), "org.example.Native")
+			h.assert_eq(require("ui.app_chooser").pick(shell, "Choose application", { resolve = function()
+				return observed.answer, "found"
+			end }), "org.example.Native")
 			h.assert_eq(observed.commands[1], DIALOG .. " --file-selection --title='ErgoptiPlus — Choose application'"
 				.. " --filename='/usr/share/applications/' --file-filter='*.desktop' 2>/dev/null")
 			h.assert_eq(observed.modals, 1)
@@ -328,9 +330,9 @@ h.describe("native caption consumer inventory", function()
 	h.it("(linux-native-titles) every production CLI caption remains in the independently bounded owner inventory", function()
 		local expected = {
 			["ui.text_prompt"] = 1,
-			-- The application picker's two captions, and the open_path picker's two,
-			-- composed through window_titles and proven by test_user_actions.
-			["ui.app_chooser"] = 2,
+			-- The picker, its verification error and the open_path picker retain
+			-- their composed caption; test_app_chooser proves the error dialog.
+			["ui.app_chooser"] = 3,
 			["ui.config_dir_picker"] = 1,
 			["ui.gesture_conflicts"] = 1,
 			["modules.gestures.system_actions"] = 1,
@@ -396,7 +398,8 @@ local function picker_exit_receipt(status, output, application_root)
 			.. "local modals = 0\n"
 			.. "package.loaded['ui.modal'] = { run = function(fn) modals = modals + 1; return fn() end }\n"
 			.. "local paths = { default_config_dir = function() return '/owned/default' end }\n"
-			.. (application_root and "local value = require('ui.app_chooser').pick(shell, 'Choose application')\n"
+			.. (application_root and "local value = require('ui.app_chooser').pick(shell, 'Choose application', {resolve=function() return "
+				.. string.format("%q", output:gsub("\n$", "")) .. ", 'found' end})\n"
 				or "local value = require('ui.config_dir_picker').pick(shell, paths, nil, '/owned/current')\n")
 			.. "io.write(value == nil and 'refused' or 'accepted|' .. value)\n"
 			.. "io.write('|modal:' .. modals)\n")

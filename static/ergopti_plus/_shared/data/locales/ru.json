@@ -340,6 +340,7 @@
 	"dialog.app_picker.active_suffix": " (активно)",
 	"dialog.app_picker.prompt": "Выберите приложения:",
 	"dialog.app_picker.running_count": "{n} запущенных приложений.",
+	"dialog.app_picker.selection_unverified": "Не удалось проверить выбранное приложение, либо другая запись имеет приоритет. Назначение не сохранено.",
 	"dialog.app_picker.stopped_suffix": " (остановлено)",
 	"dialog.app_picker.title": "Выбор приложений",
 	"dialog.bulk_toggle.save_failed": "Не удалось сохранить изменение в файле конфигурации.\nОно было отменено. Закройте все приложения, удерживающие файл, и повторите попытку.",

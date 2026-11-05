@@ -340,6 +340,7 @@
 	"dialog.app_picker.active_suffix": " (aktivní)",
 	"dialog.app_picker.prompt": "Vyberte aplikace:",
 	"dialog.app_picker.running_count": "{n} spuštěná/spuštěných aplikace/í.",
+	"dialog.app_picker.selection_unverified": "Vybranou aplikaci nelze ověřit nebo má jiná položka přednost. Žádné přiřazení nebylo uloženo.",
 	"dialog.app_picker.stopped_suffix": " (zastaveno)",
 	"dialog.app_picker.title": "Výběr aplikace",
 	"dialog.bulk_toggle.save_failed": "Změnu se nepodařilo uložit do konfiguračního souboru.\nByla vrácena zpět. Zavřete všechny aplikace, které soubor drží otevřený, a zkuste to znovu.",

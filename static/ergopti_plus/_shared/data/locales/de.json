@@ -340,6 +340,7 @@
 	"dialog.app_picker.active_suffix": " (aktiv)",
 	"dialog.app_picker.prompt": "Anwendungen auswählen:",
 	"dialog.app_picker.running_count": "{n} laufende Anwendung(en).",
+	"dialog.app_picker.selection_unverified": "Die ausgewählte Anwendung kann nicht überprüft werden oder ein anderer Eintrag hat Vorrang. Es wurde keine Belegung gespeichert.",
 	"dialog.app_picker.stopped_suffix": " (gestoppt)",
 	"dialog.app_picker.title": "Anwendungsauswahl",
 	"dialog.bulk_toggle.save_failed": "Die Änderung konnte nicht in der Konfigurationsdatei gespeichert werden.\nSie wurde rückgängig gemacht. Schließen Sie jede App, die die Datei festhält, und versuchen Sie es erneut.",

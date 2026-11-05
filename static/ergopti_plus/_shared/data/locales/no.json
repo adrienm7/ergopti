@@ -340,6 +340,7 @@
 	"dialog.app_picker.active_suffix": " (aktiv)",
 	"dialog.app_picker.prompt": "Velg programmer:",
 	"dialog.app_picker.running_count": "{n} kjørende program(er).",
+	"dialog.app_picker.selection_unverified": "Det valgte programmet kan ikke bekreftes, eller en annen oppføring har forrang. Ingen binding ble lagret.",
 	"dialog.app_picker.stopped_suffix": " (stoppet)",
 	"dialog.app_picker.title": "Programvalg",
 	"dialog.bulk_toggle.save_failed": "Endringen kunne ikke lagres i konfigurasjonsfilen.\nDen er angret. Lukk alle programmer som holder filen åpen, og prøv igjen.",

@@ -340,6 +340,7 @@
 	"dialog.app_picker.active_suffix": " (aktywna)",
 	"dialog.app_picker.prompt": "Wybierz aplikacje:",
 	"dialog.app_picker.running_count": "{n} działająca(-e) aplikacja(-e).",
+	"dialog.app_picker.selection_unverified": "Nie można zweryfikować wybranej aplikacji lub inny wpis ma pierwszeństwo. Nie zapisano przypisania.",
 	"dialog.app_picker.stopped_suffix": " (zatrzymana)",
 	"dialog.app_picker.title": "Wybór aplikacji",
 	"dialog.bulk_toggle.save_failed": "Nie udało się zapisać zmiany w pliku konfiguracyjnym.\nZostała cofnięta. Zamknij wszystkie aplikacje blokujące plik i spróbuj ponownie.",

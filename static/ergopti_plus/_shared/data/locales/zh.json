@@ -340,6 +340,7 @@
 	"dialog.app_picker.active_suffix": " (运行中)",
 	"dialog.app_picker.prompt": "选择应用程序：",
 	"dialog.app_picker.running_count": "{n} 个运行中的应用。",
+	"dialog.app_picker.selection_unverified": "无法验证所选应用，或其他条目具有更高优先级。未保存绑定。",
 	"dialog.app_picker.stopped_suffix": " (已停止)",
 	"dialog.app_picker.title": "应用选择",
 	"dialog.bulk_toggle.save_failed": "无法将更改保存到配置文件。\n更改已撤销。请关闭占用该文件的所有应用后重试。",

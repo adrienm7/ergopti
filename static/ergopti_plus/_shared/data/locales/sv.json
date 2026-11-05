@@ -340,6 +340,7 @@
 	"dialog.app_picker.active_suffix": " (aktiv)",
 	"dialog.app_picker.prompt": "Välj program:",
 	"dialog.app_picker.running_count": "{n} program som körs.",
+	"dialog.app_picker.selection_unverified": "Det valda programmet kan inte verifieras eller en annan post har företräde. Ingen bindning sparades.",
 	"dialog.app_picker.stopped_suffix": " (stoppad)",
 	"dialog.app_picker.title": "Programurval",
 	"dialog.bulk_toggle.save_failed": "Ändringen kunde inte sparas i konfigurationsfilen.\nDen har återställts. Stäng alla program som håller filen öppen och försök igen.",
