@@ -1,0 +1,45 @@
+
+=== shared engine: the hotstring cascade ===
+  ok   cascade, one arrow and an absent count are today's behaviour
+  ok   cascade, two arrows return ONE net edit: chatg gives ChatGPT
+  ok   cascade, two arrows stop after one more link, three go on
+  ok   cascade, a replacement that ends with its own trigger does not loop
+  ok   cascade, the guard folds case: the UPPER output of a rule is the same spec
+  ok   cascade, a final_result link ends the chain, and the net edit stays final
+  ok   cascade, the second link may reach back into the text typed before the first
+  ok   cascade, a private link is never composed into another hotstring's output
+  ok   cascade, the per-step gate can refuse a link, keeping the first one
+  ok   cascade, a link produced from output carries the time of the expander
+  ok   cascade, rejects an invalid arrow count loudly and keeps the first link
+
+=== shared engine: the cascade and Backspace undo ===
+  ok   cascade, an Undo restores what was typed, not a half-way text
+  ok   cascade, an Undo restores the text a later link reached back over
+  ok   cascade, an Undo after an end character puts the trigger and the terminator back
+
+=== shared engine: the cascade and end characters ===
+  ok   cascade, an end-character link cascades into another end-character link
+  ok   cascade, one arrow leaves the end-character chain to the next keystroke
+  ok   cascade, a consumed delimiter still lets the end-character chain run, then swallows it once
+  ok   cascade, a link that would swallow the typed end character ends the chain instead
+  ok   cascade, a word-start-only link never fires in the middle of a word
+
+=== shared engine: the shared cascade_vectors.json corpus ===
+  ok   fb_space_three_arrows_keeps_the_space (cascade-corpus)
+  ok   fb_space_consumed_swallows_the_space_once (cascade-corpus)
+  ok   fb_space_one_arrow_is_a_single_expansion (cascade-corpus)
+  ok   fb_space_one_arrow_consumed (cascade-corpus)
+  ok   fb_magic_key_consumed_chains (cascade-corpus)
+  ok   fb_enter_keeps_the_end_character (cascade-corpus)
+  ok   two_arrows_stop_after_the_second_expansion (cascade-corpus)
+  ok   three_arrows_stop_after_the_third_expansion (cascade-corpus)
+  ok   ten_arrows_run_the_whole_chain (cascade-corpus)
+  ok   auto_chain_needs_no_end_character (cascade-corpus)
+  ok   auto_chain_one_arrow (cascade-corpus)
+  ok   same_rule_fires_once_per_chain (cascade-corpus)
+  ok   link_that_would_swallow_the_end_character_ends_the_chain (cascade-corpus)
+  ok   swallowing_link_refused_even_when_consumed (cascade-corpus)
+  ok   word_start_rule_does_not_fire_inside_a_word (cascade-corpus)
+  ok   in_word_rule_fires_inside_a_word (cascade-corpus)
+  ok   end_character_rule_needs_the_end_character (cascade-corpus)
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":36}

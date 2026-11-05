@@ -1,0 +1,35 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"after_last_new_roots": ["WRSW-001", "WRSW-002"],
+	"excluded_policy_ambiguity": "Modifier scope of nonarrow Home/End/Page navigation; no third finding",
+	"sweeps": [
+		{
+			"sweep": "A",
+			"scope": "All 27 coverage aspects: physical/synthetic event routing; arrows/shortcuts/tap-holds; ordinary/modified Backspace; selectAll/nativeUndo; idle/recovery; terminal/multiline; full/incomplete AI context; fresh/stale observers; defaults/persistence/lifecycle",
+			"new_confirmed_roots": 0,
+			"source_files": 22,
+			"lexical_checks": 24,
+			"native_ahk_tests_executed": 0,
+			"basis": "Bounded manual source review plus exact-source lexical replay, not AHK execution",
+			"command": "python3 source-contract.py <repo-root>",
+			"program_sha256": "28db93faa6613f7550598594d58a273e353eadaf59beb17f9a56d95c61006a40",
+			"raw_stdout": "dry-A.txt",
+			"raw_stdout_sha256": "0a2d21115f046f7c8f1571bc497b8018520f429aaf769d9c37fc1b90dd24e28a",
+			"formatting": "Program and metadata preformatted with repository config before final replay; raw stdout retained without formatting"
+		},
+		{
+			"sweep": "B",
+			"scope": "All 27 coverage aspects: physical/synthetic event routing; arrows/shortcuts/tap-holds; ordinary/modified Backspace; selectAll/nativeUndo; idle/recovery; terminal/multiline; full/incomplete AI context; fresh/stale observers; defaults/persistence/lifecycle",
+			"new_confirmed_roots": 0,
+			"source_files": 22,
+			"lexical_checks": 24,
+			"native_ahk_tests_executed": 0,
+			"basis": "Bounded manual source review plus exact-source lexical replay, not AHK execution",
+			"command": "python3 source-contract.py <repo-root>",
+			"program_sha256": "28db93faa6613f7550598594d58a273e353eadaf59beb17f9a56d95c61006a40",
+			"raw_stdout": "dry-B.txt",
+			"raw_stdout_sha256": "0a2d21115f046f7c8f1571bc497b8018520f429aaf769d9c37fc1b90dd24e28a",
+			"formatting": "Program and metadata preformatted with repository config before final replay; raw stdout retained without formatting"
+		}
+	]
+}

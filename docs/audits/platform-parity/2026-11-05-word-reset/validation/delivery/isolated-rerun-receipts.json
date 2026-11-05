@@ -1,0 +1,12 @@
+[
+	{
+		"name": "app-cloner",
+		"command": ["npm", "run", "test:app-cloner-generated-literals"],
+		"exit_code": 0
+	},
+	{
+		"name": "ollama-protocol",
+		"command": ["node", "tools/test/test-managed-ollama-protocol.cjs"],
+		"exit_code": 0
+	}
+]

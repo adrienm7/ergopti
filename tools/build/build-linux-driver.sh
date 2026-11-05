@@ -104,8 +104,9 @@ echo "--- Copying _shared tree ---"
 # Every shared WebView application is production runtime data. Copying only the
 # four root helpers produced a valid-looking bundle in which all fifteen window
 # openers rendered an app-not-found page. Keep the complete offline UI tree;
-# corpus fixtures remain development-only.
-copy_tree "${SHARED_SRC}/" "${BUILD_DIR}/_shared/" --exclude corpus
+# Corpus fixtures and website-only source-review declarations are development data.
+copy_tree "${SHARED_SRC}/" "${BUILD_DIR}/_shared/" --exclude corpus \
+	--exclude modules/features/behaviors.json
 
 # Every Linux package (.deb, .rpm, AppImage, Flatpak, tarball) is made from this
 # shared tree, and none of them carries a .git: without the stamp the daemon's

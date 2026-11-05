@@ -408,6 +408,7 @@ const FORBIDDEN = [
 		group: 'developer-tooling',
 		test: (target) =>
 			/(^|\/)(generate_models|validate_[^/]*)\.py$/.test(target) ||
+			target === `${SHARED_ROOT}/modules/features/behaviors.json` ||
 			target.startsWith(`${SHARED_ROOT}/modules/llm/install/`) ||
 			target.startsWith(`${SHARED_ROOT}/native/`) ||
 			target.startsWith(`${SHARED_ROOT}/go/`)
@@ -1175,6 +1176,7 @@ try {
 
 	// One injection per forbidden group: the audit must refuse it
 	const injections = [
+		`${SHARED_ROOT}/modules/features/behaviors.json`,
 		`${DRIVER_ROOT}/tests/run.lua`,
 		`${SHARED_ROOT}/tests/corpus/x.json`,
 		`${SHARED_ROOT}/lua/test/format.lua`,

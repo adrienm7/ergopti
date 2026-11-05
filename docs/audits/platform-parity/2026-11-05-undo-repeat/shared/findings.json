@@ -1,0 +1,37 @@
+{
+	"schema_version": 1,
+	"scope": "shared",
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"created_at": "2026-11-05",
+	"report_path": "report.md",
+	"findings": [
+		{
+			"id": "URS001",
+			"title": "Linux automatic Backspace restoration is absent from generated behavioral inventory",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["behavior_inventory_coverage"],
+			"reproduction": "At the audited commit inspect all website inventory projections and their generator inputs, then Linux Main _undoable and handle_control. Specialized restoration exists in Linux but no behavioral declaration can reach the generated site/docs.",
+			"root_cause": "The projection owns configuration/action/menu/layer/tap-hold catalogues only; no independent source describes behavior without a setting.",
+			"silent_failure": "No drift gate can require a declaration outside its authored input domain. Existing docs candidly disclaim exhaustive product capability coverage.",
+			"regression_test": "Project a supplementary explicit behavior catalogue to site/docs and reject missing owners, stale reviewed hashes, duplicate ids, unknown OS, and missing localized qualifications. Do not infer native behavior from a matching receipt.",
+			"evidence": ["source-observation.json", "source_probe.py"],
+			"basis": "authenticated-source-review"
+		},
+		{
+			"id": "URS002",
+			"title": "English inventory translations are inert mappings inside JSDoc",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["localized_inventory_display"],
+			"reproduction": "Import the pinned src/routes/ergopti-plus/locales/en.js as a real JS module; inventory header and legend return undefined while Pour qui ? returns Who for?. The public accessor falls back to French.",
+			"root_cause": "The mappings were inserted inside the header JSDoc placeholder example before export default, so they are not members of the dictionary.",
+			"silent_failure": "The module parses and the gettext fallback renders French; source-substring checks can see apparent translations without verifying exports.",
+			"regression_test": "Import the actual exported dictionary and assert nonempty English values for every inventory heading and legend; never inspect mere source text.",
+			"evidence": ["source-observation.json", "source_probe.py"],
+			"basis": "actual-JS-import-and-source-review"
+		}
+	]
+}

@@ -1,0 +1,1023 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"claims": 145,
+	"distinct_paths": 83,
+	"qualification": "Claimed files only, not all transitive dependencies or whole-repository coverage. Expected metadata integration drift is listed explicitly.",
+	"results": [
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
+			"sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
+			"sha256": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
+			"sha256": "b1f46fb50f3ca84f6a17a9bd10a180dc42845486049afdbe9c7920c7f64e2832",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_match.ahk",
+			"sha256": "e9cf27cd2b56669a388dbae15146a462db50d482412d7393b24c8eb0ff5249b8",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_cascade.ahk",
+			"sha256": "e78d1ed3e57c2b21784f6a92b88b8f11d8d59691766b754fe15e2e3acaca313d",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/dynamic_hotstrings/user_code.ahk",
+			"sha256": "d244ef367fe7fc4e2ee519e07a79587d0868c1cdd11d69c2765f8ef5ea8937ea",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/dynamic_hotstrings/dynamic_hotstrings.ahk",
+			"sha256": "c2473eac43ac80812cc14dcff0d2e436143f9f6ceac082e64a9d573588f1454a",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/hotstrings/hotstrings_text_expansion.ahk",
+			"sha256": "45a67b3854bb6362e499a9032ef73357f3c50fca1cb9a269353d022eb833d474",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keystats/keystats_hotstring_log.ahk",
+			"sha256": "ad7f97ae3fc93acc4331a8fc836fcfef8998c0afd51534adb2728c4aeffdba45",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/wpm_display.ahk",
+			"sha256": "203b47646a5784b00a6c2598eee71ef68b2cab34c7ec73b4158a5137f6504055",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/wpm_config.ahk",
+			"sha256": "210947274712ee82e21b5378cc71a29db29e1c42650b7b79afd502e941fe5446",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/editors.ahk",
+			"sha256": "003f73f84ad8cfc92c98c5dfea4e4f163441950f22ff31ba62efc92f2d2a58e6",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/feature_state.ahk",
+			"sha256": "4fb1e47acebfe140556d66a50078461bab5ad576602ac26b6e6c320f8a475919",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/modules/hotstrings/engine/test_repeat_key_honours_rebuild_fence.ahk",
+			"sha256": "b480da1ae5497278d22958a2b9071189ab4a722a79b57297552c88ea3313746f",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/modules/hotstrings/preview/test_no_repeat_preview.ahk",
+			"sha256": "93ce420cdaef4de92adc3f63fee798c61e3e347188c83fd2b9c3c6e8aacea73b",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/modules/hotstrings/engine/test_hotstring_fire_log_privacy.ahk",
+			"sha256": "b78c44245398264b40e83487939b351f723f0773af9d94b3ef07dc6c657c97e9",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/wpm_widget/constants.toml",
+			"sha256": "5958af1049d9a196c6bb256985ba6c824355a9bfd62e97520094cbae30aa78db",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml",
+			"sha256": "45746566d2709a6508774034e60897296134168bd92ecb8b8af29a570fee9b66",
+			"receipt": "windows/source-contract-result.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+			"sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/registry.lua",
+			"sha256": "1fdc94fb8b7001627ae314b42a6c04eefdab98d1a38b51c3c88cac5a138f6eb1",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/registry_index.lua",
+			"sha256": "0d7144c2e59772709e123795de5f9ba16de62feaab78dcedadc07550ca25d22f",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/registry_groups.lua",
+			"sha256": "d0a61987990990e6beee90227e8f90ab6a9ce0cdb323c8569d55d148ee40910f",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/state.lua",
+			"sha256": "e565599088ffc788cdd93b8133b013c931183dde93690d0d8d551d29beb9897e",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/llm_bridge.lua",
+			"sha256": "1cb966c2341686ff8394de5d21ad5dfb7388d3a7a38457f53ec859b72f95b4ff",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/terminators.lua",
+			"sha256": "8e1e1f18292bb2562a6a91895e5f1da00b9299e67755bd6c77f322cd747c51f1",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/utils.lua",
+			"sha256": "46c0b4e7a1926e4b056090da6df95352845153f54a3b947ff89e60ca1cb1f6f3",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/dynamic_hotstrings/rules_engine.lua",
+			"sha256": "28523d822adc3f2529cc6cb91a8b792d7356cb0838e3a3fab13afac10f31271a",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keystats/init.lua",
+			"sha256": "04668df840bfefd7d6bb8aac0d18665b500d622a024d84f72eed88b1ab0d36d6",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/synthetic_input.lua",
+			"sha256": "3a72301204dd545ca4773ad114f719e0d6b171799874dbe96b047899d102259e",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/text_sender.lua",
+			"sha256": "b8b8a4f5c2b672874feab51192185f1100b67495f1a3071470c06ffd83caef9f",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/preferences.lua",
+			"sha256": "8047bca3664aabd36d5d72a07d0fa3d80289c3c73559864bb21eca872b3c90af",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_hotstrings_management.lua",
+			"sha256": "d96f2ed251187ae9d4d8d926256807a67d1fe15e58f952368416c0ae557f6040",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_state.lua",
+			"sha256": "e6c629104558eb578eb31bf103725aa60e41545de4116d4845ed56e53cfebd75",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/llm/prediction_engine.lua",
+			"sha256": "f1d9d1b6ba43636a60add78deedcbeb80fd3ec6ea6583a592d80255baea06b69",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml",
+			"sha256": "45746566d2709a6508774034e60897296134168bd92ecb8b8af29a570fee9b66",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/hotstrings/repeat_key_vectors.json",
+			"sha256": "e7a777c6c3390aba9392d2077c964343405811e9c9001554bd3fbe93347358a0",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "docs/memory/text-input-and-config.md",
+			"sha256": "4bacef0f3b010cc89eb5e85c4802b6cc75498f1b5729774af5c70b4c26a230cf",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": false,
+			"matches_reviewed_metadata": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/keymap/repeat/test_star_validation_beats_repeat_key.lua",
+			"sha256": "a7be649f341924a94440b971866b65f4b2bfdeaaac11c35a686d2bb3a7a51209",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/keymap/llm_bridge/test_private_expansion_never_prompted.lua",
+			"sha256": "1a3f514d0a1670e7523739ea1749b51693b87508dfa0572f60499dfc92155973",
+			"receipt": "macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+			"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
+			"sha256": "b479068f12b908edd9034442313848c7bd4363031141e07ee9c32418d8a35d13",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/engine.lua",
+			"sha256": "af7aab05f344db92f759b4033efeda06920481fbdb688f06cefeb56cbbd361bc",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/word_reset.lua",
+			"sha256": "449c91fa83af61d76d781dc76e84ca1eb9fcd8c82dbe627d2a47d5dd04f36120",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/loader.lua",
+			"sha256": "f169cabafc9e3e8aeab6874fe8715f113e05852cbb0b77c5260aa43335fba4cf",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/injector.lua",
+			"sha256": "0e7fd57730f818ac710c41d60079ef023453e181c0dfac9ca8a8c17edba07445",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/output_transaction.lua",
+			"sha256": "ea64490b273a0ce5372feb24c87affbad728836fa5beb8cb8a8c9d7bf8743730",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
+			"sha256": "1d28167df7eabbc1be798067269c03706cc41c8e1abd812102977784006404f7",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/magic_key.lua",
+			"sha256": "6f1be4b49903f625aef71919bcd595ca9e1c9c132716545d3d0973c2ce741db9",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/expansion_delay.lua",
+			"sha256": "30d9710fe4eead073f4682f9375a5f4091d7bbda64ec0e8e68af4f4265e6c4f3",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/keystats/focus_guard.lua",
+			"sha256": "09457462789a02ed57959c73993cf0ea853021118e7f3caf51d67c2276c856ce",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/keystats/keystats.lua",
+			"sha256": "bdbd5a1878833c3adec1f15bb4dd9ed3759d572f0cdf19dc57c1edbde0d0f64b",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/dynamic_hotstrings/prefix_rules.lua",
+			"sha256": "68349d9cc3ee05b9f23d54e748023060922a0605fe5283611105e881b9fa66f4",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/ui/menu/menu_hotstrings.lua",
+			"sha256": "a5ba41898949763cea999e18c7494c952de3db78f58d9df5d0b6ea75f53fe13f",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/support/text_owner_fixture.lua",
+			"sha256": "8d26c4b875d6043a91394e17ae7bb13f0cabfa745ce69e7b4b56d96ae5eb6c43",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/hotstring_engine/init.lua",
+			"sha256": "be675a01bcdd3d4dfbd55b2c061ebca82c160f82f7fd8a6bc2f1c0fe91e2a0de",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators.lua",
+			"sha256": "a45d8d0107d88573d3056b7a802e8fd5dc936813fa0e6b8e754897cc0eaa2d3f",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/reader.lua",
+			"sha256": "71be5f48fbbc91a5528d4446bfc4548a813feaa5fc457a5cf6778f8a38f4141a",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/hotstrings/repeat_key_vectors.json",
+			"sha256": "e7a777c6c3390aba9392d2077c964343405811e9c9001554bd3fbe93347358a0",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml",
+			"sha256": "45746566d2709a6508774034e60897296134168bd92ecb8b8af29a570fee9b66",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+			"sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
+			"sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "docs/memory/text-input-and-config.md",
+			"sha256": "4bacef0f3b010cc89eb5e85c4802b6cc75498f1b5729774af5c70b4c26a230cf",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": false,
+			"matches_reviewed_metadata": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_repeat_key.lua",
+			"sha256": "be5372e6e4e58a0642371f62d928fe04a76d7ab86d460e4de784e7ce449a15de",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_word_reset.lua",
+			"sha256": "9c3e29b0ef7bc9d00be9247cabd4d0586cf9eb33b10c9075082027d2aca2b06e",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_word_reset_events.lua",
+			"sha256": "527d77534f0954a32ba2d47a1fcbe253995039b731af8ef4dfc08868c0b0c3ac",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_hotstring_final_result.lua",
+			"sha256": "8fdf335b0c3a3c887927f42201b3c7cb8685604c7e97070499a40967a6058826",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_hotstring_cascade.lua",
+			"sha256": "7c8a9bffbfbeb988b9987702c8b933c3d9951ed0ebf06d3eb04b8e6f673fd4f2",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_hotstring_cascade_net_edit.lua",
+			"sha256": "8b80d26413ed48c4399814c651ecd1d8be7cf291cf4b8a085c3029cb752851a0",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/injector/test_output_transaction.lua",
+			"sha256": "99ea036aa9ed25fc6d08dbaa0c76558ddd6ab79ac85799258bd3fae09255926c",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/injector/test_hotstring_undo_owner.lua",
+			"sha256": "586b51ca82be4aebc56b67e0e51cc74d0c058e68aad6c9770e68abae8fde1166",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/injector/test_injector_terminator_contract.lua",
+			"sha256": "ad617e56b4ce47d43412ee90d984ceea51e8234c6967706f3dfc8c858211ebc9",
+			"receipt": "linux/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "tools/codegen/codegen-feature-inventory.cjs",
+			"sha256": "5cb181fc68b1e4dd92d3174540be5d09b4e7e1ac4f724a2e0f44685175a971bd",
+			"receipt": "shared/source-observation.json",
+			"current_matches": false,
+			"matches_reviewed_metadata": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"receipt": "shared/source-observation.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/core/features.json",
+			"sha256": "8746b37d5c7210e68f86a3e86534a3069f0be9c3bc2467261d1fff9d45529b99",
+			"receipt": "shared/source-observation.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/menu/menu_manifest.json",
+			"sha256": "544782751c80291ac36158a1e3b07b5507d42a1fde349c73859a2097427741d3",
+			"receipt": "shared/source-observation.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "src/routes/ergopti-plus/feature-inventory.json",
+			"sha256": "5edb4101f1523786323fba71a5c2f40ab26eb329b7f4183da1ca121dc5d0241f",
+			"receipt": "shared/source-observation.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "src/routes/ergopti-plus/action-inventory.json",
+			"sha256": "9df9eaeb3c0cdb15d0766004c34103a91005da905ff9dd568bb7b4d9bfbb01a9",
+			"receipt": "shared/source-observation.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "src/routes/ergopti-plus/menu-gaps.json",
+			"sha256": "3a98f3e48eef1f76e5db34b41537ed45e38e3824ae2ae9c50f3475b2cbf0c52a",
+			"receipt": "shared/source-observation.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "src/routes/ergopti-plus/input-inventory.json",
+			"sha256": "1dc9d69999e41080e009a627ef467b9d3f44d323cfb449debf632c3607015545",
+			"receipt": "shared/source-observation.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "src/routes/ergopti-plus/locales/en.js",
+			"sha256": "799f83797c90bfc917edf80591367d5d8a1ce9124533aa02f3f2cde8eb388d12",
+			"receipt": "shared/source-observation.json",
+			"current_matches": false,
+			"matches_reviewed_metadata": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+			"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9",
+			"receipt": "shared/source-observation.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
+			"sha256": "b479068f12b908edd9034442313848c7bd4363031141e07ee9c32418d8a35d13",
+			"receipt": "shared/source-observation.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+			"sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887",
+			"receipt": "shared/source-observation.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56",
+			"receipt": "shared/source-observation.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
+			"sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70",
+			"receipt": "shared/source-observation.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
+			"sha256": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503",
+			"receipt": "shared/source-observation.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/hotstrings/repeat_key_vectors.json",
+			"sha256": "e7a777c6c3390aba9392d2077c964343405811e9c9001554bd3fbe93347358a0",
+			"receipt": "shared/source-observation.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml",
+			"sha256": "45746566d2709a6508774034e60897296134168bd92ecb8b8af29a570fee9b66",
+			"receipt": "shared/source-observation.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "TODO.md",
+			"sha256": "4f1a93abd6626110f664a00a90ea53e56199dd0e44d4fa636647fa931f1d2906",
+			"receipt": "shared/source-observation.json",
+			"current_matches": false,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
+			"sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70",
+			"receipt": "timing-followup/windows/source-contract.txt",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_match.ahk",
+			"sha256": "e9cf27cd2b56669a388dbae15146a462db50d482412d7393b24c8eb0ff5249b8",
+			"receipt": "timing-followup/windows/source-contract.txt",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
+			"sha256": "b1f46fb50f3ca84f6a17a9bd10a180dc42845486049afdbe9c7920c7f64e2832",
+			"receipt": "timing-followup/windows/source-contract.txt",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
+			"sha256": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503",
+			"receipt": "timing-followup/windows/source-contract.txt",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/dynamic_hotstrings/user_code.ahk",
+			"sha256": "d244ef367fe7fc4e2ee519e07a79587d0868c1cdd11d69c2765f8ef5ea8937ea",
+			"receipt": "timing-followup/windows/source-contract.txt",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56",
+			"receipt": "timing-followup/windows/source-contract.txt",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"receipt": "timing-followup/windows/source-contract.txt",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "docs/memory/text-input-and-config.md",
+			"sha256": "4bacef0f3b010cc89eb5e85c4802b6cc75498f1b5729774af5c70b4c26a230cf",
+			"receipt": "timing-followup/windows/source-contract.txt",
+			"current_matches": false,
+			"matches_reviewed_metadata": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56",
+			"receipt": "timing-followup/macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/state.lua",
+			"sha256": "e565599088ffc788cdd93b8133b013c931183dde93690d0d8d551d29beb9897e",
+			"receipt": "timing-followup/macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+			"sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887",
+			"receipt": "timing-followup/macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/hotstrings/hotstrings_config.lua",
+			"sha256": "e1b453d1e1cbdb0d1b1c2e61dad0769c3cc5d8b7d73c9980e4136092592c9d2a",
+			"receipt": "timing-followup/macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_state.lua",
+			"sha256": "e6c629104558eb578eb31bf103725aa60e41545de4116d4845ed56e53cfebd75",
+			"receipt": "timing-followup/macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/keymap/repeat/test_star_validation_beats_repeat_key.lua",
+			"sha256": "a7be649f341924a94440b971866b65f4b2bfdeaaac11c35a686d2bb3a7a51209",
+			"receipt": "timing-followup/macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/hotstrings/magickey.toml",
+			"sha256": "440f5c11c53e8f9b26b46b660d54e00bd0e80ae28a9344c43a59e85b3c32bc26",
+			"receipt": "timing-followup/macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"receipt": "timing-followup/macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+			"sha256": "0d28466a2306acc79dec7c8bcc39b49c07ba742f488aaea1bfc00727b498cf91",
+			"receipt": "timing-followup/macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/hotstring_engine/init.lua",
+			"sha256": "be675a01bcdd3d4dfbd55b2c061ebca82c160f82f7fd8a6bc2f1c0fe91e2a0de",
+			"receipt": "timing-followup/macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/hotstrings/repeat_key_vectors.json",
+			"sha256": "e7a777c6c3390aba9392d2077c964343405811e9c9001554bd3fbe93347358a0",
+			"receipt": "timing-followup/macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/en.json",
+			"sha256": "5dbc069c890d121fdf85d54599c345d74b13c559f42856cac932e36d0645dcd9",
+			"receipt": "timing-followup/macos/source-hashes.json",
+			"current_matches": false,
+			"matches_reviewed_metadata": true
+		},
+		{
+			"path": "docs/memory/text-input-and-config.md",
+			"sha256": "4bacef0f3b010cc89eb5e85c4802b6cc75498f1b5729774af5c70b4c26a230cf",
+			"receipt": "timing-followup/macos/source-hashes.json",
+			"current_matches": false,
+			"matches_reviewed_metadata": true
+		},
+		{
+			"path": "docs/memory/maintainer-decisions.md",
+			"sha256": "20f028ed75ea62d31398e02a648f27db35782053b5b75577410ffb75355674a5",
+			"receipt": "timing-followup/macos/source-hashes.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+			"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9",
+			"receipt": "timing-followup/linux/receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
+			"sha256": "b479068f12b908edd9034442313848c7bd4363031141e07ee9c32418d8a35d13",
+			"receipt": "timing-followup/linux/receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
+			"sha256": "1d28167df7eabbc1be798067269c03706cc41c8e1abd812102977784006404f7",
+			"receipt": "timing-followup/linux/receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/expansion_delay.lua",
+			"sha256": "30d9710fe4eead073f4682f9375a5f4091d7bbda64ec0e8e68af4f4265e6c4f3",
+			"receipt": "timing-followup/linux/receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/word_reset.lua",
+			"sha256": "449c91fa83af61d76d781dc76e84ca1eb9fcd8c82dbe627d2a47d5dd04f36120",
+			"receipt": "timing-followup/linux/receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/magic_key.lua",
+			"sha256": "6f1be4b49903f625aef71919bcd595ca9e1c9c132716545d3d0973c2ce741db9",
+			"receipt": "timing-followup/linux/receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/infra/hotstring_preferences.lua",
+			"sha256": "d15fbe1e2a5af2ca23023e097625b4dff5266bd3012dda7ab57e58879e6b332d",
+			"receipt": "timing-followup/linux/receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/hotstring_engine/init.lua",
+			"sha256": "be675a01bcdd3d4dfbd55b2c061ebca82c160f82f7fd8a6bc2f1c0fe91e2a0de",
+			"receipt": "timing-followup/linux/receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"receipt": "timing-followup/linux/receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+			"sha256": "0d28466a2306acc79dec7c8bcc39b49c07ba742f488aaea1bfc00727b498cf91",
+			"receipt": "timing-followup/linux/receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/hotstrings/repeat_key_vectors.json",
+			"sha256": "e7a777c6c3390aba9392d2077c964343405811e9c9001554bd3fbe93347358a0",
+			"receipt": "timing-followup/linux/receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "docs/memory/text-input-and-config.md",
+			"sha256": "4bacef0f3b010cc89eb5e85c4802b6cc75498f1b5729774af5c70b4c26a230cf",
+			"receipt": "timing-followup/linux/receipt.json",
+			"current_matches": false,
+			"matches_reviewed_metadata": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/state.lua",
+			"sha256": "e565599088ffc788cdd93b8133b013c931183dde93690d0d8d551d29beb9897e",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/hotstrings/hotstrings_config.lua",
+			"sha256": "e1b453d1e1cbdb0d1b1c2e61dad0769c3cc5d8b7d73c9980e4136092592c9d2a",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_state.lua",
+			"sha256": "e6c629104558eb578eb31bf103725aa60e41545de4116d4845ed56e53cfebd75",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+			"sha256": "0d28466a2306acc79dec7c8bcc39b49c07ba742f488aaea1bfc00727b498cf91",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/hotstrings/delay_resolver.lua",
+			"sha256": "37e8073e2434d343a881d5201b1a3890da076802d11da4357e08b13c55e07f7a",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/hotstring_engine/init.lua",
+			"sha256": "be675a01bcdd3d4dfbd55b2c061ebca82c160f82f7fd8a6bc2f1c0fe91e2a0de",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/hotstrings/magickey.toml",
+			"sha256": "440f5c11c53e8f9b26b46b660d54e00bd0e80ae28a9344c43a59e85b3c32bc26",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
+			"sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
+			"sha256": "b1f46fb50f3ca84f6a17a9bd10a180dc42845486049afdbe9c7920c7f64e2832",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
+			"sha256": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+			"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
+			"sha256": "b479068f12b908edd9034442313848c7bd4363031141e07ee9c32418d8a35d13",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/expansion_delay.lua",
+			"sha256": "30d9710fe4eead073f4682f9375a5f4091d7bbda64ec0e8e68af4f4265e6c4f3",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "docs/memory/text-input-and-config.md",
+			"sha256": "4bacef0f3b010cc89eb5e85c4802b6cc75498f1b5729774af5c70b4c26a230cf",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": false,
+			"matches_reviewed_metadata": true
+		},
+		{
+			"path": "docs/memory/maintainer-decisions.md",
+			"sha256": "20f028ed75ea62d31398e02a648f27db35782053b5b75577410ffb75355674a5",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/hotstrings/repeat_key_vectors.json",
+			"sha256": "e7a777c6c3390aba9392d2077c964343405811e9c9001554bd3fbe93347358a0",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+			"sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887",
+			"receipt": "timing-followup/shared/source-receipt.json",
+			"current_matches": true,
+			"matches_reviewed_metadata": false
+		}
+	]
+}

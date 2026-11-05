@@ -1,0 +1,32 @@
+Selecting exact test module: "tests.unit.modules.keymap.repeat.test_star_validation_beats_repeat_key"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.repeat.test_star_validation_beats_repeat_key
+
+=== pressing ★ validates the tooltip on every expansion branch ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_star_validation_beats_repeat_key","name":"decides 'the magic key was typed' exactly once","status":"pass","elapsed_ms":246.129175,"timing_error":""}
+  ok   decides 'the magic key was typed' exactly once
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_star_validation_beats_repeat_key","name":"routes magic dispatch through the shared resolver with the ordinary timing policy","status":"pass","elapsed_ms":5.281807,"timing_error":""}
+  ok   routes magic dispatch through the shared resolver with the ordinary timing policy
+
+=== the repeat-key fallback runs only after every expansion attempt ===
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_star_validation_beats_repeat_key","name":"calls try_repeat_feature after both expansion branches","status":"pass","elapsed_ms":13.400985,"timing_error":""}
+  ok   calls try_repeat_feature after both expansion branches
+
+=== the tooltip's star preview does not second-guess the engine's timing ===
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_star_validation_beats_repeat_key","name":"collects star matches without consulting the typing-speed delay","status":"pass","elapsed_ms":4.216915,"timing_error":""}
+  ok   collects star matches without consulting the typing-speed delay
+
+=== magic validation through the real keymap eventtap ===
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_star_validation_beats_repeat_key","name":"keeps true stars delay-free and changed-key literal autos timed","status":"pass","elapsed_ms":53.132469,"timing_error":""}
+  ok   keeps true stars delay-free and changed-key literal autos timed
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.repeat.test_star_validation_beats_repeat_key","name":"tests.unit.modules.keymap.repeat.test_star_validation_beats_repeat_key","status":"pass","elapsed_ms":323.009919,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  5
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

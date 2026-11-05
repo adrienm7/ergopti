@@ -1,0 +1,52 @@
+
+=== keyboard shortcuts: late contextual delivery custody ===
+  ok   (contextual-late-custody) preserves actual logger callback and unchanged editor action
+  ok   (contextual-late-custody) refuses original queued action after logger changes master
+  ok   (contextual-late-custody) refuses original queued action after logger changes paused
+  ok   (contextual-late-custody) refuses original queued action after logger changes inhibited
+  ok   (contextual-late-custody) refuses original queued action after logger changes source
+  ok   (contextual-late-custody) refuses original queued action after logger changes rebind
+  ok   (contextual-late-custody) refuses original queued action after logger changes owner
+  ok   (contextual-late-custody) rereads live master after source callback reentry
+  ok   (contextual-late-custody) rereads live paused after source callback reentry
+  ok   (contextual-late-custody) rereads live inhibited after source callback reentry
+  ok   (contextual-late-custody) closes configuration owner reentry in late admission
+  ok   (contextual-late-custody) closes configuration owner reentry in late source
+  ok   (contextual-late-custody) closes configuration owner reentry in late final admission
+  ok   (contextual-late-custody) refuses failed source callback after logging without invoking executor
+  ok   (contextual-late-custody) refuses source read after original admission retires configuration owner
+  ok   (contextual-late-custody) refuses a replacement admission owner after logger without invoking it
+  ok   (contextual-late-custody) refuses a replacement decision owner after logger without invoking it
+  ok   (contextual-late-custody) refuses admission issuer replacement during original getter before source callback
+  ok   (contextual-late-custody) refuses final admission read after source retires dispatch owner
+  ok   (contextual-late-custody) closes issuer replacement inside final original admission read
+
+=== Keyboard consumption queue acknowledgement ===
+  ok   (consume-queue-ack) refuses inline true before any action
+  ok   (consume-queue-ack) refuses inline false before any action
+  ok   (consume-queue-ack) refuses inline throw before any action
+  ok   (consume-queue-ack) refuses retained false before any action
+  ok   (consume-queue-ack) refuses retained nil before any action
+  ok   (consume-queue-ack) refuses retained unknown before any action
+  ok   (consume-queue-ack) refuses retained throw before any action
+  ok   (consume-queue-ack) acknowledges one action under duplicate delivery
+  ok   (consume-queue-ack) acknowledges one action under reentrant delivery
+
+=== keyboard collision claim source ===
+  ok   retains explicit native reservations and refuses source divergence
+  ok   configuration acquisition and its release cannot revive an old collision frame
+
+=== keyboard shortcuts: live deferred admission ===
+  ok   (ordinary-live-admission) cancels an ordinary action after master
+  ok   (ordinary-live-admission) cancels an ordinary action after paused
+  ok   (ordinary-live-admission) cancels an ordinary action after inhibited
+  ok   (ordinary-live-admission) cancels an ordinary action after reader failure
+  ok   (ordinary-live-admission) cancels an ordinary action after reader replacement
+  ok   (ordinary-live-admission) keeps script control available through master
+  ok   (ordinary-live-admission) keeps script control available through paused
+
+=== keyboard shortcuts: admission callback boundaries ===
+  ok   (ordinary-live-admission) rechecks pause at capture
+  ok   (ordinary-live-admission) rechecks pause at queue acknowledgement
+  ok   (ordinary-live-admission) rechecks pause at execution log
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":41}

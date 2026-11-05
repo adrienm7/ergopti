@@ -1,0 +1,45 @@
+
+=== word reset: the shared pause rule ===
+  ok   word reset, starts a new word once the pause reaches the delay
+  ok   word reset, never resets with a delay of 0 or before the first keystroke
+  ok   word reset, takes the clock resolution off the measured gap
+  ok   word reset, refuses an invalid delay or resolution loudly
+  ok   word reset, validates a configured delay
+
+=== word reset: the settings ===
+  ok   word reset, reads the manifest defaults from an empty configuration
+  ok   word reset, reads stored values, 0 included
+  ok   word reset, persists, reloads and toggles every switch on its own
+  ok   word reset, persists both leaves sparsely, keeping neighbours
+  ok   word reset, refuses an invalid value and keeps the source when publication refuses
+  ok   word reset, reads an outdated value as the default with one warning
+  ok   word reset, marks every leaf as read for the cleanup
+  ok   word reset, adopts and restores a scope candidate
+
+=== word reset: the input path ===
+  ok   word reset, resets after the configured pause, measured from the previous key
+  ok   word reset, never resets when the delay is 0
+  ok   word reset, parses a free entry with a decimal point or comma
+
+=== word reset: the menu's choice and free entry ===
+  ok   word reset, lists the presets, then a free entry, ticking the current preset
+  ok   word reset, ticks the free entry and names a free value with its unit
+  ok   word reset, refuses the row when the free entry has no owner
+
+=== word reset: the daemon wiring ===
+  ok   word reset, resets the engine after an idle pause before feeding the character
+  ok   word reset, resets the engine on a click at the configured boundary
+  ok   word reset, hands every control key but a one-character Backspace to the options
+  ok   word reset, forgets on a pause through the engine and lets a terminal Enter empty the line (bs-word-start)
+  ok   word reset, tells the engine of each tap-hold command the catalogue runs
+  ok   word reset, gives each new switch its menu command and checked state
+  ok   word reset, lets the Hotstrings scope adopt and restore both leaves
+
+=== word reset: the cascade arrow count ===
+  ok   cascade arrows, default to three, the manifest default
+  ok   cascade arrows, persists sparsely, reloads, and a default is an absent leaf
+  ok   cascade arrows, refuses a value that is no whole number from 1 to 10
+  ok   cascade arrows, reads an outdated value as the default with one warning
+  ok   cascade arrows, is marked as read for the cleanup and adopted with the scope
+  ok   cascade arrows, reach the menu and the keystroke path
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":32}

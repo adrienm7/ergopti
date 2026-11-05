@@ -1,0 +1,80 @@
+Selecting exact test module: "tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time
+
+=== keymap expander: repeat uses an explicit replacement transaction ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"tags the delete and repeated character with one generation","status":"pass","elapsed_ms":31.001594,"timing_error":""}
+  ok   tags the delete and repeated character with one generation
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"a delimiter the user added ends a word, as on Windows (PAR-8)","status":"pass","elapsed_ms":7.672414,"timing_error":""}
+  ok   a delimiter the user added ends a word, as on Windows (PAR-8)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"allocates a new generation for an immediate consecutive repeat","status":"pass","elapsed_ms":7.573474,"timing_error":""}
+  ok   allocates a new generation for an immediate consecutive repeat
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"deletes both codepoints of a French composite magic event","status":"pass","elapsed_ms":8.223233,"timing_error":""}
+  ok   deletes both codepoints of a French composite magic event
+
+=== keymap expander: the shared repeat_key_vectors.json corpus ===
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"mid_word_letter_doubles (repeat-key-corpus)","status":"pass","elapsed_ms":11.245394,"timing_error":""}
+  ok   mid_word_letter_doubles (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"accented_letter_doubles_whole (repeat-key-corpus)","status":"pass","elapsed_ms":7.687396,"timing_error":""}
+  ok   accented_letter_doubles_whole (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"second_word_letter_doubles (repeat-key-corpus)","status":"pass","elapsed_ms":7.702619,"timing_error":""}
+  ok   second_word_letter_doubles (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"word_start_letter_is_not_doubled (repeat-key-corpus)","status":"pass","elapsed_ms":7.850973,"timing_error":""}
+  ok   word_start_letter_is_not_doubled (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"word_start_after_space_is_not_doubled (repeat-key-corpus)","status":"pass","elapsed_ms":8.104885,"timing_error":""}
+  ok   word_start_after_space_is_not_doubled (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"word_start_after_newline_is_not_doubled (repeat-key-corpus)","status":"pass","elapsed_ms":7.577742,"timing_error":""}
+  ok   word_start_after_newline_is_not_doubled (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"word_start_after_period_is_not_doubled (repeat-key-corpus)","status":"pass","elapsed_ms":7.511341,"timing_error":""}
+  ok   word_start_after_period_is_not_doubled (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"word_start_after_opening_quote_is_not_doubled (repeat-key-corpus)","status":"pass","elapsed_ms":7.335446,"timing_error":""}
+  ok   word_start_after_opening_quote_is_not_doubled (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"space_is_not_repeated (repeat-key-corpus)","status":"pass","elapsed_ms":7.551231,"timing_error":""}
+  ok   space_is_not_repeated (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"newline_is_not_repeated (repeat-key-corpus)","status":"pass","elapsed_ms":7.455847,"timing_error":""}
+  ok   newline_is_not_repeated (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"magic_key_alone_has_nothing_to_repeat (repeat-key-corpus)","status":"pass","elapsed_ms":7.593144,"timing_error":""}
+  ok   magic_key_alone_has_nothing_to_repeat (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"digit_predecessor_doubles (repeat-key-corpus)","status":"pass","elapsed_ms":7.584150,"timing_error":""}
+  ok   digit_predecessor_doubles (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"underscore_predecessor_doubles (repeat-key-corpus)","status":"pass","elapsed_ms":7.639715,"timing_error":""}
+  ok   underscore_predecessor_doubles (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"opening_parenthesis_is_a_word_start (repeat-key-corpus)","status":"pass","elapsed_ms":7.396358,"timing_error":""}
+  ok   opening_parenthesis_is_a_word_start (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"hyphen_is_a_word_start (repeat-key-corpus)","status":"pass","elapsed_ms":7.207203,"timing_error":""}
+  ok   hyphen_is_a_word_start (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"two_magic_keys_are_not_a_repeat (repeat-key-corpus)","status":"pass","elapsed_ms":7.558462,"timing_error":""}
+  ok   two_magic_keys_are_not_a_repeat (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"unknown_buffer_start_refuses_the_first_letter (repeat-key-corpus)","status":"pass","elapsed_ms":7.264810,"timing_error":""}
+  ok   unknown_buffer_start_refuses_the_first_letter (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"unknown_buffer_start_allows_a_later_letter (repeat-key-corpus)","status":"pass","elapsed_ms":8.089852,"timing_error":""}
+  ok   unknown_buffer_start_allows_a_later_letter (repeat-key-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"user_chosen_magic_key (repeat-key-corpus)","status":"pass","elapsed_ms":8.107279,"timing_error":""}
+  ok   user_chosen_magic_key (repeat-key-corpus)
+
+=== keymap expander: the shared idle_reset_vectors.json corpus ===
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"pause_equal_to_delay_resets (idle-reset-corpus)","status":"pass","elapsed_ms":0.004627,"timing_error":""}
+  ok   pause_equal_to_delay_resets (idle-reset-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"one_millisecond_short_does_not_reset (idle-reset-corpus)","status":"pass","elapsed_ms":0.001362,"timing_error":""}
+  ok   one_millisecond_short_does_not_reset (idle-reset-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"long_pause_resets (idle-reset-corpus)","status":"pass","elapsed_ms":0.001112,"timing_error":""}
+  ok   long_pause_resets (idle-reset-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"zero_delay_disables_the_reset (idle-reset-corpus)","status":"pass","elapsed_ms":0.002033,"timing_error":""}
+  ok   zero_delay_disables_the_reset (idle-reset-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"no_previous_keystroke_never_resets (idle-reset-corpus)","status":"pass","elapsed_ms":0.001312,"timing_error":""}
+  ok   no_previous_keystroke_never_resets (idle-reset-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"fractional_delay_deadline_resets (idle-reset-corpus)","status":"pass","elapsed_ms":0.001392,"timing_error":""}
+  ok   fractional_delay_deadline_resets (idle-reset-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"fractional_delay_one_millisecond_short (idle-reset-corpus)","status":"pass","elapsed_ms":0.001062,"timing_error":""}
+  ok   fractional_delay_one_millisecond_short (idle-reset-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","name":"tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time","status":"pass","elapsed_ms":205.679466,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  30
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

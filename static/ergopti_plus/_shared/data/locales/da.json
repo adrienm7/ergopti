@@ -4070,5 +4070,13 @@
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Ingen kontakt på Linux: GNOME og KDE vælger Dupliker i deres egen skærmvælger Super+P; tildel den tast som tastekombination.",
 	"platform_reason.action_sticky_keys_are_the_systems": "Dette system har Træg tast i sine hjælpemiddelindstillinger, som får hver modifikator til at gælde én tast; slå den til dér.",
 	"platform_reason.action_take_note_uses_notepad": "Kun Windows: denne handling åbner dagens notefil i Notesblok, editoren der følger med hver Windows. macOS har sin egen Hurtig note (Fn+Q), og Linux har ingen editor, der følger med alle skriveborde.",
-	"platform_reason.action_text_recognition_is_live_text_on_macos": "På macOS læser Livetekst teksten i ethvert skærmbillede eller billede: tag et med den tilsvarende handling, og markér derefter teksten."
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "På macOS læser Livetekst teksten i ethvert skærmbillede eller billede: tag et med den tilsvarende handling, og markér derefter teksten.",
+	"inventory.behavior.backspace_restore": "Gendan en udvidelse med Backspace",
+	"inventory.behavior.repeat_condition": "Gentager et tegn midt i et ord, når ingen udvidelse passer, og gentagelse med den magiske tast er aktiveret.",
+	"inventory.behavior.repeat_linux": "Gentagelse med den magiske tast findes, men gentagelser i træk mister i øjeblikket deres kontekst efter den første udvidelse. Rettelser efter en gentagelse påvirkes også.",
+	"inventory.behavior.backspace_linux": "Et øjeblikkeligt Backspace uden modifikatortast kan gendanne en egnet udvidelse med ren tekst; adfærden i native tekstfelter er endnu ikke verificeret.",
+	"inventory.behavior.backspace_other": "Ingen automatisk gendannelse af udløseren med Backspace; programmets Fortryd er separat.",
+	"inventory.behavior.repeat_activation_window": "Aktiveringsvindue for gentagelse med den magiske tast",
+	"inventory.behavior.repeat_window_untimed": "Intet særskilt aktiveringsvindue for reservegentagelsen; en ny ordstart efter inaktivitet er uafhængig.",
+	"inventory.behavior.repeat_window_macos": "Bruger den magiske tasts gældende aktiveringsvindue med tidsregler for modifikatortaster; nul deaktiverer dette vindue. En ny ordstart efter inaktivitet er uafhængig."
 }

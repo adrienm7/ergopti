@@ -551,6 +551,11 @@ function reportFolder(paths) {
 				/rm -rf "\$other/,
 				'another copy is unregistered, never deleted'
 			);
+			assert.match(
+				installer,
+				/--retry 6 --retry-delay 5 --retry-all-errors -C - \\\n\t\t"\$archive_url"/,
+				'a cut transfer resumes instead of ending the run'
+			);
 			const ask = installer.indexOf('sudo -v || fail');
 			assert(ask > 0, 'the installer must ask for the administrator password');
 			assert(

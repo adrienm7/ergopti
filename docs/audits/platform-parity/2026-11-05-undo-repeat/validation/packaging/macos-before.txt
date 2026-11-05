@@ -1,0 +1,3 @@
+
+[31m[ERROR] macOS bundle payload guard:[0m
+  - ergopti_plus/_shared/modules/features/behaviors.json belongs to the excluded group developer-tooling

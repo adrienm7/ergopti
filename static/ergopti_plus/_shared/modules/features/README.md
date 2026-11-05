@@ -23,6 +23,10 @@ After changing a declaration or the vocabulary, run `npm run codegen:feature-req
 
 ## Key files
 
+`behaviors.json` supplements configuration toggles with explicitly reviewed product behavior. It does not create a runtime setting. Every OS has an explicit declaration, a localized qualification, and reviewed owner files. Whole-file SHA-256 receipts conservatively stop inventory generation when these owners change; review the behavior and update its receipt deliberately. The generator never refreshes receipts automatically, and a matching receipt is source provenance rather than runtime proof. Add reviewed behaviors as audits expand coverage; an unlisted behavior is not automatically absent.
+
+Rows can also describe observed behavior variants rather than missing product features. For `hotstrings.repeat_activation_window`, the declaration states whether a separate activation window exists; timed versus untimed is not a quality claim. Its cross-OS timing intent remains unresolved, and idle word reset is independent.
+
 | File                | Description                                                                  |
 | ------------------- | ---------------------------------------------------------------------------- |
 | `manifest.toml`     | Master feature registry with `default`, `label`, `section`, `id`, `requires` |

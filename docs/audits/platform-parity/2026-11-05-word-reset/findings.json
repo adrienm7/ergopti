@@ -1,0 +1,158 @@
+{
+	"schema_version": 1,
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"created_at": "2026-11-05",
+	"module": "word-reset",
+	"findings": [
+		{
+			"id": "WRSW-001",
+			"title": "Synthetic Alt and Win Backspace invent a known word start",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["physical_synthetic_word_boundary_parity"],
+			"reproduction": "SOURCE-ONLY: public send_shortcut alt+backspace passes real parsing/emission/TextPressKey into successful canonical synthetic edit, clearing HSE with KnownBoundary=true; equivalent physical Alt+Backspace sets unknown false. Unbound focus re-admission preserves the synthetic true, so a word-only mapping can fire after the unknown undo/delete position.",
+			"root_cause": "HS_CommitSyntheticEffect uses one successful-edit boundary verdict for every generic edit; unlike the physical modified-Backspace branch it does not distinguish known Ctrl word deletion from unknown Alt/Win undo/delete semantics.",
+			"silent_failure": "The sender and context commit both succeed, and the diagnostic only says buffers reset. No exception identifies the invented boundary. Existing physical Alt+Backspace behavioral test explicitly requires unknown but does not compare the public synthetic sibling.",
+			"regression_test": "Actual AHK parsed send_shortcut/TextPressKey/canonical effect and real physical keydown: compare Ctrl/Alt/Win/Shift Backspace boundary and subsequent word-only/in-word matcher decisions, with settings on/off, focus rebinding, Unicode fragments, send refusal. Retain atomic declaration/send and fail-closed unknown contexts.",
+			"basis": "source",
+			"source_report": "windows/report.md",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "windows/findings.json",
+					"sha256": "f0bd1dd6212549a2bfddb151d8a9614bf268831d187e616c4b36f3c61005677c"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3baee7a334bbb42ff3607532820ee2e122a324945cdacdb8b830977ea24c63fc"
+				}
+			],
+			"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request.",
+			"role": "windows"
+		},
+		{
+			"id": "WRSW-002",
+			"title": "Physical editing shortcut branches preserve obsolete complete AI context",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["ai_context_continuity_after_unknown_edit"],
+			"reproduction": "SOURCE-ONLY: complete active prediction context OLD_WORD with reset_on_nav=true, or agent-only context with active typing feed; Ctrl+Backspace deletes the word (or Ctrl+A then x replaces selection), then type x in stable focus. Real prefix-hook early branch resets only HSE/preview; incomplete-only bridge discard preserves complete AI context. Next char appends x, fresh observer captures current physical generation and forwards obsolete OLD_WORDx to engine/agent.",
+			"root_cause": "LLM key forwarding sits below the physical shortcut/modified-Backspace early returns. Prefix context mutation only discards incomplete UTF16; bridge dispatcher fallback intentionally returns while prefix hook exists. Synthetic key declarations similarly have no complete AI-context edit while SendLevel0 prevents hook echo.",
+			"silent_failure": "All strings and newly captured generation/focus receipts are valid. Old observer/output fences work but do not detect a new owner carrying obsolete semantic text. Length diagnostics and direct bridge navigation tests do not cover real prefix shortcut branching. No actual network or persistence measured.",
+			"regression_test": "Genuine AHK real prefix keydown and actual bridge/agent owners: complete contexts after Ctrl+Backspace and Ctrl+A replacement must match empty/known edited text before next real engine/agent observer. Include inactive requests, CtrlZ/Y/V/F/L, Alt/Win, reset_on_nav policy, tap-hold modifier and command/synthetic sources, stale/focus/pause/refused output; keep self-echo disabled and stale-owner admission intact.",
+			"basis": "source",
+			"source_report": "windows/report.md",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "windows/findings.json",
+					"sha256": "f0bd1dd6212549a2bfddb151d8a9614bf268831d187e616c4b36f3c61005677c"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3baee7a334bbb42ff3607532820ee2e122a324945cdacdb8b830977ea24c63fc"
+				}
+			],
+			"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request.",
+			"role": "windows"
+		},
+		{
+			"id": "WRM-001",
+			"title": "Next typing replaces the independent AI navigation policy with the hotstring lifetime",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["independent_ai_context_policy"],
+			"reproduction": "Actual public Keymap: type bonjour, navigate, type x. AIreset=false+wordreset=true retains context immediately then loses it to x; AIreset=true+wordreset=false clears immediately then resurrects bonjourx. Arrow and shortcut crossproducts plus click. Separate actual request serializer confirms omission/resurrection over fake HTTP.",
+			"root_cause": "Bridge.check_nav_reset applies independent retention correctly, but update_preview_body subsequently sets llm_buffer from ai_context_of(cursor-relative hotstring buffer), overriding the independent lifetime on the next edit.",
+			"silent_failure": "Typing and requests succeed without diagnostics; registered navigation regression checks immediate retention but not next ordinary-character continuity.",
+			"regression_test": "Actual public arrow/shortcut/click followed by ordinary typing and edits under both preference crossproducts; independently retain or clear AI text through actual request serialization while keeping private redaction and cursor-safe hotstring resets.",
+			"evidence": [
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "macos/findings.json",
+					"sha256": "3540af1233093ce18601b747c1c573d6183909150896d723f7827bc38b55c348"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3baee7a334bbb42ff3607532820ee2e122a324945cdacdb8b830977ea24c63fc"
+				}
+			],
+			"basis": "actual-owner",
+			"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving.",
+			"role": "macos",
+			"source_report": "macos/report.md"
+		},
+		{
+			"id": "WRM-002",
+			"title": "Terminal empty-prompt receipt recognizes main Return but excludes keypad Enter",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["enter_key_identity"],
+			"reproduction": "Condition: classified terminal accepts bare keypadEnter as submission and later Backspaces at empty prompt. Actual public Keymap/TOML fixture: a,submit,a,Backspacex2,r. MainReturn36 emits word-only r→R; keypad76 CR/ETX controls retain pre-submit word and emitno expansion. Native receiving is unexecuted.",
+			"root_cause": "Main Keymap terminal-empty-prompt and no-prediction reset branches check only Keycodes.RETURN36, although generated HID identity and Bridge explicitly support keypadEnter76 as equivalent Enter-family identity.",
+			"silent_failure": "No exception or diagnostic; mainReturn-only registered empty-prompt regressions pass, and keypad state is treated as ordinary retained typed text.",
+			"regression_test": "Actual public main/keypad Enter family, supported native payloads, conditional terminal-submit+empty-prompt deletion and subsequent word-only rules; preserve multiline/ShiftReturn, predictions, pause/focus refusal and terminals with different keypad bindings.",
+			"evidence": [
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "macos/findings.json",
+					"sha256": "3540af1233093ce18601b747c1c573d6183909150896d723f7827bc38b55c348"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3baee7a334bbb42ff3607532820ee2e122a324945cdacdb8b830977ea24c63fc"
+				}
+			],
+			"basis": "actual-owner",
+			"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Conditional on terminal accepting bare keypad Enter as submission and later Backspaces at an empty prompt; no unconditional G2 claim.",
+			"role": "macos",
+			"source_report": "macos/report.md"
+		},
+		{
+			"id": "WRSL-001",
+			"title": "Synthetic action arrows bypass the governing arrow and context policy",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["governing_arrow_ownership", "ai_context_navigation_publication"],
+			"reproduction": "Run continuity-probe.lua against the audited tree. Catalogue arrow_left with arrow reset and AI navigation reset enabled emits acknowledged 105 DOWN/UP through the real Manager/Emitter/Writer/Broker, yet keeps the word and AI context ab; the following physical c produces abc and Main passes abc to its predictor receiver. An actual own tap arrow with arrow reset off and tap reset on resets the word to c; the inverse settings keep abc. Physical-arrow controls independently exercise the enabled word and AI reset effects.",
+			"root_cause": "Two explicitly separate action-origin submechanisms share the absence of canonical arrow semantic effect publication. (A) Public catalogue _execute_action sends its generated combo through ComboEmitter/Writer with no WordReset/engine notification; Main gestures.init supplies no such observer and synthetic output is deliberately excluded from keyboard input. (B) Main own tap-action callback invokes generic WordReset.apply_tap_action(engine,binding), classifying every catalogue action by tap_hold_resets_word and discarding whether its effect is an arrow. Physical control_owner correctly gives arrows precedence. Shared manifest explicitly requires arrow_resets_word regardless of source.",
+			"silent_failure": "Native output succeeds. No diagnostic names the missing/wrong logical reset effect or ignored governing setting. Separately green physical-word-reset and emitter-order tests do not join these action origins to their canonical semantic owner.",
+			"regression_test": "Cover both independent admission paths: public catalogue arrow dispatch and actual TapHoldEngine own arrow actions through Main, using the real engine/context and Writer acknowledgments. Cover all four arrows, modifiers, arrow/tap/AI settings on and off, the next typed key and predictor context, native refusal and lifecycle/privacy guards. Preserve self-synthetic filtering. A fix in one caller must not close the sibling path.",
+			"evidence": [
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "linux/findings.json",
+					"sha256": "4cb550f57c6934f0fd04cc1f30b4967302d9e4c75712b3d9241105fd337277d8"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3baee7a334bbb42ff3607532820ee2e122a324945cdacdb8b830977ea24c63fc"
+				}
+			],
+			"basis": "actual-owner",
+			"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request.",
+			"role": "linux",
+			"source_report": "linux/report.md"
+		}
+	]
+}

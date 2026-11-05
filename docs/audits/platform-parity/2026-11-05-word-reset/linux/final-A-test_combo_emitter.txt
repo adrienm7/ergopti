@@ -1,0 +1,12 @@
+
+=== combo emitter: the parse ===
+  ok   separates modifiers from the key they modify
+  ok   handles more than one modifier
+  ok   maps the copy and paste chords used by selection transforms
+  ok   names an unmapped key instead of swallowing it
+  ok   refuses a combo with no key to strike
+
+=== combo emitter: every catalogue combo resolves ===
+  ok   maps every key name the generated action table uses
+  ok   goes back and forward in the browser history with Alt+arrow (action-parity-nav-history)
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":7}

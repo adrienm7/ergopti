@@ -1,0 +1,93 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"files": [
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+			"sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/registry.lua",
+			"sha256": "1fdc94fb8b7001627ae314b42a6c04eefdab98d1a38b51c3c88cac5a138f6eb1"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/registry_index.lua",
+			"sha256": "0d7144c2e59772709e123795de5f9ba16de62feaab78dcedadc07550ca25d22f"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/registry_groups.lua",
+			"sha256": "d0a61987990990e6beee90227e8f90ab6a9ce0cdb323c8569d55d148ee40910f"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/state.lua",
+			"sha256": "e565599088ffc788cdd93b8133b013c931183dde93690d0d8d551d29beb9897e"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/llm_bridge.lua",
+			"sha256": "1cb966c2341686ff8394de5d21ad5dfb7388d3a7a38457f53ec859b72f95b4ff"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/terminators.lua",
+			"sha256": "8e1e1f18292bb2562a6a91895e5f1da00b9299e67755bd6c77f322cd747c51f1"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/utils.lua",
+			"sha256": "46c0b4e7a1926e4b056090da6df95352845153f54a3b947ff89e60ca1cb1f6f3"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/dynamic_hotstrings/rules_engine.lua",
+			"sha256": "28523d822adc3f2529cc6cb91a8b792d7356cb0838e3a3fab13afac10f31271a"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keystats/init.lua",
+			"sha256": "04668df840bfefd7d6bb8aac0d18665b500d622a024d84f72eed88b1ab0d36d6"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/synthetic_input.lua",
+			"sha256": "3a72301204dd545ca4773ad114f719e0d6b171799874dbe96b047899d102259e"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/text_sender.lua",
+			"sha256": "b8b8a4f5c2b672874feab51192185f1100b67495f1a3071470c06ffd83caef9f"
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/preferences.lua",
+			"sha256": "8047bca3664aabd36d5d72a07d0fa3d80289c3c73559864bb21eca872b3c90af"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_hotstrings_management.lua",
+			"sha256": "d96f2ed251187ae9d4d8d926256807a67d1fe15e58f952368416c0ae557f6040"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_state.lua",
+			"sha256": "e6c629104558eb578eb31bf103725aa60e41545de4116d4845ed56e53cfebd75"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/llm/prediction_engine.lua",
+			"sha256": "f1d9d1b6ba43636a60add78deedcbeb80fd3ec6ea6583a592d80255baea06b69"
+		},
+		{
+			"path": "static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml",
+			"sha256": "45746566d2709a6508774034e60897296134168bd92ecb8b8af29a570fee9b66"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/hotstrings/repeat_key_vectors.json",
+			"sha256": "e7a777c6c3390aba9392d2077c964343405811e9c9001554bd3fbe93347358a0"
+		},
+		{
+			"path": "docs/memory/text-input-and-config.md",
+			"sha256": "4bacef0f3b010cc89eb5e85c4802b6cc75498f1b5729774af5c70b4c26a230cf"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/keymap/repeat/test_star_validation_beats_repeat_key.lua",
+			"sha256": "a7be649f341924a94440b971866b65f4b2bfdeaaac11c35a686d2bb3a7a51209"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/keymap/llm_bridge/test_private_expansion_never_prompted.lua",
+			"sha256": "1a3f514d0a1670e7523739ea1749b51693b87508dfa0572f60499dfc92155973"
+		}
+	]
+}

@@ -1,0 +1,29 @@
+2026-11-05 14:29:58:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+[logger] unified log write refused: /tmp/lua_OtSP4x_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_OtSP4x_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_hotstrings.log: No such file or directory
+2026-11-05 14:29:58:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='dt' section='datefr'.
+2026-11-05 14:29:58:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='date' section='datelongfr'.
+2026-11-05 14:29:58:000 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-05 14:29:58:000 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+2026-11-05 14:29:58:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+[logger] unified log write refused: /tmp/lua_OtSP4x_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_OtSP4x_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_hotstrings.log: No such file or directory
+2026-11-05 14:29:58:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='dt' section='datefr'.
+2026-11-05 14:29:58:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='date' section='datelongfr'.
+2026-11-05 14:29:58:000 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-05 14:29:58:000 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+2026-11-05 14:29:59:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+[logger] unified log write refused: /tmp/lua_OtSP4x_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_OtSP4x_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_hotstrings.log: No such file or directory
+2026-11-05 14:29:59:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='dt' section='datefr'.
+2026-11-05 14:29:59:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='date' section='datelongfr'.
+2026-11-05 14:29:59:000 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-05 14:29:59:000 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+2026-11-05 14:29:59:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+[logger] unified log write refused: /tmp/lua_OtSP4x_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_OtSP4x_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_hotstrings.log: No such file or directory
+2026-11-05 14:29:59:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='dt' section='datefr'.
+2026-11-05 14:29:59:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='date' section='datelongfr'.
+2026-11-05 14:29:59:000 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-05 14:29:59:000 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+{"caller_proof":"public-context.lua","requests":[{"actual_old":false,"ai_context":" puis voici la prochaine phrase","expected_old":true,"policy_holds":false,"reset_ai":false,"reset_word":true},{"actual_old":true,"ai_context":"bonjour ceci est le dossier initial puis voici la prochaine phrase","expected_old":false,"policy_holds":false,"reset_ai":true,"reset_word":false},{"actual_old":true,"ai_context":"bonjour ceci est le dossier initial puis voici la prochaine phrase","expected_old":true,"policy_holds":true,"reset_ai":false,"reset_word":false},{"actual_old":false,"ai_context":" puis voici la prochaine phrase","expected_old":false,"policy_holds":true,"reset_ai":true,"reset_word":true}],"transport":"fake HTTP; no network request"}

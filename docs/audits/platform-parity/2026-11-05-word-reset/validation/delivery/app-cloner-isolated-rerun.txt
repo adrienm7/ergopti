@@ -1,0 +1,58 @@
+
+> svelte-static@3.0.0 test:app-cloner-generated-literals
+> node ./tools/test/test-app-cloner-generated-literals.cjs
+
+TAP version 14
+1..51
+ok 1 - the actual Bash path port reads native filename data without changing POSIX backslashes
+ok 2 - the shared receipt writer preserves exact path bytes and one protocol newline
+ok 3 - the shared receipt writer rejects invalid argument counts before publishing bytes
+ok 4 - the actual CLI physical probe executes its exact twenty-two owned POSIX cases
+ok 5 - finite log writes preserve primary failures, foreign bundles and independent workspace retirement
+ok 6 - the actual final receipt writers report closed descriptors and pipes while retiring owned workspaces
+ok 7 - actual logging preserves literal backslash-c and backslash-t source paths byte for byte
+ok 8 - both actual CLI success formatters return literal backslash HOME paths exactly
+ok 9 - a real external child keeps the default file-size signal after actual healthy logging
+ok 10 - actual same-second shortcut creations reserve distinct native identities
+ok 11 - both identity namespaces call the native generator once and reject unknown arguments before it
+ok 12 - both callers reject failed or malformed native UUID receipts before any bundle or workspace allocation
+ok 13 - shell literals compile after quotes, substitutions, backslashes, and newlines
+ok 14 - shell literals round-trip byte-exact without executing their contents
+ok 15 - Python literals compile after quotes, substitutions, backslashes, and newlines
+ok 16 - Python literals round-trip byte-exact
+ok 17 - clone_app routes both generated languages through the literal emitter
+ok 18 - XML literals escape every plist metacharacter through the production emitter
+ok 19 - the actual generated Info.plist round-trips a hostile clone name
+ok 20 - clone_app validates the generated plist before reporting the destination
+ok 21 - the actual generated clone launcher body compiles with hostile assignments
+ok 22 - the actual generated PWA launcher body compiles with hostile assignments
+ok 23 - the production shortcut generator emits a syntactically valid hostile launcher
+ok 24 - the generated shortcut preserves arguments without command substitution
+ok 25 - the actual clone setup reserves distinct bundles and preserves previous contents
+ok 26 - repeated clone names keep distinct data profiles and preserve existing profile contents
+ok 27 - the first clone keeps its original unsuffixed data profile
+ok 28 - cleanup runtime absence fails before reserving any clone destination
+ok 29 - failed temporary-directory allocation removes only its reserved clone bundle
+ok 30 - a later failure removes its reserved bundle and temporary workspace without swallowing the error
+ok 31 - cancelling a clone transaction removes its owned bundle and temporary workspace
+ok 32 - rollback refuses a replacement directory and still retires its temporary workspace
+ok 33 - rollback refuses a replacement symbolic link without following or deleting it
+ok 34 - a bundle cleanup failure preserves the primary error and still retires temporary files
+ok 35 - an identity capture failure reports the error and preserves an unadmitted destination
+ok 36 - a completed clone keeps its owned bundle while retiring its temporary workspace
+ok 37 - a completed bundle survives failure to write its final success receipt
+ok 38 - clone rollback preserves pre-existing same-name bundles and symbolic links
+ok 39 - the full shortcut helper rolls back its reservation when temporary allocation fails
+ok 40 - the full shortcut helper rolls back a later write error and retires its temporary workspace
+ok 41 - the full shortcut helper keeps its successful bundle and preserves the existing shortcut
+ok 42 - the full shortcut helper preserves its healthy standalone path without Python commands
+ok 43 - same-second shortcut creation reserves three separate bundles without overwriting earlier launchers
+ok 44 - bundle reservation preserves occupied files and dangling symbolic links
+ok 45 - a real ENOTDIR reservation refusal is fatal and never reports a destination
+ok 46 - a genuine EEXIST still chooses a suffix after the previous owner retires its path
+ok 47 - errno-aware reservation preserves literal shell metacharacters as path data
+ok 48 - a genuine missing-parent errno remains fatal without guessing a suffix
+ok 49 - the complete production launcher executes every URI and file routing case in every app family
+ok 50 - accepted single-slash Teams and RFC scheme URIs dispatch through actual open-a once without positional URL arguments
+ok 51 - empty and file arguments preserve their actual positional data and never dispatch a URL
+# passed: 51/51

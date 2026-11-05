@@ -1,0 +1,44 @@
+Selecting exact test module: "tests.unit.infra.preferences.test_preferences_word_reset"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.infra.preferences.test_preferences_word_reset
+
+=== word-reset preferences ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.infra.preferences.test_preferences_word_reset","name":"reads, saves and reloads both settings","status":"pass","elapsed_ms":125.228092,"timing_error":""}
+  ok   reads, saves and reloads both settings
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.infra.preferences.test_preferences_word_reset","name":"reads, saves and reloads the arrow and shortcut settings","status":"pass","elapsed_ms":18.345592,"timing_error":""}
+  ok   reads, saves and reloads the arrow and shortcut settings
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.infra.preferences.test_preferences_word_reset","name":"reads, saves and reloads the cascade arrow count, the default stored as absent","status":"pass","elapsed_ms":34.815673,"timing_error":""}
+  ok   reads, saves and reloads the cascade arrow count, the default stored as absent
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.infra.preferences.test_preferences_word_reset","name":"reads the outdated cascade arrow count 0 as absent with a warning","status":"pass","elapsed_ms":7.793013,"timing_error":""}
+  ok   reads the outdated cascade arrow count 0 as absent with a warning
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.infra.preferences.test_preferences_word_reset","name":"reads the outdated cascade arrow count 11 as absent with a warning","status":"pass","elapsed_ms":8.698149,"timing_error":""}
+  ok   reads the outdated cascade arrow count 11 as absent with a warning
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.infra.preferences.test_preferences_word_reset","name":"reads the outdated cascade arrow count -1 as absent with a warning","status":"pass","elapsed_ms":9.558329,"timing_error":""}
+  ok   reads the outdated cascade arrow count -1 as absent with a warning
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.infra.preferences.test_preferences_word_reset","name":"reads the outdated cascade arrow count 1.5 as absent with a warning","status":"pass","elapsed_ms":12.268372,"timing_error":""}
+  ok   reads the outdated cascade arrow count 1.5 as absent with a warning
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.infra.preferences.test_preferences_word_reset","name":"reads the outdated cascade arrow count \"deep\" as absent with a warning","status":"pass","elapsed_ms":7.497049,"timing_error":""}
+  ok   reads the outdated cascade arrow count "deep" as absent with a warning
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.infra.preferences.test_preferences_word_reset","name":"reads the outdated cascade arrow count true as absent with a warning","status":"pass","elapsed_ms":8.732721,"timing_error":""}
+  ok   reads the outdated cascade arrow count true as absent with a warning
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.infra.preferences.test_preferences_word_reset","name":"reports a negative idle delay as outdated and reads it as absent","status":"pass","elapsed_ms":9.035084,"timing_error":""}
+  ok   reports a negative idle delay as outdated and reads it as absent
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.infra.preferences.test_preferences_word_reset","name":"reports a text idle delay as outdated and reads it as absent","status":"pass","elapsed_ms":7.342822,"timing_error":""}
+  ok   reports a text idle delay as outdated and reads it as absent
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.infra.preferences.test_preferences_word_reset","name":"reports a text click flag as outdated and reads it as absent","status":"pass","elapsed_ms":8.623118,"timing_error":""}
+  ok   reports a text click flag as outdated and reads it as absent
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.infra.preferences.test_preferences_word_reset","name":"reports a text arrow flag as outdated and reads it as absent","status":"pass","elapsed_ms":7.533353,"timing_error":""}
+  ok   reports a text arrow flag as outdated and reads it as absent
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.infra.preferences.test_preferences_word_reset","name":"reports a numeric shortcut flag as outdated and reads it as absent","status":"pass","elapsed_ms":6.239074,"timing_error":""}
+  ok   reports a numeric shortcut flag as outdated and reads it as absent
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.infra.preferences.test_preferences_word_reset","name":"tests.unit.infra.preferences.test_preferences_word_reset","status":"pass","elapsed_ms":273.177903,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  14
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

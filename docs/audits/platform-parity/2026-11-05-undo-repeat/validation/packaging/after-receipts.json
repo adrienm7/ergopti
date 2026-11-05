@@ -1,0 +1,20 @@
+[
+	{
+		"os": "windows",
+		"script": "test-windows-bundle-manifest.cjs",
+		"phase": "after explicit developer metadata exclusion",
+		"exit_code": 0
+	},
+	{
+		"os": "macos",
+		"script": "test-macos-bundle-payload.cjs",
+		"phase": "after explicit developer metadata exclusion",
+		"exit_code": 0
+	},
+	{
+		"os": "linux",
+		"script": "test-linux-package-options.cjs",
+		"phase": "after explicit developer metadata exclusion",
+		"exit_code": 0
+	}
+]

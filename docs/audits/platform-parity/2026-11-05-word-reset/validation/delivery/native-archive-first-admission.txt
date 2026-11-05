@@ -1,0 +1,5 @@
+
+> svelte-static@3.0.0 test:linux:updater-archive-native
+> node ./tools/test/run-linux-updater-archive-native.cjs
+
+[FAIL] Linux updater archive native prerequisites: admission or physical closure refused; private evidence retained.

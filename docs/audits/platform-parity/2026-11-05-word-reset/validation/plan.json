@@ -1,0 +1,7 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"module": "word-reset",
+	"begins_after": "undo-repeat four reviewer scopes closed; root final driver programs all exited 0",
+	"scope": "word and AI context resets for navigation, shortcuts, tap-hold, idle and edited controls; explicit keep/reset options",
+	"worktrees": "reuse owned parity-undo-repeat-2026-11-05 paths; metadata-only changes in shared WT do not alter audited runtime sources"
+}

@@ -1,0 +1,138 @@
+[
+	{
+		"pass": "A",
+		"completed_at": "2026-11-05T14:26:42.424926+00:00",
+		"axes": [
+			"canonical defaults versus raw initialization placeholders",
+			"public callers versus pure corpus scope",
+			"arrow shortcut tap-hold option and AI preference cross-product",
+			"immediate state and next-key continuation",
+			"modified Backspace and Escape effects",
+			"terminal newline and empty-line backspace",
+			"idle no-reset and coarse-clock boundaries",
+			"Unicode backspace and private mark",
+			"menus source publication and declared OS restriction",
+			"prior-root deduplication and intentional-difference basis"
+		],
+		"new_shared_roots": 0,
+		"known_peer_root": "Mac caller mirror lifetime, owned by macOS reviewer",
+		"runs": [
+			{
+				"label": "source",
+				"argv": [
+					"python3",
+					"/workspace/scratch/parity-word-reset-2026-11-05/shared/source_probe.py",
+					"/workspace/worktrees/parity-undo-repeat-2026-11-05/shared"
+				],
+				"cwd": "/workspace/worktrees/parity-undo-repeat-2026-11-05/shared",
+				"exit_code": 0,
+				"output": "dry-A-source.txt",
+				"sha256": "21615248f8f6d249e2713f375fa3ef1f791c87d96c4bb23f2f44bf64ca0fa918"
+			},
+			{
+				"label": "lua54",
+				"argv": [
+					"lua",
+					"/workspace/scratch/parity-word-reset-2026-11-05/shared/context-controls.lua",
+					"/workspace/worktrees/parity-undo-repeat-2026-11-05/shared"
+				],
+				"cwd": "/workspace/worktrees/parity-undo-repeat-2026-11-05/shared",
+				"exit_code": 0,
+				"output": "dry-A-lua54.txt",
+				"sha256": "b0e153a43c9914a361e2b7d5d518af1a169fc1694cb39ac6c1f0e65f14cd108d"
+			},
+			{
+				"label": "luajit",
+				"argv": [
+					"luajit",
+					"/workspace/scratch/parity-word-reset-2026-11-05/shared/context-controls.lua",
+					"/workspace/worktrees/parity-undo-repeat-2026-11-05/shared"
+				],
+				"cwd": "/workspace/worktrees/parity-undo-repeat-2026-11-05/shared",
+				"exit_code": 0,
+				"output": "dry-A-luajit.txt",
+				"sha256": "b0e153a43c9914a361e2b7d5d518af1a169fc1694cb39ac6c1f0e65f14cd108d"
+			},
+			{
+				"label": "macos-peer",
+				"argv": [
+					"lua",
+					"/workspace/scratch/parity-word-reset-2026-11-05/shared/macos-peer-replay.lua",
+					"/workspace/worktrees/parity-undo-repeat-2026-11-05/shared"
+				],
+				"cwd": "/workspace/worktrees/parity-undo-repeat-2026-11-05/shared",
+				"exit_code": 0,
+				"output": "dry-A-macos-peer.txt",
+				"sha256": "804c00864aa104e56c5798c8f717c44101cfc85c7d92d3faf49e33504078c48b"
+			}
+		]
+	},
+	{
+		"pass": "B",
+		"completed_at": "2026-11-05T14:26:43.340352+00:00",
+		"axes": [
+			"canonical defaults versus raw initialization placeholders",
+			"public callers versus pure corpus scope",
+			"arrow shortcut tap-hold option and AI preference cross-product",
+			"immediate state and next-key continuation",
+			"modified Backspace and Escape effects",
+			"terminal newline and empty-line backspace",
+			"idle no-reset and coarse-clock boundaries",
+			"Unicode backspace and private mark",
+			"menus source publication and declared OS restriction",
+			"prior-root deduplication and intentional-difference basis"
+		],
+		"new_shared_roots": 0,
+		"known_peer_root": "Mac caller mirror lifetime, owned by macOS reviewer",
+		"runs": [
+			{
+				"label": "source",
+				"argv": [
+					"python3",
+					"/workspace/scratch/parity-word-reset-2026-11-05/shared/source_probe.py",
+					"/workspace/worktrees/parity-undo-repeat-2026-11-05/shared"
+				],
+				"cwd": "/workspace/worktrees/parity-undo-repeat-2026-11-05/shared",
+				"exit_code": 0,
+				"output": "dry-B-source.txt",
+				"sha256": "21615248f8f6d249e2713f375fa3ef1f791c87d96c4bb23f2f44bf64ca0fa918"
+			},
+			{
+				"label": "lua54",
+				"argv": [
+					"lua",
+					"/workspace/scratch/parity-word-reset-2026-11-05/shared/context-controls.lua",
+					"/workspace/worktrees/parity-undo-repeat-2026-11-05/shared"
+				],
+				"cwd": "/workspace/worktrees/parity-undo-repeat-2026-11-05/shared",
+				"exit_code": 0,
+				"output": "dry-B-lua54.txt",
+				"sha256": "b0e153a43c9914a361e2b7d5d518af1a169fc1694cb39ac6c1f0e65f14cd108d"
+			},
+			{
+				"label": "luajit",
+				"argv": [
+					"luajit",
+					"/workspace/scratch/parity-word-reset-2026-11-05/shared/context-controls.lua",
+					"/workspace/worktrees/parity-undo-repeat-2026-11-05/shared"
+				],
+				"cwd": "/workspace/worktrees/parity-undo-repeat-2026-11-05/shared",
+				"exit_code": 0,
+				"output": "dry-B-luajit.txt",
+				"sha256": "b0e153a43c9914a361e2b7d5d518af1a169fc1694cb39ac6c1f0e65f14cd108d"
+			},
+			{
+				"label": "macos-peer",
+				"argv": [
+					"lua",
+					"/workspace/scratch/parity-word-reset-2026-11-05/shared/macos-peer-replay.lua",
+					"/workspace/worktrees/parity-undo-repeat-2026-11-05/shared"
+				],
+				"cwd": "/workspace/worktrees/parity-undo-repeat-2026-11-05/shared",
+				"exit_code": 0,
+				"output": "dry-B-macos-peer.txt",
+				"sha256": "804c00864aa104e56c5798c8f717c44101cfc85c7d92d3faf49e33504078c48b"
+			}
+		]
+	}
+]

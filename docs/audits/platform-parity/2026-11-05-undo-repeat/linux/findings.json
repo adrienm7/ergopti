@@ -1,0 +1,54 @@
+{
+	"schema_version": 1,
+	"scope": "linux-undo-repeat",
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/platform-parity/2026-11-05-undo-repeat/linux/report.md",
+	"findings": [
+		{
+			"id": "URL001",
+			"title": "Linux repeat publication clears the matcher and invents a word start",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Execute owner-probe.lua against the audited tree: po + magic + magic produces poo\u2605 with one injection; ac + magic + \u00ea produces acc\u00ea despite all fourteen shipped correction rows loading, while manually typed acc\u00ea becomes accu. A word-start-only x\u2192z mapping fires in po + magic + x, producing pooz; manual poox stays unchanged.",
+			"root_cause": "Main synthesizes a repeat result with final_result=true and then uses ordinary final-output publication: apply_expansion followed by reset(nil,nil,\"keep\"). The matcher buffer is emptied and its default word-start flag becomes true although the caret still follows the repeated word. The keep flag preserves AI context only. Windows repeat uses FinalResult=false; macOS commits full next_buffer.",
+			"silent_failure": "The first repeat delivery succeeds. Its logical publication destroys context without a warning, so subsequent repeat/correction silently fails or a word-only rule silently fires mid-word. The pure repeat corpus tests resolve(), not Main publication.",
+			"regression_test": "Drive actual Main + real engine through acknowledged repeat, a second repeat, shipped repeat correction and word-start-only mapping refusal. Include disabled, native failure and ordinary registered-match positive controls; do not certify only the standalone repeat rule.",
+			"evidence": [
+				"owner-probe.lua: repeat_then_repeat, shipped_after_repeat, shipped_manual_positive, repeat_forges_word_start, manual_doubling_keeps_word_start_guard",
+				"final-A-luajit-owner.txt",
+				"final-A-lua-owner.txt",
+				"final-B-luajit-owner.txt",
+				"final-B-lua-owner.txt",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua:1382-1392,1483-1487",
+				"static/ergopti_plus/_shared/lua/hotstring_engine/init.lua:1144-1153"
+			],
+			"basis": "Actual production Lua callbacks, engine, shipped loader and injector over recorded native keyboard/XKB/accessibility ports. No actual desktop editor receiving."
+		},
+		{
+			"id": "URL002",
+			"title": "Linux repeat loses private ancestry from a real personal prefix output",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["private_output_classification"],
+			"reproduction": "Use actual Prefix.build with synthetic social_security_number=123456789012349; type12345 to invoke the real private prefix expansion, then magic. First injector call is private; the next repeated9 is private=false. The probe explicitly enables TRACE; at that level the actual injector logs text='9' and Main passes the unclassified repeated9 to its telemetry receiver. Private Undo restores12345 with private=true as a positive control.",
+			"root_cause": "Prefix producer deliberately returns is_private=true and final_result=false. The acknowledged private output remains in the matcher, but no private ancestry travels into the newly constructed repeat result; Main omits is_private and then invokes ordinary injection and record_hotstring.",
+			"silent_failure": "No error occurs. Initial private output correctly withholds content, making the next derived scalar appear ordinary to the real logger and metrics interface. The metrics owner uses this flag for redaction and event publication.",
+			"regression_test": "Compose actual Prefix.build, real engine and actual Main repeat dispatch, observing injector classification, actual logging and metrics input. Assert inherited private classification for derived repeat output, with public repeat and private Undo positive controls; do not suppress unrelated user typing.",
+			"evidence": [
+				"owner-probe.lua: repeat_private_ancestry and private_undo",
+				"final-A-luajit-owner.txt",
+				"final-A-lua-owner.txt",
+				"final-B-luajit-owner.txt",
+				"final-B-lua-owner.txt",
+				"static/ergopti_plus/linux/modules/dynamic_hotstrings/prefix_rules.lua:59-65",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua:1382-1392,1422-1426,1436-1440",
+				"static/ergopti_plus/linux/modules/hotstrings/injector.lua:891-895",
+				"static/ergopti_plus/linux/modules/keystats/keystats.lua:1092-1128"
+			],
+			"basis": "Actual production private-prefix producer, Main callbacks, engine, injector and logger over recorded native ports. Metrics input observed; no real database persistence or full-secret exfiltration claim. TRACE diagnostic emission is conditional on that explicitly enabled level, not claimed at the default log level."
+		}
+	]
+}

@@ -1,0 +1,176 @@
+{
+	"schema_version": 1,
+	"module": "undo-repeat",
+	"platform": "windows",
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"rows": [
+		{
+			"aspect": "public-repeat-entry",
+			"status": "available",
+			"observation": "_OnPrefixChar: registry, personal combo, user-code, repeat precedence; deferred publication distinguished from success",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1559",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "repeat-feature-default",
+			"status": "available",
+			"observation": "Shared default false/recommended true; live runtime flag; missing config returns manifest default",
+			"source": "static/ergopti_plus/windows/infra/feature_state.ahk:246",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "repeat-toggle-publication",
+			"status": "available",
+			"observation": "Persist-before-publish, decision generation advance, projection invalidation; no reload required",
+			"source": "static/ergopti_plus/windows/ui/editors.ahk:560",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "repeat-corrections-independent",
+			"status": "available",
+			"observation": "Separate default-off section, two-second delay; fourteen layout mappings, ordinary registry metadata",
+			"source": "static/ergopti_plus/_shared/modules/features/manifest.toml:1101",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "midword-boundary",
+			"status": "available",
+			"observation": "Both complete scalars must be word chars, custom terminators excluded; first letter blocked",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:1193",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "unknown-buffer-start",
+			"status": "available",
+			"observation": "Unknown first predecessor cannot license doubling; additional known predecessor required",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:1248",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "unicode-scalar",
+			"status": "available",
+			"observation": "Complete-tail scalar guards; UTF16 length separated from codepoint erasure",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:1218",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "grapheme-native-delete",
+			"status": "unmeasured",
+			"observation": "Application backspace semantics for combining/emoji clusters need receiving; no scalar==grapheme claim",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk:1265",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "magic-source-and-double-magic",
+			"status": "available",
+			"observation": "Configured exact suffix, no regex interpolation in fallback; repeated magic excluded",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:1207",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "repeat-delay",
+			"status": "available",
+			"observation": "Fallback has no TimeActivationSeconds; registered corrections have independent gate; idle context still applies",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk:1142",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "withheld-bubble",
+			"status": "intentional",
+			"observation": "Explicit no-repeat-preview decision, oracle still describes next real action; no lower fallback promotion",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:2711",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "cascade-exclusion",
+			"status": "intentional",
+			"observation": "IsRepeat and private outputs explicitly excluded from chain links",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_cascade.ahk:99",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "pause-rebuild-transition",
+			"status": "available",
+			"observation": "Public pause guard, registry rebuild/transition and suppression checks retained",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:1194",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "original-destination",
+			"status": "available",
+			"observation": "Normal owner preflight + deferred original source/destination generations; native receiving not certified",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk:1291",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "output-refusal",
+			"status": "available",
+			"observation": "Sender verdict precedes state/analytics commit; deferred schedule not fire; no native injection performed",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk:1510",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "private-derived-repeat",
+			"status": "partial",
+			"observation": "URW-001: supported private nonfinal user-code output can donate its last scalar to a public repeat",
+			"source": "static/ergopti_plus/windows/modules/dynamic_hotstrings/user_code.ahk:424",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "personal-final-private-controls",
+			"status": "available",
+			"observation": "Real shipped personal @/prefix mappings final; multi-field key output clears model; direct personal-field sequence refuted",
+			"source": "static/ergopti_plus/windows/modules/dynamic_hotstrings/dynamic_hotstrings.ahk:168",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "cross-host-live-classification",
+			"status": "partial",
+			"observation": "URW-002: normalized repeat_key atomically, raw magickey/repeat_corrections on deferred host; canonical row has no category field",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk:624",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "plain-backspace-scalar-tracking",
+			"status": "available",
+			"observation": "Actual keydown calls commit/decrement/preview rerender; no trigger restoration on this path",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1995",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "immediate-backspace-trigger-restoration",
+			"status": "missing",
+			"observation": "Not implemented on inspected Windows owner; Linux owns explicit undo receipt. No policy authorizing permanent exclusion found",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1822",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "modified-backspace-and-native-undo",
+			"status": "available",
+			"observation": "Ctrl word delete vs Alt/Win unknown-context reset; Ctrl+Z/Y app owned; no native grouping promise",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1791",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "idle-forgotten-word",
+			"status": "available",
+			"observation": "Backspace restores last forgotten word only if input/content generations and empty matcher still current",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:2026",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "test-trust",
+			"status": "limited",
+			"observation": "Read genuine repeat/fence/corpus, scalar and no-bubble tests; none executed in AHK. Source checks are not runtime cases",
+			"source": "static/ergopti_plus/windows/tests/unit/modules/hotstrings/engine/test_repeat_key_honours_rebuild_fence.ahk:129",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		},
+		{
+			"aspect": "performance-and-memory",
+			"status": "unmeasured",
+			"observation": "No G4 or leak assertion; native hot path and real owner lifetimes need receiving",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk:1291",
+			"basis": "exact-source review; no AHK or native desktop execution"
+		}
+	]
+}

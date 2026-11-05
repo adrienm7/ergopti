@@ -1,0 +1,8 @@
+2026-11-05 14:04:08:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+[logger] unified log write refused: /tmp/lua_QN5dcp_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_QN5dcp_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_hotstrings.log: No such file or directory
+2026-11-05 14:04:08:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='dt' section='datefr'.
+2026-11-05 14:04:08:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='date' section='datelongfr'.
+2026-11-05 14:04:08:000 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-05 14:04:08:000 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+{"ai_context":"6 merci pour votre dossier","full_secret_present":false,"private_expansion":{"private":true,"source":"hotstring","text":"2840175123456","variant":"dynamichotstrings"},"remote_includes_repeat":true,"repeat_events":2,"repeat_output":{"private":false,"source":"hotstring","text":"6","variant":"repeat_key"}}

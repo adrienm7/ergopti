@@ -1,0 +1,120 @@
+{
+  "audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+  "basis": "exact-source authentication and lexical contracts only; zero AHK runtime tests or native receipts",
+  "source_receipts": [
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
+      "sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
+      "sha256": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_buffer_effects.ahk",
+      "sha256": "334ef8e027b2e1691166e7dd838053e286dbddb0eb57e485ef34589d62d2af3f"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_send.ahk",
+      "sha256": "dcc3b043ac6fdd16099edda1d3f225335daf2b4f797e1feb568cbeead047915e"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hook_dispatcher.ahk",
+      "sha256": "815b776cfa26935041130add0447994adacef4685be9f1670891de302112e79c"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+      "sha256": "82f831243cc220a81da56ad61fe5ee97d2eb84d1790ce2d9f35bd30c44bf1b8f"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/tick_count.ahk",
+      "sha256": "d82440cd7048e3e329b99168e549063cf00db7d15570a07dc3d4d640cc7286ec"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/send_input_parameter.ahk",
+      "sha256": "7db5091d412d3d6902d2624ec5817a1ac4002e11ffaae7763edaf08a69b58985"
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/keymap/llm_bridge.ahk",
+      "sha256": "ac1ce7abd174bc6686530df1a030d5f13c465a0b049e16e3731951f7075eda83"
+    },
+    {
+      "path": "static/ergopti_plus/windows/adapters/key_state.ahk",
+      "sha256": "5f9426ebd47a57fd3c66066e77bed1399fa5c47021d94a031c819ee2c8291050"
+    },
+    {
+      "path": "static/ergopti_plus/windows/adapters/text_sender.ahk",
+      "sha256": "0721bdeb5445797f3ca698428278dfd598964bd2ba5cea63d34e6bc7b93132ad"
+    },
+    {
+      "path": "static/ergopti_plus/windows/platform/remap/constants.ahk",
+      "sha256": "3c094b62641fa76bbdd53782e0d243a6697492c025a99476b036d6622b52835c"
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/gestures/actions.ahk",
+      "sha256": "38ac49e062182b7e57a4b50642f2fc817fa933a7c04d12c8ccbf744f10070224"
+    },
+    {
+      "path": "static/ergopti_plus/windows/ui/editors.ahk",
+      "sha256": "003f73f84ad8cfc92c98c5dfea4e4f163441950f22ff31ba62efc92f2d2a58e6"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/feature_state.ahk",
+      "sha256": "4fb1e47acebfe140556d66a50078461bab5ad576602ac26b6e6c320f8a475919"
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/unit/modules/hotstrings/engine/test_hotstring_event_word_reset.ahk",
+      "sha256": "f3da4d19e48300e8a195a7ff00d352e00541c214154500f60dbfb34023ee49bb"
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/unit/modules/hotstrings/engine/test_hotstring_idle_click_reset.ahk",
+      "sha256": "7aa8b37b6f6cdcbf81dc96f320e69f3853087b05d902fef9232cf83638a27832"
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/unit/modules/hotstrings/engine/test_hotstring_backspace_word_start.ahk",
+      "sha256": "5bc024c4127d2f0f1056c30d97485782ff689d46b4c22d0d4ba53720461c73d9"
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/unit/modules/llm/navigation/test_llm_nav_cycle_windows.ahk",
+      "sha256": "85b5f2fe57ed0d3b9c052e392bc640dd8f7b9949ae0e4950cb8f0ddeff48f862"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+      "sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/actions/send_keys.json",
+      "sha256": "a808e8e48e51ec2d0909cd0d129cd1b2881880f44a1d243c7718bc57cef11e13"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+      "sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0"
+    }
+  ],
+  "checks": {
+    "public_send_shortcut_action_is_all_platform": true,
+    "parsed_shortcut_reaches_textpresskey": true,
+    "textpresskey_modified_press_uses_effect_owner": true,
+    "alt_and_backspace_in_actual_vocabulary": true,
+    "modified_backspace_excluded_from_configurable_shortcuts": true,
+    "synthetic_successful_edit_asserts_boundary": true,
+    "synthetic_failed_edit_loses_boundary": true,
+    "physical_modified_backspace_uses_live_ctrl_only_boundary": true,
+    "word_delete_disallows_alt_or_win": true,
+    "focus_rebind_preserves_unbound_boundary": true,
+    "physical_modified_branch_returns_before_ai_feed": true,
+    "physical_shortcut_branch_returns_before_ai_feed": true,
+    "prefix_context_only_discards_incomplete_ai": true,
+    "complete_ai_context_survives_discard": true,
+    "normal_hook_disables_bridge_key_fallback": true,
+    "next_character_appends_to_existing_ai_context": true,
+    "new_observer_captures_fresh_physical_generation": true,
+    "new_observer_forwards_current_retained_context": true,
+    "prediction_engine_receives_buffer_unchanged": true,
+    "true_reset_on_nav_only_applies_when_called": true,
+    "genuine_physical_alt_backspace_test_has_unknown_control": true,
+    "idle_recovery_retains_generation_fence": true,
+    "arrows_keep_separate_config_under_modifiers": true,
+    "terminal_enter_distinguishes_shift": true
+  }
+}

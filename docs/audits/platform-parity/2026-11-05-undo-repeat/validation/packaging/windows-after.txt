@@ -1,0 +1,3 @@
+Native flags: 21 bitmaps match every authoritative PNG pixel.
+[32m[OK] the Windows bundle ships 380 files (1491 excluded by 16 groups); 463 literal file names, 174 root-anchored paths (15 dynamic), 174 page and 42 data references all resolve to shipped files; 61 self-checks fail as they must.[0m
+

@@ -1,0 +1,62 @@
+{
+	"schema_version": 1,
+	"scope": "hammerspoon",
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"created_at": "2026-11-05",
+	"report_path": "report.md",
+	"findings": [
+		{
+			"id": "WRM-001",
+			"title": "Next typing replaces the independent AI navigation policy with the hotstring lifetime",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["independent_ai_context_policy"],
+			"reproduction": "Actual public Keymap: type bonjour, navigate, type x. AIreset=false+wordreset=true retains context immediately then loses it to x; AIreset=true+wordreset=false clears immediately then resurrects bonjourx. Arrow and shortcut crossproducts plus click. Separate actual request serializer confirms omission/resurrection over fake HTTP.",
+			"root_cause": "Bridge.check_nav_reset applies independent retention correctly, but update_preview_body subsequently sets llm_buffer from ai_context_of(cursor-relative hotstring buffer), overriding the independent lifetime on the next edit.",
+			"silent_failure": "Typing and requests succeed without diagnostics; registered navigation regression checks immediate retention but not next ordinary-character continuity.",
+			"regression_test": "Actual public arrow/shortcut/click followed by ordinary typing and edits under both preference crossproducts; independently retain or clear AI text through actual request serialization while keeping private redaction and cursor-safe hotstring resets.",
+			"evidence": [
+				{
+					"path": "public-context.lua",
+					"basis": "executed actual Keymap/Bridge/ContextBuffer over repository native ports",
+					"observed": "12publicscenarios:5policy mismatches,7positivecontrols"
+				},
+				{
+					"path": "context-request.lua",
+					"basis": "executed actual Bridge/PredictionEngine/PromptBuilder with fake HTTP; caller transitions independently public-proven",
+					"observed": "4actual serialized request bodies show2mismatches and2positivecontrols; no network delivery"
+				}
+			]
+		},
+		{
+			"id": "WRM-002",
+			"title": "Terminal empty-prompt receipt recognizes main Return but excludes keypad Enter",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["enter_key_identity"],
+			"reproduction": "Condition: classified terminal accepts bare keypadEnter as submission and later Backspaces at empty prompt. Actual public Keymap/TOML fixture: a,submit,a,Backspacex2,r. MainReturn36 emits word-only r\u2192R; keypad76 CR/ETX controls retain pre-submit word and emitno expansion. Native receiving is unexecuted.",
+			"root_cause": "Main Keymap terminal-empty-prompt and no-prediction reset branches check only Keycodes.RETURN36, although generated HID identity and Bridge explicitly support keypadEnter76 as equivalent Enter-family identity.",
+			"silent_failure": "No exception or diagnostic; mainReturn-only registered empty-prompt regressions pass, and keypad state is treated as ordinary retained typed text.",
+			"regression_test": "Actual public main/keypad Enter family, supported native payloads, conditional terminal-submit+empty-prompt deletion and subsequent word-only rules; preserve multiline/ShiftReturn, predictions, pause/focus refusal and terminals with different keypad bindings.",
+			"evidence": [
+				{
+					"path": "keypad-enter.lua",
+					"basis": "executed actual public Keymap/TOML owners over native identity ports; explicitly conditional terminal semantics",
+					"observed": "Return36 Rpositive; keypad76 CR andETX no word-only output; separate CR76 end-charpositive proves notgloballydiscarded"
+				},
+				{
+					"path": "static/ergopti_plus/macos/_generated/hid_key_identity.lua",
+					"basis": "source identity",
+					"observed": "NumpadEnter kc76"
+				},
+				{
+					"path": "static/ergopti_plus/macos/modules/keymap/llm_bridge.lua",
+					"basis": "source identity and intended comparison",
+					"observed": "KEYCODE_ENTER76 annotated samebehaviourasReturn; predictionacceptance admitsboth"
+				}
+			]
+		}
+	]
+}

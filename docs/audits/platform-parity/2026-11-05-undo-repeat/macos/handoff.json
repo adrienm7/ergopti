@@ -1,0 +1,50 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"source_file_claims": 22,
+	"findings": ["URM-001"],
+	"coverage_rows": 25,
+	"native_receiving": false,
+	"actual_metrics_disk_write": false,
+	"actual_persistence_value_selection": true,
+	"sweeps": [
+		{
+			"label": "A",
+			"started_at": "2026-11-05T14:04:00.293172+00:00",
+			"completed_at": "2026-11-05T14:04:03.739068+00:00",
+			"new_roots": 0,
+			"root_discovery_basis": "Manual source reread and adjudication, not inferred mechanically from green probes",
+			"registered_cases": 53
+		},
+		{
+			"label": "B",
+			"started_at": "2026-11-05T14:04:07.765630+00:00",
+			"completed_at": "2026-11-05T14:04:10.688139+00:00",
+			"new_roots": 0,
+			"root_discovery_basis": "Manual source reread and adjudication, not inferred mechanically from green probes",
+			"registered_cases": 53
+		}
+	],
+	"legacy_validator": "Not applicable to outside-repository scratch deliverable: CLI refuses report outside repository. Root must validate final campaign schema and paths.",
+	"programs": [
+		{
+			"path": "public-repeat.lua",
+			"sha256": "b68f4e664b8c71324eea3aaf2fcad2e09abc4de54c5ab55861c236100d347fdc",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-undo-repeat-2026-11-05/macos/public-repeat.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/macos"
+			]
+		},
+		{
+			"path": "private-repeat.lua",
+			"sha256": "0aa7f4177d9883b74da8a53761e8eca38a8d939d1228782ee5728f269d312018",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-undo-repeat-2026-11-05/macos/private-repeat.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/macos"
+			]
+		}
+	],
+	"status": "complete; awaiting root independent adjudication",
+	"followup_control": "Actual public po\u2605x and manual poox both remain poox under enabled word-only x\u2192z mapping; standalone x\u2192z positive control fires."
+}

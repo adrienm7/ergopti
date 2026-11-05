@@ -1,0 +1,40 @@
+
+=== combo press: the order a hand produces ===
+  ok   holds the modifier across the key it modifies
+  ok   releases several modifiers in reverse
+  ok   presses a bare key with no modifier events at all
+
+=== combo press: when it must not write ===
+  ok   writes nothing for a key name it cannot map
+  ok   writes nothing when the device is not open
+  ok   releases partial chord presses after a false return or exception
+  ok   releases every held key when an event write fails
+
+=== combo press: a modifier the hand or a hold already has down ===
+  ok   neither presses nor releases a modifier already down
+  ok   still presses the modifiers the held one does not cover
+  ok   presses a right-hand-held modifier's left twin normally
+
+=== combo press: foreign carrier modifiers retain their original source ===
+  ok   select-all excludes the Ctrl carrier and restores exactly its original owners
+  ok   select-all excludes the Alt carrier and restores exactly its original owners
+  ok   select-all excludes the Ctrl+Shift carrier and restores exactly its original owners
+  ok   select-all excludes the Super carrier and restores exactly its original owners
+  ok   select-all excludes the Alt+Shift carrier and restores exactly its original owners
+  ok   select-all excludes the Super+Shift carrier and restores exactly its original owners
+  ok   preserves the requested modifier family while exact side 29 remains held
+  ok   preserves the requested modifier family while exact side 97 remains held
+  ok   preserves the requested modifier family while exact side 42 remains held
+  ok   preserves the requested modifier family while exact side 54 remains held
+  ok   preserves the requested modifier family while exact side 125 remains held
+  ok   preserves the requested modifier family while exact side 126 remains held
+  ok   does not borrow AltGr as the requested ordinary Alt family
+  ok   retires output after neutralize refuses its native ACK
+  ok   retires output after neutralize throws its native ACK
+  ok   retires output after restore refuses its native ACK
+  ok   retires output after restore throws its native ACK
+  ok   never restores a carrier whose real source UP arrived during the chord
+  ok   restores the other carrier source after one of two same-code owners releases
+  ok   refuses a nested producer while restoring the original carrier exactly once
+  ok   refuses a foreign modifier on a legacy channel without borrowing another source's cleanup rights
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":31}

@@ -1,0 +1,40 @@
+{
+  "scope": "repeat timing contradictory follow-up",
+  "audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+  "source_files": 19,
+  "standalone_shared_findings": 0,
+  "repeat_timing_intent": "unresolved",
+  "actual_shared_assertions_per_runtime": 21,
+  "files": [
+    {
+      "path": "source-receipt.json",
+      "sha256": "0c6fde34b37572a92bc2749fdc8448d38ac860dee4ffba4318dd93872308a6ca",
+      "bytes": 3139
+    },
+    {
+      "path": "format.txt",
+      "sha256": "f7082eb69f9e9f63a0066097903f54a9b1c5d93c2463e71c586093ac141829c9",
+      "bytes": 170
+    },
+    {
+      "path": "model-luajit.txt",
+      "sha256": "c8b8d3f160ab8e2e29b25bc4eb403cda9fed6211d9e382dc7aebc35a2a45e5f3",
+      "bytes": 1183
+    },
+    {
+      "path": "source-note.md",
+      "sha256": "64aedad3cfa0328ec4685940164a834e6ca92f890210d0474539546383e107a7",
+      "bytes": 8088
+    },
+    {
+      "path": "model-lua54.txt",
+      "sha256": "c8b8d3f160ab8e2e29b25bc4eb403cda9fed6211d9e382dc7aebc35a2a45e5f3",
+      "bytes": 1183
+    },
+    {
+      "path": "timing-model.lua",
+      "sha256": "bf3f00862bb53020a9e539b77045ace868f3f4e3b563883d489c7787f80cd5ef",
+      "bytes": 3020
+    }
+  ]
+}

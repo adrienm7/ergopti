@@ -1,0 +1,40 @@
+{
+	"changed_files": 25,
+	"new_behavior": "hotstrings.repeat_activation_window",
+	"behavior_count": 3,
+	"locale_count": 21,
+	"new_keys_per_locale": 3,
+	"canonical_key_count": 4080,
+	"previous_locale_values_changed": 0,
+	"previous_catalogue_metadata_or_rows_changed": false,
+	"runtime_source_files_changed": false,
+	"registered_tests_changed": false,
+	"main_worktree_touched": false,
+	"native_timing_verified": false,
+	"checks": [
+		{
+			"output": "implementation-followup-inventory-test.txt",
+			"sha256": "ca5e5224217d64a6ae96ca29a83831f275719e73692cb5768c39641f51b22c87",
+			"bytes": 168,
+			"exit_code": 0
+		},
+		{
+			"output": "implementation-followup-locales.txt",
+			"sha256": "789f6957c76c500d379b58d9475442599f73cfe809ead2385d49921d409b894e",
+			"bytes": 1239,
+			"exit_code": 0
+		},
+		{
+			"output": "implementation-followup-generators.txt",
+			"sha256": "9ecb955548334197fca37d6715669f0377094a9d694f6fdfa0d504fbb49f4761",
+			"bytes": 61,
+			"exit_code": 0
+		},
+		{
+			"output": "implementation-followup-format-check.txt",
+			"sha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+			"bytes": 66,
+			"exit_code": 0
+		}
+	]
+}

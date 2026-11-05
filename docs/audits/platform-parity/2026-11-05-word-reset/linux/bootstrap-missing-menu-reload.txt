@@ -1,0 +1,71 @@
+
+=== llm settings: where the default comes from ===
+  ok   takes every consumed generation value from the shared manifest
+  ok   stores nothing while both are at their shipped values
+
+=== llm settings: changing them ===
+  ok   stores a value the user chose
+  ok   reads a stored value back
+  ok   keeps word limits coherent and persists automatic diversity
+  ok   refuses a fractional context length
+  ok   clears the entry when it returns to the shipped value
+  ok   keeps the durable value active when a write or delete fails
+
+=== llm settings: the bounds ===
+  ok   refuses a value outside the declared range
+  ok   ignores a stored value outside the range rather than clipping it
+  ok   offers only presets inside the range
+
+=== LLM reset-on-navigation check ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   (ai-context) is a Linux row, checked by default, that persists a change sparsely
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   (ai-context) is greyed and refuses a click while the AI is off
+
+=== LLM shared automatic temperature control ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   replays the bool by prediction-count matrix through real owners (shared-auto-raise)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  FAIL uses the changed shared label and order before numeric providers (shared-auto-raise) — ...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:305: the actual automatic temperature control must exist
+stack traceback:
+	[C]: in function 'assert'
+	...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:305: in function <...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:294>
+	[C]: in function 'xpcall'
+	...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:294: in function 'with_auto_menu'
+	...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:380: in function 'fn'
+	...-11-05/linux/static/ergopti_plus/linux/tests/helpers.lua:365: in function <...-11-05/linux/static/ergopti_plus/linux/tests/helpers.lua:363>
+	[C]: in function 'pcall'
+	...-11-05/linux/static/ergopti_plus/linux/tests/helpers.lua:363: in function 'it'
+	...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:379: in function <...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:350>
+	[C]: in function 'pcall'
+	...-11-05/linux/static/ergopti_plus/linux/tests/helpers.lua:333: in function 'describe'
+	...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:350: in main chunk
+	[C]: in function 'require'
+	...ch/parity-word-reset-2026-11-05/linux/run-registered.lua:12: in main chunk
+	[C]: at 0x559dc8b34360
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   refuses a delayed callback after the real count owner changes (shared-auto-raise)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   refuses stale callbacks after pause or the live AI gate closes (shared-auto-raise)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   preserves live and durable values with no optimistic redraw on writer refusal (shared-auto-raise)
+AUDIT_RESULTS={"failed":1,"failures":[{"err":"...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:305: the actual automatic temperature control must exist\nstack traceback:\n\t[C]: in function 'assert'\n\t...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:305: in function <...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:294>\n\t[C]: in function 'xpcall'\n\t...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:294: in function 'with_auto_menu'\n\t...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:380: in function 'fn'\n\t...-11-05/linux/static/ergopti_plus/linux/tests/helpers.lua:365: in function <...-11-05/linux/static/ergopti_plus/linux/tests/helpers.lua:363>\n\t[C]: in function 'pcall'\n\t...-11-05/linux/static/ergopti_plus/linux/tests/helpers.lua:363: in function 'it'\n\t...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:379: in function <...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:350>\n\t[C]: in function 'pcall'\n\t...-11-05/linux/static/ergopti_plus/linux/tests/helpers.lua:333: in function 'describe'\n\t...ux/tests/unit/modules/llm/settings/test_llm_settings.lua:350: in main chunk\n\t[C]: in function 'require'\n\t...ch/parity-word-reset-2026-11-05/linux/run-registered.lua:12: in main chunk\n\t[C]: at 0x559dc8b34360","kind":"case","name":"uses the changed shared label and order before numeric providers (shared-auto-raise)"}],"passed":17}

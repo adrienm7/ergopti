@@ -1,0 +1,39 @@
+{
+	"schema_version": 1,
+	"scope": "word-reset-windows",
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/platform-parity/2026-11-05-word-reset/windows/report.md",
+	"findings": [
+		{
+			"id": "WRSW-001",
+			"title": "Synthetic Alt and Win Backspace invent a known word start",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["physical_synthetic_word_boundary_parity"],
+			"reproduction": "SOURCE-ONLY: public send_shortcut alt+backspace passes real parsing/emission/TextPressKey into successful canonical synthetic edit, clearing HSE with KnownBoundary=true; equivalent physical Alt+Backspace sets unknown false. Unbound focus re-admission preserves the synthetic true, so a word-only mapping can fire after the unknown undo/delete position.",
+			"root_cause": "HS_CommitSyntheticEffect uses one successful-edit boundary verdict for every generic edit; unlike the physical modified-Backspace branch it does not distinguish known Ctrl word deletion from unknown Alt/Win undo/delete semantics.",
+			"silent_failure": "The sender and context commit both succeed, and the diagnostic only says buffers reset. No exception identifies the invented boundary. Existing physical Alt+Backspace behavioral test explicitly requires unknown but does not compare the public synthetic sibling.",
+			"regression_test": "Actual AHK parsed send_shortcut/TextPressKey/canonical effect and real physical keydown: compare Ctrl/Alt/Win/Shift Backspace boundary and subsequent word-only/in-word matcher decisions, with settings on/off, focus rebinding, Unicode fragments, send refusal. Retain atomic declaration/send and fail-closed unknown contexts.",
+			"basis": "Exact-source deduction; no AHK execution, behavior translation, native application or network receipt",
+			"source_report": "docs/audits/platform-parity/2026-11-05-word-reset/windows/report.md",
+			"evidence": ["report.md", "source-contract.py", "source-contract.txt"]
+		},
+		{
+			"id": "WRSW-002",
+			"title": "Physical editing shortcut branches preserve obsolete complete AI context",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["ai_context_continuity_after_unknown_edit"],
+			"reproduction": "SOURCE-ONLY: complete active prediction context OLD_WORD with reset_on_nav=true, or agent-only context with active typing feed; Ctrl+Backspace deletes the word (or Ctrl+A then x replaces selection), then type x in stable focus. Real prefix-hook early branch resets only HSE/preview; incomplete-only bridge discard preserves complete AI context. Next char appends x, fresh observer captures current physical generation and forwards obsolete OLD_WORDx to engine/agent.",
+			"root_cause": "LLM key forwarding sits below the physical shortcut/modified-Backspace early returns. Prefix context mutation only discards incomplete UTF16; bridge dispatcher fallback intentionally returns while prefix hook exists. Synthetic key declarations similarly have no complete AI-context edit while SendLevel0 prevents hook echo.",
+			"silent_failure": "All strings and newly captured generation/focus receipts are valid. Old observer/output fences work but do not detect a new owner carrying obsolete semantic text. Length diagnostics and direct bridge navigation tests do not cover real prefix shortcut branching. No actual network or persistence measured.",
+			"regression_test": "Genuine AHK real prefix keydown and actual bridge/agent owners: complete contexts after Ctrl+Backspace and Ctrl+A replacement must match empty/known edited text before next real engine/agent observer. Include inactive requests, CtrlZ/Y/V/F/L, Alt/Win, reset_on_nav policy, tap-hold modifier and command/synthetic sources, stale/focus/pause/refused output; keep self-echo disabled and stale-owner admission intact.",
+			"basis": "Exact-source deduction; no AHK execution, behavior translation, native application or network receipt",
+			"source_report": "docs/audits/platform-parity/2026-11-05-word-reset/windows/report.md",
+			"evidence": ["report.md", "source-contract.py", "source-contract.txt"]
+		}
+	]
+}

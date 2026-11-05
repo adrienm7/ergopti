@@ -1,0 +1,4 @@
+Native flags: 21 bitmaps match every authoritative PNG pixel.
+
+[31m[FAIL] Windows bundle manifest:[0m
+  - static/ergopti_plus/_shared/modules/features/behaviors.json ships but is behavior review metadata

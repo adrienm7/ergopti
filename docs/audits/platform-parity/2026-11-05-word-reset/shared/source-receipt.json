@@ -1,0 +1,70 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"source_files": {
+		"static/ergopti_plus/_shared/modules/features/manifest.toml": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+		"static/ergopti_plus/_shared/modules/menu/menu_manifest.json": "544782751c80291ac36158a1e3b07b5507d42a1fde349c73859a2097427741d3",
+		"static/ergopti_plus/_shared/lua/hotstring_engine/init.lua": "be675a01bcdd3d4dfbd55b2c061ebca82c160f82f7fd8a6bc2f1c0fe91e2a0de",
+		"static/ergopti_plus/_shared/lua/llm/context_buffer.lua": "0768215b6df83167a4cedfd31fd924eca7c873e214a7605893aba07b00fd0b37",
+		"static/ergopti_plus/_shared/tests/corpus/hotstrings/idle_reset_vectors.json": "77bfd861f34b0a4cc848f0e2986d8299520fdd47e8e62343fe3c05469845d087",
+		"static/ergopti_plus/_shared/tests/corpus/llm/context_buffer_vectors.json": "62dcad4706afcfd3eafbbeb08c5ae17d166f7141c538326766d2e48f9dd5b289",
+		"static/ergopti_plus/linux/modules/hotstrings/word_reset.lua": "449c91fa83af61d76d781dc76e84ca1eb9fcd8c82dbe627d2a47d5dd04f36120",
+		"static/ergopti_plus/linux/modules/hotstrings/engine.lua": "af7aab05f344db92f759b4033efeda06920481fbdb688f06cefeb56cbbd361bc",
+		"static/ergopti_plus/linux/modules/llm/context.lua": "4d6b2087caa82612759906d263fd950247845ca474842556fa67e4bf7378f433",
+		"static/ergopti_plus/linux/modules/llm/settings.lua": "432d5d1eb06b5a2dc2f7bbf21efc3cee91e54f61badd70c0fc8a21670a68b3bf",
+		"static/ergopti_plus/linux/ergopti_hotstrings.lua": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9",
+		"static/ergopti_plus/linux/ui/menu/menu_hotstrings.lua": "a5ba41898949763cea999e18c7494c952de3db78f58d9df5d0b6ea75f53fe13f",
+		"static/ergopti_plus/macos/modules/keymap/init.lua": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56",
+		"static/ergopti_plus/macos/modules/keymap/state.lua": "e565599088ffc788cdd93b8133b013c931183dde93690d0d8d551d29beb9897e",
+		"static/ergopti_plus/macos/modules/keymap/llm_bridge.lua": "1cb966c2341686ff8394de5d21ad5dfb7388d3a7a38457f53ec859b72f95b4ff",
+		"static/ergopti_plus/macos/ui/menu/menu_hotstrings_management.lua": "d96f2ed251187ae9d4d8d926256807a67d1fe15e58f952368416c0ae557f6040",
+		"static/ergopti_plus/macos/tests/unit/modules/keymap/terminators/test_nav_invalidates_hotstring_buffer.lua": "5bb615922f08b13a09f38844ee9d8ed9ad2a202225b847a5473b080a119c4511",
+		"static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70",
+		"static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503",
+		"tools/build/build-features-manifest.js": "102d3db701ca3a55a46addf9f5e3c98394d68d3a2c0bb76cdce3bee5e9edd03a"
+	},
+	"actual_declaration_model": [
+		{
+			"path": "hotstrings.idle_reset_seconds",
+			"default": 3,
+			"platforms": ["ahk", "hs", "linux"],
+			"reason_key": null
+		},
+		{
+			"path": "hotstrings.click_resets_word",
+			"default": true,
+			"platforms": ["ahk", "hs", "linux"],
+			"reason_key": null
+		},
+		{
+			"path": "hotstrings.arrow_resets_word",
+			"default": true,
+			"platforms": ["ahk", "hs", "linux"],
+			"reason_key": null
+		},
+		{
+			"path": "hotstrings.shortcut_resets_word",
+			"default": true,
+			"platforms": ["ahk", "hs", "linux"],
+			"reason_key": null
+		},
+		{
+			"path": "hotstrings.tap_hold_resets_word",
+			"default": true,
+			"platforms": ["ahk", "linux"],
+			"reason_key": "platform_reason.tap_hold_word_reset_not_on_macos"
+		},
+		{
+			"path": "llm.generation.reset_on_nav",
+			"default": true,
+			"platforms": ["ahk", "hs", "linux"],
+			"reason_key": null
+		}
+	],
+	"basis": "authenticated exact source plus actual declaration-model code; no native AHK execution",
+	"corpus_limit": "Shared pure policy success does not certify caller state after the next key.",
+	"known_differences": [
+		"macOS tap-hold origin is unavailable by explicit Karabiner policy",
+		"Linux modifier-free newline cannot distinguish terminal Shift+Enter",
+		"Linux coarse clock subtracts its measured resolution when high-resolution backend is absent"
+	]
+}

@@ -1,0 +1,30 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"after_last_new_root": "URW-001 confirmed after URW-002 category mismatch",
+	"sweeps": [
+		{
+			"sweep": "A",
+			"scope": "all 24 coverage aspects; repeat, corrections, plain/modified Backspace, app Undo, owner lifecycle, output host completions and privacy/classification sinks",
+			"new_confirmed_roots": 0,
+			"basis": "manual bounded source review plus lexical source authentication; not runtime certification",
+			"replay": "python3 source-contract.py <repo-root> > dry-A.json",
+			"receipt": "dry-A.json",
+			"sha256": "59e361daefa6f29ce89c4bc0533e0fd14b590dac2eafde8269225088c881de03",
+			"source_files": 19,
+			"lexical_checks": 18,
+			"native_ahk_tests_executed": 0
+		},
+		{
+			"sweep": "B",
+			"scope": "all 24 coverage aspects; repeat, corrections, plain/modified Backspace, app Undo, owner lifecycle, output host completions and privacy/classification sinks",
+			"new_confirmed_roots": 0,
+			"basis": "manual bounded source review plus lexical source authentication; not runtime certification",
+			"replay": "python3 source-contract.py <repo-root> > dry-B.json",
+			"receipt": "dry-B.json",
+			"sha256": "59e361daefa6f29ce89c4bc0533e0fd14b590dac2eafde8269225088c881de03",
+			"source_files": 19,
+			"lexical_checks": 18,
+			"native_ahk_tests_executed": 0
+		}
+	]
+}

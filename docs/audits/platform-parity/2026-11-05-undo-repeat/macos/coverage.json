@@ -1,0 +1,282 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"os": "macos",
+	"module": "undo-repeat",
+	"rows": [
+		{
+			"id": "MAC-UR-01",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Opt-in repeat feature",
+			"status": "available",
+			"description": "Manifest neutral default false, explicit enable gate; disabling removes sparse persisted leaf.",
+			"basis": "executed actual registry/preferences owner",
+			"evidence": "dry-A/registered/test_repeat_neutral_config.log",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-02",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Menu repeat toggle",
+			"status": "available",
+			"description": "Shared checkbox command invokes actual keymap setter, checks exact true, saves sparse preferences and reloads. Save refusal remains loud but native menu receiving unmeasured.",
+			"basis": "source review",
+			"evidence": "static/ergopti_plus/macos/ui/menu/menu_hotstrings_management.lua:651",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-03",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Midword literal repeat",
+			"status": "available",
+			"description": "Public po\u2605 produces poo and one repeated scalar.",
+			"basis": "executed actual public Keymap/SyntheticInput owner",
+			"evidence": "public-repeat.lua",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-04",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "First-letter and unknown-boundary refusal",
+			"status": "available",
+			"description": "Shared word-character corpus refuses isolated first letter and unknown buffer start; guards apply to predecessor and repeated scalar.",
+			"basis": "executed registered corpus plus source review",
+			"evidence": "dry-A/registered/test_repeat_feature_arm_time.log",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-05",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Unicode word policy",
+			"status": "available",
+			"description": "Uses codepoints, accepts shared non-ASCII word-character rule; no grapheme promise is inferred.",
+			"basis": "executed registered corpus plus source review",
+			"evidence": "static/ergopti_plus/macos/modules/keymap/expander.lua:1293",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-06",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Whitespace/punctuation and custom delimiter refusal",
+			"status": "available",
+			"description": "Whitespace/double magic refused; custom digit terminator refuses itself and the following word-start letter.",
+			"basis": "executed registered controls",
+			"evidence": "dry-A/registered/test_repeat_feature_arm_time.log",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-07",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Composite physical magic events",
+			"status": "available",
+			"description": "NBSP/NNBSP plus configured punctuation recognized; physical-codepoint deletion count belongs to actual payload in explicit ignored-output helper fixture.",
+			"basis": "executed registered owner controls",
+			"evidence": "dry-A/registered/test_repeat_feature_arm_time.log",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-08",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Mapping precedence",
+			"status": "available",
+			"description": "Eligible true magic and end-char mappings resolve before fallback; final no-op wins without an edit.",
+			"basis": "executed registered eventtap timing and source review",
+			"evidence": "dry-A/registered/test_star_validation_beats_repeat_key.log",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-09",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Repeat timing",
+			"status": "available",
+			"description": "Explicit mappings bypass ordinary delay; fallback retains STAR_TRIGGER timing gate and complex-key multiplier.",
+			"basis": "executed registered real-eventtap controls plus source review",
+			"evidence": "static/ergopti_plus/macos/modules/keymap/init.lua:1358",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-10",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Changed-key literal provenance",
+			"status": "available",
+			"description": "Literal mappings ending configured magic retain timing and original ownership across subsequent key changes; true stars follow renamed magic.",
+			"basis": "executed registered public eventtap controls",
+			"evidence": "dry-A/registered/test_star_validation_beats_repeat_key.log",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-11",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "No repeat tooltip row",
+			"status": "intentional_difference",
+			"description": "Doubling withheld as constant midword noise; repeat still fires. Correction entries are not doublings.",
+			"basis": "explicit policy plus executed registered control",
+			"evidence": "docs/memory/text-input-and-config.md:367",
+			"intent": "Explicit maintainer decision: project-the-bubble-never-offers-a-doubling"
+		},
+		{
+			"id": "MAC-UR-12",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Repeat correction catalogue",
+			"status": "available",
+			"description": "Shipped cc\u00ea\u2192ccu actual row works after public ac\u2605\u2192acc: \u00ea\u2192accu.",
+			"basis": "executed actual public owners and shared TOML catalogue",
+			"evidence": "public-repeat.lua",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-13",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Section/extension ownership",
+			"status": "available",
+			"description": "Repeat corrections retain bound section and extension source; not synthesized as repeat fallback entries.",
+			"basis": "executed actual registry bound-section controls plus source review",
+			"evidence": "dry-A/registered/test_registry_bound_sections.log",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-14",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Continuation after repeat",
+			"status": "available",
+			"description": "Retained poo allows public next\u2605 to resolve separately registered poo\u2605\u2192NEXT_MAGIC. Actual word-only x\u2192z rule leaves both po\u2605x and manual poox unchanged as poox; standalone x\u2192z proves positive rule reachability.",
+			"basis": "executed actual public owner",
+			"evidence": "public-repeat.lua",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-15",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Immutable native event ownership",
+			"status": "available",
+			"description": "Consecutive repeats in same clock tick receive different immutable generations; deletion and insertion share transaction.",
+			"basis": "executed actual SyntheticInput owner with recording native events",
+			"evidence": "dry-A/registered/test_repeat_feature_arm_time.log",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-16",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Output refusal cleanup",
+			"status": "available",
+			"description": "Refused text emitter leaves buffer unchanged, zero callback events, zero synthetic metrics and preview writes.",
+			"basis": "executed registered actual replacement owner",
+			"evidence": "dry-A/registered/test_repeat_replacement_transaction.log",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-17",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Preview and metrics after successful output",
+			"status": "available",
+			"description": "Actual repeat replacement publishes synthetic notification, buffer and post-completion preview only after successful construction.",
+			"basis": "executed actual registered owner",
+			"evidence": "dry-A/registered/test_repeat_replacement_transaction.log",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-18",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Private-derived repeat propagation",
+			"status": "partial",
+			"description": "URM-001: private SSN output repeated scalar6 becomes nonprivate, literal DEBUG boundary and actual recorded-value function return6.",
+			"basis": "executed actual public SSN/Keymap/Expander/metrics value owners",
+			"evidence": "public-repeat.lua",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-19",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Private-derived AI context",
+			"status": "partial",
+			"description": "URM-001: old private prefix remains protected, newly repeated scalar6 appears in actual bridge context and actual request serialized into fake HTTP port.",
+			"basis": "executed actual Bridge/PredictionEngine owners; fake network port",
+			"evidence": "private-repeat.lua",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-20",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Fresh typing after private output",
+			"status": "available",
+			"description": "Fresh user text after private span is intentionally available; full existing private prefix remains withheld.",
+			"basis": "explicit bridge policy and executed actual private-context controls",
+			"evidence": "dry-A/registered/test_private_expansion_never_prompted.log",
+			"intent": "Bridge documents separate hotstring cursor buffer and visible AI context; private prefix excluded, fresh suffix allowed"
+		},
+		{
+			"id": "MAC-UR-21",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Bare Backspace after expansion",
+			"status": "available",
+			"description": "Public expand\u2605\u2192EXPANDED then bare Backspace passes through, tracked buffer EXPANDE, no new synthetic output.",
+			"basis": "executed actual public Keymap tap",
+			"evidence": "public-repeat.lua",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-22",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Expansion-specific Backspace undo",
+			"status": "unavailable",
+			"description": "No Linux-style custom undo receipt found in bounded Mac Keymap/Expander owners; bare Backspace edits emitted text instead of restoring original trigger.",
+			"basis": "bounded source census corroborated public control",
+			"evidence": "static/ergopti_plus/macos/modules/keymap/init.lua:1829",
+			"intent": "Intent for absence not located; implementation difference only"
+		},
+		{
+			"id": "MAC-UR-23",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Application Cmd+Z",
+			"status": "native_unmeasured",
+			"description": "Public Cmd+Z passes through with configured shortcut reset; no synthetic custom undo. Native editor effect/grouping not executed.",
+			"basis": "actual Keymap passthrough, native editor gap",
+			"evidence": "public-repeat.lua",
+			"intent": "Host owns native undo; no editor receipt inferred"
+		},
+		{
+			"id": "MAC-UR-24",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Pause/focus/security admission",
+			"status": "source_review",
+			"description": "Early keymap guards reconcile generation and reject ignored/secure fields before trigger/repeat dispatch. Public probe fixes native classification to normal; does not execute real focus/device transitions.",
+			"basis": "source-only on these native transitions",
+			"evidence": "static/ergopti_plus/macos/modules/keymap/init.lua:1682",
+			"intent": null
+		},
+		{
+			"id": "MAC-UR-25",
+			"os": "macos",
+			"module": "undo-repeat",
+			"aspect": "Latency and long-run memory",
+			"status": "unmeasured",
+			"description": "No actual macOS timing or memory soak; no G4 claim or inferred leak from short Lua fixture.",
+			"basis": "explicit coverage gap",
+			"evidence": "report.md",
+			"intent": null
+		}
+	]
+}

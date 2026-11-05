@@ -1,0 +1,22 @@
+Selecting exact test module: "tests.unit.modules.keymap.registry.test_registry_bound_sections"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.registry.test_registry_bound_sections
+
+=== Registry: sections a layout extension binds ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry_bound_sections","name":"(layout-extension-binding) loads bound sections from the extension file under the bundled group","status":"pass","elapsed_ms":23.338600,"timing_error":""}
+  ok   (layout-extension-binding) loads bound sections from the extension file under the bundled group
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry_bound_sections","name":"(layout-extension-binding) keeps the bound sections through disable, enable and reload","status":"pass","elapsed_ms":7.479232,"timing_error":""}
+  ok   (layout-extension-binding) keeps the bound sections through disable, enable and reload
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry_bound_sections","name":"(layout-extension-binding) refuses a bound file without its section and malformed sources","status":"pass","elapsed_ms":5.255046,"timing_error":""}
+  ok   (layout-extension-binding) refuses a bound file without its section and malformed sources
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.registry.test_registry_bound_sections","name":"tests.unit.modules.keymap.registry.test_registry_bound_sections","status":"pass","elapsed_ms":36.338988,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  3
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

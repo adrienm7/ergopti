@@ -1,0 +1,152 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"sources": [
+		{
+			"path": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+			"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
+			"sha256": "b479068f12b908edd9034442313848c7bd4363031141e07ee9c32418d8a35d13"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/engine.lua",
+			"sha256": "af7aab05f344db92f759b4033efeda06920481fbdb688f06cefeb56cbbd361bc"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/word_reset.lua",
+			"sha256": "449c91fa83af61d76d781dc76e84ca1eb9fcd8c82dbe627d2a47d5dd04f36120"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/loader.lua",
+			"sha256": "f169cabafc9e3e8aeab6874fe8715f113e05852cbb0b77c5260aa43335fba4cf"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/injector.lua",
+			"sha256": "0e7fd57730f818ac710c41d60079ef023453e181c0dfac9ca8a8c17edba07445"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/output_transaction.lua",
+			"sha256": "ea64490b273a0ce5372feb24c87affbad728836fa5beb8cb8a8c9d7bf8743730"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
+			"sha256": "1d28167df7eabbc1be798067269c03706cc41c8e1abd812102977784006404f7"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/magic_key.lua",
+			"sha256": "6f1be4b49903f625aef71919bcd595ca9e1c9c132716545d3d0973c2ce741db9"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/expansion_delay.lua",
+			"sha256": "30d9710fe4eead073f4682f9375a5f4091d7bbda64ec0e8e68af4f4265e6c4f3"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/keystats/focus_guard.lua",
+			"sha256": "09457462789a02ed57959c73993cf0ea853021118e7f3caf51d67c2276c856ce"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/keystats/keystats.lua",
+			"sha256": "bdbd5a1878833c3adec1f15bb4dd9ed3759d572f0cdf19dc57c1edbde0d0f64b"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/dynamic_hotstrings/prefix_rules.lua",
+			"sha256": "68349d9cc3ee05b9f23d54e748023060922a0605fe5283611105e881b9fa66f4"
+		},
+		{
+			"path": "static/ergopti_plus/linux/ui/menu/menu_hotstrings.lua",
+			"sha256": "a5ba41898949763cea999e18c7494c952de3db78f58d9df5d0b6ea75f53fe13f"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/support/text_owner_fixture.lua",
+			"sha256": "8d26c4b875d6043a91394e17ae7bb13f0cabfa745ce69e7b4b56d96ae5eb6c43"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/hotstring_engine/init.lua",
+			"sha256": "be675a01bcdd3d4dfbd55b2c061ebca82c160f82f7fd8a6bc2f1c0fe91e2a0de"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators.lua",
+			"sha256": "a45d8d0107d88573d3056b7a802e8fd5dc936813fa0e6b8e754897cc0eaa2d3f"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/reader.lua",
+			"sha256": "71be5f48fbbc91a5528d4446bfc4548a813feaa5fc457a5cf6778f8a38f4141a"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/hotstrings/repeat_key_vectors.json",
+			"sha256": "e7a777c6c3390aba9392d2077c964343405811e9c9001554bd3fbe93347358a0"
+		},
+		{
+			"path": "static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml",
+			"sha256": "45746566d2709a6508774034e60897296134168bd92ecb8b8af29a570fee9b66"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+			"sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
+			"sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70"
+		},
+		{
+			"path": "docs/memory/text-input-and-config.md",
+			"sha256": "4bacef0f3b010cc89eb5e85c4802b6cc75498f1b5729774af5c70b4c26a230cf"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_repeat_key.lua",
+			"sha256": "be5372e6e4e58a0642371f62d928fe04a76d7ab86d460e4de784e7ce449a15de"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_word_reset.lua",
+			"sha256": "9c3e29b0ef7bc9d00be9247cabd4d0586cf9eb33b10c9075082027d2aca2b06e"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_word_reset_events.lua",
+			"sha256": "527d77534f0954a32ba2d47a1fcbe253995039b731af8ef4dfc08868c0b0c3ac"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_hotstring_final_result.lua",
+			"sha256": "8fdf335b0c3a3c887927f42201b3c7cb8685604c7e97070499a40967a6058826"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_hotstring_cascade.lua",
+			"sha256": "7c8a9bffbfbeb988b9987702c8b933c3d9951ed0ebf06d3eb04b8e6f673fd4f2"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_hotstring_cascade_net_edit.lua",
+			"sha256": "8b80d26413ed48c4399814c651ecd1d8be7cf291cf4b8a085c3029cb752851a0"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/injector/test_output_transaction.lua",
+			"sha256": "99ea036aa9ed25fc6d08dbaa0c76558ddd6ab79ac85799258bd3fae09255926c"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/injector/test_hotstring_undo_owner.lua",
+			"sha256": "586b51ca82be4aebc56b67e0e51cc74d0c058e68aad6c9770e68abae8fde1166"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/injector/test_injector_terminator_contract.lua",
+			"sha256": "ad617e56b4ce47d43412ee90d984ceea51e8234c6967706f3dfc8c858211ebc9"
+		}
+	],
+	"programs": [
+		{
+			"path": "owner-probe.lua",
+			"sha256": "a62dfd621d343a454718823d705f6d3ba968c6edd2cf150dfa25811cd23ddeb9"
+		},
+		{
+			"path": "run-registered.lua",
+			"sha256": "60dcf34266ac63821c0e4a95af0bc2de1f718ee116e562981df451be983e6cbc"
+		},
+		{
+			"path": "run-proofs.py",
+			"sha256": "ea29757adff3b312e41c86b32b91a6812a8b2bdc3852529e630e0e861a975a01"
+		}
+	],
+	"scope_note": "Hash claims cover the named files only, not all transitive runtime dependencies."
+}

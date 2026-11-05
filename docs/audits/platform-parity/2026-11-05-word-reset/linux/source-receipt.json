@@ -1,0 +1,180 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"sources": [
+		{
+			"path": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+			"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/word_reset.lua",
+			"sha256": "449c91fa83af61d76d781dc76e84ca1eb9fcd8c82dbe627d2a47d5dd04f36120"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/engine.lua",
+			"sha256": "af7aab05f344db92f759b4033efeda06920481fbdb688f06cefeb56cbbd361bc"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/device_finder.lua",
+			"sha256": "a5d0c4830dd56868f0f5881f988e60b066106cea30d9e95cbf5d5e4bf3150931"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/llm/context.lua",
+			"sha256": "4d6b2087caa82612759906d263fd950247845ca474842556fa67e4bf7378f433"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/llm/settings.lua",
+			"sha256": "432d5d1eb06b5a2dc2f7bbf21efc3cee91e54f61badd70c0fc8a21670a68b3bf"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/keystats/focus_guard.lua",
+			"sha256": "09457462789a02ed57959c73993cf0ea853021118e7f3caf51d67c2276c856ce"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/gestures/manager.lua",
+			"sha256": "f57b749763cdf55368f9af38e6a60bea2679adbc14070518279f62307b3dcb08"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/gestures/combo_emitter.lua",
+			"sha256": "729f390c6d84f9b88050dc885c2f9f93ac1f621d2081349aad60f7911a06edee"
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+			"sha256": "fe64d1d6985da694281e21d3b09614fc7f346947dbfb24a2a136a05e98c455b7"
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/uinput_writer.lua",
+			"sha256": "d5cd2ebaba30e1f27bffbf3c215ffeea8173c3d31e824c923a2c86c3c4532ba4"
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/modifier_broker.lua",
+			"sha256": "71d6384cf91985d7c404022f053017db0fb85a04ca9775848a5d7209a86bf736"
+		},
+		{
+			"path": "static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua",
+			"sha256": "b856fe543eece29449c3c736af6fed9f524e70466d812d5d5567c8ab52be97e7"
+		},
+		{
+			"path": "static/ergopti_plus/linux/infra/device_names.lua",
+			"sha256": "b5d351328761cbc9309f003126aa42e82d47773d6872d6036d10795e79e863d6"
+		},
+		{
+			"path": "static/ergopti_plus/linux/ui/menu/menu_hotstrings.lua",
+			"sha256": "a5ba41898949763cea999e18c7494c952de3db78f58d9df5d0b6ea75f53fe13f"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/fakes/init.lua",
+			"sha256": "19bebef6668d05ecdcda0eea86cec74afb30becbe6a72cf044aa325cb548ec60"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/support/llm_preferences_fixture.lua",
+			"sha256": "25a947276f00570cc7fd957cbdd6e43f801a354187d58b16bd1627c8e6c676e8"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/support/menu_part_reload.lua",
+			"sha256": "b1ffd6444811d654d9a386c75c2b11d16d9c193f5618c242691c55283796209a"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/run.lua",
+			"sha256": "9e1884ac4c38513d94f4c66f735eebe4fde54bf133c29f417d956db172e104ab"
+		},
+		{
+			"path": "static/ergopti_plus/linux/_generated/gesture_emit_actions.lua",
+			"sha256": "aaff68b8707131cc7271f371dc02885f7ff55a97be36868f29eee7d07ee96822"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/hotstring_engine/init.lua",
+			"sha256": "be675a01bcdd3d4dfbd55b2c061ebca82c160f82f7fd8a6bc2f1c0fe91e2a0de"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/llm/context_buffer.lua",
+			"sha256": "0768215b6df83167a4cedfd31fd924eca7c873e214a7605893aba07b00fd0b37"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+			"sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/en.json",
+			"sha256": "5dbc069c890d121fdf85d54599c345d74b13c559f42856cac932e36d0645dcd9"
+		},
+		{
+			"path": "docs/memory/text-input-and-config.md",
+			"sha256": "4bacef0f3b010cc89eb5e85c4802b6cc75498f1b5729774af5c70b4c26a230cf"
+		},
+		{
+			"path": "docs/memory/linux-web-release.md",
+			"sha256": "eec06e1f26814576e0e0e71bc517abb556dc36794d5f9021754462d7a9f4c5ef"
+		},
+		{
+			"path": "docs/memory/maintainer-decisions.md",
+			"sha256": "20f028ed75ea62d31398e02a648f27db35782053b5b75577410ffb75355674a5"
+		},
+		{
+			"path": "tools/test/run-linux-lua.cjs",
+			"sha256": "6b163b308f6296aa322e85c2e10389a5d5fb9eb7313c83b4126ec539085ac0ce"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_word_reset.lua",
+			"sha256": "9c3e29b0ef7bc9d00be9247cabd4d0586cf9eb33b10c9075082027d2aca2b06e"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_word_reset_events.lua",
+			"sha256": "527d77534f0954a32ba2d47a1fcbe253995039b731af8ef4dfc08868c0b0c3ac"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/llm/context/test_ai_typing_context.lua",
+			"sha256": "c53a4cbb7c436bcde2b174c6efb23b625c970935d5210690ee6de4aeda0da6ca"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/llm/context/test_context_buffer_vectors.lua",
+			"sha256": "24eacd82dfa3484aa808493aa932176789398093cfd86aec8a98942ee7fdb8b6"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/llm/prediction/test_prediction_control_retirement.lua",
+			"sha256": "c4c64c623982a759447265078011124eb150cd52ef4708e6a191737a47061408"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_llm_settings.lua",
+			"sha256": "87e3e9ff5940d827fdd969b23e2fc0fc1828ba5bab32120d5258676e78a27889"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_keyboard_shortcuts_late_contextual_delivery.lua",
+			"sha256": "1523576b2c983853f95bf37460b0b09557b496f83b624d9d756091a2203f1fc9"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_manager_lifecycle.lua",
+			"sha256": "9fbfd6615ac27189c3b5c787598f78eddfeb040ee74295f87a11b66105028560"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_combo_press_order.lua",
+			"sha256": "870ff2eef6574baebb3aa1bc7d3d234f176d4cf0c3067b3648b2c732343b2019"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_combo_emitter.lua",
+			"sha256": "9b180ef19278a0004a67582b1e005c715ca7c696620b6859da11194ae2ae7de9"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/infra/scope/test_hotstrings_scope.lua",
+			"sha256": "e0cebf200554c3c456e499ecbba057bbd1dcb1af0a86c39f6c9961bb254d77bf"
+		}
+	],
+	"programs": [
+		{
+			"path": "continuity-probe.lua",
+			"sha256": "1902d2769848a926b26854e1d83ff5d1835fed91879ead97d85e75ad90261e16"
+		},
+		{
+			"path": "run-proofs.py",
+			"sha256": "dd5571c54080f4e5120cfcee76a5fe1ed84a03eafb78fdb3ba24087ae0eb50b8"
+		},
+		{
+			"path": "run-registered.lua",
+			"sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7"
+		}
+	],
+	"scope_note": "Named source and program hashes only; not a claim to cover every transitive dependency."
+}

@@ -1,0 +1,20 @@
+Selecting exact test module: "tests.unit.modules.keymap.repeat.test_repeat_replacement_transaction"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.repeat.test_repeat_replacement_transaction
+
+=== repeat replacement transaction ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_replacement_transaction","name":"repeat replacement transaction publishes telemetry, keystats buffer, and preview","status":"pass","elapsed_ms":52.917842,"timing_error":""}
+  ok   repeat replacement transaction publishes telemetry, keystats buffer, and preview
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_replacement_transaction","name":"repeat replacement transaction refuses output without ghost telemetry","status":"pass","elapsed_ms":22.555883,"timing_error":""}
+  ok   repeat replacement transaction refuses output without ghost telemetry
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.repeat.test_repeat_replacement_transaction","name":"tests.unit.modules.keymap.repeat.test_repeat_replacement_transaction","status":"pass","elapsed_ms":75.985125,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  2
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

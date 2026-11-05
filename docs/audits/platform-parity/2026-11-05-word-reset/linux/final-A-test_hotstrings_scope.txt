@@ -1,0 +1,46 @@
+
+=== hotstrings scope: restore recommended ===
+  ok   enables the loaded catalogue, measures delays and keeps unknown entries
+
+=== hotstrings scope: clear ===
+  ok   returns every choice to neutral and every section to its declared delay
+
+=== hotstrings scope: refusals ===
+  ok   restores both files and the runtime when config.toml publication is refused
+  ok   refuses a configuration an external editor changed during the scope
+  ok   publishes neither file when the engine refuses the candidate catalogue
+  ok   retains a refused restoration, fences ordinary setters and retries it
+  ok   routes the rendered clear request to the public terminal
+  ok   routes the rendered recommended request to the public terminal
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   routes the Configuration restore row to the recommended hotstrings
+  ok   refuses to start while paused
+
+=== hotstrings scope: word delimiters ===
+  ok   returns the shipped word delimiters to the catalogue and keeps the user's on recommended
+  ok   returns the shipped word delimiters to the catalogue and keeps the user's on clear
+  ok   resets the shipped delimiters around a [[hotstrings.terminators]] list
+  ok   puts the word delimiters back when config.toml publication is refused
+
+=== hotstrings scope: composition ===
+  ok   reverts a committed restore to the exact bytes and runtime it replaced
+  ok   forgets its inverse once the composition commits
+
+=== hotstrings retained native release debt ===
+  ok   compensates both files and runtime on clear nil release
+  ok   compensates both files and runtime on clear false release
+  ok   compensates both files and runtime on clear truthy string release
+  ok   compensates both files and runtime on clear wrong object release
+  ok   compensates both files and runtime on clear exception release
+  ok   compensates both files and runtime on recommended nil release
+  ok   compensates both files and runtime on recommended false release
+  ok   compensates both files and runtime on recommended truthy string release
+  ok   compensates both files and runtime on recommended wrong object release
+  ok   compensates both files and runtime on recommended exception release
+  ok   retains a partial native acquisition whose acquired claim cannot release
+  ok   retains a committed candidate while a released claim refuses inverse reacquisition
+  ok   preserves an external source successor until exact inverse repair
+  ok   retries only release after an acknowledged explicit inverse
+  ok   stops the actual global composition before later categories on native release debt
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":31}

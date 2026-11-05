@@ -237,9 +237,20 @@ reports `expander_gap_ms`. The vectors in
 three drivers. Parity pinned by those vectors: the configured seconds are rounded
 to whole milliseconds and compared with the elapsed whole milliseconds, the exact
 deadline instant fires and one millisecond later does not, a delay of 0 is no
-gate, and a missing reference time fails closed. Known difference kept on
-purpose: macOS widens the window for Shift/Alt-complex keystrokes
-(`COMPLEX_DELAY_MULT`), the other drivers have no such multiplier.
+gate, and a missing reference time fails closed. Where a registered rule uses
+that gate, all three owners support the shared complex-key multiplier and carry
+policy (`complex_key_delay_multiplier`, `complex_key_carry_ms` in the shared
+timings catalogue). The expander's own complexity widens its gate; complexity of
+the preceding reference only carries within the configured interval. Do not
+restore the obsolete claim that this widening exists only on macOS.
+
+The pure time-gate and repeat corpora do not establish every caller's timing
+policy. Windows' transient repeat has no `TimeActivationSeconds`; Linux tries
+repeat after rejecting an expired ordinary result; macOS separately bounds its
+fallback through `STAR_TRIGGER` while validated explicit star mappings bypass
+the speed gate. The intended common repeat policy is not established by those
+implementation choices. A timing change must inspect public admission and
+candidate-refusal/fallback ordering, not just rerun the pure helper vectors.
 
 ### project-hotstring-case-flags-are-orthogonal
 

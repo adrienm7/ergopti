@@ -1,0 +1,130 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"module": "word-reset",
+	"role": "shared",
+	"findings": 0,
+	"coverage_rows": 15,
+	"actual_assertions_per_runtime": 1388,
+	"policy_scenarios": 208,
+	"existing_mac_peer_cases": 12,
+	"existing_mac_peer_mismatches": 5,
+	"source_files": 20,
+	"final_dry_sweeps": 2,
+	"files": [
+		{
+			"file": "context-controls-lua54.txt",
+			"bytes": 244,
+			"sha256": "b0e153a43c9914a361e2b7d5d518af1a169fc1694cb39ac6c1f0e65f14cd108d"
+		},
+		{
+			"file": "context-controls-luajit.txt",
+			"bytes": 244,
+			"sha256": "b0e153a43c9914a361e2b7d5d518af1a169fc1694cb39ac6c1f0e65f14cd108d"
+		},
+		{
+			"file": "context-controls.lua",
+			"bytes": 9873,
+			"sha256": "c81770a8a12e33846f3daf26201bc186c02f914d4ea1d4b33a9914837e166821"
+		},
+		{
+			"file": "coverage.json",
+			"bytes": 8948,
+			"sha256": "c76a1053dddec1a4c2cc4132facc0b790e1b3711e59dabcb5296b36001438cb1"
+		},
+		{
+			"file": "dry-A-lua54.txt",
+			"bytes": 244,
+			"sha256": "b0e153a43c9914a361e2b7d5d518af1a169fc1694cb39ac6c1f0e65f14cd108d"
+		},
+		{
+			"file": "dry-A-luajit.txt",
+			"bytes": 244,
+			"sha256": "b0e153a43c9914a361e2b7d5d518af1a169fc1694cb39ac6c1f0e65f14cd108d"
+		},
+		{
+			"file": "dry-A-macos-peer.txt",
+			"bytes": 2413,
+			"sha256": "804c00864aa104e56c5798c8f717c44101cfc85c7d92d3faf49e33504078c48b"
+		},
+		{
+			"file": "dry-A-source.txt",
+			"bytes": 4434,
+			"sha256": "21615248f8f6d249e2713f375fa3ef1f791c87d96c4bb23f2f44bf64ca0fa918"
+		},
+		{
+			"file": "dry-B-lua54.txt",
+			"bytes": 244,
+			"sha256": "b0e153a43c9914a361e2b7d5d518af1a169fc1694cb39ac6c1f0e65f14cd108d"
+		},
+		{
+			"file": "dry-B-luajit.txt",
+			"bytes": 244,
+			"sha256": "b0e153a43c9914a361e2b7d5d518af1a169fc1694cb39ac6c1f0e65f14cd108d"
+		},
+		{
+			"file": "dry-B-macos-peer.txt",
+			"bytes": 2413,
+			"sha256": "804c00864aa104e56c5798c8f717c44101cfc85c7d92d3faf49e33504078c48b"
+		},
+		{
+			"file": "dry-B-source.txt",
+			"bytes": 4434,
+			"sha256": "21615248f8f6d249e2713f375fa3ef1f791c87d96c4bb23f2f44bf64ca0fa918"
+		},
+		{
+			"file": "dry-receipts.json",
+			"bytes": 5371,
+			"sha256": "8d9e170e468159df226e6232029569c85b7a2626e5baed5b8249e77748a015ff"
+		},
+		{
+			"file": "dry_sweep.py",
+			"bytes": 3007,
+			"sha256": "87d012cbfeb4ad937e2b34b2d5226497540c480922fe75781a6da2a6d97e29a9"
+		},
+		{
+			"file": "findings.json",
+			"bytes": 212,
+			"sha256": "d56566c614f3fc53c0950bc92a3add2161232525db8b4c123df0b239f39309cc"
+		},
+		{
+			"file": "macos-peer-replay.lua",
+			"bytes": 3563,
+			"sha256": "10eac2846198917acce77c58f7bf5f765958cb0bd8da31e73dc8f77a2a424878"
+		},
+		{
+			"file": "macos-peer-replay.txt",
+			"bytes": 2413,
+			"sha256": "804c00864aa104e56c5798c8f717c44101cfc85c7d92d3faf49e33504078c48b"
+		},
+		{
+			"file": "prose-format.txt",
+			"bytes": 236,
+			"sha256": "ec6882813827b6cb63534fddf2ecc08ceecfcee927a12dc2c2dd95470e7de002"
+		},
+		{
+			"file": "python-format.txt",
+			"bytes": 20,
+			"sha256": "96a977f329ec3c59092d40e041a019b49dcf03ca04055e177aa0ccb8c27234df"
+		},
+		{
+			"file": "python-lint.txt",
+			"bytes": 19,
+			"sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+		},
+		{
+			"file": "report.md",
+			"bytes": 13833,
+			"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+		},
+		{
+			"file": "source-receipt.json",
+			"bytes": 4434,
+			"sha256": "21615248f8f6d249e2713f375fa3ef1f791c87d96c4bb23f2f44bf64ca0fa918"
+		},
+		{
+			"file": "source_probe.py",
+			"bytes": 3729,
+			"sha256": "5809e63b4b377e5ae7c973f7691eefae3033cf56e743f91cf86aa2d0525aa96d"
+		}
+	]
+}

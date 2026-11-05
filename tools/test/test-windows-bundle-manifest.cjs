@@ -73,6 +73,7 @@ const LICENSE_NOTICES = new Set([`${SHARED_REL}/ui/vendor/LICENSES.md`]);
 // Categories no Windows code can need at run time, judged by what the file is,
 // not by what the manifest says. A reference into one of them is itself a failure.
 const NEVER_RUNTIME = [
+	['behavior review metadata', (arc) => arc === `${SHARED_REL}/modules/features/behaviors.json`],
 	['shared test corpora', (arc) => arc.startsWith(`${SHARED_REL}/tests/`)],
 	['Python driver runtime', (arc) => arc.startsWith(`${SHARED_REL}/python/`)],
 	['native compile sources', (arc) => arc.startsWith(`${SHARED_REL}/native/`)],
@@ -920,6 +921,7 @@ if (selection && refs) {
 	// add one forbidden file, and require the audit to name it.
 	const sharedTest = universeArcs.find((arc) => arc.startsWith(`${SHARED_REL}/tests/`));
 	const mutations = [
+		['add', `${SHARED_REL}/modules/features/behaviors.json`, 'the build-only behavior catalogue'],
 		['drop', `${SHARED_REL}/modules/llm/models.json`, 'a file name passed to a helper'],
 		['drop', 'vendor/sqlite3.dll', 'a root-anchored file'],
 		...[

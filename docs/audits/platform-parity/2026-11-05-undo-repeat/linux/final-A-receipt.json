@@ -1,0 +1,146 @@
+{
+	"pass": "final-A",
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"rows": [
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-undo-repeat-2026-11-05/linux/owner-probe.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux"
+			],
+			"exit_code": 0,
+			"owner_cases": 20,
+			"output": "final-A-luajit-owner.txt",
+			"sha256": "f10770f1fdac756258c6b6de0ea772777267f603ea30d6a4c415629a4db80f8f"
+		},
+		{
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-undo-repeat-2026-11-05/linux/owner-probe.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux"
+			],
+			"exit_code": 0,
+			"owner_cases": 20,
+			"output": "final-A-lua-owner.txt",
+			"sha256": "f10770f1fdac756258c6b6de0ea772777267f603ea30d6a4c415629a4db80f8f"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-undo-repeat-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.engine.test_repeat_key"
+			],
+			"exit_code": 0,
+			"passed": 48,
+			"failed": 0,
+			"output": "final-A-test_repeat_key.txt",
+			"sha256": "ee532dfff5f8ffe68abb69d717ea9bd3b81942b296af74a7d7c0fb11616f9216"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-undo-repeat-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.engine.test_word_reset"
+			],
+			"exit_code": 0,
+			"passed": 32,
+			"failed": 0,
+			"output": "final-A-test_word_reset.txt",
+			"sha256": "1bed92f0b167be973ce7232dea5484a70d285b5bdd205657001dbbf7b5aa69c0"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-undo-repeat-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.engine.test_word_reset_events"
+			],
+			"exit_code": 0,
+			"passed": 43,
+			"failed": 0,
+			"output": "final-A-test_word_reset_events.txt",
+			"sha256": "eef30321b9cdf6ec5848fe3d6fd7c8dbaa3e2d35ffe6bfe44f0d68d0be44b1df"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-undo-repeat-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.engine.test_hotstring_final_result"
+			],
+			"exit_code": 0,
+			"passed": 226,
+			"failed": 0,
+			"output": "final-A-test_hotstring_final_result.txt",
+			"sha256": "5fe40845808c3f6da84e42cb63e2fac0227c29bf24aac1d81bc918cbcd103c1b"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-undo-repeat-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.engine.test_hotstring_cascade"
+			],
+			"exit_code": 0,
+			"passed": 36,
+			"failed": 0,
+			"output": "final-A-test_hotstring_cascade.txt",
+			"sha256": "edf80b9d79402c43edeb70f39a3441e1e51373c3e583143319f398243407f9e4"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-undo-repeat-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.engine.test_hotstring_cascade_net_edit"
+			],
+			"exit_code": 0,
+			"passed": 8,
+			"failed": 0,
+			"output": "final-A-test_hotstring_cascade_net_edit.txt",
+			"sha256": "4faf7b4086b873c2b58745c7db79bedafaf9c4913c1301e78c935834fd3113f2"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-undo-repeat-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.injector.test_output_transaction"
+			],
+			"exit_code": 0,
+			"passed": 4,
+			"failed": 0,
+			"output": "final-A-test_output_transaction.txt",
+			"sha256": "8f4b96cfc913d2cb037217243f88dd396133901a03b40317cac4c9f369941166"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-undo-repeat-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.injector.test_hotstring_undo_owner"
+			],
+			"exit_code": 0,
+			"passed": 7,
+			"failed": 0,
+			"output": "final-A-test_hotstring_undo_owner.txt",
+			"sha256": "67d890c49d5e839a63194b4fe497d283d56e7557499ecd288148e3119860f143"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-undo-repeat-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.injector.test_injector_terminator_contract"
+			],
+			"exit_code": 0,
+			"passed": 8,
+			"failed": 0,
+			"output": "final-A-test_injector_terminator_contract.txt",
+			"sha256": "b4aa0ae1c4bf2c49ff749ad24e6d38f7abf77b4325147e4632c266333f0f30de"
+		}
+	],
+	"registered_case_count": 412
+}

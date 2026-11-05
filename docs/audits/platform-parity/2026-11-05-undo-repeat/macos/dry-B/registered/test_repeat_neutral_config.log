@@ -1,0 +1,18 @@
+Selecting exact test module: "tests.unit.modules.keymap.repeat.test_repeat_neutral_config"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.repeat.test_repeat_neutral_config
+
+=== neutral repeat configuration ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.repeat.test_repeat_neutral_config","name":"requires explicit repeat intent and saves it through the canonical sparse preferences","status":"pass","elapsed_ms":27.509709,"timing_error":""}
+  ok   requires explicit repeat intent and saves it through the canonical sparse preferences
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.repeat.test_repeat_neutral_config","name":"tests.unit.modules.keymap.repeat.test_repeat_neutral_config","status":"pass","elapsed_ms":29.638492,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  1
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

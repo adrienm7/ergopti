@@ -1,0 +1,172 @@
+{
+	"pass": "final-B",
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"rows": [
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-word-reset-2026-11-05/linux/continuity-probe.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux"
+			],
+			"exit_code": 0,
+			"owner_cases": 43,
+			"output": "final-B-luajit-owner.txt",
+			"sha256": "add3514d0bf586c32591bcfd9ac092863dfb689420ebd6e6f924495d5bf49a21"
+		},
+		{
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-word-reset-2026-11-05/linux/continuity-probe.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux"
+			],
+			"exit_code": 0,
+			"owner_cases": 43,
+			"output": "final-B-lua-owner.txt",
+			"sha256": "add3514d0bf586c32591bcfd9ac092863dfb689420ebd6e6f924495d5bf49a21"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-word-reset-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.engine.test_word_reset"
+			],
+			"exit_code": 0,
+			"passed": 32,
+			"failed": 0,
+			"output": "final-B-test_word_reset.txt",
+			"sha256": "1bed92f0b167be973ce7232dea5484a70d285b5bdd205657001dbbf7b5aa69c0"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-word-reset-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.engine.test_word_reset_events"
+			],
+			"exit_code": 0,
+			"passed": 43,
+			"failed": 0,
+			"output": "final-B-test_word_reset_events.txt",
+			"sha256": "eef30321b9cdf6ec5848fe3d6fd7c8dbaa3e2d35ffe6bfe44f0d68d0be44b1df"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-word-reset-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.llm.context.test_ai_typing_context"
+			],
+			"exit_code": 0,
+			"passed": 30,
+			"failed": 0,
+			"output": "final-B-test_ai_typing_context.txt",
+			"sha256": "4865ded8e2e68d1c1055ceafb08d6833ba528f702e21c6f9a3adefe93bea1f52"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-word-reset-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.llm.context.test_context_buffer_vectors"
+			],
+			"exit_code": 0,
+			"passed": 26,
+			"failed": 0,
+			"output": "final-B-test_context_buffer_vectors.txt",
+			"sha256": "8977273d0674ad0f9dffb1cc97a6582380bef562543e181162a9156ae889ab64"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-word-reset-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.llm.prediction.test_prediction_control_retirement"
+			],
+			"exit_code": 0,
+			"passed": 205,
+			"failed": 0,
+			"output": "final-B-test_prediction_control_retirement.txt",
+			"sha256": "c2e6b418a234a2fc68a1c5c75a3cd0dcefefce81349b4ff24a400c67e26e2c16"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-word-reset-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.llm.settings.test_llm_settings"
+			],
+			"exit_code": 0,
+			"passed": 18,
+			"failed": 0,
+			"output": "final-B-test_llm_settings.txt",
+			"sha256": "74ba196e54132e2b5638b5b19fb24f3d932e3f7298fca4a5a023be8c8cfa1332"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-word-reset-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.shortcuts.keyboard.test_keyboard_shortcuts_late_contextual_delivery"
+			],
+			"exit_code": 0,
+			"passed": 41,
+			"failed": 0,
+			"output": "final-B-test_keyboard_shortcuts_late_contextual_delivery.txt",
+			"sha256": "0d16e6cfc25ce13044a89f5416fdcbb789d7ad3dd2f28271178823e8804da4e2"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-word-reset-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.platform.remap.tap_hold.test_tap_hold_manager_lifecycle"
+			],
+			"exit_code": 0,
+			"passed": 36,
+			"failed": 0,
+			"output": "final-B-test_tap_hold_manager_lifecycle.txt",
+			"sha256": "732538fd7a334bc0e6a388be252e3e8e8d7920a93f164a5e13caab1ddee73848"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-word-reset-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.gestures.engine.test_combo_press_order"
+			],
+			"exit_code": 0,
+			"passed": 31,
+			"failed": 0,
+			"output": "final-B-test_combo_press_order.txt",
+			"sha256": "cda8e4c8ae39e319a20a4f71f40fdb180f443be2e70f71082cf9a5ae5ad095cd"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-word-reset-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.modules.gestures.engine.test_combo_emitter"
+			],
+			"exit_code": 0,
+			"passed": 7,
+			"failed": 0,
+			"output": "final-B-test_combo_emitter.txt",
+			"sha256": "936e35d0ecf9dd705d4b30d8f954b51dfcc7729fbc56e65c107b08642ec6efd1"
+		},
+		{
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-word-reset-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux",
+				"tests.unit.infra.scope.test_hotstrings_scope"
+			],
+			"exit_code": 0,
+			"passed": 31,
+			"failed": 0,
+			"output": "final-B-test_hotstrings_scope.txt",
+			"sha256": "0c330ef343909ff3760e6295b8622e89a6d606b21beca8a6e4bff8bf22f53635"
+		}
+	],
+	"registered_case_count": 500
+}

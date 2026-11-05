@@ -1,0 +1,59 @@
+
+=== magic-key repeat: the rule ===
+  ok   doubles the character before the magic key
+  ok   repeats a multi-byte character whole
+  ok   a delimiter the user added ends a word, as on Windows (PAR-8)
+  ok   works with a magic key the user chose
+
+=== magic-key repeat: when it stays out of the way ===
+  ok   does nothing when the buffer does not end with the magic key
+  ok   does nothing when the magic key is the whole buffer
+  ok   does not double the magic key itself
+  ok   refuses a missing or empty magic key rather than guessing
+
+=== magic-key repeat: canonical sparse preferences ===
+  ok   keeps an empty canonical config neutral despite a legacy true
+  ok   reads canonical false instead of the legacy true
+  ok   persists true and preserves neighbors across fresh module load
+  ok   clears the leaf sparsely without resurrecting legacy or cached true
+  ok   preserves exact runtime and source when publication refuses
+  ok   rejects an external edit between validation and publication
+  ok   reads an outdated value as neutral, never a legacy value, and offers it (config-outdated-repeat-key)
+  ok   never raises on the typing path for [hotstrings] repeat_key_enabled = "true" 
+  ok   never raises on the typing path for [hotstrings broken
+  ok   does not coerce a nonboolean setter into activation
+  ok   refreshes the leaf after an actual canonical clear candidate was published
+  ok   retains the last valid runtime when an explicit refresh refuses
+  ok   does not reread disk on each input-path query
+  ok   keeps the consumed setting during actual unused-key cleanup
+
+=== magic-key repeat: the shared repeat_key_vectors.json corpus ===
+  ok   mid_word_letter_doubles (repeat-key-corpus)
+  ok   accented_letter_doubles_whole (repeat-key-corpus)
+  ok   second_word_letter_doubles (repeat-key-corpus)
+  ok   word_start_letter_is_not_doubled (repeat-key-corpus)
+  ok   word_start_after_space_is_not_doubled (repeat-key-corpus)
+  ok   word_start_after_newline_is_not_doubled (repeat-key-corpus)
+  ok   word_start_after_period_is_not_doubled (repeat-key-corpus)
+  ok   word_start_after_opening_quote_is_not_doubled (repeat-key-corpus)
+  ok   space_is_not_repeated (repeat-key-corpus)
+  ok   newline_is_not_repeated (repeat-key-corpus)
+  ok   magic_key_alone_has_nothing_to_repeat (repeat-key-corpus)
+  ok   digit_predecessor_doubles (repeat-key-corpus)
+  ok   underscore_predecessor_doubles (repeat-key-corpus)
+  ok   opening_parenthesis_is_a_word_start (repeat-key-corpus)
+  ok   hyphen_is_a_word_start (repeat-key-corpus)
+  ok   two_magic_keys_are_not_a_repeat (repeat-key-corpus)
+  ok   unknown_buffer_start_refuses_the_first_letter (repeat-key-corpus)
+  ok   unknown_buffer_start_allows_a_later_letter (repeat-key-corpus)
+  ok   user_chosen_magic_key (repeat-key-corpus)
+
+=== idle word reset: the shared idle_reset_vectors.json corpus ===
+  ok   pause_equal_to_delay_resets (idle-reset-corpus)
+  ok   one_millisecond_short_does_not_reset (idle-reset-corpus)
+  ok   long_pause_resets (idle-reset-corpus)
+  ok   zero_delay_disables_the_reset (idle-reset-corpus)
+  ok   no_previous_keystroke_never_resets (idle-reset-corpus)
+  ok   fractional_delay_deadline_resets (idle-reset-corpus)
+  ok   fractional_delay_one_millisecond_short (idle-reset-corpus)
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":48}

@@ -1,0 +1,246 @@
+{
+	"schema_version": 1,
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"created_at": "2026-11-05",
+	"module": "undo-repeat",
+	"findings": [
+		{
+			"id": "URW-001",
+			"title": "Repeat declassifies the last scalar of a private programmable expansion",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["private_derived_output"],
+			"reproduction": "SOURCE-ONLY: enable repeat and one genuine programmable audit suffix with callback returning SYNTHETIC_CANARY_Z. After its accepted private nonfinal output and suppression release, type the magic key before idle expiry, with unchanged focus and no registered/programmed competing suffix. Repeat derives Z<magic> -> ZZ without IsPrivate; successful dispatch can feed ZZ to AI context and unredacted metrics trigger/replacement/tag.",
+			"root_cause": "The actual programmable commit labels output private but leaves it nonfinal in HSE_Buffer. The repeat transient Spec derives text from that retained buffer but carries no inherited privacy bit; canonical effect, synthetic marker and fire-log queue default false.",
+			"silent_failure": "Every operation can succeed. Privacy redaction and AI-context clearing trust only the current Spec/effect bit. No refusal or exception identifies the programmatically derived scalar as private. Direct shipped personal fields are blocked by final-output forgetting and are not the reproducer.",
+			"regression_test": "Genuine AHK actual programmable commit, repeat fallback, dispatcher and real analytics/AI sinks with faithful recording native ports: no previously classified private scalar becomes public fire/tag/synthetic output or AI context. Positive public-repeat and final-private controls, Unicode, physical new text, reset/pause/focus/rebuild and host completion/refusal controls.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "windows/findings.json",
+					"sha256": "b63d5e10e49b0bc00d5c913c1d4657ab4f24cdbc52b19ab7a6fd2b48651401c2"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3a00425bd0cc05003afd747e6bec0688e5510014c463197463d16f4708216c21"
+				}
+			],
+			"basis": "source",
+			"source_report": "windows/report.md",
+			"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution.",
+			"submitted_id": "URW-001",
+			"role": "windows"
+		},
+		{
+			"id": "URW-002",
+			"title": "Deferred repeat output acquires magic-key WPM coloring",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["truthful_live_repeat_classification"],
+			"reproduction": "SOURCE-ONLY: identical unmatched mid-word repeat in atomic host versus admitted Notepad/native-literal or paced terminal host with active metrics and visible WPM. Atomic caller normalizes repeat to repeat_key; deferred owners preserve magickey/repeat_corrections and WPM treats it as colored hotstring.",
+			"root_cause": "Repeat transient Spec stores magickey/repeat_corrections; IsRepeat category normalization exists only in synchronous _OnPrefixChar caller. Both deferred owner constructors copy raw Spec metadata and completion queues it unchanged.",
+			"silent_failure": "All values are valid. Shared neutral_sources includes repeat_key and excludes magickey; successful analytics forwarding therefore mutates different WPM category/section/ring classification without throwing. Canonical JSONL has no category/section fields, so no durable category corruption is claimed.",
+			"regression_test": "Execute real transient repeat Spec through atomic/Notepad/terminal success and actual fire/WPM sinks. Require equivalent neutral repeat classification and preserve colored real repeat-correction mappings; cover pending/exactly-once/refusal/stale/pause.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "windows/findings.json",
+					"sha256": "b63d5e10e49b0bc00d5c913c1d4657ab4f24cdbc52b19ab7a6fd2b48651401c2"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3a00425bd0cc05003afd747e6bec0688e5510014c463197463d16f4708216c21"
+				}
+			],
+			"basis": "source",
+			"source_report": "windows/report.md",
+			"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution.",
+			"submitted_id": "URW-002",
+			"role": "windows"
+		},
+		{
+			"id": "URM-001",
+			"title": "Repeat drops privacy on a scalar derived from a private expansion",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["private_output_propagation"],
+			"reproduction": "Enable repeat and actual personal SSN prefix producer; type synthetic prefix 28401 in a permitted field, then magic immediately after private expansion 2840175123456. Public eventtap emits extra6 as nonprivate. Actual bridge context6; later public phrase reaches actual serialized prediction request through a fake HTTP port. Full SSN remains withheld.",
+			"root_cause": "Expander.try_repeat_feature derives last_char from the existing output buffer but unconditionally passes is_private=false and logs last_char literally; the prior private prefix mark is not extended.",
+			"silent_failure": "Repeat succeeds with public telemetry and no dropped-privacy diagnostic; baseline private-context tests cover new typing and deletion but not derived repetition.",
+			"regression_test": "Actual SSN producer and Keymap tap, actual repeat/Bridge/SyntheticInput/metrics sinks: derived private scalar stays private and absent from DEBUG and local/remote AI contexts; ordinary repeat and fresh public typing remain available, including delete/custom magic/refusal controls.",
+			"evidence": [
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "macos/findings.json",
+					"sha256": "92b2302bc636ffc4c70604fc518f2473d81a6d76d51e67ab75970dc6036037a7"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3a00425bd0cc05003afd747e6bec0688e5510014c463197463d16f4708216c21"
+				}
+			],
+			"basis": "actual-owner",
+			"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request.",
+			"submitted_id": "URM-001",
+			"role": "macos",
+			"source_report": "macos/report.md"
+		},
+		{
+			"id": "URL-001",
+			"title": "Linux repeat publication clears the matcher and invents a word start",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Execute owner-probe.lua against the audited tree: po + magic + magic produces poo★ with one injection; ac + magic + ê produces accê despite all fourteen shipped correction rows loading, while manually typed accê becomes accu. A word-start-only x→z mapping fires in po + magic + x, producing pooz; manual poox stays unchanged.",
+			"root_cause": "Main synthesizes a repeat result with final_result=true and then uses ordinary final-output publication: apply_expansion followed by reset(nil,nil,\"keep\"). The matcher buffer is emptied and its default word-start flag becomes true although the caret still follows the repeated word. The keep flag preserves AI context only. Windows repeat uses FinalResult=false; macOS commits full next_buffer.",
+			"silent_failure": "The first repeat delivery succeeds. Its logical publication destroys context without a warning, so subsequent repeat/correction silently fails or a word-only rule silently fires mid-word. The pure repeat corpus tests resolve(), not Main publication.",
+			"regression_test": "Drive actual Main + real engine through acknowledged repeat, a second repeat, shipped repeat correction and word-start-only mapping refusal. Include disabled, native failure and ordinary registered-match positive controls; do not certify only the standalone repeat rule.",
+			"evidence": [
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "linux/findings.json",
+					"sha256": "fbb4e232a95c09cee46556b4f4b5fed1b64c0d758a59d72314e0ce908747635f"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3a00425bd0cc05003afd747e6bec0688e5510014c463197463d16f4708216c21"
+				}
+			],
+			"basis": "actual-owner",
+			"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence.",
+			"submitted_id": "URL001",
+			"role": "linux",
+			"source_report": "linux/report.md"
+		},
+		{
+			"id": "URL-002",
+			"title": "Linux repeat loses private ancestry from a real personal prefix output",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["private_output_classification"],
+			"reproduction": "Use actual Prefix.build with synthetic social_security_number=123456789012349; type12345 to invoke the real private prefix expansion, then magic. First injector call is private; the next repeated9 is private=false. The probe explicitly enables TRACE; at that level the actual injector logs text='9' and Main passes the unclassified repeated9 to its telemetry receiver. Private Undo restores12345 with private=true as a positive control.",
+			"root_cause": "Prefix producer deliberately returns is_private=true and final_result=false. The acknowledged private output remains in the matcher, but no private ancestry travels into the newly constructed repeat result; Main omits is_private and then invokes ordinary injection and record_hotstring.",
+			"silent_failure": "No error occurs. Initial private output correctly withholds content, making the next derived scalar appear ordinary to the real logger and metrics interface. The metrics owner uses this flag for redaction and event publication.",
+			"regression_test": "Compose actual Prefix.build, real engine and actual Main repeat dispatch, observing injector classification, actual logging and metrics input. Assert inherited private classification for derived repeat output, with public repeat and private Undo positive controls; do not suppress unrelated user typing.",
+			"evidence": [
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "linux/findings.json",
+					"sha256": "fbb4e232a95c09cee46556b4f4b5fed1b64c0d758a59d72314e0ce908747635f"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3a00425bd0cc05003afd747e6bec0688e5510014c463197463d16f4708216c21"
+				}
+			],
+			"basis": "actual-owner",
+			"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence.",
+			"submitted_id": "URL002",
+			"role": "linux",
+			"source_report": "linux/report.md"
+		},
+		{
+			"id": "URS-001",
+			"title": "Linux automatic Backspace restoration is absent from generated behavioral inventory",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["behavior_inventory_coverage"],
+			"reproduction": "At the audited commit inspect all website inventory projections and their generator inputs, then Linux Main _undoable and handle_control. Specialized restoration exists in Linux but no behavioral declaration can reach the generated site/docs.",
+			"root_cause": "The projection owns configuration/action/menu/layer/tap-hold catalogues only; no independent source describes behavior without a setting.",
+			"silent_failure": "No drift gate can require a declaration outside its authored input domain. Existing docs candidly disclaim exhaustive product capability coverage.",
+			"regression_test": "Project a supplementary explicit behavior catalogue to site/docs and reject missing owners, stale reviewed hashes, duplicate ids, unknown OS, and missing localized qualifications. Do not infer native behavior from a matching receipt.",
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				},
+				{
+					"path": "shared/findings.json",
+					"sha256": "05843120dede755c9e7d53296b98ee4b54388e717494f84218e88dade1782cec"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3a00425bd0cc05003afd747e6bec0688e5510014c463197463d16f4708216c21"
+				}
+			],
+			"basis": "source",
+			"qualification": "Authenticated pinned source plus actual JS dictionary import; registered common repeat decisions are not post-commit or native receiving proof.",
+			"submitted_id": "URS001",
+			"role": "shared",
+			"source_report": "shared/report.md"
+		},
+		{
+			"id": "URS-002",
+			"title": "English inventory translations are inert mappings inside JSDoc",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["localized_inventory_display"],
+			"reproduction": "Import the pinned src/routes/ergopti-plus/locales/en.js as a real JS module; inventory header and legend return undefined while Pour qui ? returns Who for?. The public accessor falls back to French.",
+			"root_cause": "The mappings were inserted inside the header JSDoc placeholder example before export default, so they are not members of the dictionary.",
+			"silent_failure": "The module parses and the gettext fallback renders French; source-substring checks can see apparent translations without verifying exports.",
+			"regression_test": "Import the actual exported dictionary and assert nonempty English values for every inventory heading and legend; never inspect mere source text.",
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				},
+				{
+					"path": "shared/findings.json",
+					"sha256": "05843120dede755c9e7d53296b98ee4b54388e717494f84218e88dade1782cec"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3a00425bd0cc05003afd747e6bec0688e5510014c463197463d16f4708216c21"
+				},
+				{
+					"path": "validation/final-dictionary.json",
+					"sha256": "c05dc3d5c902051048c1a20668c9d6bbe2759e10dce20fcc4b9e24f52cc791ce"
+				},
+				{
+					"path": "validation/final-dictionary-check.mjs",
+					"sha256": "d44dc38216421dd5ede587ef3b9e12941023f86cb5ed513413de447374f060e1"
+				}
+			],
+			"basis": "actual-owner",
+			"qualification": "Authenticated pinned source plus actual JS dictionary import; registered common repeat decisions are not post-commit or native receiving proof.",
+			"delivery_resolution": {
+				"status": "repaired_in_this_delivery",
+				"qualification": "Historical pinned defect retained; actual final dictionary import confirms thirteen required inventory mappings. Pre-repair current-dictionary.json remains unchanged.",
+				"evidence": [
+					{
+						"path": "validation/final-dictionary.json",
+						"sha256": "c05dc3d5c902051048c1a20668c9d6bbe2759e10dce20fcc4b9e24f52cc791ce"
+					},
+					{
+						"path": "validation/final-dictionary-check.mjs",
+						"sha256": "d44dc38216421dd5ede587ef3b9e12941023f86cb5ed513413de447374f060e1"
+					}
+				]
+			},
+			"submitted_id": "URS002",
+			"role": "shared",
+			"source_report": "shared/report.md"
+		}
+	]
+}

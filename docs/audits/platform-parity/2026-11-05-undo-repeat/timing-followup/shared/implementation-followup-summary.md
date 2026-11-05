@@ -1,0 +1,11 @@
+# Repeat timing metadata follow-up
+
+The supplementary behavior catalogue now has a third row, `hotstrings.repeat_activation_window`. Its Boolean declares whether the fallback has a separate activation window: false on Windows/Linux, true on macOS. It does not grade implementation quality or introduce a setting. The notes explain the effective magic-key window and modifier timing, zero disabling that window, and independent idle reset. No fixed two-second full-boot behavior is promised. The feature README labels this an observed variant whose cross-OS intent remains unresolved.
+
+Three new keys are translated in all 21 canonical locales. Structured comparisons prove exactly three additions per locale, no removed keys and no changed prior values. Removing the three keys and serializing the remaining locale object reconstructs each original source hash exactly. Previous catalogue metadata, source-owner receipts, behavior rows and generated prior rows are unchanged. Existing source references are reused as requested.
+
+`implementation-followup-files.json` is the exact 25-file handoff, with old/current hashes: 21 locale files, the authored behavior catalogue, its feature README, and the generated website JSON/documentation. The generated artifacts are review previews from this worktree's existing owner; regenerate with the final main-worktree generator after integration so root packaging fixes remain authoritative. No frontend/runtime/tooling/test file changed in this follow-up. The node_modules link remains untouched. No commit was made.
+
+Validation passed: existing inventory/behavior projection test, all 21 locales (4,080 canonical keys, no missing/extra keys), generator ownership (136 outputs), authored-source Prettier checks and Git whitespace checks. The historical test's zero-parity-gap line classifies declarations; it is not a runtime parity verdict.
+
+The large `implementation-followup-before.json` and one-off updater are scratch preparation aids, not archival deliverables. Retain the compact exact-file manifest, baseline hashes, structural JSON diff, summary and validation logs. The root already retained the initial metadata snapshot. Main was not touched while its combined verification was running.

@@ -1,0 +1,9 @@
+{
+	"qualification": "Actual current JS export using the summary key from the actual Svelte consumer; old inventory header remains unresolved. No browser/native receiving.",
+	"source_sha256": "27d06ac4cef771985577e902db6e0e3f6386c9c07919149fc7b01c80f4f0ecdb",
+	"observed": {
+		"Comportements examinés dans le code": "Behaviors reviewed in the source",
+		"Inventaire des réglages et fonctionnalités": null
+	},
+	"diagnostic": "Initial root check used an obsolete draft summary label, failed its positive fixture assertion, and is not credited; corrected to the actual consumer key."
+}

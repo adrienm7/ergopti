@@ -1,0 +1,20 @@
+Selecting exact test module: "tests.unit.modules.keymap.terminators.test_escape_invalidates_hotstring_buffer"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.terminators.test_escape_invalidates_hotstring_buffer
+
+=== Escape invalidates hotstring context ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_escape_invalidates_hotstring_buffer","name":"Escape invalidates hotstring context in runtime and hotstring-only modes","status":"pass","elapsed_ms":54.909661,"timing_error":""}
+  ok   Escape invalidates hotstring context in runtime and hotstring-only modes
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_escape_invalidates_hotstring_buffer","name":"Escape invalidates hotstring context only after deferral commits","status":"pass","elapsed_ms":31.869453,"timing_error":""}
+  ok   Escape invalidates hotstring context only after deferral commits
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.terminators.test_escape_invalidates_hotstring_buffer","name":"tests.unit.modules.keymap.terminators.test_escape_invalidates_hotstring_buffer","status":"pass","elapsed_ms":87.684463,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  2
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

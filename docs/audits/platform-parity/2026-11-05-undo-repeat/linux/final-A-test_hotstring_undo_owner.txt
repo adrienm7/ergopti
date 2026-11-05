@@ -1,0 +1,10 @@
+
+=== Main Undo retains its original expansion authority ===
+  ok   restores the original trigger on the stable native route (undo-owner)
+  ok   restores the original trigger on the stable clipboard route (undo-owner)
+  ok   refuses a successor text field at undo-log (undo-owner)
+  ok   refuses a successor text field at clipboard-read (undo-owner)
+  ok   refuses a successor text field at clipboard-write (undo-owner)
+  ok   refuses a successor text field at erase-settle (undo-owner)
+  ok   keeps the private trigger out of the actual injector trace (undo-owner)
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":7}

@@ -1,0 +1,207 @@
+{
+	"schema_version": 1,
+	"module": "undo-repeat",
+	"platform": "linux",
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"rows": [
+		{
+			"id": "L01",
+			"aspect": "Feature declaration and native requirements",
+			"status": "present",
+			"basis": "source",
+			"detail": "Repeat is default false, recommended true; allOS declared, Linux evdev/uinput prerequisites.",
+			"evidence": "_shared/modules/features/manifest.toml:510-526",
+			"intent": "Explicit manifest policy"
+		},
+		{
+			"id": "L02",
+			"aspect": "Runtime toggle/menu/state projection",
+			"status": "present",
+			"basis": "source+registered runtime",
+			"detail": "Menu calls real RepeatKey.toggle/is_enabled. Setter publishes conditional sparse canonical write before runtime state.",
+			"evidence": "linux/ui/menu/menu_hotstrings.lua:1480-1496; repeat_key.lua:148-174; test_repeat_key"
+		},
+		{
+			"id": "L03",
+			"aspect": "Malformed/outdated config and native publication refusal",
+			"status": "guarded",
+			"basis": "registered runtime",
+			"detail": "Invalid reads are cached neutral; malformed explicit refresh retains last runtime. Failed/external writes preserve runtime and canonical bytes.",
+			"evidence": "test_repeat_key.lua canonical sparse preference cases"
+		},
+		{
+			"id": "L04",
+			"aspect": "Cached input-path configuration",
+			"status": "present",
+			"basis": "source+registered runtime",
+			"detail": "is_enabled performs no repeated disk reads after first resolution; acquired settings scope refuses competing setter.",
+			"evidence": "repeat_key.lua:is_enabled,set_enabled; test_repeat_key"
+		},
+		{
+			"id": "L05",
+			"aspect": "Mid-word, punctuation, whitespace, custom delimiter predicates",
+			"status": "present",
+			"basis": "registered runtime",
+			"detail": "Actual pure owner and shared corpus exercise word-start/unknown boundary/refusal plus custom delimiter write/remove.",
+			"evidence": "test_repeat_key.lua and repeat_key_vectors.json"
+		},
+		{
+			"id": "L06",
+			"aspect": "Custom magic key and scalar Unicode",
+			"status": "present",
+			"basis": "actual owner+registered runtime",
+			"detail": "Configured magic-key argument works in corpus; actual caller/injector cases repeat nonBMP and combining scalar.",
+			"evidence": "final-B-luajit-owner.json:repeat_non_bmp,repeat_combining_scalar; test_repeat_key",
+			"intent": "Codepoint word-character contract; not grapheme certification"
+		},
+		{
+			"id": "L07",
+			"aspect": "Registered-match precedence",
+			"status": "present",
+			"basis": "actual owner",
+			"detail": "Actual ordinary mapping wins before fallback.",
+			"evidence": "owner-probe.lua:registered_mapping_wins"
+		},
+		{
+			"id": "L08",
+			"aspect": "After-repeat matcher continuity and second repeat",
+			"status": "defect URL001",
+			"basis": "actual owner",
+			"detail": "Matcher empties after first ACK; second magic remains literal.",
+			"evidence": "owner-probe.lua:repeat_then_repeat"
+		},
+		{
+			"id": "L09",
+			"aspect": "Shipped repeat-correction integration",
+			"status": "defect URL001",
+			"basis": "actual owner",
+			"detail": "All14rows load; generated doubling loses prefix so ac\u2605\u00ea does not correct, manual acc\u00ea positive does.",
+			"evidence": "owner-probe.lua:shipped_after_repeat,shipped_manual_positive"
+		},
+		{
+			"id": "L10",
+			"aspect": "After-repeat word-start truth",
+			"status": "defect URL001",
+			"basis": "actual owner",
+			"detail": "Word-only x\u2192z fires after repeat inside poo; manually doubled control refuses.",
+			"evidence": "owner-probe.lua:repeat_forges_word_start,manual_doubling_keeps_word_start_guard"
+		},
+		{
+			"id": "L11",
+			"aspect": "Repeat derived from real private prefix",
+			"status": "defect URL002",
+			"basis": "actual owner",
+			"detail": "Actual Prefix.build private SSN result yields a later public scalar9 to injector and telemetry interface. Probe enables TRACE explicitly for payload-bearing log observation; no default-level emission or real SQLite persistence measured.",
+			"evidence": "owner-probe.lua:repeat_private_ancestry; prefix_rules.lua:59-65"
+		},
+		{
+			"id": "L12",
+			"aspect": "Delivery ACK, Undo and metrics publication",
+			"status": "guarded",
+			"basis": "actual owner+registered runtime",
+			"detail": "First native DOWN refusal produces loud error, emergency-stop once and no Undo or telemetry publication.",
+			"evidence": "owner-probe.lua:repeat_failure_no_undo_or_telemetry; test_output_transaction; test_injector_terminator_contract"
+		},
+		{
+			"id": "L13",
+			"aspect": "Immediate Backspace restores expansion trigger",
+			"status": "present with limits",
+			"basis": "actual owner+registered runtime",
+			"detail": "Actual Main/injector restores po\u2605 after repeat; existing cases restore native/clipboard routes and classify private trigger.",
+			"evidence": "owner-probe.lua:repeat_immediate_backspace,private_undo; test_hotstring_undo_owner",
+			"intent": "Driver compensates physical Backspace already forwarded; single-use immediate window"
+		},
+		{
+			"id": "L14",
+			"aspect": "Terminator and cascade net trigger restoration",
+			"status": "present",
+			"basis": "actual owner+registered runtime",
+			"detail": "Nonconsumed tail included in remaining count; actual terminator case restores original trigger. Existing cascade net-edit cases cover typed net trigger.",
+			"evidence": "owner-probe.lua:terminator_undo; test_hotstring_cascade; test_hotstring_cascade_net_edit"
+		},
+		{
+			"id": "L15",
+			"aspect": "Empty literal output without replay tail",
+			"status": "behavior limit",
+			"basis": "actual owner",
+			"detail": "Valid empty replacement arms receipt, but zero remaining skips restoration; physical Backspace acts on preceding text. No extra synthetic erasure.",
+			"evidence": "owner-probe.lua:empty_replacement_undo",
+			"intent": "Not attributed intentional; current guarded exception, obligation unresolved"
+		},
+		{
+			"id": "L16",
+			"aspect": "Empty output with replayed tail",
+			"status": "present",
+			"basis": "actual owner",
+			"detail": "Physical Backspace removes Space; remaining count1 permits zero-erase trigger restoration.",
+			"evidence": "owner-probe.lua:empty_replacement_with_tail_undo"
+		},
+		{
+			"id": "L17",
+			"aspect": "Typed key, arrow and modified Backspace retirement",
+			"status": "guarded",
+			"basis": "actual owner+registered runtime",
+			"detail": "Any subsequent text retires Undo; arrow does so even with arrow reset disabled; CtrlBackspace does not invoke expansion restoration.",
+			"evidence": "owner-probe.lua:repeat_then_typed_char_retires_undo,repeat_then_arrow_retires_undo,repeat_then_ctrl_backspace_no_undo; test_word_reset_events",
+			"intent": "One-character Backspace only; Ctrl/Alt/Super controls have independent navigation semantics"
+		},
+		{
+			"id": "L18",
+			"aspect": "Original destination and private Undo authority",
+			"status": "guarded",
+			"basis": "registered actual-owner runtime",
+			"detail": "Existing Main+injector+focusguard cases refuse successor field at logger/read/write/settle boundaries and retain private trigger classification.",
+			"evidence": "test_hotstring_undo_owner.lua"
+		},
+		{
+			"id": "L19",
+			"aspect": "Pause and resume ownership",
+			"status": "guarded",
+			"basis": "source+actual owner",
+			"detail": "Paused character callback emits no repeat. Real pause reset clears Undo and engine before later input; resume does not rearm old receipt.",
+			"evidence": "owner-probe.lua:repeat_paused; ergopti_hotstrings.lua:1097-1103"
+		},
+		{
+			"id": "L20",
+			"aspect": "Pointer/focus/capture/desync retirement",
+			"status": "guarded",
+			"basis": "source",
+			"detail": "on_click invalidates real guard; guard reset_text clears Undo. Focus/capture blocking and desync also retire state.",
+			"evidence": "ergopti_hotstrings.lua:1171-1178,1188-1196,2102-2118,2903-2912,3106-3114"
+		},
+		{
+			"id": "L21",
+			"aspect": "Registry rebuild/source publication",
+			"status": "guarded within bounded source review",
+			"basis": "source+registered runtime",
+			"detail": "Catalogue publication requires acknowledged complete engine load before source state swap; source snapshots retained on refused parse. No asynchronous input-reentry claim made.",
+			"evidence": "hotstrings_config.lua:1621-1639; loader.lua:223-237; test_repeat_key"
+		},
+		{
+			"id": "L22",
+			"aspect": "Preview and repeat-correction visibility",
+			"status": "intentional distinction",
+			"basis": "source",
+			"detail": "Doubling excluded from candidate index; normal registry correction rows remain eligible. Pure repeat result never added as preview row.",
+			"evidence": "ergopti_hotstrings.lua:1497-1510; docs/memory/text-input-and-config.md:project-the-bubble-never-offers-a-doubling",
+			"intent": "Explicit maintainer policy, not missing preview parity"
+		},
+		{
+			"id": "L23",
+			"aspect": "Key-token outputs and Undo availability",
+			"status": "intentional restriction",
+			"basis": "source+registered runtime",
+			"detail": "Parsed key outputs publish no Undo and reset text position because caret may move.",
+			"evidence": "ergopti_hotstrings.lua:1415-1418,1442,1480-1483; test_hotstring_final_result",
+			"intent": "Explicit source rationale unknown caret"
+		},
+		{
+			"id": "L24",
+			"aspect": "Native application Ctrl+Z, grapheme/newline/selection receiving, latency and memory",
+			"status": "unmeasured",
+			"basis": "coverage gap",
+			"detail": "No live desktop/device/appNativeUndo, IME/deadkey, rich clipboard, end-to-end selection or performance/memory measurement. Scalar model is not native receiving.",
+			"evidence": "report.md:Coverage gaps and memory watch-list"
+		}
+	]
+}

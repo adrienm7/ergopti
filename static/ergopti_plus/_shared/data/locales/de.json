@@ -4070,5 +4070,13 @@
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Kein Umschalter unter Linux: GNOME und KDE wählen Duplizieren in ihrem eigenen Anzeigewechsler Super+P; belegen Sie diese Taste als Tastenkombination.",
 	"platform_reason.action_sticky_keys_are_the_systems": "Dieses System hat Einrastfunktion in seinen Bedienungshilfen, die jeden Modifikator einmalig wirken lässt; schalten Sie sie dort ein.",
 	"platform_reason.action_take_note_uses_notepad": "Nur Windows: Diese Aktion öffnet die Notizdatei des Tages im Editor, den jedes Windows mitbringt. macOS hat seine eigene Schnellnotiz (Fn+Q), und Linux hat keinen Editor, den jeder Desktop mitbringt.",
-	"platform_reason.action_text_recognition_is_live_text_on_macos": "Unter macOS liest Live Text den Text jedes Bildschirmfotos oder Bildes: Erstellen Sie eines mit der gleichwertigen Aktion und markieren Sie dann seinen Text."
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "Unter macOS liest Live Text den Text jedes Bildschirmfotos oder Bildes: Erstellen Sie eines mit der gleichwertigen Aktion und markieren Sie dann seinen Text.",
+	"inventory.behavior.backspace_restore": "Eine Erweiterung mit der Rücktaste zurücknehmen",
+	"inventory.behavior.repeat_condition": "Wiederholt ein Zeichen innerhalb eines Wortes, wenn keine Erweiterung passt und die Wiederholung per magischer Taste aktiviert ist.",
+	"inventory.behavior.repeat_linux": "Die Wiederholung per magischer Taste ist vorhanden, aber aufeinanderfolgende Wiederholungen verlieren derzeit nach der ersten Erweiterung ihren Kontext. Auch nachfolgende Wiederholungskorrekturen sind betroffen.",
+	"inventory.behavior.backspace_linux": "Eine sofortige Rücktaste ohne Zusatztaste kann eine geeignete Klartexterweiterung zurücknehmen; das Verhalten nativer Textfelder bleibt ungeprüft.",
+	"inventory.behavior.backspace_other": "Keine automatische Wiederherstellung des Auslösers mit der Rücktaste; die Rückgängig-Funktion der Anwendung ist davon unabhängig.",
+	"inventory.behavior.repeat_activation_window": "Aktivierungszeitfenster für die Wiederholung per magischer Taste",
+	"inventory.behavior.repeat_window_untimed": "Kein eigenes Aktivierungszeitfenster für die Ersatzwiederholung; der Wortneustart nach einer Pause ist unabhängig.",
+	"inventory.behavior.repeat_window_macos": "Verwendet das wirksame Aktivierungszeitfenster der magischen Taste einschließlich der Zeitregeln für Zusatztasten; null deaktiviert dieses Fenster. Der Wortneustart nach einer Pause ist unabhängig."
 }

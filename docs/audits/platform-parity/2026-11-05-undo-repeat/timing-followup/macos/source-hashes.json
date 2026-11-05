@@ -1,0 +1,61 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"files": [
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/state.lua",
+			"sha256": "e565599088ffc788cdd93b8133b013c931183dde93690d0d8d551d29beb9897e"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+			"sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/hotstrings/hotstrings_config.lua",
+			"sha256": "e1b453d1e1cbdb0d1b1c2e61dad0769c3cc5d8b7d73c9980e4136092592c9d2a"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_state.lua",
+			"sha256": "e6c629104558eb578eb31bf103725aa60e41545de4116d4845ed56e53cfebd75"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/keymap/repeat/test_star_validation_beats_repeat_key.lua",
+			"sha256": "a7be649f341924a94440b971866b65f4b2bfdeaaac11c35a686d2bb3a7a51209"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/hotstrings/magickey.toml",
+			"sha256": "440f5c11c53e8f9b26b46b660d54e00bd0e80ae28a9344c43a59e85b3c32bc26"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+			"sha256": "0d28466a2306acc79dec7c8bcc39b49c07ba742f488aaea1bfc00727b498cf91"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/hotstring_engine/init.lua",
+			"sha256": "be675a01bcdd3d4dfbd55b2c061ebca82c160f82f7fd8a6bc2f1c0fe91e2a0de"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/hotstrings/repeat_key_vectors.json",
+			"sha256": "e7a777c6c3390aba9392d2077c964343405811e9c9001554bd3fbe93347358a0"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/en.json",
+			"sha256": "5dbc069c890d121fdf85d54599c345d74b13c559f42856cac932e36d0645dcd9"
+		},
+		{
+			"path": "docs/memory/text-input-and-config.md",
+			"sha256": "4bacef0f3b010cc89eb5e85c4802b6cc75498f1b5729774af5c70b4c26a230cf"
+		},
+		{
+			"path": "docs/memory/maintainer-decisions.md",
+			"sha256": "20f028ed75ea62d31398e02a648f27db35782053b5b75577410ffb75355674a5"
+		}
+	]
+}

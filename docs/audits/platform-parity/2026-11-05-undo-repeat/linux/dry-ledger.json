@@ -1,0 +1,35 @@
+{
+	"last_confirmed_roots": ["URL001", "URL002"],
+	"source_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"pass_order": ["final-A", "final-B"],
+	"sweeps": [
+		{
+			"pass": "final-A",
+			"axes": [
+				"entry points, defaults and toggle publication",
+				"cache/outdated/read/write refusal",
+				"word/delimiter/Unicode/magic predicates",
+				"real registered-match precedence",
+				"repeat/correction and boundary publication",
+				"private ancestry and actual output logs",
+				"Undo compensation and terminator/empty limits"
+			],
+			"new_distinct_roots": 0,
+			"receipt": "final-A-receipt.json"
+		},
+		{
+			"pass": "final-B",
+			"axes": [
+				"pause/focus/guard invalidation/capture/desync ownership",
+				"pointer and modified control retirement",
+				"ACK refusal cleanup and publication",
+				"source/registry rebuild ownership",
+				"preview intent and telemetry private flag",
+				"source-only discarded private TOML assumption",
+				"native receiving, performance and memory gaps"
+			],
+			"new_distinct_roots": 0,
+			"receipt": "final-B-receipt.json"
+		}
+	]
+}

@@ -1,0 +1,72 @@
+Selecting exact test module: "tests.unit.modules.llm.vectors.test_context_buffer_vectors"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.llm.vectors.test_context_buffer_vectors
+
+=== AI context buffer corpus ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"declares the window the module implements","status":"pass","elapsed_ms":0.003425,"timing_error":""}
+  ok   declares the window the module implements
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"append-accumulates","status":"pass","elapsed_ms":0.009034,"timing_error":""}
+  ok   append-accumulates
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"backspace-drops-one-codepoint","status":"pass","elapsed_ms":0.005639,"timing_error":""}
+  ok   backspace-drops-one-codepoint
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"backspace-on-empty-is-noop","status":"pass","elapsed_ms":0.002714,"timing_error":""}
+  ok   backspace-on-empty-is-noop
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"expansion-replaces-trigger","status":"pass","elapsed_ms":0.006089,"timing_error":""}
+  ok   expansion-replaces-trigger
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"expansion-keeps-replayed-terminator","status":"pass","elapsed_ms":0.003184,"timing_error":""}
+  ok   expansion-keeps-replayed-terminator
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"expansion-deleting-more-than-known-empties-first","status":"pass","elapsed_ms":0.002794,"timing_error":""}
+  ok   expansion-deleting-more-than-known-empties-first
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"expansion-multibyte-tail","status":"pass","elapsed_ms":0.003796,"timing_error":""}
+  ok   expansion-multibyte-tail
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"set-replaces-everything","status":"pass","elapsed_ms":0.003415,"timing_error":""}
+  ok   set-replaces-everything
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"clear-forgets","status":"pass","elapsed_ms":0.002684,"timing_error":""}
+  ok   clear-forgets
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"navigation-clears-when-preferred","status":"pass","elapsed_ms":0.005979,"timing_error":""}
+  ok   navigation-clears-when-preferred
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"navigation-keeps-when-not-preferred","status":"pass","elapsed_ms":0.005688,"timing_error":""}
+  ok   navigation-keeps-when-not-preferred
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"navigation-keeps-typing-after","status":"pass","elapsed_ms":0.004056,"timing_error":""}
+  ok   navigation-keeps-typing-after
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"window-keeps-newest-codepoints","status":"pass","elapsed_ms":3.013608,"timing_error":""}
+  ok   window-keeps-newest-codepoints
+
+=== AI context buffer strictness ===
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"rejects non-text and invalid UTF-8 instead of drifting from the field","status":"pass","elapsed_ms":0.011076,"timing_error":""}
+  ok   rejects non-text and invalid UTF-8 instead of drifting from the field
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"answers the navigation rule without a buffer","status":"pass","elapsed_ms":0.002253,"timing_error":""}
+  ok   answers the navigation rule without a buffer
+
+=== AI context buffer private mirror corpus ===
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"(private-ai-context) no-private-expansion-shows-everything","status":"pass","elapsed_ms":0.001653,"timing_error":""}
+  ok   (private-ai-context) no-private-expansion-shows-everything
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"(private-ai-context) text-typed-after-the-secret-is-visible","status":"pass","elapsed_ms":0.001472,"timing_error":""}
+  ok   (private-ai-context) text-typed-after-the-secret-is-visible
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"(private-ai-context) nothing-after-the-secret-shows-nothing","status":"pass","elapsed_ms":0.001382,"timing_error":""}
+  ok   (private-ai-context) nothing-after-the-secret-shows-nothing
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"(private-ai-context) backspace-into-the-secret-keeps-the-rest-marked","status":"pass","elapsed_ms":0.005348,"timing_error":""}
+  ok   (private-ai-context) backspace-into-the-secret-keeps-the-rest-marked
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"(private-ai-context) typing-after-a-backspace-is-visible","status":"pass","elapsed_ms":0.001592,"timing_error":""}
+  ok   (private-ai-context) typing-after-a-backspace-is-visible
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"(private-ai-context) backspace-far-back-keeps-the-surviving-prefix-marked","status":"pass","elapsed_ms":0.001953,"timing_error":""}
+  ok   (private-ai-context) backspace-far-back-keeps-the-surviving-prefix-marked
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"(private-ai-context) another-field-releases-the-mark","status":"pass","elapsed_ms":0.001622,"timing_error":""}
+  ok   (private-ai-context) another-field-releases-the-mark
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"(private-ai-context) divergence-inside-the-secret-keeps-the-common-part","status":"pass","elapsed_ms":0.002374,"timing_error":""}
+  ok   (private-ai-context) divergence-inside-the-secret-keeps-the-common-part
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"(private-ai-context) never-cuts-inside-a-codepoint","status":"pass","elapsed_ms":0.001543,"timing_error":""}
+  ok   (private-ai-context) never-cuts-inside-a-codepoint
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"(private-ai-context) rejects a malformed text or mark","status":"pass","elapsed_ms":0.001953,"timing_error":""}
+  ok   (private-ai-context) rejects a malformed text or mark
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","name":"tests.unit.modules.llm.vectors.test_context_buffer_vectors","status":"pass","elapsed_ms":6.831651,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  26
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

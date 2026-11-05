@@ -1,0 +1,9 @@
+{
+	"schema_version": 1,
+	"scope": "shared",
+	"module": "word-reset",
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"created_at": "2026-11-05",
+	"report_path": "report.md",
+	"findings": []
+}

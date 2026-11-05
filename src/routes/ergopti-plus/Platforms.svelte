@@ -22,6 +22,7 @@ under another configuration path.
 	import actions from './action-inventory.json';
 	import inputs from './input-inventory.json';
 	import menuGaps from './menu-gaps.json';
+	import behaviors from './behavior-inventory.json';
 
 	/** @type {{macosApps: Array<{id: string, name: string, description: string}>}} */
 	let { macosApps } = $props();
@@ -80,6 +81,40 @@ under another configuration path.
 									title={!available ? row.reason?.[i18n.lang] : undefined}
 									>{available ? '✓' : '—'}</td
 								>
+							{/each}
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</details>
+
+		<details class="table-wrap" use:reveal>
+			<summary>{t('Comportements examinés dans le code')} ({behaviors.length})</summary>
+			<p class="lead">
+				{t(
+					'Ce catalogue complémentaire couvre les comportements examinés. Il ne constitue pas un inventaire exhaustif ni une garantie de fonctionnement dans chaque application.'
+				)}
+			</p>
+			<table class="matrix">
+				<thead>
+					<tr>
+						<th class="feat-col">{t('Fonctionnalité ou réglage')}</th>
+						<th>Windows</th>
+						<th>macOS</th>
+						<th>Linux</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each behaviors as row}
+						<tr>
+							<td class="feat-col">{row.labels[i18n.lang]}</td>
+							{#each ['windows', 'macos', 'linux'] as os}
+								<td>
+									<span class:ok={row.platforms[os]} class:off={!row.platforms[os]} class="cell"
+										>{row.platforms[os] ? '✓' : '—'}</span
+									>
+									<small class="behavior-note">{row.notes[os][i18n.lang]}</small>
+								</td>
 							{/each}
 						</tr>
 					{/each}
@@ -452,6 +487,14 @@ under another configuration path.
 
 	.cell.off {
 		color: rgba(255, 255, 255, 0.25);
+	}
+
+	.behavior-note {
+		color: var(--ink-soft);
+		display: block;
+		font-size: 0.78rem;
+		line-height: 1.5;
+		margin-top: 6px;
 	}
 
 	.legend {

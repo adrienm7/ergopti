@@ -1,0 +1,502 @@
+{
+	"schema_version": 1,
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"created_at": "2026-11-05",
+	"module": "word-reset",
+	"capabilities": [
+		{
+			"id": "defaults",
+			"contract": "Resolve effective defaults through canonical feature model",
+			"windows": "Idle3s; arrow/shortcut/click/tap-hold true; AI nav true.",
+			"macos": "Same applicable settings; raw state false values are placeholders.",
+			"linux": "Same applicable defaults confirmed by actual model/owners.",
+			"classification": "raw_parity",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "independent-ai-context",
+			"contract": "Navigation word policy and AI context have separate lifetimes",
+			"windows": "Complete AI context can survive physical edit/shortcut early returns.",
+			"macos": "Next character overrides independent nav policy from hotstring buffer.",
+			"linux": "Actual helper cross-product and Main next-key controls preserve independence.",
+			"classification": "observed_defect",
+			"finding_ids": ["WRSW-002", "WRM-001"],
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "keep-ai-next-key",
+			"contract": "Retain opted-in AI context through the next character",
+			"windows": "Some physical editing routes retain obsolete complete text instead of a known edit.",
+			"macos": "Keep-AI/reset-word loses old sentence; reset-AI/keep-word resurrects it.",
+			"linux": "Physical arrows plus next key keep/reset the actual Main predictor argument correctly.",
+			"classification": "observed_defect",
+			"finding_ids": ["WRSW-002", "WRM-001"],
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "synthetic-unknown-edit",
+			"contract": "Synthetic modified Backspace must not invent known position",
+			"windows": "Alt/Win+Backspace successful synthetic effect asserts start; physical counterpart explicitly refuses.",
+			"macos": "Exact synthetic chord/native semantics not recertified in this scope.",
+			"linux": "Physical AltBackspace clears unknown context; exact synthetic counterpart not recertified.",
+			"classification": "observed_defect",
+			"finding_ids": ["WRSW-001"],
+			"availability": {
+				"windows": "partial",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "all-arrow-origins",
+			"contract": "Arrow policy applies regardless of input origin",
+			"windows": "Canonical synthetic classifier uses arrow switch by source.",
+			"macos": "Public physical controls run; synthetic-origin counterpart remains source-qualified.",
+			"linux": "Catalogue arrows omit notification; tap arrows use generic tap switch, contrary explicit all-arrow policy.",
+			"classification": "observed_defect",
+			"finding_ids": ["WRSL-001"],
+			"availability": {
+				"windows": "present",
+				"macos": "unverified",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "tap-origin",
+			"contract": "Separate tap-hold attribution where qualified",
+			"windows": "Command tap/owned CtrlAltWin/layer identities distinct.",
+			"macos": "Independent tap-hold-reset option explicitly unavailable; shortcut policy is alternative.",
+			"linux": "Actual held modifier provenance works; action-arrow path wrong-owner in WRSL-001.",
+			"classification": "native_constraint",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "absent",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Explicit shared manifest/platform reason for macOS origin limitation, already tracked before this campaign. Linux action defect separately confirmed.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "terminal-empty-line",
+			"contract": "Bare submission establishes empty-prompt Backspace authority",
+			"windows": "Main Enter records known empty line; ShiftEnter differs.",
+			"macos": "Main Return works; keypad Enter misses terminal receipt under stated native condition.",
+			"linux": "Bare terminal typed newline records empty-line authority; Shift provenance limitation qualified.",
+			"classification": "observed_defect",
+			"finding_ids": ["WRM-002"],
+			"availability": {
+				"windows": "present",
+				"macos": "partial",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "newline-origin",
+			"contract": "GUI newline and terminal submission remain distinct",
+			"windows": "Terminal bare Enter versus multiline ShiftEnter owner.",
+			"macos": "Main Return versus ShiftReturn and keypad/payload controls qualified.",
+			"linux": "GUI typed newline remains text; terminal reset path differs; hook lacks Shift on typed newline.",
+			"classification": "native_constraint",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Observed driver input routes and documented Linux Shift/typed-newline limitation; no universal native Enter guarantee.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "idle-backspace",
+			"contract": "Idle reset preserves qualified editing recovery",
+			"windows": "Forgets word then can restore exact forgotten word for immediate Backspace.",
+			"macos": "Avoids bareBackspace idle wipe; AI rebuilding falls under WRM-001.",
+			"linux": "Idle evaluated on typed chars; bareBackspace edits retained known word.",
+			"classification": "explicit_intent",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Routed project-backspace-word-start memory documents these architecture differences; no latency claim.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "home-modifiers",
+			"contract": "Document modified non-arrow navigation policy ambiguity",
+			"windows": "Shortcut-off can preserve modified Home/End/Page keys; bare forms reset.",
+			"macos": "Modified-key global parity is source-qualified, not decided from an isolated label.",
+			"linux": "Actual control tests forget bare Home/End/Page/Insert/Delete; CtrlHome helper is ungoverned.",
+			"classification": "unknown_intent",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Broad shortcut scope and other-navigation manifest wording do not explicitly settle every modified-key case. No extra confirmed finding.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "privacy-retirement",
+			"contract": "Unknown focus/private/pause transitions override stale context",
+			"windows": "Physical generations and stale observer fences remain effective; WRSW-002 is fresh wrong text.",
+			"macos": "Pause/stop/public edited controls qualified; no claim keep-context overrides field privacy.",
+			"linux": "Real focus guard resets on click/focus, and pause clears even with nav retention.",
+			"classification": "native_constraint",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Conservative privacy/field-identity retirement is preserved; do not weaken admission merely to keep context.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "shared-pure-policy",
+			"contract": "Shared helper policy itself handles following typing",
+			"windows": "Source counterpart only; AHK runtime unexecuted.",
+			"macos": "Caller can defeat correct helper, demonstrated WRM-001.",
+			"linux": "208 option scenarios plus actual common vectors pass; caller action publication still needs WRSL-001.",
+			"classification": "observed_limit",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "1388 actual assertions per Lua54/LuaJIT; 7 idle, 13 context, 9 private vectors. Passing a helper does not certify callers.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "native-receiving",
+			"contract": "Keep host receiving outside source/native-port claims",
+			"windows": "AHK/editor execution unexecuted.",
+			"macos": "Actual Hammerspoon native service/editor/terminal unexecuted.",
+			"linux": "Actual device/compositor/editor/model request unexecuted.",
+			"classification": "observed_limit",
+			"finding_ids": [],
+			"availability": {
+				"windows": "unverified",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "No native clipboard/input device or user configuration accessed; no G4 or long-duration memory measurement.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		}
+	]
+}

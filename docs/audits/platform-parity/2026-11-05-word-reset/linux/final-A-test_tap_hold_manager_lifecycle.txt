@@ -1,0 +1,49 @@
+
+=== tap-hold manager ===
+  ok   installs the engine at init and runs its tap actions
+  ok   transports the actual monitor tap binding through release and queued rollover
+  ok   admits a monitor tap only from its active canonical tap-hold source
+  ok   tells the engine which modifiers the live layout holds (engine-live-modifiers)
+  ok   gives the one-shot Shift the shared results and the magic key's (one-shot-results-shared)
+  ok   gives the magic key its result before the character's own (one-shot-magic-first)
+  ok   lets the engine lift the level keys the hook says are held (one-shot-lifts-levels)
+  ok   lets the engine lift the shortcut keys the hook says are held (lalt-backspace-logic)
+  ok   takes the engine out on pause and off, and back after
+  ok   applies a changed file live on reload
+  ok   keeps the running engine when a reload cannot read the defaults
+  ok   offers every hold option and the catalogue as taps
+  ok   rejects a second init and a use before init
+  ok   reports one threshold only when every key agrees
+
+=== tap-hold manager: taps this driver cannot run ===
+  ok   offers every action the shared catalogue declares for Linux as a tap
+  ok   warns once at configuration load about a tap it cannot run (config-outdated-tap-hold)
+
+=== tap-hold manager: the daemon's action executor ===
+  ok   never drops the action catalogue when the touchpad reader fails
+  ok   resets the typing buffer after a one-shot result the injector typed (one-shot-injected-text)
+  ok   preserves unknown start authority through the actual one-shot callback (one-shot-injected-text)
+  ok   binds the tap-hold executor to the catalogue once, at init
+
+=== native OneShot Manager route ===
+  ok   loads the saved action and arms through the actual Manager callback
+  ok   refuses all-positive public ports replaced before Manager construction
+  ok   refuses public ports rebound after Manager construction without calling them
+  ok   refuses missing required public arm authority at the final frame join
+  ok   does not arm when the original source changes during command admission
+  ok   withdraws an unspent arm before a foreign keyboard is forwarded
+  ok   retains the ordinary generic action route
+  ok   keeps an action outside the catalogue unavailable
+  ok   (linux-caps-word-trigger) runs a CapsWord pair through the catalogue executor
+  ok   does not grant a lease outside the exact Manager action frame
+  ok   settles original inverse ACK after consumed source descriptor replacement
+  ok   settles exact retired original output without borrowing its reopened successor
+  ok   retires uncertain original inverse output instead of claiming healthy settlement
+
+=== OneShot daemon Manager bootstrap ===
+  ok   selects Hook at setup when keystats already constructed Manager before it
+
+=== OneShot construction-original text source ===
+  ok   refuses a rebound text getter before_manager without changing raw input
+  ok   refuses a rebound text getter after_manager without changing raw input
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":36}

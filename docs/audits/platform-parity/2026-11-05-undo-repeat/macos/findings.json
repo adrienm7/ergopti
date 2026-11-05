@@ -1,0 +1,33 @@
+{
+	"schema_version": 1,
+	"scope": "hammerspoon",
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"created_at": "2026-11-05",
+	"report_path": "report.md",
+	"findings": [
+		{
+			"id": "URM-001",
+			"title": "Repeat drops privacy on a scalar derived from a private expansion",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["private_output_propagation"],
+			"reproduction": "Enable repeat and actual personal SSN prefix producer; type synthetic prefix 28401 in a permitted field, then magic immediately after private expansion 2840175123456. Public eventtap emits extra6 as nonprivate. Actual bridge context6; later public phrase reaches actual serialized prediction request through a fake HTTP port. Full SSN remains withheld.",
+			"root_cause": "Expander.try_repeat_feature derives last_char from the existing output buffer but unconditionally passes is_private=false and logs last_char literally; the prior private prefix mark is not extended.",
+			"silent_failure": "Repeat succeeds with public telemetry and no dropped-privacy diagnostic; baseline private-context tests cover new typing and deletion but not derived repetition.",
+			"regression_test": "Actual SSN producer and Keymap tap, actual repeat/Bridge/SyntheticInput/metrics sinks: derived private scalar stays private and absent from DEBUG and local/remote AI contexts; ordinary repeat and fresh public typing remain available, including delete/custom magic/refusal controls.",
+			"evidence": [
+				{
+					"path": "public-repeat.lua",
+					"basis": "executed actual Lua public owner over repository native ports",
+					"observed": "private expansion:true; repeat6:false; actual recorded_char=6 vs private control\u2022; literal DEBUG boundary; AI context6"
+				},
+				{
+					"path": "private-repeat.lua",
+					"basis": "executed actual Lua privacy fixture owner and actual prediction serialization over fake HTTP port",
+					"observed": "serialized request includes6 plus fresh phrase; full SSN absent; no actual network or native receiving"
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,83 @@
+{
+	"qualification": "Worker hashes authenticate exact original submission bytes retained as .txt. Pinned Prettier changes archive presentation only; JSON values and worker hash-claim values remain unchanged. Current canonical evidence hashes describe the formatted archive. No historical claim value was rewritten.",
+	"rows": [
+		{
+			"worker_receipt": "windows/dry-sweeps.json",
+			"worker_pointer": "/sweeps/0",
+			"worker_expected_sha256": "59e361daefa6f29ce89c4bc0533e0fd14b590dac2eafde8269225088c881de03",
+			"original_bytes": "validation/original-submissions/windows/dry-A.json.txt",
+			"original_sha256": "59e361daefa6f29ce89c4bc0533e0fd14b590dac2eafde8269225088c881de03",
+			"formatted_archive": "windows/dry-A.json",
+			"formatted_sha256": "ad00f1f0592425397a6ec4ed9a5082849154591f372428318a6fb75c57664dac",
+			"json_values_equal": true
+		},
+		{
+			"worker_receipt": "windows/dry-sweeps.json",
+			"worker_pointer": "/sweeps/1",
+			"worker_expected_sha256": "59e361daefa6f29ce89c4bc0533e0fd14b590dac2eafde8269225088c881de03",
+			"original_bytes": "validation/original-submissions/windows/dry-B.json.txt",
+			"original_sha256": "59e361daefa6f29ce89c4bc0533e0fd14b590dac2eafde8269225088c881de03",
+			"formatted_archive": "windows/dry-B.json",
+			"formatted_sha256": "ad00f1f0592425397a6ec4ed9a5082849154591f372428318a6fb75c57664dac",
+			"json_values_equal": true
+		},
+		{
+			"worker_receipt": "timing-followup/shared/handoff.json",
+			"worker_pointer": "/files/0",
+			"worker_expected_sha256": "0c6fde34b37572a92bc2749fdc8448d38ac860dee4ffba4318dd93872308a6ca",
+			"original_bytes": "validation/original-submissions/timing-followup/shared/source-receipt.json.txt",
+			"original_sha256": "0c6fde34b37572a92bc2749fdc8448d38ac860dee4ffba4318dd93872308a6ca",
+			"formatted_archive": "timing-followup/shared/source-receipt.json",
+			"formatted_sha256": "a139d46ad75dcfe1cb36dc9a50c27f0babe39d295904200a1c0ae4b6f546289c",
+			"json_values_equal": true
+		}
+	],
+	"root_followup_json_formatting": [
+		{
+			"original_bytes": "validation/original-submissions/timing-followup/shared/implementation-followup-files.json.txt",
+			"original_sha256": "9d8bec398d85edb8743fac7acf048e69d307fd4660b9fa6cb2f8766fa413434f",
+			"formatted_archive": "timing-followup/shared/implementation-followup-files.json",
+			"formatted_sha256": "705b1e7c3ebdd7eb424f1484e97d628e75b3493d6a45b6b8f8019d9e9ca7453a",
+			"json_values_equal": true
+		},
+		{
+			"original_bytes": "validation/original-submissions/timing-followup/shared/implementation-followup-json-diff.json.txt",
+			"original_sha256": "822b12dba34ba38806ba6a51556504baa00c25fe5f6d8ed6f88584c2ca588fcc",
+			"formatted_archive": "timing-followup/shared/implementation-followup-json-diff.json",
+			"formatted_sha256": "d317273f9ac5cd4168d198e450c89304fb8aefb4cc7ef269bb81a1625e17f2cc",
+			"json_values_equal": true
+		},
+		{
+			"original_bytes": "validation/original-submissions/timing-followup/shared/implementation-followup-validation.json.txt",
+			"original_sha256": "c58c03099fd0c1aca124bdd278051e2afb205f80ee23b88143a891a3918761c8",
+			"formatted_archive": "timing-followup/shared/implementation-followup-validation.json",
+			"formatted_sha256": "f8f9109d35d619b51585318968c92c831bb82660b00c9ffd534ff6d27b60c8da",
+			"json_values_equal": true
+		}
+	],
+	"archive_presentation_followup": [
+		{
+			"original_bytes": "validation/original-submissions/timing-followup/report.md.txt",
+			"original_sha256": "26f437d9aa66584d372c0a0c0a218c4f5e9b4f1b13f0dddeb2745b20231bf172",
+			"formatted_archive": "timing-followup/report.md",
+			"formatted_sha256": "220c5a2a9cc6b74e478ece56abcc003027d8c08438a15fc5b2e71cf13d1b75cb",
+			"formatter": "repository pinned Prettier"
+		},
+		{
+			"original_bytes": "validation/original-submissions/timing-followup/shared/handoff.json.txt",
+			"original_sha256": "e22cbe8e0d0dba4e9f4c8830d07c9bd4b9a541d0598af9bf57b6ebd5670d54c5",
+			"formatted_archive": "timing-followup/shared/handoff.json",
+			"formatted_sha256": "074a770056e3099c0ae832dca412a0824f3175d2d1e8257ef9d1eab580bff420",
+			"formatter": "repository pinned Prettier",
+			"json_values_equal": true
+		},
+		{
+			"original_bytes": "validation/original-submissions/timing-followup/shared/implementation-followup-baseline-hashes.json.txt",
+			"original_sha256": "f02e9e4ddc8b290895bfc5bc10644d5f2d1846a1ccf618c582d2b3b686f6bedf",
+			"formatted_archive": "timing-followup/shared/implementation-followup-baseline-hashes.json",
+			"formatted_sha256": "89e946ffc7ea7127a3f32696b3fd74cc88297d13e29b2e1cb567b2959eabe1aa",
+			"formatter": "repository pinned Prettier",
+			"json_values_equal": true
+		}
+	]
+}

@@ -1,0 +1,138 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"scope": "repeat timing contradictory followup only",
+	"new_findings": [],
+	"intent": "Timing discrepancy observed; no explicit common repeat timing contract located. Do not classify inferred intent or force a G2 finding.",
+	"program": {
+		"path": "probe.lua",
+		"sha256": "4b1aafe3ddb40616c26ec9591ecdf506b20c88bc3fd47860d6ade710436030a8"
+	},
+	"sources": [
+		{
+			"path": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+			"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
+			"sha256": "b479068f12b908edd9034442313848c7bd4363031141e07ee9c32418d8a35d13"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
+			"sha256": "1d28167df7eabbc1be798067269c03706cc41c8e1abd812102977784006404f7"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/expansion_delay.lua",
+			"sha256": "30d9710fe4eead073f4682f9375a5f4091d7bbda64ec0e8e68af4f4265e6c4f3"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/word_reset.lua",
+			"sha256": "449c91fa83af61d76d781dc76e84ca1eb9fcd8c82dbe627d2a47d5dd04f36120"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/magic_key.lua",
+			"sha256": "6f1be4b49903f625aef71919bcd595ca9e1c9c132716545d3d0973c2ce741db9"
+		},
+		{
+			"path": "static/ergopti_plus/linux/infra/hotstring_preferences.lua",
+			"sha256": "d15fbe1e2a5af2ca23023e097625b4dff5266bd3012dda7ab57e58879e6b332d"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/hotstring_engine/init.lua",
+			"sha256": "be675a01bcdd3d4dfbd55b2c061ebca82c160f82f7fd8a6bc2f1c0fe91e2a0de"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+			"sha256": "0d28466a2306acc79dec7c8bcc39b49c07ba742f488aaea1bfc00727b498cf91"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/hotstrings/repeat_key_vectors.json",
+			"sha256": "e7a777c6c3390aba9392d2077c964343405811e9c9001554bd3fbe93347358a0"
+		},
+		{
+			"path": "docs/memory/text-input-and-config.md",
+			"sha256": "4bacef0f3b010cc89eb5e85c4802b6cc75498f1b5729774af5c70b4c26a230cf"
+		}
+	],
+	"dry_sweeps": [
+		{
+			"name": "A",
+			"axes": [
+				"actual canonical base/default/factor resolution",
+				"bare 1s/2s repeat with idle disabled",
+				"expired ordinary mapping fallback versus admitted ordinary/complex mapping",
+				"acknowledged changed magic and literal old key",
+				"acknowledged shorter/unlimited base"
+			],
+			"new_distinct_roots": 0
+		},
+		{
+			"name": "B",
+			"axes": [
+				"actual canonical base/default/factor resolution",
+				"bare 1s/2s repeat with idle disabled",
+				"expired ordinary mapping fallback versus admitted ordinary/complex mapping",
+				"acknowledged changed magic and literal old key",
+				"acknowledged shorter/unlimited base"
+			],
+			"new_distinct_roots": 0
+		}
+	],
+	"runs": [
+		{
+			"sweep": "A",
+			"runtime": "luajit",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-repeat-timing-2026-11-05/linux/probe.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux"
+			],
+			"exit_code": 0,
+			"owner_cases": 9,
+			"output": "dry-A-luajit.txt",
+			"sha256": "8a2f00f89c9309056eae77abbfffb6bc7d74384d6f2b04631749245f36c6e523"
+		},
+		{
+			"sweep": "A",
+			"runtime": "lua",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-repeat-timing-2026-11-05/linux/probe.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux"
+			],
+			"exit_code": 0,
+			"owner_cases": 9,
+			"output": "dry-A-lua.txt",
+			"sha256": "8a2f00f89c9309056eae77abbfffb6bc7d74384d6f2b04631749245f36c6e523"
+		},
+		{
+			"sweep": "B",
+			"runtime": "luajit",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-repeat-timing-2026-11-05/linux/probe.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux"
+			],
+			"exit_code": 0,
+			"owner_cases": 9,
+			"output": "dry-B-luajit.txt",
+			"sha256": "8a2f00f89c9309056eae77abbfffb6bc7d74384d6f2b04631749245f36c6e523"
+		},
+		{
+			"sweep": "B",
+			"runtime": "lua",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-repeat-timing-2026-11-05/linux/probe.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/linux"
+			],
+			"exit_code": 0,
+			"owner_cases": 9,
+			"output": "dry-B-lua.txt",
+			"sha256": "8a2f00f89c9309056eae77abbfffb6bc7d74384d6f2b04631749245f36c6e523"
+		}
+	]
+}

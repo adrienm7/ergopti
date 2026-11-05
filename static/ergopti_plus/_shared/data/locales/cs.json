@@ -4070,5 +4070,13 @@
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "V Linuxu není přepínač: GNOME a KDE volí Duplikovat ve vlastním přepínači obrazovek Super+P; přiřaďte tuto klávesu jako kombinaci kláves.",
 	"platform_reason.action_sticky_keys_are_the_systems": "Tento systém má v nastavení usnadnění Jedním prstem (lepivé klávesy), díky nimž každý modifikátor platí pro jednu klávesu; zapněte je tam.",
 	"platform_reason.action_take_note_uses_notepad": "Pouze Windows: tato akce otevře soubor poznámek dne v Poznámkovém bloku, editoru, který má každý Windows. macOS má vlastní Rychlou poznámku (Fn+Q) a Linux nemá editor, který by měla všechna prostředí.",
-	"platform_reason.action_text_recognition_is_live_text_on_macos": "V macOS čte Živý text text každého snímku nebo obrázku: pořiďte snímek odpovídající akcí a pak označte jeho text."
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "V macOS čte Živý text text každého snímku nebo obrázku: pořiďte snímek odpovídající akcí a pak označte jeho text.",
+	"inventory.behavior.backspace_restore": "Obnovit rozvinutí klávesou Backspace",
+	"inventory.behavior.repeat_condition": "Opakuje znak uvnitř slova, pokud neodpovídá žádné rozvinutí a je zapnuto opakování magickou klávesou.",
+	"inventory.behavior.repeat_linux": "Opakování magickou klávesou existuje, ale po sobě jdoucí opakování nyní ztrácejí kontext po prvním rozvinutí. Ovlivněny jsou také opravy následující po opakování.",
+	"inventory.behavior.backspace_linux": "Okamžitý Backspace bez modifikátorů může obnovit způsobilé rozvinutí prostého textu; chování v nativních textových polích zůstává neověřené.",
+	"inventory.behavior.backspace_other": "Bez automatického obnovení spouštěče klávesou Backspace; funkce Zpět v aplikaci je samostatná.",
+	"inventory.behavior.repeat_activation_window": "Aktivační okno opakování magickou klávesou",
+	"inventory.behavior.repeat_window_untimed": "Záložní opakování nemá samostatné aktivační okno; začátek nového slova po nečinnosti je nezávislý.",
+	"inventory.behavior.repeat_window_macos": "Používá platné aktivační okno magické klávesy včetně časových pravidel modifikátorů; nula toto okno vypíná. Začátek nového slova po nečinnosti je nezávislý."
 }

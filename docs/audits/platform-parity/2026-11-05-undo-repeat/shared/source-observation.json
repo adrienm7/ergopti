@@ -1,0 +1,32 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"basis": "actual JS module import plus authenticated source review; no AHK/native desktop execution",
+	"translation_observation": {
+		"header": null,
+		"legend": null,
+		"control": "Who for?"
+	},
+	"repeat_corpus_vectors": 19,
+	"repeat_corpus_scope": "pure decision/single repeat; no consecutive-owner publication coverage",
+	"backspace_owner": "Linux Main only; corpus is not proof of native receiving",
+	"sources": {
+		"tools/codegen/codegen-feature-inventory.cjs": "5cb181fc68b1e4dd92d3174540be5d09b4e7e1ac4f724a2e0f44685175a971bd",
+		"static/ergopti_plus/_shared/modules/features/manifest.toml": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+		"static/ergopti_plus/_shared/core/features.json": "8746b37d5c7210e68f86a3e86534a3069f0be9c3bc2467261d1fff9d45529b99",
+		"static/ergopti_plus/_shared/modules/menu/menu_manifest.json": "544782751c80291ac36158a1e3b07b5507d42a1fde349c73859a2097427741d3",
+		"src/routes/ergopti-plus/feature-inventory.json": "5edb4101f1523786323fba71a5c2f40ab26eb329b7f4183da1ca121dc5d0241f",
+		"src/routes/ergopti-plus/action-inventory.json": "9df9eaeb3c0cdb15d0766004c34103a91005da905ff9dd568bb7b4d9bfbb01a9",
+		"src/routes/ergopti-plus/menu-gaps.json": "3a98f3e48eef1f76e5db34b41537ed45e38e3824ae2ae9c50f3475b2cbf0c52a",
+		"src/routes/ergopti-plus/input-inventory.json": "1dc9d69999e41080e009a627ef467b9d3f44d323cfb449debf632c3607015545",
+		"src/routes/ergopti-plus/locales/en.js": "799f83797c90bfc917edf80591367d5d8a1ce9124533aa02f3f2cde8eb388d12",
+		"static/ergopti_plus/linux/ergopti_hotstrings.lua": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9",
+		"static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua": "b479068f12b908edd9034442313848c7bd4363031141e07ee9c32418d8a35d13",
+		"static/ergopti_plus/macos/modules/keymap/expander.lua": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887",
+		"static/ergopti_plus/macos/modules/keymap/init.lua": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56",
+		"static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70",
+		"static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503",
+		"static/ergopti_plus/_shared/tests/corpus/hotstrings/repeat_key_vectors.json": "e7a777c6c3390aba9392d2077c964343405811e9c9001554bd3fbe93347358a0",
+		"static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml": "45746566d2709a6508774034e60897296134168bd92ecb8b8af29a570fee9b66",
+		"TODO.md": "4f1a93abd6626110f664a00a90ea53e56199dd0e44d4fa636647fa931f1d2906"
+	}
+}

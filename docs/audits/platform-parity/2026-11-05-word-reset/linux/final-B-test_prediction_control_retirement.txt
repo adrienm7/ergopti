@@ -1,0 +1,222 @@
+
+=== Main feeds the AI its own typing context (llm.generation.reset_on_nav) ===
+  ok   (ai-context) keeps the sentence across left when navigation is not to reset it
+  ok   (ai-context) starts the sentence over after left by default
+  ok   (ai-context) keeps the sentence across enter when navigation is not to reset it
+  ok   (ai-context) starts the sentence over after enter by default
+  ok   (ai-context) keeps the sentence across escape when navigation is not to reset it
+  ok   (ai-context) starts the sentence over after escape by default
+  ok   (ai-context) lets a manual request see the sentence that navigation did not clear
+
+=== Main retires AI at forwarded document controls ===
+  ok   does not submit the pre-Home context after debounce
+  ok   rejects late streaming, completion and acceptance after home
+  ok   rejects late streaming, completion and acceptance after end
+  ok   rejects late streaming, completion and acceptance after pageup
+  ok   rejects late streaming, completion and acceptance after pagedown
+  ok   rejects late streaming, completion and acceptance after left
+  ok   rejects late streaming, completion and acceptance after right
+  ok   rejects late streaming, completion and acceptance after up
+  ok   rejects late streaming, completion and acceptance after down
+  ok   rejects late streaming, completion and acceptance after delete
+  ok   rejects late streaming, completion and acceptance after insert
+  ok   rejects late streaming, completion and acceptance after enter
+  ok   rejects late streaming, completion and acceptance after escape
+  ok   rejects late streaming, completion and acceptance after backspace
+  ok   withdraws an already visible prediction before Home can relocate acceptance
+  ok   retires a forwarded arrow even when hotstring word reset is off
+  ok   preserves an unchanged document's offer through f1
+  ok   preserves an unchanged document's offer through f12
+  ok   preserves an unchanged document's offer through shortcut
+  ok   does not retire an offer for physical modifiers or locks
+  ok   keeps a genuinely consumed tooltip arrow out of the document-control handler
+  ok   lets the actual consumed validation chord commit the current offer
+  ok   retires replacement-context work before the hotstring Undo early return
+
+=== Main retires AI at forwarded standard editing chords ===
+  ok   editing-chord-owner retires debounce through Ctrl+V
+  ok   editing-chord-owner retires late through Ctrl+V
+  ok   editing-chord-owner retires visible through Ctrl+V
+  ok   editing-chord-owner retires debounce through Ctrl+Shift+V
+  ok   editing-chord-owner retires late through Ctrl+Shift+V
+  ok   editing-chord-owner retires visible through Ctrl+Shift+V
+  ok   editing-chord-owner retires debounce through Ctrl+X
+  ok   editing-chord-owner retires late through Ctrl+X
+  ok   editing-chord-owner retires visible through Ctrl+X
+  ok   editing-chord-owner retires debounce through Ctrl+Z
+  ok   editing-chord-owner retires late through Ctrl+Z
+  ok   editing-chord-owner retires visible through Ctrl+Z
+  ok   editing-chord-owner retires debounce through Ctrl+Shift+Z
+  ok   editing-chord-owner retires late through Ctrl+Shift+Z
+  ok   editing-chord-owner retires visible through Ctrl+Shift+Z
+  ok   editing-chord-owner retires debounce through Ctrl+Y
+  ok   editing-chord-owner retires late through Ctrl+Y
+  ok   editing-chord-owner retires visible through Ctrl+Y
+  ok   editing-chord-owner retires debounce through Ctrl+A
+  ok   editing-chord-owner retires late through Ctrl+A
+  ok   editing-chord-owner retires visible through Ctrl+A
+  ok   (ai-context) a paste or undo changes the text by an unknown amount, so navigation retention does not keep it
+  ok   editing-chord-owner retires paste even when shortcut word reset is off
+  ok   editing-chord-owner preserves unclassified Ctrl+C
+  ok   editing-chord-owner preserves unclassified Ctrl+S
+  ok   editing-chord-owner preserves unclassified Ctrl+Alt+V
+  ok   editing-chord-owner preserves unclassified Ctrl+Meta+V
+  ok   editing-chord-owner preserves unclassified Ctrl+AltGr+V
+  ok   editing-chord-owner retires before the dispatch port starts a successor request
+
+=== whole Main retires Readline editing controls ===
+  ok   readline-control-retirement u debounce reset=false
+  ok   readline-control-retirement u debounce reset=true
+  ok   readline-control-retirement u late reset=false
+  ok   readline-control-retirement u late reset=true
+  ok   readline-control-retirement u visible reset=false
+  ok   readline-control-retirement u visible reset=true
+  ok   readline-control-retirement h debounce reset=false
+  ok   readline-control-retirement h debounce reset=true
+  ok   readline-control-retirement h late reset=false
+  ok   readline-control-retirement h late reset=true
+  ok   readline-control-retirement h visible reset=false
+  ok   readline-control-retirement h visible reset=true
+  ok   readline-control-retirement k debounce reset=false
+  ok   readline-control-retirement k debounce reset=true
+  ok   readline-control-retirement k late reset=false
+  ok   readline-control-retirement k late reset=true
+  ok   readline-control-retirement k visible reset=false
+  ok   readline-control-retirement k visible reset=true
+  ok   readline-control-retirement w debounce reset=false
+  ok   readline-control-retirement w debounce reset=true
+  ok   readline-control-retirement w late reset=false
+  ok   readline-control-retirement w late reset=true
+  ok   readline-control-retirement w visible reset=false
+  ok   readline-control-retirement w visible reset=true
+  ok   readline-control-scope c ctrl owned-gui-editor
+  ok   readline-control-scope s ctrl owned-gui-editor
+  ok   readline-control-scope u ctrl owned-gui-editor
+  ok   readline-control-scope u ctrl-alt gnome-terminal
+  ok   readline-control-scope u ctrl-meta gnome-terminal
+  ok   readline-control-scope u ctrl-altgr gnome-terminal
+  ok   readline-control-scope u ctrl-shift gnome-terminal
+  ok   readline-control whole-Main GUI paste still retires
+  ok   readline-control-successor dispatch late reset=false
+  ok   readline-control-successor dispatch late reset=true
+  ok   readline-control-successor dispatch visible reset=false
+  ok   readline-control-successor dispatch visible reset=true
+  ok   readline-control-successor consumed late reset=false
+  ok   readline-control-successor consumed late reset=true
+  ok   readline-control-successor consumed visible reset=false
+  ok   readline-control-successor consumed visible reset=true
+
+=== whole Main retires Readline caret and text edits ===
+  ok   readline-terminal-retirement b debounce reset=false
+  ok   readline-terminal-retirement b debounce reset=true
+  ok   readline-terminal-retirement b late reset=false
+  ok   readline-terminal-retirement b late reset=true
+  ok   readline-terminal-retirement b visible reset=false
+  ok   readline-terminal-retirement b visible reset=true
+  ok   readline-terminal-retirement f debounce reset=false
+  ok   readline-terminal-retirement f debounce reset=true
+  ok   readline-terminal-retirement f late reset=false
+  ok   readline-terminal-retirement f late reset=true
+  ok   readline-terminal-retirement f visible reset=false
+  ok   readline-terminal-retirement f visible reset=true
+  ok   readline-terminal-retirement e debounce reset=false
+  ok   readline-terminal-retirement e debounce reset=true
+  ok   readline-terminal-retirement e late reset=false
+  ok   readline-terminal-retirement e late reset=true
+  ok   readline-terminal-retirement e visible reset=false
+  ok   readline-terminal-retirement e visible reset=true
+  ok   readline-terminal-retirement d debounce reset=false
+  ok   readline-terminal-retirement d debounce reset=true
+  ok   readline-terminal-retirement d late reset=false
+  ok   readline-terminal-retirement d late reset=true
+  ok   readline-terminal-retirement d visible reset=false
+  ok   readline-terminal-retirement d visible reset=true
+  ok   readline-terminal-retirement t debounce reset=false
+  ok   readline-terminal-retirement t debounce reset=true
+  ok   readline-terminal-retirement t late reset=false
+  ok   readline-terminal-retirement t late reset=true
+  ok   readline-terminal-retirement t visible reset=false
+  ok   readline-terminal-retirement t visible reset=true
+  ok   readline-terminal-scope b ctrl owned-gui-editor
+  ok   readline-terminal-scope b ctrl-alt gnome-terminal
+  ok   readline-terminal-scope b ctrl-meta gnome-terminal
+  ok   readline-terminal-scope b ctrl-altgr gnome-terminal
+  ok   readline-terminal-scope b ctrl-shift gnome-terminal
+  ok   readline-terminal-successor dispatch late
+  ok   readline-terminal-successor dispatch visible
+
+=== whole Main retires Readline history and submitted lines ===
+  ok   readline-history-retirement p debounce reset=false
+  ok   readline-history-retirement p debounce reset=true
+  ok   readline-history-retirement p late reset=false
+  ok   readline-history-retirement p late reset=true
+  ok   readline-history-retirement p visible reset=false
+  ok   readline-history-retirement p visible reset=true
+  ok   readline-history-retirement n debounce reset=false
+  ok   readline-history-retirement n debounce reset=true
+  ok   readline-history-retirement n late reset=false
+  ok   readline-history-retirement n late reset=true
+  ok   readline-history-retirement n visible reset=false
+  ok   readline-history-retirement n visible reset=true
+  ok   readline-history-retirement j debounce reset=false
+  ok   readline-history-retirement j debounce reset=true
+  ok   readline-history-retirement j late reset=false
+  ok   readline-history-retirement j late reset=true
+  ok   readline-history-retirement j visible reset=false
+  ok   readline-history-retirement j visible reset=true
+  ok   readline-history-retirement m debounce reset=false
+  ok   readline-history-retirement m debounce reset=true
+  ok   readline-history-retirement m late reset=false
+  ok   readline-history-retirement m late reset=true
+  ok   readline-history-retirement m visible reset=false
+  ok   readline-history-retirement m visible reset=true
+  ok   readline-history-scope p ctrl owned-gui-editor
+  ok   readline-history-scope p ctrl-alt gnome-terminal
+  ok   readline-history-scope p ctrl-meta gnome-terminal
+  ok   readline-history-scope p ctrl-altgr gnome-terminal
+  ok   readline-history-scope p ctrl-shift gnome-terminal
+  ok   readline-history-successor dispatch late
+  ok   readline-history-successor dispatch visible
+
+=== whole Main retires terminal Alt word edits ===
+  ok   readline-meta-word-retirement b debounce reset=false
+  ok   readline-meta-word-retirement b debounce reset=true
+  ok   readline-meta-word-retirement b late reset=false
+  ok   readline-meta-word-retirement b late reset=true
+  ok   readline-meta-word-retirement b visible reset=false
+  ok   readline-meta-word-retirement b visible reset=true
+  ok   readline-meta-word-retirement f debounce reset=false
+  ok   readline-meta-word-retirement f debounce reset=true
+  ok   readline-meta-word-retirement f late reset=false
+  ok   readline-meta-word-retirement f late reset=true
+  ok   readline-meta-word-retirement f visible reset=false
+  ok   readline-meta-word-retirement f visible reset=true
+  ok   readline-meta-word-retirement d debounce reset=false
+  ok   readline-meta-word-retirement d debounce reset=true
+  ok   readline-meta-word-retirement d late reset=false
+  ok   readline-meta-word-retirement d late reset=true
+  ok   readline-meta-word-retirement d visible reset=false
+  ok   readline-meta-word-retirement d visible reset=true
+  ok   readline-meta-word-scope b alt owned-gui-editor
+  ok   readline-meta-word-scope b altgr gnome-terminal
+  ok   readline-meta-word-scope b meta gnome-terminal
+  ok   readline-meta-word-scope b alt-shift gnome-terminal
+  ok   readline-meta-word-successor dispatch late
+  ok   readline-meta-word-successor dispatch visible
+
+=== whole Main receives selected keypad Home conservatively ===
+  ok   keypad-home-retirement gnome-terminal debounce reset=false
+  ok   keypad-home-retirement gnome-terminal debounce reset=true
+  ok   keypad-home-retirement gnome-terminal late reset=false
+  ok   keypad-home-retirement gnome-terminal late reset=true
+  ok   keypad-home-retirement gnome-terminal visible reset=false
+  ok   keypad-home-retirement gnome-terminal visible reset=true
+  ok   keypad-home-retirement owned-gui-editor debounce reset=false
+  ok   keypad-home-retirement owned-gui-editor debounce reset=true
+  ok   keypad-home-retirement owned-gui-editor late reset=false
+  ok   keypad-home-retirement owned-gui-editor late reset=true
+  ok   keypad-home-retirement owned-gui-editor visible reset=false
+  ok   keypad-home-retirement owned-gui-editor visible reset=true
+  ok   keypad numeric text reaches actual Main onChar without acquiring Home policy
+  ok   an unclassified nil-text input leaves the unchanged Main field and offer alone
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":205}

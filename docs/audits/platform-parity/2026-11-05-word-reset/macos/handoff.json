@@ -1,0 +1,71 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"source_file_claims": 28,
+	"findings": ["WRM-001", "WRM-002"],
+	"coverage_rows": 32,
+	"native_receiving": false,
+	"actual_network_delivery": false,
+	"actual_request_serialization": true,
+	"sweeps": [
+		{
+			"label": "A",
+			"command_loop_started_at": "2026-11-05T14:29:27.774677+00:00",
+			"command_loop_completed_at": "2026-11-05T14:29:35.452742+00:00",
+			"new_roots": 0,
+			"root_discovery_basis": "Manual bounded source review, separate from green program exits",
+			"registered_cases": 145,
+			"selected_modules": 10
+		},
+		{
+			"label": "B",
+			"command_loop_started_at": "2026-11-05T14:29:57.534603+00:00",
+			"command_loop_completed_at": "2026-11-05T14:30:06.050804+00:00",
+			"new_roots": 0,
+			"root_discovery_basis": "Manual bounded source review, separate from green program exits",
+			"registered_cases": 145,
+			"selected_modules": 10
+		}
+	],
+	"final_manual_source_walk_completed_at": "2026-11-05T14:32:17.212062+00:00",
+	"manual_time_note": "Command loop receipts time executable controls only; final bounded source reread completed after those controls. New-root conclusions are manual, not inferred from exit codes.",
+	"programs": [
+		{
+			"path": "public-context.lua",
+			"sha256": "10eac2846198917acce77c58f7bf5f765958cb0bd8da31e73dc8f77a2a424878",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-word-reset-2026-11-05/macos/public-context.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/macos"
+			]
+		},
+		{
+			"path": "context-request.lua",
+			"sha256": "75bab30a9518b5088722b2aed76fd7593b2a06ff6e64e9be8ad0e28b6886f0cd",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-word-reset-2026-11-05/macos/context-request.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/macos"
+			]
+		},
+		{
+			"path": "public-edits.lua",
+			"sha256": "25588d015792cd02e8e6dfd11cd06845c266cb8c1efccd776afc14cc44583005",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-word-reset-2026-11-05/macos/public-edits.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/macos"
+			]
+		},
+		{
+			"path": "keypad-enter.lua",
+			"sha256": "758bd56cbc00fe60273a4c3babdf2e03cd5cfa6fd90eb7782e4ab22074e06bb7",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-word-reset-2026-11-05/macos/keypad-enter.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/macos"
+			]
+		}
+	],
+	"format_validation": "Python helpers formatted and checked by pinned Ruff; report/metadata formatted with repository Prettier configuration before final dry command loops.",
+	"status": "complete; root independent replays and final campaign validation pending"
+}

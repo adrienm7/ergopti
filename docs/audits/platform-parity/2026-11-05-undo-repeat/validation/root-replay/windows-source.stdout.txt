@@ -1,0 +1,102 @@
+{
+  "audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+  "basis": "exact-source authentication and lexical checks; no AHK execution, no behavioral simulation, no desktop receipt",
+  "source_receipts": [
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
+      "sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
+      "sha256": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
+      "sha256": "b1f46fb50f3ca84f6a17a9bd10a180dc42845486049afdbe9c7920c7f64e2832"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_match.ahk",
+      "sha256": "e9cf27cd2b56669a388dbae15146a462db50d482412d7393b24c8eb0ff5249b8"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_cascade.ahk",
+      "sha256": "e78d1ed3e57c2b21784f6a92b88b8f11d8d59691766b754fe15e2e3acaca313d"
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/dynamic_hotstrings/user_code.ahk",
+      "sha256": "d244ef367fe7fc4e2ee519e07a79587d0868c1cdd11d69c2765f8ef5ea8937ea"
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/dynamic_hotstrings/dynamic_hotstrings.ahk",
+      "sha256": "c2473eac43ac80812cc14dcff0d2e436143f9f6ceac082e64a9d573588f1454a"
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/hotstrings/hotstrings_text_expansion.ahk",
+      "sha256": "45a67b3854bb6362e499a9032ef73357f3c50fca1cb9a269353d022eb833d474"
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/keystats/keystats_hotstring_log.ahk",
+      "sha256": "ad7f97ae3fc93acc4331a8fc836fcfef8998c0afd51534adb2728c4aeffdba45"
+    },
+    {
+      "path": "static/ergopti_plus/windows/ui/wpm/wpm_display.ahk",
+      "sha256": "203b47646a5784b00a6c2598eee71ef68b2cab34c7ec73b4158a5137f6504055"
+    },
+    {
+      "path": "static/ergopti_plus/windows/ui/wpm/wpm_config.ahk",
+      "sha256": "210947274712ee82e21b5378cc71a29db29e1c42650b7b79afd502e941fe5446"
+    },
+    {
+      "path": "static/ergopti_plus/windows/ui/editors.ahk",
+      "sha256": "003f73f84ad8cfc92c98c5dfea4e4f163441950f22ff31ba62efc92f2d2a58e6"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/feature_state.ahk",
+      "sha256": "4fb1e47acebfe140556d66a50078461bab5ad576602ac26b6e6c320f8a475919"
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/unit/modules/hotstrings/engine/test_repeat_key_honours_rebuild_fence.ahk",
+      "sha256": "b480da1ae5497278d22958a2b9071189ab4a722a79b57297552c88ea3313746f"
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/unit/modules/hotstrings/preview/test_no_repeat_preview.ahk",
+      "sha256": "93ce420cdaef4de92adc3f63fee798c61e3e347188c83fd2b9c3c6e8aacea73b"
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/unit/modules/hotstrings/engine/test_hotstring_fire_log_privacy.ahk",
+      "sha256": "b78c44245398264b40e83487939b351f723f0773af9d94b3ef07dc6c657c97e9"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/wpm_widget/constants.toml",
+      "sha256": "5958af1049d9a196c6bb256985ba6c824355a9bfd62e97520094cbae30aa78db"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+      "sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92"
+    },
+    {
+      "path": "static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml",
+      "sha256": "45746566d2709a6508774034e60897296134168bd92ecb8b8af29a570fee9b66"
+    }
+  ],
+  "checks": {
+    "repeat_spec_marks_repeat_but_not_private": true,
+    "repeat_spec_attributes_magic_key_corrections": true,
+    "repeat_reads_resolved_tail": true,
+    "repeat_rebuild_pause_runtime_fences": true,
+    "programmable_commit_is_private_nonfinal_literal": true,
+    "literal_apply_retains_nonfinal_output": true,
+    "private_effect_clears_ai_only": true,
+    "postfire_does_not_retire_private_matcher": true,
+    "notepad_copies_raw_spec_category": true,
+    "notepad_completion_queues_category_unchanged": true,
+    "terminal_copies_raw_spec_category": true,
+    "atomic_caller_normalizes_repeat_category": true,
+    "queue_carries_explicit_private_bit": true,
+    "wpm_neutral_policy_is_explicit": true,
+    "personal_prefixes_have_final_backstop": true,
+    "public_fire_row_preserves_unredacted_trigger_and_output": true,
+    "category_reaches_live_wpm_not_durable_category_field": true,
+    "repeat_cannot_cascade": true
+  }
+}

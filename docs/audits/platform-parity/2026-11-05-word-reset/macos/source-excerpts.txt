@@ -1,0 +1,415 @@
+static/ergopti_plus/macos/modules/keymap/init.lua [1493-1527]
+1493: -- The four arrows, governed by hotstrings.arrow_resets_word whatever modifiers
+1494: -- are held with them.
+1495: -- Literal like FAST_EXIT_KEYCODES above: this table is built when the module
+1496: -- loads, and the keycode registry's LEFT_ARROW … UP_ARROW and FORWARD_DELETE
+1497: -- (the same numbers) are not part of every narrowed registry fixture.
+1498: local ARROW_KEYCODES = {
+1499: 	[123] = true,  -- Left
+1500: 	[124] = true,  -- Right
+1501: 	[125] = true,  -- Down
+1502: 	[126] = true,  -- Up
+1503: }
+1504: 
+1505: -- Forward Delete, Home, End, Page Up and Page Down: they delete text or jump to
+1506: -- a place the buffer never observed, so the next run always starts at an
+1507: -- unknown boundary. No word-reset option governs them.
+1508: local UNOBSERVED_JUMP_KEYCODES = {
+1509: 	[117] = true,  -- Forward Delete
+1510: 	[115] = true,  -- Home
+1511: 	[116] = true,  -- Page Up
+1512: 	[119] = true,  -- End
+1513: 	[121] = true,  -- Page Down
+1514: }
+1515: 
+1516: --- The kind of application that receives typing, for the empty-line rules:
+1517: --- "terminal", "browser" or "other". Read only on Return, Cmd+A and Cmd+L, never
+1518: --- on ordinary typing. An identity that cannot be read is logged and makes no
+1519: --- empty-line promise.
+1520: --- @return string kind
+1521: local function focused_input_kind()
+1522: 	local ok, bundle, name = pcall(TextSender.focusedAppIdentity)
+1523: 	if not ok then
+1524: 		Logger.error(LOG, "Focused application identity unreadable: %s.", tostring(bundle))
+1525: 		return "other"
+1526: 	end
+1527: 	if TextSender.isTerminalInputHost(bundle, name) then return "terminal" end
+static/ergopti_plus/macos/modules/keymap/init.lua [1723-1752]
+1723: 		and LLMBridge.handle_llm_keys(keyCode, flags, false) then return true end
+1724: 
+1725: 	-- Wipe the buffer after the user pauses for hotstrings.idle_reset_seconds:
+1726: 	-- the pause itself stands in for a word terminator, so the post-wipe
+1727: 	-- context starts on a fresh word boundary and word-boundary-required
+1728: 	-- triggers are allowed to fire. The rule is the shared engine's; the
+1729: 	-- seconds clock is exact enough that no resolution is taken off.
+1730: 	-- A bare Backspace is no new word: it edits the word typed before the pause,
+1731: 	-- so that word stays in the buffer for it ("ab", a pause, Backspace,
+1732: 	-- Backspace, "c★" expands). An empty buffer at a word start has nothing to
+1733: 	-- forget and keeps the empty line a terminal Return left.
+1734: 	if HotstringCore.idle_resets_word(previous_key_ms, now * 1000, CoreState.WORD_TIMEOUT_SEC, 0) then
+1735: 		local edits_word = keyCode == Keycodes.BACKSPACE
+1736: 			and not (flags.cmd or flags.ctrl or flags.alt)
+1737: 		if not edits_word and (CoreState.buffer ~= "" or not CoreState.start_is_word_boundary) then
+1738: 			CoreState.buffer = ""
+1739: 			CoreState.start_is_word_boundary = true
+1740: 			CoreState.start_is_line_start = false
+1741: 		end
+1742: 		CoreState.llm_buffer = ""
+1743: 		-- The mark describes the hotstring buffer: it goes with it, and stays while a
+1744: 		-- bare Backspace keeps the word before the pause (and so a secret in it).
+1745: 		if CoreState.buffer == "" then CoreState.llm_private_mark = "" end
+1746: 		LLMBridge.reset_predictions()
+1747: 	end
+1748: 
+1749: 	if internal_loopback then
+1750: 		-- F16 is an internal edge, never application input. A declined chain (for
+1751: 		-- example after a reset) is still consumed; only the first live delivery may
+1752: 		-- ask the engine to advance.
+static/ergopti_plus/macos/modules/keymap/init.lua [1802-1890]
+1802: 	-- Cmd/Ctrl + Backspace / Forward Delete delete an unknown amount of text and
+1803: 	-- Cmd/Ctrl + Home/End/PgUp/PgDn jump somewhere unobserved: they keep the
+1804: 	-- unconditional reset to an unknown boundary. Every other chord (cut, paste,
+1805: 	-- undo, select-all, app shortcuts, …) follows hotstrings.shortcut_resets_word:
+1806: 	-- on, the next run starts a new word; off, the buffer and the word-start
+1807: 	-- state are left exactly as they were and the word continues. The prediction
+1808: 	-- side is the same either way: a shortcut still withdraws a visible
+1809: 	-- prediction.
+1810: 	-- Cmd+A outside a terminal and Cmd+L in a browser select the whole text of
+1811: 	-- the field: once a Backspace or a character replaces it the field is empty,
+1812: 	-- and a further Backspace deletes nothing (start_is_line_start).
+1813: 	if (flags.cmd or flags.ctrl) and not ARROW_KEYCODES[keyCode] then
+1814: 		if keyCode == Keycodes.BACKSPACE or UNOBSERVED_JUMP_KEYCODES[keyCode] then
+1815: 			CoreState.buffer = ""
+1816: 			CoreState.start_is_word_boundary = false
+1817: 			CoreState.start_is_line_start = false
+1818: 		elseif CoreState.shortcut_resets_word == true then
+1819: 			CoreState.buffer = ""
+1820: 			CoreState.start_is_word_boundary = true
+1821: 			CoreState.start_is_line_start = flags.cmd == true and not flags.ctrl and not flags.alt
+1822: 				and selects_whole_field(chars)
+1823: 		end
+1824: 		cancel_action_preview_recovery()
+1825: 		LLMBridge.check_nav_reset()
+1826: 		return false
+1827: 	end
+1828: 
+1829: 	-- 6. Handle Backspace.
+1830: 	if keyCode == Keycodes.BACKSPACE then
+1831: 		-- Option+Backspace deletes the previous word: the caret now sits where
+1832: 		-- that word began, so the next character starts a word. (Cmd and Ctrl
+1833: 		-- with Backspace were handled above, at an unknown position.)
+1834: 		if flags.alt then
+1835: 			CoreState.buffer = ""
+1836: 			CoreState.start_is_word_boundary = true
+1837: 			CoreState.start_is_line_start = false
+1838: 			cancel_action_preview_recovery()
+1839: 			LLMBridge.check_nav_reset()
+1840: 			return false
+1841: 		end
+1842: 		if #CoreState.buffer > 0 then
+1843: 			-- Remove the last UTF-8 character from the buffer safely.
+1844: 			local ok, offset = pcall(utf8.offset, CoreState.buffer, -1)
+1845: 			CoreState.buffer = (ok and offset) and CoreState.buffer:sub(1, offset - 1) or ""
+1846: 			-- The Backspace that erases the last character typed since the
+1847: 			-- buffer started puts the caret back where that typing began: the
+1848: 			-- next character starts a word, as on Windows and Linux.
+1849: 			if CoreState.buffer == "" then CoreState.start_is_word_boundary = true end
+1850: 			update_preview_with_action_recovery(CoreState.buffer)
+1851: 		elseif CoreState.start_is_line_start and CoreState.start_is_word_boundary then
+1852: 			-- The start of an empty line: the Backspace deleted nothing.
+1853: 			cancel_action_preview_recovery()
+1854: 		else
+1855: 			-- Backspace pressed against an already-empty buffer: the user
+1856: 			-- has just deleted a character that lived to the LEFT of where
+1857: 			-- the buffer ever started, into territory we never observed.
+1858: 			-- Flip the boundary flag so subsequent word-boundary-required
+1859: 			-- triggers refuse to fire until a real terminator is observed.
+1860: 			CoreState.start_is_word_boundary = false
+1861: 			CoreState.start_is_line_start = false
+1862: 			cancel_action_preview_recovery()
+1863: 		end
+1864: 		return false
+1865: 	end
+1866: 
+1867: 	-- 7. Navigation. Forward Delete, Home, End, Page Up and Page Down always
+1868: 	-- empty the buffer at an unknown boundary. An arrow (with any modifier; the
+1869: 	-- Karabiner navigation layer's arrows are foreign events and arrive here the
+1870: 	-- same way) follows hotstrings.arrow_resets_word: on, the next run starts a
+1871: 	-- new word; off, the buffer and the word-start state are left untouched and
+1872: 	-- the word continues. Predictions are withdrawn in every case.
+1873: 	if UNOBSERVED_JUMP_KEYCODES[keyCode] then
+1874: 		CoreState.buffer = ""
+1875: 		CoreState.start_is_word_boundary = false
+1876: 		CoreState.start_is_line_start = false
+1877: 		cancel_action_preview_recovery()
+1878: 		LLMBridge.check_nav_reset()
+1879: 		return false
+1880: 	end
+1881: 	if ARROW_KEYCODES[keyCode] then
+1882: 		if CoreState.arrow_resets_word == true then
+1883: 			CoreState.buffer = ""
+1884: 			CoreState.start_is_word_boundary = true
+1885: 			CoreState.start_is_line_start = false
+1886: 		end
+1887: 		cancel_action_preview_recovery()
+1888: 		LLMBridge.check_nav_reset()
+1889: 		return false
+1890: 	end
+static/ergopti_plus/macos/modules/keymap/init.lua [1978-1998]
+1978: 
+1979: 	-- Enter / Tab with no predictions visible clears prediction state.
+1980: 	-- When predictions ARE visible, Tab is consumed upstream by handle_llm_keys
+1981: 	-- (fast-accepts pred #1) and never reaches this point.
+1982: 	if keyCode == Keycodes.RETURN or keyCode == 48 then
+1983: 		cancel_action_preview_recovery()
+1984: 		LLMBridge.check_nav_reset()
+1985: 	end
+1986: 
+1987: 	-- A bare Return in a terminal submits the line: the prompt that follows is
+1988: 	-- empty and a Backspace there deletes nothing. Shift+Return inserts a
+1989: 	-- newline in the multi-line TUIs and keeps no such promise.
+1990: 	if keyCode == Keycodes.RETURN and not (flags.shift or flags.alt or flags.cmd or flags.ctrl)
+1991: 		and focused_input_kind() == "terminal" then
+1992: 		CoreState.buffer = ""
+1993: 		CoreState.start_is_word_boundary = true
+1994: 		CoreState.start_is_line_start = true
+1995: 	end
+1996: 
+1997: 	return false
+1998: end
+static/ergopti_plus/macos/modules/keymap/llm_bridge.lua [78-86]
+78: 	[22] = 6, [26] = 7, [28] = 8, [25] = 9, [29] = 10,
+79: }
+80: 
+81: local KEYCODE_ESCAPE    = Keycodes.ESCAPE   -- Escape key consumed by the dynamic escape trap
+82: local KEYCODE_RETURN    = Keycodes.RETURN   -- Main Return key (accepts the active prediction)
+83: local KEYCODE_ENTER     = 76   -- Numpad Enter (same behaviour as Return)
+84: local KEYCODE_TAB       = 48   -- Tab: accepts the highlighted prediction and stops all streaming
+85: local EMPTY_MODIFIERS   = {}   -- Submit keys are owned only as bare physical keys.
+86: 
+static/ergopti_plus/macos/modules/keymap/llm_bridge.lua [749-763]
+749: ---   3. If a match is found → show the hotstring tooltip (and optionally chain LLM).
+750: ---   4. Otherwise → reset predictions and arm the inactivity timer.
+751: ---
+752: --- @param buf string The current typed buffer.
+753: local function update_preview_body(buf)
+754: 	if not require_state("update_preview") then return end
+755: 	-- This is the sole observation seam for physical text. Hotstring matching owns
+756: 	-- `_state.buffer`; LLM prompting owns this separate context so navigation can
+757: 	-- revoke cursor-relative actions without defeating the user's keep-context
+758: 	-- preference.
+759: 	local ai_context = buf
+760: 	if type(buf) == "string" then ai_context = ai_context_of(buf) end
+761: 	_state.llm_buffer = ai_context
+762: 	-- The agent's automatic mode waits for a pause in the typing: every
+763: 	-- keystroke drops what it had in flight and re-arms its own timer
+static/ergopti_plus/macos/modules/keymap/llm_bridge.lua [1890-1902]
+1890: 		return true
+1891: 	end
+1892: 
+1893: 	-- Return / Enter accepts the currently highlighted prediction.
+1894: 	if (keyCode == KEYCODE_RETURN or keyCode == KEYCODE_ENTER)
+1895: 		and core_llm.check_modifiers(flags, EMPTY_MODIFIERS) then
+1896: 		local idx = engine.get_current_index() or 1
+1897: 		Logger.debug(LOG, "Return — accepting prediction #%d.", idx)
+1898: 		if not M.apply_prediction(idx) then M.reset_predictions() end
+1899: 		return true
+1900: 	end
+1901: 
+1902: 	-- The exact validation chord plus digit N selects prediction N (bare digits
+static/ergopti_plus/macos/modules/keymap/llm_bridge.lua [1951-1966]
+1951: end
+1952: 
+1953: --- Handles navigation keys (arrows, Enter, mouse) outside prediction mode.
+1954: --- Cursor-relative hotstring eligibility is always revoked by the caller. The
+1955: --- preference controls only whether the separate LLM prompt context is retained.
+1956: function M.check_nav_reset()
+1957: 	if not require_state("check_nav_reset") then return end
+1958: 
+1959: 	local retained = ContextBuffer.retained_after_navigation(_state.llm_buffer, reset_buffer_on_navigation == true)
+1960: 	if retained ~= _state.llm_buffer then
+1961: 		Logger.debug(LOG, "LLM context cleared on navigation.")
+1962: 		_state.llm_buffer = retained
+1963: 	end
+1964: 	M.reset_predictions()
+1965: end
+1966: 
+static/ergopti_plus/_shared/lua/llm/context_buffer.lua [1-26]
+1: --- _shared/lua/llm/context_buffer.lua
+2: 
+3: --- ==============================================================================
+4: --- MODULE: AI Context Buffer — Shared Lua Implementation
+5: --- DESCRIPTION:
+6: --- The text the prediction engine completes: a rolling window of what the user
+7: --- typed, kept apart from the hotstring matcher's word buffer so the two have
+8: --- their own lifetimes. macOS keeps the same text in its `llm_buffer`; Linux
+9: --- feeds this object from the hotstring engine's edits. Both drivers decide
+10: --- what a navigation or Escape does to it through the same rule, pinned by
+11: --- _shared/tests/corpus/llm/context_buffer_vectors.json.
+12: ---
+13: --- FEATURES & RATIONALE:
+14: --- 1. The hotstring buffer forgets a word on many events (a pause, an arrow,
+15: ---    a click, a shortcut) because a trigger must never fire against text the
+16: ---    caret has left. The AI context has a different question: should the
+17: ---    sentence be sent to the model after the caret moved? That is the
+18: ---    `llm.generation.reset_on_nav` preference, nothing else.
+19: --- 2. Edits mirror the engine's: typed text is appended, a Backspace drops the
+20: ---    last codepoint, and an expansion deletes its trigger and appends what
+21: ---    was really produced, so the context is the text actually in the field.
+22: --- 3. The window is counted in codepoints and cut at a codepoint boundary,
+23: ---    wide enough for the largest `llm.generation.context_length` the prompt
+24: ---    builder will ever use.
+25: --- 4. Strict input: a non-string text or a malformed count is a caller bug and
+26: ---    raises, so the context can never silently drift from the field.
+static/ergopti_plus/_shared/lua/llm/context_buffer.lua [54-66]
+54: -- =============================================
+55: 
+56: --- What a navigation (arrow, Enter, click) or Escape leaves of the context.
+57: --- @param text string The context before the event.
+58: --- @param reset_on_nav boolean The `llm.generation.reset_on_nav` preference.
+59: --- @return string text The context after the event.
+60: function M.retained_after_navigation(text, reset_on_nav)
+61: 	if type(text) ~= "string" then error("context text must be a string", 2) end
+62: 	if type(reset_on_nav) ~= "boolean" then error("reset_on_nav must be a boolean", 2) end
+63: 	if reset_on_nav then return "" end
+64: 	return text
+65: end
+66: 
+static/ergopti_plus/_shared/modules/features/manifest.toml [535-609]
+535: # Backspace that erases the last character typed since the word started puts
+536: # the caret back at a word start (« ab », Backspace, Backspace, « c★ »
+537: # expands), a correction that leaves letters keeps the word, and a Backspace
+538: # right after the pause still edits the word typed before it. A Backspace
+539: # past the buffer's start makes the start unknown, except on an empty line: a
+540: # terminal prompt after a bare Enter, a field whose whole text Ctrl+A (Cmd+A)
+541: # or a browser's Ctrl+L (Cmd+L) selected, where it deletes nothing.
+542: [[features.hotstrings]]
+543: id = "idle_reset_seconds"
+544: requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
+545: default = 3
+546: recommended = 3
+547: family = "setting"
+548: type = "number"
+549: preset_values = [0, 1, 2, 3, 5, 10]
+550: description_key = "menu.hotstrings.idle_reset"
+551: 
+552: # Whether a mouse click (or a touch with tap-to-click) starts a new word. Off,
+553: # the click still empties the buffer (the caret moved somewhere unknown) but
+554: # the next run is treated as the middle of a word, so word-start hotstrings
+555: # wait for a delimiter.
+556: [[features.hotstrings]]
+557: id = "click_resets_word"
+558: requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
+559: default = true
+560: recommended = true
+561: family = "setting"
+562: type = "boolean"
+563: description_key = "menu.hotstrings.click_resets_word"
+564: 
+565: # Whether an arrow key starts a new word, whatever modifier is held with it and
+566: # wherever it comes from: the keyboard, or a key the driver itself sends (the
+567: # navigation layer, a remap, a tap-hold, a gesture). Off, the word in progress
+568: # survives the caret move; the other navigation keys (Home, End, Page Up, Page
+569: # Down, Insert, Delete) still forget it, since they move by an unknown amount.
+570: [[features.hotstrings]]
+571: id = "arrow_resets_word"
+572: requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
+573: default = true
+574: recommended = true
+575: family = "setting"
+576: type = "boolean"
+577: description_key = "menu.hotstrings.arrow_resets_word"
+578: 
+579: # Whether a shortcut starts a new word: a key struck with Ctrl, Alt or Win held
+580: # (Cmd or Ctrl on macOS, where Option types characters), Shift added or not.
+581: # AltGr and Shift alone are typing. Off, Ctrl+V or Ctrl+Z leave the word in
+582: # progress open. Ctrl+Backspace (Option+Backspace on macOS) deletes the
+583: # previous word and always starts a new one; its siblings (Alt+Backspace,
+584: # Cmd+Backspace) delete text by an unknown amount and forget the word either
+585: # way.
+586: [[features.hotstrings]]
+587: id = "shortcut_resets_word"
+588: requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
+589: default = true
+590: recommended = true
+591: family = "setting"
+592: type = "boolean"
+593: description_key = "menu.hotstrings.shortcut_resets_word"
+594: 
+595: # Whether a tap-hold key's own output starts a new word: the action of its tap
+596: # (copy, paste, a window switch…) and every shortcut struck under its held
+597: # modifier or layer. A tap that types its key (Space, Enter, Tab, Backspace…)
+598: # keeps that key's effect, a Shift or AltGr hold is typing, and an arrow from
+599: # the navigation layer follows arrow_resets_word. Not on macOS: Karabiner-
+600: # Elements runs the tap-holds there and its output reaches the driver as the
+601: # keyboard's own keys, so a shortcut it sends follows shortcut_resets_word.
+602: [[features.hotstrings]]
+603: id = "tap_hold_resets_word"
+604: platforms = ["ahk", "linux"]
+605: requires = { linux = ["evdev", "uinput"], windows = [] }
+606: default = true
+607: recommended = true
+608: family = "setting"
+609: type = "boolean"
+static/ergopti_plus/_shared/modules/features/manifest.toml [1575-1584]
+1575: 
+1576: [[features.llm.generation]]
+1577: id = "reset_on_nav"
+1578: requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
+1579: default = true
+1580: recommended = true
+1581: family = "setting"
+1582: type = "boolean"
+1583: description_key = "menu.llm.generation.reset_on_nav"
+1584: 
+static/ergopti_plus/macos/_generated/hid_key_identity.lua [100-107]
+100: 			[84] = { code = "NumpadDivide", kc = 75 },
+101: 			[85] = { code = "NumpadMultiply", kc = 67 },
+102: 			[86] = { code = "NumpadSubtract", kc = 78 },
+103: 			[87] = { code = "NumpadAdd", kc = 69 },
+104: 			[88] = { code = "NumpadEnter", kc = 76 },
+105: 			[89] = { code = "Numpad1", kc = 83 },
+106: 			[90] = { code = "Numpad2", kc = 84 },
+107: 			[91] = { code = "Numpad3", kc = 85 },
+static/ergopti_plus/linux/modules/hotstrings/word_reset.lua [529-553]
+529: --- @param detail table|nil As for control_owner().
+530: --- @param app_id string|nil Focused application id.
+531: --- @return string effect "word_start", "unknown" or "kept".
+532: function M.apply_control(engine, key_name, detail, app_id)
+533: 	-- A Backspace under a modifier removes text by an unknown amount: the AI
+534: 	-- context no longer describes the field and is forgotten by the reset. Every
+535: 	-- other control key is a navigation, which the AI context treats by its own
+536: 	-- preference whatever the word-reset options decide for the hotstring buffer.
+537: 	local ai_effect = key_name ~= "backspace" and "navigation" or nil
+538: 	if key_name == "backspace" and M.deletes_previous_word(detail) then
+539: 		engine:reset(true)
+540: 		return "word_start"
+541: 	end
+542: 	local owner = M.control_owner(key_name, detail)
+543: 	if owner ~= nil and not M.current()[owner .. "_resets_word"] then
+544: 		-- The word is kept, the caret still moved.
+545: 		if ai_effect then engine:navigated() end
+546: 		return "kept"
+547: 	end
+548: 	local at_word_start = owner ~= nil or key_name == "escape"
+549: 	engine:reset(at_word_start, owner ~= nil and key_name == "shortcut" and selects_whole_field(detail, app_id),
+550: 		ai_effect)
+551: 	return at_word_start and "word_start" or "unknown"
+552: end
+553: 
+static/ergopti_plus/linux/modules/hotstrings/engine.lua [110-124]
+110: 	--- @param ai_effect string|nil "keep" when the AI context is not affected (an
+111: 	---   expansion already mirrored by apply_expansion or replaced(), an accepted
+112: 	---   prediction), "navigation" when the reset is a caret move the AI context
+113: 	---   treats by `llm.generation.reset_on_nav`; omitted forgets it.
+114: 	function engine:reset(at_boundary, at_line_start, ai_effect)
+115: 		shared_reset(self, at_boundary, at_line_start)
+116: 		if not ai_context then return end
+117: 		if ai_effect == "navigation" then
+118: 			ai_context:navigated()
+119: 		elseif ai_effect ~= "keep" then
+120: 			ai_context:reset()
+121: 		end
+122: 	end
+123: 
+124: 	-- reset_after_pause() resets through engine.reset, so a pause forgets the AI

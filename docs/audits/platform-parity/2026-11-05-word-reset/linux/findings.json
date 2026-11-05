@@ -1,0 +1,34 @@
+{
+	"schema_version": 1,
+	"scope": "linux-word-reset",
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/platform-parity/2026-11-05-word-reset/linux/report.md",
+	"findings": [
+		{
+			"id": "WRSL-001",
+			"title": "Synthetic action arrows bypass the governing arrow and context policy",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["governing_arrow_ownership", "ai_context_navigation_publication"],
+			"reproduction": "Run continuity-probe.lua against the audited tree. Catalogue arrow_left with arrow reset and AI navigation reset enabled emits acknowledged 105 DOWN/UP through the real Manager/Emitter/Writer/Broker, yet keeps the word and AI context ab; the following physical c produces abc and Main passes abc to its predictor receiver. An actual own tap arrow with arrow reset off and tap reset on resets the word to c; the inverse settings keep abc. Physical-arrow controls independently exercise the enabled word and AI reset effects.",
+			"root_cause": "Two explicitly separate action-origin submechanisms share the absence of canonical arrow semantic effect publication. (A) Public catalogue _execute_action sends its generated combo through ComboEmitter/Writer with no WordReset/engine notification; Main gestures.init supplies no such observer and synthetic output is deliberately excluded from keyboard input. (B) Main own tap-action callback invokes generic WordReset.apply_tap_action(engine,binding), classifying every catalogue action by tap_hold_resets_word and discarding whether its effect is an arrow. Physical control_owner correctly gives arrows precedence. Shared manifest explicitly requires arrow_resets_word regardless of source.",
+			"silent_failure": "Native output succeeds. No diagnostic names the missing/wrong logical reset effect or ignored governing setting. Separately green physical-word-reset and emitter-order tests do not join these action origins to their canonical semantic owner.",
+			"regression_test": "Cover both independent admission paths: public catalogue arrow dispatch and actual TapHoldEngine own arrow actions through Main, using the real engine/context and Writer acknowledgments. Cover all four arrows, modifiers, arrow/tap/AI settings on and off, the next typed key and predictor context, native refusal and lifecycle/privacy guards. Preserve self-synthetic filtering. A fix in one caller must not close the sibling path.",
+			"evidence": [
+				"continuity-probe.lua:catalogue_arrow_does_not_reset,tap_arrow_off_tap_reset_on,tap_arrow_on_tap_reset_off",
+				"final-A-luajit-owner.txt",
+				"final-A-lua-owner.txt",
+				"final-B-luajit-owner.txt",
+				"final-B-lua-owner.txt",
+				"static/ergopti_plus/_shared/modules/features/manifest.toml:561-565",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua:1047-1056,2743-2747",
+				"static/ergopti_plus/linux/modules/hotstrings/word_reset.lua:518-527,572-590",
+				"static/ergopti_plus/linux/modules/gestures/manager.lua:740-757,1934-1939",
+				"static/ergopti_plus/linux/modules/hotstrings/device_finder.lua:267-271"
+			],
+			"basis": "Actual production reader/hook, Main closures, WordReset, engine/context, public action manager, combo emitter, Writer and ModifierBroker over recording native syscall/XKB/accessibility/preference ports. Public action and own tap-arrow issuance acknowledged; no physical gesture acquisition, real editor caret/text receipt or model request."
+		}
+	]
+}

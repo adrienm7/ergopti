@@ -1,0 +1,9 @@
+{
+	"exit_code": 1,
+	"command": ["npm", "run", "test:linux:updater-archive-native"],
+	"parameters": {
+		"ERGOPTI_MANAGED_NATIVE_MODERN_CURL": "/usr/bin/curl",
+		"ERGOPTI_MANAGED_NATIVE_MODERN_SHA256": "52e9ceef96bd7c7dd4c2c9d8ac4c5f466c563dc0d16817720518b430da7a94b7"
+	},
+	"qualification": "Independent selected gate over the same frozen staged working snapshot, using actual system curl8.14.1 and its observed binary SHA. Not a desktop receiving test."
+}

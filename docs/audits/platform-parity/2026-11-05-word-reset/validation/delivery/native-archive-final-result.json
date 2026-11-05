@@ -1,0 +1,6 @@
+{
+	"command": ["npm", "run", "test:linux:updater-archive-native"],
+	"source_head": "07299374d0176f33188d7fe42c935fe99f92c513",
+	"exit_code": 0,
+	"qualification": "Native archive receiving and cleanup, not native keyboard input."
+}

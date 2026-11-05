@@ -1,0 +1,286 @@
+{
+  "locales": [
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/ar.json",
+      "previous_sha256": "971e79738b453e6fdec24e275347366c5595ca1ba126c835ebec7445997f9522",
+      "current_sha256": "8fad378966bd4980f4e4982ff10b3284a36a920a1e80d82e21170ae1256c2e72",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "نافذة تفعيل التكرار بالمفتاح السحري",
+        "inventory.behavior.repeat_window_macos": "يستخدم نافذة التفعيل الفعلية للمفتاح السحري، بما فيها قواعد التوقيت لمفاتيح التعديل؛ الصفر يعطل هذه النافذة. بدء كلمة جديدة بعد الخمول قاعدة مستقلة.",
+        "inventory.behavior.repeat_window_untimed": "لا توجد نافذة تفعيل مستقلة للتكرار الاحتياطي؛ بدء كلمة جديدة بعد الخمول قاعدة مستقلة."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/cs.json",
+      "previous_sha256": "c6491001a10f70473f7fbded9692c611aab3422b9a27b34e058cf226695310f4",
+      "current_sha256": "a3e2dd8782d71ed1b4a70a960e77fe3633a2af6ae4f25cd1b64ebea10b0bfcfd",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "Aktivační okno opakování magickou klávesou",
+        "inventory.behavior.repeat_window_macos": "Používá platné aktivační okno magické klávesy včetně časových pravidel modifikátorů; nula toto okno vypíná. Začátek nového slova po nečinnosti je nezávislý.",
+        "inventory.behavior.repeat_window_untimed": "Záložní opakování nemá samostatné aktivační okno; začátek nového slova po nečinnosti je nezávislý."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/da.json",
+      "previous_sha256": "afa4ad154ac5c53a9f26965a80f40c722fae25fb558113c95d769fc241997597",
+      "current_sha256": "6f7d53870f42dfe0de3157835c9360120936823ff9a345afc3898daf40ecee49",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "Aktiveringsvindue for gentagelse med den magiske tast",
+        "inventory.behavior.repeat_window_macos": "Bruger den magiske tasts gældende aktiveringsvindue med tidsregler for modifikatortaster; nul deaktiverer dette vindue. En ny ordstart efter inaktivitet er uafhængig.",
+        "inventory.behavior.repeat_window_untimed": "Intet særskilt aktiveringsvindue for reservegentagelsen; en ny ordstart efter inaktivitet er uafhængig."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/de.json",
+      "previous_sha256": "4d1342d343862310c87d88dc6a9d5ae6422e2f1521408afc87ef677d25676974",
+      "current_sha256": "9f9461f5a0851ed10c9dfadeab90a48e3739692e8d3a25b1cb5c3535177bafbc",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "Aktivierungszeitfenster für die Wiederholung per magischer Taste",
+        "inventory.behavior.repeat_window_macos": "Verwendet das wirksame Aktivierungszeitfenster der magischen Taste einschließlich der Zeitregeln für Zusatztasten; null deaktiviert dieses Fenster. Der Wortneustart nach einer Pause ist unabhängig.",
+        "inventory.behavior.repeat_window_untimed": "Kein eigenes Aktivierungszeitfenster für die Ersatzwiederholung; der Wortneustart nach einer Pause ist unabhängig."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/en.json",
+      "previous_sha256": "d5a9fe7ab967aaf23254070764c0c44a2a0e01977a6290c5288b1e2f0dbbf9af",
+      "current_sha256": "750425bc132f156baa8e7fbc2db1e4ccb331a47c565972822955c0547c47c196",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "Magic-key repeat activation window",
+        "inventory.behavior.repeat_window_macos": "Uses the effective magic-key activation window, including modifier timing rules; zero disables this window. Idle word reset is independent.",
+        "inventory.behavior.repeat_window_untimed": "No separate activation window for fallback repetition; idle word reset is independent."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/es.json",
+      "previous_sha256": "436ba2446af5154fc0f6ed5ec7ae0fa1d71b03814eca71daec0fbc7c2bf6828d",
+      "current_sha256": "9df0c3b132d4158475f865283f30ce65aa6a9d9b5a439ba3c63099d0d587c8d0",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "Ventana de activación de la repetición con la tecla mágica",
+        "inventory.behavior.repeat_window_macos": "Usa la ventana efectiva de la tecla mágica, incluidas las reglas de tiempo de los modificadores; cero desactiva esta ventana. El reinicio de palabra por inactividad es independiente.",
+        "inventory.behavior.repeat_window_untimed": "La repetición de respaldo no tiene una ventana de activación propia; el reinicio de palabra por inactividad es independiente."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/fr.json",
+      "previous_sha256": "35d9710f71afab29b7d3b75607c7107f947b970c26e6e517653ee24bfac27709",
+      "current_sha256": "a2be5769ea4a97a358ca6c60e2334c4b9be5d92f2932cc6d7709f030fe2a150a",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "Délai d’activation de la répétition par touche magique",
+        "inventory.behavior.repeat_window_macos": "Utilise le délai effectif de la touche magique, avec les règles de temporisation des modificateurs ; zéro désactive ce délai. Le début d’un nouveau mot après une pause est indépendant.",
+        "inventory.behavior.repeat_window_untimed": "Aucun délai d’activation propre à la répétition de secours ; le début d’un nouveau mot après une pause est indépendant."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/he.json",
+      "previous_sha256": "5d448305303bd9728d95b0193ff116b96d818b70845898ff2785877941329c58",
+      "current_sha256": "0e1b74543eab765748aef1c86929e7b63d7df8edc8aef85a7121217d545e828b",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "חלון הפעלה לחזרה במקש הקסם",
+        "inventory.behavior.repeat_window_macos": "משתמש בחלון ההפעלה התקף של מקש הקסם, כולל כללי התזמון למקשי שינוי; אפס מבטל חלון זה. התחלת מילה חדשה לאחר חוסר פעילות היא כלל נפרד.",
+        "inventory.behavior.repeat_window_untimed": "אין חלון הפעלה נפרד לחזרת הגיבוי; התחלת מילה חדשה לאחר חוסר פעילות היא כלל נפרד."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/hi.json",
+      "previous_sha256": "9e65e41874f8cc35e0d1f314db593b4d7c00d2cc6833132ca1f68715029acd4d",
+      "current_sha256": "2e261f8206cfa17923d045b01f899acc8550aa437494e7783d3c53b391915b23",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "मैजिक कुंजी दोहराव की सक्रियण समय-सीमा",
+        "inventory.behavior.repeat_window_macos": "संशोधक कुंजियों के समय नियमों सहित मैजिक कुंजी की प्रभावी सक्रियण समय-सीमा का उपयोग करता है; शून्य इस सीमा को बंद करता है। निष्क्रियता के बाद नया शब्द शुरू करने का नियम स्वतंत्र है।",
+        "inventory.behavior.repeat_window_untimed": "वैकल्पिक दोहराव की अलग सक्रियण समय-सीमा नहीं है; निष्क्रियता के बाद नया शब्द शुरू करने का नियम स्वतंत्र है।"
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/it.json",
+      "previous_sha256": "f3c260b852970e374f6b2ac8eee59498627b42a7b93472dd77e2418feca98ae1",
+      "current_sha256": "355dfa41cfd31bc7c6d2cf71c4deb302ea687c03f2bafc700368aecd262b3bca",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "Finestra di attivazione della ripetizione con il tasto magico",
+        "inventory.behavior.repeat_window_macos": "Usa la finestra effettiva del tasto magico, incluse le regole temporali dei modificatori; zero disattiva questa finestra. Il riavvio della parola dopo una pausa è indipendente.",
+        "inventory.behavior.repeat_window_untimed": "Nessuna finestra di attivazione separata per la ripetizione di riserva; il riavvio della parola dopo una pausa è indipendente."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/ja.json",
+      "previous_sha256": "b1358c4f30f8c3eae06bbdc24fa137cb7bc1dbdbb16a42d4692becb33913918f",
+      "current_sha256": "24339ab31789883b12e5246e284b0ca4c9b567f2f7080b2298f4b73c6c900d2c",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "魔法キー繰り返しの有効時間枠",
+        "inventory.behavior.repeat_window_macos": "修飾キーの時間ルールを含め、魔法キーに現在適用される有効時間枠を使います。ゼロでこの時間枠を無効にします。無操作後の単語リセットは別のルールです。",
+        "inventory.behavior.repeat_window_untimed": "フォールバックの繰り返しに独立した有効時間枠はありません。無操作後の単語リセットは別のルールです。"
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/ko.json",
+      "previous_sha256": "38e129fda097bc60b005a58f5f79d38b9d05fab405e70e4c68280dc59dd11a66",
+      "current_sha256": "e85a6df6ef0978aee9f61261482c57304028790859ff29397110ea60c979bb08",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "매직 키 반복의 활성화 시간 창",
+        "inventory.behavior.repeat_window_macos": "보조 키의 시간 규칙을 포함한 현재 매직 키 활성화 시간 창을 사용합니다. 0은 이 시간 창을 비활성화합니다. 유휴 후 단어 초기화는 별도 규칙입니다.",
+        "inventory.behavior.repeat_window_untimed": "대체 반복에는 별도의 활성화 시간 창이 없습니다. 유휴 후 단어 초기화는 별도 규칙입니다."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/nl.json",
+      "previous_sha256": "fe172fb9cae8ba5163aa2ba10a6c15b8134d41b229527097450b70b589607b98",
+      "current_sha256": "4bfaa6b7c70ce7bd876659ebe5c728c26e559a3bbc4c7ebb89f703ee04ecfc54",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "Activeringsvenster voor herhalen met de magische toets",
+        "inventory.behavior.repeat_window_macos": "Gebruikt het geldende activeringsvenster van de magische toets, inclusief tijdregels voor modificatietoetsen; nul schakelt dit venster uit. Een nieuw woord na een pauze staat hier los van.",
+        "inventory.behavior.repeat_window_untimed": "Geen afzonderlijk activeringsvenster voor de terugvalherhaling; een nieuw woord na een pauze staat hier los van."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/no.json",
+      "previous_sha256": "c6ec804378c7931717cd99bbb5dc2f47447761d4745badecbe2e2fc9267c32d7",
+      "current_sha256": "ebc07222f88986e62c0129156788951622723e15ec0860c23e201eb72bd730d3",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "Aktiveringsvindu for gjentakelse med den magiske tasten",
+        "inventory.behavior.repeat_window_macos": "Bruker den magiske tastens gjeldende aktiveringsvindu, inkludert tidsregler for modifikasjonstaster; null deaktiverer dette vinduet. Ny ordstart etter inaktivitet er uavhengig.",
+        "inventory.behavior.repeat_window_untimed": "Ingen egen aktiveringsperiode for reservegjentakelsen; ny ordstart etter inaktivitet er uavhengig."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/pl.json",
+      "previous_sha256": "ffc711504ed1bdf221360ee2763608f2a30a42f9d4a12b3e119af62c9515cd98",
+      "current_sha256": "be7570add9ce0aaa06f0c4bbbccac96ab5e1e7b55ee95a1ce3249e9eaf3ddf78",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "Okno aktywacji powtarzania magicznym klawiszem",
+        "inventory.behavior.repeat_window_macos": "Używa obowiązującego okna aktywacji magicznego klawisza, wraz z regułami czasowymi modyfikatorów; zero wyłącza to okno. Rozpoczęcie nowego słowa po bezczynności jest niezależne.",
+        "inventory.behavior.repeat_window_untimed": "Powtarzanie awaryjne nie ma osobnego okna aktywacji; rozpoczęcie nowego słowa po bezczynności jest niezależne."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/pt.json",
+      "previous_sha256": "880b684d04fb0aa661ac8193c55e4b86fd0de075332164d79ff97a1427665c99",
+      "current_sha256": "7f12011d58218a2dc4b486c92aa64685e85ca5f1ec32193d6520cfd5d92967e9",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "Janela de ativação da repetição pela tecla mágica",
+        "inventory.behavior.repeat_window_macos": "Usa a janela efetiva da tecla mágica, incluindo as regras de tempo dos modificadores; zero desativa esta janela. O reinício de palavra por inatividade é independente.",
+        "inventory.behavior.repeat_window_untimed": "A repetição de recurso não tem uma janela de ativação própria; o reinício de palavra por inatividade é independente."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/ru.json",
+      "previous_sha256": "8d6066aaf6a7faefcb6dfd6875810544068cfe4155e608ae7c7026812aa78ed8",
+      "current_sha256": "8d445586e1653f68abd565dc56cf33b96f9586787bee37cdb56b837789d1fff1",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "Окно активации повтора магической клавишей",
+        "inventory.behavior.repeat_window_macos": "Используется действующее окно активации магической клавиши с правилами времени для модификаторов; ноль отключает это окно. Начало нового слова после паузы независимо.",
+        "inventory.behavior.repeat_window_untimed": "У резервного повтора нет отдельного окна активации; начало нового слова после паузы независимо."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/sv.json",
+      "previous_sha256": "4940c67c268cf71803d988c368054f38331574c18b76cfbb5ad24fc0557259c3",
+      "current_sha256": "0ec292589efb5a9914d3d6918aacd25fb8009b06432f3d7fe798739776600607",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "Aktiveringsfönster för upprepning med den magiska tangenten",
+        "inventory.behavior.repeat_window_macos": "Använder den magiska tangentens gällande aktiveringsfönster, inklusive tidsregler för modifierare; noll stänger av detta fönster. Ordstart efter inaktivitet är oberoende.",
+        "inventory.behavior.repeat_window_untimed": "Inget separat aktiveringsfönster för reservupprepningen; ordstart efter inaktivitet är oberoende."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/tr.json",
+      "previous_sha256": "a9d9a991fcb248d0cc19855b477602bcd3e623fbc3819dcb9f7a8268c67e40dd",
+      "current_sha256": "758a6934543171e6a500acb77fc362a00ec266a28b89a95ce823817dfc2c6bb0",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "Sihirli tuşla yineleme etkinleştirme penceresi",
+        "inventory.behavior.repeat_window_macos": "Değiştirici tuşların zaman kuralları dahil sihirli tuşun geçerli etkinleştirme penceresini kullanır; sıfır bu pencereyi devre dışı bırakır. Boşta kalma sonrası sözcük sıfırlama bağımsızdır.",
+        "inventory.behavior.repeat_window_untimed": "Yedek yinelemenin ayrı bir etkinleştirme penceresi yoktur; boşta kalma sonrası sözcük sıfırlama bağımsızdır."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/uk.json",
+      "previous_sha256": "33d811ed3a7b242ba7cfa9956b4952a5677f06ca49910cd5d29bba3830a3a067",
+      "current_sha256": "02465bcaefe1a5b973de62137347aee898e69e33d7f0b6fdfb517fdce08e75b1",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "Вікно активації повторення магічною клавішею",
+        "inventory.behavior.repeat_window_macos": "Використовується чинне вікно активації магічної клавіші з часовими правилами модифікаторів; нуль вимикає це вікно. Початок нового слова після паузи є незалежним.",
+        "inventory.behavior.repeat_window_untimed": "Резервне повторення не має окремого вікна активації; початок нового слова після паузи є незалежним."
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/data/locales/zh.json",
+      "previous_sha256": "7cb635e751c63b75e5aac433ef5d28cc2ff39a44fc5b743bcfcf985966bf1502",
+      "current_sha256": "0d11ca3f442a3ae34994cbc2043a348f2dcc726be774730968f1dfe9c2823c50",
+      "added": {
+        "inventory.behavior.repeat_activation_window": "魔法键重复的激活时间窗口",
+        "inventory.behavior.repeat_window_macos": "使用魔法键当前生效的激活时间窗口，包括修饰键的计时规则；设为零可禁用此窗口。空闲后重新开始词语的规则独立生效。",
+        "inventory.behavior.repeat_window_untimed": "后备重复功能没有独立的激活时间窗口；空闲后重新开始词语的规则独立生效。"
+      },
+      "removed": [],
+      "changed_existing": [],
+      "prior_bytes_reconstructed_from_current_by_removing_three_keys": true
+    }
+  ],
+  "all_previous_catalogue_metadata_and_behavior_rows_unchanged": true,
+  "generated_previous_rows_unchanged": true,
+  "new_row": "hotstrings.repeat_activation_window",
+  "declared": {
+    "windows": false,
+    "macos": true,
+    "linux": false
+  },
+  "source_owners_reused": true
+}

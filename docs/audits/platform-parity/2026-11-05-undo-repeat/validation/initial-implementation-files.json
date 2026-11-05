@@ -1,0 +1,134 @@
+[
+	{
+		"path": ".prettierignore",
+		"sha256": "dc106acc0c67064c859c9842ce1e0c4e19e65468136682ff5b6b61047fcf749c"
+	},
+	{
+		"path": "README.md",
+		"sha256": "83ab9da13763a517b16dd42a54562c4bc80e9df89445e58ac1e9660cc4d25298"
+	},
+	{
+		"path": "docs/behavior-inventory.md",
+		"sha256": "68877141049d32cc1491f4896d84dbe3fd0844ea336f57a4bb573980086feeae"
+	},
+	{
+		"path": "src/routes/ergopti-plus/Platforms.svelte",
+		"sha256": "ddd352dff1758ddabda233bf02e1ff560ecf6e27911d1051f40b1093ee181fd4"
+	},
+	{
+		"path": "src/routes/ergopti-plus/behavior-inventory.json",
+		"sha256": "1352ea8b7fbb50c53925d9cc633f9ce83afc7f38e94465927d1e63e40eddec2e"
+	},
+	{
+		"path": "src/routes/ergopti-plus/locales/en.js",
+		"sha256": "27d06ac4cef771985577e902db6e0e3f6386c9c07919149fc7b01c80f4f0ecdb"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/ar.json",
+		"sha256": "971e79738b453e6fdec24e275347366c5595ca1ba126c835ebec7445997f9522"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/cs.json",
+		"sha256": "c6491001a10f70473f7fbded9692c611aab3422b9a27b34e058cf226695310f4"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/da.json",
+		"sha256": "afa4ad154ac5c53a9f26965a80f40c722fae25fb558113c95d769fc241997597"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/de.json",
+		"sha256": "4d1342d343862310c87d88dc6a9d5ae6422e2f1521408afc87ef677d25676974"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/en.json",
+		"sha256": "d5a9fe7ab967aaf23254070764c0c44a2a0e01977a6290c5288b1e2f0dbbf9af"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/es.json",
+		"sha256": "436ba2446af5154fc0f6ed5ec7ae0fa1d71b03814eca71daec0fbc7c2bf6828d"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/fr.json",
+		"sha256": "35d9710f71afab29b7d3b75607c7107f947b970c26e6e517653ee24bfac27709"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/he.json",
+		"sha256": "5d448305303bd9728d95b0193ff116b96d818b70845898ff2785877941329c58"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/hi.json",
+		"sha256": "9e65e41874f8cc35e0d1f314db593b4d7c00d2cc6833132ca1f68715029acd4d"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/it.json",
+		"sha256": "f3c260b852970e374f6b2ac8eee59498627b42a7b93472dd77e2418feca98ae1"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/ja.json",
+		"sha256": "b1358c4f30f8c3eae06bbdc24fa137cb7bc1dbdbb16a42d4692becb33913918f"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/ko.json",
+		"sha256": "38e129fda097bc60b005a58f5f79d38b9d05fab405e70e4c68280dc59dd11a66"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/nl.json",
+		"sha256": "fe172fb9cae8ba5163aa2ba10a6c15b8134d41b229527097450b70b589607b98"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/no.json",
+		"sha256": "c6ec804378c7931717cd99bbb5dc2f47447761d4745badecbe2e2fc9267c32d7"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/pl.json",
+		"sha256": "ffc711504ed1bdf221360ee2763608f2a30a42f9d4a12b3e119af62c9515cd98"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/pt.json",
+		"sha256": "880b684d04fb0aa661ac8193c55e4b86fd0de075332164d79ff97a1427665c99"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/ru.json",
+		"sha256": "8d6066aaf6a7faefcb6dfd6875810544068cfe4155e608ae7c7026812aa78ed8"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/sv.json",
+		"sha256": "4940c67c268cf71803d988c368054f38331574c18b76cfbb5ad24fc0557259c3"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/tr.json",
+		"sha256": "a9d9a991fcb248d0cc19855b477602bcd3e623fbc3819dcb9f7a8268c67e40dd"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/uk.json",
+		"sha256": "33d811ed3a7b242ba7cfa9956b4952a5677f06ca49910cd5d29bba3830a3a067"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/data/locales/zh.json",
+		"sha256": "7cb635e751c63b75e5aac433ef5d28cc2ff39a44fc5b743bcfcf985966bf1502"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/modules/features/README.md",
+		"sha256": "3015aef398dbe37d1d4244af5ef1321cc07c70be7658ba357edbd2131eeb87df"
+	},
+	{
+		"path": "static/ergopti_plus/_shared/modules/features/behaviors.json",
+		"sha256": "56def349b06335ec239a39ac2423c85a3a24986e075e357fcb1e58d119b1ac5a"
+	},
+	{
+		"path": "tools/build/generators.cjs",
+		"sha256": "c8853a59276b3fd7e05b57b456b3f94425c2d27300841b2e57004e230864b0d8"
+	},
+	{
+		"path": "tools/codegen/codegen-feature-inventory.cjs",
+		"sha256": "91060ace8f5971a695beaa65771707bc5be1d00118d52c9f3b0970adc45d4095"
+	},
+	{
+		"path": "tools/lib/behavior-capabilities.cjs",
+		"sha256": "15eeed6d862fea2056b1a4917632c12eee95dc8193706f8aca45dca395e33546"
+	},
+	{
+		"path": "tools/test/test-linux-feature-parity.cjs",
+		"sha256": "57909356a3be7f68b1b58995068118cb044696dcbf13633c5d500ff5d10405d5"
+	}
+]

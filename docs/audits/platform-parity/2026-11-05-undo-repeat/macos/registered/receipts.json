@@ -1,0 +1,90 @@
+[
+	{
+		"module": "tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time"
+		],
+		"exit_code": 0,
+		"summary": null,
+		"log": "test_repeat_feature_arm_time.log"
+	},
+	{
+		"module": "tests.unit.modules.keymap.repeat.test_repeat_replacement_transaction",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.repeat.test_repeat_replacement_transaction"
+		],
+		"exit_code": 0,
+		"summary": null,
+		"log": "test_repeat_replacement_transaction.log"
+	},
+	{
+		"module": "tests.unit.modules.keymap.repeat.test_repeat_neutral_config",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.repeat.test_repeat_neutral_config"
+		],
+		"exit_code": 0,
+		"summary": null,
+		"log": "test_repeat_neutral_config.log"
+	},
+	{
+		"module": "tests.unit.modules.keymap.repeat.test_star_validation_beats_repeat_key",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.repeat.test_star_validation_beats_repeat_key"
+		],
+		"exit_code": 0,
+		"summary": null,
+		"log": "test_star_validation_beats_repeat_key.log"
+	},
+	{
+		"module": "tests.unit.modules.keymap.preview.test_no_repeat_preview",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.preview.test_no_repeat_preview"
+		],
+		"exit_code": 0,
+		"summary": null,
+		"log": "test_no_repeat_preview.log"
+	},
+	{
+		"module": "tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted"
+		],
+		"exit_code": 0,
+		"summary": null,
+		"log": "test_private_expansion_never_prompted.log"
+	},
+	{
+		"module": "tests.unit.modules.keymap.expansion.test_hotstring_chaining",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.expansion.test_hotstring_chaining"
+		],
+		"exit_code": 0,
+		"summary": null,
+		"log": "test_hotstring_chaining.log"
+	},
+	{
+		"module": "tests.unit.modules.keymap.registry.test_registry_bound_sections",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.registry.test_registry_bound_sections"
+		],
+		"exit_code": 0,
+		"summary": null,
+		"log": "test_registry_bound_sections.log"
+	}
+]
