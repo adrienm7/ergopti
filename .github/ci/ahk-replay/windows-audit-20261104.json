@@ -1,40 +1,60 @@
 {
-	"expected_count": 15,
+	"expected_count": 48,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
 	"filters": [
 		{
+			"contains": "metrics-live-foreground-worker",
+			"expected_count": 4
+		},
+		{
+			"contains": "klr-detached-foreground",
+			"expected_count": 3
+		},
+		{
+			"contains": "klr-live-snapshot-order",
+			"expected_count": 2
+		},
+		{
+			"contains": "suspend-prefetch-retirement",
+			"expected_count": 9
+		},
+		{
+			"contains": "keystats-worker-timings-must-be-strings",
+			"expected_count": 5
+		},
+		{
+			"contains": "metrics-history-seed",
+			"expected_count": 8
+		},
+		{
+			"contains": "hcw-native-reset-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "hcw-native-destroy-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "hcw-native-reset-retirement-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "hcw_reset_all:",
+			"expected_count": 6
+		},
+		{
+			"contains": "native-winhttp-ipv6-host1",
+			"expected_count": 1
+		},
+		{
+			"contains": "paths-editor-native-subscription-retirement-owner",
+			"expected_count": 2
+		},
+		{
 			"contains": "klr-live-deep-inventory",
 			"expected_count": 2
-		},
-		{
-			"contains": "metrics-live-foreground-worker",
-			"expected_count": 2
-		},
-		{
-			"contains": "keystats-native-high-backspace",
-			"expected_count": 2
-		},
-		{
-			"contains": "action-picker-native-subscription-retirement-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "personal-info-subscription-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "wpm-graph-native-reentry",
-			"expected_count": 2
-		},
-		{
-			"contains": "screenshot-layered-native",
-			"expected_count": 2
-		},
-		{
-			"contains": "native-ipv6-http-socks1",
-			"expected_count": 1
 		}
 	]
 }
