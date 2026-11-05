@@ -58,6 +58,9 @@ local SAMPLE_INTERVAL_MS = 30000
 -- so a busy machine that merely ran late is never mistaken for one that slept.
 local SLEEP_GAP_MS = SAMPLE_INTERVAL_MS * 3
 
+-- A sampler must never switch time domains within one captured history.
+local _sample_clock_source = nil
+
 -- Where the kernel publishes battery state. A glob rather than a fixed name:
 -- BAT0 and BAT1 are both common, and a machine can have neither.
 local BATTERY_GLOB = "/sys/class/power_supply/BAT*/capacity"
@@ -324,7 +327,21 @@ end
 --- Captures one producer clock and partitions elapsed time at local day cuts.
 --- @return table|nil Current cumulative day, or nil on source refusal.
 function M.sample()
-	local clock = Calendar.capture()
+	local clock = Calendar.capture(true)
+	local boot_ms = clock.boot_ms
+	if not _sample_clock_source then
+		_sample_clock_source = type(boot_ms) == "number" and "boot" or "monotonic"
+		if _sample_clock_source == "monotonic" then
+			Logger.warn(LOG, "Suspend-aware clock unavailable; sleep intervals may be missed.")
+		end
+	end
+	if _sample_clock_source == "boot" then
+		if type(boot_ms) ~= "number" then
+			Logger.error(LOG, "Suspend-aware clock refused; system sample deferred.")
+			return nil
+		end
+		clock.mono_ms = boot_ms
+	end
 	local now_ms, date = clock.mono_ms, clock.date
 	if _day and _day.date == date and _last.at_ms and (now_ms - _last.at_ms) < SAMPLE_INTERVAL_MS then return _day end
 	assert(type(_event_admit) == "function", "System transition capture has no recording-policy authority")
@@ -426,6 +443,7 @@ end
 --- Test seam: forgets everything, the wireless listing's path included.
 function M._reset()
 	_event_admit = nil
+	_sample_clock_source = nil
 	_owner_database, _owner_device, _load_day = nil, nil, nil
 	_day, _days = nil, {}
 	_events = {}
