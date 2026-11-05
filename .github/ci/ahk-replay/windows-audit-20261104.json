@@ -1,8 +1,16 @@
 {
-	"expected_count": 13,
+	"expected_count": 42,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
+		{
+			"contains": "clipboard-paste-title-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "clipboard-source-title-owner",
+			"expected_count": 4
+		},
 		{
 			"contains": "layout-settings-close-owner",
 			"expected_count": 2
@@ -12,12 +20,40 @@
 			"expected_count": 3
 		},
 		{
-			"contains": "clipboard-paste-title-owner",
+			"contains": "layout-settings-successor-owner",
+			"expected_count": 1
+		},
+		{
+			"contains": "llm-native-entry-lifecycle",
 			"expected_count": 4
 		},
 		{
-			"contains": "clipboard-source-title-owner",
-			"expected_count": 4
+			"contains": "model-browser-native-backend",
+			"expected_count": 2
+		},
+		{
+			"contains": "tap-hold-stage-ownership",
+			"expected_count": 2
+		},
+		{
+			"contains": "tap-hold-global-transaction",
+			"expected_count": 11
+		},
+		{
+			"contains": "loader-toml-injection-readfile-hotpath",
+			"expected_count": 3
+		},
+		{
+			"contains": "tap-hold: failed persistence cannot publish partial live state",
+			"expected_count": 1
+		},
+		{
+			"contains": "layout-subscription-close-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "secure-field-native-style-change",
+			"expected_count": 3
 		}
 	]
 }
