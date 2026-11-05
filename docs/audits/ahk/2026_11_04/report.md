@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **114 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **119 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1823,3 +1823,7 @@ Replay41980253833 at3005ee52e6c0a2b67e785395a52a3cab79f1c890 executes all142 sel
 AHK-114 is independently demonstrated by the real Jev requester/private HTTP peer: after original requester withdrawal, one actual POST still publishes before the stale consumer ignores it. Exact transport and registry retirement succeed. The live control passes; the withdrawn case fails in both orders. The same replay confirms a destruction-reentrancy sibling of AHK-109: a native replacement changelog window survives but the returning old Close clears its global owner. Both fixes are in progress.
 
 Replay41981613076 executes no business cases: its discovery stops on the reserved AHK variable name Case in the newly added UTC test. That test syntax is corrected; no qualification is attributed to this failed discovery.
+
+Native replay41983518296 atba6cc6c6b7a5c0cfa9eae5cc8d2e9c6d289ae5d5 executes137 cases:122 pass and15 fail, with the same names and counts reversed. Production compilation passes; both E2E manifests are unselected. It qualifies the selected Jev requester correction, changelog detachment, held/relative TOML writer, profile retirement, final context clocks and UTC snapshot contracts. It is not a whole-suite qualification.
+
+Five new distinct families are confirmed:115 decoded physical-key membership,116 Norwegian catalogue mapping,117 user UI language versus regional formats,118 Kana tap admission,119 canonical SQL thinking-pause reconstruction. Additional observed proxy, Wrap scalar, existing-folder target, nonempty context and onboarding failures extend existing072/068/111/110/109 families and add no count. One shutdown-chain failure is only an incomplete fixture class graph and is corrected separately.
