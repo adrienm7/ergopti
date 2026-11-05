@@ -81,8 +81,9 @@ end
 --- @param body string Raw JSON
 --- @return string url or ""
 function M.parse_html_url(body)
-	if not body or body == "" then return "" end
-	return body:match('"html_url"%s*:%s*"([^"]+)"') or ""
+	if type(body) ~= "string" or body == "" then return "" end
+	local release = Json.decode(body)
+	return type(release) == "table" and type(release.html_url) == "string" and release.html_url or ""
 end
 
 
