@@ -196,14 +196,14 @@
 		},
 		{
 			"id": "zero-timeout",
-			"contract": "User-facing zero or unlimited timeout setting",
+			"contract": "Zero, unlimited and overflow timing behavior",
 			"windows": "Nonpositive constant fallback2s",
-			"macos": "No unlimited UI preset established; ordinary menu rejects zero. Original state Owner.arm separately accepts positive infinity; fractional setter can publish rejected zero (OSM-002).",
+			"macos": "No explicit unlimited preset established. Raw menu overflow text1e309 is accepted, persists +inf and survives reload, then breaks second editor callback; direct fractional setter persists zero, while fractional menu input rejects zero. Infinity arming accepts in recorded owner.",
 			"linux": "No same user setting; registry default positive",
-			"classification": "observed_limit",
+			"classification": "unknown_intent",
 			"availability": {
 				"windows": "absent",
-				"macos": "absent",
+				"macos": "unverified",
 				"linux": "absent"
 			},
 			"observation_basis": {
@@ -211,7 +211,7 @@
 				"macos": "actual-owner",
 				"linux": "actual-owner"
 			},
-			"basis": "No supported zero/unlimited UI choice established. A separate original state-owner probe accepts math.huge: positive does not imply finite. It does not execute the setter with infinity or establish persistence support. Historical TODO wording is not current feature evidence.",
+			"basis": "No supported unlimited preset contract is established; absence of an explicit preset does not exclude raw free-text overflow. Real private persistence and editor failure are confirmed under original owners/declared native ports. Historical TODO wording is not a current product contract.",
 			"finding_ids": ["OSM-002"],
 			"evidence": [
 				{
@@ -233,6 +233,42 @@
 				{
 					"path": "validation/infinity-qualification.lua",
 					"sha256": "3e81d8b1409166cdb8325ad38934111c1107e075c570b075b9cabc28cc579566"
+				},
+				{
+					"path": "macos/ui-domain/report.md",
+					"sha256": "a6c8601dd3f50590d132f64f73fd2d3322d232861e79f5113273a29c72852b3f"
+				},
+				{
+					"path": "macos/ui-domain/menu-infinity-probe.lua",
+					"sha256": "8587a5e49b479c8d588aa04a68f4f8e32885adb4204a1d6e8f85a3b500311190"
+				},
+				{
+					"path": "macos/ui-domain/source-and-replay-receipt.json",
+					"sha256": "eac6674bb835632b5082c6daff75274179b2ab40a7020a27c490cfd3321f222b"
+				},
+				{
+					"path": "validation/custody-ui-domain.json",
+					"sha256": "9fc7efcc0f1905f836a1725b2236f6059bde88bf2272d3f86856a80b9d0b4649"
+				},
+				{
+					"path": "macos/real-config-domain/report.md",
+					"sha256": "28217f3b440af17e1649db174ec861f2cb27ebe765ef85da572732d884eeb17e"
+				},
+				{
+					"path": "macos/real-config-domain/real-config-domain.lua",
+					"sha256": "e6335f4cac6ed417a8178e09387b1d9fde669f4550fce11d5a64caf6f1665c4b"
+				},
+				{
+					"path": "macos/real-config-domain/real-menu-persistence.lua",
+					"sha256": "fdcc5410e56bc7a1c9f8da2d8d4acf2889bca308baed64bc3ef857e25d9adfee"
+				},
+				{
+					"path": "macos/real-config-domain/source-and-replay-receipt.json",
+					"sha256": "b329d140eaeea4b04c07aafc5ae39d9cb12a799c32b473781a20083fce5d7105"
+				},
+				{
+					"path": "validation/custody-real-config-domain.json",
+					"sha256": "738b9e6f4812d2bafe32502fdc62803f9878b284c5dd89f1aceff8df224a3050"
 				}
 			]
 		},
@@ -572,10 +608,10 @@
 		},
 		{
 			"id": "fractional-timeout-api",
-			"contract": "Accepted timeout belongs to the arming numeric domain",
-			"windows": "Fixed shared constant with finite fallback; no matching public fractional setting.",
-			"macos": "Setter publishes zero from positive fractions, or numeric NaN, through acknowledged save port; separate public arm rejects both. Infinity accepted by setter and arm; no supported unlimited UI choice established.",
-			"linux": "Shared timing value; no same end-user fractional timeout setting.",
+			"contract": "Accepted editable timing values belong to consumer numeric domains",
+			"windows": "Shared constant with finite fallback; no matching end-user timeout setter/menu API established in this bounded scope.",
+			"macos": "Positive-fraction/NaN setter values violate arming domain. Original menu overflow 1e309 or finite 1e20 persists through real private Config/TOML and reload, then second editor callback raises at %d; both enabled states. Ordinary fractional menu 0.9 remains rejected.",
+			"linux": "Shared timing registry value; no matching end-user timeout setter/menu API established in this bounded scope.",
 			"availability": {
 				"windows": "absent",
 				"macos": "partial",
@@ -587,7 +623,7 @@
 				"linux": "actual-owner"
 			},
 			"classification": "observed_defect",
-			"basis": "Same numeric validation root (OSM-002); independently executed actual setter and public arm, declared persistence/lifecycle ports; original shared formatter handles nonfinite values via protected fallback. No ordinary UI or real-disk failure is claimed.",
+			"basis": "Same OSM-002 validation root. Latest original menu/setter/real Config save/reload/reopen is linked in one process and writes actual private Linux bytes; native filesystem metadata, lease, dialog and regeneration remain ports. No native UI/app crash claim. Platform API absence describes the matching editable interface, not absence of one-shot Shift.",
 			"finding_ids": ["OSM-002"],
 			"evidence": [
 				{
@@ -605,6 +641,42 @@
 				{
 					"path": "validation/config-domain-receipt.json",
 					"sha256": "dedb692ffcc5e449cbdb5fc8c16925651f1c0bb5a4e3490ef25817bcfc8cb852"
+				},
+				{
+					"path": "macos/ui-domain/report.md",
+					"sha256": "a6c8601dd3f50590d132f64f73fd2d3322d232861e79f5113273a29c72852b3f"
+				},
+				{
+					"path": "macos/ui-domain/menu-infinity-probe.lua",
+					"sha256": "8587a5e49b479c8d588aa04a68f4f8e32885adb4204a1d6e8f85a3b500311190"
+				},
+				{
+					"path": "macos/ui-domain/source-and-replay-receipt.json",
+					"sha256": "eac6674bb835632b5082c6daff75274179b2ab40a7020a27c490cfd3321f222b"
+				},
+				{
+					"path": "validation/custody-ui-domain.json",
+					"sha256": "9fc7efcc0f1905f836a1725b2236f6059bde88bf2272d3f86856a80b9d0b4649"
+				},
+				{
+					"path": "macos/real-config-domain/report.md",
+					"sha256": "28217f3b440af17e1649db174ec861f2cb27ebe765ef85da572732d884eeb17e"
+				},
+				{
+					"path": "macos/real-config-domain/real-config-domain.lua",
+					"sha256": "e6335f4cac6ed417a8178e09387b1d9fde669f4550fce11d5a64caf6f1665c4b"
+				},
+				{
+					"path": "macos/real-config-domain/real-menu-persistence.lua",
+					"sha256": "fdcc5410e56bc7a1c9f8da2d8d4acf2889bca308baed64bc3ef857e25d9adfee"
+				},
+				{
+					"path": "macos/real-config-domain/source-and-replay-receipt.json",
+					"sha256": "b329d140eaeea4b04c07aafc5ae39d9cb12a799c32b473781a20083fce5d7105"
+				},
+				{
+					"path": "validation/custody-real-config-domain.json",
+					"sha256": "738b9e6f4812d2bafe32502fdc62803f9878b284c5dd89f1aceff8df224a3050"
 				}
 			]
 		},

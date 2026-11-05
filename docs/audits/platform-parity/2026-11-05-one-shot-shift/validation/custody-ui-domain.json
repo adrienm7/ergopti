@@ -1,0 +1,110 @@
+{
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"scope": "same OSM-002 numeric-domain root; public menu callback over declared ports, no native dialog/disk/deployment or receiving proof",
+	"worker_handoff_sha256": "e49aa95d8585e0f0bb2bede7912c5107694453e6ee01e422c06d850713f7716a",
+	"listed_artifacts": 7,
+	"formatting": [
+		{
+			"path": "macos/ui-domain/handoff.sha256.json",
+			"original_sha256": "e49aa95d8585e0f0bb2bede7912c5107694453e6ee01e422c06d850713f7716a",
+			"exact_original": "validation/ui-domain-originals/handoff.sha256.json.txt",
+			"formatted_sha256": "1100b53e3c589a4993d0ff0d90f2a5d34a111eb3ca95435a7fe23865aff0b613",
+			"qualification": "JSON values unchanged; exact frozen bytes retained before formatting."
+		}
+	],
+	"worker_program": {
+		"path": "macos/ui-domain/check_menu_domain.py",
+		"sha256": "d3a2c2ad99f741bc96d12f5abec746028ec8dc0495a484b248ced4c9be7e25fe"
+	},
+	"derivative_program": {
+		"path": "validation/check_menu_domain.py",
+		"sha256": "0c9953fcbe3f11b9e947cb15a1da9a22349994cc136e974394285ce5ea843c24",
+		"adaptation": "Program input anchored macos/ui-domain; optional second outputdirectory defaults validation; only log/receipt destinations redirected.",
+		"ast_matches_after_declared_path_output_replacements": true,
+		"unchanged_assert_nodes": 34
+	},
+	"source_claims": [
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua",
+			"sha256": "ac391baa4071af3b97e81313201d05bca1eb102a444a1a2b224b76e7dfa1765d",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/ui/menu/keyboard_layout/test_karabiner_timeout_regenerates.lua",
+			"sha256": "7ba60e5c1ef7d091c47881c56442572bd7787c007701997d4786e550995e9694",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/helpers/init.lua",
+			"sha256": "03e75d07bb6759fbdf665652fdeb805ef39253b5ed60df4286adbcdd2b7048ce",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/support/remap_transaction_fixture.lua",
+			"sha256": "388f8976e15d9a4d2a0ccb09d143b93311b5a91d2788d5eb99414d5e4e41be91",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/init.lua",
+			"sha256": "18082e82568983bbd93847843a0f309719d51da7909f4145541275edd197923b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/config.lua",
+			"sha256": "05f383dff5598cb296bbdb3fdfc89594bb4731845a4350b5d1131c19c175bbc8",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/text_utils.lua",
+			"sha256": "5fae92ac44b056a320998c9ff7f6079a3294522f9c1524e67e70f73051e84197",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/text_utils/init.lua",
+			"sha256": "91fa72430bf0375aa1d464804a0c19e55ddde9e934344834953c0f257dff6592",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/en.json",
+			"sha256": "750425bc132f156baa8e7fbc2db1e4ccb331a47c565972822955c0547c47c196",
+			"pinned_matches": true,
+			"current_matches": true
+		}
+	],
+	"nested_output_hashes_checked": 2,
+	"lua_program_hash_checked": true,
+	"freeze": "Prepared in scratch only while main full gate runs. No main writes or HEAD changes.",
+	"source_union": {
+		"before_supplement": 113,
+		"new_distinct_paths": [
+			"static/ergopti_plus/_shared/lua/text_utils/init.lua",
+			"static/ergopti_plus/macos/infra/text_utils.lua",
+			"static/ergopti_plus/macos/tests/helpers/init.lua",
+			"static/ergopti_plus/macos/tests/unit/ui/menu/keyboard_layout/test_karabiner_timeout_regenerates.lua"
+		],
+		"after_supplement": 117
+	},
+	"independent_derivative_replay": {
+		"command": [
+			"python3",
+			"/workspace/scratch/parity-one-shot-2026-11-05/ui-domain-package/validation/check_menu_domain.py",
+			"/workspace/ergopti",
+			"/workspace/scratch/parity-one-shot-2026-11-05/ui-domain-package/external-replay"
+		],
+		"runner_sha256": "0c9953fcbe3f11b9e947cb15a1da9a22349994cc136e974394285ce5ea843c24",
+		"receipt_sha256": "235ded80b383b46d916d0f8482db084efbe3830bbe660392a7d1bcef11d3d513",
+		"sweeps": 2,
+		"asserted_rows_per_sweep": 10,
+		"all_successful": true,
+		"output_hashes_authenticated": true,
+		"qualifications": "Original menu build/callback and original Remap setter in both disabled and enabled fixture states; acknowledged save and regeneration ports; recorded valid AppleScript dialog strings; no native UI, disk, lease regeneration, or application proof."
+	}
+}

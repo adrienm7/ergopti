@@ -1,0 +1,252 @@
+{
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"scope": "Same OSM-002 numeric-domain root. Original Config/TOML/FileSystem publishes and reloads actual private Linux bytes; original menu/setter/save/rebuild/reopen linked in same process. Native filesystem metadata, lease/dialog/regeneration/logging remain ports; no native macOS or receiving proof.",
+	"worker_handoff_sha256": "73b4fce015bdce6a0372663b31e15ad09ff2983f0854733e4cd8bb6d30677c8f",
+	"listed_artifacts": 9,
+	"formatting": [
+		{
+			"path": "macos/real-config-domain/handoff.sha256.json",
+			"original_sha256": "73b4fce015bdce6a0372663b31e15ad09ff2983f0854733e4cd8bb6d30677c8f",
+			"exact_original": "validation/real-config-domain-originals/handoff.sha256.json.txt",
+			"formatted_sha256": "7fdf7dd08638dfb5faff5e224c478d1b431570075aa4e5bc289ae370cd9ff73b",
+			"qualification": "JSON values unchanged; exact frozen bytes retained before formatting."
+		}
+	],
+	"worker_program": {
+		"path": "macos/real-config-domain/check_real_config.py",
+		"sha256": "fe960c53b738100d3d40a02b48ba3971aba14c3141f591044be0448110762b28"
+	},
+	"derivative_program": {
+		"path": "validation/check_real_config.py",
+		"sha256": "36485c08098690d8bcaf2676b324644b9f793e41b4c7386826a2246d5501d066",
+		"adaptation": "Program and sibling UI input paths anchored macos archives; optional second outputdirectory defaults validation; only log/receipt destinations redirected.",
+		"ast_matches_after_declared_path_output_replacements": true,
+		"unchanged_assert_nodes": 46
+	},
+	"source_claims": [
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua",
+			"sha256": "ac391baa4071af3b97e81313201d05bca1eb102a444a1a2b224b76e7dfa1765d",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/ui/menu/keyboard_layout/test_karabiner_timeout_regenerates.lua",
+			"sha256": "7ba60e5c1ef7d091c47881c56442572bd7787c007701997d4786e550995e9694",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/helpers/init.lua",
+			"sha256": "03e75d07bb6759fbdf665652fdeb805ef39253b5ed60df4286adbcdd2b7048ce",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/support/remap_transaction_fixture.lua",
+			"sha256": "388f8976e15d9a4d2a0ccb09d143b93311b5a91d2788d5eb99414d5e4e41be91",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/init.lua",
+			"sha256": "18082e82568983bbd93847843a0f309719d51da7909f4145541275edd197923b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/config.lua",
+			"sha256": "05f383dff5598cb296bbdb3fdfc89594bb4731845a4350b5d1131c19c175bbc8",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/text_utils.lua",
+			"sha256": "5fae92ac44b056a320998c9ff7f6079a3294522f9c1524e67e70f73051e84197",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/text_utils/init.lua",
+			"sha256": "91fa72430bf0375aa1d464804a0c19e55ddde9e934344834953c0f257dff6592",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/en.json",
+			"sha256": "750425bc132f156baa8e7fbc2db1e4ccb331a47c565972822955c0547c47c196",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/file_system.lua",
+			"sha256": "b0b67258ea3bd02fdb8ea68c5ce323b334aedb17d1ad7332775508d23d9c2cef",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/write_lock_path.lua",
+			"sha256": "00a4e919248296bc31c8f63e90d1400edb48b5d2baa9b694af2fc8c1bcd0b870",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/fs_dir.lua",
+			"sha256": "1f5ea58e7cf4e1cd0b0659d8d59c2312943a6b701cc5f6294139215c41a9f934",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/stubs/hs.lua",
+			"sha256": "c1702704058115f7573ef4da2dc2924a72c45b0229c00e5ea932c89f27f3b8f6",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/test/runner_home.lua",
+			"sha256": "42ba4b5b3deda6c250697687db46e3a741b4781747ad12f1c834f3593e6f8d12",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/basic_string.lua",
+			"sha256": "8fd4ba4698d9c1161365b7d6ee1cfc089484390a9c2cdfb0cf7f1d476eab5d43",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/bom.lua",
+			"sha256": "5320dda42dfe4b82b0b77726ea24ddfd3646de63fdd61240601df783678ea696",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/cleanup_roots.lua",
+			"sha256": "862455819c3bcf9ed834d63720883f44ab00c7e7fc37ec493790194d5961071a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/codec.lua",
+			"sha256": "a154aaebadd1bc6994a2ad842f3279d7e850789b1f461be29fa17f52f7b0b9ef",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/init.lua",
+			"sha256": "97ed0ffa484a2e54d51e426306bef6f565758af56e78ee9af1e8ba7664cc8262",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/key_path.lua",
+			"sha256": "903a780b5b6a9b787a338957fdb53c6c8e3df4af72f005ba5429cc75d19b74e4",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/leaf_rows.lua",
+			"sha256": "a13c30916b01124c54b86e94fac997920cc9629cfcda68ff2509903e49c5018c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/reader.lua",
+			"sha256": "71be5f48fbbc91a5528d4446bfc4548a813feaa5fc457a5cf6778f8a38f4141a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/record_list.lua",
+			"sha256": "e7a919c07facf6a38ebf13dc8eb3b88e5e20f56db1ef75ae200daba5badaf83f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/record_scanner.lua",
+			"sha256": "b71dea55bda709fe21e0b95b1a433cbe924e90894d4f36888bc354d8b89de74d",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/source_memo.lua",
+			"sha256": "77fdd31aeb9ae759a4ffd9a1b98cb841ad333630f8e8ff3abdc6864205114c3c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/source_open.lua",
+			"sha256": "586e23720cf1af0d63614425617eba6b21f3c0a097df86cb45e604485e7a3a8d",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/writer.lua",
+			"sha256": "4703e1a529daf5cc610cf26029363de2cfd3e3f6a96f6581e6e92e71474d0e5c",
+			"pinned_matches": true,
+			"current_matches": true
+		}
+	],
+	"nested_output_hashes_checked": 4,
+	"frozen_sibling_ui_probe_sha256": "8587a5e49b479c8d588aa04a68f4f8e32885adb4204a1d6e8f85a3b500311190",
+	"freeze": "Prepared in scratch only while main full gate runs. No main writes or HEAD changes.",
+	"source_union": {
+		"before_supplement": 117,
+		"new_distinct_paths": [
+			"static/ergopti_plus/_shared/lua/test/runner_home.lua",
+			"static/ergopti_plus/_shared/lua/toml_codec/basic_string.lua",
+			"static/ergopti_plus/_shared/lua/toml_codec/bom.lua",
+			"static/ergopti_plus/_shared/lua/toml_codec/cleanup_roots.lua",
+			"static/ergopti_plus/_shared/lua/toml_codec/codec.lua",
+			"static/ergopti_plus/_shared/lua/toml_codec/init.lua",
+			"static/ergopti_plus/_shared/lua/toml_codec/key_path.lua",
+			"static/ergopti_plus/_shared/lua/toml_codec/leaf_rows.lua",
+			"static/ergopti_plus/_shared/lua/toml_codec/reader.lua",
+			"static/ergopti_plus/_shared/lua/toml_codec/record_list.lua",
+			"static/ergopti_plus/_shared/lua/toml_codec/record_scanner.lua",
+			"static/ergopti_plus/_shared/lua/toml_codec/source_memo.lua",
+			"static/ergopti_plus/_shared/lua/toml_codec/source_open.lua",
+			"static/ergopti_plus/_shared/lua/toml_codec/writer.lua",
+			"static/ergopti_plus/macos/adapters/file_system.lua",
+			"static/ergopti_plus/macos/adapters/write_lock_path.lua",
+			"static/ergopti_plus/macos/infra/fs_dir.lua",
+			"static/ergopti_plus/macos/tests/stubs/hs.lua"
+		],
+		"after_supplement": 135
+	},
+	"independent_derivative_replay": {
+		"command": [
+			"python3",
+			"/workspace/scratch/parity-one-shot-2026-11-05/real-config-domain-package/validation/check_real_config.py",
+			"/workspace/ergopti",
+			"/workspace/scratch/parity-one-shot-2026-11-05/real-config-domain-package/external-replay"
+		],
+		"runner_sha256": "36485c08098690d8bcaf2676b324644b9f793e41b4c7386826a2246d5501d066",
+		"receipt_sha256": "d6f1f8234419008ed7510b6979d44e9b6082fd0001a8662048f0cd0320f5c572",
+		"processes": 4,
+		"sweeps": 2,
+		"direct_rows_per_sweep": 10,
+		"linked_ui_rows_per_sweep": 10,
+		"all_successful": true,
+		"output_hashes_authenticated": true,
+		"exact_worker_output_comparisons": [
+			{
+				"log": "sweep-1-real-config-domain.log",
+				"worker_bytes_equal": true
+			},
+			{
+				"log": "sweep-1-real-menu-persistence.log",
+				"worker_bytes_equal": true
+			},
+			{
+				"log": "sweep-2-real-config-domain.log",
+				"worker_bytes_equal": true
+			},
+			{
+				"log": "sweep-2-real-menu-persistence.log",
+				"worker_bytes_equal": true
+			}
+		],
+		"qualifications": "Original menu/setter/Config/TOML/file_system owners with actual private Linux file writes/readbacks; original test HOME isolation; native Hammerspoon metadata/lease/dialog/regeneration/logging ports remain fixtures. No native macOS UI, application receiving or deployment proof."
+	}
+}

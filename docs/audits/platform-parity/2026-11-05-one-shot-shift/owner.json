@@ -842,6 +842,42 @@
 				{
 					"path": "validation/config-domain-receipt.json",
 					"sha256": "dedb692ffcc5e449cbdb5fc8c16925651f1c0bb5a4e3490ef25817bcfc8cb852"
+				},
+				{
+					"path": "macos/ui-domain/report.md",
+					"sha256": "a6c8601dd3f50590d132f64f73fd2d3322d232861e79f5113273a29c72852b3f"
+				},
+				{
+					"path": "macos/ui-domain/menu-infinity-probe.lua",
+					"sha256": "8587a5e49b479c8d588aa04a68f4f8e32885adb4204a1d6e8f85a3b500311190"
+				},
+				{
+					"path": "macos/ui-domain/source-and-replay-receipt.json",
+					"sha256": "eac6674bb835632b5082c6daff75274179b2ab40a7020a27c490cfd3321f222b"
+				},
+				{
+					"path": "validation/custody-ui-domain.json",
+					"sha256": "9fc7efcc0f1905f836a1725b2236f6059bde88bf2272d3f86856a80b9d0b4649"
+				},
+				{
+					"path": "macos/real-config-domain/report.md",
+					"sha256": "28217f3b440af17e1649db174ec861f2cb27ebe765ef85da572732d884eeb17e"
+				},
+				{
+					"path": "macos/real-config-domain/real-config-domain.lua",
+					"sha256": "e6335f4cac6ed417a8178e09387b1d9fde669f4550fce11d5a64caf6f1665c4b"
+				},
+				{
+					"path": "macos/real-config-domain/real-menu-persistence.lua",
+					"sha256": "fdcc5410e56bc7a1c9f8da2d8d4acf2889bca308baed64bc3ef857e25d9adfee"
+				},
+				{
+					"path": "macos/real-config-domain/source-and-replay-receipt.json",
+					"sha256": "b329d140eaeea4b04c07aafc5ae39d9cb12a799c32b473781a20083fce5d7105"
+				},
+				{
+					"path": "validation/custody-real-config-domain.json",
+					"sha256": "738b9e6f4812d2bafe32502fdc62803f9878b284c5dd89f1aceff8df224a3050"
 				}
 			],
 			"findings": [
@@ -879,17 +915,20 @@
 				},
 				{
 					"id": "OSM-002",
-					"title": "Programmatic timeout validation publishes values rejected by arming",
+					"title": "Accepted timeouts violate arming and editor numeric domains",
 					"severity": "low",
 					"confidence": "high",
 					"guarantees": [],
-					"additional_properties": ["positive timeout configuration invariant"],
+					"additional_properties": [
+						"accepted timeout belongs to arming numeric domain",
+						"accepted editable timeout remains representable by editor formatting"
+					],
 					"basis": "actual-owner",
-					"qualification": "Actual Remap setter/transaction with acknowledged persistence port and actual public Keymap arm executed separately, linked by real getter/setter contract. No actual disk, ordinary-menu failure, simultaneous full-app instance or native application failure. Supplemental setter still uses acknowledged persistence/no-op logger ports; actual shared formatter is independently executed over a recorded sink. No full real Config persistence or native logger transport is claimed.",
-					"reproduction": "Call public Remap.set_sticky_timeout with 0.1 or 0.9 milliseconds while remapping is disabled in the registered transaction fixture. The real setter accepts, publishes getter zero and sends zero to acknowledged save port. Separately original Keymap.arm_one_shot_shift with that getter value raises invalid one-shot Shift timeout. Controls include 0, 1, 2.5 and 2000; the ordinary menu floors first and rejects zero. Supplement: original setter with numeric NaN returns true and publishes NaN through live getter/acknowledged save payload; independent original public arm with NaN raises invalid one-shot Shift timeout. Positive infinity is accepted by both owners and stays active at recorded clock1e12; this is characterization, not proof of a supported unlimited menu choice.",
-					"root_cause": "Setter tests positivity before flooring, allowing a positive fraction to become zero after validation; public arming requires strictly positive timeout. The value <= 0 guard also admits numeric NaN, which the arm timeout > 0 contract rejects.",
-					"silent_failure": "Transaction reports accepted mutation and acknowledged zero save payload despite the published value violating the arm precondition; arming raises explicitly rather than silently succeeding.",
-					"regression_test": "Validate after flooring or require integer milliseconds before mutation, assert rejected fractions preserve live and persistence values, and run actual setter/getter-to-arm contract plus loaded configuration validation. Keep ordinary menu rejection as control. Include numeric NaN, numeric strings, finite values around one, both infinities and transaction refusals; define infinity policy explicitly.",
+					"qualification": "Initial positive-fraction and NaN setter/arm observations use acknowledged save ports and separate actual public arming. Later original menu → actual Remap → original Config/TOML/FileSystem → actual private Linux bytes/reload → rebuilt menu and second callback execute in the same process, with remapping initially disabled and enabled. Native filesystem metadata, Hammerspoon lease, AppleScript dialog, regeneration and logger transports remain recorded ports; no native macOS UI, deployment, application receiving or app crash is established. The registered transaction fixture and private config explicitly use the hand-written shared-runtime profile. The inspected setter/persistence numeric path has no runtime-specific value guard; real owned-runtime activation is not exercised.",
+					"reproduction": "Initial API: positive fractions 0.1/0.9 floor to zero and numeric NaN is accepted through acknowledged save; separately actual public arm rejects zero/NaN. Real persistence supplement: direct 0.1 setter publishes sticky_timeout_ms = 0 and original Config reload returns zero. Same-process public menu: recorded valid dialog string 1e309 or 1e20 passes actual parsing/menu/setter and original real Config save, publishing +inf or 1e+20 to private Linux TOML. Original reload retains those values. Rebuilt label renders inf s or 1e+17 s; invoking its second original callback raises number has no integer representation in shared text_utils/init.lua:716 before a second dialog. Both enabled states reproduce. Controls: 2000 works, neutral-default save omits sticky_timeout_ms; menu 0.9 is rejected without save; invalid text makes no setter call.",
+					"root_cause": "Setter checks value <= 0 before flooring, admits positive fractions that become zero and admits numeric NaN. It also accepts positive infinity and large finite values outside the editor integer formatting domain; original Config/TOML preserves them. Arming requires value > 0, while editor default formatting floors and passes %d to original applescript_format/string.format without checking representability.",
+					"silent_failure": "Accepted setter/save publishes values outside downstream numeric domains. Zero/NaN arming and large/infinite second-menu callback raise explicitly. The original Config real-write route demonstrably preserves invalid downstream values; it does not prevent the menu route. No native UI exception handling or application crash is inferred.",
+					"regression_test": "Define finite/range/integer policy across setter, menu, loaded config, arming and editor formatting; validate after normalization before live mutation or save. Drive actual menu→setter→real private Config/TOML save/reload→rebuild/reopen in both enabled states, with 0.1,0.9,NaN,positive/negative infinity,overflow text1e309,finite 1e20,invalid text and 2000/default omission controls. Preserve values on rejection and test lease/transaction refusal. Native UI/deployment receiving remains a separate lane.",
 					"evidence": [
 						{
 							"path": "macos/report.md",
@@ -918,9 +957,52 @@
 						{
 							"path": "validation/config-domain-receipt.json",
 							"sha256": "dedb692ffcc5e449cbdb5fc8c16925651f1c0bb5a4e3490ef25817bcfc8cb852"
+						},
+						{
+							"path": "macos/ui-domain/report.md",
+							"sha256": "a6c8601dd3f50590d132f64f73fd2d3322d232861e79f5113273a29c72852b3f"
+						},
+						{
+							"path": "macos/ui-domain/menu-infinity-probe.lua",
+							"sha256": "8587a5e49b479c8d588aa04a68f4f8e32885adb4204a1d6e8f85a3b500311190"
+						},
+						{
+							"path": "macos/ui-domain/source-and-replay-receipt.json",
+							"sha256": "eac6674bb835632b5082c6daff75274179b2ab40a7020a27c490cfd3321f222b"
+						},
+						{
+							"path": "validation/custody-ui-domain.json",
+							"sha256": "9fc7efcc0f1905f836a1725b2236f6059bde88bf2272d3f86856a80b9d0b4649"
+						},
+						{
+							"path": "macos/real-config-domain/report.md",
+							"sha256": "28217f3b440af17e1649db174ec861f2cb27ebe765ef85da572732d884eeb17e"
+						},
+						{
+							"path": "macos/real-config-domain/real-config-domain.lua",
+							"sha256": "e6335f4cac6ed417a8178e09387b1d9fde669f4550fce11d5a64caf6f1665c4b"
+						},
+						{
+							"path": "macos/real-config-domain/real-menu-persistence.lua",
+							"sha256": "fdcc5410e56bc7a1c9f8da2d8d4acf2889bca308baed64bc3ef857e25d9adfee"
+						},
+						{
+							"path": "macos/real-config-domain/source-and-replay-receipt.json",
+							"sha256": "b329d140eaeea4b04c07aafc5ae39d9cb12a799c32b473781a20083fce5d7105"
+						},
+						{
+							"path": "validation/custody-real-config-domain.json",
+							"sha256": "738b9e6f4812d2bafe32502fdc62803f9878b284c5dd89f1aceff8df224a3050"
 						}
 					],
-					"submitted_title": "Fractional positive API timeout publishes zero rejected by arming"
+					"submitted_title": "Fractional positive API timeout publishes zero rejected by arming",
+					"initial_adjudication": {
+						"title": "Programmatic timeout validation publishes values rejected by arming",
+						"qualification": "Actual Remap setter/transaction with acknowledged persistence port and actual public Keymap arm executed separately, linked by real getter/setter contract. No actual disk, ordinary-menu failure, simultaneous full-app instance or native application failure. Supplemental setter still uses acknowledged persistence/no-op logger ports; actual shared formatter is independently executed over a recorded sink. No full real Config persistence or native logger transport is claimed.",
+						"reproduction": "Call public Remap.set_sticky_timeout with 0.1 or 0.9 milliseconds while remapping is disabled in the registered transaction fixture. The real setter accepts, publishes getter zero and sends zero to acknowledged save port. Separately original Keymap.arm_one_shot_shift with that getter value raises invalid one-shot Shift timeout. Controls include 0, 1, 2.5 and 2000; the ordinary menu floors first and rejects zero. Supplement: original setter with numeric NaN returns true and publishes NaN through live getter/acknowledged save payload; independent original public arm with NaN raises invalid one-shot Shift timeout. Positive infinity is accepted by both owners and stays active at recorded clock1e12; this is characterization, not proof of a supported unlimited menu choice.",
+						"qualification_status": "Historical initial adjudication before public-menu and real-persistence supplements; the API-only/no-real-disk limitation is not the current evidence claim."
+					},
+					"original_submitted_title": "Fractional positive API timeout publishes zero rejected by arming"
 				}
 			],
 			"coverage": [
@@ -972,7 +1054,7 @@
 				{
 					"aspect": "Settings",
 					"basis": "actual-owner",
-					"qualification": "actual Remap transaction setter + actual public arm separately. OSM-002; acknowledged persistence, not real disk; ordinary menu rejects zero",
+					"qualification": "Original setter/public arm numeric-domain observations plus original public menu and same-process original Config/TOML/FileSystem private Linux save/reload; enabled and disabled controls. Ten direct and ten linked UI rows per sweep, repeated twice, supplement the existing Settings area. Fractional menu values reject zero; overflow 1e309 and finite 1e20 persist and second menu callback raises at %d. Native filesystem metadata, lease/dialog/regeneration/logging remain ports; no native UI/app crash/deployment/receiving proof.",
 					"evidence": [
 						{
 							"path": "macos/coverage.json",
@@ -981,6 +1063,42 @@
 						{
 							"path": "macos/report.md",
 							"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+						},
+						{
+							"path": "macos/ui-domain/report.md",
+							"sha256": "a6c8601dd3f50590d132f64f73fd2d3322d232861e79f5113273a29c72852b3f"
+						},
+						{
+							"path": "macos/ui-domain/menu-infinity-probe.lua",
+							"sha256": "8587a5e49b479c8d588aa04a68f4f8e32885adb4204a1d6e8f85a3b500311190"
+						},
+						{
+							"path": "macos/ui-domain/source-and-replay-receipt.json",
+							"sha256": "eac6674bb835632b5082c6daff75274179b2ab40a7020a27c490cfd3321f222b"
+						},
+						{
+							"path": "validation/custody-ui-domain.json",
+							"sha256": "9fc7efcc0f1905f836a1725b2236f6059bde88bf2272d3f86856a80b9d0b4649"
+						},
+						{
+							"path": "macos/real-config-domain/report.md",
+							"sha256": "28217f3b440af17e1649db174ec861f2cb27ebe765ef85da572732d884eeb17e"
+						},
+						{
+							"path": "macos/real-config-domain/real-config-domain.lua",
+							"sha256": "e6335f4cac6ed417a8178e09387b1d9fde669f4550fce11d5a64caf6f1665c4b"
+						},
+						{
+							"path": "macos/real-config-domain/real-menu-persistence.lua",
+							"sha256": "fdcc5410e56bc7a1c9f8da2d8d4acf2889bca308baed64bc3ef857e25d9adfee"
+						},
+						{
+							"path": "macos/real-config-domain/source-and-replay-receipt.json",
+							"sha256": "b329d140eaeea4b04c07aafc5ae39d9cb12a799c32b473781a20083fce5d7105"
+						},
+						{
+							"path": "validation/custody-real-config-domain.json",
+							"sha256": "738b9e6f4812d2bafe32502fdc62803f9878b284c5dd89f1aceff8df224a3050"
 						}
 					]
 				},
@@ -1947,14 +2065,14 @@
 		},
 		{
 			"id": "zero-timeout",
-			"contract": "User-facing zero or unlimited timeout setting",
+			"contract": "Zero, unlimited and overflow timing behavior",
 			"windows": "Nonpositive constant fallback2s",
-			"macos": "No unlimited UI preset established; ordinary menu rejects zero. Original state Owner.arm separately accepts positive infinity; fractional setter can publish rejected zero (OSM-002).",
+			"macos": "No explicit unlimited preset established. Raw menu overflow text1e309 is accepted, persists +inf and survives reload, then breaks second editor callback; direct fractional setter persists zero, while fractional menu input rejects zero. Infinity arming accepts in recorded owner.",
 			"linux": "No same user setting; registry default positive",
-			"classification": "observed_limit",
+			"classification": "unknown_intent",
 			"availability": {
 				"windows": "absent",
-				"macos": "absent",
+				"macos": "unverified",
 				"linux": "absent"
 			},
 			"observation_basis": {
@@ -1962,7 +2080,7 @@
 				"macos": "actual-owner",
 				"linux": "actual-owner"
 			},
-			"basis": "No supported zero/unlimited UI choice established. A separate original state-owner probe accepts math.huge: positive does not imply finite. It does not execute the setter with infinity or establish persistence support. Historical TODO wording is not current feature evidence.",
+			"basis": "No supported unlimited preset contract is established; absence of an explicit preset does not exclude raw free-text overflow. Real private persistence and editor failure are confirmed under original owners/declared native ports. Historical TODO wording is not a current product contract.",
 			"finding_ids": ["OSM-002"],
 			"evidence": [
 				{
@@ -1984,6 +2102,42 @@
 				{
 					"path": "validation/infinity-qualification.lua",
 					"sha256": "3e81d8b1409166cdb8325ad38934111c1107e075c570b075b9cabc28cc579566"
+				},
+				{
+					"path": "macos/ui-domain/report.md",
+					"sha256": "a6c8601dd3f50590d132f64f73fd2d3322d232861e79f5113273a29c72852b3f"
+				},
+				{
+					"path": "macos/ui-domain/menu-infinity-probe.lua",
+					"sha256": "8587a5e49b479c8d588aa04a68f4f8e32885adb4204a1d6e8f85a3b500311190"
+				},
+				{
+					"path": "macos/ui-domain/source-and-replay-receipt.json",
+					"sha256": "eac6674bb835632b5082c6daff75274179b2ab40a7020a27c490cfd3321f222b"
+				},
+				{
+					"path": "validation/custody-ui-domain.json",
+					"sha256": "9fc7efcc0f1905f836a1725b2236f6059bde88bf2272d3f86856a80b9d0b4649"
+				},
+				{
+					"path": "macos/real-config-domain/report.md",
+					"sha256": "28217f3b440af17e1649db174ec861f2cb27ebe765ef85da572732d884eeb17e"
+				},
+				{
+					"path": "macos/real-config-domain/real-config-domain.lua",
+					"sha256": "e6335f4cac6ed417a8178e09387b1d9fde669f4550fce11d5a64caf6f1665c4b"
+				},
+				{
+					"path": "macos/real-config-domain/real-menu-persistence.lua",
+					"sha256": "fdcc5410e56bc7a1c9f8da2d8d4acf2889bca308baed64bc3ef857e25d9adfee"
+				},
+				{
+					"path": "macos/real-config-domain/source-and-replay-receipt.json",
+					"sha256": "b329d140eaeea4b04c07aafc5ae39d9cb12a799c32b473781a20083fce5d7105"
+				},
+				{
+					"path": "validation/custody-real-config-domain.json",
+					"sha256": "738b9e6f4812d2bafe32502fdc62803f9878b284c5dd89f1aceff8df224a3050"
 				}
 			]
 		},
@@ -2323,10 +2477,10 @@
 		},
 		{
 			"id": "fractional-timeout-api",
-			"contract": "Accepted timeout belongs to the arming numeric domain",
-			"windows": "Fixed shared constant with finite fallback; no matching public fractional setting.",
-			"macos": "Setter publishes zero from positive fractions, or numeric NaN, through acknowledged save port; separate public arm rejects both. Infinity accepted by setter and arm; no supported unlimited UI choice established.",
-			"linux": "Shared timing value; no same end-user fractional timeout setting.",
+			"contract": "Accepted editable timing values belong to consumer numeric domains",
+			"windows": "Shared constant with finite fallback; no matching end-user timeout setter/menu API established in this bounded scope.",
+			"macos": "Positive-fraction/NaN setter values violate arming domain. Original menu overflow 1e309 or finite 1e20 persists through real private Config/TOML and reload, then second editor callback raises at %d; both enabled states. Ordinary fractional menu 0.9 remains rejected.",
+			"linux": "Shared timing registry value; no matching end-user timeout setter/menu API established in this bounded scope.",
 			"availability": {
 				"windows": "absent",
 				"macos": "partial",
@@ -2338,7 +2492,7 @@
 				"linux": "actual-owner"
 			},
 			"classification": "observed_defect",
-			"basis": "Same numeric validation root (OSM-002); independently executed actual setter and public arm, declared persistence/lifecycle ports; original shared formatter handles nonfinite values via protected fallback. No ordinary UI or real-disk failure is claimed.",
+			"basis": "Same OSM-002 validation root. Latest original menu/setter/real Config save/reload/reopen is linked in one process and writes actual private Linux bytes; native filesystem metadata, lease, dialog and regeneration remain ports. No native UI/app crash claim. Platform API absence describes the matching editable interface, not absence of one-shot Shift.",
 			"finding_ids": ["OSM-002"],
 			"evidence": [
 				{
@@ -2356,6 +2510,42 @@
 				{
 					"path": "validation/config-domain-receipt.json",
 					"sha256": "dedb692ffcc5e449cbdb5fc8c16925651f1c0bb5a4e3490ef25817bcfc8cb852"
+				},
+				{
+					"path": "macos/ui-domain/report.md",
+					"sha256": "a6c8601dd3f50590d132f64f73fd2d3322d232861e79f5113273a29c72852b3f"
+				},
+				{
+					"path": "macos/ui-domain/menu-infinity-probe.lua",
+					"sha256": "8587a5e49b479c8d588aa04a68f4f8e32885adb4204a1d6e8f85a3b500311190"
+				},
+				{
+					"path": "macos/ui-domain/source-and-replay-receipt.json",
+					"sha256": "eac6674bb835632b5082c6daff75274179b2ab40a7020a27c490cfd3321f222b"
+				},
+				{
+					"path": "validation/custody-ui-domain.json",
+					"sha256": "9fc7efcc0f1905f836a1725b2236f6059bde88bf2272d3f86856a80b9d0b4649"
+				},
+				{
+					"path": "macos/real-config-domain/report.md",
+					"sha256": "28217f3b440af17e1649db174ec861f2cb27ebe765ef85da572732d884eeb17e"
+				},
+				{
+					"path": "macos/real-config-domain/real-config-domain.lua",
+					"sha256": "e6335f4cac6ed417a8178e09387b1d9fde669f4550fce11d5a64caf6f1665c4b"
+				},
+				{
+					"path": "macos/real-config-domain/real-menu-persistence.lua",
+					"sha256": "fdcc5410e56bc7a1c9f8da2d8d4acf2889bca308baed64bc3ef857e25d9adfee"
+				},
+				{
+					"path": "macos/real-config-domain/source-and-replay-receipt.json",
+					"sha256": "b329d140eaeea4b04c07aafc5ae39d9cb12a799c32b473781a20083fce5d7105"
+				},
+				{
+					"path": "validation/custody-real-config-domain.json",
+					"sha256": "738b9e6f4812d2bafe32502fdc62803f9878b284c5dd89f1aceff8df224a3050"
 				}
 			]
 		},
@@ -2495,5 +2685,11 @@
 				}
 			]
 		}
-	]
+	],
+	"source_authentication": {
+		"initial_role_claims": 132,
+		"initial_distinct_paths": 107,
+		"combined_distinct_paths": 135,
+		"qualification": "Named source receipts from four frozen roles and subsequent public-channel/config/menu/real-persistence supplements. Overlapping role claims are not distinct coverage; 135 is a source-file union, not 135 scenarios or transitive completeness. Each named current file and pinned Git blob is authenticated."
+	}
 }

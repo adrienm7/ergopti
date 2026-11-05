@@ -1,0 +1,8 @@
+{
+	"qualification": "Formatting only; the final numeric delivery receipt pins the exact source-authentication original preserved here. Current JSON values are identical. No recorded source digests were rewritten.",
+	"original": "final-numeric-source-authentication.json.original.txt",
+	"original_sha256": "8fbb4a02183c7e1ac030d1b56af30bc17e1be4c5671987104d82bf97eda72b44",
+	"current": "final-numeric-source-authentication.json",
+	"current_sha256": "2fc59284e2ba02e68cb716a0a3ff8736628209e2744ea420ec964c20e2c9e710",
+	"json_equal": true
+}
