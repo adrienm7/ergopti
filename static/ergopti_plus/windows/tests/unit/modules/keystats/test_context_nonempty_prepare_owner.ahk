@@ -15,6 +15,8 @@ _KCNP_ChildSource() {
 	AssertEqual(1, Aliases, "The entire actual privacy predicate must remain intact behind its scheduling alias")
 	Source := StrReplace(Source, "#Include " . Owner . "`n", Embedded . "`n", true, &Includes)
 	AssertEqual(1, Includes, "Only the real privacy owner include may be embedded")
+	Source := RegExReplace(Source, "m)^KL_LogWindowSwitch\(Values\*\) \{", "$0`n`t_KCNP_ObserveWindow(Values*)", &ObserverCount)
+	AssertEqual(1, ObserverCount, "Only the existing delegated window logger receives the read-only observer")
 	return Source . "#Include " . _DriverDir . "\tests\fixtures\context_nonempty_prepare_owner_body.ahk`n"
 }
 _KCNP_Case(Mode) {
@@ -61,6 +63,6 @@ _KCNP_Case(Mode) {
 		throw Primary
 	AssertTrue(Retired, "The exact native owner must retire before recursive source cleanup")
 }
-for _KCNP_Mode in ["ordinary-control", "stop-during-prepare", "existing-retry-stop", "external-active", "abc-deferred", "abc-deferred-stop", "abc-deferred-shift"]
+for _KCNP_Mode in ["ordinary-control", "stop-during-prepare", "existing-retry-stop", "external-active", "abc-deferred", "abc-deferred-stop", "abc-deferred-shift", "abc-deferred-sameapp-shift"]
 	Test("Keystats nonempty context prepare: " . _KCNP_Mode . " preserves new input attribution (context-nonempty-prepare-owner)",
 		_KCNP_Case.Bind(_KCNP_Mode))
