@@ -680,6 +680,8 @@ global _LLM_MBW_SessionEpoch := 0
 ; Reset and close a controller that is already mid-teardown. Same guard as every
 ; other WebView2 host in the driver.
 global _LLM_MBW_ResetDone  := false
+global _LLM_MBW_SubscriptionOwner := 0
+global _LLM_MBW_RetiredHosts := []
 
 ; Virtual host mapped to _SharedDir so the document and its relative assets
 ; and the locale fetch resolve over https:// -- file:// is an opaque origin
@@ -700,6 +702,7 @@ _LLM_ModelBrowser_ShowWeb() {
 	global _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_ResetDone, _LLM_MBW_SessionEpoch
 	global _VendorDir, _SharedDir, _I18nLocale
 
+	_LLM_MBW_RetryRetiredHosts()
 	if IsSet(_LLM_MBW_Gui) {
 		Window := _LLM_MBW_Gui, SessionEpoch := _LLM_MBW_SessionEpoch
 		WMPresentWindow(Window)
@@ -721,7 +724,7 @@ _LLM_ModelBrowser_ShowWeb() {
 	} finally Critical(PreviousCritical)
 
 	g := Gui_Create("+Resize +MinSize780x460", t("model_browser.window_title"))
-	Installed := false, FactoryFailed := false, ResetForFallback := false
+	Installed := false, FactoryFailed := false, ResetForFallback := false, Host := 0
 	try {
 		if !_LLM_MBW_StartupCurrent(SessionEpoch)
 			return g
@@ -763,6 +766,9 @@ _LLM_ModelBrowser_ShowWeb() {
 			View := Controller.CoreWebView2
 			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
 				return g
+			Host := _LLM_MBW_BeginSubscriptions(SessionEpoch, g, Controller, View)
+			if !IsObject(Host)
+				return g
 			try {
 				s := View.Settings
 				for Setting in ["AreDevToolsEnabled", "AreDefaultContextMenusEnabled", "IsStatusBarEnabled",
@@ -774,7 +780,8 @@ _LLM_ModelBrowser_ShowWeb() {
 			}
 			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
 				return g
-			MsgSub := View.WebMessageReceived(_LLM_MBW_OnWebMessage.Bind(SessionEpoch))
+			if !_LLM_MBW_Subscribe(Host, _LLM_MBW_OnWebMessage.Bind(SessionEpoch))
+				return g
 			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
 				return g
 			try View.SetVirtualHostNameToFolderMapping(LLM_MBW_VHOST, _SharedDir, LLM_MBW_HOST_ACCESS_ALLOW)
@@ -789,8 +796,7 @@ _LLM_ModelBrowser_ShowWeb() {
 					return g
 				_LLM_MBW_Controller := Controller
 				_LLM_MBW_WebView := View
-				_LLM_MBW_MsgSub := MsgSub
-				MsgSub := unset
+				_LLM_MBW_MsgSub := Host.message
 				Installed := true
 			} finally Critical(PreviousCritical)
 			try View.Navigate(_LLM_MBW_HtmlUrl())
@@ -808,16 +814,124 @@ _LLM_ModelBrowser_ShowWeb() {
 		if !Installed {
 			; Only this frame's captured resources retire, even if Close reopens.
 			ResetForFallback := _LLM_MBW_Reset(SessionEpoch, g)
-			try MsgSub := unset
-			if IsSet(Controller)
-				try Controller.Close()
-			try g.Destroy()
+			if IsObject(Host) {
+				_LLM_MBW_RetireSubscriptionHost(Host)
+			} else {
+				if IsSet(Controller)
+					try Controller.Close()
+				try g.Destroy()
+			}
 		}
 	}
 	; A retired constructor is handled. Only a still-owned factory failure
 	; may ask the public entry to open the native fallback.
 	return FactoryFailed && ResetForFallback && _LLM_MBW_SessionEpoch == SessionEpoch + 1
 		&& !IsSet(_LLM_MBW_Gui) ? "" : g
+}
+
+; A subscription is returned after add_Event has pumped native messages. The
+; exact host retains its HWND/controller until that returned handle is released.
+_LLM_MBW_BeginSubscriptions(Epoch, Window, Controller, View) {
+	global _LLM_MBW_SubscriptionOwner
+	Host := {epoch: Epoch, gui: Window, controller: Controller, view: View, message: 0, in_flight: false, retired: false, closing: false, closed: false}
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_MBW_StartupCurrent(Epoch, Window) || IsObject(_LLM_MBW_SubscriptionOwner)
+			return 0
+		_LLM_MBW_SubscriptionOwner := Host
+		return Host
+	} finally Critical(PreviousCritical)
+}
+
+_LLM_MBW_Subscribe(Host, Handler) {
+	global _LLM_MBW_SubscriptionOwner
+	PreviousCritical := Critical("On")
+	try {
+		if Host.retired || _LLM_MBW_SubscriptionOwner != Host
+				|| !_LLM_MBW_StartupCurrent(Host.epoch, Host.gui)
+			return false
+		Host.in_flight := true
+	} finally Critical(PreviousCritical)
+	Subscription := 0, Failed := false, FailureType := ""
+	try {
+		Subscription := Host.view.WebMessageReceived(Handler)
+	} catch Any as Failure {
+		Failed := true, FailureType := Type(Failure)
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			Host.message := Subscription
+			Subscription := 0
+			Host.in_flight := false
+			Current := !Host.retired && _LLM_MBW_SubscriptionOwner == Host
+				&& _LLM_MBW_StartupCurrent(Host.epoch, Host.gui)
+		} finally Critical(PreviousCritical)
+	}
+	if Host.retired
+		_LLM_MBW_RetryRetiredHosts()
+	if Failed
+		try LoggerError("LLM.browser", "Browser subscription failed (error_type={1}).", FailureType)
+	return !Failed && Current && !Host.retired
+}
+
+_LLM_MBW_RetireSubscriptionHost(Host) {
+	global _LLM_MBW_RetiredHosts
+	PreviousCritical := Critical("On")
+	try {
+		if !IsObject(Host.gui)
+			return
+		Host.retired := true
+		Found := false
+		for Pending in _LLM_MBW_RetiredHosts
+			if Pending == Host
+				Found := true
+		if !Found
+			_LLM_MBW_RetiredHosts.Push(Host)
+	} finally Critical(PreviousCritical)
+	; Hide can pump a replacement; all subsequent operations use this old record.
+	try Host.gui.Hide()
+	_LLM_MBW_RetryRetiredHosts()
+}
+
+_LLM_MBW_RetryRetiredHosts() {
+	global _LLM_MBW_RetiredHosts
+	PreviousCritical := Critical("On")
+	try Pending := _LLM_MBW_RetiredHosts.Clone()
+	finally Critical(PreviousCritical)
+	for Host in Pending {
+		PreviousCritical := Critical("On")
+		try {
+			if Host.in_flight || Host.closing
+				continue
+			Host.closing := true
+		} finally Critical(PreviousCritical)
+		Settled := false
+		try {
+			Host.message := 0
+			if !Host.closed {
+				Host.controller.Close()
+				Host.closed := true
+			}
+			Host.gui.Destroy()
+			Host.gui := 0, Host.controller := 0, Host.view := 0
+			Settled := true
+		} catch Any as Failure {
+			try LoggerWarn("LLM.browser", "Browser retirement remains pending (error_type={1}).", Type(Failure))
+		} finally {
+			PreviousCritical := Critical("On")
+			try {
+				Host.closing := false
+				if Settled {
+					Count := _LLM_MBW_RetiredHosts.Length
+					Loop Count {
+						Index := Count - A_Index + 1
+						if _LLM_MBW_RetiredHosts[Index] == Host
+							_LLM_MBW_RetiredHosts.RemoveAt(Index)
+					}
+				}
+			} finally Critical(PreviousCritical)
+		}
+	}
 }
 
 _LLM_MBW_StartupCurrent(SessionEpoch, Window := unset) {
@@ -1602,11 +1716,15 @@ _LLM_MBW_Num(v) {
 }
 
 _LLM_MBW_OnClose(ExpectedWindow := unset, *) {
-	global _LLM_MBW_Gui
-	Window := IsSet(ExpectedWindow) ? ExpectedWindow : (IsSet(_LLM_MBW_Gui) ? _LLM_MBW_Gui : 0)
+	global _LLM_MBW_Gui, _LLM_MBW_SubscriptionOwner
+	PreviousCritical := Critical("On")
+	try {
+		Host := _LLM_MBW_SubscriptionOwner
+		Window := IsSet(ExpectedWindow) ? ExpectedWindow : (IsSet(_LLM_MBW_Gui) ? _LLM_MBW_Gui : 0)
+	} finally Critical(PreviousCritical)
 	if !_LLM_MBW_Reset(, Window)
 		return
-	if IsObject(Window)
+	if !IsObject(Host) && IsObject(Window)
 		try Window.Destroy()
 }
 
@@ -1619,6 +1737,7 @@ _LLM_MBW_OnResize(GuiObj, MinMax, Width, Height) {
 }
 
 _LLM_MBW_Reset(ExpectedEpoch := unset, ExpectedWindow := unset) {
+	global _LLM_MBW_SubscriptionOwner
 	global _LLM_MBW_Gui, _LLM_MBW_WebView, _LLM_MBW_Controller, _LLM_MBW_MsgSub
 	global _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_ResetDone, _LLM_MBW_SessionEpoch
 	PreviousCritical := Critical("On")
@@ -1630,6 +1749,10 @@ _LLM_MBW_Reset(ExpectedEpoch := unset, ExpectedWindow := unset) {
 			return false
 		; Detach RAM before releasing subscriptions or closing COM: either can
 		; pump a replacement which owns entirely different global references.
+		Host := _LLM_MBW_SubscriptionOwner
+		if IsObject(Host)
+			Host.retired := true
+		_LLM_MBW_SubscriptionOwner := 0
 		if IsSet(_LLM_MBW_Gui)
 			RetiredWindow := _LLM_MBW_Gui
 		if IsSet(_LLM_MBW_WebView)
@@ -1648,7 +1771,9 @@ _LLM_MBW_Reset(ExpectedEpoch := unset, ExpectedWindow := unset) {
 		_LLM_MBW_Queue := []
 	} finally Critical(PreviousCritical)
 	try RetiredMsgSub := unset
-	if IsSet(RetiredController)
+	if IsObject(Host) {
+		_LLM_MBW_RetireSubscriptionHost(Host)
+	} else if IsSet(RetiredController)
 		try RetiredController.Close()
 	return true
 }
