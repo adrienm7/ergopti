@@ -502,13 +502,14 @@ end
 -- ==========================================
 
 local function load_categories()
-	local read_ok, content, read_status, read_detail = pcall(FileSystem.read_with_status, categories_file())
+	local path = categories_file()
+	local read_ok, content, read_status, read_detail = pcall(FileSystem.read_with_status, path)
 	if not read_ok or read_status == "error" then
 		Logger.error(LOG, "App categories read did not commit; edit refused — %s.",
 			tostring(read_ok and read_detail or content))
 		return nil, "failed"
 	end
-	if read_status == "absent" then return CategoryStore.empty(), "absent", { status = "absent" } end
+	if read_status == "absent" then return CategoryStore.empty(), "absent", { status = "absent", path = path } end
 	if read_status ~= "ok" or type(content) ~= "string" then
 		Logger.error(LOG, "App categories returned an invalid read status; edit refused — %s.",
 			tostring(read_status))
@@ -523,11 +524,11 @@ local function load_categories()
 	-- A store in the previous flat layout is rewritten in the shared one by the
 	-- next save: the categories it holds are kept.
 	if model.legacy then Logger.info(LOG, "App categories read from the previous layout; the next save upgrades it.") end
-	return model, "ok", { status = "ok", content = content }
+	return model, "ok", { status = "ok", content = content, path = path }
 end
 
 local function save_categories(data, source_snapshot)
-	if type(source_snapshot) ~= "table" then
+	if type(source_snapshot) ~= "table" or source_snapshot.path ~= categories_file() then
 		Logger.error(LOG, "App categories save refused without an exact source snapshot.")
 		return false
 	end
@@ -539,7 +540,7 @@ local function save_categories(data, source_snapshot)
 
 	local write_ok, committed = pcall(
 		FileSystem.write_if_unchanged,
-		categories_file(),
+		source_snapshot.path,
 		encoded,
 		source_snapshot
 	)
@@ -571,7 +572,7 @@ local function push_categories_to_ui(generation, webview)
 end
 
 local function list_existing_categories()
-	local cats = load_categories()
+	local cats, _, source_snapshot = load_categories()
 	if not cats then return nil end
 	local general = i18n.get("metrics_apps.general_category")
 	local seen = { [general] = true }
@@ -584,10 +585,17 @@ local function list_existing_categories()
 		end
 	end
 	table.sort(result, function(a, b) return a:lower() < b:lower() end)
-	return result
+	return result, cats, source_snapshot
 end
 
-local function prompt_score_then_save(app_name, chosen_cat, default_score, generation, webview)
+local function category_source_current(expected)
+	if expected.path ~= categories_file() then return false end
+	local _, _, current = load_categories()
+	return current ~= nil and current.path == expected.path and current.status == expected.status
+		and current.content == expected.content
+end
+
+local function prompt_score_then_save(app_name, chosen_cat, default_score, generation, webview, cats, source_snapshot)
 	if not owner_is_current(generation, webview) then return false end
 	local btn, score_str = dialog.text_prompt(
 		i18n.get("metrics_apps.score_title"),
@@ -600,8 +608,10 @@ local function prompt_score_then_save(app_name, chosen_cat, default_score, gener
 		dialog.block_alert(i18n.get("common.warning"), i18n.get("metrics_apps.score_error"), i18n.get("button.ok"))
 		return
 	end
-	local cats, _, source_snapshot = load_categories()
-	if not cats then return false end
+	if not category_source_current(source_snapshot) then
+		Logger.warn(LOG, "App categories changed while the editor was open; edit refused.")
+		return false
+	end
 	local stored, reason = CategoryStore.set(cats, app_name, chosen_cat, score)
 	if not stored then
 		Logger.error(LOG, "App category refused: %s.", tostring(reason))
@@ -618,7 +628,7 @@ end
 
 function M.prompt_category(app_name, default_cat, default_score, generation, webview)
 	if not owner_is_current(generation, webview) then return false end
-	local existing = list_existing_categories()
+	local existing, cats, source_snapshot = list_existing_categories()
 	if not existing then return false end
 	local choices  = {}
 
@@ -633,14 +643,14 @@ function M.prompt_category(app_name, default_cat, default_score, generation, web
 		if not owner_is_current(generation, webview) then return end
 		if not choice then return end
 		if choice._kind == "pick" then
-			prompt_score_then_save(app_name, choice._value, default_score, generation, webview)
+			prompt_score_then_save(app_name, choice._value, default_score, generation, webview, cats, source_snapshot)
 		elseif choice._kind == "new" then
 			local btn, new_cat = dialog.text_prompt(i18n.get("metrics_apps.new_category_title"),
 				string.format(i18n.get("metrics_apps.new_category_prompt"), app_name),
 				"", i18n.get("button.ok"), i18n.get("common.cancel"))
 			if not owner_is_current(generation, webview) then return end
 			if btn == i18n.get("button.ok") and new_cat and new_cat ~= "" then
-				prompt_score_then_save(app_name, new_cat, default_score, generation, webview)
+				prompt_score_then_save(app_name, new_cat, default_score, generation, webview, cats, source_snapshot)
 			end
 		elseif choice._kind == "rename" then
 			local rename_choices = {}
@@ -655,8 +665,10 @@ function M.prompt_category(app_name, default_cat, default_score, generation, web
 					c2.text, i18n.get("button.ok"), i18n.get("common.cancel"))
 				if not owner_is_current(generation, webview) then return end
 				if btn == i18n.get("button.ok") and new_name and new_name ~= "" and new_name ~= c2.text then
-					local cats, _, source_snapshot = load_categories()
-					if not cats then return end
+					if not category_source_current(source_snapshot) then
+						Logger.warn(LOG, "App categories changed while the editor was open; rename refused.")
+						return
+					end
 					local renamed, reason = CategoryStore.rename_category(cats, c2.text, new_name)
 					if not renamed then
 						Logger.error(LOG, "Category rename refused: %s.", tostring(reason))
