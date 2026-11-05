@@ -77,6 +77,21 @@ helpers.describe("llm_language parameter replays the shared translate corpus", f
 		end)
 	end
 
+	helpers.it("refuses duplicated or missing locales in the translation choices", function()
+		local config_text = json.encode(config)
+		local names_text = json.encode(names)
+		local order = read_json("data/locale_order.json")
+		order.order[2] = order.order[1]
+		local duplicate, duplicate_reason = Translation.parse(config_text, names_text, json.encode(order))
+		helpers.assert_nil(duplicate, "a duplicated choice must not hide another language")
+		helpers.assert_true(type(duplicate_reason) == "string")
+		order = read_json("data/locale_order.json")
+		table.remove(order.order)
+		local missing, missing_reason = Translation.parse(config_text, names_text, json.encode(order))
+		helpers.assert_nil(missing, "a language absent from the display order must be refused")
+		helpers.assert_true(type(missing_reason) == "string")
+	end)
+
 	helpers.it("the driver's reader accepts the shipped files and refuses a broken one", function()
 		local data = Translation.data()
 		helpers.assert_true(data ~= nil, "translate.json and the locale files load")
