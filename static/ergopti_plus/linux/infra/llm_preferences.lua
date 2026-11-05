@@ -93,21 +93,21 @@ end
 local function lookup(document, path)
 	local value, walked = document, {}
 	for key in path:gmatch("[^.]+") do
-		if value == nil then return nil end
+		if value == nil then return nil, "absent" end
 		if type(value) ~= "table" then
 			ConfigOutdated.report(table.concat(walked, "."), "a table of settings is expected here", Logger)
-			return nil
+			return nil, "invalid"
 		end
 		walked[#walked + 1] = key
 		value = value[key]
 	end
-	if value == nil then return nil end
+	if value == nil then return nil, "absent" end
 	local definition = Manifest.find_entry_by_path(path)
 	if definition and not pcall(validate, definition, value) then
 		ConfigOutdated.report(path, "the value no longer fits its " .. tostring(definition.type) .. " setting", Logger)
-		return nil
+		return nil, "invalid"
 	end
-	return value
+	return value, "ok"
 end
 
 local function read()
@@ -145,6 +145,17 @@ function M.get(path, absent)
 	if value == nil then return absent end
 	if type(value) == "table" then return TableUtil.deep_copy(value) end
 	return value
+end
+
+--- Reads a preference while distinguishing proven absence from a refused value.
+--- @param path string Declared preference path.
+--- @return any value Detached accepted value or nil.
+--- @return string status "ok", "absent", or "invalid".
+function M.get_with_status(path)
+	entry(path)
+	local value, status = lookup(read(), path)
+	if type(value) == "table" then value = TableUtil.deep_copy(value) end
+	return value, status
 end
 
 --- Resolves related choices from one exact source snapshot.

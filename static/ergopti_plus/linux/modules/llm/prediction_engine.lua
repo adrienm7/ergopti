@@ -603,14 +603,14 @@ local function schedule(context, output_context, event, live)
 			return
 		end
 		if not live then
-			M.predict(context, captured)
+			M.predict(context, captured, nil, true)
 			return
 		end
 		-- A pause or the AI switch turn live mode off; checked again here, since
 		-- the timer may have been armed just before.
 		if _is_paused() or not _enabled then return end
 		local override = live_override()
-		if override then M.predict(context, captured, override) end
+		if override then M.predict(context, captured, override, true) end
 	end)
 	if fired_early or type(handle) ~= "table" or handle.armed ~= true then
 		if type(handle) == "table" then _debounce.own(handle, cancel_timer); _debounce.retire(handle) end
@@ -876,9 +876,10 @@ end
 ---   mode's minimum word count), instead of the menu's profile (and its
 ---   automatic choice), count and minimum, which stay unchanged. `live` marks
 ---   the offer as live mode's, the one Tab accepts.
+--- @param automatic boolean|nil True when the typing trigger scheduled this request.
 --- @return string|nil refusal A MANUAL_REFUSAL_KEYS reason the user should be
 ---   told, when the request was refused for one.
-function M.predict(context, output_context, override)
+function M.predict(context, output_context, override, automatic)
 	if _runtime_closed or _scope_owner then return false end
 	if _predicting or type(context) ~= "string" or context == "" then return end
 	local request, app_epoch, engine, owner = _request_epoch, _runtime_app_epoch, _engine, _runtime_owner
@@ -887,7 +888,7 @@ function M.predict(context, output_context, override)
 		return false
 	end
 	-- The applications the user switched the trigger off in (llm.trigger.disabled_apps)
-	if TriggerSettings.is_app_disabled(type(output_context) == "table" and output_context.app_id or nil) then
+	if TriggerSettings.is_app_disabled(type(output_context) == "table" and output_context.app_id or nil, automatic) then
 		Logger.debug(LOG, "Prediction suppressed: the application is excluded.")
 		return false
 	end

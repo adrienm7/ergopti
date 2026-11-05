@@ -32,6 +32,27 @@ local function with_config(source, body)
 	end)
 end
 
+helpers.describe("AI preference classification", function()
+	for _, vector in ipairs({
+		{ name = "absent", content = "[llm.trigger]\n", status = "absent" },
+		{ name = "valid array", content = '[llm.trigger]\ndisabled_apps = ["firefox"]\n', status = "ok", value = { "firefox" } },
+		{ name = "wrong leaf", content = '[llm.trigger]\ndisabled_apps = "firefox"\n', status = "invalid" },
+		{ name = "wrong parent", content = '[llm]\ntrigger = "firefox"\n', status = "invalid" },
+	}) do
+		helpers.it("classifies " .. vector.name .. " without changing source bytes", function()
+			with_config(vector.content, function(path)
+				local preferences = require("infra.llm_preferences")
+				local before = Sandbox.read_bytes(path)
+				local value, status = preferences.get_with_status("llm.trigger.disabled_apps")
+				helpers.assert_eq(status, vector.status)
+				helpers.assert_eq(value, vector.value)
+				helpers.assert_eq(Sandbox.read_bytes(path), before)
+				if value then value[1] = "mutated"; helpers.assert_eq(preferences.get("llm.trigger.disabled_apps"), vector.value) end
+			end)
+		end)
+	end
+end)
+
 helpers.describe("canonical Linux AI settings", function()
 	helpers.it("round-trips the agent-mode enum through the real durable owner without changing neighbors", function()
 		with_config('[llm]\nagent_mode = "auto"\nfuture = "keep"\n[other]\nvalue = 42\n', function(path)
