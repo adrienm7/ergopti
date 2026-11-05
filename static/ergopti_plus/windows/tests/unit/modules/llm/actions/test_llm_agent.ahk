@@ -849,3 +849,54 @@ _LAG_AnswersRefusedOrFailing() {
 }
 Test("LLM agent: invalid actions are dropped, failures reported, older answers ignored",
 	_LAG_AnswersRefusedOrFailing)
+
+
+; Exercise accepted model JSON through the real action schema before rendering.
+; Canonical line endings must not depend on how a JSON newline was spelled.
+_LAG_LineBreakPayload(Connector, Mode) {
+	Config := LLM_Agent_Config()
+	switch Mode {
+		case "lf-control":
+			Escaped := "\n", IcsExpected := "first\nsecond", MailExpected := "first%0D%0Asecond"
+		case "crlf-control":
+			Escaped := "\r\n", IcsExpected := "first\nsecond", MailExpected := "first%0D%0Asecond"
+		case "carriage":
+			Escaped := "\r", IcsExpected := "first\nsecond", MailExpected := "first%0D%0Asecond"
+		case "mixed":
+			Escaped := "\r\nmiddle\rfinal\n"
+			IcsExpected := "first\nmiddle\nfinal\nsecond"
+			MailExpected := "first%0D%0Amiddle%0D%0Afinal%0D%0Asecond"
+		case "literal-control":
+			Escaped := "\\r", IcsExpected := "first\\rsecond", MailExpected := "first%5Crsecond"
+		default:
+			throw ValueError("Unknown agent payload line break mode")
+	}
+	Raw := Connector == "calendar"
+		? '{"type":"calendar","title":"Fixture","start":"2026-10-01T14:00","notes":"first' . Escaped . 'second"}'
+		: '{"type":"mail","subject":"Fixture","body":"first' . Escaped . 'second"}'
+	Decoded := JsonParse(Raw)
+	Action := LLM_Agent_ValidateAction(Config, Decoded, [], &Reason)
+	AssertEqual("", Reason, "the actual schema accepts the genuinely decoded model field")
+	AssertTrue(Action is Map)
+	if Connector == "calendar" {
+		AssertEqual(Decoded["notes"], Action["notes"], "validation must preserve the original admitted newline spelling")
+		Payload := LLM_Agent_Ics(Config, Action, "owned-fixture", "20261105T000000Z")
+		ExpectedRecord := "DESCRIPTION:" . IcsExpected . "`r`n"
+		_TestPrint("# agent-payload-linebreak connector=" . Connector . " mode=" . Mode
+			. " exact_record=" . !!InStr(Payload, ExpectedRecord, true)
+			. " lone_break=" . !!RegExMatch(Payload, "(?<!\r)\n|\r(?!\n)"))
+		AssertFalse(RegExMatch(Payload, "(?<!\r)\n|\r(?!\n)"), "all physical iCalendar delimiters must be complete CRLF pairs")
+		AssertTrue(InStr(Payload, ExpectedRecord, true), "each accepted logical newline must be escaped within its original TEXT record")
+	} else {
+		AssertEqual(Decoded["body"], Action["body"])
+		Payload := LLM_Agent_Mailto(Action)
+		Expected := "mailto:?subject=Fixture&body=" . MailExpected
+		_TestPrint("# agent-payload-linebreak connector=" . Connector . " mode=" . Mode . " uri=" . Payload)
+		AssertEqual(Expected, Payload, "each accepted mail body newline must encode the complete RFC6068 CRLF sequence")
+	}
+}
+for _LAG_LB_Connector in ["calendar", "mail"] {
+	for _LAG_LB_Mode in ["lf-control", "crlf-control", "carriage", "mixed", "literal-control"]
+		Test("LLM agent payload line breaks: " . _LAG_LB_Connector . "/" . _LAG_LB_Mode . " (agent-payload-line-breaks)",
+			_LAG_LineBreakPayload.Bind(_LAG_LB_Connector, _LAG_LB_Mode))
+}
