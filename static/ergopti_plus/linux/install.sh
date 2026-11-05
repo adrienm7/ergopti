@@ -274,9 +274,7 @@ if $INSTALL_SERVICE && ! $SETUP_PERMS_ONLY; then
 				if grep -Fxq "$startup_unit_exec" "$startup_path" \
 					|| grep -Fxq "ExecStart=$startup_wrapper --tray" "$startup_path"; then continue; fi ;;
 			*.desktop)
-				if grep -Fxq "$startup_desktop_exec" "$startup_path" \
-					|| grep -Fxq "Exec=$startup_wrapper --tray" "$startup_path" \
-					|| grep -Fxq "Exec=$startup_wrapper --session-start --tray" "$startup_path"; then continue; fi ;;
+				if ergopti_desktop_entry_owned "$startup_path" "$startup_wrapper"; then continue; fi ;;
 		esac
 		printf '[install] code=foreign-startup path=%q\n' "$startup_path" >&2
 		exit 1

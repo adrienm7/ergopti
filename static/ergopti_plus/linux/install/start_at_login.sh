@@ -72,9 +72,7 @@ fi
 
 if [ "$ACTION" = status ]; then
 	# Report a real conflicting command without acquiring it for replacement.
-	if [ -f "$DESKTOP_FILE" ] && ! grep -Fxq "Exec=$LAUNCHER --tray" "$DESKTOP_FILE" \
-		&& ! grep -Fxq "Exec=$LAUNCHER --session-start --tray" "$DESKTOP_FILE" \
-		&& ! grep -Fxq "$(ergopti_desktop_exec "$LAUNCHER")" "$DESKTOP_FILE"; then
+	if [ -f "$DESKTOP_FILE" ] && ! ergopti_desktop_entry_owned "$DESKTOP_FILE" "$LAUNCHER"; then
 		printf 'other\n'
 		exit 0
 	fi
@@ -105,9 +103,7 @@ if { [ -e "$DESKTOP_FILE" ] || [ -L "$DESKTOP_FILE" ]; } \
 	startup_record invalid-source desktop "$DESKTOP_FILE"
 	exit 78
 fi
-if [ -f "$DESKTOP_FILE" ] && ! grep -Fxq "Exec=$LAUNCHER --tray" "$DESKTOP_FILE" \
-	&& ! grep -Fxq "Exec=$LAUNCHER --session-start --tray" "$DESKTOP_FILE" \
-	&& ! grep -Fxq "$(ergopti_desktop_exec "$LAUNCHER")" "$DESKTOP_FILE"; then
+if [ -f "$DESKTOP_FILE" ] && ! ergopti_desktop_entry_owned "$DESKTOP_FILE" "$LAUNCHER"; then
 	ergopti_msg startup.foreign_entry >&2
 	exit 78
 fi

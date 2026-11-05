@@ -957,6 +957,28 @@ for (const kind of [
 	}
 }
 
+// An expected command in a duplicate key or action does not own the main entry.
+for (const kind of ['duplicate', 'action-decoy']) {
+	let original;
+	const run = runInstaller({
+		desktopProvided: true,
+		seed(home, configRoot) {
+			const desktop = path.join(configRoot, 'autostart/ergopti-hotstrings.desktop');
+			const launcher = `${bashPath(home)}/.local/bin/ergopti-hotstrings`;
+			fs.mkdirSync(path.dirname(desktop), { recursive: true });
+			original = kind === 'duplicate'
+				? `[Desktop Entry]\nExec=${launcher} --tray\nExec=/other/program\n`
+				: `[Desktop Entry]\nExec=/other/program\n[Desktop Action Example]\nExec=${launcher} --tray\n`;
+			fs.writeFileSync(desktop, original);
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0, `${kind} main entry must be refused`);
+		assert.equal(fs.readFileSync(path.join(run.configRoot, 'autostart/ergopti-hotstrings.desktop'), 'utf8'), original);
+		assert.equal(fs.existsSync(path.join(run.home, '.local/lib/ergopti')), false);
+	} finally { run.cleanup(); }
+}
+
 // A valid receipt's last row remains authoritative without a trailing newline.
 {
 	const run = runInstaller({

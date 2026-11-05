@@ -230,6 +230,18 @@ try {
 	assert.equal(run('enable', { SHOW_REFUSE: '1' }).status, 0, 'offline disabled service permits XDG startup');
 	assert.doesNotMatch(fs.readFileSync(calls, 'utf8').slice(offlineCalls), /--no-reload disable/);
 	assert.equal(run('disable', { SHOW_REFUSE: '1' }).status, 0);
+	const ownedDesktop = fs.readFileSync(desktop, 'utf8');
+	for (const mixed of [
+		`${ownedDesktop}Exec=/other/program\n`,
+		`[Desktop Entry]\nExec=/other/program\n[Desktop Action Example]\n${ownedDesktop.match(/^Exec=.*$/m)[0]}\n`
+	]) {
+		fs.writeFileSync(desktop, mixed);
+		assert.equal(run('status').stdout.trim(), 'other', 'ambiguous desktop command is foreign');
+		assert.notEqual(run('enable').status, 0, 'ambiguous desktop command must be preserved');
+		assert.equal(fs.readFileSync(desktop, 'utf8'), mixed);
+	}
+	fs.writeFileSync(desktop, `${ownedDesktop}[Desktop Action Example]\nExec=/other/program\n`);
+	assert.equal(run('status').stdout.trim(), 'disabled', 'unrelated desktop actions do not change the main command');
 	fs.writeFileSync(desktop, '[Desktop Entry]\nExec=/other/program\n');
 	assert.equal(
 		run('status').stdout.trim(),
