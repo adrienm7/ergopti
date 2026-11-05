@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **123 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **124 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1859,3 +1859,13 @@ A genuine source containing signed MAXINT produces resolved1, accepted1, new_id1
 Severity: high. Confidence: high. Evidence: native Windows fail-before.
 
 A real JSON-produced13-unit name containing NUL causes each actual ST_Set/Get/Has/Delete operation to address its distinct shorter private HKCU neighbor. Set replaces Original with Edited; Get returns Original instead of missing; Has returns1; Delete removes Original. Unicode and default-name controls pass. Commit2c5ac7cc checks the original UTF-16 span before native conversion and keeps the established numeric-key conversion contract. The six native cases and two numeric controls await native postfix qualification. Separate scalar-persistence and counted-name inventory probes are hypotheses until their own actual native receipts arrive; they add no finding count.
+
+Replay42020967359 at0fd15d38839c8d58b7e9978a79aa69210f0f1703 executes65 strictly selected cases:62 pass and3 fail, with identical failures reversed. Production compilation passes; both E2E flags are unselected. The signed event-domain/capacity, stale ROI, public registry-name/coercion, override partial-publication and custom Kana endpoint corrections all pass their selected controls in both orders. This remains a selected-case qualification, not a whole-suite result.
+
+Its three failures are a personal-information close/reopen sibling of109, a counted native-name inventory sibling of123 and one distinct scalar-persistence family124. The real WM_DESTROY callback issues the public reopen request but no successor is constructed (windows1/factories1/newer_seen0); ordinary close passes. Actual NtSetValueKey accepts a distinct counted NUL name, raw Win32 enumeration proves its full13 units, yet ST_Clear acknowledges1 with1 of2 values still present. Conversion to a truncated String precedes name validation. Both cases await correction and add no new distinct count.
+
+### AHK-124: A successful scalar String write silently truncates embedded NUL content
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+A genuine3-unit JSON-produced String A/NUL/B is persisted through actual ST_Set into an exclusively owned HKCU fixture. Result1 is followed by actual_string_units1: the suffix is lost. The same content in the supported JSON Map envelope roundtrips3 units, and exact/wide binary64 controls preserve the independent expected bit patterns. Both orders reproduce the scalar failure. Direct scalar envelope construction reaches a null-terminated native conversion without validating the original span. The correction must either preserve every unit or refuse before mutating Original; it is pending. The numeric precision hypothesis is refuted for the qualified controls, so no numeric encoding rewrite is proposed.
