@@ -97,7 +97,7 @@ function M.notify(key, ...)
 		if at then text = text:sub(1, at - 1) .. tostring((select(index, ...))) .. text:sub(at + #token) end
 	end
 	local ok, Notifier = pcall(require, "adapters.application_notifier")
-	if not ok or type(Notifier.send) ~= "function" or Notifier.send(text, { level = "error" }) ~= true then
+	if not ok or type(Notifier.send) ~= "function" or Notifier.send(text, { level = "error", private = true }) ~= true then
 		Logger.warn(LOG, "Notice '%s' could not be shown.", key)
 	end
 end

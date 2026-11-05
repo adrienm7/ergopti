@@ -75,6 +75,14 @@ helpers.describe("notifier: sending", function()
 		end)
 	end)
 
+	helpers.it("delivers the private message to an available notification service", function()
+		with_shell(nil, function(notifier, commands)
+			helpers.assert_true(notifier.send("private diagnostic", { private = true }))
+			helpers.assert_true(commands[1]:find("private diagnostic", 1, true) ~= nil,
+				"privacy controls the fallback log, not the requested notice")
+		end)
+	end)
+
 	helpers.it("issues a notify-send carrying the message", function()
 		with_shell(nil, function(notifier, commands)
 			notifier.send("Le clavier a été rechargé.")
