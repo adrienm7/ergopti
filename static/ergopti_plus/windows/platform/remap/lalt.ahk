@@ -198,15 +198,23 @@ SC11D & SC038:: {
 #HotIf _LAltIsPlainBackspace() and not LayerEnabled
 *SC038::
 {
+	; Cleanup retires this callback even when the key remains held after resume.
+	RepeatEpoch := _TH_SyntheticEpoch
 	BackSpaceActionWithModifiers := BackSpaceLogic()
 	if not BackSpaceActionWithModifiers {
+		if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
+			return
 		TapHoldEmitKeyTap("BackSpace") ; Event keeps hotstring engine in sync
 		Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
+		if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
+			return
 		while KS_IsDown("SC038") { ; key-repeat loop while LAlt physically held
-			if A_IsSuspended
+			if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
 				break
 			TapHoldEmitKeyTap("BackSpace")
 			Sleep(KEY_REPEAT_INTERVAL_MS)
+			if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
+				break
 		}
 	}
 }

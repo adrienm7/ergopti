@@ -64,6 +64,8 @@ _RCtrlHoldModKey() {
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "backspace" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and not LayerEnabled
 *SC11D::
 {
+	; Cleanup retires this callback even when the key remains held after resume.
+	RepeatEpoch := _TH_SyntheticEpoch
 	if KS_IsDown("LShift") { ; LShift physically held → Delete
 		TextPressKey("Delete", "")
 	} else if TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and KS_IsDown("SC038") { ; LAlt(=OneShotShift) physically held
@@ -72,13 +74,19 @@ _RCtrlHoldModKey() {
 		TextPressKey("Right", "")
 		TextPressKey("BackSpace", "")
 	} else {
+		if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
+			return
 		TapHoldEmitKeyTap("BackSpace")
 		Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
+		if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
+			return
 		while KS_IsDown("SC11D") { ; key-repeat loop while RCtrl physically held
-			if A_IsSuspended
+			if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
 				break
 			TapHoldEmitKeyTap("BackSpace")
 			Sleep(KEY_REPEAT_INTERVAL_MS)
+			if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
+				break
 		}
 	}
 }
