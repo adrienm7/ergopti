@@ -20,25 +20,33 @@
 ; =====================================================
 ; =====================================================
 
-_MBWB_SubscriptionRetained(Body) {
+_MBWB_SubscriptionRetained(Body, Subscribe) {
 	Code := _DriverMaskNonCode(&Body)
-	if !RegExMatch(Code, "m)^[ \t]+([A-Za-z0-9_]+)\s*:=\s*[A-Za-z0-9_]+\.WebMessageReceived\(", &Capture)
+	SubscriptionCode := _DriverMaskNonCode(&Subscribe)
+	if !RegExMatch(Code, "m)^[ \t]+if !_LLM_MBW_Subscribe\(Host,")
+		return false
+	if !RegExMatch(SubscriptionCode, "m)^[ \t]+([A-Za-z0-9_]+)\s*:=\s*Host\.view\.WebMessageReceived\(", &Capture)
 		return false
 	ReturnName := Capture[1]
-	return RegExMatch(Code, "m)^[ \t]+_LLM_MBW_MsgSub\s*:=\s*" . ReturnName . "\s*$") > 0
+	return RegExMatch(SubscriptionCode, "m)^[ \t]+Host\.message\s*:=\s*" . ReturnName . "\s*$") > 0
+		&& RegExMatch(Code, "m)^[ \t]+_LLM_MBW_MsgSub\s*:=\s*Host\.message\s*$") > 0
 }
 
 _MBWB_CheckSubscriptionPersisted() {
 	Body := _DriverFuncBody("_LLM_ModelBrowser_ShowWeb")
-	Assert(Body != "", "The actual model browser constructor must exist")
-	; Startup owns the returned subscription locally until it can atomically
-	; lend it to the still-current host; the native child also checks its lifetime.
-	AssertTrue(_MBWB_SubscriptionRetained(Body), "The exact SDK return must reach the retained subscription owner")
-	AssertFalse(_MBWB_SubscriptionRetained(StrReplace(Body, "MsgSub := View.WebMessageReceived(", "View.WebMessageReceived(")),
+	Subscribe := _DriverFuncBody("_LLM_MBW_Subscribe")
+	Assert(Body != "" && Subscribe != "", "The actual browser constructor and subscription owner must exist")
+	; The SDK return reaches the exact in-flight owner before the constructor
+	; can lend it to the still-current host; the native child checks its lifetime.
+	AssertTrue(_MBWB_SubscriptionRetained(Body, Subscribe), "The exact SDK return must reach the retained subscription owner")
+	AssertFalse(_MBWB_SubscriptionRetained(Body,
+		StrReplace(Subscribe, "Subscription := Host.view.WebMessageReceived(", "Host.view.WebMessageReceived(")),
 		"A discarded subscription return cannot qualify")
-	AssertFalse(_MBWB_SubscriptionRetained(StrReplace(Body, "_LLM_MBW_MsgSub := MsgSub", "_LLM_MBW_MsgSub := Foreign")),
+	AssertFalse(_MBWB_SubscriptionRetained(Body,
+		StrReplace(Subscribe, "Host.message := Subscription", "Host.message := Foreign")),
 		"An unrelated retained value cannot qualify")
-	AssertFalse(_MBWB_SubscriptionRetained(StrReplace(Body, "_LLM_MBW_MsgSub := MsgSub", "; _LLM_MBW_MsgSub := MsgSub")),
+	AssertFalse(_MBWB_SubscriptionRetained(StrReplace(Body,
+		"_LLM_MBW_MsgSub := Host.message", "; _LLM_MBW_MsgSub := Host.message"), Subscribe),
 		"A commented transfer cannot qualify")
 }
 
