@@ -1,51 +1,39 @@
 {
-	"expected_count": 18,
+	"expected_count": 15,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
 	"filters": [
 		{
-			"contains": "prompt-native-subscription-retirement-owner",
+			"contains": "klr-live-deep-inventory",
 			"expected_count": 2
 		},
 		{
-			"contains": "model-web-native-subscription-retirement-owner",
+			"contains": "metrics-live-foreground-worker",
 			"expected_count": 2
 		},
 		{
-			"contains": "prompt-startup-owner",
-			"expected_count": 3
+			"contains": "keystats-native-high-backspace",
+			"expected_count": 2
 		},
 		{
-			"contains": "prompt-startup-repoint-owner",
-			"expected_count": 1
+			"contains": "action-picker-native-subscription-retirement-owner",
+			"expected_count": 2
 		},
 		{
-			"contains": "prompt-navigation-custody",
-			"expected_count": 4
+			"contains": "personal-info-subscription-owner",
+			"expected_count": 2
 		},
 		{
-			"contains": "Model browser startup: current preserves its native owner (model-browser-startup-owner)",
-			"expected_count": 1
+			"contains": "wpm-graph-native-reentry",
+			"expected_count": 2
 		},
 		{
-			"contains": "Model browser startup: factory preserves its native owner (model-browser-startup-owner)",
-			"expected_count": 1
+			"contains": "screenshot-layered-native",
+			"expected_count": 2
 		},
 		{
-			"contains": "Model browser startup: settings preserves its native owner (model-browser-startup-owner)",
-			"expected_count": 1
-		},
-		{
-			"contains": "Model browser startup: subscription preserves its native owner (model-browser-startup-owner)",
-			"expected_count": 1
-		},
-		{
-			"contains": "Model browser startup: teardown-reopen preserves its native owner (model-browser-startup-owner)",
-			"expected_count": 1
-		},
-		{
-			"contains": "model_browser: WebMessageReceived subscription handle is captured into _LLM_MBW_MsgSub, not discarded",
+			"contains": "native-ipv6-http-socks1",
 			"expected_count": 1
 		}
 	]
