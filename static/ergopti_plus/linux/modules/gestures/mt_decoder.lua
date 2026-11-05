@@ -218,9 +218,15 @@ function M.new(opts)
 	local _dropping = false -- invalid queue contents through the next SYN_REPORT
 
 	--- Discards everything and returns to "no fingers down".
-	local function reset()
-		_slots = {}
-		_current_slot = 0
+	local function reset(keep_device)
+		if keep_device then
+			-- evdev retains both per-slot axis values and the selected slot across
+			-- contacts, and suppresses unchanged values in later reports.
+			for _, slot in pairs(_slots) do slot.id = nil end
+		else
+			_slots = {}
+			_current_slot = 0
+		end
 		_touching = false
 		_peak_fingers = 0
 		_peak_since = nil
@@ -296,9 +302,8 @@ function M.new(opts)
 				if not slot then slot = {} ; _slots[_current_slot] = slot end
 				if code == ABS_MT_TRACKING_ID then
 					slot.id = value
-					-- -1 retires the slot. Its position is dropped with it so a stale
-					-- coordinate cannot contribute to the next gesture's centroid.
-					if value < 0 then slot.x, slot.y = nil, nil end
+					-- The kernel retains axis values after a slot is retired and may
+					-- omit them when the next contact lands at the same position.
 				elseif code == ABS_MT_POSITION_X then
 					slot.x = value
 				elseif code == ABS_MT_POSITION_Y then
@@ -402,7 +407,7 @@ function M.new(opts)
 		-- A contact held across loss can publish finger-count changes on lift,
 		-- without another BTN_TOUCH down. Only a fresh observed start owns a tap.
 		if _peak_fingers == 0 or _started_at == nil then
-			reset()
+			reset(true)
 			return nil
 		end
 
@@ -414,7 +419,7 @@ function M.new(opts)
 		local aborted = _aborted
 		local clock_invalid = _clock_invalid
 
-		reset()
+		reset(true)
 		if _last_scroll_end_at and started_at < _last_scroll_end_at then _last_scroll_end_at = nil end
 
 		if clock_invalid then

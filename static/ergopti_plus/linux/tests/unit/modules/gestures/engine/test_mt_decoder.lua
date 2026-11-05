@@ -354,6 +354,50 @@ end)
 
 helpers.describe("mt decoder: what must not go wrong", function()
 
+	helpers.it("recognises another tap when a reused slot omits unchanged coordinates", function()
+		local decoder = Decoder.new()
+		local first = feed_all(decoder, gesture_events(1, 0, 0))
+		helpers.assert_true(first and first.tap)
+		local again = feed_all(decoder, {
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, 800 },
+			{ EV_KEY, BTN_TOOL[1], 1 }, { EV_KEY, BTN_TOUCH, 1 },
+			{ EV_SYN, SYN_REPORT, 0 }, { EV_SYN, SYN_REPORT, 0 },
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1 },
+			{ EV_KEY, BTN_TOOL[1], 0 }, { EV_KEY, BTN_TOUCH, 0 },
+			{ EV_SYN, SYN_REPORT, 0 },
+		})
+		helpers.assert_true(again and again.tap, "the kernel need not resend unchanged position values")
+	end)
+
+	helpers.it("retains the current slot across completed gestures", function()
+		local decoder = Decoder.new()
+		feed_all(decoder, {
+			{ EV_ABS, Decoder.ABS_MT_SLOT, 1 }, { EV_ABS, Decoder.ABS_MT_TRACKING_ID, 1 },
+			{ EV_ABS, Decoder.ABS_MT_POSITION_X, 100 }, { EV_ABS, Decoder.ABS_MT_POSITION_Y, 100 },
+			{ EV_KEY, BTN_TOOL[1], 1 }, { EV_KEY, BTN_TOUCH, 1 },
+			{ EV_SYN, SYN_REPORT, 0 }, { EV_SYN, SYN_REPORT, 0 },
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1 },
+			{ EV_KEY, BTN_TOOL[1], 0 }, { EV_KEY, BTN_TOUCH, 0 }, { EV_SYN, SYN_REPORT, 0 },
+		})
+		local result = feed_all(decoder, {
+			-- The selected kernel slot is still 1: there is no redundant slot event.
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, 2 },
+			{ EV_ABS, Decoder.ABS_MT_POSITION_X, 100 }, { EV_ABS, Decoder.ABS_MT_POSITION_Y, 100 },
+			{ EV_KEY, BTN_TOUCH, 1 }, { EV_KEY, BTN_TOOL[1], 1 }, { EV_SYN, SYN_REPORT, 0 },
+			{ EV_ABS, Decoder.ABS_MT_SLOT, 0 }, { EV_ABS, Decoder.ABS_MT_TRACKING_ID, 3 },
+			{ EV_ABS, Decoder.ABS_MT_POSITION_X, 100 }, { EV_ABS, Decoder.ABS_MT_POSITION_Y, 100 },
+			{ EV_KEY, BTN_TOOL[1], 0 }, { EV_KEY, BTN_TOOL[2], 1 },
+			{ EV_SYN, SYN_REPORT, 0 }, { EV_SYN, SYN_REPORT, 0 },
+			{ EV_ABS, Decoder.ABS_MT_SLOT, 1 }, { EV_ABS, Decoder.ABS_MT_POSITION_Y, 500 },
+			{ EV_SYN, SYN_REPORT, 0 },
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1 },
+			{ EV_ABS, Decoder.ABS_MT_SLOT, 0 }, { EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1 },
+			{ EV_KEY, BTN_TOOL[2], 0 }, { EV_KEY, BTN_TOUCH, 0 }, { EV_SYN, SYN_REPORT, 0 },
+		})
+		helpers.assert_true(result and result.direction == "down" and result.fingers == 2,
+			"the two contacts must not collapse into one slot")
+	end)
+
 	helpers.it("throws the gesture away on SYN_DROPPED", function()
 		local decoder = Decoder.new()
 		local events = gesture_events(5, 0, -400)
