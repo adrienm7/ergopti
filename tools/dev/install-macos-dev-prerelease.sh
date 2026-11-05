@@ -106,6 +106,32 @@ if [ -n "${new:-}" ]; then
 	log "Installed $tag in $APP."
 fi
 
+# Another copy of the app (a local build) shares the bundle ids but not the
+# certificate: System Settings then grants Accessibility to that copy, the boot
+# finds itself untrusted and resets the entry, so the switch vanishes at every
+# reload. Every other copy is unregistered from LaunchServices (its files stay)
+# and stopped, leaving one code identity for the grant.
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+others="$({
+	mdfind "kMDItemCFBundleIdentifier == '$ERGOPTI_BUNDLE_ID_LAUNCHER'" 2>/dev/null || true
+	"$LSREGISTER" -dump 2>/dev/null | awk -v id="$ERGOPTI_BUNDLE_ID_LAUNCHER" '
+		/^-----/ { if (ident == id && path != "") print path; path = ""; ident = "" }
+		/^path:/ { sub(/^path: */, ""); sub(/ \(0x[0-9a-f]+\)$/, ""); path = $0 }
+		/^identifier:/ { sub(/^identifier: */, ""); ident = $0 }
+		END { if (ident == id && path != "") print path }' || true
+} | { grep '\.app$' || true; } | { grep -vxF "$APP" || true; } | sort -u)"
+while IFS= read -r other; do
+	[ -n "$other" ] || continue
+	log "Another copy shares the app's identity: $other; unregistering it (its files stay)."
+	pkill -f "^$other/Contents/" >/dev/null 2>&1 || true
+	"$LSREGISTER" -u "$other" >/dev/null 2>&1 || true
+	[ -d "$other/Contents/Frameworks/Hammerspoon.app" ] \
+		&& { "$LSREGISTER" -u "$other/Contents/Frameworks/Hammerspoon.app" >/dev/null 2>&1 || true; }
+done <<<"$others"
+"$LSREGISTER" -f "$APP" || fail "LaunchServices refused to register $APP."
+"$LSREGISTER" -f "$APP/Contents/Frameworks/Hammerspoon.app" \
+	|| fail "LaunchServices refused to register the embedded Hammerspoon."
+
 # The launcher hands this clone to its Lua only after proving it (fieldRunRoot in main.swift).
 open --env "${ERGOPTI_FIELD_REPORT_ENVIRONMENT}=$REPO_ROOT" "$APP" || fail "$APP could not be opened."
 log "Opened $APP with this clone as its field-run root."
