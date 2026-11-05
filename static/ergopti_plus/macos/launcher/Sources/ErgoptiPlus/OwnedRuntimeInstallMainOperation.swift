@@ -36,6 +36,39 @@ enum OwnedRuntimeInstallMainOperation {
 		return hashes
 	}
 
+	/// The `cdhash` of each architecture slice the helper carries, for the staged copy's requirement. The
+	/// requirement language compares the 20-byte truncated hash, and `codesign --all-architectures` checks every
+	/// slice: the full SHA-256 of the host slice alone matched neither, so the administrator shell refused every
+	/// install with status 1 (field report 2026-11-05).
+	/// - Parameter helper: The helper bundle.
+	/// - Returns: One 20-byte hash per slice present, or nil when a present slice reports none or two collide.
+	static func sliceCodeHashes(_ helper: URL) -> [Data]? {
+		var hashes: [Data] = []
+		for architecture in ["arm64", "x86_64"] {
+			var code: SecStaticCode?
+			let attributes = [kSecCodeAttributeArchitecture as String: architecture] as CFDictionary
+			// An architecture the universal file does not carry has no slice to admit.
+			guard SecStaticCodeCreateWithPathAndAttributes(helper as CFURL, [], attributes, &code) == errSecSuccess,
+				let code else { continue }
+			var information: CFDictionary?
+			guard SecCodeCopySigningInformation(code, SecCSFlags(rawValue: kSecCSSigningInformation), &information) == errSecSuccess,
+				let unique = (information as? [String: Any])?[kSecCodeInfoUnique as String] as? Data, unique.count == 20 else { return nil }
+			hashes.append(unique)
+		}
+		return hashes.isEmpty || Set(hashes).count != hashes.count ? nil : hashes
+	}
+
+	/// The staged helper's requirement: Ergopti's installer identifier, this launcher's leaf and one slice's cdhash.
+	/// - Parameters:
+	///   - leaf: The launcher's certificate leaf.
+	///   - slices: The helper's slice hashes (sliceCodeHashes).
+	/// - Returns: The requirement text `codesign --test-requirement` reads.
+	static func stagedRequirement(leaf: Data, slices: [Data]) -> String {
+		let codeHashes = slices.map { "cdhash H\"" + hex($0) + "\"" }.sorted().joined(separator: " or ")
+		return "identifier \"" + Identifiers.SigningIds.runtimeInstaller + "\" and certificate leaf = H\""
+			+ hex(Insecure.SHA1.hash(data: leaf)) + "\" and (" + codeHashes + ")"
+	}
+
 	/// Writes the one answer line, then returns the exit status.
 	private static func answer(_ line: String, _ status: Int32) -> Int32 {
 		do { try FileHandle.standardOutput.write(contentsOf: Data((line + "\n").utf8)) } catch { return 75 }
@@ -96,7 +129,7 @@ enum OwnedRuntimeInstallMainOperation {
 				let fields = OwnedRuntimePublisherSignature.information(code, role: .installer),
 				let certificates = fields[kSecCodeInfoCertificates as String] as? [SecCertificate], let certificate = certificates.first,
 				SecCertificateCopyData(certificate) as Data == publisher.leaf,
-				let hashes = codeDirectoryHashes(fields) else {
+				codeDirectoryHashes(fields) != nil, let slices = sliceCodeHashes(helper) else {
 				return refuse("helper_signature", "the downloaded installer helper is not signed with this launcher's certificate")
 			}
 			let bytes = try Data(contentsOf: helper.appendingPathComponent(installerExecutable))
@@ -105,9 +138,7 @@ enum OwnedRuntimeInstallMainOperation {
 			}
 			try source.verify()
 			let stage = URL(fileURLWithPath: "/Library/Application Support/ErgoptiPlus/.runtime-installer-" + UUID().uuidString + "/Helper.app")
-			let codeHashes = hashes.map { "cdhash H\"" + hex($0) + "\"" }.sorted().joined(separator: " or ")
-			let requirement = "identifier \"" + Identifiers.SigningIds.runtimeInstaller + "\" and certificate leaf = H\""
-				+ hex(Insecure.SHA1.hash(data: publisher.leaf)) + "\" and (" + codeHashes + ")"
+			let requirement = stagedRequirement(leaf: publisher.leaf, slices: slices)
 			let directory = OwnedVirtualHIDDaemonReportMainOperation.quote(stage.deletingLastPathComponent().path)
 			program = OwnedVirtualHIDDaemonReportMainOperation.stagedHelperProgram(source: helper.path, stage: stage,
 				requirement: requirement, digest: hex(SHA256.hash(data: bytes))) { executable in
