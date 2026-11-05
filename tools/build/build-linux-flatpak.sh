@@ -79,6 +79,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if ! "$SKIP_FLATPAK"; then
+  for producer in flatpak-builder flatpak; do
+    if ! command -v "$producer" >/dev/null 2>&1; then
+      echo "[ERR] $producer is required to build a Flatpak; use --skip-flatpak for staging only." >&2
+      exit 69
+    fi
+  done
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 IFS= read -r -d '' PROJECT_ROOT < <(CDPATH= cd -Pe -- "${SCRIPT_DIR}/../.." && printf '%s\0' "$PWD")
 # The external hosts are declared once in _shared/data/identifiers.json.
@@ -421,14 +430,6 @@ print_host_permission_warning() {
 if [ "$SKIP_FLATPAK" = true ]; then
   echo ""
   echo "=== Structure complete (--skip-flatpak) ==="
-  print_manual_commands
-  print_host_permission_warning
-  exit 0
-fi
-
-if ! command -v flatpak-builder &>/dev/null || ! command -v flatpak &>/dev/null; then
-  echo ""
-  echo "=== Structure complete (flatpak toolchain not available) ==="
   print_manual_commands
   print_host_permission_warning
   exit 0
