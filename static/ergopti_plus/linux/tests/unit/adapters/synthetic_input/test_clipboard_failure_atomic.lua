@@ -87,6 +87,22 @@ helpers.describe("clipboard paste snapshot", function()
 		end)
 	end)
 
+	helpers.it("does not overwrite a copy when the ownership read fails", function()
+		with_clipboard(true, "saved", function(clipboard, shell)
+			local original, reads = shell.exec_checked, 0
+			shell.exec_checked = function(...)
+				reads = reads + 1
+				if reads == 2 then return false, "", "unreadable" end
+				return original(...)
+			end
+			local result, why = clipboard.paste_text("replacement", channel(), function() shell.value = "external copy" end)
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(why, "clipboard restoration failed")
+			helpers.assert_eq(shell.value, "external copy")
+			helpers.assert_eq(#shell.writes, 1)
+		end)
+	end)
+
 	helpers.it("keeps a copy another application made during the paste", function()
 		with_clipboard(true, "saved", function(clipboard, shell)
 			local uinput = channel()
