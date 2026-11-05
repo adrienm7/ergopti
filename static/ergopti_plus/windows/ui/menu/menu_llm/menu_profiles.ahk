@@ -105,8 +105,20 @@ LLM_Menu_PromptChoicesText() {
  * @returns {string} A label unique within that menu.
  */
 _LLM_Menu_UniqueMenuLabel(Seen, Label) {
-	Seen[Label] := (Seen.Has(Label) ? Seen[Label] : 0) + 1
-	return (Seen[Label] > 1) ? (Label . " #" . Seen[Label]) : Label
+	; Reserve actual outputs too: a free-text name may already equal a suffix.
+	static UsedKey := {}
+	if !Seen.Has(UsedKey)
+		Seen[UsedKey] := Map()
+	Used := Seen[UsedKey]
+	Number := (Seen.Has(Label) ? Seen[Label] : 0) + 1
+	Candidate := Number > 1 ? Label . " #" . Number : Label
+	while Used.Has(Candidate) {
+		Number := Max(2, Number + 1)
+		Candidate := Label . " #" . Number
+	}
+	Seen[Label] := Number
+	Used[Candidate] := true
+	return Candidate
 }
 
 /**
