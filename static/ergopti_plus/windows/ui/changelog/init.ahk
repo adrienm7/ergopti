@@ -220,6 +220,10 @@ _CLW_BuildWindow(Channel, Request) {
 		; Native destruction during Show is an ordinary retired opening.
 		if WindowEpoch != _CLW_WindowEpoch || !IsSet(_CLW_Gui) || _CLW_Gui != g
 			return false
+		; This Show failed while its exact native host was still current.
+		; Reset first, then destroy only that host: Destroy may open a successor.
+		_CLW_Reset()
+		try g.Destroy()
 		throw Err
 	}
 	if WindowEpoch != _CLW_WindowEpoch || !IsSet(_CLW_Gui) || _CLW_Gui != g
