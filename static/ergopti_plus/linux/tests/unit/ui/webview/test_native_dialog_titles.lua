@@ -146,7 +146,7 @@ h.describe("native menu dialog captions", function()
 		local names = { "ui.menu.builder", "ui.menu.uninstall", "infra.installation", "ui.modal", "ui.menu.llm_backend_rows" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-		local original_execute = os.execute
+		local original_execute, original_checked = os.execute, Shell.exec_checked
 		local commands, accepted, modals, dialogs = {}, nil, 0, nil
 		package.loaded["ui.menu.llm_backend_rows"] = {
 			bind_page = function(_, options) dialogs = options.dialogs end,
@@ -192,8 +192,15 @@ h.describe("native menu dialog captions", function()
 			h.assert_eq(commands[5], DIALOG .. " --error --title='ErgoptiPlus'"
 				.. " --text='Preserved explicit empty caption' 2>/dev/null")
 			h.assert_eq(modals, 5)
+			dialogs.error("Invalid URL <host>&value")
+			h.assert_true(commands[6]:find("Invalid URL &lt;host&gt;&amp;value", 1, true) ~= nil)
+			dialogs.info("Information", "Model <name>&value")
+			h.assert_true(commands[7]:find("Model &lt;name&gt;&amp;value", 1, true) ~= nil)
+			Shell.exec_checked = function(command) commands[#commands + 1] = command; return true, "" end
+			dialogs.prompt("Prompt", "Provider <name>&value", "")
+			h.assert_true(commands[8]:find("Provider &lt;name&gt;&amp;value", 1, true) ~= nil)
 		end, debug.traceback)
-		os.execute = original_execute
+		os.execute, Shell.exec_checked = original_execute, original_checked
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(err, 0) end
 	end)
