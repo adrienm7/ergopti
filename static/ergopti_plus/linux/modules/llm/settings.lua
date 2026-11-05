@@ -151,7 +151,7 @@ end
 --- @param expected_source table|nil Exact source retained by a deferred editor.
 --- @param admission function|nil Final originating configuration admission.
 --- @return boolean Whether it was accepted.
-local function set_with_reason(name, value, expected_source, admission, on_notice)
+local function set_with_reason(name, value, expected_source, admission, on_notice, publication_guard)
 	local default = shipped()[name]
 	if default == nil then
 		Logger.error(LOG, "set(): '%s' has no shipped default — refusing to store it.", tostring(name))
@@ -183,6 +183,7 @@ local function set_with_reason(name, value, expected_source, admission, on_notic
 		Logger.error(LOG, "No storage — '%s' was not changed.", name)
 		return false, "persistence"
 	end
+	local values_owner, previous_value = _values, _values[name]
 	local persisted
 	if expected_source ~= nil or admission ~= nil then
 		if type(expected_source) ~= "table" or type(admission) ~= "function"
@@ -203,7 +204,11 @@ local function set_with_reason(name, value, expected_source, admission, on_notic
 		Logger.error(LOG, "Could not persist '%s' — the active value was not changed.", name)
 		return false, "persistence"
 	end
-	_values[name] = value
+	local may_publish = not publication_guard or publication_guard()
+	if _values == values_owner and _values[name] == previous_value then
+		if may_publish then _values[name] = value
+		else _values[name] = nil end
+	end
 	Logger.info(LOG, "%s: %s.", name, tostring(value))
 	return true
 end
@@ -215,8 +220,8 @@ end
 --- @param admission function|nil Original configuration admission.
 --- @return boolean accepted
 --- @return string|nil reason "invalid" or "persistence" on refusal.
-function M.set_with_reason(name, value, expected_source, admission, on_notice)
-	return set_with_reason(name, value, expected_source, admission, on_notice)
+function M.set_with_reason(name, value, expected_source, admission, on_notice, publication_guard)
+	return set_with_reason(name, value, expected_source, admission, on_notice, publication_guard)
 end
 
 --- Sets one value, retaining the original single-result contract.

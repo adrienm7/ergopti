@@ -226,22 +226,23 @@ end
 --- @param expected_source table|nil Exact source retained by a deferred editor.
 --- @param admission function|nil Final originating configuration admission.
 --- @return boolean
-local function set(name, value, expected_source, admission, on_notice)
+local function set(name, value, expected_source, admission, on_notice, publication_guard)
 	local shipped = default_for(name)
 	if shipped == nil or not valid(name, value) then
 		Logger.error(LOG, "Refused invalid trigger setting %s=%s.", tostring(name), tostring(value))
-		return false
+		return false, "invalid"
 	end
 	value = detached(name, value)
 	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage then
 		Logger.error(LOG, "No storage; trigger setting '%s' was not changed.", name)
-		return false
+		return false, "unconfirmed"
 	end
+	local values_owner, previous_value = _values, _values[name]
 	local persisted
 	if expected_source ~= nil or admission ~= nil then
 		if type(expected_source) ~= "table" or admission ~= nil and type(admission) ~= "function"
-			or type(Storage.set_many) ~= "function" then return false end
+			or type(Storage.set_many) ~= "function" then return false, "invalid" end
 		if on_notice then persisted = Storage.set_many_with_notice({[PREF_PREFIX .. name] = value}, expected_source, admission, on_notice)
 		else persisted = Storage.set_many({[PREF_PREFIX .. name] = value}, expected_source, admission) end
 	else
@@ -250,15 +251,31 @@ local function set(name, value, expected_source, admission, on_notice)
 	end
 	if persisted ~= true then
 		Logger.error(LOG, "Trigger setting '%s' could not be persisted; live state is unchanged.", name)
-		return false
+		return false, "unconfirmed"
 	end
-	_values[name] = detached(name, value)
+	local may_publish = not publication_guard or publication_guard()
+	if _values == values_owner and _values[name] == previous_value then
+		if may_publish then _values[name] = detached(name, value)
+		else _values[name] = nil end
+	end
 	Logger.info(LOG, "%s: %s.", name, tostring(value))
 	return true
 end
 
 function M.set(name, value, expected_source, admission)
-	return set(name, value, expected_source, admission)
+	local committed = set(name, value, expected_source, admission)
+	return committed
+end
+
+--- Stores a menu choice with a closed refusal reason and exact notice receipt.
+--- @return boolean committed
+--- @return string|nil reason
+--- @return boolean noticed
+function M.set_with_reason_notice(name, value, expected_source, admission, publication_guard)
+	local noticed = false
+	local receipt = { admit = admission, acknowledge = function() noticed = true end }
+	local committed, reason = set(name, value, expected_source, admission, receipt, publication_guard)
+	return committed, reason, noticed
 end
 
 --- Stores a value and returns whether this exact write already showed a notice.
@@ -272,8 +289,8 @@ end
 
 --- Stores a retained setting with notice acknowledgement from its exact write.
 --- @return boolean committed
-function M.set_with_source_notice(name, value, expected_source, admission, on_notice)
-	return set(name, value, expected_source, admission, on_notice)
+function M.set_with_source_notice(name, value, expected_source, admission, on_notice, publication_guard)
+	return set(name, value, expected_source, admission, on_notice, publication_guard)
 end
 
 --- Flips one boolean setting transactionally.
