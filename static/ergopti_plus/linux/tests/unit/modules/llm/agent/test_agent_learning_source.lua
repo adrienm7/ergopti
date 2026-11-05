@@ -83,6 +83,10 @@ helpers.describe("agent learning source admission", function()
 		end)
 	end)
 	for _, candidate in ipairs({
+		{ name = "null application map", source = '{"version":1,"apps":null}' },
+		{ name = "null threshold map", source = PREFIX .. '7,"thresholds":null}}}' },
+		{ name = "invalid saved recency", source = PREFIX .. '"bad"' .. SUFFIX },
+		{ name = "invalid saved threshold", source = PREFIX .. '7,"thresholds":{"calendar":"bad"}}}}' },
 		{ name = "overflow number", source = PREFIX .. "1e999" .. SUFFIX },
 		{ name = "leading-zero number", source = PREFIX .. "01" .. SUFFIX },
 		{ name = "trailing bytes", source = PREFIX .. "1" .. SUFFIX .. " trailing" },
@@ -96,6 +100,17 @@ helpers.describe("agent learning source admission", function()
 			end)
 		end)
 	end
+
+	helpers.it("preserves every original byte before replacing a partially invalid learning map", function()
+		local source = '{"version":1,"apps":{"Mail":{"used":7,"thresholds":{"calendar":0.2}},'
+			.. '"Other":{"used":8,"thresholds":{"calendar":"bad"}}}}'
+		with_source(source, function(Learning, path, config)
+			Learning.record(config, "Mine", "calendar", true)
+			helpers.assert_true(Learning.flush())
+			helpers.assert_eq(read(path .. ".corrupt"), source, "valid and invalid entries remain recoverable")
+			helpers.assert_not_nil(Json.decode_lossless(assert(read(path))).apps.Mine)
+		end)
+	end)
 
 	for _, initial in ipairs({ "present", "absent" }) do
 		helpers.it("preserves another learning update after loading an " .. initial .. " source", function()
