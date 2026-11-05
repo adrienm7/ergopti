@@ -775,7 +775,7 @@ KL_Hook_Tick() {
 		; timer in keystats.ahk handles persistence asynchronously.
 		if (Keystats.buffer_events.Length = 0
 				&& Keystats.session_clicks = 0
-				&& Keystats.session_scrolls = 0)
+				&& Keystats.session_scrolls = 0 && Keystats.mouse_distance = 0)
 				return
 		try KL_FlushBuffer()
 		; Re-arm the debounce timer so the dashboard sees the flush within

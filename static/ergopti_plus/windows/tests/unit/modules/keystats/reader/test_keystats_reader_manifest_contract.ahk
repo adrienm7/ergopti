@@ -970,9 +970,11 @@ _KFCD_ChildSource() {
 		Source .= Definition[0] . "`n"
 	}
 	Source .= 'class HookDispatcher {`nstatic Unregister(*) {`nthrow Error("Unexpected physical hook removal.")`n}`n}`n'
-	Owner := _DriverProductionFileForSymbol("KL_JsonEncode", _DriverDir)
-	AssertTrue(Owner != "")
-	Source .= "#Include " . Owner . "`n"
+	for JsonSymbol in ["JsonStringLiteral", "KL_JsonEncode"] {
+		Owner := _DriverProductionFileForSymbol(JsonSymbol, _DriverDir)
+		AssertTrue(Owner != "", "The actual canonical JSON graph requires its genuine owner: " . JsonSymbol)
+		Source .= "#Include " . Owner . "`n"
+	}
 	for Symbol in ["KL_Hook_Stop", "KL_Hook_InvalidateCapture", "KL_PasswordFocusTrackingStop", "KL_FreePasswordFocusCallback"] {
 		Body := _DriverFuncBody(Symbol)
 		AssertTrue(Body != "")

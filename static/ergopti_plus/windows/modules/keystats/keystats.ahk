@@ -668,7 +668,7 @@ KL_FlushBuffer(PublishGuard := unset, &DeferredByActiveFlush := false) {
 		} else {
 		if (Keystats.buffer_events.Length = 0
 			&& Keystats.session_clicks = 0
-			&& Keystats.session_scrolls = 0)
+			&& Keystats.session_scrolls = 0 && Keystats.mouse_distance = 0)
 			return true
 
 		Keystats._flush_in_progress := true
@@ -733,7 +733,7 @@ KL_FlushBuffer(PublishGuard := unset, &DeferredByActiveFlush := false) {
 ; rejected owner restores the snapshot while the outer serialisation latch is
 ; still held.
 _KL_PublishBufferSnapshot(Snapshot, AttemptFlushTick, PublishGuard := unset) {
-	if (Snapshot.Events.Length = 0 && Snapshot.Clicks = 0 && Snapshot.Scrolls = 0)
+	if (Snapshot.Events.Length = 0 && Snapshot.Clicks = 0 && Snapshot.Scrolls = 0 && Snapshot.Distance = 0)
 		return true
 	total_time_ms := 0
 	total_chars := 0

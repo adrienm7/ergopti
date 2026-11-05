@@ -1137,6 +1137,17 @@
 			"root_cause": "The strict UIASW_ConsumeSelectionSnapshot epoch guard is necessary, but WrapTextIfSelected has no fresh selection acquisition route for the triggering key itself. AutoHotkey2.0.26 hook.cpp updates g_TimeLastInputPhysical in KeybdEventIsPhysical before posting the hotkey callback, including a suppressed nonmodifier.",
 			"silent_failure": "Production reachability is source-derived from upstream v2.0.26 hook.cpp (SHA256 a57af3904a523710eed8872a62789c76583f2da41f79e5431439e5e404417a58), lines428/3056 before1807/2060. Native runs41954012438 and41960804242 reproduce the analogous no-hook RegisterHotKey/injected-input composition while the direct control passes. Neither is a physical-hardware or installed-hook input measurement; same-tick inputs can still match.",
 			"regression_test": "Keep the strict snapshot getter. Only an otherwise-valid epoch mismatch starts a new default async copy of the actual selection. Retain original target, lifecycle owner, command id and physical generation through final SendInstant; a settled same-context timeout alone may emit the original bare symbol. Four native fresh/current-empty/timeout/supersession cases and nine private cleanup/cancellation controls are integrated. Gesture transforms also retain their original target/admission across transformation as an098 sibling. Native post-fix qualification pending."
+		},
+		{
+			"id": "AHK-104",
+			"title": "Pointer movement alone never reaches the durable distance aggregate",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Use the genuine pointer sampler for positions0,0 then3,4 without a key or click, then invoke public direct or periodic flush and rebuild canonical SQL.",
+			"root_cause": "KL_Hook_Tick, KL_FlushBuffer and _KL_PublishBufferSnapshot return early when event/click/scroll counters are empty without considering mouse_distance or Snapshot.Distance.",
+			"silent_failure": "Native run41967942121 at1152bd8815094b59581f62a65c663fbf7b089f6a records samples2/remaining_distance5/errors0 but pending_rows0 and cold SQL distance0 in both direct and periodic modes, repeated in inverse order. The with-click control reaches a missing JsonStringLiteral fixture dependency and is not qualified by this run.",
+			"regression_test": "Include distance in all three empty guards, retaining the actual snapshot/publisher/SQL route. Repair the independent control composition by including the real JsonStringLiteral owner; do not replace the serializer or loosen distance assertions. Three native cases await post-fix qualification."
 		}
 	]
 }

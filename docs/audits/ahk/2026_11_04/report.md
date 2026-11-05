@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **103 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **104 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1727,3 +1727,13 @@ AutoHotkey2.0.26 [hook.cpp](https://github.com/AutoHotkey/AutoHotkey/blob/v2.0.2
 Runs41954012438 and41960804242 reproduce a no-hook RegisterHotKey/injected-input analogue with unchanged target and selection while the direct control passes. These runs are not physical-hardware or installed-hook input measurements. Production physical reachability is derived from the exact upstream ordering above.
 
 The correction retains the strict getter and starts a new default asynchronous copy only for an otherwise-valid snapshot rejected by epoch. It never promotes the old text or epoch. The original target, lifecycle owner, command id and input generation remain required at the final send. Only a same-context timeout whose cleanup debt has settled may type its original bare symbol; failed starts, empty successful captures, cancellation and supersession cannot. Four native composition cases and nine cleanup controls await post-fix qualification. Gesture transforms retain the same original-target admission across their actual work as a sibling of098.
+
+## AHK-104: Pointer movement alone never reaches the durable distance aggregate
+
+Severity: medium. Confidence: high. Evidence: source and native Windows fail-before.
+
+The hook tick, public flush and snapshot publisher each test only events, clicks and scrolls when deciding that a buffer is empty. All three omit accumulated pointer distance.
+
+Run41967942121 at1152bd8815094b59581f62a65c663fbf7b089f6a drives the genuine sampler from0,0 to3,4. Both direct and periodic flush report `samples=2 pending_rows=0 remaining_distance=5 errors=0`; cold canonical SQL contains no distance. Both failures repeat in inverse order. The with-click control is not qualified by this run: its child omits the genuine JsonStringLiteral dependency and fails on that binding before its comparison.
+
+The correction includes distance in all three empty guards. The control composition now includes the actual JSON owner; no serializer or SQL oracle is replaced. The same three native cases await post-fix qualification.
