@@ -387,7 +387,11 @@ public sealed class ErgoptiRelayHop {
                 authority = line[1];
             } else if (line[1].StartsWith("http://", StringComparison.OrdinalIgnoreCase)) {
                 Uri target = new Uri(line[1]);
-                authority = target.Authority.Contains(":") ? target.Authority : target.Authority + ":80";
+                // IPv6 punctuation cannot identify an explicit destination port.
+                // Build one canonical authority from the URI's separate fields.
+                string targetHost = target.IdnHost.Trim('[', ']');
+                if (target.HostNameType == UriHostNameType.IPv6) targetHost = "[" + targetHost + "]";
+                authority = targetHost + ":" + target.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 // HTTP proxies forward plaintext HTTP without CONNECT. SOCKS
                 // still establishes a destination tunnel carrying origin form.
                 tunnel = scheme.StartsWith("socks");

@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory=$true)][string]$RoutesPath,
     [Parameter(Mandatory=$true)][string]$TransportPath,
     [Parameter(Mandatory=$true)][string]$PolicyPath,
-    [Parameter(Mandatory=$true)][string]$UpdaterDefaultsPath
+    [Parameter(Mandatory=$true)][string]$UpdaterDefaultsPath,
+    [ValidateSet(80,18080)][int]$TargetPort=80
 )
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
@@ -21,12 +22,14 @@ public sealed class ErgoptiIpv6SocksOracle : IDisposable {
     readonly TcpListener listener=new TcpListener(IPAddress.Loopback,0);
     readonly Thread worker;
     readonly object gate=new object();
+    readonly int targetPort;
     readonly ManualResetEvent controlsDone=new ManualResetEvent(false);
     TcpClient active;volatile bool stopped;
     public int Greetings, ConnectFrames, Requests, EarlyClose, Failures;
     public bool Joined;
     public int Port {get{return ((IPEndPoint)listener.LocalEndpoint).Port;}}
-    public ErgoptiIpv6SocksOracle(){listener.Start();worker=new Thread(Serve);worker.IsBackground=true;worker.Start();}
+    public int TargetPort {get{return targetPort;}}
+    public ErgoptiIpv6SocksOracle(int targetPort){this.targetPort=targetPort;listener.Start();worker=new Thread(Serve);worker.IsBackground=true;worker.Start();}
     static byte[] Exact(Stream stream,int count) {
         byte[] data=new byte[count];int used=0;
         while(used<count){int n=stream.Read(data,used,count-used);if(n==0)throw new EndOfStreamException();used+=n;}
@@ -45,10 +48,10 @@ public sealed class ErgoptiIpv6SocksOracle : IDisposable {
                 Write(stream,new byte[]{5,1,0});byte[] choice=Exact(stream,2);
                 if(choice[0]!=5||choice[1]!=0)return false;
                 byte[] request=new byte[22];request[0]=5;request[1]=1;request[3]=4;
-                Buffer.BlockCopy(IPAddress.Parse("2001:db8::123").GetAddressBytes(),0,request,4,16);request[21]=80;
+                Buffer.BlockCopy(IPAddress.Parse("2001:db8::123").GetAddressBytes(),0,request,4,16);request[20]=(byte)(targetPort>>8);request[21]=(byte)(targetPort&255);
                 Write(stream,request);byte[] reply=Exact(stream,10);
                 if(reply[0]!=5||reply[1]!=0||reply[3]!=1)return false;
-                Write(stream,Encoding.ASCII.GetBytes("GET /v1/models HTTP/1.1\r\nHost: [2001:db8::123]\r\nConnection: close\r\n\r\n"));
+                Write(stream,Encoding.ASCII.GetBytes("GET /v1/models HTTP/1.1\r\nHost: [2001:db8::123]"+(targetPort==80?"":":"+targetPort)+"\r\nConnection: close\r\n\r\n"));
                 string head=Head(stream);
                 return head.StartsWith("HTTP/1.1 200 ",StringComparison.Ordinal)&&head.Contains("Content-Length: 2\r\n")&&Encoding.ASCII.GetString(Exact(stream,2))=="OK";
             }
@@ -70,7 +73,7 @@ public sealed class ErgoptiIpv6SocksOracle : IDisposable {
                         if(frame[0]!=5||frame[1]!=1||frame[2]!=0||frame[3]!=4)throw new InvalidDataException();
                         byte[] authority=Exact(stream,18),expected=IPAddress.Parse("2001:db8::123").GetAddressBytes();
                         for(int i=0;i<16;i++)if(authority[i]!=expected[i])throw new InvalidDataException();
-                        if(authority[16]!=0||authority[17]!=80)throw new InvalidDataException();
+                        if(authority[16]!=(byte)(targetPort>>8)||authority[17]!=(byte)(targetPort&255))throw new InvalidDataException();
                         Interlocked.Increment(ref ConnectFrames);Write(stream,new byte[]{5,0,0,1,127,0,0,1,0,0});
                         if(!Head(stream).StartsWith("GET /v1/models HTTP/1.1\r\n",StringComparison.Ordinal))throw new InvalidDataException();
                         Interlocked.Increment(ref Requests);
@@ -102,7 +105,7 @@ function Write-Ipv6SocksDiagnostic($Phase,$Peer,$Metrics,$ActualRetired,$EngineR
         $Diagnostic.proxy_answered=[bool]$Metrics.proxy_answered
     }
     if($null -ne $Peer) {
-        $Diagnostic.greetings=$Peer.Greetings;$Diagnostic.connect_frames=$Peer.ConnectFrames
+        $Diagnostic.target_port=$Peer.TargetPort;$Diagnostic.greetings=$Peer.Greetings;$Diagnostic.connect_frames=$Peer.ConnectFrames
         $Diagnostic.requests=$Peer.Requests;$Diagnostic.early_close=$Peer.EarlyClose
         $Diagnostic.proxy_failures=$Peer.Failures;$Diagnostic.proxy_joined=$Peer.Joined
     }
@@ -116,9 +119,10 @@ $ActualRetired=$null;$EngineRetired=$null;$ControlsDone=$null;$FailureReceipt=@{
 try {
     New-Item -ItemType Directory -Path $Directory -ErrorAction Stop | Out-Null
     $DirectoryCreated=$true
-    $Proxy=[ErgoptiIpv6SocksOracle]::new()
+    $Proxy=[ErgoptiIpv6SocksOracle]::new($TargetPort)
     if(-not $Proxy.IndependentOracle()){throw 'The independent IPv6 SOCKS CONNECT and HTTP response did not qualify.'}
-    $Destination=[Uri]'http://[2001:db8::123]/v1/models'
+    $PortSuffix=if($TargetPort -eq 80){''}else{':'+$TargetPort}
+    $Destination=[Uri]('http://[2001:db8::123]'+$PortSuffix+'/v1/models')
     $Override='socks5h://127.0.0.1:'+$Proxy.Port
     $Environment={param($Name) if($Name -ceq 'ERGOPTI_PROXY_OVERRIDE'){return $Override};return ''}.GetNewClosure()
     $Selection=Resolve-ErgoptiNativeNetworkRoutes -DestinationUrl $Destination.AbsoluteUri -BudgetMs 10000 `
