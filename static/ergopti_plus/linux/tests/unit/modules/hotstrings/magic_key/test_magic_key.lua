@@ -30,6 +30,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+-- Tests below load this owner while its dependencies are replaced. Restore the
+-- original cached owner after the module finishes, including an absent entry.
+local previous_magic_key = package.loaded["modules.hotstrings.magic_key"]
 
 
 --- Installs an in-memory canonical preference owner and returns it with a
@@ -171,6 +174,7 @@ helpers.describe("magic key: the user's choice outranks the shipped default", fu
 	end)
 
 end)
+
 
 
 
@@ -508,3 +512,5 @@ helpers.describe("Magic trigger declared native provider", function()
 		end)
 	end
 end)
+
+package.loaded["modules.hotstrings.magic_key"] = previous_magic_key
