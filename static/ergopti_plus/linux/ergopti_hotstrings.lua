@@ -1283,12 +1283,30 @@ local function main()
 		end,
 	})
 	privacy_owners.context = secure_focus_guard
+	-- Attribute time only after the native field and its application/title have
+	-- been joined. Until then the previous context is retired and no new interval
+	-- may start, including when the asynchronous probe settles after startup.
+	local function publish_admitted_focus()
+		if secure_focus_guard.blocks_text() then return false end
+		local context = secure_focus_guard.current_context()
+		if type(context) ~= "table" or type(context.app_id) ~= "string" or context.app_id == ""
+			or keystats.is_unrecorded_app(context.app_id) then return false end
+		local now = math.floor(Monotonic.now_ms())
+		keystats.set_window_title(context.app_id, context.title, now)
+		keystats.on_app_focus(context.app_id, now)
+		return true
+	end
+	local function refresh_admitted_focus(immediate)
+		local admitted = secure_focus_guard.refresh(immediate)
+		if admitted then publish_admitted_focus() end
+		return admitted
+	end
 	-- Close the input path before the hook starts, then publish a conclusive
 	-- initial answer if the accessibility service is already usable.
 	if not privacy_owners.watch.start() or not privacy_owners.watch.wait_ready() then
 		Logger.warn(LOG, "Native accessibility focus watcher unavailable; text automation and metrics stay closed.")
 	end
-	secure_focus_guard.prime()
+	if secure_focus_guard.prime() then publish_admitted_focus() end
 	local physical_privacy_admission = nil
 	if input_capture_gate ~= nil then error("input capture gate already initialised") end
 	input_capture_gate = InputCaptureGate.new({
@@ -3037,14 +3055,8 @@ local function main()
 			if llm_overlay then llm_overlay.hide() end
 			engine:reset(false)
 			_cached_app_id = (type(appName) == "string" and appName ~= "" and appName) or nil
-			-- The private-browsing verdict is computed HERE, off the input path.
-			-- The title was previously received and discarded, which is why the
-			-- driver had no private-browsing filter at all.
-			-- The title itself, which was received and discarded. The apps dashboard
-			-- groups a day by window — the difference between "four hours in the
-			-- editor" and "four hours across three files" — and this driver had
-			-- nothing to group by. Handed over AFTER the private-window verdict, so
-			-- a title that marks an incognito session is judged before it is stored.
+			-- Close the previous title using the existing transition policy. The
+			-- privacy fence below retires the tentative new title until admission.
 			keystats.set_window_title(_cached_app_id, windowTitle,
 				math.floor(Monotonic.now_ms()))
 			-- And the secure-field verdict, likewise. adapters/secure_field_detector
@@ -3057,10 +3069,7 @@ local function main()
 			--
 			-- Here rather than per keystroke, deliberately: the probe spawns an AT-SPI
 			-- query, and the focused element is what it can answer about.
-			secure_focus_guard.prime()
-			if _cached_app_id then
-				keystats.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
-			end
+			if secure_focus_guard.prime() then publish_admitted_focus() end
 		end)
 		-- start() seeds its change detector with the current window and therefore
 		-- does not emit an initial callback. Prime the keystats explicitly so a
@@ -3075,11 +3084,8 @@ local function main()
 		-- Primed here too. Without it the first window of the session — which on a
 		-- login that restores a password manager is exactly the window that matters
 		-- — is recorded until the user switches away from it.
-		secure_focus_guard.prime()
+		if secure_focus_guard.prime() then publish_admitted_focus() end
 		if not privacy_owners.startup_checkpoint() then return end
-		if type(_cached_app_id) == "string" and _cached_app_id ~= "" then
-			keystats.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
-		end
 		process_lifecycle.start()
 	end
 
@@ -3118,7 +3124,7 @@ local function main()
 		-- Raw navigation invalidates synchronously. Dispatch/retry stays periodic
 		-- after the shared focus-settle deadline; idle consumes retained results.
 		-- Unknown and probe failure stay fail-closed.
-		secure_focus_guard.refresh(false)
+		refresh_admitted_focus(false)
 		if file_watchers then
 			local owner = file_watchers
 			local function retire()
@@ -3329,7 +3335,7 @@ local function main()
 			privacy_owners.watch.pump()
 			RuntimeGuard.call("metrics SQLite flush acknowledgement", keystats.pump_flush)
 			-- Consume owned results promptly; fresh dispatch/retry stays periodic.
-			if secure_focus_guard.has_context_operation() then secure_focus_guard.refresh(false) end
+			if secure_focus_guard.has_context_operation() then refresh_admitted_focus(false) end
 			if not RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop) then return end
 			-- The touchpad, on the same tick as the keyboard. Cheap when nothing is
 			-- reading: gestures.pump() returns 0 immediately unless start_reading()

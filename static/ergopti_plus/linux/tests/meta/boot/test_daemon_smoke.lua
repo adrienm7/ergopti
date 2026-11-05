@@ -440,7 +440,8 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
         "bare Tab must explicitly invalidate the accessible-control verdict")
       helpers.assert_true(invalidate_pos < metric_pos and invalidate_pos < llm_pos,
         "focus invalidation must happen before metrics or LLM can consume text")
-      helpers.assert_true(src:find("secure_focus_guard.refresh(false)", 1, true) ~= nil,
+      helpers.assert_true(src:find("refresh_admitted_focus(false)", 1, true) ~= nil
+        and src:find("secure_focus_guard.refresh(immediate)", 1, true) ~= nil,
         "the periodic path must publish the settled fresh verdict")
     end)
 
@@ -580,8 +581,14 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       helpers.assert_true(start_pos ~= nil, "daemon must start lifecycle polling")
       helpers.assert_true(prime_pos and start_pos and prime_pos < start_pos,
         "initial foreground app must be attributed before lifecycle polling starts")
-      helpers.assert_true(src:find("keystats.on_app_focus(_cached_app_id", prime_pos, true) ~= nil,
-        "initial foreground app must be forwarded to the keystats")
+      local helper_start = assert(src:find("local function publish_admitted_focus()", 1, true))
+      local helper_end = assert(src:find("local function refresh_admitted_focus", helper_start, true))
+      local helper = src:sub(helper_start, helper_end - 1)
+      helpers.assert_true(helper:find("keystats.on_app_focus(context.app_id", 1, true) ~= nil,
+        "the admitted app must be forwarded to the keystats")
+      local boot = src:sub(prime_pos, start_pos)
+      helpers.assert_true(boot:find("if secure_focus_guard.prime() then publish_admitted_focus() end", 1, true) ~= nil,
+        "startup must publish only after focus admission")
     end)
   end)
 
