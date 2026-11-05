@@ -1224,7 +1224,7 @@ Reproduction: Native run41927538467 at09e8ea2: the public GestureCaptureRegion o
 
 Consequence: A failed capture may delete an unowned existing temporary file, including an artifact left by an earlier process with a recycled ID.
 
-Regression: Two public-owner/native filesystem cases prove pre-write failure must preserve the exact independently created stage identity and bytes. A synthetic one-pixel GDI compatibility probe separately refutes the proposed zero-access metadata lease: DeleteFile succeeds, so that proposal cannot be used as a fix. Qualification of a real read lease is pending. No production ownership correction is integrated yet; this finding is confirmed but is not counted as fixed.
+Regression: Two public-owner/native filesystem cases prove pre-write failure must preserve the exact independently created stage identity and bytes. A synthetic one-pixel GDI compatibility probe separately refutes the proposed zero-access metadata lease: DeleteFile succeeds, so that proposal cannot be used as a fix. Native run41930158432 qualifies the actual read lease with real GDI encoding. The production correction now acquires CREATE_NEW before capture and retains its owned handle through cleanup; post-fix qualification is pending.
 
 ## Native qualification at 69c71ef and 09e8ea2
 
