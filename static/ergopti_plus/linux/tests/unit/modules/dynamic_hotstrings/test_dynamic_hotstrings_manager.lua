@@ -35,6 +35,25 @@ helpers.describe("dynamic hotstrings manager", function()
 
   helpers.describe("init and rule registration", function()
 
+    helpers.it("linux-dynamic-init-cancel: refuses reinitialization when programmable cancellation fails", function()
+      local UserCode = require("modules.dynamic_hotstrings.user_code")
+      local Engine = require("dynamic_hotstrings")
+      local old_invalidate, old_reset = UserCode.invalidate, Engine.reset_rules
+      local old_manager = package.loaded["modules.dynamic_hotstrings.manager"]
+      local manager = helpers.load_module("modules.dynamic_hotstrings.manager")
+      local previous_trigger = manager.get_trigger_char()
+      local resets = 0
+      UserCode.invalidate = function() return false end
+      Engine.reset_rules = function(...) resets = resets + 1; return old_reset(...) end
+      local ok, result = pcall(manager.init, { trigger_char = "§" })
+      UserCode.invalidate, Engine.reset_rules = old_invalidate, old_reset
+      package.loaded["modules.dynamic_hotstrings.manager"] = old_manager
+      helpers.assert_true(ok)
+      helpers.assert_eq(result, false)
+      helpers.assert_eq(manager.get_trigger_char(), previous_trigger)
+      helpers.assert_eq(resets, 0, "a refused programmable cancellation must preserve the active rules")
+    end)
+
     helpers.it("personal info FIFO is refused without blocking dynamic initialization", function()
       local uv = require("luv")
       local shell = require("adapters.shell_runner")
