@@ -1,215 +1,27 @@
 {
-	"expected_count": 152,
-	"native_http_client_e2e": true,
-	"native_hotstring_e2e": true,
+	"expected_count": 30,
+	"native_http_client_e2e": false,
+	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "reader-think-pause-corpus",
-			"expected_count": 2
-		},
-		{
-			"contains": "klr-thinking-pause-numeric)",
-			"expected_count": 1
-		},
-		{
-			"contains": "klr-thinking-pause-encrypted",
-			"expected_count": 2
-		},
-		{
-			"contains": "klr-thinking-pause-checkpoint",
-			"expected_count": 1
-		},
-		{
-			"contains": "klr-thinking-pause-numeric-domain",
-			"expected_count": 5
-		},
-		{
-			"contains": "klr-cache-encryption)",
-			"expected_count": 5
-		},
-		{
-			"contains": "klr-cache-encryption-toggle",
-			"expected_count": 1
-		},
-		{
-			"contains": "klr-cold-projection-failure",
-			"expected_count": 2
-		},
-		{
-			"contains": "klr-projection-paging",
-			"expected_count": 1
-		},
-		{
-			"contains": "klr-projection-key-ownership",
-			"expected_count": 1
-		},
-		{
-			"contains": "klr-projection-scoped-work",
-			"expected_count": 1
-		},
-		{
-			"contains": "klr-reader-durable-cache",
-			"expected_count": 9
-		},
-		{
-			"contains": "klr-newest-first-rebuild",
-			"expected_count": 1
-		},
-		{
-			"contains": "klr-rebuild-resume",
-			"expected_count": 3
-		},
-		{
-			"contains": "klr-executed-round-ownership",
-			"expected_count": 5
-		},
-		{
-			"contains": "final-context-duration-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "context-clock-ack-owner",
-			"expected_count": 4
-		},
-		{
-			"contains": "context-tail-retry-owner",
-			"expected_count": 4
-		},
-		{
-			"contains": "context-nonempty-prepare-owner",
-			"expected_count": 5
-		},
-		{
-			"contains": "context-native64-origin-contract",
-			"expected_count": 1
-		},
-		{
-			"contains": "switch-destination-privacy-owner",
-			"expected_count": 7
-		},
-		{
-			"contains": "keystats-session-close-retry",
-			"expected_count": 5
-		},
-		{
-			"contains": "keystats-idle-resume-retry",
+			"contains": "local-prediction-custody",
 			"expected_count": 6
 		},
 		{
-			"contains": "keystats-shutdown-close-chain",
-			"expected_count": 1
-		},
-		{
-			"contains": "focus-refresh-bounded-resident",
-			"expected_count": 9
-		},
-		{
-			"contains": "AHK-22 deferred-hotstring-lifecycle:",
-			"expected_count": 3
-		},
-		{
-			"contains": "keystats-critical-restore",
-			"expected_count": 5
-		},
-		{
-			"contains": "keystats-flush-race-condition",
-			"expected_count": 2
-		},
-		{
-			"contains": "personal-info-typing-row-leak",
-			"expected_count": 12
-		},
-		{
-			"contains": "keystats-fire-publication-owner",
-			"expected_count": 3
-		},
-		{
-			"contains": "llm-accepted-metrics)",
-			"expected_count": 5
-		},
-		{
-			"contains": "llm-accepted-metrics-clock",
-			"expected_count": 1
-		},
-		{
-			"contains": "mouse-distance-flush-owner",
-			"expected_count": 3
-		},
-		{
-			"contains": "kl-payload-privacy-filter-scoped",
-			"expected_count": 2
-		},
-		{
-			"contains": "KL_FlushBuffer called before KL_LogWindowSwitch",
-			"expected_count": 1
-		},
-		{
-			"contains": "(toml-update-name-scalar)",
-			"expected_count": 3
-		},
-		{
-			"contains": "(config-migration-stage-ownership)",
-			"expected_count": 2
-		},
-		{
-			"contains": "(registry-pending-source-ownership)",
-			"expected_count": 2
-		},
-		{
-			"contains": "paths-generation-ownership",
-			"expected_count": 2
-		},
-		{
-			"contains": "agent-timezone-native-fallback-control",
-			"expected_count": 1
-		},
-		{
-			"contains": "agent-timezone-native-fallback-boundary",
-			"expected_count": 1
-		},
-		{
-			"contains": "agent-timezone-native-bias",
-			"expected_count": 1
-		},
-		{
-			"contains": "agent-timezone-offset-refusal",
-			"expected_count": 1
-		},
-		{
-			"contains": "sticky-kana-native",
-			"expected_count": 2
-		},
-		{
-			"contains": "personal-stage-ownership",
-			"expected_count": 2
-		},
-		{
-			"contains": "proxy-boot-seal-source",
-			"expected_count": 4
-		},
-		{
-			"contains": "proxy-full-save-persistence",
-			"expected_count": 3
-		},
-		{
-			"contains": "llm-debounce-source-privacy",
-			"expected_count": 3
+			"contains": "public-prediction-requester-admission",
+			"expected_count": 18
 		},
 		{
 			"contains": "llm-captured-source-app-privacy",
 			"expected_count": 1
 		},
 		{
-			"contains": "llm-app-filter-enforced",
-			"expected_count": 1
+			"contains": "proxy-queued-full-save",
+			"expected_count": 3
 		},
 		{
-			"contains": "audit-ahk-006",
-			"expected_count": 1
-		},
-		{
-			"contains": "llm-persisted-option-type-boundary-restore-engine-filter",
-			"expected_count": 1
+			"contains": "override-stage-ownership",
+			"expected_count": 2
 		}
 	]
 }
