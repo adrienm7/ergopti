@@ -149,3 +149,7 @@ for _HNRT_DestroyMode in ["destroy-current", "destroy-reopen"]
 for _HNRT_RetirementMode in ["retire-pre", "retire-post"]
 	Test("Native hotstrings reset retirement: " . _HNRT_RetirementMode . " retains exact cleanup custody (hcw-native-reset-retirement-owner)",
 		_HNRT_Case.Bind(_HNRT_RetirementMode))
+
+for _HNRT_NumericMode in ["numeric-current", "numeric-overflow", "numeric-empty-delay", "numeric-empty-priority"]
+	Test("Native hotstrings numeric admission: " . _HNRT_NumericMode . " uses actual Edit and debounce (hcw-native-numeric-domain-owner)",
+		_HNRT_Case.Bind(_HNRT_NumericMode))
