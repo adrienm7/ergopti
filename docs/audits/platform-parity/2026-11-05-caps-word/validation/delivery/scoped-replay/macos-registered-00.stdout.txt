@@ -1,0 +1,10 @@
+
+=== karabiner.watchers: deactivate_capsword is never called bare in the eventtap body (F-HIGH-7) ===
+  ok   the eventtap callback body wraps the per-lease closure in Logger.pcall
+
+=== karabiner.watchers: eventtap callback survives a throwing deactivate_capsword (F-HIGH-7) ===
+  ok   invoking the captured callback does not raise even when deactivate_capsword throws
+  ok   the callback returns false (never consumes the pointer event) even when it throws internally
+  ok   a throwing writer releases the pending guard for the next event
+  ok   uses elapsed monotonic time when the wall clock moves backward
+AUDIT_RESULT	5	0

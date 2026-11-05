@@ -1,0 +1,8 @@
+
+=== karabiner/watchers.lua: CapsWord pointer watcher spawns no reader ===
+  ok   (capsword-no-cli-reader) the watcher never runs karabiner_cli
+
+=== karabiner/watchers.lua: inputSourceChanged broker ownership ===
+  ok   watchers subscribe through the process-wide broker
+  ok   watcher teardown removes only its named broker subscriber
+AUDIT_RESULT	3	0
