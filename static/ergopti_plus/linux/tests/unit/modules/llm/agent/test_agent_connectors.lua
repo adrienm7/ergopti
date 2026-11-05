@@ -214,6 +214,17 @@ helpers.describe("AI agent connectors: one program per action, never a shell", f
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("a caller cannot alter the cached tool admission list", function()
+		with_connectors({ tools = { "valid" } }, function(Connectors, world, done)
+			local cfg = config()
+			local offered = Connectors.tools(cfg)
+			offered[1] = "../outside"
+			helpers.assert_eq(Connectors.tools(cfg), { "valid" })
+			Connectors.run(cfg, { type = "shortcut", name = "../outside" }, done)
+			helpers.assert_eq(#world.runs, 0, "a detached list cannot authorize another executable")
+		end)
+	end)
+
 	helpers.it("the tools list is capped, and read again after ten minutes or a refresh", function()
 		local names = {}
 		for index = 1, 60 do names[index] = string.format("tool%02d", index) end

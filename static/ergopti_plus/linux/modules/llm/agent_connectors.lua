@@ -221,6 +221,12 @@ end
 -- =========================================
 -- =========================================
 
+local function copy_tools(names)
+	local copy = {}
+	for index, name in ipairs(names) do copy[index] = name end
+	return copy
+end
+
 --- The user's tools: the executable files of the tools folder, sorted, at most
 --- config.max_tools. Read again after TOOLS_TTL_SEC or refresh_tools().
 --- @param config table Decoded agent.json.
@@ -229,7 +235,7 @@ function M.tools(config)
 	if _stopping then return {} end
 	local now = _deps.clock()
 	if _stopping then return {} end
-	if _tools_cache and now - _tools_cache.at < TOOLS_TTL_SEC then return _tools_cache.names end
+	if _tools_cache and now - _tools_cache.at < TOOLS_TTL_SEC then return copy_tools(_tools_cache.names) end
 	local directory = _deps.tools_dir()
 	if _stopping then return {} end
 	local names, reason = _deps.list_executables(directory)
@@ -249,7 +255,7 @@ function M.tools(config)
 		end
 	end
 	_tools_cache = { at = now, names = kept }
-	return kept
+	return copy_tools(kept)
 end
 
 --- Forgets the tools list: the next tools() reads the folder again.
