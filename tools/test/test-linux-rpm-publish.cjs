@@ -61,6 +61,7 @@ try {
 'use strict';
 const fs = require('node:fs'); const path = require('node:path');
 const args = process.argv.slice(2);
+if (process.env.ERGOPTI_RPM_PRODUCER_LOG) fs.appendFileSync(process.env.ERGOPTI_RPM_PRODUCER_LOG, path.basename(process.argv[1]) + '\\n');
 if (path.basename(process.argv[1]) === 'rpm') {
  if (args.length !== 4 || args[0] !== '-qp' || args[1] !== '--queryformat') throw new Error('unexpected RPM metadata request');
  const record = JSON.parse(fs.readFileSync(args[3], 'utf8'));
@@ -93,9 +94,14 @@ if (path.basename(process.argv[1]) === 'rpm') {
 	const producer = path.join(ROOT, 'tools/build/build-linux-rpm.sh');
 	// The genuine runtime is staged and admitted on the oldest supported LTS by
 	// the AppImage stager; the packager only carries that prefix.
-	const unstaged = bash(producer, [], modelEnv);
+	const producerLog = path.join(scratch, 'native-producers.log');
+	const priorOutput = path.join(BUILD, 'ErgoptiPlus-linux-x86_64.rpm');
+	fs.writeFileSync(priorOutput, 'previous release output\n');
+	const unstaged = bash(producer, [], { ...modelEnv, ERGOPTI_RPM_PRODUCER_LOG: producerLog });
 	assert.notEqual(unstaged.status, 0, 'a package without the staged private runtime must refuse');
-	assert.match(unstaged.stderr, /No staged private runtime/);
+	assert.match(unstaged.stderr, /private runtime/i, 'refusal names the missing runtime');
+	assert.equal(fs.existsSync(producerLog), false, 'native RPM build/query must not run');
+	assert.equal(fs.readFileSync(priorOutput, 'utf8'), 'previous release output\n');
 	fs.rmSync(path.join(BUILD, 'rpm'), { recursive: true, force: true });
 	stageAppDir(BUILD);
 	const direct = success(bash(producer, [], modelEnv));
