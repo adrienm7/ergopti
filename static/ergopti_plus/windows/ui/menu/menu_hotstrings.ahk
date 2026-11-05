@@ -12,6 +12,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\infra\number.ahk
 
 
 
@@ -279,11 +280,11 @@ _HS_PromptDefaultDelay() {
 		return
 	}
 	Val := Trim(IB.Value, " `t")
-	if !RegExMatch(Val, "^\d+$") {
+	if !RegExMatch(Val, "^\d+$") || !NumberTryParseInputInteger(Val, &Ms) {
 		Ui_MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
 		return
 	}
-	return _HS_CommitBaseDelay((Val + 0) / 1000)
+	return _HS_CommitBaseDelay(Ms / 1000)
 }
 
 ; Label for a per-category default-delay item ("<name> : <ms>[ (default)]").
@@ -314,11 +315,11 @@ _HS_PromptCategoryDelay(Cat, I18nKey, DefaultSec := "") {
 		return
 	}
 	Val := Trim(IB.Value, " `t")
-	if !RegExMatch(Val, "^\d+$") {
+	if !RegExMatch(Val, "^\d+$") || !NumberTryParseInputInteger(Val, &Ms) {
 		Ui_MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
 		return
 	}
-	return _HS_CommitDelayOverride(Cat, (Val + 0) / 1000)
+	return _HS_CommitDelayOverride(Cat, Ms / 1000)
 }
 
 ; Persist the base expansion delay, then re-register the hotstrings live: their
@@ -1283,9 +1284,9 @@ _HS_PromptPersonalFileField(Owner, Section, Field) {
 		return
 	Value := Trim(Prompt.Value)
 	if Field == "delay" || Field == "priority" {
-		if !RegExMatch(Value, "^\d+$")
+		if !RegExMatch(Value, "^\d+$") || !NumberTryParseInputInteger(Value, &Parsed)
 			return false
-		Value := Integer(Value)
+		Value := Parsed
 		if Field == "delay"
 			Value /= 1000
 	} else if !RegExMatch(Value, "^#?[0-9A-Fa-f]{6}$")

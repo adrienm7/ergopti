@@ -34,6 +34,7 @@
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
 #Include %A_LineFile%\..\ai_action_gate.ahk
+#Include %A_LineFile%\..\number.ahk
 
 
 
@@ -1697,11 +1698,14 @@ KeyCombinationChordPromptDelay() {
 ; @returns {Boolean} False when nothing was committed.
 KeyCombinationChordCommitDelay(Text, Path := "", ReloadFn := 0) {
 	global ConfigurationFile
-	if !RegExMatch(Text, "^\d+(\.\d+)?$") || (Text + 0) <= 0 {
+	Parsed := ""
+	Valid := RegExMatch(Text, "^\d+(\.\d+)?$")
+		&& (InStr(Text, ".") ? NumberTryParseFiniteFloat(Text, &Parsed) : NumberTryParseInputInteger(Text, &Parsed))
+	if !Valid || Parsed <= 0 {
 		LoggerWarn("KeyCombinations", "The chord delay '{1}' is no positive number: nothing changes.", Text)
 		return false
 	}
-	Rows := [ManifestSparseOperation(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, Text + 0)]
+	Rows := [ManifestSparseOperation(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, Parsed)]
 	if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, Rows, "the delay of the key chords")
 		return false
 	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
