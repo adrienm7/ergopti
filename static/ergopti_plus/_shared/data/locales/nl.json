@@ -340,6 +340,7 @@
 	"dialog.app_picker.active_suffix": " (actief)",
 	"dialog.app_picker.prompt": "Selecteer toepassingen:",
 	"dialog.app_picker.running_count": "{n} actieve toepassing(en).",
+	"dialog.app_picker.selection_unverified": "De geselecteerde toepassing kan niet worden gecontroleerd of een ander item heeft voorrang. Er is geen binding opgeslagen.",
 	"dialog.app_picker.stopped_suffix": " (gestopt)",
 	"dialog.app_picker.title": "Toepassingsselectie",
 	"dialog.bulk_toggle.save_failed": "De wijziging kon niet worden opgeslagen in het configuratiebestand.\nHet is teruggedraaid. Sluit alle apps die het bestand vasthouden en probeer het opnieuw.",

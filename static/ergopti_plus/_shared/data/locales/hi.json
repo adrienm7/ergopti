@@ -340,6 +340,7 @@
 	"dialog.app_picker.active_suffix": " (सक्रिय)",
 	"dialog.app_picker.prompt": "अनुप्रयोग चुनें:",
 	"dialog.app_picker.running_count": "{n} चल रहा है अनुप्रयोग।",
+	"dialog.app_picker.selection_unverified": "चुने गए ऐप की पुष्टि नहीं हो सकी या किसी अन्य प्रविष्टि को प्राथमिकता है। कोई बाइंडिंग सहेजी नहीं गई।",
 	"dialog.app_picker.stopped_suffix": " (बंद)",
 	"dialog.app_picker.title": "अनुप्रयोग चयन",
 	"dialog.bulk_toggle.save_failed": "बदलाव को कॉन्फ़िगरेशन फ़ाइल में सहेजा नहीं जा सका।\nउसे वापस ले लिया गया है। फ़ाइल को रोकने वाले ऐप बंद करें और फिर कोशिश करें।",

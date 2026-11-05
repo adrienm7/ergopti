@@ -340,6 +340,7 @@
 	"dialog.app_picker.active_suffix": " (نشط)",
 	"dialog.app_picker.prompt": "اختر التطبيقات:",
 	"dialog.app_picker.running_count": "{n} تطبيق(ات) قيد التشغيل.",
+	"dialog.app_picker.selection_unverified": "تعذر التحقق من التطبيق المحدد أو توجد أولوية لإدخال آخر. لم يُحفظ أي تعيين.",
 	"dialog.app_picker.stopped_suffix": " (متوقف)",
 	"dialog.app_picker.title": "اختيار التطبيق",
 	"dialog.bulk_toggle.save_failed": "تعذّر حفظ التغيير في ملف الإعدادات.\nتم التراجع عنه. أغلق أي تطبيق يحتفظ بالملف وأعد المحاولة.",

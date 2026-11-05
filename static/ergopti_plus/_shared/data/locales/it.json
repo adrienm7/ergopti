@@ -340,6 +340,7 @@
 	"dialog.app_picker.active_suffix": " (attiva)",
 	"dialog.app_picker.prompt": "Seleziona applicazioni:",
 	"dialog.app_picker.running_count": "{n} applicazione/i in esecuzione.",
+	"dialog.app_picker.selection_unverified": "Impossibile verificare l’applicazione selezionata oppure un’altra voce ha la precedenza. Nessuna associazione è stata salvata.",
 	"dialog.app_picker.stopped_suffix": " (fermata)",
 	"dialog.app_picker.title": "Selezione applicazione",
 	"dialog.bulk_toggle.save_failed": "Impossibile salvare la modifica nel file di configurazione.\nÈ stata annullata. Chiudi qualsiasi app che trattiene il file e riprova.",

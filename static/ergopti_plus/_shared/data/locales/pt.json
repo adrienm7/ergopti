@@ -340,6 +340,7 @@
 	"dialog.app_picker.active_suffix": " (ativo)",
 	"dialog.app_picker.prompt": "Selecionar aplicativos:",
 	"dialog.app_picker.running_count": "{n} aplicativo(s) em execução.",
+	"dialog.app_picker.selection_unverified": "Não é possível verificar a aplicação selecionada ou outra entrada tem prioridade. Nenhuma associação foi guardada.",
 	"dialog.app_picker.stopped_suffix": " (parado)",
 	"dialog.app_picker.title": "Seleção de aplicativos",
 	"dialog.bulk_toggle.save_failed": "Não foi possível guardar a alteração no ficheiro de configuração.\nFoi revertida. Feche qualquer aplicação que esteja a manter o ficheiro aberto e tente novamente.",

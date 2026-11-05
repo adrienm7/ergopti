@@ -340,6 +340,7 @@
 	"dialog.app_picker.active_suffix": " (פעיל)",
 	"dialog.app_picker.prompt": "בחר יישומים:",
 	"dialog.app_picker.running_count": "{n} יישום(ים) רצים.",
+	"dialog.app_picker.selection_unverified": "לא ניתן לאמת את היישום שנבחר או שלרשומה אחרת יש עדיפות. ההקצאה לא נשמרה.",
 	"dialog.app_picker.stopped_suffix": " (מופסק)",
 	"dialog.app_picker.title": "בחירת יישומים",
 	"dialog.bulk_toggle.save_failed": "לא ניתן היה לשמור את השינוי בקובץ התצורה.\nהוא בוטל. סגור כל יישום שמחזיק את הקובץ ונסה שוב.",
