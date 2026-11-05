@@ -1,10 +1,10 @@
 # Windows audit campaign, 4 November 2026
 
-Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus Windows; read-only parallel passes covered keystats, input, UI and LLM request handling. Evidence is derived from production source and existing tests. The findings below have not all been executed on native Windows. No performance numbers were measured.
+Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus Windows; parallel passes cover keystats, input, UI and LLM request handling. Source-derived findings and native qualification are recorded separately below. Native execution covers the declared targeted cohorts; the register has not all been executed on Windows. Instrumented work observations identify their measurement limits.
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **145 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **146 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -2179,3 +2179,21 @@ Source9cb40f4f refuses NUL-bearing captures before StrGet through the existing f
 Selectionfbb1538c targets29 cases: classified publisher17, original command capture4, stderr1, existing real-command/script2, new pause-owner4 and first-line work observation1. Already qualified locale6 is not repeated. Pause probesd36ff083 keep a genuine gated cmd tree and complete native suspend reactor; failed exact termination is the deliberate cutpoint, while final sinks are passive recorders. Acquisition additionally observes the actual native creation boundary so create-then-cancel cannot masquerade as refusing a revoked start. These are unclassified hypotheses until native receipts arrive.
 
 The first-line observation preserves the established prefix result and measures actual encoding-call work with a delegated observer; any recorded duration includes instrumentation and has no elapsed-time assertion. Helper9e3235e4 emits only explicitly marked, bounded ASCII numeric observations after successful manifest validation, keeping successful metrics reviewable without requiring artifact access. No first-line production change or additional finding is claimed. The register remains145 distinct findings.
+
+### Native qualification: complete command captures and classified stages
+
+Replay42131231224 at14810634 completes29 timed cases in each order, with25PASS/4FAIL, exact matching names/statuses and no errors or omissions. All17 classified-publication controls,4 original command capture cases,1 binary stderr control and2 existing public real-command/script controls pass. This qualifies the selected071 and145 corrections, including exact foreign-stage retention and existing explicit output refusals.
+
+All four lifecycle probes fail before actual command construction, including the unchanged-epoch control: started0/native_creates0/lifecycle0 with transport diagnostics. Their private composition omits the genuine PLC_CreateProcessWithInheritedHandles owner, which native parse warnings identify as unassigned. Commit `eed5995a` includes that real owner while preserving all four business oracles and diagnostic prerequisites. No lifecycle finding or source correction is admitted from these fixture failures.
+
+### AHK-146: quadratic first-line sizing work
+
+The successful isolated observation at the actual65536-byte capture and200-byte notice budgets records65338 byte-size calls receiving2147562052 cumulative UTF-16 input units. Its prefix remains correct. The500ms receipt includes observation overhead; it is not a measurement of noninstrumented UI latency or allocated bytes. The reverse case passes its original output assertions, but only the isolated numeric receipt is separately emitted. This establishes the repeated whole-line sizing algorithm, independently of145's captured-byte admission.
+
+Sourced304d10b bounds the candidate before the existing byte-repair loop, retaining the original fit check, surrogate cleanup and ellipsis policy. Its regression now bounds sizing input work to one full-capture scan plus work determined by notice width; the recorded original counter exceeds that ceiling. Companion505a111d covers11 ASCII/Unicode/zero/negative/blank-line vectors. Both Lua consumers already use a bounded prefix. Native postfix remains pending, and the register reaches146 distinct findings.
+
+### Focused notice qualification and independent calendar hypothesis
+
+Selectione679ca58 contains9 cases: the4 repaired-composition command pause probes, the first-line work/scalar/script3 and2 new calendar-focus cases. The25 preceding postfix cases remain qualified and are not repeated. No command-lifecycle source fix is integrated before a usable baseline.
+
+Tests77e5065c retain real initialization, native owned GUI/focus, monotonic elapsed intervals, public midnight maintenance, stop, durable journal ingestion and canonical SQLite reader. Only the calendar date/timestamp functions are explicit boundary ports. App and title durations must retain their before/after calendar ownership without manufacturing an app switch; the same-day control also calls real maintenance. Other OS producers already split their foreground intervals at the calendar boundary. This remains an unexecuted Windows hypothesis, with no finding added before its native receipts.
