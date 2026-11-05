@@ -929,7 +929,7 @@ _LATRT_Diagnostic(State, Notices, Phase) {
     _TestPrint("# THINKING_RETRY_DEBUG " . KL_JsonEncode(Data))
 }
 
-_LATRT_Case(Cancel) {
+_LATRT_Case(Cancel, AliasMode := "") {
     global _DriverDir, _LLM_Menu, _LLM_Menu_ApiTestProgress
     global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LLM_Remote_RetryOf
     global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_ThinkingRefused
@@ -947,9 +947,9 @@ _LATRT_Case(Cancel) {
     AssertFalse(_LLM_Menu_ApiTestProgress.Has("entry"), "no foreign progress can be replaced")
 
     Nonce := DllCall("GetCurrentProcessId", "UInt") . "_" . A_TickCount . "_" . Random(100000, 999999)
-    Mode := Cancel ? "cancel" : "positive"
+    Mode := AliasMode != "" ? AliasMode : (Cancel ? "cancel" : "positive")
     State := {Cancel: Cancel, Nonce: Nonce, Mode: Mode, Directory: "", Registry: "",
-        Peer: 0, PeerPid: 0, PeerCalls: 0, PeerCode: -1, PeerOutput: "", PeerErrors: "",
+        AliasBefore: _LLM_Remote_RetryOf.Count, Peer: 0, PeerPid: 0, PeerCalls: 0, PeerCode: -1, PeerOutput: "", PeerErrors: "",
         Progress: 0, ProgressHwnd: 0, Logs: [], CleanupIssues: [], Owner: 0, OriginalId: 0, OriginalEntry: 0, RetryId: 0, RetryEntry: 0,
         Cutpoint: false, AfterCutpoint: false, OriginalGone: false, Cancelled: false,
         OwnerCurrentAtCutpoint: false, OwnerRetiredAtCutpoint: false,
@@ -1020,6 +1020,23 @@ _LATRT_Case(Cancel) {
             throw State.Failure
         AssertTrue(State.Cutpoint && State.OriginalGone && State.OwnerCurrentAtCutpoint)
         _LATRT_HoldRetry(State)
+        if AliasMode != "" {
+            AssertTrue(_LATRT_Wait(() => _LATRA_RetryHeld(State), 30000),
+                "the alias must name an actual managed child while its owned peer withholds response two")
+            Waiting := JsonParse(FSReadUtf8Exact(State.Directory . "\retry_waiting.json"))
+            AssertEqual(Nonce, Waiting["nonce"])
+            AssertEqual(Mode, Waiting["case"])
+            AssertEqual(State.PeerPid, Waiting["pid"])
+            AssertTrue(State.RetryId && _LLM_Remote_RetryOf.Get(State.OriginalId, 0) == State.RetryId)
+            AssertTrue(_LLM_Remote_Async.Has(State.RetryId) && _LLM_Remote_Async[State.RetryId] == State.RetryEntry)
+            AssertTrue(State.RetryEntry["http"] is CurlAsyncRequest && !State.RetryEntry["http"].Completed)
+            if AliasMode == "alias-cancel" {
+                State.Cancelled := _LLM_Menu_ApiTestProgressCancel(State.Progress)
+                AssertTrue(State.Cancelled, "the actual public Cancel must reach the active original-to-retry link")
+                AssertTrue(State.RetryEntry["cancelled"], "Cancel(original) must mark that exact active child")
+            } else
+                AssertEqual(1, _LATRT_Control(State, "finish-retry"))
+        }
         AssertTrue(_LATRT_Wait(() => _LATRT_RequestsGone(State), 30000),
             "every published original/retry must deliver genuine managed completion")
 
@@ -1037,7 +1054,9 @@ _LATRT_Case(Cancel) {
         _TestPrint("# THINKING_RETRY " . KL_JsonEncode(Map("case", Mode, "counter_delta", Delta,
             "http_requests", Receipt["http_requests"], "original_gone", State.OriginalGone,
             "cancelled", State.Cancelled, "owner_retired", !LLM_AuxIsCurrent(State.Owner),
-            "peer_pid", State.PeerPid)))
+            "peer_pid", State.PeerPid, "retry_id", State.RetryId,
+            "alias_before", State.AliasBefore, "alias_after", _LLM_Remote_RetryOf.Count,
+            "owned_alias_present", _LLM_Remote_RetryOf.Has(State.OriginalId))))
 
         if Cancel {
             AssertTrue(State.Cancelled && State.OwnerRetiredAtCutpoint && State.WindowRetiredAtCutpoint)
@@ -1045,11 +1064,24 @@ _LATRT_Case(Cancel) {
             AssertEqual(1, Delta, "cancel at the exact retired-original gap must prevent retry reservation")
             AssertEqual(1, Receipt["http_requests"], "cancel must prevent the real second POST")
             AssertFalse(_LLM_Remote_RetryOf.Has(State.OriginalId), "cancelled work must not gain a retry link")
+        } else if AliasMode == "alias-cancel" {
+            AssertTrue(State.Cancelled && !LLM_AuxIsCurrent(State.Owner) && !WMHandleExists(State.ProgressHwnd))
+            AssertEqual(0, Notices.Length, "an actually cancelled retry must publish no verdict")
+            AssertEqual(2, Delta, "the cancellation control must have published a real retry")
+            AssertEqual(2, Receipt["http_requests"], "the owned peer must independently receive that active child")
         } else {
             AssertEqual(2, Delta, "positive control must really reserve its thinking retry")
             AssertEqual(2, Receipt["http_requests"], "positive control must send both actual native HTTP POSTs")
             AssertEqual(1, Notices.Length, "positive control must publish exactly once")
             AssertTrue(Notices[1]["ok"], "second response must complete through the genuine Menu callback")
+        }
+        if AliasMode != "" {
+            AssertTrue(_LATRT_Wait(() => _LATRA_ChildSettled(State), 10000),
+                "native child completion/abort and its exact artifact custody must settle")
+            AssertFalse(_LLM_Remote_RetryOf.Has(State.OriginalId),
+                "a physically retired retry must retire its original cancellation alias")
+            AssertEqual(State.AliasBefore, _LLM_Remote_RetryOf.Count,
+                "the completed private exchange cannot retain a new alias or clear another exchange's alias")
         }
         AssertFalse(LLM_AuxIsCurrent(State.Owner))
         AssertFalse(_LLM_Menu_ApiTestProgress.Has("entry"))
@@ -1062,6 +1094,10 @@ _LATRT_Case(Cancel) {
             if !IsObject(Primary)
                 Primary := CleanupFailure
         }
+        ; Only these new cases retire their own observed alias after the verdict.
+        ; A fail-before receipt remains visible before this public cleanup call.
+        if AliasMode != "" && State.OriginalId
+            try LLM_RemoteCancelAsync(State.OriginalId)
         if IsObject(Primary) || !Retired
             try _LATRT_Diagnostic(State, Notices, "after-cleanup")
         if !Retired
@@ -1096,9 +1132,29 @@ _LATRT_Case(Cancel) {
         throw Primary
 }
 
-_LATRT_Run(Cancel) {
-    _ManagedRemoteFixtureWithLlmTimings(_LATHTTP_HostScope.Bind(_LTO_WithoutListingFetch.Bind(_LATRT_Case.Bind(Cancel))))
+_LATRT_Run(Cancel, AliasMode := "") {
+    _ManagedRemoteFixtureWithLlmTimings(_LATHTTP_HostScope.Bind(_LTO_WithoutListingFetch.Bind(_LATRT_Case.Bind(Cancel, AliasMode))))
 }
+
+_LATRA_RetryHeld(State) {
+    global _LLM_Remote_Async
+    _LATRT_HoldRetry(State)
+    return State.RetryId && _LLM_Remote_Async.Has(State.RetryId)
+        && FSStrictExists(State.Directory . "\retry_waiting.json")
+}
+
+_LATRA_ChildSettled(State) {
+    if !(State.RetryEntry is Map) || !State.RetryEntry.Has("http")
+        return false
+    Http := State.RetryEntry["http"]
+    return Http is CurlAsyncRequest && Http.Completed && !IsObject(Http.Handle)
+        && !Http.CleanupPending && !(Http.ManagedCapture is Map)
+}
+
+Test("llm API native thinking retry: completed alias retires (api-thinking-retry-alias-owner)",
+    _LATRT_Run.Bind(false, "alias-complete"))
+Test("llm API native thinking retry: original cancels active child (api-thinking-retry-alias-owner)",
+    _LATRT_Run.Bind(false, "alias-cancel"))
 
 Test("llm API native thinking retry: positive control (api-thinking-retry-owner)",
     _LATRT_Run.Bind(false))
