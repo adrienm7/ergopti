@@ -41,11 +41,17 @@ class _PWSO_View {
 		this.Settings := {}, this.Subscriptions := 0, this.Navigations := 0
 	}
 	WebMessageReceived(Callback) {
+		global _PWSO
 		this.Subscriptions += 1
+		if InStr(_PWSO.Mode, "subscription-") == 1
+			return _PWSO_Subscribe(Callback)
 		return { Callback: Callback }
 	}
 	NavigationCompleted(Callback) {
+		global _PWSO
 		this.Subscriptions += 1
+		if InStr(_PWSO.Mode, "subscription-") == 1
+			return _PWSO_Subscription(Callback)
 		return { Callback: Callback }
 	}
 	SetVirtualHostNameToFolderMapping(*) => 0
@@ -60,6 +66,12 @@ class _PWSO_Controller {
 		this.CoreWebView2 := _PWSO_View(), this.Closed := 0, this.Fills := 0
 	}
 	Close() {
+		global _PWSO
+		if InStr(_PWSO.Mode, "subscription-") == 1 {
+			_PWSO.CloseCalls += 1
+			_PWSO.ActiveAtClose := _PWSO.ActiveSubscriptions
+			_PWSO.AliveAtClose := !!DllCall("IsWindow", "Ptr", _PWSO.Hwnds[1], "Int")
+		}
 		this.Closed += 1
 	}
 	Fill() {
@@ -76,7 +88,7 @@ _PWSO_Create(Hwnd) {
 		"The browser wait begins only after the genuine editor is visible and published.")
 	Controller := _PWSO_Controller()
 	_PWSO.Controllers.Push(Controller)
-	if _PWSO.Controllers.Length > 1 || _PWSO.Mode == "current"
+	if _PWSO.Controllers.Length > 1 || _PWSO.Mode == "current" || InStr(_PWSO.Mode, "subscription-") == 1
 		return Controller
 	_PWSO.Pending := Promise.withResolvers()
 	; The timer port has an independent settlement consumer so Promise.task does
@@ -162,6 +174,10 @@ _PWSO_Check() {
 	global _PathsEdWeb_Controller, _PathsEdWeb_WebView, _PathsEdWeb_MsgSub, _PathsEdWeb_NavSub
 	if IsObject(_PWSO.Failure)
 		throw _PWSO.Failure
+	if InStr(_PWSO.Mode, "subscription-") == 1 {
+		_PWSO_CheckSubscription()
+		return
+	}
 	if _PWSO.Mode == "current" {
 		_PWSO_Require(_PWSO.Controllers.Length == 1 && _PWSO.Windows.Length == 1,
 			"The public current editor must open exactly one browser host without native fallback.")
@@ -211,7 +227,10 @@ _PWSO_Main() {
 		ExitApp(2)
 	Persistent(true)
 	global _PWSO := { Mode: A_Args[1], Windows: [], Hwnds: [], Controllers: [], Pending: 0,
-		Boundary: 0, Failure: 0, CloseSent: 0, OldEpoch: 0, SuccessorEpoch: 0 }
+		Boundary: 0, Failure: 0, CloseSent: 0, OldEpoch: 0, SuccessorEpoch: 0,
+		SubscriptionCalls: 0, InFlight: false, ActiveSubscriptions: 0, CreatedSubscriptions: 0,
+		ReleasedSubscriptions: 0, ReleasedInFlight: false, CloseObserved: false,
+		AliveAtReturn: false, AliveAtClose: false, ActiveAtClose: -1, CloseCalls: 0 }
 	global _VendorDir := A_Args[2], _SharedDir := A_Args[2], _I18nLocale := "en"
 	global _ConfigDir := A_Args[2] . "\", _PathsFile := A_Args[2] . "\unwritten-paths.toml"
 	Primary := 0
@@ -251,6 +270,87 @@ _PWSO_Main() {
 	}
 	FileAppend("PASS paths-editor-startup " . _PWSO.Mode . "`n", "*", "UTF-8")
 	ExitApp(0)
+}
+
+; The browser port returns a real AHK handle with the same last-reference
+; unsubscribe lifetime as the shipped SDK. Native cancellation is unmodified.
+class _PWSO_Subscription {
+	__New(Callback) {
+		global _PWSO
+		this.Callback := Callback
+		_PWSO.ActiveSubscriptions += 1, _PWSO.CreatedSubscriptions += 1
+	}
+	__Delete() {
+		global _PWSO
+		_PWSO.ReleasedInFlight := _PWSO.ReleasedInFlight || _PWSO.InFlight
+		_PWSO.ActiveSubscriptions -= 1, _PWSO.ReleasedSubscriptions += 1
+	}
+}
+
+_PWSO_SubscriptionClose() {
+	global _PWSO, _PathsEdWeb_SessionEpoch, _PathsEdWeb_Gui
+	Hwnd := _PWSO.Hwnds[1], Epoch := _PathsEdWeb_SessionEpoch
+	_PWSO_Require(Epoch > 0 && _PathsEdWeb_Gui == _PWSO.Windows[1]
+		&& WinGetPID("ahk_id " . Hwnd) == ProcessExist()
+		&& DllCall("IsWindowVisible", "Ptr", Hwnd, "Int"),
+		"The add-event actor requires its exact current visible native editor")
+	_PWSO.CloseSent += 1
+	_PWSO_Require(DllCall("PostMessageW", "Ptr", Hwnd, "UInt", 0x10, "Ptr", 0, "Ptr", 0, "Int"),
+		"The owned editor must admit the genuine WM_CLOSE")
+	Started := A_TickCount
+	while _PathsEdWeb_SessionEpoch == Epoch && A_TickCount - Started < 1000
+		Sleep(10)
+	_PWSO.CloseObserved := _PathsEdWeb_SessionEpoch > Epoch && !IsObject(_PathsEdWeb_Gui)
+	_PWSO_Require(_PWSO.CloseObserved, "The actual Close must revoke the editor before add-event returns")
+}
+
+_PWSO_Subscribe(Callback) {
+	global _PWSO
+	_PWSO.SubscriptionCalls += 1
+	_PWSO.InFlight := true
+	try {
+		if _PWSO.Mode == "subscription-close"
+			_PWSO_SubscriptionClose()
+		_PWSO.AliveAtReturn := !!DllCall("IsWindow", "Ptr", _PWSO.Hwnds[1], "Int")
+		return _PWSO_Subscription(Callback)
+	} finally _PWSO.InFlight := false
+}
+
+_PWSO_CheckSubscription() {
+	global _PWSO, _PathsEdWeb_Gui, _PathsEdWeb_Controller, _PathsEdWeb_WebView
+	global _PathsEdWeb_MsgSub, _PathsEdWeb_NavSub
+	Ready := true
+	if _PWSO.Mode == "subscription-current" {
+		Ready := _PWSO.SubscriptionCalls == 1 && _PWSO.ActiveSubscriptions == 2
+			&& _PWSO.Controllers.Length == 1 && _PWSO.Windows.Length == 1
+			&& _PathsEdWeb_Gui == _PWSO.Windows[1] && _PathsEdWeb_Controller == _PWSO.Controllers[1]
+			&& _PathsEdWeb_WebView == _PWSO.Controllers[1].CoreWebView2
+			&& IsSet(_PathsEdWeb_MsgSub) && IsSet(_PathsEdWeb_NavSub)
+			&& _PWSO.Controllers[1].CoreWebView2.Navigations == 1 && _PWSO.Controllers[1].Fills >= 1
+		_PWSO_SubscriptionClose()
+	}
+	FileAppend("OBSERVATION paths-editor-subscription mode=" . _PWSO.Mode
+		. " calls=" . _PWSO.SubscriptionCalls . " close_sent=" . _PWSO.CloseSent
+		. " close_observed=" . _PWSO.CloseObserved . " native_alive_at_return=" . _PWSO.AliveAtReturn
+		. " native_alive_at_close=" . _PWSO.AliveAtClose . " active_at_close=" . _PWSO.ActiveAtClose
+		. " created=" . _PWSO.CreatedSubscriptions . " released=" . _PWSO.ReleasedSubscriptions
+		. " released_in_flight=" . _PWSO.ReleasedInFlight . " controller_closed=" . _PWSO.Controllers[1].Closed
+		. " close_calls=" . _PWSO.CloseCalls . " ready=" . Ready . "`n", "*", "UTF-8")
+	_PWSO_Require(Ready && _PWSO.Controllers.Length == 1 && _PWSO.Windows.Length == 1
+		&& _PWSO.CloseSent == 1 && _PWSO.CloseObserved && _PWSO.SubscriptionCalls == 1,
+		"One genuine public browser must reach its actual native cancellation")
+	if _PWSO.Mode == "subscription-close"
+		_PWSO_Require(_PWSO.Controllers[1].CoreWebView2.Subscriptions == 1
+			&& _PWSO.Controllers[1].CoreWebView2.Navigations == 0 && _PWSO.Controllers[1].Fills == 0,
+			"A retired add-event must not subscribe again, navigate or Fill")
+	_PWSO_Require(_PWSO.AliveAtReturn && _PWSO.AliveAtClose && _PWSO.ActiveAtClose == 0
+		&& _PWSO.ActiveSubscriptions == 0 && _PWSO.CreatedSubscriptions == _PWSO.ReleasedSubscriptions
+		&& !_PWSO.ReleasedInFlight && _PWSO.Controllers[1].Closed == 1 && _PWSO.CloseCalls == 1,
+		"The HWND must survive add-event return and unsubscribe before its controller closes once")
+	_PWSO_Require(!DllCall("IsWindow", "Ptr", _PWSO.Hwnds[1], "Int") && !IsObject(_PathsEdWeb_Gui)
+		&& !IsSet(_PathsEdWeb_Controller) && !IsSet(_PathsEdWeb_WebView)
+		&& !IsSet(_PathsEdWeb_MsgSub) && !IsSet(_PathsEdWeb_NavSub),
+		"The exact retired editor must finally release its native and browser resources")
 }
 
 _PWSO_Main()
