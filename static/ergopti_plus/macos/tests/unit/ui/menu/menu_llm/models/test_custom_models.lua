@@ -127,6 +127,20 @@ helpers.describe("custom model list transactions", function()
 		end)
 	end)
 
+	for _, local_backend in ipairs({ "ollama", "mlx" }) do
+		helpers.it("keeps the active API model when removing the same " .. local_backend .. " identifier", function()
+			local list = { { backend = local_backend, name = "owner/model" } }
+			with_models({ list = list, model = "owner/model", backend = "api" }, function(ops, state, calls)
+				helpers.assert_true(ops.remove(local_backend, "owner/model"))
+				helpers.assert_nil(calls.disabled, "removing a local entry must not disable the active API")
+				helpers.assert_eq(state.llm_backend, "api")
+				helpers.assert_eq(state.llm_model, "owner/model")
+				helpers.assert_eq(calls.saves, 1, "the removal must be persisted")
+				helpers.assert_eq(#state.llm_user_models, 0)
+			end)
+		end)
+	end
+
 	helpers.it("disables the active MLX model when its own entry is removed", function()
 		local list = { { backend = "mlx", name = "owner/model" } }
 		with_models({ list = list, model = "owner/model", backend = "mlx" }, function(ops, state, calls)
