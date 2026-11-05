@@ -689,3 +689,38 @@ helpers.describe("retained remap provenance across keyboard roster changes", fun
 		end)
 	end)
 end)
+
+helpers.describe("physical magic key post-output failure", function()
+	helpers.it("does not replay the physical key after the injected character was delivered", function()
+		local SourceFixture = require("tests.support.modules.hotstrings.magic_key.magic_key_source_fixture")
+		SourceFixture.with_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source)
+			local session, entered, seen, dispatched = nil, false, nil, false
+			local ok, err = pcall(function()
+				Fixture.with_session({ on_consume = function(_, detail) seen = detail; return Source.on_key(detail) end }, function(s)
+					session = s
+					package.loaded["adapters.xkb_capture"].source_generation = function() return 0 end
+					Source.init({ is_active = function() return true end, replace_on = function() return true end,
+						magic_key = function() return "★" end, can_type = function() return true end,
+						type_text = function()
+							entered = true
+							assert(session.writer.emit(2, 1)); assert(session.writer.emit(2, 0)); return true
+						end,
+						end_selection = function() end,
+						dispatch_char = function() dispatched = true; error("controlled downstream failure") end,
+						can_capture = function() return true end, key_text = function() return "j" end,
+						defer = function() return true end })
+					helpers.assert_eq(Source.evdev_code(), 36, "the configured magic source must be KeyJ")
+					s.edge("a", 36, 1, 1)
+					helpers.assert_true(dispatched, "the downstream exception must actually occur after output")
+					helpers.assert_eq(s.hook.isRunning(), false, "the downstream exception must actually stop the hook")
+					helpers.assert_true(seen ~= nil, "the hook must invoke its consumer")
+					helpers.assert_true(entered, "the magic owner must have attempted the replacement, code=" .. tostring(seen.code) .. " ctrl=" .. tostring(seen.mods.ctrl) .. " shift=" .. tostring(seen.mods.shift))
+					helpers.assert_eq(s.rows, { { 2, 1 }, { 2, 0 } },
+						"the already-replaced physical press must not be salvaged")
+				end)
+			end)
+			Source._reset_for_test()
+			if not ok then error(err, 0) end
+		end)
+	end)
+end)
