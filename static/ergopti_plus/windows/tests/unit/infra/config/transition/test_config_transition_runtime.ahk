@@ -602,7 +602,7 @@ Test("config transition retention: settled raw rollback releases its original na
 
 
 
-_PBAD_Case(Invalid) {
+_PBAD_Case(Invalid, Protocol := "utf8") {
 	Root := A_Temp . "\ergopti_paths_byte_admission_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
 	Created := false
 	try {
@@ -619,9 +619,23 @@ _PBAD_Case(Invalid) {
 		Source := "ConfigDirPath = " . TOML_RenderValue(StrReplace(TargetDir, "\", "/")) . "`n"
 		if Invalid
 			Source := StrReplace(Source, Chr(0xFFFD), "?", true)
-		Count := StrPut(Source, "UTF-8") - 1
-		Bytes := Buffer(Count + 1)
-		StrPut(Source, Bytes, "UTF-8")
+		if Protocol == "utf16le-bom" {
+			AssertFalse(Invalid)
+			Count := 2 + StrLen(Source) * 2
+			Bytes := Buffer(Count + 2, 0)
+			NumPut("UShort", 0xFEFF, Bytes)
+			StrPut(Source, Bytes.Ptr + 2, StrLen(Source) + 1, "UTF-16")
+		} else {
+			Prefix := Protocol == "utf8-bom" ? 3 : 0
+			AssertTrue(Protocol == "utf8" || Protocol == "utf8-bom")
+			Count := Prefix + StrPut(Source, "UTF-8") - 1
+			Bytes := Buffer(Count + 1, 0)
+			if Prefix {
+				NumPut("UChar", 0xEF, "UChar", 0xBB, "UChar", 0xBF, Bytes)
+				AssertFalse(Invalid)
+			}
+			StrPut(Source, Bytes.Ptr + Prefix, Count - Prefix + 1, "UTF-8")
+		}
 		Marker := -1
 		if Invalid {
 			Loop Count {
@@ -645,6 +659,16 @@ _PBAD_Case(Invalid) {
 			AssertFalse(FSReadUtf8Exact(Path) is String, "the actual raw locator is not valid UTF-8")
 			AssertTrue(InStr(FileRead(Path, "UTF-8"), Chr(0xFFFD), true) > 0,
 				"the native compatibility reader really substitutes a different scalar")
+		}
+		if !Invalid {
+			AssertEqual(Source, FileRead(Path, "UTF-8"), "the declared native source protocol must independently decode exactly")
+			if Protocol == "utf16le-bom"
+				AssertEqual(0xFEFF, NumGet(Before, 0, "UShort"))
+			else if Protocol == "utf8-bom" {
+				AssertEqual(0xEF, NumGet(Before, 0, "UChar"))
+				AssertEqual(0xBB, NumGet(Before, 1, "UChar"))
+				AssertEqual(0xBF, NumGet(Before, 2, "UChar"))
+			}
 		}
 		Selected := "", Refused := false, Owner := "<none>"
 		try {
@@ -676,6 +700,8 @@ _PBAD_Case(Invalid) {
 }
 Test("paths byte admission: invalid UTF-8 cannot select another profile (paths-byte-admission)", _PBAD_Case.Bind(true))
 Test("paths byte admission: actual Unicode UTF-8 profile remains selected (paths-byte-admission)", _PBAD_Case.Bind(false))
+Test("paths byte admission: actual Unicode UTF-8 BOM profile remains selected (paths-byte-admission)", _PBAD_Case.Bind(false, "utf8-bom"))
+Test("paths byte admission: actual Unicode UTF-16LE BOM profile remains selected (paths-byte-admission)", _PBAD_Case.Bind(false, "utf16le-bom"))
 
 
 
