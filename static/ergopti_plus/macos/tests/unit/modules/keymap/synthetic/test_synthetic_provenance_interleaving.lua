@@ -435,7 +435,7 @@ local function selftest_fixture(world)
 	local fixture = load_fixture()
 	local Gate = require("modules.keymap.selftest_gate")
 	Gate._ports = {
-		dev_source_active = function() return world.dev end,
+		field_run_running = function() return world.running end,
 		focused_own_window_id = function() return world.focused end,
 	}
 	if world.publish then require("infra.field_run_selftest").publish(world.publish) end
@@ -468,35 +468,35 @@ helpers.describe("keymap selftest gate: field-run keys decode as typing only in 
 	end
 
 	helpers.it("decodes an admitted key as typing and passes it to the scratch field", function()
-		local buffer, down, up = type_selftest({ dev = true, focused = SCRATCH, publish = SCRATCH })
+		local buffer, down, up = type_selftest({ running = true, focused = SCRATCH, publish = SCRATCH })
 		helpers.assert_true(not down, "an admitted key reaches the focused scratch field")
 		helpers.assert_true(not up)
 		helpers.assert_eq(buffer, " a", "an admitted selftest key enters the buffer like a typed one")
 	end)
 
-	helpers.it("consumes the key outside a developer runtime", function()
-		local buffer, down, up = type_selftest({ dev = false, focused = SCRATCH, publish = SCRATCH })
+	helpers.it("consumes the key while no field run is running", function()
+		local buffer, down, up = type_selftest({ running = false, focused = SCRATCH, publish = SCRATCH })
 		helpers.assert_true(down, "a refused selftest key must never reach an application")
 		helpers.assert_true(up)
 		helpers.assert_eq(buffer, " ")
 	end)
 
 	helpers.it("consumes the key while no typing step published its window", function()
-		local buffer, down, up = type_selftest({ dev = true, focused = SCRATCH })
+		local buffer, down, up = type_selftest({ running = true, focused = SCRATCH })
 		helpers.assert_true(down)
 		helpers.assert_true(up)
 		helpers.assert_eq(buffer, " ")
 	end)
 
 	helpers.it("consumes the key while another window has the focus", function()
-		local buffer, down, up = type_selftest({ dev = true, focused = 7, publish = SCRATCH })
+		local buffer, down, up = type_selftest({ running = true, focused = 7, publish = SCRATCH })
 		helpers.assert_true(down)
 		helpers.assert_true(up)
 		helpers.assert_eq(buffer, " ")
 	end)
 
 	helpers.it("treats an evicted selftest key as ordinary output, never as typing", function()
-		local buffer, down = type_selftest({ dev = true, focused = SCRATCH, publish = SCRATCH }, function(fixture)
+		local buffer, down = type_selftest({ running = true, focused = SCRATCH, publish = SCRATCH }, function(fixture)
 			fixture.synthetic.RECORD_LIMIT = 4
 			local events = selftest_events(fixture, "a")
 			-- Two newer pairs evict both unpinned selftest phases.
