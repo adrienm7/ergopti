@@ -1,0 +1,118 @@
+{
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"program": {
+		"path": "validation/check_source_guards.py",
+		"sha256": "685d6adb87ae034f6b0d95af09e263882d65c753d9e3d8ae851920b3b9c4e46e"
+	},
+	"checker": {
+		"path": "check_sources.py",
+		"sha256": "3f6d132409869225c62775cfa47febd89eac76e2fd6a6d8defd65e91684261c3"
+	},
+	"source_receipts": [
+		{
+			"path": "windows/source-contract.json",
+			"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+		},
+		{
+			"path": "macos/source-receipts.json",
+			"sha256": "46f002f8823b0973fec3270a0b9037abdcfe20755f809466ab59ae9f06cc4140"
+		},
+		{
+			"path": "linux/source-receipts.json",
+			"sha256": "eda0905c715e72929b4c668bb09bb9afee43ce40ad981a0a5939a7e5a84faa63"
+		},
+		{
+			"path": "shared/source-receipt.json",
+			"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+		}
+	],
+	"positive_controls": 2,
+	"negative_controls": 5,
+	"rationale": "A private 107-source/4-receipt skeleton uses real Git init and an object alternate pointing to the repository object database, with a real audited HEAD ref. No full checkout, fake Git executable, production mutation or frozen receipt mutation. Each negative must fail with its specific guard marker and produce no acceptance receipt. These controls test authentication refusal, not semantic parity or native delivery.",
+	"current_drift": {
+		"path": "static/ergopti_plus/windows/platform/remap/one_shot_shift.ahk",
+		"current_before_sha256": "458c21c994de1d2794b62d1f70dabd6f8b26305c174c6641429cb8c07a994b5b",
+		"current_drifted_sha256": "d66fa2e7c709f82b00e9a26207f12e7923a843d41c637c3c81e2f86229ced912",
+		"pinned_before_sha256": "458c21c994de1d2794b62d1f70dabd6f8b26305c174c6641429cb8c07a994b5b",
+		"pinned_after_sha256": "458c21c994de1d2794b62d1f70dabd6f8b26305c174c6641429cb8c07a994b5b",
+		"qualification": "Hashes use complete original Git blob bytes before and after the private current-file mutation; the pinned blob remains unchanged."
+	},
+	"results": [
+		{
+			"case": "original-main",
+			"expected": "accept",
+			"expected_marker": "Authenticated 132 role claims over 107 distinct source paths.",
+			"exit_code": 0,
+			"stdout": "Authenticated 132 role claims over 107 distinct source paths.\n",
+			"stderr": "",
+			"stdout_sha256": "f161db4d09303b736e278af9f6a7029175795d9a71c25aef08bfa32cd5847fe6",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"result_sha256": "b55e23527d2ee10f1ef1063cd195c4ca1ba67d089f3559f0ffea7ecedc06eed9",
+			"claims": 132,
+			"distinct_paths": 107
+		},
+		{
+			"case": "private-mirror-baseline",
+			"expected": "accept",
+			"expected_marker": "Authenticated 132 role claims over 107 distinct source paths.",
+			"exit_code": 0,
+			"stdout": "Authenticated 132 role claims over 107 distinct source paths.\n",
+			"stderr": "",
+			"stdout_sha256": "f161db4d09303b736e278af9f6a7029175795d9a71c25aef08bfa32cd5847fe6",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"result_sha256": "7263f6b7eee48a96f4ff541493c511577253e1ca2f3e7820814ed781abfdf0d4",
+			"claims": 132,
+			"distinct_paths": 107
+		},
+		{
+			"case": "wrong-receipt-pin",
+			"expected": "reject",
+			"expected_marker": "wrong source pin:",
+			"exit_code": 1,
+			"stdout": "",
+			"stderr": "Traceback (most recent call last):\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 128, in <module>\n    main()\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 86, in main\n    entries = claims(directory)\n              ^^^^^^^^^^^^^^^^^\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 56, in claims\n    require(document.get(pin_field) == AUDITED_SHA, f\"wrong source pin: {receipt}\")\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 22, in require\n    raise ValueError(message)\nValueError: wrong source pin: windows/source-contract.json\n",
+			"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stderr_sha256": "5e1cd4591d5c2487b8c9585099052e8867251af8b128faf60bf343efc0f4f836"
+		},
+		{
+			"case": "wrong-receipt-digest",
+			"expected": "reject",
+			"expected_marker": "pinned claim mismatch:",
+			"exit_code": 1,
+			"stdout": "",
+			"stderr": "Traceback (most recent call last):\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 128, in <module>\n    main()\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 105, in main\n    require(pinned_digest == expected, f\"pinned claim mismatch: {relative}\")\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 22, in require\n    raise ValueError(message)\nValueError: pinned claim mismatch: static/ergopti_plus/windows/platform/remap/one_shot_shift.ahk\n",
+			"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stderr_sha256": "d2a1fd176d295400fccef1c14ec1325e1cbbb16a08da524dcca94cf7628995a8"
+		},
+		{
+			"case": "unsafe-parent-path",
+			"expected": "reject",
+			"expected_marker": "noncanonical source path:",
+			"exit_code": 1,
+			"stdout": "",
+			"stderr": "Traceback (most recent call last):\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 128, in <module>\n    main()\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 86, in main\n    entries = claims(directory)\n              ^^^^^^^^^^^^^^^^^\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 65, in claims\n    relative_path(relative)\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 31, in relative_path\n    require(\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 22, in require\n    raise ValueError(message)\nValueError: noncanonical source path: ../outside-source\n",
+			"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stderr_sha256": "df0efdabff123d393ad298a9f674a05c8c562f91c288d90807dfd1fa2f9ff9e9"
+		},
+		{
+			"case": "symlink-receipt",
+			"expected": "reject",
+			"expected_marker": "symlink source or receipt:",
+			"exit_code": 1,
+			"stdout": "",
+			"stderr": "Traceback (most recent call last):\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 128, in <module>\n    main()\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 86, in main\n    entries = claims(directory)\n              ^^^^^^^^^^^^^^^^^\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 55, in claims\n    document = json.loads(regular_file(directory, receipt).read_text(encoding=\"utf-8\"))\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 46, in regular_file\n    require(not path.is_symlink(), f\"symlink source or receipt: {relative}\")\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 22, in require\n    raise ValueError(message)\nValueError: symlink source or receipt: windows/source-contract.json\n",
+			"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stderr_sha256": "c565f8c3d6852f472d97e7c787b84030aafa0dd13a929dcffb818a2d2d4e11b8"
+		},
+		{
+			"case": "real-current-byte-drift",
+			"expected": "reject",
+			"expected_marker": "current claimed source drift:",
+			"exit_code": 1,
+			"stdout": "",
+			"stderr": "Traceback (most recent call last):\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 128, in <module>\n    main()\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 106, in main\n    require(current_digest == expected, f\"current claimed source drift: {relative}\")\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py\", line 22, in require\n    raise ValueError(message)\nValueError: current claimed source drift: static/ergopti_plus/windows/platform/remap/one_shot_shift.ahk\n",
+			"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stderr_sha256": "c1189d25e33b24987e0692b5e7ecad9a04d9c9ae8d6dc3238373661a6c204e82"
+		}
+	]
+}

@@ -1,0 +1,201 @@
+=== Hammerspoon E2E virtual-keyboard harness ===
+
+
+--- Hardcoded E2E scenarios ---
+  PASS  scenario1 — basic expansion text
+  PASS  scenario1 — basic expansion backspaces
+  PASS  scenario1 — terminator withheld by the replay gate
+  PASS  scenario1 — callback output carries exact transaction provenance
+  PASS  scenario1 — reserved terminator never returns from the callback
+  PASS  scenario1 — reserved terminator posts once from the global FIFO
+  PASS  scenario1 — all synthetic transactions settle after FIFO replay
+  PASS  scenario2 — non-matching buffer emits nothing
+  PASS  scenario3 — is_word mid-word blocked
+  PASS  scenario4 — is_word start-of-buffer fires
+  PASS  scenario4 — is_word start-of-buffer backspaces
+  PASS  scenario5 — case-sensitive no match on wrong case
+
+--- Shared corpus vectors ---
+  PASS  e2e[simple_expansion] — emitted replacement
+  PASS  e2e[simple_expansion] — backspace count
+  PASS  e2e[no_match_unrelated_buffer] — no expansion emitted
+  PASS  e2e[word_boundary_mid_word_blocked] — no expansion emitted
+  PASS  e2e[word_boundary_start_of_buffer] — emitted replacement
+  PASS  e2e[word_boundary_start_of_buffer] — backspace count
+  PASS  e2e[word_boundary_after_space] — emitted replacement
+  PASS  e2e[word_boundary_after_space] — backspace count
+  PASS  e2e[word_boundary_after_punctuation] — emitted replacement
+  PASS  e2e[word_boundary_after_punctuation] — backspace count
+  PASS  e2e[case_sensitive_no_match] — no expansion emitted
+  PASS  e2e[case_sensitive_exact_match] — emitted replacement
+  PASS  e2e[case_sensitive_exact_match] — backspace count
+  PASS  e2e[backspace_count_equals_trigger_length] — emitted replacement
+  PASS  e2e[backspace_count_equals_trigger_length] — backspace count
+  PASS  e2e[backspace_count_with_consumed_terminator] — emitted replacement
+  PASS  e2e[backspace_count_with_consumed_terminator] — backspace count
+  PASS  e2e[partial_trigger_no_match] — no expansion emitted
+  PASS  e2e[trigger_with_special_chars] — emitted replacement
+  PASS  e2e[trigger_with_special_chars] — backspace count
+  PASS  e2e[multiword_replacement] — emitted replacement
+  PASS  e2e[multiword_replacement] — backspace count
+  PASS  e2e[empty_buffer_no_match] — no expansion emitted
+  PASS  e2e[utf8_trigger_two_codepoints] — emitted replacement
+  PASS  e2e[utf8_trigger_two_codepoints] — backspace count
+  PASS  e2e[utf8_trigger_three_codepoints] — emitted replacement
+  PASS  e2e[utf8_trigger_three_codepoints] — backspace count
+  PASS  e2e[word_boundary_after_newline] — emitted replacement
+  PASS  e2e[word_boundary_after_newline] — backspace count
+  PASS  e2e[word_boundary_after_tab] — emitted replacement
+  PASS  e2e[word_boundary_after_tab] — backspace count
+  SKIP  e2e[buffer_cap_trigger_longer_than_window]  (driver-specific: rolling_buffer_cap)
+  PASS  e2e[buffer_cap_trigger_exactly_at_window] — emitted replacement
+  PASS  e2e[buffer_cap_trigger_exactly_at_window] — backspace count
+  PASS  e2e[buffer_cap_retains_tail_after_eviction] — emitted replacement
+  PASS  e2e[buffer_cap_retains_tail_after_eviction] — backspace count
+  PASS  e2e[case_insensitive_upper_buffer] — emitted replacement
+  PASS  e2e[case_insensitive_upper_buffer] — backspace count
+  PASS  e2e[case_conform_title_buffer] — emitted replacement
+  PASS  e2e[case_conform_title_buffer] — backspace count
+  PASS  e2e[case_conform_rejects_mixed] — no expansion emitted
+  PASS  e2e[case_conform_keeps_replacement_capitals] — emitted replacement
+  PASS  e2e[case_conform_keeps_replacement_capitals] — backspace count
+  PASS  e2e[case_conform_title_keeps_inner_capitals] — emitted replacement
+  PASS  e2e[case_conform_title_keeps_inner_capitals] — backspace count
+  PASS  e2e[case_conform_upper_buffer_uppercases_mixed_replacement] — emitted replacement
+  PASS  e2e[case_conform_upper_buffer_uppercases_mixed_replacement] — backspace count
+  PASS  e2e[case_literal_folds] — emitted replacement
+  PASS  e2e[case_literal_folds] — backspace count
+  PASS  e2e[case_insensitive_word_boundary_still_applies] — no expansion emitted
+  PASS  e2e[magic_key_trigger_matches_literally] — emitted replacement
+  PASS  e2e[magic_key_trigger_matches_literally] — backspace count
+  PASS  e2e[magic_key_leading_trigger_after_text] — emitted replacement
+  PASS  e2e[magic_key_leading_trigger_after_text] — backspace count
+  PASS  e2e[word_boundary_blocked_after_non_ascii] — no expansion emitted
+  PASS  e2e[non_star_waits_for_terminator] — no expansion emitted
+  PASS  e2e[star_fires_where_non_star_waits] — emitted replacement
+  PASS  e2e[star_fires_where_non_star_waits] — backspace count
+  PASS  e2e[noop_expansion_does_not_fire] — no expansion emitted
+  PASS  e2e[word_boundary_applies_to_a_separator_prefixed_trigger] — no expansion emitted
+  PASS  e2e[separator_prefixed_trigger_fires_at_a_real_boundary] — emitted replacement
+  PASS  e2e[separator_prefixed_trigger_fires_at_a_real_boundary] — backspace count
+
+--- Shipped hotstring family samples ---
+  PASS  e2e[family.autocorrection.abbreviations.adn] — emitted replacement
+  PASS  e2e[family.autocorrection.abbreviations.adn] — backspace count
+  PASS  e2e[family.autocorrection.names.autohotkey] — emitted replacement
+  PASS  e2e[family.autocorrection.names.autohotkey] — backspace count
+  PASS  e2e[family.autocorrection.technical_terms.adaboost] — emitted replacement
+  PASS  e2e[family.autocorrection.technical_terms.adaboost] — backspace count
+  PASS  e2e[family.magic_key.text_expansion_symbols.(1)★] — emitted replacement
+  PASS  e2e[family.magic_key.text_expansion_symbols.(1)★] — backspace count
+  PASS  e2e[family.magic_key.text_expansion_symbols_typst.$alpha$] — emitted replacement
+  PASS  e2e[family.magic_key.text_expansion_symbols_typst.$alpha$] — backspace count
+  PASS  e2e[family.magic_key.repeat_corrections.ccê] — emitted replacement
+  PASS  e2e[family.magic_key.repeat_corrections.ccê] — backspace count
+  PASS  e2e[family.distances_reduction.qu.qa] — emitted replacement
+  PASS  e2e[family.distances_reduction.qu.qa] — backspace count
+  PASS  e2e[family.distances_reduction.comma_j.,a] — emitted replacement
+  PASS  e2e[family.distances_reduction.comma_j.,a] — backspace count
+  PASS  e2e[family.distances_reduction.comma_far_letters.,c] — emitted replacement
+  PASS  e2e[family.distances_reduction.comma_far_letters.,c] — backspace count
+  PASS  e2e[family.sfbs_reduction.comma.,d] — emitted replacement
+  PASS  e2e[family.sfbs_reduction.comma.,d] — backspace count
+  PASS  e2e[family.sfbs_reduction.e_circ.ê,] — emitted replacement
+  PASS  e2e[family.sfbs_reduction.e_circ.ê,] — backspace count
+  PASS  e2e[family.sfbs_reduction.i_e_acute.àé] — emitted replacement
+  PASS  e2e[family.sfbs_reduction.i_e_acute.àé] — backspace count
+  PASS  e2e[family.rolls.hc.hc] — emitted replacement
+  PASS  e2e[family.rolls.hc.hc] — backspace count
+  PASS  e2e[family.rolls.sx.sx] — emitted replacement
+  PASS  e2e[family.rolls.sx.sx] — backspace count
+  PASS  e2e[family.rolls.close_chevron_tag.<@] — emitted replacement
+  PASS  e2e[family.rolls.close_chevron_tag.<@] — backspace count
+  PASS  e2e[family.french_distancesreduction.suffixes_a.à'] — emitted replacement
+  PASS  e2e[family.french_distancesreduction.suffixes_a.à'] — backspace count
+  PASS  e2e[family.french_distancesreduction.suffixes_a.àa] — emitted replacement
+  PASS  e2e[family.french_distancesreduction.suffixes_a.àa] — backspace count
+  PASS  e2e[family.french_autocorrection.accents.abim] — emitted replacement
+  PASS  e2e[family.french_autocorrection.accents.abim] — backspace count
+  PASS  e2e[family.french_autocorrection.typographic_apostrophe.c'] — emitted replacement
+  PASS  e2e[family.french_autocorrection.typographic_apostrophe.c'] — backspace count
+  PASS  e2e[family.french_autocorrection.minus.aije] — emitted replacement
+  PASS  e2e[family.french_autocorrection.minus.aije] — backspace count
+  PASS  e2e[family.french_magickey.text_expansion.+m★] — emitted replacement
+  PASS  e2e[family.french_magickey.text_expansion.+m★] — backspace count
+  PASS  e2e[family.french_magickey.text_expansion.1ere★] — emitted replacement
+  PASS  e2e[family.french_magickey.text_expansion.1ere★] — backspace count
+  PASS  e2e[family.french_magickey.text_expansion_auto.ya] — emitted replacement
+  PASS  e2e[family.french_magickey.text_expansion_auto.ya] — backspace count
+Family samples processed: 23
+
+--- Shared sequence vectors ---
+  PASS  sequence[chain_output_completes_the_next_trigger] — screen
+  PASS  sequence[chain_output_completes_the_next_trigger] — expansions
+  PASS  sequence[chain_through_three_magic_keys] — screen
+  PASS  sequence[chain_through_three_magic_keys] — expansions
+  PASS  sequence[output_holding_a_trigger_fires_nothing_alone] — screen
+  PASS  sequence[output_holding_a_trigger_fires_nothing_alone] — expansions
+  PASS  sequence[final_result_ends_the_chain] — screen
+  PASS  sequence[final_result_ends_the_chain] — expansions
+  PASS  sequence[end_char_trigger_keeps_its_terminator] — screen
+  PASS  sequence[end_char_trigger_keeps_its_terminator] — expansions
+  PASS  sequence[end_char_triggers_in_a_row] — screen
+  PASS  sequence[end_char_triggers_in_a_row] — expansions
+  PASS  sequence[erase_keeps_the_text_before_the_trigger] — screen
+  PASS  sequence[erase_keeps_the_text_before_the_trigger] — expansions
+  PASS  sequence[erase_counts_codepoints_not_bytes] — screen
+  PASS  sequence[erase_counts_codepoints_not_bytes] — expansions
+  PASS  sequence[synthetic_output_does_not_retrigger_itself] — screen
+  PASS  sequence[synthetic_output_does_not_retrigger_itself] — expansions
+  PASS  sequence[word_trigger_after_an_expansion] — screen
+  PASS  sequence[word_trigger_after_an_expansion] — expansions
+Sequence vectors processed: 10
+
+--- Installed-application boot scenarios ---
+  PASS  hardening-a/b boot (arm64): a fresh install opens the first-run wizard
+  PASS  hardening-a/b boot (x86_64): a fresh install opens the first-run wizard
+  PASS  hardening-a/b boot (arm64): the neutral defaults boot
+  PASS  hardening-a/b boot (x86_64): the neutral defaults boot
+  PASS  hardening-a/b boot (arm64): the AI turned on and consented boots its MLX port cleanup (init-boot-mlx)
+  PASS  hardening-a/b boot (x86_64): the AI turned on and consented boots its MLX port cleanup (init-boot-mlx)
+  PASS  hardening-a/b boot (arm64): the AI turned on in config.toml alone boots its MLX port cleanup (init-boot-mlx-config)
+  PASS  hardening-a/b boot (x86_64): the AI turned on in config.toml alone boots its MLX port cleanup (init-boot-mlx-config)
+  PASS  hardening-a/b boot (arm64): the layout menu selects French through its native fallback (native-layout-selection)
+  PASS  hardening-a/b boot (x86_64): the layout menu selects French through its native fallback (native-layout-selection)
+  PASS  hardening-a/b boot (arm64): the layout menu preserves ABC when Carbon refuses selection (native-layout-selection-refused)
+  PASS  hardening-a/b boot (x86_64): the layout menu preserves ABC when Carbon refuses selection (native-layout-selection-refused)
+  PASS  hardening-a/b boot (arm64): the layout menu refuses ambiguous native names (native-layout-selection-ambiguous)
+  PASS  hardening-a/b boot (x86_64): the layout menu refuses ambiguous native names (native-layout-selection-ambiguous)
+  PASS  hardening-a/b boot (arm64): a partial saved WPM position recovers after typing (wpm-partial-position)
+  PASS  hardening-a/b boot (x86_64): a partial saved WPM position recovers after typing (wpm-partial-position)
+  PASS  hardening-a/b boot (arm64): the recommended preset imported from the menu boots and opens its windows
+  PASS  hardening-e-presets (arm64): the recommended navigation layer is deployed (75 rows for 51 preset keys) and a key enters it (11)
+  PASS  hardening-a/b boot (x86_64): the recommended preset imported from the menu boots and opens its windows
+  PASS  hardening-e-presets (x86_64): the recommended navigation layer is deployed (75 rows for 51 preset keys) and a key enters it (11)
+  PASS  hardening-a/b boot (arm64): the recommended preset imported without Ergopti's own runtime installed boots and saves
+  PASS  hardening-a/b boot (x86_64): the recommended preset imported without Ergopti's own runtime installed boots and saves
+  PASS  hardening-a/b boot (arm64): an Ergopti layout boots while the lease worker answers late, on one lease worker
+  PASS  hardening-a/b boot (x86_64): an Ergopti layout boots while the lease worker answers late, on one lease worker
+  PASS  hardening-a/b boot (arm64): a layout switch while the boot's RESUME is in flight activates a fresh lease
+  PASS  hardening-a/b boot (x86_64): a layout switch while the boot's RESUME is in flight activates a fresh lease
+  PASS  hardening-a/b boot (arm64): a reload while the boot's RESUME is in flight fences the lease before reloading
+  PASS  hardening-a/b boot (x86_64): a reload while the boot's RESUME is in flight fences the lease before reloading
+  PASS  hardening-a/b boot (arm64): a Mac migrated from Intel boots and runs a Python helper without Rosetta
+  PASS  hardening-a/b boot (x86_64): a Mac migrated from Intel boots and runs a Python helper without Rosetta
+  PASS  hardening-a/b boot (arm64): a Mac migrated from Intel without an arm64 Python boots without Rosetta
+  PASS  hardening-a/b boot (x86_64): a Mac migrated from Intel without an arm64 Python boots without Rosetta
+  PASS  hardening-a/b boot (arm64): an older release's config.toml boots (shipped_keyboard_slot_parameters_on_macos)
+  PASS  hardening-a/b boot (x86_64): an older release's config.toml boots (shipped_keyboard_slot_parameters_on_macos)
+  PASS  hardening-a/b boot (arm64): an older release's config.toml boots (shipped_keyboard_slots_neutral_on_macos)
+  PASS  hardening-a/b boot (x86_64): an older release's config.toml boots (shipped_keyboard_slots_neutral_on_macos)
+  PASS  hardening-a/b boot (arm64): an older release's config.toml boots (shipped_trigger_shortcut_removed_on_macos)
+  PASS  hardening-a/b boot (x86_64): an older release's config.toml boots (shipped_trigger_shortcut_removed_on_macos)
+  PASS  hardening-a/b boot (arm64): an older release's config.toml boots (shipped_user_profiles_array_becomes_envelope_on_macos)
+  PASS  hardening-a/b boot (x86_64): an older release's config.toml boots (shipped_user_profiles_array_becomes_envelope_on_macos)
+  PASS  hardening-a/b boot (arm64): an older release's config.toml boots (shipped_user_profiles_envelope_wins_on_macos)
+  PASS  hardening-a/b boot (x86_64): an older release's config.toml boots (shipped_user_profiles_envelope_wins_on_macos)
+
+1..181
+# pass 181 / 181
+# skip 1 driver-specific vector(s) or host-specific scenario(s)
+# All E2E scenarios passed.

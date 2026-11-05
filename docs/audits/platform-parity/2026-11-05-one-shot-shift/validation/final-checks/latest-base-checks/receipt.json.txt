@@ -1,0 +1,84 @@
+{
+	"head": "4ca161c3e512eecc4c78499db0465139c9a71861",
+	"base": "7ebb56b137623fb80d8bf1a387dd984baa0263fd",
+	"checks": [
+		{
+			"name": "macos-virtual-keyboard",
+			"command": [
+				"lua",
+				"tests/e2e/run_e2e.lua"
+			],
+			"cwd": "/workspace/ergopti/static/ergopti_plus/macos",
+			"exit_code": 0,
+			"program_sha256": "77af5ff7c71ec65f777e622029a50dfc764d595f34d7a50f45a6e2584afe2954",
+			"stdout": {
+				"path": "macos-virtual-keyboard.stdout.txt",
+				"sha256": "fcc1ed1a454de5911544aa9c903871a175c8a4a8585af380e3189c6ff296949c"
+			},
+			"stderr": {
+				"path": "macos-virtual-keyboard.stderr.txt",
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			}
+		},
+		{
+			"name": "macos-conflicts",
+			"command": [
+				"lua",
+				"static/ergopti_plus/macos/tests/run.lua",
+				"--only",
+				"tests/unit/modules/gestures/config/test_conflicts.lua"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"program_sha256": "a2767ffc7e86d1a722e0422d0952bd198dbcc26c06c123ab6d50cd8be6d5e23e",
+			"stdout": {
+				"path": "macos-conflicts.stdout.txt",
+				"sha256": "7475aab84979e430c6ec12aa6c4cde03ae36774969004f61b2f51c04662884cf"
+			},
+			"stderr": {
+				"path": "macos-conflicts.stderr.txt",
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			}
+		},
+		{
+			"name": "macos-system-conflicts",
+			"command": [
+				"lua",
+				"static/ergopti_plus/macos/tests/run.lua",
+				"--only",
+				"tests/unit/modules/gestures/config/test_system_gesture_conflicts.lua"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"program_sha256": "a2767ffc7e86d1a722e0422d0952bd198dbcc26c06c123ab6d50cd8be6d5e23e",
+			"stdout": {
+				"path": "macos-system-conflicts.stdout.txt",
+				"sha256": "5b3609eab28246a5cf73f2da106031951f3e34ce17f79eae82637510d9c7250d"
+			},
+			"stderr": {
+				"path": "macos-system-conflicts.stderr.txt",
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			}
+		},
+		{
+			"name": "windows-seal",
+			"command": [
+				"node",
+				"tools/test/test-windows-updater-original-source.cjs"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"program_sha256": "5650dd261daebf3d45ee476cae2ff9ef2060960721399703ad1847056132f91f",
+			"stdout": {
+				"path": "windows-seal.stdout.txt",
+				"sha256": "73ddae184594c58679534ea6fa99ff6d23a3e937ae1142c604929af5d730a137"
+			},
+			"stderr": {
+				"path": "windows-seal.stderr.txt",
+				"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			}
+		}
+	],
+	"failed": 0,
+	"qualification": "Targeted checks for the final two upstream commits after the complete572 run. macOS virtual-keyboard harness is stubbed and is not native Hammerspoon receiving."
+}

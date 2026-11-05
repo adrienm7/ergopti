@@ -1,0 +1,1 @@
+{"positive_infinity_accepted":true,"qualification":"Actual original Owner.arm accepts math.huge. Positive does not mean finite. No infinite UI preset or persistence support is established; frozen shared report remains unchanged.","zero_rejected":true}

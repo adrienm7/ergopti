@@ -799,6 +799,7 @@ Each closes on a named green hosted or native run, recorded here.
       (962a25a973), AppImage Build and `install-linux` rows (dce846a0bd), the Linux per-step installs (17e80f2882),
       "Qualify the installed managed Ollama route plan" (c0a50b5e41), the Linux private runtime in every package,
       and the run-timing summary (`run-timing.cjs --step-summary`; Flatpak under 5 min).
+      Audit preflight [42099804561](https://github.com/adrienm7/ergopti/actions/runs/42099804561) is not a green receipt: Arch integration's `local-server-detection-native` case reported that its textgen_webui stand-in never listened, and Common failed while installing shared UI browsers. Diagnose/requalify those cells; the portable audit checks do not close the hosted checkpoint. Its macOS stubbed replay failure is covered by upstream `cf18689745` and a later local181/181 replay; native receiving remains separate.
 - [ ] **macOS lane.** L32 and L42 Swift in the Build stage; the Issue #101
       Swift and Go cells; native qualification of the Hotstrings category boot publication and the obsolete-leaf
       setters; item 31's lane once its runtime build is green. Already green (run 41257389239): Launcher XCTest,
