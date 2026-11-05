@@ -2412,12 +2412,18 @@ _LLMRemoteParseStructuredRootState(Format, Root) {
         if !Root.Has("content")
             return Map("recognized", false, "text", "", "reason", "unsupported_shape")
         if Root["content"] is Array {
+            Text := ""
             for _, Block in Root["content"] {
-                if !(Block is Map) or !Block.Has("type") or Block["type"] != "text"
+                if !(Block is Map)
+                    return Map("recognized", true, "text", "", "reason", "canonical_empty")
+                Kind := Block.Get("type", 0)
+                if !(Kind is String) || StrCompare(Kind, "text", true) != 0
                     continue
-                Text := Block.Has("text") and Type(Block["text"]) == "String" ? Block["text"] : ""
-                return Map("recognized", true, "text", Text, "reason", "canonical_empty")
+                if Type(Block.Get("text", 0)) != "String"
+                    return Map("recognized", true, "text", "", "reason", "canonical_empty")
+                Text .= Block["text"]
             }
+            return Map("recognized", true, "text", Text, "reason", "canonical_empty")
         }
         return Map("recognized", true, "text", "", "reason", "canonical_empty")
     }
@@ -2429,14 +2435,19 @@ _LLMRemoteParseStructuredRootState(Format, Root) {
             if (Candidate is Map) and Candidate.Has("content") and (Candidate["content"] is Map) {
                 Content := Candidate["content"]
                 if Content.Has("parts") and (Content["parts"] is Array) {
+                    Text := ""
                     for _, Part in Content["parts"] {
-                        if (Part is Map) and Part.Has("thought") and Part["thought"] == true
+                        if !(Part is Map)
+                            return Map("recognized", true, "text", "", "reason", "canonical_empty")
+                        if Part.Has("thought") && Part["thought"] == true
                             continue
-                        if (Part is Map) and Part.Has("text") {
-                            Text := Type(Part["text"]) == "String" ? Part["text"] : ""
-                            return Map("recognized", true, "text", Text, "reason", "canonical_empty")
-                        }
+                        if !Part.Has("text")
+                            continue
+                        if Type(Part["text"]) != "String"
+                            return Map("recognized", true, "text", "", "reason", "canonical_empty")
+                        Text .= Part["text"]
                     }
+                    return Map("recognized", true, "text", Text, "reason", "canonical_empty")
                 }
             }
         }
