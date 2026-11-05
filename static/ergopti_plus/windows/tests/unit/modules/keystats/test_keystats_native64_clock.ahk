@@ -26,7 +26,7 @@ _KLSCR_Native64Scope(Run) {
 		"session_close", "session_close_draining", "idle_close"]
 		Saved[Name] := KLWatch.%Name%
 	SavedHook := Map()
-	for Name in ["last_tick", "app_entered_at", "title_entered_at"]
+	for Name in ["last_tick", "app_entered_at", "title_entered_at", "context_transition", "context_stop", "context_observations", "context_observation_head"]
 		SavedHook[Name] := KLHook.%Name%
 	SavedInitialized := Keystats.initialized
 	SavedRows := _Stub_AppendLogRows
@@ -45,6 +45,8 @@ _KLSCR_Native64Scope(Run) {
 		; Session fixtures own no foreground interval to compensate.
 		for Name in ["last_tick", "app_entered_at", "title_entered_at"]
 			KLHook.%Name% := 0
+		KLHook.context_transition := false, KLHook.context_stop := false
+		KLHook.context_observations := [], KLHook.context_observation_head := 1
 		Keystats.initialized := true
 		_Stub_AppendLogRows := []
 		_Stub_AppendLogAccept := true

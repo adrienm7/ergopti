@@ -139,6 +139,8 @@ class KLHook {
 		; keystroke; refreshed at most every CONTEXT_TTL_MS.
 		static context_at := 0
 		static context_transition := false
+		static context_observations := []
+		static context_observation_head := 1
 		static context_stop := false
 
 		; Previous (app, title) values + their entry tick — used to emit
@@ -190,6 +192,12 @@ KL_Hook_AdvanceContextWatermarks(Elapsed, NowTick := unset) {
 			Pending := KLHook.context_transition
 			if IsObject(KLHook.context_stop)
 				return ; the first stop endpoint also freezes an unfinished normal transition
+			if KLHook.context_observation_head <= KLHook.context_observations.Length {
+				; A pause after C was observed belongs to C, not to the still-pending B.
+				Last := KLHook.context_observations[-1]
+				Last.Shift := Min(Last.Shift + Elapsed, TickElapsed64(Last.EndTick, Now))
+				return
+			}
 			if IsObject(Pending) && Pending.App.Required && !Pending.App.Done
 					&& KLHook.app_entered_at = Pending.App.Origin
 				Pending.App.Shift := Min(Pending.App.Shift + Elapsed, TickElapsed64(Pending.EndTick, Now))
@@ -238,8 +246,20 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 					return
 			Pending := KLHook.context_transition
 		} finally Critical(EntryCritical)
-		if IsObject(Pending) && !_KL_ContextDrain(Pending, Generation)
-			return false
+		while IsObject(Pending) {
+			if !_KL_ContextDrain(Pending, Generation) {
+				; Keep accepting actual later observations even when publication of the
+				; previous interval is deferred. The canonical cache remains the owner.
+				try Later := HasMethod(SnapshotFn, "Call") ? SnapshotFn.Call() : MF_GetFocusSnapshot()
+				catch
+					return false
+				_KL_ContextStageObserved(Pending, Later, A_TickCount, Generation)
+				return false
+			}
+			PreviousCritical := Critical("On")
+			try Pending := KLHook.context_transition
+			finally Critical(PreviousCritical)
+		}
 		if !_KL_ContextEpochCurrent(Generation)
 			return false
 		if !force && TickElapsed64(KLHook.context_at) < KLHookConst.CONTEXT_TTL_MS

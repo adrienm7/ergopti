@@ -266,7 +266,7 @@ _KLRManifest_AbandonmentStart(Kind, Duration := unset, Commit := 0) {
 
 _KLRManifest_Abandonment(Scenario, Consumer := "") {
 	HookSaved := Map()
-	for Name in ["prev_app", "prev_title", "app_entered_at", "title_entered_at", "context_at", "suspend_tick", "last_tick"]
+	for Name in ["prev_app", "prev_title", "app_entered_at", "title_entered_at", "context_at", "suspend_tick", "last_tick", "context_transition", "context_stop", "context_observations", "context_observation_head"]
 		HookSaved[Name] := KLHook.%Name%
 	WatchSaved := Map()
 	for Name in ["is_session_active", "session_started_at", "session_generation", "idle_generation", "last_authorized_tick", "is_idle", "session_close", "session_close_draining", "privacy_interrupted", "privacy_started_at"]
@@ -288,6 +288,8 @@ _KLRManifest_Abandonment(Scenario, Consumer := "") {
 		Keystats.buffer_text := ""
 		KLHook.prev_app := ""
 		KLHook.prev_title := ""
+		KLHook.context_transition := false, KLHook.context_stop := false
+		KLHook.context_observations := [], KLHook.context_observation_head := 1
 		KLHook.last_tick := 0
 		KLWatch.is_session_active := false
 		KLWatch.is_idle := false
@@ -430,7 +432,7 @@ for _KLRManifest_AbandonmentConsumer in ["Map", "encoded"] {
 ; Native origins retain their complete elapsed span and abandonment authority.
 _KLRManifest_Native64(Scenario, Consumer := "projection") {
 	HookSaved := Map()
-	for Name in ["prev_app", "prev_title", "app_entered_at", "title_entered_at", "context_at", "suspend_tick", "last_tick"]
+	for Name in ["prev_app", "prev_title", "app_entered_at", "title_entered_at", "context_at", "suspend_tick", "last_tick", "context_transition", "context_stop", "context_observations", "context_observation_head"]
 		HookSaved[Name] := KLHook.%Name%
 	WatchSaved := Map()
 	for Name in ["is_session_active", "session_started_at", "session_generation", "idle_generation", "last_authorized_tick", "is_idle", "session_close", "session_close_draining", "privacy_interrupted", "privacy_started_at"]
@@ -452,6 +454,8 @@ _KLRManifest_Native64(Scenario, Consumer := "projection") {
 		Keystats.buffer_text := ""
 		KLHook.prev_app := ""
 		KLHook.prev_title := ""
+		KLHook.context_transition := false, KLHook.context_stop := false
+		KLHook.context_observations := [], KLHook.context_observation_head := 1
 		KLHook.last_tick := 0
 		KLWatch.is_session_active := false
 		KLWatch.is_idle := false
@@ -1317,6 +1321,9 @@ for _KTAC_Mode in ["app-control", "title-control", "app-stop", "title-stop"]
 	Test("Keystats context clock ACK: " . _KTAC_Mode . " respects accepted-row and native-stop ownership (context-clock-ack-owner)",
 		_KTAC_DurableCase.Bind(_KTAC_Mode))
 
+for _KTAC_ThirdMode in ["app-third", "title-third"]
+	Test("Keystats context clock ACK: " . _KTAC_ThirdMode . " preserves third observation receipts (context-clock-ack-third)",
+		_KTAC_Case.Bind(_KTAC_ThirdMode))
 
 _KCTR_ChildSource() {
 	global _DriverDir

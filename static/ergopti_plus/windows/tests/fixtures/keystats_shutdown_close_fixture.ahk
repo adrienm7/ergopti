@@ -29,6 +29,8 @@ class KLHook {
 	static context_at := 0
 	static suspend_tick := 0
 	static context_transition := false
+	static context_observations := []
+	static context_observation_head := 1
 	static context_stop := false
 }
 

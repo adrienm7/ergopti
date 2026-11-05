@@ -10,6 +10,10 @@ _KTAC_Boundary() {
 	try {
 		_KSD_Require(!A_IsCritical && !_KTAC.Done, "The native cutpoint must interrupt the retained accepted-producer frame.")
 		_KTAC.TimerCalls += 1
+		if _KTAC.ThirdRequested {
+			_KSD_Acquire({App: "fixture-tail-c.exe", Title: "Fixture destination title C", Hwnd: 1103})
+			_KTAC.ThirdReturned := KL_Hook_RefreshContext(true)
+		}
 		if _KTAC.StopRequested {
 			_KTAC.StopReturn := KL_Hook_Stop()
 			_KSD_Require(KLHook.capture_stopping && KLHook.HasOwnProp("registered") && !KLHook.registered,
@@ -71,6 +75,28 @@ _KTAC_Main() {
 	_KSD_Require(_KTAC.Fired && _KTAC.Done && _KTAC.TimerCalls == 1
 		&& _KSD.Errors == 0 && !IsObject(_KSD.Failure),
 		"Accepted-row/timer prerequisites cannot be replaced by a swallowed dependency error.")
+	if _KTAC.ThirdRequested {
+		_KSD_Require(KL_Hook_RefreshContext(true), "The current C context must settle after the interrupted owner returns.")
+		_KSD_Require(KL_Hook_Stop(), "The real close must settle the current C interval.")
+		AppAB := 0, AppBC := 0, TitleAB := 0, TitleBC := 0
+		for Row in Keystats._pending_entries {
+			if Row["type"] == "app_switch" {
+				if Row["prev_app"] == "fixture-tail-a.exe" && Row["next_app"] == "fixture-tail-b.exe"
+					AppAB += 1
+				if Row["prev_app"] == "fixture-tail-b.exe" && Row["next_app"] == "fixture-tail-c.exe"
+					AppBC += 1
+			} else if Row["type"] == "window_switch" {
+				if Row["prev_title"] == "Fixture source title A" && Row["next_title"] == "Fixture destination title B"
+					TitleAB += 1
+				if Row["prev_title"] == "Fixture destination title B" && Row["next_title"] == "Fixture destination title C"
+					TitleBC += 1
+			}
+		}
+		FileAppend("OBSERVATION partial-ack third_returned=" . _KTAC.ThirdReturned . " app_ab=" . AppAB
+			. " app_bc=" . AppBC . " title_ab=" . TitleAB . " title_bc=" . TitleBC . "`n", "*")
+		_KSD_Require(AppAB == 1 && AppBC == 1 && TitleAB == 1 && TitleBC == 1,
+			"A third observation during actual app/title ACK must retain every exact clock receipt once.")
+	}
 	After := _KTAC_State(), Stable := true
 	for Index, Value in After
 		if !(Value == _KTAC.AfterBoundary[Index])
@@ -84,10 +110,11 @@ _KTAC_Main() {
 		. " returned=" . Returned . " errors=" . _KSD.Errors . "`n", "*", "UTF-8")
 }
 
-if A_Args.Length != 2 || !(A_Args[1] == "app-control" || A_Args[1] == "title-control" || A_Args[1] == "app-stop" || A_Args[1] == "title-stop")
+if A_Args.Length != 2 || !(A_Args[1] == "app-control" || A_Args[1] == "title-control" || A_Args[1] == "app-stop" || A_Args[1] == "title-stop" || A_Args[1] == "app-third" || A_Args[1] == "title-third")
 	throw Error("The private context ACK child requires an exact mode and owned directory.")
 global _KSD := {Mode: A_Args[1], Log: A_Args[2] . "\private.log", Probes: 0, Errors: 0, LogCalls: 0, FlushCalls: 0, Failure: 0}
 global _KTAC := {Stage: InStr(A_Args[1], "app-") == 1 ? "app" : "title", StopRequested: InStr(A_Args[1], "-stop") > 0,
+	ThirdRequested: InStr(A_Args[1], "-third") > 0, ThirdReturned: false,
 	Fired: false, Done: false, Failure: 0, TimerCalls: 0, Origin: 0, End: 0, AfterBoundary: [], RowsAtBoundary: 0, StopReturn: ""}
 try {
 	_KTAC_Main()

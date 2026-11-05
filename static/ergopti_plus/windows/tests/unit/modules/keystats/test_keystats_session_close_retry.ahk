@@ -25,7 +25,7 @@ _KLSCR_RetryPartialClose(Mode) {
 			Saved[Name] := KLWatch.%Name%
 	}
 	SavedHookState := Map()
-	for Name in ["last_tick", "app_entered_at", "title_entered_at"]
+	for Name in ["last_tick", "app_entered_at", "title_entered_at", "context_transition", "context_stop", "context_observations", "context_observation_head"]
 		SavedHookState[Name] := KLHook.%Name%
 	SavedInitialized := Keystats.initialized
 	SavedRows := _Stub_AppendLogRows
@@ -36,6 +36,8 @@ _KLSCR_RetryPartialClose(Mode) {
 		AssertFalse(KLWatch.HasOwnProp("idle_check_timer"), "the fixture must not stop a live timer")
 		AssertFalse(KLWatch.HasOwnProp("session_msg_handler"), "the fixture must not detach live callbacks")
 		AssertFalse(KLWatch.HasOwnProp("power_msg_handler"), "the fixture must not detach live callbacks")
+		KLHook.context_transition := false, KLHook.context_stop := false
+		KLHook.context_observations := [], KLHook.context_observation_head := 1
 		KLWatch.system_events := false
 		KLWatch.wts_registered := false
 		KLWatch.wts_retry_timer := false
@@ -153,7 +155,7 @@ _KLSCR_ShortIdleRetry(Mode) {
 			Saved[Name] := KLWatch.%Name%
 	}
 	SavedHookState := Map()
-	for Name in ["last_tick", "app_entered_at", "title_entered_at"]
+	for Name in ["last_tick", "app_entered_at", "title_entered_at", "context_transition", "context_stop", "context_observations", "context_observation_head"]
 		SavedHookState[Name] := KLHook.%Name%
 	SavedInitialized := Keystats.initialized
 	SavedRows := _Stub_AppendLogRows
@@ -164,6 +166,8 @@ _KLSCR_ShortIdleRetry(Mode) {
 		AssertFalse(KLWatch.HasOwnProp("idle_check_timer"), "the fixture must not stop a live timer")
 		AssertFalse(KLWatch.HasOwnProp("session_msg_handler"), "the fixture must not detach live callbacks")
 		AssertFalse(KLWatch.HasOwnProp("power_msg_handler"), "the fixture must not detach live callbacks")
+		KLHook.context_transition := false, KLHook.context_stop := false
+		KLHook.context_observations := [], KLHook.context_observation_head := 1
 		KLWatch.system_events := false
 		KLWatch.wts_registered := false
 		KLWatch.wts_retry_timer := false

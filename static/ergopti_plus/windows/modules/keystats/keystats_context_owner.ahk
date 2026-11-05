@@ -135,7 +135,7 @@ _KL_ContextPrepare(Frame, Generation, Stopped) {
 	try {
 		if !_KL_ContextPrepareCurrent(Frame, Token, Generation, Stopped)
 			return false
-		if Frame.Mode = "transition" {
+		if Frame.Mode = "transition" && !Frame.BufferStaged {
 			Keystats.session_app := Frame.NewApp
 			Keystats.session_title := Frame.NewTitle
 		}
@@ -222,7 +222,29 @@ _KL_ContextDrain(Frame, Generation, Stopped := false, AppendFn := unset) {
 			return false
 		if Frame.Mode = "transition" {
 			KLHook.context_at := Frame.EndTick
-			KLHook.context_transition := false
+			if KLHook.context_observation_head <= KLHook.context_observations.Length {
+				Observed := KLHook.context_observations[KLHook.context_observation_head++]
+				Next := _KL_ContextNewFrame("transition", Observed.App, Observed.Title, Observed.EndTick)
+				Next.Config := Observed.Config
+				Next.BufferStaged := true
+				; Shift belongs to time after this observed destination, not the
+				; preceding interval whose endpoint was frozen earlier.
+				PromotionNow := A_TickCount
+				if Next.App.Required
+					Next.App.Shift := Observed.Shift
+				else
+					KLHook.app_entered_at := Min(KLHook.app_entered_at + Observed.Shift, PromotionNow)
+				if Next.Title.Required
+					Next.Title.Shift := Observed.Shift
+				else
+					KLHook.title_entered_at := Min(KLHook.title_entered_at + Observed.Shift, PromotionNow)
+				KLHook.context_transition := Next
+				if KLHook.context_observation_head > KLHook.context_observations.Length {
+					KLHook.context_observations := []
+					KLHook.context_observation_head := 1
+				}
+			} else
+				KLHook.context_transition := false
 		} else {
 			KLHook.prev_app := "", KLHook.prev_title := ""
 			KLHook.app_entered_at := 0, KLHook.title_entered_at := 0
@@ -230,6 +252,51 @@ _KL_ContextDrain(Frame, Generation, Stopped := false, AppendFn := unset) {
 			; Keep Stop owned until its actual hooks, final flush and classifier retire.
 		}
 		Frame.Completed := true
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+; Admit only an actual, still-current canonical focus object. Detach its
+; predecessor and label the new live buffer in the same indivisible RAM claim.
+_KL_ContextStageObserved(Pending, Snapshot, EndTick, Generation) {
+	PreviousCritical := Critical("On")
+	try {
+		if !_KL_ContextEpochCurrent(Generation)
+			return false
+		if !IsObject(Snapshot) || Snapshot != MetricsFocusCache.state
+			return false
+		if !Snapshot.HasOwnProp("valid") || !Snapshot.valid {
+			if IsSet(KL_Roi_DiscardWord)
+				KL_Roi_DiscardWord()
+			return false
+		}
+		if IsSet(KL_Roi_AdmitWordContext)
+			KL_Roi_AdmitWordContext(Snapshot)
+		; A nested timer may have finished or replaced the frame while focus was
+		; acquired. Join the current owner and stage its destination first.
+		Current := KLHook.context_transition
+		if IsObject(Current) && !Current.BufferStaged {
+			PriorBuffer := _KL_DetachBufferSnapshot()
+			if IsObject(PriorBuffer)
+				Keystats._retry_snapshots.Push(PriorBuffer)
+			Keystats.session_app := Current.NewApp
+			Keystats.session_title := Current.NewTitle
+			Current.BufferStaged := true
+		}
+		if Snapshot.process_name == Keystats.session_app && Snapshot.title == Keystats.session_title
+			return true
+		OldBuffer := _KL_DetachBufferSnapshot()
+		if IsObject(OldBuffer)
+			Keystats._retry_snapshots.Push(OldBuffer)
+		if !IsObject(Current) {
+			Current := _KL_ContextNewFrame("transition", Snapshot.process_name, Snapshot.title, EndTick)
+			Current.BufferStaged := true
+			KLHook.context_transition := Current
+		} else
+			KLHook.context_observations.Push({App: Snapshot.process_name, Title: Snapshot.title,
+				EndTick: EndTick, Config: _KL_ContextConfigStamp(), Shift: 0})
+		Keystats.session_app := Snapshot.process_name
+		Keystats.session_title := Snapshot.title
 		return true
 	} finally Critical(PreviousCritical)
 }
@@ -264,8 +331,13 @@ _KL_ContextCloseTail(AppendFn := unset) {
 		Stop := KLHook.context_stop
 		Pending := KLHook.context_transition
 	} finally Critical(PreviousCritical)
-	if IsObject(Pending) && !_KL_ContextDrain(Pending, Generation, true, AppendFn?)
-		return false
+	while IsObject(Pending) {
+		if !_KL_ContextDrain(Pending, Generation, true, AppendFn?)
+			return false
+		PreviousCritical := Critical("On")
+		try Pending := KLHook.context_transition
+		finally Critical(PreviousCritical)
+	}
 	PreviousCritical := Critical("On")
 	try {
 		if KLHook.context_stop != Stop || !_KL_ContextEpochCurrent(Generation, true)
