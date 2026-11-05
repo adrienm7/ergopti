@@ -406,7 +406,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 			-- retires the running request (set_backend) before deleting it.
 			actions[1] = { id = "test", text = tr("menu.llm.api_test_entry"), run = function()
 				if not active_commands_ready() then return false end
-				return run_test(remote, dialogs, active, active_name, nil, page_current)
+				return run_test(remote, dialogs, active, active_name, function() return entries.active() == active end, page_current)
 			end }
 			actions[2] = { id = "remove", text = tr("menu.llm.api_remove_entry"), run = function()
 				local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return active_name end))
