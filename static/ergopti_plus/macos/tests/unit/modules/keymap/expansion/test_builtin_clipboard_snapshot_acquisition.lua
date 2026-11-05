@@ -17,6 +17,11 @@ local function with_world(scenario)
 	Fixture.with_world({}, function(w)
 		local native_write, native_set = hs.pasteboard.writeAllData, hs.pasteboard.setContents
 		local native_clear, native_count = hs.pasteboard.clearContents, hs.pasteboard.changeCount
+		local native_types = hs.pasteboard.allContentTypes
+		hs.pasteboard.allContentTypes = function()
+			if w.multi then return { { "public.utf8-plain-text" }, { "public.file-url" } } end
+			return native_types()
+		end
 		local scheduler = require("adapters.timer_scheduler")
 		local original, foreign = {}, {
 			["public.utf8-plain-text"] = "FOREIGN INITIAL COPY",
@@ -52,7 +57,7 @@ local function with_world(scenario)
 			local captured = {}
 			for uti, bytes in pairs(w.board) do captured[uti] = bytes end
 			if w.copy_at == "after-read" then copy_foreign() end
-			if w.empty_snapshot then return nil end
+			if w.empty_snapshot then return {} end
 			return captured
 		end
 		hs.pasteboard.setContents = function(value)
@@ -122,7 +127,7 @@ local function with_world(scenario)
 				"neither CmdV, Delete prefix nor the pre-acquired Tab follower may escape refusal")
 			helpers.assert_true(helpers.deep_equal(w.board, expected))
 			w.retired()
-			w.copy_at, w.count_stage, w.count_fault, w.same_copy = nil, nil, nil, nil
+			w.copy_at, w.count_stage, w.count_fault, w.same_copy, w.multi = nil, nil, nil, nil, nil
 			local successor = w.start(B .. "{Tab}")
 			w.advance(2)
 			helpers.assert_true(successor.completed and successor.completion_status == "complete")
@@ -137,6 +142,10 @@ local function with_world(scenario)
 end
 
 helpers.describe("builtin clipboard snapshot requires stable native acquisition", function()
+	helpers.it("refuses to overwrite a multi-item clipboard", function()
+		with_world(function(w) w.multi = true; w.refused(w.original_bytes, 0, 0) end)
+	end)
+
 	helpers.it("accepts a healthy rich snapshot from native count zero (builtin-snapshot-rich)", function()
 		with_world(function(w) w.healthy(w.original_bytes) end)
 	end)

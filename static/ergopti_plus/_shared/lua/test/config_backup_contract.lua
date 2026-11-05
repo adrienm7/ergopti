@@ -163,6 +163,17 @@ function M.register(helpers, env)
 	end
 
 	helpers.describe("shared configuration backup (config_backup)", function()
+		helpers.it("refuses a backup whose published manifest cannot be read back", function()
+			local owner, fs = fixture()
+			local create = fs.io.create
+			fs.io.create = function(path, content)
+				local ok, err = create(path, content)
+				if ok and path:match("/backup%.json$") then fs.files[path] = "damaged" end
+				return ok, err
+			end
+			local record = owner.create("pre_install")
+			helpers.assert_eq(record, nil, "a corrupted manifest must not authorize installation")
+		end)
 		helpers.it("refuses a backup directory claimed after listing", function()
 			local owner, fs = fixture()
 			fs.io.make_dir_exclusive = function(path)

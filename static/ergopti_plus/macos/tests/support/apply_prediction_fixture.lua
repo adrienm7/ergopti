@@ -54,6 +54,7 @@ function M.run(options)
 	local clipboard_value = "original"
 	local clipboard_restores = 0
 	hs_stub.pasteboard.getContents = function() return clipboard_value end
+	hs_stub.pasteboard.allContentTypes = function() return { { "text" } } end
 	hs_stub.pasteboard.readAllData = function() return { text = clipboard_value } end
 	hs_stub.pasteboard.setContents = function(value)
 		clipboard_generation = clipboard_generation + 1

@@ -243,9 +243,20 @@ ConfigBackup_Create(ConfigDir, Kind, Tag := "", FromVersion := "", Rules := 0, C
 		. ',"files":[' . _ConfigBackup_JoinArray(FilesJson) . "]}"
 	if !FSWriteCreateDurable(BackupPath . "\" . Rules["manifest"], Manifest)
 		throw Error("Configuration backup failed writing its manifest in '" . BackupPath . "'.")
+	_ConfigBackup_RequireManifest(BackupPath . "\" . Rules["manifest"], Manifest)
 	try LoggerSuccess("ConfigBackup", "Configuration backed up to {1} ({2} file(s)).", BackupPath, Files.Length)
 	return Map("id", Id, "path", BackupPath, "kind", Kind, "created_at", Time["iso"], "tag", Tag,
 		"from_version", FromVersion, "files", Files)
+}
+
+; A successful create does not prove that the published manifest still holds
+; the encoded bytes. Refuse the backup on any read failure or mismatch.
+_ConfigBackup_RequireManifest(Path, Expected) {
+	try Matches := FSUtf8ExactMatches(Path, Expected)
+	catch
+		Matches := false
+	if !Matches
+		throw Error("Configuration backup failed verifying its manifest.")
 }
 
 _ConfigBackup_JoinArray(Items) {

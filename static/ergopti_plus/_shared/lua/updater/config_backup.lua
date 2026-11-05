@@ -372,10 +372,15 @@ function M.new(options)
 			Logger.error(LOG, "Configuration backup failed encoding its manifest: %s.", tostring(encode_err))
 			return nil, "cannot encode the manifest"
 		end
-		local wrote, manifest_err = io_port.create(join(path, rules.manifest), encoded)
+		local manifest_path = join(path, rules.manifest)
+		local wrote, manifest_err = io_port.create(manifest_path, encoded)
 		if not wrote then
 			Logger.error(LOG, "Configuration backup failed writing its manifest: %s.", tostring(manifest_err))
 			return nil, "cannot write the manifest"
+		end
+		if io_port.read(manifest_path) ~= encoded then
+			Logger.error(LOG, "Configuration backup failed: its manifest does not read back as written.")
+			return nil, "verification failed for the manifest"
 		end
 		record.path = path
 		Logger.success(LOG, "Configuration backed up to %s (%d file(s)).", path, #manifest_files)

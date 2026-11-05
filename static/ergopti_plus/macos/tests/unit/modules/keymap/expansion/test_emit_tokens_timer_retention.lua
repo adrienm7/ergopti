@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 
 local function load_fixture()
 	for _, name in ipairs({
-		"modules.keymap.utils", "adapters.timer_scheduler", "adapters.synthetic_input",
+		"modules.keymap.utils", "adapters.clipboard", "adapters.timer_scheduler", "adapters.synthetic_input",
 		"infra.logger", "infra.timings", "infra.text_utils",
 	}) do
 		package.loaded[name] = nil
@@ -137,6 +137,7 @@ local function load_fixture()
 	}
 
 	local pasted = {}
+	hs_stub.pasteboard.allContentTypes = function() return { { "original" } } end
 	hs_stub.pasteboard.readAllData = function() return { original = "snapshot" } end
 	local native_set_contents = hs_stub.pasteboard.setContents
 	local native_write_all_data = hs_stub.pasteboard.writeAllData

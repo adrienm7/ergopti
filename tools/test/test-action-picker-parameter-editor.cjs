@@ -325,6 +325,28 @@ function loadPage(host, current) {
 	);
 }
 
+// Keyboard activation of an actual focused button must keep its own action.
+for (const id of ['send_text', 'send_key', 'send_shortcut', 'llm_prompt_prediction']) {
+	const page = loadPage('hs');
+	page.context.__buttonAction = id;
+	vm.runInContext('doConfirm(__buttonAction)', page.context);
+	const back = page.byId['param-back'];
+	back.tagName = 'BUTTON';
+	const enter = page.keydown({ key: 'Enter', code: 'Enter', target: back });
+	check(!enter.prevented, `Enter on Back must retain native button activation for ${id}`);
+	check(page.posted.length === 0, `Enter on Back must not save ${id}`);
+	if (!enter.prevented) back.dispatch('click');
+	check(page.byId.param.hidden === true, `Back returns to the action list for ${id}`);
+}
+{
+	const page = loadPage('hs');
+	const cancel = page.byId['btn-cancel'];
+	cancel.tagName = 'BUTTON';
+	const enter = page.keydown({ key: 'Enter', code: 'Enter', target: cancel });
+	check(!enter.prevented, 'Enter on Cancel must retain native button activation');
+	check(page.posted.length === 0, 'Enter on Cancel must not confirm the selected action');
+}
+
 // 2. Picking a parameterized action opens the editor instead of confirming.
 {
 	const page = loadPage('ahk');

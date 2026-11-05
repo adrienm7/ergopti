@@ -510,6 +510,10 @@ local function _manifest_windows(db, start_date, end_date)
 		end)
 		if accepted ~= true then complete = false end
 	end
+	-- Filters cannot create rows in an empty database. Avoid visiting every
+	-- calendar window when a bounded empty read has no source dates.
+	if not lo and not hi then return {}, complete end
+	if not lo or not hi then return {}, false end
 	if start_date and start_date ~= "" and (not lo or start_date > lo) then lo = start_date end
 	if end_date and end_date ~= "" and (not hi or end_date < hi) then hi = end_date end
 	local windows = {}

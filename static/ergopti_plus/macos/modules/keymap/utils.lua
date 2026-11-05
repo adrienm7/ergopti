@@ -25,6 +25,7 @@ local text_utils  = require("infra.text_utils")
 local shared_utils = require("keymap.utils")
 local Logger      = require("infra.logger")
 local Timings     = require("infra.timings")
+local Clipboard = require("adapters.clipboard")
 local TimerScheduler = require("adapters.timer_scheduler")
 local SyntheticInput = require("adapters.synthetic_input")
 local SecureFieldDetector = require("adapters.secure_field_detector")
@@ -509,13 +510,13 @@ local function perform_paste(value, handoff)
 			end
 		end
 		-- Preserve all clipboard types (images, RTF, etc.), not just plain text.
-		local ok_snapshot, snapshot_or_error = pcall(function()
-			return hs.pasteboard.readAllData()
-		end)
-		if not ok_snapshot or (snapshot_or_error ~= nil and type(snapshot_or_error) ~= "table") then
+		local ok_snapshot, snapshot_or_error, captured, snapshot_count = pcall(Clipboard.save, true)
+		if not ok_snapshot or captured ~= true then
 			Logger.error(LOG, "Clipboard paste snapshot failed: %s.", tostring(snapshot_or_error))
 			return false
 		end
+		if guarded_count ~= nil and snapshot_count ~= guarded_count then return false end
+		if builtin_snapshot_count ~= nil and snapshot_count ~= builtin_snapshot_count then return false end
 		if guarded_count ~= nil and clipboard_change_count() ~= guarded_count then return false end
 		if builtin_snapshot_count ~= nil and clipboard_change_count() ~= builtin_snapshot_count then
 			Logger.error(LOG, "Clipboard paste snapshot ownership changed during acquisition.")

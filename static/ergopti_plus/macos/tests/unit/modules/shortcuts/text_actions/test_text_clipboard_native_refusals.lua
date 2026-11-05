@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local function load_fixture(options)
 	options = options or {}
 	for _, name in ipairs({
-		"modules.shortcuts.actions.text", "adapters.synthetic_input",
+		"modules.shortcuts.actions.text", "adapters.clipboard", "adapters.synthetic_input",
 		"adapters.timer_scheduler", "infra.logger",
 	}) do package.loaded[name] = nil end
 	local original = {
@@ -30,7 +30,10 @@ local function load_fixture(options)
 	local selection_reads = 0
 	local pasteboard = {
 		changeCount = function() return change_count end,
-		allContentTypes = function() return { {} } end,
+		allContentTypes = function()
+			if options.multi then return { { "public.utf8-plain-text" }, { "public.file-url" } } end
+			return { {} }
+		end,
 		readAllData = function() return original end,
 		getContents = function()
 			selection_reads = selection_reads + 1
@@ -147,6 +150,13 @@ end
 
 
 helpers.describe("text actions: clipboard refusals fail closed", function()
+	helpers.it("refuses plain paste before overwriting a multi-item clipboard", function()
+		local f = load_fixture({ multi = true })
+		helpers.assert_eq(f.text.paste_as_plain_text(), false)
+		helpers.assert_eq(#f.keys, 0)
+		helpers.assert_true(f.current() == f.original)
+	end)
+
 	helpers.it("transform mutate-then-false restores exact data and posts no Cmd+V", function()
 		local f = load_fixture({ write_outcomes = { "false" } })
 		f.text.toggle_titlecase()
