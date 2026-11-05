@@ -139,7 +139,7 @@ _PTME_WebTooltipPayloadPreservesBooleanType() {
 		try FileDelete(Path)
 		_HCfgTestReset()
 		_HotstringsOverridesPath := Path
-		_HotstringsOverrides := Map()
+		_HotstringsOverrides := _ParseOverrides(Path)
 		_HCW_CATEGORY_LIST := [Entry]
 		_HCW_GROUP_LIST := []
 		_HCW_COLOR_PRESETS := []
@@ -197,7 +197,7 @@ _PTME_WebDelayPayloadPreservesIntegerMilliseconds() {
 		try FileDelete(Path)
 		_HCfgTestReset()
 		_HotstringsOverridesPath := Path
-		_HotstringsOverrides := Map()
+		_HotstringsOverrides := _ParseOverrides(Path)
 		_HCW_CATEGORY_LIST := [Entry]
 		_HCW_GROUP_LIST := []
 		_HCW_COLOR_PRESETS := []
