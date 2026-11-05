@@ -773,3 +773,20 @@ _KSP_ChildSource() {
 for _KSP_Mode in ["packet-bmp", "packet-astral"]
 	Test("Keystats native Unicode record: " . _KSP_Mode . " preserves accepted output across JSON/UTF-8 (keystats-native-utf16-packet-roundtrip)",
 		_KPU_Case.Bind(_KSP_Mode, _KSP_ChildSource))
+
+
+_KSB_ChildSource() {
+	global _DriverDir
+	Source := _KPU_ChildSource()
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\keystats_unicode_packet_owner_body.ahk`n"
+	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
+	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
+	Fixture := FSReadStrict(_DriverDir . "\tests\fixtures\keystats_unicode_packet_owner_body.ahk")
+	Start := InStr(Fixture, "_KID_Exercise() {")
+	AssertTrue(Start > 0 && InStr(Fixture, "_KID_Exercise() {", , Start + 1) == 0)
+	return Source . SubStr(Fixture, 1, Start - 1)
+		. "#Include " . _DriverDir . "\tests\fixtures\keystats_high_backspace_body.ahk`n"
+}
+for _KSB_Mode in ["plain", "high"]
+	Test("Keystats native Backspace after " . _KSB_Mode . " preserves the actual owned Edit (keystats-native-high-backspace)",
+		_KPU_Case.Bind(_KSB_Mode, _KSB_ChildSource))
