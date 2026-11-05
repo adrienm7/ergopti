@@ -27,6 +27,12 @@
 
 
 
+#Include ../adapters/system_locale.ahk
+
+
+
+
+
 ; =============================================
 ; =============================================
 ; ======= 1/ Constants and module state =======
@@ -73,35 +79,21 @@ global _I18nFlagExistsCache := Map()
 ; ===================================
 ; ===================================
 
-; Detect the Windows UI language via GetLocaleInfoEx(LOCALE_SISO639LANGNAME)
-; and map it to a supported locale code. Falls back to "en" when the detected
-; language is not in the supported list or the API call fails.
-;
-; CRITICAL: LOCALE_NAME_USER_DEFAULT is the NULL pointer, NOT L"". Passing an
-; empty string here would silently switch to LOCALE_NAME_INVARIANT and return
-; "iv" — historical source of "everyone gets English regardless of Windows
-; language" bugs. Pass "Ptr", 0 explicitly.
-;
-; @returns string A supported two-letter locale code (e.g. "fr", "en", "de").
+; Detect the Windows UI language, independently of regional-format settings.
+; Unsupported or unavailable UI languages keep the established English fallback.
+; @returns {String} A supported two-letter locale code.
 _I18nDetectSystemLocale(LocaleProbe := 0) {
-	; Optional per-call probe substitutes only the native regional-language read.
-	if HasMethod(LocaleProbe, "Regional") {
-		Code := LocaleProbe.Regional()
-		Len := (Code is String) ? StrLen(Code) + 1 : 0
-	} else {
-		; LOCALE_SISO639LANGNAME = 0x59 — returns the ISO 639-1 language code.
-		BufSize := 16
-		Buf := Buffer(BufSize * 2, 0)
-		Len := DllCall("GetLocaleInfoEx",
-			"Ptr", 0,           ; LOCALE_NAME_USER_DEFAULT (must be NULL, not L"")
-			"UInt", 0x59,
-			"Ptr", Buf,
-			"Int", BufSize,
-			"Int")
-		Code := Len > 1 ? StrGet(Buf, "UTF-16") : ""
-	}
+	if HasMethod(LocaleProbe, "Ui")
+		Code := LocaleProbe.Ui()
+	else
+		Code := NativeSystemUiLanguageCode()
+	Len := (Code is String) ? StrLen(Code) + 1 : 0
+
 	if Len > 1 {
 		Code := StrLower(SubStr(Code, 1, 2))
+		; Windows names Norwegian Bokmål "nb"; the shipped catalogue is "no".
+		if Code == "nb"
+			Code := "no"
 		for _, _loc in I18N_LOCALES {
 			if _loc.Code = Code {
 				try LoggerDebug("i18n", "detect_system_locale: matched '{1}'.", Code)
@@ -110,7 +102,7 @@ _I18nDetectSystemLocale(LocaleProbe := 0) {
 		}
 		try LoggerDebug("i18n", "detect_system_locale: '{1}' not supported — falling back to 'en'.", Code)
 	} else {
-		try LoggerDebug("i18n", "detect_system_locale: GetLocaleInfoEx returned 0 — falling back to 'en'.")
+		try LoggerDebug("i18n", "detect_system_locale: user UI language unavailable — falling back to 'en'.")
 	}
 	return "en"
 }

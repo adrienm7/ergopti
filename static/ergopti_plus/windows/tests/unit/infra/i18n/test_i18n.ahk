@@ -844,7 +844,7 @@ class _IDN_LocaleProbe {
 		return this.UiRegion != "" ? _IDN_NativeIso(this.UiRegion) : _IDN_ActualUiIso()
 	}
 }
-_IDN_InitFromRegion(Region, UiRegion := "") {
+_IDN_InitFromRegion(Region, UiRegion := "", UseNative := false) {
 	global _I18nLocale, _I18nCacheLoaded, _I18nFlagExistsCache
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
@@ -871,7 +871,10 @@ _IDN_InitFromRegion(Region, UiRegion := "") {
 		_I18nCacheLoaded := false
 		Fixture := _IDN_LocaleProbe(Region, UiRegion)
 		Critical("Off")
-		I18nInit(Map("script", Map("locale", "_")), Fixture)
+		if UseNative
+			I18nInit(Map("script", Map("locale", "_")))
+		else
+			I18nInit(Map("script", Map("locale", "_")), Fixture)
 		Observed := _I18nLocale
 		return { Locale: Observed, Calls: Fixture.RegionalCalls + Fixture.UiCalls,
 			RegionalCalls: Fixture.RegionalCalls, UiCalls: Fixture.UiCalls }
@@ -936,3 +939,25 @@ _IDN_UiLanguageNotRegion() {
 	AssertEqual(Expected, Result.Locale, "initial UI language follows the Windows UI language")
 }
 Test("i18n: initial UI language is independent of regional formats (i18n-native-ui-region)", _IDN_UiLanguageNotRegion)
+
+
+_IDN_RealUserUiControl() {
+	global I18N_LOCALES
+	UiCode := _IDN_ActualUiIso(), UiPrefix := SubStr(UiCode, 1, 2), Expected := "en"
+	if UiPrefix == "nb"
+		Expected := "no"
+	else {
+		for Locale in I18N_LOCALES {
+			if Locale.Code == UiPrefix {
+				Expected := UiPrefix
+				break
+			}
+		}
+	}
+	Result := _IDN_InitFromRegion("", "", true)
+	_TestAppendProgress("# i18n native-default ui=" . UiCode . " expected=" . Expected
+		. " init=" . Result.Locale . " port_calls=" . Result.Calls)
+	AssertEqual(0, Result.Calls, "the genuine default adapter is used")
+	AssertEqual(Expected, Result.Locale, "real I18nInit follows the current user UI language")
+}
+Test("i18n: default native path follows current user UI language (i18n-native-ui-default)", _IDN_RealUserUiControl)
