@@ -2031,3 +2031,11 @@ The targeted frontend Reset check now passes44/44 with a privately compiled Lua5
 ### AHK-139: IPv6 native server-name presentation
 
 The replay48 raw oracle and genuine transport establish a distinct native HTTP defect, bringing the register to139. Raw bracketed IPv6 succeeds with200/exact-body/wire1; unbracketed fails12005 at connect/wire0. Production uses the unbracketed IdnHost and reproduces12005 before reaching its proxy. DNS and deliberately refusing-proxy controls pass, all native handles retire and the private peer joins, in both orders. The correction will use the native bracketed IPv6 representation while preserving existing DNS/IDN handling. Equivalent expanded/compressed IPv6 spellings require a structural wire comparison. The previously suspected SOCKS authority behavior is not established by this failure and is not counted.
+
+### WPM qualification and SDK exception baseline
+
+Replay42096622224 at160d47f6 passes15/19 cases individually and reversed. It qualifies the five WPM native graph/reentry/destroy-refusal/newer-Hide cases plus seven persistence and one inherited-Critical controls. The four failed SDK cases establish current Prompt error identity loss and current/direct model error consumption with lost public fallback. The cleanup-reopen baseline preserves B but still consumes the error; it does not reproduce a fallback over B. Both retired SDK controls pass.
+
+Sourcec7e9952d preserves the exact current error, consumes only failures from retired openings and requires the original model Reset acknowledgement before public fallback. It also rejects a successor admitted during cleanup or error logging. Seven dedicated SDK controls await native postfix execution, alongside prior startup/navigation/subscription controls. The extra Close-during-unwind probe must prove the real Reset refused after actual native Close; it forges no acknowledgement.
+
+IPv6 source91a7682c uses bracketed Uri.Host only for IPv6. The independent oracle now compares equivalent IPv6 addresses and adds actual production DNS/IPv4 controls. macOS URLSession and Linux curl use their native URL owners, without the Windows bracket-stripping wrapper. Their runtime qualification is not claimed. The Windows native postfix remains pending.
