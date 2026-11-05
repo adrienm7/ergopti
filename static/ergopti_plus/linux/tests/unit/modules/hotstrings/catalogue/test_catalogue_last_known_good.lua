@@ -521,9 +521,67 @@ helpers.describe("hotstring catalogue: removed source lifetime", function()
 end)
 
 helpers.describe("hotstring catalogue: unreadable discovery", function()
+	helpers.it("continues to load an explicitly selected TOML file", function()
+		local uv = require("luv")
+		local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-explicit-file-XXXXXX"))
+		local path = root .. "/custom.toml"
+		local file = assert(io.open(path, "wb"))
+		assert(file:write('[probe]\n"exactfile" = { output = "FOUND", auto_expand = true }\n')); assert(file:close())
+		local ok, err = pcall(function()
+			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+			local engine = require("hotstring_engine").new()
+			Config._set_override_config_dir_for_test(root)
+			require("tests.support.hotstring_choices").with_file(Config, { custom = true }, function()
+				assert(Config.init(engine, path))
+				local _, published = Config.load_all(nil, true)
+				helpers.assert_true(published)
+				helpers.assert_eq(Config.mapping_count(), 1)
+			end)
+		end)
+		os.remove(path); uv.fs_rmdir(root)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("discovers a personal folder created after daemon startup", function()
+		local uv = require("luv")
+		local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-late-personal-XXXXXX"))
+		local personal = root .. "/hotstrings"
+		local file = assert(io.open("ergopti_hotstrings.lua", "rb"))
+		local source = assert(file:read("*a")); assert(file:close())
+		local first = assert(source:find("local function resolve_config_path(", 1, true))
+		local last = assert(source:find("local function reload_hotstrings(", first, true))
+		local chunk = assert(loadstring(source:sub(first, last - 1) .. "\nreturn resolve_config_path"))
+		setfenv(chunk, setmetatable({ DEFAULT_CONFIG_DIR = personal }, { __index = _G }))
+		local resolve = chunk()
+		local ok, err = pcall(function()
+			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+			local engine = require("hotstring_engine").new()
+			Config._set_override_config_dir_for_test(root)
+			local id = require("hotstrings.personal_files").describe({ "custom.toml" }).id
+			require("tests.support.hotstring_choices").with_file(Config, { [id] = true }, function()
+				assert(Config.init(engine, resolve(nil)))
+				local _, published = Config.load_all(nil, true); helpers.assert_true(published)
+				assert(uv.fs_mkdir(personal, 448))
+				local out = assert(io.open(personal .. "/custom.toml", "wb"))
+				assert(out:write('[probe]\n"lateword" = { output = "FOUND", auto_expand = true }\n')); assert(out:close())
+				_, published = Config.reload(); helpers.assert_true(published)
+				engine:reset(false)
+				local match
+				for c in ("lateword"):gmatch(".") do match = engine:on_char(c) end
+				helpers.assert_not_nil(match, "reload must read the newly created personal folder")
+				helpers.assert_eq(match.replacement, "FOUND")
+			end)
+		end)
+		os.remove(personal .. "/custom.toml"); uv.fs_rmdir(personal); uv.fs_rmdir(root)
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("distinguishes an absent personal root from an absent bundled root", function()
 		local uv = require("luv")
 		local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-scan-roots-XXXXXX"))
+		local bad_root, link_root = root .. "/not-a-directory", root .. "/link-directory"
+		local stream = assert(io.open(bad_root, "wb")); assert(stream:write("not a directory")); assert(stream:close())
+		assert(uv.fs_symlink(root, link_root))
 		local paths = require("infra.paths")
 		local original_shared = paths.shared
 		local ok, err = pcall(function()
@@ -541,9 +599,25 @@ helpers.describe("hotstring catalogue: unreadable discovery", function()
 				end
 				_, published = Config.load_all(nil, true)
 				helpers.assert_eq(published, false, "an absent bundled root cannot certify a catalogue")
+				paths.shared = function(path)
+					if path == "modules/hotstrings" then return nil end
+					return original_shared(path)
+				end
+				_, published = Config.load_all(nil, true)
+				helpers.assert_eq(published, false, "an unresolved bundled root cannot certify a catalogue")
+				for _, invalid in ipairs({ bad_root, link_root }) do
+					paths.shared = function(path)
+						if path == "modules/hotstrings" then return invalid end
+						return original_shared(path)
+					end
+					local _, published, reason = Config.load_all(nil, true)
+					helpers.assert_eq(published, false, "a file or no-follow link cannot certify a bundled directory")
+					helpers.assert_eq(reason, "source-unavailable", "discovery must reject the root itself")
+				end
 			end)
 		end)
 		paths.shared = original_shared
+		os.remove(bad_root); os.remove(link_root)
 		uv.fs_rmdir(root)
 		if not ok then error(err, 0) end
 	end)

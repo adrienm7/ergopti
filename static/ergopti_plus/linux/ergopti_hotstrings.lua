@@ -640,16 +640,11 @@ local function resolve_config_path(config_path)
 		if code == "ENOENT" then return false end
 		error("Hotstring catalogue directory inspection failed: " .. tostring(code), 0)
 	end
-	if is_directory(DEFAULT_CONFIG_DIR) then return DEFAULT_CONFIG_DIR end
-	-- Fall back to bundled shared hotstrings.
-	-- One level up, not two: SCRIPT_DIR is the driver root and _shared is its
-	-- sibling. The old "../../" resolved outside the tree, so this fallback
-	-- never found the bundled hotstrings and silently returned the default dir.
-	local Paths = require("infra.paths")
-	local shared = Paths.shared("modules/hotstrings")
-	if not shared then return DEFAULT_CONFIG_DIR end
-	if is_directory(shared) then return shared end
-	return nil
+	-- Keep the optional personal location even when absent. The config loader
+	-- always loads the bundled catalogue separately, and this path must remain
+	-- stable if the user creates their folder during this daemon session.
+	is_directory(DEFAULT_CONFIG_DIR)
+	return DEFAULT_CONFIG_DIR
 end
 
 --- Reloads the hotstring catalogue in this process. This is not the Reload

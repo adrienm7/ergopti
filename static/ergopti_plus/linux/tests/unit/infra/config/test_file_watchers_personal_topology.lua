@@ -307,6 +307,17 @@ helpers.describe("file_watchers Personal topology", function()
 	end
 
 	for _, backend in ipairs({ "native", "pump" }) do
+		helpers.it("discovers a personal directory created after startup (" .. backend .. ")", function()
+			session(backend, function(s)
+				s.remove_directory(s.personal)
+				s.start()
+				s.directory(s.personal)
+				s.file(s.personal .. "/new.toml")
+				s.settle()
+				s.settle()
+				helpers.assert_true(s.reloads > 0, "creation must trigger a catalogue reload")
+			end)
+		end)
 		helpers.it("(linux-watch-topology) " .. backend .. " admits a moved-in populated tree and its later edits", function()
 			session(backend, function(s)
 				local staging = s.directory(s.root .. "/staging"); local sub = s.directory(staging .. "/nested")

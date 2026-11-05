@@ -1396,6 +1396,7 @@ local function resolve_paths(cold_boot)
 
 	local ok_paths, Paths = pcall(require, "infra.paths")
 	local bundled = ok_paths and Paths.shared("modules/hotstrings") or nil
+	assert(bundled, "bundled hotstring root is unavailable")
 	-- Language folders are not overlaid by stem: french/autocorrection.toml is
 	-- its own group, not a second copy of the neutral autocorrection.toml.
 	if bundled then
@@ -2035,8 +2036,8 @@ function M.personal_file_scope_binding(id)
 			if _personal_debt or _personal_gate_debt or _personal_adoptions ~= inventory or _categories[id] ~= category or _config_dir ~= root
 				or _engine ~= engine or engine_generation(engine) ~= generation
 				or PersonalAdoption.current(inventory, record) ~= true then return false end
-			local _, _, fresh = resolve_paths()
-			if not fresh or #fresh ~= #inventory then return false end
+			local resolved, _, _, fresh = pcall(resolve_paths)
+			if not resolved or not fresh or #fresh ~= #inventory then return false end
 			local expected = {}
 			for _, source in ipairs(inventory) do expected[source.owner] = source end
 			for _, source in ipairs(fresh) do
