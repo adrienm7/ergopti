@@ -1,5 +1,5 @@
 {
-	"qualification": "Worker hashes describe original submission bytes; pinned Prettier changes JSON presentation only. Original bytes are retained as .txt; current canonical evidence hashes use formatted archive bytes. No worker receipt was rewritten.",
+	"qualification": "Worker hashes authenticate exact original submission bytes retained as .txt. Pinned Prettier changes archive presentation only; JSON values and worker hash-claim values remain unchanged. Current canonical evidence hashes describe the formatted archive. No historical claim value was rewritten.",
 	"rows": [
 		{
 			"worker_receipt": "windows/dry-sweeps.json",
@@ -52,6 +52,31 @@
 			"original_sha256": "c58c03099fd0c1aca124bdd278051e2afb205f80ee23b88143a891a3918761c8",
 			"formatted_archive": "timing-followup/shared/implementation-followup-validation.json",
 			"formatted_sha256": "f8f9109d35d619b51585318968c92c831bb82660b00c9ffd534ff6d27b60c8da",
+			"json_values_equal": true
+		}
+	],
+	"archive_presentation_followup": [
+		{
+			"original_bytes": "validation/original-submissions/timing-followup/report.md.txt",
+			"original_sha256": "26f437d9aa66584d372c0a0c0a218c4f5e9b4f1b13f0dddeb2745b20231bf172",
+			"formatted_archive": "timing-followup/report.md",
+			"formatted_sha256": "220c5a2a9cc6b74e478ece56abcc003027d8c08438a15fc5b2e71cf13d1b75cb",
+			"formatter": "repository pinned Prettier"
+		},
+		{
+			"original_bytes": "validation/original-submissions/timing-followup/shared/handoff.json.txt",
+			"original_sha256": "e22cbe8e0d0dba4e9f4c8830d07c9bd4b9a541d0598af9bf57b6ebd5670d54c5",
+			"formatted_archive": "timing-followup/shared/handoff.json",
+			"formatted_sha256": "074a770056e3099c0ae832dca412a0824f3175d2d1e8257ef9d1eab580bff420",
+			"formatter": "repository pinned Prettier",
+			"json_values_equal": true
+		},
+		{
+			"original_bytes": "validation/original-submissions/timing-followup/shared/implementation-followup-baseline-hashes.json.txt",
+			"original_sha256": "f02e9e4ddc8b290895bfc5bc10644d5f2d1846a1ccf618c582d2b3b686f6bedf",
+			"formatted_archive": "timing-followup/shared/implementation-followup-baseline-hashes.json",
+			"formatted_sha256": "89e946ffc7ea7127a3f32696b3fd74cc88297d13e29b2e1cb567b2959eabe1aa",
+			"formatter": "repository pinned Prettier",
 			"json_values_equal": true
 		}
 	]
