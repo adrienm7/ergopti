@@ -99,32 +99,40 @@ end
 -- ==========================
 -- ==========================
 
+-- Provider content is an ordered sequence. Refuse malformed later chunks too,
+-- so a partial prefix never becomes an apparently complete answer.
+local function typed_text(content)
+	if not Json.is_array(content) then return "" end
+	local parts = {}
+	for _, block in ipairs(content) do
+		if type(block) ~= "table" or Json.is_null(block) or Json.is_array(block) then return "" end
+		if block.type == "text" then
+			if type(block.text) ~= "string" then return "" end
+			parts[#parts + 1] = block.text
+		end
+	end
+	return table.concat(parts)
+end
+
 local function extract_text(format, root)
 	if type(root) ~= "table" then return "" end
 	if format == "backboard" then return Formats.backboard_text(root) or "" end
 	if format == Formats.AGENT_FORMAT then return Formats.agent_text(root) or "" end
-	if format == "anthropic" then
-		local content = root.content
-		if type(content) == "table" then
-			for _, block in ipairs(content) do
-				if type(block) == "table" and block.type == "text" then
-					return type(block.text) == "string" and block.text or ""
-				end
-			end
-		end
-		return ""
-	end
+	if format == "anthropic" then return typed_text(root.content) end
 	if format == "gemini" then
 		local candidates = root.candidates
 		if type(candidates) == "table" and type(candidates[1]) == "table" then
 			local content = candidates[1].content
-			if type(content) == "table" and type(content.parts) == "table" then
+			if type(content) == "table" and Json.is_array(content.parts) then
+				local parts = {}
 				for _, part in ipairs(content.parts) do
-					if type(part) == "table" and part.thought ~= true
-						and type(part.text) == "string" then
-						return part.text
+					if type(part) ~= "table" or Json.is_null(part) or Json.is_array(part) then return "" end
+					if part.thought ~= true and part.text ~= nil then
+						if type(part.text) ~= "string" then return "" end
+						parts[#parts + 1] = part.text
 					end
 				end
+				return table.concat(parts)
 			end
 		end
 		return ""
@@ -133,7 +141,8 @@ local function extract_text(format, root)
 	if type(choices) == "table" and type(choices[1]) == "table" then
 		local message = choices[1].message
 		if type(message) == "table" then
-			return type(message.content) == "string" and message.content or ""
+			if type(message.content) == "string" then return message.content end
+			return typed_text(message.content)
 		end
 	end
 	return ""
