@@ -197,6 +197,7 @@ local _now_sec = Monotonic.now_sec
 -- may acquire them on a desktop without a touchpad too.
 local function NEVER_PAUSED() return false end
 local _is_paused = NEVER_PAUSED
+local _parameter_configuration_owner = nil
 local _click_holds = require("modules.gestures.click_hold").new(function() return not _is_paused() end)
 
 -- =========================================
@@ -620,8 +621,14 @@ local BUILTIN_HANDLERS = {
 		Logger.error(LOG, "open_system_settings: none of %s is installed — nothing opened.",
 			table.concat(SETTINGS_APPLICATIONS, ", "))
 	end,
-	["left_click_toggle"] = function(binding) return _click_holds.toggle("1", binding) end,
-	["right_click_toggle"] = function(binding) return _click_holds.toggle("3", binding) end,
+	["left_click_toggle"] = function(binding)
+		if _parameter_configuration_owner and M.DEFAULT_GESTURES[binding] ~= nil then return false end
+		return _click_holds.toggle("1", binding)
+	end,
+	["right_click_toggle"] = function(binding)
+		if _parameter_configuration_owner and M.DEFAULT_GESTURES[binding] ~= nil then return false end
+		return _click_holds.toggle("3", binding)
+	end,
 	["open_chatgpt"] = function()
 		return require("modules.shortcuts.chatgpt").open()
 	end,
@@ -1122,7 +1129,6 @@ local _reading       = false -- the touchpad's evdev node is open and being drai
 local _reader_stop_error = nil -- an unacknowledged close must fence reacquisition
 local _decoder       = nil   -- the multitouch frame decoder for that device
 local _touchpad      = nil   -- what touchpad_finder chose, and what it can express
-local _parameter_configuration_owner = nil
 local _parameter_delivery_epoch = 0
 local _scope_owner   = nil   -- retains refused runtime compensation
 require("infra.scope_registry").register("gesture_scope", function()
@@ -1991,6 +1997,8 @@ end
 --- @param binding string|nil What asked for it, for the logs and the parameters.
 --- @return boolean True when a name was given at all.
 function M.execute_action(action_name, binding)
+	if _parameter_configuration_owner ~= nil and M.DEFAULT_GESTURES[binding] ~= nil
+		and (action_name == "left_click_toggle" or action_name == "right_click_toggle") then return false end
 	if type(action_name) ~= "string" or action_name == "" or action_name == "none" then
 		return false
 	end
@@ -2019,6 +2027,7 @@ function M.dispatch_gesture(gesture)
 	end
 
 	local action = _actions[slot]
+	if _parameter_configuration_owner ~= nil and (action == "left_click_toggle" or action == "right_click_toggle") then return false end
 	if not action or action == "none" then
 		-- Not a warning. Linux ships no default bindings, so an unbound slot is
 		-- the normal state until the user chooses — saying so at INFO would make
@@ -2041,6 +2050,7 @@ function M.dispatch_gesture(gesture)
 	end
 
 	Logger.info(LOG, "GESTURE FIRE: slot=%s action=%s", slot, action)
+	if _parameter_configuration_owner ~= nil and (action == "left_click_toggle" or action == "right_click_toggle") then return false end
 	_execute_action(action, nil, slot)
 	return true
 end
@@ -2484,6 +2494,38 @@ end
 function M.parameter_configuration_actions_snapshot(owner)
 	if type(owner) ~= "table" or _parameter_configuration_owner ~= owner then return nil end
 	return M.get_all_actions()
+end
+
+-- A parameter transaction may apply and roll back several candidate maps.
+-- Its opaque receipt delays irreversible click retirement until publication and
+-- lease release have both succeeded.
+local _click_configuration_receipts = setmetatable({}, { __mode = "k" })
+function M.capture_click_configuration(owner, slot)
+	if type(owner) ~= "table" or _parameter_configuration_owner ~= owner or type(slot) ~= "string" then return nil end
+	local old = _actions[slot]
+	local button = old == "left_click_toggle" and "1" or old == "right_click_toggle" and "3" or nil
+	local receipt = {}
+	_click_configuration_receipts[receipt] = {
+		owner = owner, slot = slot, old = old,
+		retire = button and _click_holds.capture_binding_retirement(button, slot) or function() end,
+	}
+	return receipt
+end
+function M.seal_click_configuration(owner, receipt)
+	local record = _click_configuration_receipts[receipt]
+	if not record or record.owner ~= owner or _parameter_configuration_owner ~= owner or record.sealed then return false end
+	record.changed = _actions[record.slot] ~= record.old
+	record.sealed = true
+	return true
+end
+function M.commit_click_configuration(owner, receipt)
+	local record = _click_configuration_receipts[receipt]
+	if not record or record.owner ~= owner or not record.sealed then return end
+	_click_configuration_receipts[receipt] = nil
+	if record.changed then
+		local ok = pcall(record.retire)
+		if not ok then pcall(Logger.error, LOG, "Could not advance captured gesture click cleanup; its owner retains the debt.") end
+	end
 end
 
 --- Applies only assignments without changing input-reader ownership or files.

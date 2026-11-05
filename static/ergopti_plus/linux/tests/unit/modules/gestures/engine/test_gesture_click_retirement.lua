@@ -170,6 +170,105 @@ helpers.describe("gesture click retirement", function()
 	end
 
 
+	helpers.it("does not retire a replacement click when finalizing a captured receipt", function()
+		with_manager(function(manager, state)
+			helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
+			manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
+			local owner = {}
+			helpers.assert_true(manager.acquire_parameter_configuration(owner))
+			local receipt = manager.capture_click_configuration(owner, "swipe_3_left")
+			local actions = manager.parameter_configuration_actions_snapshot(owner)
+			actions.swipe_3_left = "open_url"
+			helpers.assert_true(manager.apply_parameter_configuration_actions(owner, actions))
+			helpers.assert_true(manager.seal_click_configuration(owner, receipt))
+			helpers.assert_true(manager.release_parameter_configuration(owner))
+			manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
+			manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
+			helpers.assert_eq(edges(state), { "mousedown:1", "mouseup:1", "mousedown:1" })
+			manager.commit_click_configuration(owner, receipt); state.harvest()
+			helpers.assert_eq(edges(state), { "mousedown:1", "mouseup:1", "mousedown:1" })
+		end)
+	end)
+
+	helpers.it("does not start a removed gesture click during parameter publication", function()
+		with_manager(function(manager, state)
+			manager._test_begin_reading({ feed = function() end })
+			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end, drain = function() return 0, "would_block" end }
+			helpers.assert_true(manager.enable())
+			helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
+			local path = os.tmpname(); local backup = path .. ".backup"
+			local file = assert(io.open(path, "w")); file:write('[gestures]\nswipe_3_left = "left_click_toggle"\n'); file:close()
+			local stop = manager.stop_programs
+			local ran = false
+			manager.stop_programs = function()
+				ran = true
+				helpers.assert_eq(manager.dispatch_gesture({ fingers = 3, direction = "left" }), false)
+				helpers.assert_eq(manager.execute_action("left_click_toggle", "swipe_3_left"), false)
+				state.harvest()
+				return stop()
+			end
+			local owner = require("infra.program_binding_transaction").new({ binding = "swipe_3_left", action = "open_url",
+				scalar = "https://example.test", path = path, backup_path = backup,
+				is_paused = function() return false end, parameters = manager })
+			local ok, detail = xpcall(function()
+				helpers.assert_true(owner.apply()); helpers.assert_true(ran); state.harvest()
+				helpers.assert_eq(edges(state), {}, "the old binding cannot acquire a new click after capture")
+			end, debug.traceback)
+			manager.stop_programs = stop
+			os.remove(path); os.remove(path .. ".tmp"); os.remove(backup); os.remove(backup .. ".tmp")
+			if not ok then error(detail, 0) end
+		end)
+	end)
+	for _, mode in ipairs({ "publication refused", "release refused", "committed" }) do
+		helpers.it("retains click ownership through " .. mode .. " parameter publication", function()
+			local refused = mode ~= "committed"
+			with_manager(function(manager, state)
+				helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
+				manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
+				local path = os.tmpname(); local backup = path .. ".backup"
+				local file = assert(io.open(path, "w")); file:write('[gestures]\nswipe_3_left = "left_click_toggle"\n'); file:close()
+				local Writer = require("toml_codec.writer")
+				local files = {
+					read_with_status = function(target) return Writer.read_classified(target) end,
+					write = function() error("unconditional publication is forbidden") end,
+					write_if_unchanged = function(target, content, expected)
+						if target == path then
+							manager.pump()
+							helpers.assert_eq(edges(state), { "mousedown:1" }, "publication cannot release a click")
+							if mode == "publication refused" then return false, "controlled publication refusal" end
+						end
+						return Writer.publish_if_unchanged(target, content, nil, expected)
+					end,
+				}
+				local release = manager.release_parameter_configuration
+				if mode == "release refused" then
+					local first = true
+					manager.release_parameter_configuration = function(token)
+						if first then first = false; return false end
+						return release(token)
+					end
+				end
+				local owner = require("infra.program_binding_transaction").new({ binding = "swipe_3_left",
+					action = "open_url", scalar = "https://example.test", path = path, backup_path = backup,
+					is_paused = function() return false end, parameters = manager, files = files })
+				local ok, detail = xpcall(function()
+					helpers.assert_eq(owner.apply(), not refused)
+					state.harvest()
+					if refused then
+						helpers.assert_eq(manager.get_action("swipe_3_left"), "left_click_toggle")
+						helpers.assert_eq(edges(state), { "mousedown:1" }, "compensation cannot invent a reversible UP")
+					else
+						helpers.assert_eq(manager.get_action("swipe_3_left"), "open_url")
+						helpers.assert_eq(edges(state), { "mousedown:1", "mouseup:1" })
+					end
+				end, debug.traceback)
+				manager.release_parameter_configuration = release
+				os.remove(path); os.remove(path .. ".tmp"); os.remove(backup); os.remove(backup .. ".tmp")
+				if not ok then error(detail, 0) end
+			end)
+		end)
+	end
+
 	for _, transition in ipairs({ "disable", "stop", "pause" }) do
 		helpers.it("releases both buttons on " .. transition .. " without a touchpad reader", function()
 			with_manager(function(manager, state)
