@@ -129,6 +129,21 @@ local function perform(fixture, controls, expected, label)
 end
 
 helpers.describe("Prediction dispatch under native AX focus refusal", function()
+	helpers.it("refuses dispatch when an excluded application path cannot be read", function()
+		with_pipeline(function(fixture)
+			fixture.engine.set_llm_secure_field_filter_enabled(false)
+			fixture.engine.set_llm_disabled_apps({ { appPath = "/Applications/Secret.app" } })
+			local app = hs.application.frontmostApplication()
+			local original_path = app.path
+			app.path = function() return nil end
+			fixture.engine.perform_check(true)
+			helpers.assert_eq(fixture.fetches, 0, "unknown excluded path must not reach the backend")
+			helpers.assert_eq(fixture.loading_calls, 0)
+			app.path = original_path
+			fixture.engine.perform_check(true)
+			helpers.assert_eq(fixture.fetches, 1, "a readable nonexcluded application must still dispatch")
+		end)
+	end)
 	helpers.it("(native-ai-dispatch) refuses a healthy known secure field before backend dispatch", function()
 		with_pipeline(function(fixture, controls)
 			perform(fixture, controls, 0, "Healthy secure focus must suppress actual backend dispatch")

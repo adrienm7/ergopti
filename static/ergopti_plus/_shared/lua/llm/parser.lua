@@ -137,7 +137,9 @@ local function clean_model_output(text)
 	
 	text = utils.unescape_text(text)
 	text = text:gsub("%*%*", ""):gsub("`", ""):gsub("\"", "")
-	text = text:gsub("<[^>]->", "")
+	-- Strip HTML tags, not angle-bracket comparisons such as "1 < 2 > 0".
+	text = text:gsub("</?[%a][%w:_%-]*%s*/?>", "")
+	text = text:gsub("</?[%a][%w:_%-]*%s+[^<>]->", "")
 	
 	text = text:gsub("^Voici la suite%s*:?%s*", "")
 	text = text:gsub("^Je propose%s*:?%s*", "")

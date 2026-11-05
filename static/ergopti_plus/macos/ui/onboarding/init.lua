@@ -498,18 +498,17 @@ end
 --- MenuPaths so a config-dir change made moments earlier is honoured. Pure apart
 --- from the injected resolver, so the retarget is testable without a webview.
 --- @param menu_paths table The ui.menu.menu_paths module (or a test double).
---- @param fallback string Path to keep when the resolver yields nothing usable.
---- @return string Absolute path to config.toml.
+--- @param fallback string Previously captured path, used only for diagnostics.
+--- @return string|nil Absolute path to config.toml, or nil on resolution failure.
 function M._resolve_commit_path(menu_paths, fallback)
 	if type(menu_paths) ~= "table" or type(menu_paths.get) ~= "function" then
-		return fallback
+		return nil
 	end
 	local ok, resolved = pcall(menu_paths.get, CONFIG_TOML_PATH_KEY)
-	-- A resolver that throws or hands back anything but a usable path must never
-	-- redirect the write: keeping the fallback still lands the answers somewhere
-	-- readable, whereas an empty target would drop them on the floor.
-	if not ok or type(resolved) ~= "string" or resolved == "" then
-		return fallback
+	-- The old capture is no longer authoritative once the folder changed.
+	if not ok or type(resolved) ~= "string" or not NativePath.is_absolute(resolved)
+		or resolved:find("\0", 1, true) then
+		return nil
 	end
 	if resolved ~= fallback then
 		Logger.info(LOG, "Config write retargeted to '%s' (was '%s').", resolved, tostring(fallback))
@@ -733,7 +732,13 @@ local function commit_owned(answers, publication)
 		-- BEFORE the wizard ran; persistence above moved the resolver. Writing
 		-- through the stale path would leave the NEW directory without config.toml,
 		-- so should_run() would reopen the wizard with every answer lost.
-		_config_path = M._resolve_commit_path(menu_paths, _config_path)
+		local resolved_path = M._resolve_commit_path(menu_paths, _config_path)
+		if not resolved_path then
+			Logger.error(LOG, "The selected configuration path could not be resolved; onboarding answers were not written.")
+			fail_commit("paths_editor.save_failed_title", i18n.get("paths_editor.save_failed"))
+			return
+		end
+		_config_path = resolved_path
 	end
 
 	-- Switch to the chosen locale before writing so success messages are translated,
