@@ -33,7 +33,7 @@ end
 
 --- Runs one isolated public callback case over explicitly scripted HTTP.
 --- @param test function Receives the provider, queued requests and logger records.
-local function isolated(test)
+local function isolated(test, real_logger)
 	local saved = {}
 	for _, name in ipairs({ "adapters.http_client", "modules.llm.api_remote", "logger.shim" }) do
 		saved[name] = package.loaded[name]
@@ -46,9 +46,13 @@ local function isolated(test)
 		end,
 		cancel = function() error("a settled callback must not cancel its successor") end,
 	}
-	local logger = helpers.make_logger_stub()
-	logger.error = function(owner, message, detail)
-		logs[#logs + 1] = { owner = owner, message = message, detail = detail }
+	local logger = real_logger and helpers.fresh_module("logger") or helpers.make_logger_stub()
+	if real_logger then
+		logger.set_sink(function(line) logs[#logs + 1] = line end)
+	else
+		logger.error = function(owner, message, detail)
+			logs[#logs + 1] = { owner = owner, message = message, detail = detail }
+		end
 	end
 	package.loaded["logger.shim"] = logger
 	local ok, err = pcall(function()
@@ -114,6 +118,16 @@ local function check_delivery(delivered, chunks, text, reason)
 end
 
 helpers.describe("api_remote_callbacks: safe reporting and callback ownership", function()
+	helpers.it("withholds callback text in the real formatted logger", function()
+		isolated(function(remote, calls, logs)
+			assert(start(remote, "openai", nil, function(text) error(text, 0) end))
+			calls[1].callback({ ok = true, status = 200, body = replies.openai })
+			local lines = table.concat(logs, "\n")
+			helpers.assert_contains(lines, "Terminal callback raised")
+			helpers.assert_contains(lines, "details withheld")
+			helpers.assert_nil(lines:find("valid reply", 1, true))
+		end, true)
+	end)
 	helpers.it("withholds private response text raised by a terminal callback", function()
 		isolated(function(remote, calls, logs)
 			assert(start(remote, "openai", nil, function(text) error(text, 0) end))
