@@ -1,219 +1,111 @@
 {
-  "expected_count": 142,
+  "expected_count": 69,
   "native_http_client_e2e": false,
-  "native_hotstring_e2e": true,
+  "native_hotstring_e2e": false,
   "filters": [
     {
-      "contains": "sendinstant-native-snapshot-copy",
-      "expected_count": 3
-    },
-    {
-      "contains": "sendinstant-post-receipt-owner",
-      "expected_count": 3
-    },
-    {
-      "contains": "sendinstant-clipboard-owner",
-      "expected_count": 3
-    },
-    {
-      "contains": "sendinstant-clip-contention",
-      "expected_count": 3
-    },
-    {
-      "contains": "send-instant-sleep-clipboard-on-keyboard-thread",
-      "expected_count": 3
-    },
-    {
-      "contains": "hotstrings: SendInstant restores only its own clipboard sequence",
-      "expected_count": 1
-    },
-    {
-      "contains": "wrap-native-render-focus",
+      "contains": "final-context-duration-owner",
       "expected_count": 2
     },
     {
-      "contains": "gesture-transform-native-render-focus",
-      "expected_count": 2
-    },
-    {
-      "contains": "selection-capture-native-control-focus",
-      "expected_count": 2
-    },
-    {
-      "contains": "gesture-title-native-transform-target",
-      "expected_count": 2
-    },
-    {
-      "contains": "wrap-native-fresh-selection",
+      "contains": "context-clock-ack-owner",
       "expected_count": 4
     },
     {
-      "contains": "selection sequence: cancelled with new user copy",
-      "expected_count": 1
-    },
-    {
-      "contains": "selection sequence: foreground changed with new user copy",
-      "expected_count": 1
-    },
-    {
-      "contains": "selection sequence: native cancellation preserves a newer copy",
-      "expected_count": 1
-    },
-    {
-      "contains": "paths-byte-admission",
+      "contains": "context-tail-retry-owner",
       "expected_count": 4
     },
     {
-      "contains": "pathstoml-read-missing-utf8-encoding",
+      "contains": "context-native64-origin-contract",
       "expected_count": 1
     },
     {
-      "contains": "personal-info-raw-decode-compat",
-      "expected_count": 1
-    },
-    {
-      "contains": "personal-info-encoding",
+      "contains": "switch-destination-privacy-owner",
       "expected_count": 7
     },
     {
-      "contains": "changelog-open-generation",
-      "expected_count": 6
-    },
-    {
-      "contains": "changelog-show-native-close",
+      "contains": "window-caption-app-owner",
       "expected_count": 2
     },
     {
-      "contains": "changelog-native-destroy-successor",
-      "expected_count": 2
-    },
-    {
-      "contains": "changelog-native-show-fault",
-      "expected_count": 2
-    },
-    {
-      "contains": "jev-native-requester",
-      "expected_count": 2
-    },
-    {
-      "contains": "open-app-native-quoted-path",
+      "contains": "window-caption-case-owner",
       "expected_count": 1
     },
     {
-      "contains": "open-app-native-shortcut",
-      "expected_count": 1
-    },
-    {
-      "contains": "open-app-probe-pause",
-      "expected_count": 1
-    },
-    {
-      "contains": "open-app-probe-resume",
-      "expected_count": 1
-    },
-    {
-      "contains": "toml-stage-collision",
-      "expected_count": 2
-    },
-    {
-      "contains": "toml-held-publication",
+      "contains": "keystats-session-close-retry",
       "expected_count": 5
     },
     {
-      "contains": "toml-write-through-atomic",
-      "expected_count": 9
+      "contains": "keystats-idle-resume-retry",
+      "expected_count": 6
     },
     {
-      "contains": "config commit gateway:",
+      "contains": "keystats-shutdown-close-chain",
+      "expected_count": 1
+    },
+    {
+      "contains": "clipboard-provenance-owner",
       "expected_count": 4
     },
     {
-      "contains": "toml-build-updated-content-detached",
+      "contains": "idle-activity-publication-owner",
+      "expected_count": 3
+    },
+    {
+      "contains": "metrics-locale-honesty: the app-time watermark",
       "expected_count": 1
     },
     {
-      "contains": "toml-build-updated-content-fresh-read",
+      "contains": "metrics-locale-honesty: both compensations",
       "expected_count": 1
     },
     {
-      "contains": "toml-batchwrite-fresh-read",
+      "contains": "(F9)",
+      "expected_count": 3
+    },
+    {
+      "contains": "kl-payload-privacy-filter-scoped",
+      "expected_count": 2
+    },
+    {
+      "contains": "KL_FlushBuffer called before KL_LogWindowSwitch on title change",
       "expected_count": 1
     },
     {
-      "contains": "toml-build-updated-content-old-authority",
+      "contains": "focus-refresh-bounded-resident",
+      "expected_count": 3
+    },
+    {
+      "contains": "(F-08)",
       "expected_count": 1
     },
     {
-      "contains": "toml-build-updated-content-render-failure",
+      "contains": "keystats shutdown: timer failure cannot skip durability",
       "expected_count": 1
     },
     {
-      "contains": "configuration snapshot: duplicate namespaces",
+      "contains": "context-compensation-atomic-owner",
       "expected_count": 1
     },
     {
-      "contains": "configuration snapshot: boot readers share",
-      "expected_count": 1
+      "contains": "reader-think-pause-corpus",
+      "expected_count": 2
     },
     {
-      "contains": "configuration snapshot: unknown scalars survive",
-      "expected_count": 1
-    },
-    {
-      "contains": "configuration snapshot: real native read refusal",
-      "expected_count": 1
-    },
-    {
-      "contains": "configuration snapshot: actual full save retains",
-      "expected_count": 1
-    },
-    {
-      "contains": "optional boot full-save source ownership:",
-      "expected_count": 4
-    },
-    {
-      "contains": "config-full-save-debt-matching",
-      "expected_count": 1
-    },
-    {
-      "contains": "config-full-save-debt-conflict",
-      "expected_count": 1
-    },
-    {
-      "contains": "config-full-save-debt-generation",
-      "expected_count": 1
-    },
-    {
-      "contains": "WPM compensation ownership:",
-      "expected_count": 4
-    },
-    {
-      "contains": "wpm-compensation-authority",
+      "contains": "toml-decoded-key-nul",
       "expected_count": 8
     },
     {
-      "contains": "llm-profile-opening-image",
-      "expected_count": 18
-    },
-    {
-      "contains": "llm-profile-memory-source",
-      "expected_count": 2
-    },
-    {
-      "contains": "llm-profile-nonllm-source",
-      "expected_count": 2
-    },
-    {
-      "contains": "llm-profile-nonllm-scope",
-      "expected_count": 2
-    },
-    {
-      "contains": "config journal: post-boot direct",
-      "expected_count": 4
-    },
-    {
-      "contains": "config journal: default native older-source migration retains registry custody",
+      "contains": "wrap-scalar-admission",
       "expected_count": 3
+    },
+    {
+      "contains": "open-app-native-folder",
+      "expected_count": 1
+    },
+    {
+      "contains": "paths-valid-replacement-scalar",
+      "expected_count": 1
     }
   ]
 }
