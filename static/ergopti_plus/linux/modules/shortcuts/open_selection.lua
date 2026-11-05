@@ -109,14 +109,15 @@ local encode_query = TextUtils.percent_encode
 
 --- Logs why a recognised target stayed closed and tells the user.
 --- @param reason string A REPORT_KEYS key.
---- @param target string
---- @param detail string English detail for the log.
-local function report(reason, target, detail)
-	Logger.error(LOG, "Could not open '%s': %s.", target, detail)
+local function report(reason)
+	-- Both the selected target and native error strings can contain user text.
+	Logger.error(LOG, "Could not open the selected target (%s).", reason)
 	local template = deps.message(REPORT_KEYS[reason])
-	local message = (tostring(template):gsub("%%s", function() return target end))
+	-- The notifier may log its message when the desktop service is absent or
+	-- refuses it, so the notice must not carry the selected target either.
+	local message = (tostring(template):gsub("%%s", "…"))
 	if deps.notify(message) ~= true then
-		Logger.warn(LOG, "The notice for '%s' was not shown.", target)
+		Logger.warn(LOG, "The selected-target notice was not shown.")
 	end
 end
 
@@ -125,16 +126,16 @@ end
 --- @param target string
 --- @return boolean admitted
 local function open(kind, target)
-	Logger.start(LOG, "Opening the selected %s '%s'…", kind, target)
-	local request, refusal = deps.open(target, function(result)
+	Logger.start(LOG, "Opening the selected %s…", kind)
+	local request = deps.open(target, function(result)
 		if result.ok == true then
-			Logger.success(LOG, "xdg-open accepted the selected %s '%s'.", kind, target)
+			Logger.success(LOG, "xdg-open accepted the selected %s.", kind)
 		else
-			report("failed", target, "xdg-open failed (" .. tostring(result.error or result.code) .. ")")
+			report("failed")
 		end
 	end)
 	if not request then
-		report("failed", target, "the desktop opener refused it (" .. tostring(refusal) .. ")")
+		report("failed")
 		return false
 	end
 	return true
@@ -223,21 +224,21 @@ function M.open(text)
 	end
 	if kind == "path" then
 		if not deps.exists(target) then
-			report("missing", target, "no file or folder exists at that path")
+			report("missing")
 			return false
 		end
 		return open(kind, target)
 	end
 	if kind == "url" then return open(kind, target) end
 	if kind == "file_name" then
-		report("file_name", target, "a file name without its folder cannot be located")
+		report("file_name")
 		return false
 	end
 	if kind == "unsupported" then
-		report("windows_only", target, "only Windows can open it")
+		report("windows_only")
 		return false
 	end
-	report("failed", target, "unexpected target kind " .. tostring(kind))
+	report("failed")
 	return false
 end
 

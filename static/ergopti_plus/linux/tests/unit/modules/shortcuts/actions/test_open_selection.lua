@@ -28,6 +28,68 @@ local function read_corpus()
 	return assert(json.decode(raw), "the open-target corpus is not valid JSON")
 end
 
+helpers.describe("opening selected content privacy", function()
+	for _, failure in ipairs({ false, true }) do
+		helpers.it("does not log selected search text on " .. (failure and "failure" or "success"), function()
+			local old_logger, old_subject = package.loaded["logger.shim"], package.loaded["modules.shortcuts.open_selection"]
+			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			local logs, opened = {}, nil
+			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
+			package.loaded["logger.shim"] = logger
+			package.loaded["modules.shortcuts.open_selection"] = nil
+			local ok, err = xpcall(function()
+				local subject = require("modules.shortcuts.open_selection")
+				subject._set_deps_for_test({
+					open = function(target, done)
+						opened = target
+						done(failure and { ok = false, error = "secretmarker" } or { ok = true })
+						return {}
+					end,
+					notify = function() return true end, message = function() return "%s" end,
+					getenv = function() return "/tmp" end,
+				})
+				helpers.assert_true(subject.open("secretmarker"))
+				helpers.assert_true(opened:find("secretmarker", 1, true) ~= nil)
+				helpers.assert_true(not table.concat(logs, "\n"):find("secretmarker", 1, true),
+					"the selected query and native error details must not enter logs")
+			end, debug.traceback)
+			package.loaded["logger.shim"], package.loaded["modules.shortcuts.open_selection"] = old_logger, old_subject
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
+
+helpers.describe("opening selected content notifier privacy", function()
+	for _, mode in ipairs({ "unavailable", "refused" }) do
+		helpers.it("keeps the selected path out of the real notifier fallback when " .. mode, function()
+			local names = { "logger.shim", "modules.shortcuts.open_selection", "adapters.notifier", "adapters.shell_runner" }
+			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local logs = {}
+			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
+			package.loaded["logger.shim"] = logger
+			package.loaded["adapters.shell_runner"] = {
+				has_command = function() return mode ~= "unavailable" end,
+				quote = function(value) return "'" .. value .. "'" end,
+				run = function() return false end,
+			}
+			package.loaded["adapters.notifier"] = nil
+			package.loaded["modules.shortcuts.open_selection"] = nil
+			local ok, err = xpcall(function()
+				local subject = require("modules.shortcuts.open_selection")
+				subject._set_deps_for_test({ exists = function() return false end,
+					message = function() return "Cannot open %s" end, getenv = function() return "/tmp" end })
+				helpers.assert_eq(subject.open("/tmp/secretmarker"), false)
+				local output = table.concat(logs, "\n")
+				helpers.assert_true(not output:find("secretmarker", 1, true), "notifier fallback must not expose the path")
+				helpers.assert_true(output:find("Cannot open", 1, true) ~= nil, "the fallback still reports the failure")
+			end, debug.traceback)
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
+
 --- Runs body with the session PRIMARY reader answering `selection`.
 local function with_selection(selection, body)
 	local previous = package.loaded["adapters.clipboard"]
@@ -164,8 +226,8 @@ helpers.describe("copy_selected_path opens the primary selection (open-target-ip
 		Subject._set_deps_for_test(nil)
 		helpers.assert_eq(world.opened, { "/home/ada/Documents" })
 		helpers.assert_eq(#world.notices, 1, "the missing path must be reported, not searched")
-		helpers.assert_true(world.notices[1]:find("/home/ada/nowhere", 1, true) ~= nil,
-			"the notice names the path")
+		helpers.assert_true(world.notices[1]:find("/home/ada/nowhere", 1, true) == nil,
+			"the notice must not carry the private path to fallback logs")
 	end)
 
 	helpers.it("open-target: reports a registry key and a bare file name instead of searching them", function()
