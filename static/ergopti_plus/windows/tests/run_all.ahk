@@ -802,6 +802,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/hotstrings/prefix/test_prefix_llm_typing_privacy.ahk
 #Include unit/modules/hotstrings/prefix/test_prefix_backspace_native_owned.ahk
 #Include unit/modules/hotstrings/prefix/test_prefix_backspace_native_gap.ahk
+#Include unit/modules/hotstrings/prefix/test_prefix_backspace_native_gap_controls.ahk
 #Include unit/modules/hotstrings/prefix/test_prefix_fresh_native_privacy.ahk
 #Include unit/modules/hotstrings/prefix/test_llm_native_admission_order.ahk
 #Include unit/modules/hotstrings/prefix/test_llm_native_entry_lifecycle.ahk
