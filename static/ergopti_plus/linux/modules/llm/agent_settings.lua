@@ -119,6 +119,26 @@ function M.parse_config(text)
 	for _, key in ipairs({ "actions", "source_kinds", "learning", "ics" }) do
 		if type(root[key]) ~= "table" then return nil, "agent.json has no " .. key end
 	end
+	-- The action validator uses these rules as executable schema. Reject a
+	-- broken rule here instead of raising after a model has returned an action.
+	for _, action in ipairs({ "calendar", "reminder", "mail", "shortcut" }) do
+		if type(root.actions[action]) ~= "table" then return nil, "agent.json action schema is invalid" end
+	end
+	for _, schema in pairs(root.actions) do
+		if type(schema) ~= "table" then return nil, "agent.json action schema is invalid" end
+		for name, rule in pairs(schema) do
+			if type(name) ~= "string" or type(rule) ~= "table"
+				or (rule.required ~= nil and type(rule.required) ~= "boolean")
+				or (rule.type ~= "text" and rule.type ~= "datetime" and rule.type ~= "emails" and rule.type ~= "tool")
+				or ((rule.type == "text" or rule.type == "emails") and not integer_in(rule.max, 0, math.huge)) then
+				return nil, "agent.json action field is invalid"
+			end
+		end
+	end
+	local start = root.actions.calendar.start
+	if type(start) ~= "table" or start.type ~= "datetime" or start.required ~= true then
+		return nil, "agent.json calendar start rule is invalid"
+	end
 	local learning = root.learning
 	if not number_in(learning.step, 0, 1) or not number_in(learning.min_threshold, 0, 1)
 		or not number_in(learning.max_threshold, learning.min_threshold, 1) then
