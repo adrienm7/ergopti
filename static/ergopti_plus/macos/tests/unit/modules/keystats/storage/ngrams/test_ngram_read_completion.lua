@@ -12,6 +12,31 @@ local Fixture = require("tests.support.modules.keystats.ngram_completion_fixture
 local function key(family) return family.code == "kc" and "12" or "a" end
 
 helpers.describe("ngram-read-completion", function()
+	helpers.it("selected app retains Unknown but excludes Browser in historical and today results", function()
+		Fixture.run({ today = true }, function(state, reader)
+			for _, date in ipairs({ Fixture.PAST, Fixture.TODAY }) do
+				for _, item in ipairs({ { "Unknown", "unknown-probe", 3 }, { "Browser", "browser-probe", 5 } }) do
+					state.tables.ngram_chars[#state.tables.ngram_chars + 1] = {
+						date = date, app = item[1], token = item[2], c = item[3], td = 0, e = 0, esrc_json = "{}",
+					}
+				end
+			end
+			for _, paced in ipairs({ false, true }) do
+				local historical, complete = reader.read_ngrams("/fixture/db.sqlite", Fixture.PAST, Fixture.PAST,
+					{ "Editor" }, paced and state.pacer or nil)
+				helpers.assert_true(complete)
+				helpers.assert_eq(historical.c.a.c, 7)
+				helpers.assert_eq(historical.c["unknown-probe"].c, 3)
+				helpers.assert_nil(historical.c["browser-probe"])
+			end
+			local today, complete = reader.read_today_split("/fixture/db.sqlite", Fixture.TODAY, Fixture.TODAY,
+				{ "Editor" }, nil, Fixture.TODAY)
+			helpers.assert_true(complete)
+			helpers.assert_eq(today.Editor.c.b.c, 11)
+			helpers.assert_eq(today.Unknown.c["unknown-probe"].c, 3)
+			helpers.assert_nil(today.Browser)
+		end)
+	end)
 	helpers.it("paced empty future bounds perform no daily reads, including the last date", function()
 		Fixture.run({ empty = true }, function(state, reader)
 			local data, complete = reader.read_ngrams("/fixture/db.sqlite", "9999-12-31", "9999-12-31", nil, state.pacer)
