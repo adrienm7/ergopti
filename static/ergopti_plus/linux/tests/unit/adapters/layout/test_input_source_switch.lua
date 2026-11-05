@@ -119,6 +119,43 @@ helpers.describe("input source switch: plans", function()
 end)
 
 helpers.describe("input source switch: switcher", function()
+	helpers.it("linux-layout-refresh-order: an older completion cannot replace newer choices", function()
+		local pending, completed = {}, {}
+		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+			run = function(_, _, callback) pending[#pending + 1] = callback; return true end })
+		switcher.refresh(function(changed) completed[#completed + 1] = changed end)
+		switcher.refresh(function(changed) completed[#completed + 1] = changed end)
+		pending[2]({ ok = true, stdout = "layout: us\n" })
+		pending[1]({ ok = true, stdout = "layout: fr\n" })
+		helpers.assert_eq(switcher.choices()[1].id, "us")
+		helpers.assert_eq(completed, { true, false }, "the stale completion must still settle its caller")
+	end)
+	helpers.it("linux-layout-refresh-order: an old refresh cannot replace a switcher's newer listing", function()
+		local pending = {}
+		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+			run = function(_, _, callback) pending[#pending + 1] = callback; return true end })
+		switcher.refresh()
+		local switched
+		switcher.select("us", function(ok) switched = ok end)
+		pending[2]({ ok = true, stdout = "layout: us\n" })
+		pending[1]({ ok = true, stdout = "layout: fr\n" })
+		helpers.assert_eq(switcher.choices()[1].id, "us")
+		pending[3]({ ok = true, stdout = "" })
+		helpers.assert_eq(switched, true)
+	end)
+	helpers.it("linux-layout-refresh-order: a late switch listing cannot replace a newer refresh", function()
+		local pending = {}
+		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+			run = function(_, _, callback) pending[#pending + 1] = callback; return true end })
+		local switched
+		switcher.select("fr", function(ok) switched = ok end)
+		switcher.refresh()
+		pending[2]({ ok = true, stdout = "layout: us\n" })
+		pending[1]({ ok = true, stdout = "layout: fr\n" })
+		helpers.assert_eq(switcher.choices()[1].id, "us")
+		helpers.assert_nil(pending[3], "a stale plan cannot overwrite newer desktop layouts")
+		helpers.assert_eq(switched, false)
+	end)
 	helpers.it("lists the desktop's layouts and reports a change once", function()
 		local port = fake_port(Switch.GNOME, gnome_answers())
 		local switcher = Switch.new(port)

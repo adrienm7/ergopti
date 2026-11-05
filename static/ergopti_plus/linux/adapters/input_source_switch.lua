@@ -210,6 +210,7 @@ function M.new(port)
 	end
 	local switcher = {}
 	local choices = {}
+	local listing_epoch = 0
 	local busy, queued = false, nil
 	local listeners, delivering = {}, false
 
@@ -293,9 +294,14 @@ function M.new(port)
 	--- a refused reading keeps the previous list and reports changed = false.
 	--- @param on_done function|nil
 	function switcher.refresh(on_done)
+		listing_epoch = listing_epoch + 1
+		local epoch = listing_epoch
 		read_listing(function(listing, reason)
 			local changed = false
-			if listing then
+			if epoch ~= listing_epoch then
+				if type(on_done) == "function" then on_done(false) end
+				return
+			elseif listing then
 				local fresh = choices_of(listing)
 				changed = #fresh ~= #choices
 				for index, choice in ipairs(fresh) do
@@ -312,6 +318,8 @@ function M.new(port)
 
 	local function start(id, on_done)
 		busy = true
+		listing_epoch = listing_epoch + 1
+		local epoch = listing_epoch
 		read_listing(function(listing, reason)
 			local function done(ok, detail)
 				-- Keep the slot occupied during delivery: a reentrant selection must
@@ -327,6 +335,7 @@ function M.new(port)
 				settle_listeners()
 			end
 			if listing == nil then return done(false, reason) end
+			if epoch ~= listing_epoch then return done(false, "the keyboard layout listing was superseded") end
 			choices = choices_of(listing)
 			local steps, plan_reason = M.plan(listing, id)
 			if steps == nil then return done(false, plan_reason) end
