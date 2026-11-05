@@ -228,12 +228,14 @@ _STNN_ActualName(Mode) {
 			case "get": Result := ST_Get(Name, "missing")
 			case "has": Result := ST_Has(Name)
 			case "delete": Result := ST_Delete(Name)
-			case "unicode-control", "default-control":
-				Name := Mode == "unicode-control" ? "é😀" : ""
+			case "unicode-control", "default-control", "integer-key-control", "float-key-control":
+				Name := Mode == "unicode-control" ? "é😀" : Mode == "integer-key-control" ? 17 : Mode == "float-key-control" ? 0.125 : ""
 				Result := ST_Set(Name, "Independent")
 				Roundtrip := ST_Get(Name, "missing")
 				Present := ST_Has(Name)
 		}
+		if Mode == "integer-key-control" || Mode == "float-key-control"
+			AssertTrue(Name is Number, "the genuine native call receives the legacy numeric key type")
 		ActualNeighbor := ST_Get("owned", "missing")
 		_TestPrint("# storage-native-name mode=" . Mode . " disposition=" . Disposition
 			. " requested_units=" . StrLen(Name) . " result=" . Result
@@ -248,7 +250,7 @@ _STNN_ActualName(Mode) {
 			case "has": AssertFalse(Result, "the uncreated logical name must not borrow another native value's membership")
 			case "delete":
 				AssertTrue((Result is Integer) && (Result == 0 || Result == 1), "refusal or a safe idempotent delete is allowed, never deletion of another name")
-			case "unicode-control", "default-control":
+			case "unicode-control", "default-control", "integer-key-control", "float-key-control":
 				AssertTrue(Result)
 				AssertEqual("Independent", Roundtrip)
 				AssertTrue(Present)
@@ -267,3 +269,6 @@ _STNN_ActualName(Mode) {
 }
 for _STNN_Mode in ["set", "get", "has", "delete", "unicode-control", "default-control"]
 	Test("storage native name identity: " . _STNN_Mode . " (storage-native-name-nul)", _STNN_ActualName.Bind(_STNN_Mode))
+
+for _STNC_Mode in ["integer-key-control", "float-key-control"]
+	Test("storage native name legacy coercion: " . _STNC_Mode . " (storage-native-name-coercion)", _STNN_ActualName.Bind(_STNC_Mode))
