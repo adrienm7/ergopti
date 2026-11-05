@@ -1,0 +1,15 @@
+Selecting exact test module: "tests.unit.modules.diagnostics.test_crash_reporter_mkdir_recursive"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.diagnostics.test_crash_reporter_mkdir_recursive
+[PASS] test_crash_reporter_mkdir_recursive
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.diagnostics.test_crash_reporter_mkdir_recursive","name":"tests.unit.modules.diagnostics.test_crash_reporter_mkdir_recursive","status":"pass","elapsed_ms":202.076240,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  0
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

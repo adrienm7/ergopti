@@ -1,0 +1,79 @@
+
+=== Retained Archive Lease Controls ===
+  ok   unsupported allocation launches no named fallback
+
+=== Retained Archive Lease Controls ===
+  ok   literal current true is required before native open
+
+=== Retained Archive Lease Controls ===
+  ok   post-open retired owner closes only its admitted FD
+
+=== Retained Archive Lease Controls ===
+  ok   one chunk holds backpressure until its actual write ACK
+
+=== Retained Archive Lease Controls ===
+  ok   short writes preserve exact bytes and positioned offsets
+
+=== Retained Archive Lease Controls ===
+  ok   duplicate native ACK cannot resume twice or write again
+
+=== Retained Archive Lease Controls ===
+  ok   cancel waits independently for write EOF producer and timer ACKs
+
+=== Retained Archive Lease Controls ===
+  ok   producer settlement cannot stand in for stdout EOF
+
+=== Retained Archive Lease Controls ===
+  ok   EOF cannot stand in for producer physical settlement
+
+=== Retained Archive Lease Controls ===
+  ok   empty relay reset requires exact preceding ticket and native retirement
+
+=== Retained Archive Lease Controls ===
+  ok   any successfully written body bytes prevent relay reset
+
+=== Retained Archive Lease Controls ===
+  ok   original deadline expiry before reset cannot receive a fresh budget
+
+=== Retained Archive Lease Controls ===
+  ok   native ENOSPC write is typed and aborts exact sink
+
+=== Retained Archive Lease Controls ===
+  ok   invalid native write size is unknown rather than manufactured ENOSPC
+
+=== Retained Archive Lease Controls ===
+  ok   current owner revocation during pending write forbids success resume
+
+=== Retained Archive Lease Controls ===
+  ok   deadline fires while writer pending and retains physical debt
+
+=== Retained Archive Lease Controls ===
+  ok   write submission throw never guesses a physical write ACK
+
+=== Retained Archive Lease Controls ===
+  ok   ambiguous close is attempted once even if descriptor number is reused
+
+=== Retained Archive Lease Controls ===
+  ok   cancel before producer bind closes parent descriptor without fictitious EOF
+
+=== Retained Archive Lease Controls ===
+  ok   reentrant close cancellation cannot consume descriptor twice
+
+=== Retained Archive Lease Controls ===
+  ok   reentrant timer cancellation cannot recurse or consume a successor
+
+=== Retained Archive Lease Controls ===
+  ok   post-current absolute clock check closes slow probe admission
+
+=== Retained Archive Lease Controls ===
+  ok   oversized chunk launches zero native writes
+
+=== Retained Archive Lease Controls ===
+  ok   foreign attempt cannot EOF or write current output
+
+=== Retained Archive Lease Controls ===
+  ok   actual EOF during current probe forbids a new writer after settlement
+
+=== Retained Archive Lease Controls ===
+  ok   actual EOF during short-write probe forbids another native submission
+AUDIT_TEST_RESULT	26	0

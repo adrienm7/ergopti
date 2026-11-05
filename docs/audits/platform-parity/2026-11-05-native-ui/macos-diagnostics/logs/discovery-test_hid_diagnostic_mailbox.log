@@ -1,0 +1,40 @@
+Selecting exact test module: "tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox
+
+=== HID diagnostic mailbox: delivery ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox","name":"(hid-diagnostic-mailbox-off-tap) uses one pump and never schedules per report","status":"pass","elapsed_ms":1.039808,"timing_error":""}
+  ok   (hid-diagnostic-mailbox-off-tap) uses one pump and never schedules per report
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox","name":"(hid-diagnostic-mailbox-delivery-retry) retains the exact record when logging raises","status":"pass","elapsed_ms":0.159489,"timing_error":""}
+  ok   (hid-diagnostic-mailbox-delivery-retry) retains the exact record when logging raises
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox","name":"(hid-diagnostic-mailbox-bounded) coalesces overflow into a visible count","status":"pass","elapsed_ms":0.186860,"timing_error":""}
+  ok   (hid-diagnostic-mailbox-bounded) coalesces overflow into a visible count
+
+=== HID diagnostic mailbox: lifecycle ===
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox","name":"retains pending diagnostics after scheduler false and drains on retry","status":"pass","elapsed_ms":0.114962,"timing_error":""}
+  ok   retains pending diagnostics after scheduler false and drains on retry
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox","name":"retains pending diagnostics after scheduler nil and drains on retry","status":"pass","elapsed_ms":0.105808,"timing_error":""}
+  ok   retains pending diagnostics after scheduler nil and drains on retry
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox","name":"retains pending diagnostics after scheduler throw and drains on retry","status":"pass","elapsed_ms":0.206109,"timing_error":""}
+  ok   retains pending diagnostics after scheduler throw and drains on retry
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox","name":"retains exact pump ownership after cancel false and retries","status":"pass","elapsed_ms":0.110796,"timing_error":""}
+  ok   retains exact pump ownership after cancel false and retries
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox","name":"retains exact pump ownership after cancel nil and retries","status":"pass","elapsed_ms":0.096745,"timing_error":""}
+  ok   retains exact pump ownership after cancel nil and retries
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox","name":"retains exact pump ownership after cancel throw and retries","status":"pass","elapsed_ms":0.166620,"timing_error":""}
+  ok   retains exact pump ownership after cancel throw and retries
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox","name":"supports stop/start without duplicate pumps or stale callbacks","status":"pass","elapsed_ms":0.142394,"timing_error":""}
+  ok   supports stop/start without duplicate pumps or stale callbacks
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox","name":"(hid-mailbox-partial-arm-debt) retains a partially armed pump until exact cleanup","status":"pass","elapsed_ms":0.286159,"timing_error":""}
+  ok   (hid-mailbox-partial-arm-debt) retains a partially armed pump until exact cleanup
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox","name":"tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox","status":"pass","elapsed_ms":3.021388,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  11
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

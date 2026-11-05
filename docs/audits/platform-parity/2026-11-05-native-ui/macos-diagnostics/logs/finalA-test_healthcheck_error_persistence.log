@@ -1,0 +1,54 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_error_persistence"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_error_persistence
+
+=== healthcheck session issues (healthcheck-last-error-wired) ===
+2026-11-05 00:53:36:000 [ERROR] [probe] boom 42
+[logger] unified log write refused: /tmp/lua_NfAvvd_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_NfAvvd_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+2026-11-05 00:53:36:000 [START] [healthcheck] Collecting the diagnostics…
+2026-11-05 00:53:36:000 [SUCCESS] [healthcheck] Diagnostics collected in 0.2 ms.
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_error_persistence","name":"surfaces a real Logger.error after the ring has forgotten it (healthcheck-last-error-wired)","status":"pass","elapsed_ms":52.282404,"timing_error":""}
+  ok   surfaces a real Logger.error after the ring has forgotten it (healthcheck-last-error-wired)
+2026-11-05 00:53:36:000 [ERROR] [probe] first diagnostic failure
+[logger] unified log write refused: /tmp/lua_NfAvvd_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_NfAvvd_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+2026-11-05 00:53:36:000 [START] [healthcheck] Collecting the diagnostics…
+2026-11-05 00:53:36:000 [SUCCESS] [healthcheck] Diagnostics collected in 0.1 ms.
+2026-11-05 00:53:36:000 [START] [healthcheck] Collecting the diagnostics…
+2026-11-05 00:53:36:000 [SUCCESS] [healthcheck] Diagnostics collected in 0.1 ms.
+2026-11-05 00:53:36:000 [ERROR] [probe] replacement diagnostic failure
+2026-11-05 00:53:36:000 [START] [healthcheck] Collecting the diagnostics…
+2026-11-05 00:53:36:000 [SUCCESS] [healthcheck] Diagnostics collected in 0.1 ms.
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_error_persistence","name":"keeps the last error across snapshots until a newer error replaces it (healthcheck-last-error-wired)","status":"pass","elapsed_ms":59.963262,"timing_error":""}
+  ok   keeps the last error across snapshots until a newer error replaces it (healthcheck-last-error-wired)
+2026-11-05 00:53:36:000 [START] [healthcheck] Collecting the diagnostics…
+[logger] unified log write refused: /tmp/lua_NfAvvd_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+2026-11-05 00:53:36:000 [SUCCESS] [healthcheck] Diagnostics collected in 0.1 ms.
+2026-11-05 00:53:36:000 [WARNING] [probe] session warning marker
+[logger] errors-only log write refused: /tmp/lua_NfAvvd_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+2026-11-05 00:53:36:000 [ERROR] [probe] session error marker
+2026-11-05 00:53:36:000 [START] [healthcheck] Collecting the diagnostics…
+2026-11-05 00:53:36:000 [SUCCESS] [healthcheck] Diagnostics collected in 0.1 ms.
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_error_persistence","name":"counts every warning and error of the session, not the ring's (healthcheck-last-error-wired)","status":"pass","elapsed_ms":46.845725,"timing_error":""}
+  ok   counts every warning and error of the session, not the ring's (healthcheck-last-error-wired)
+2026-11-05 00:53:36:000 [START] [healthcheck] Collecting the diagnostics…
+[logger] unified log write refused: /tmp/lua_NfAvvd_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+2026-11-05 00:53:36:000 [INFO] [healthcheck] The synchronous diagnostics took 0.1 ms, over the -1 ms budget; slowest: issues=0.0 ms, developer=0.0 ms, features=0.0 ms.
+2026-11-05 00:53:36:000 [SUCCESS] [healthcheck] Diagnostics collected in 0.1 ms.
+2026-11-05 00:53:36:000 [START] [healthcheck] Collecting the diagnostics…
+2026-11-05 00:53:36:000 [INFO] [healthcheck] The synchronous diagnostics took 0.1 ms, over the -1 ms budget; slowest: issues=0.0 ms, developer=0.0 ms, features=0.0 ms.
+2026-11-05 00:53:36:000 [SUCCESS] [healthcheck] Diagnostics collected in 0.1 ms.
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_error_persistence","name":"never counts its own duration among the session's warnings (phase-a-budget-not-a-warning)","status":"pass","elapsed_ms":26.270426,"timing_error":""}
+  ok   never counts its own duration among the session's warnings (phase-a-budget-not-a-warning)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_error_persistence","name":"tests.unit.ui.healthcheck.test_healthcheck_error_persistence","status":"pass","elapsed_ms":185.617940,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  4
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

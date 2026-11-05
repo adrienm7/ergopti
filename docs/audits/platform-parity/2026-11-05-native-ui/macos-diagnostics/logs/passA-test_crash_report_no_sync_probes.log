@@ -1,0 +1,22 @@
+Selecting exact test module: "tests.unit.modules.diagnostics.test_crash_report_no_sync_probes"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.diagnostics.test_crash_report_no_sync_probes
+
+=== crash reports do not fork system probes on the run loop ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_report_no_sync_probes","name":"does not run the healthcheck probe by default","status":"pass","elapsed_ms":17.385670,"timing_error":""}
+  ok   does not run the healthcheck probe by default
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_report_no_sync_probes","name":"runs the probe when the caller explicitly asks for it","status":"pass","elapsed_ms":2.304564,"timing_error":""}
+  ok   runs the probe when the caller explicitly asks for it
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_report_no_sync_probes","name":"reads the system details from the version 2 snapshot","status":"pass","elapsed_ms":1.728698,"timing_error":""}
+  ok   reads the system details from the version 2 snapshot
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.diagnostics.test_crash_report_no_sync_probes","name":"tests.unit.modules.diagnostics.test_crash_report_no_sync_probes","status":"pass","elapsed_ms":21.609162,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  3
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

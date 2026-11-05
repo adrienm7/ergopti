@@ -1,0 +1,54 @@
+Selecting exact test module: "tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript
+
+=== hotstrings configuration JavaScript delivery ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes navigation encode_throw (config-window-javascript)","status":"pass","elapsed_ms":5.289868,"timing_error":""}
+  ok   observes navigation encode_throw (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes navigation encode_nil (config-window-javascript)","status":"pass","elapsed_ms":5.209076,"timing_error":""}
+  ok   observes navigation encode_nil (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes navigation throw (config-window-javascript)","status":"pass","elapsed_ms":5.155406,"timing_error":""}
+  ok   observes navigation throw (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes navigation nil (config-window-javascript)","status":"pass","elapsed_ms":5.826255,"timing_error":""}
+  ok   observes navigation nil (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes navigation false (config-window-javascript)","status":"pass","elapsed_ms":5.173762,"timing_error":""}
+  ok   observes navigation false (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes navigation async (config-window-javascript)","status":"pass","elapsed_ms":5.051569,"timing_error":""}
+  ok   observes navigation async (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes navigation sync_error (config-window-javascript)","status":"pass","elapsed_ms":6.289932,"timing_error":""}
+  ok   observes navigation sync_error (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes navigation success (config-window-javascript)","status":"pass","elapsed_ms":4.835504,"timing_error":""}
+  ok   observes navigation success (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes mutation encode_throw (config-window-javascript)","status":"pass","elapsed_ms":4.820993,"timing_error":""}
+  ok   observes mutation encode_throw (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes mutation encode_nil (config-window-javascript)","status":"pass","elapsed_ms":4.882575,"timing_error":""}
+  ok   observes mutation encode_nil (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes mutation throw (config-window-javascript)","status":"pass","elapsed_ms":4.777968,"timing_error":""}
+  ok   observes mutation throw (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes mutation nil (config-window-javascript)","status":"pass","elapsed_ms":6.620369,"timing_error":""}
+  ok   observes mutation nil (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes mutation false (config-window-javascript)","status":"pass","elapsed_ms":4.878840,"timing_error":""}
+  ok   observes mutation false (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes mutation async (config-window-javascript)","status":"pass","elapsed_ms":4.750536,"timing_error":""}
+  ok   observes mutation async (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes mutation sync_error (config-window-javascript)","status":"pass","elapsed_ms":6.065625,"timing_error":""}
+  ok   observes mutation sync_error (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"observes mutation success (config-window-javascript)","status":"pass","elapsed_ms":5.071770,"timing_error":""}
+  ok   observes mutation success (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"encoding reentry cannot send stale data to either owner (config-window-javascript)","status":"pass","elapsed_ms":5.533425,"timing_error":""}
+  ok   encoding reentry cannot send stale data to either owner (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"late errors retain bounded diagnostics without mutating a successor (config-window-javascript)","status":"pass","elapsed_ms":5.357609,"timing_error":""}
+  ok   late errors retain bounded diagnostics without mutating a successor (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"a failure diagnostic cannot refresh a reentrant successor (config-window-javascript)","status":"pass","elapsed_ms":5.015085,"timing_error":""}
+  ok   a failure diagnostic cannot refresh a reentrant successor (config-window-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","name":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript","status":"pass","elapsed_ms":101.363898,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  19
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

@@ -1,0 +1,7 @@
+
+=== Hotstring Editor Confirm Dialog Wiring ===
+  ✓  confirm-ok button has a click listener
+  ✓  pending confirm callback is captured and fired
+  ✓  confirm-cancel button has a click listener
+
+Results: 3 passed, 0 failed.

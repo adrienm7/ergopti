@@ -1,0 +1,46 @@
+
+=== diagnostics bridge (linux): the page's messages ===
+  ok   answers ready with a quick version 2 snapshot starting only the local probes
+  ok   refuses and logs an action outside the allowlist
+  ok   copies the redacted report
+  ok   answers a refused clipboard as a failure
+  ok   refreshes with details and restarts the probes
+  ok   closes the page it came from and cancels its probes
+  ok   ignores a message from a page that is gone
+  ok   reports the pause the daemon hands over
+  ok   replaces an open window
+  ok   pushes a probe answer into its page only
+
+=== diagnostics bridge (linux): extensive admission ===
+  ok   privacy-only refresh remains quick and starts only the local probes
+  ok   cancel retains partial results and does not invent a cleanup acknowledgement
+  ok   export observation returns the exact owned snapshot without any export side effect
+
+=== diagnostics bridge (linux): cleanup history ===
+  ok   cancel then refresh then export retains unconfirmed cleanup metadata
+
+=== diagnostics bridge (linux): sharing preview admission ===
+  ok   refuses free text before calling the clipboard adapter
+  ok   refuses a stale preview and accepts only the current retained snapshot's text
+
+=== diagnostics bridge stable-metadata report ===
+  ok   completes the actual attachment before opening a form without editable query defaults
+
+=== diagnostics asynchronous opener ownership ===
+  ok   (diagnostic-opener-session) awaits reveal and browser, then delivers the actual failure
+  ok   (diagnostic-opener-session) refresh revokes pending continuation
+  ok   (diagnostic-opener-session) ready revokes pending continuation
+  ok   (diagnostic-opener-session) close revokes pending continuation
+  ok   (diagnostic-opener-session) native_close revokes pending continuation
+  ok   (diagnostic-opener-session) epoch revokes pending continuation
+  ok   (diagnostic-opener-session) a newer action owns the only completion
+  ok   (diagnostic-opener-session) synchronous save reentry cannot dispatch the retired reveal
+
+=== diagnostic opener cancellation reentry ===
+  ok   (opener-cancel-reentry) preserves a nested action instead of overwriting it
+  ok   (opener-cancel-reentry) ready retains the replacement page
+  ok   (opener-cancel-reentry) native_close retains the replacement page
+
+=== diagnostics bridge fixture ownership ===
+  ok   restores exact collaborators and warm preference paths after a body failure
+AUDIT_TEST_RESULT	29	0

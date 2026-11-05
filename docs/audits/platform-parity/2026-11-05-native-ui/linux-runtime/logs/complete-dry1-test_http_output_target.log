@@ -1,0 +1,64 @@
+
+=== Native Parent Output Target Controls ===
+  ok   forged output object is refused by private target registry
+
+=== Native Parent Output Target Controls ===
+  ok   one registered target can bind only one producer
+
+=== Native Parent Output Target Controls ===
+  ok   native reads pause before one exact parent filesystem write
+
+=== Native Parent Output Target Controls ===
+  ok   a second incoming chunk cannot overtake pending filesystem ACK
+
+=== Native Parent Output Target Controls ===
+  ok   explicit native pause refusal launches zero filesystem writes
+
+=== Native Parent Output Target Controls ===
+  ok   owner revocation after pause refuses without ghost pending IO
+
+=== Native Parent Output Target Controls ===
+  ok   ambiguous submitted native write remains pending until its actual ACK
+
+=== Native Parent Output Target Controls ===
+  ok   actual ENOSPC reaches native abort as typed filesystem evidence
+
+=== Native Parent Output Target Controls ===
+  ok   native EOF stops future input and preserves bytes after pending ACK
+
+=== Native Parent Output Target Controls ===
+  ok   live source refusal after write ACK cannot resume retired native input
+
+=== Native Parent Output Target Controls ===
+  ok   captured lease write method cannot borrow a later replacement
+
+=== Native Parent Output Target Controls ===
+  ok   captured native resume method cannot borrow a later source method
+
+=== Native Parent Output Target Controls ===
+  ok   duplicate native write callback cannot resume or settle another attempt
+
+=== Native Parent Output Target Controls ===
+  ok   oversized input refuses before native pause and descriptor mutation
+
+=== Native Parent Output Target Controls ===
+  ok   closed retained lease cannot create a new registered output target
+
+=== Native Parent Output Target Controls ===
+  ok   zero-IO refusal reconsiders native cleanup without ghost write debt
+
+=== Native Parent Output Target Controls ===
+  ok   slow native live getter after filesystem ACK cannot resume past deadline
+
+=== Native Parent Output Target Controls ===
+  ok   native resume admission refuses another producer operation
+
+=== Native Parent Output Target Controls ===
+  ok   last ENOSPC ACK survives EOF and exact physical producer retirement
+
+=== Native Parent Output Target Controls ===
+  ok   native receipt mutation cannot replace private last-write evidence
+
+=== Native Parent Output Target Controls ===
+  ok   duplicate last-write callback cannot overwrite retained failure or reconsider twice
+AUDIT_TEST_RESULT	21	0

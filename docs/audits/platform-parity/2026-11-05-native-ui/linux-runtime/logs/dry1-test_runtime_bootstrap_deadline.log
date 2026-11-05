@@ -1,0 +1,9 @@
+
+=== Original bootstrap deadline ===
+  ok   projects the exact original bound after independent clock progress
+  ok   cannot mutate the original bound through the public capability
+  ok   refuses projection at original deadline without claiming timer closure
+  ok   refuses a backward native clock instead of reconstructing availability
+  ok   original timer retirement leaves its still-live bound unchanged
+  ok   cancellation withdraws projection while exact timer debt remains
+AUDIT_TEST_RESULT	6	0

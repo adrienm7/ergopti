@@ -1,0 +1,64 @@
+{
+	"schema_version": 1,
+	"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+	"created_at": "2026-11-05",
+	"scopes": [
+		{
+			"scope": "windows-runtime",
+			"report": "docs/audits/platform-parity/2026-11-05-native-ui/windows-runtime/report.md",
+			"manifest": "docs/audits/platform-parity/2026-11-05-native-ui/windows-runtime/findings.json",
+			"ids": []
+		},
+		{
+			"scope": "windows-webview",
+			"report": "docs/audits/platform-parity/2026-11-05-native-ui/windows-webview/report.md",
+			"manifest": "docs/audits/platform-parity/2026-11-05-native-ui/windows-webview/findings.json",
+			"ids": ["WVB-001", "WVB-002"]
+		},
+		{
+			"scope": "windows-diagnostics",
+			"report": "docs/audits/platform-parity/2026-11-05-native-ui/windows-diagnostics/report.md",
+			"manifest": "docs/audits/platform-parity/2026-11-05-native-ui/windows-diagnostics/findings.json",
+			"ids": ["WDG-001"]
+		},
+		{
+			"scope": "macos-runtime",
+			"report": "docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md",
+			"manifest": "docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/findings.json",
+			"ids": ["MRT-001", "MRT-002", "MRT-003", "MRT-004", "MRT-006"]
+		},
+		{
+			"scope": "macos-webview",
+			"report": "docs/audits/platform-parity/2026-11-05-native-ui/macos-webview/report.md",
+			"manifest": "docs/audits/platform-parity/2026-11-05-native-ui/macos-webview/findings.json",
+			"ids": ["MVB-001", "MVB-002"]
+		},
+		{
+			"scope": "macos-diagnostics",
+			"report": "docs/audits/platform-parity/2026-11-05-native-ui/macos-diagnostics/report.md",
+			"manifest": "docs/audits/platform-parity/2026-11-05-native-ui/macos-diagnostics/findings.json",
+			"ids": []
+		},
+		{
+			"scope": "linux-runtime",
+			"report": "docs/audits/platform-parity/2026-11-05-native-ui/linux-runtime/report.md",
+			"manifest": "docs/audits/platform-parity/2026-11-05-native-ui/linux-runtime/findings.json",
+			"ids": ["LRT-001"]
+		},
+		{
+			"scope": "linux-webview",
+			"report": "docs/audits/platform-parity/2026-11-05-native-ui/linux-webview/report.md",
+			"manifest": "docs/audits/platform-parity/2026-11-05-native-ui/linux-webview/findings.json",
+			"ids": ["LVB-001"]
+		},
+		{
+			"scope": "linux-diagnostics",
+			"report": "docs/audits/platform-parity/2026-11-05-native-ui/linux-diagnostics/report.md",
+			"manifest": "docs/audits/platform-parity/2026-11-05-native-ui/linux-diagnostics/findings.json",
+			"ids": ["LDG-001", "LDG-002", "LDG-003"]
+		}
+	],
+	"shared_mechanisms": {
+		"shared-zero-delay-rendering": ["WVB-002"]
+	}
+}

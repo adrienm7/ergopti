@@ -1,0 +1,26 @@
+{
+	"schema_version": 1,
+	"scope": "linux-runtime",
+	"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+	"created_at": "2026-11-05",
+	"report_path": "/workspace/scratch/parity-native-ui/linux-runtime/report.md",
+	"findings": [
+		{
+			"id": "LRT-001",
+			"title": "First managed install leaves the model browser using stale absence ancestry",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G5"],
+			"reproduction": "Open the Linux model page before the pinned release parent directories exist and with no cached models. Its default ollama_install_state.capture caches a native resolver witnessing missing parents. Install through AI enable/runtime_factory using its separately constructed resolver; after publication and successful note_repair, revisit with an empty model cache. state.capture still returns false, model_browser.reason_ollama_missing, absent although installed_runtime.capture using the installer/fresh resolver reports installed. Replay: python3 /workspace/scratch/parity-native-ui/linux-runtime/probes/run.py --source-root /workspace/worktrees/parity-2026-11-05/linux-runtime --pass-id replay",
+			"root_cause": "linux/modules/llm/ollama_install_state.lua:95 managed_status builds _resolver only once. ollama_install_resolver captures absent ancestry receipts and current() rejects newly created directories. runtime_factory.lua:26 constructs an independent resolver whose prepare updates only its own receipts. note_repair(ok=true) clears _failure but never replaces the observer resolver. All subsequent local empty-inventory state captures reuse stale absence until module reset/reload; the bridge uses that false availability to grey the group and refuse model actions.",
+			"silent_failure": "managed_status discards capture's unavailable reason and capture collapses it into absent. _last_cause remains absent, so there is no state-change log on successful installation. The native probe records only 'Local Ollama install state: absent.' before reset. UI shows the ordinary missing-runtime reason, not stale ancestry. Existing individual resolver/runtime tests do not compose the two independent resolvers with the cached state owner.",
+			"regression_test": "Use real native owned directories, actual canonical release/app directory declarations, two real resolvers, actual state and installed_runtime modules. Capture missing state before parent creation; have the install resolver prepare and publish a valid native inventory; deliver successful note_repair; require state.capture to report installed without reset. Also require a fresh observer healthy control, executable-refusal control, and continued refusal of an actually substituted foreign ancestor. Assert model-browser model actions become available with an empty model cache.",
+			"evidence": {
+				"artifact": "/workspace/scratch/parity-native-ui/linux-runtime/probes/state-cache.lua",
+				"log": "/workspace/scratch/parity-native-ui/linux-runtime/logs/complete-dry1-state-cache.log",
+				"observed": "ADVERSE installed=true observer_current=false cause=absent reason=model_browser.reason_ollama_missing; VISIBILITY Local Ollama install state: absent.; HEALTHY fresh_observer cause=installed; REFUSAL nonexecutable cause=absent",
+				"provenance": "Real luv filesystem and real policy/resolver/state/runtime inventory. Resolver construction is redirected to the owned XDG fixture; logger records messages; tiny executable/library fixtures stand in for an already published runtime. No actual daemon, official archive or WebKit UI is executed. UI consequence is independently traced in bridge.lua."
+			}
+		}
+	]
+}

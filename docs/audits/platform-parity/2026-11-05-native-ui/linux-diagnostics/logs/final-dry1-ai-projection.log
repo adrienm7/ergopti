@@ -1,0 +1,5 @@
+ADVERSE backend input=api snapshot=ollama export=ollama get_backend_calls=0
+HEALTHY backend input=ollama snapshot=ollama
+ADVERSE enabled input=false ai_field=nil export_field=nil feature_field=false
+REFUSAL absent llm ai_enabled=nil
+PRIVACY exported_private_model=false

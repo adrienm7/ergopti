@@ -1,0 +1,18 @@
+Selecting exact test module: "tests.unit.ui.editors.test_personal_info_editor_close_transaction"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.editors.test_personal_info_editor_close_transaction
+
+=== personal information editor retains refused native closes ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_close_transaction","name":"keeps the exact singleton until WebView delete succeeds","status":"pass","elapsed_ms":4.942622,"timing_error":""}
+  ok   keeps the exact singleton until WebView delete succeeds
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.editors.test_personal_info_editor_close_transaction","name":"tests.unit.ui.editors.test_personal_info_editor_close_transaction","status":"pass","elapsed_ms":5.122623,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  1
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

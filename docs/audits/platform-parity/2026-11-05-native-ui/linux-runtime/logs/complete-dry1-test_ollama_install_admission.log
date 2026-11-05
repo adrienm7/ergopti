@@ -1,0 +1,10 @@
+  ok   construction is read-only and cannot invent download consent (ollama-install)
+  ok   exact parent preparation precedes every private native allocation (ollama-install)
+  ok   revocation during parent preparation prevents private allocation (ollama-install)
+  ok   stale source blocks every file mutation and helper command admission (ollama-install)
+  ok   substituted ancestry blocks mutation and pathname cleanup (ollama-install)
+  ok   mutation receipt cannot publish readiness after source revocation (ollama-install)
+  ok   cancelled source retains exact private cleanup authority (ollama-install)
+  ok   late cancellation preserves actual published runtime receipt (ollama-install)
+  ok   later public function replacement cannot redirect captured native owner (ollama-install)
+AUDIT_TEST_RESULT	9	0

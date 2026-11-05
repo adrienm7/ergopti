@@ -1,0 +1,19 @@
+[OK] coverage oracle: healthy
+[OK] coverage oracle: generator-failure
+[OK] coverage oracle: corruption
+[OK] coverage oracle: signal
+[OK] coverage oracle: null
+[OK] coverage oracle: spawn-error
+[OK] coverage oracle: wrong-path
+[OK] coverage oracle: wrong-status
+[OK] coverage oracle: throw
+[OK] coverage oracle: initial-deletion
+[OK] coverage oracle: final-corruption
+[OK] coverage oracle: neighbor-corruption
+[OK] coverage oracle: throw-after-corruption
+[OK] coverage restoration refusal: write
+[OK] coverage restoration refusal: read
+[OK] coverage restoration refusal: unlink
+[OK] coverage restoration refusal: throw-write
+[OK] perturbation restoration refusal: primary=false
+[OK] perturbation restoration refusal: primary=true

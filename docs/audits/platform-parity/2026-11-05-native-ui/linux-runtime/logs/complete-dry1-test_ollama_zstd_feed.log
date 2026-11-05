@@ -1,0 +1,6 @@
+
+=== Fixed Ollama zstd feeder ===
+  ok   extracts only the fixed zstd stdin command into the exact stage
+  ok   refuses gzip names selection before any reader or process
+  ok   refuses gzip verbose selection before any reader or process
+AUDIT_TEST_RESULT	3	0

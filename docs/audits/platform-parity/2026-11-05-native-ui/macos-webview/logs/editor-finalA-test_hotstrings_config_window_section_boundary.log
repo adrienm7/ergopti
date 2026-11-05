@@ -1,0 +1,44 @@
+Selecting exact test module: "tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary
+
+=== Hotstrings configuration section boundary ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","name":"(config-empty-section) commits common category delay","status":"pass","elapsed_ms":7.015456,"timing_error":""}
+  ok   (config-empty-section) commits common category delay
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","name":"(config-empty-section) commits common category color","status":"pass","elapsed_ms":5.482000,"timing_error":""}
+  ok   (config-empty-section) commits common category color
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","name":"(config-empty-section) commits common category tooltip","status":"pass","elapsed_ms":5.702005,"timing_error":""}
+  ok   (config-empty-section) commits common category tooltip
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","name":"(config-empty-section) commits common category priority","status":"pass","elapsed_ms":6.601825,"timing_error":""}
+  ok   (config-empty-section) commits common category priority
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","name":"(config-empty-section) commits ext:demo category delay","status":"pass","elapsed_ms":5.972172,"timing_error":""}
+  ok   (config-empty-section) commits ext:demo category delay
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","name":"(config-empty-section) commits ext:demo category color","status":"pass","elapsed_ms":5.255258,"timing_error":""}
+  ok   (config-empty-section) commits ext:demo category color
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","name":"(config-empty-section) commits ext:demo category tooltip","status":"pass","elapsed_ms":5.288960,"timing_error":""}
+  ok   (config-empty-section) commits ext:demo category tooltip
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","name":"(config-empty-section) commits ext:demo category priority","status":"pass","elapsed_ms":7.459993,"timing_error":""}
+  ok   (config-empty-section) commits ext:demo category priority
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","name":"(config-empty-section) preserves omitted and named section semantics","status":"pass","elapsed_ms":5.415430,"timing_error":""}
+  ok   (config-empty-section) preserves omitted and named section semantics
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","name":"(config-empty-section) rejects malformed sections before mutation","status":"pass","elapsed_ms":5.027334,"timing_error":""}
+  ok   (config-empty-section) rejects malformed sections before mutation
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","name":"(config-empty-section) patches personal metadata delay","status":"pass","elapsed_ms":14.718290,"timing_error":""}
+  ok   (config-empty-section) patches personal metadata delay
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","name":"(config-empty-section) patches personal metadata color","status":"pass","elapsed_ms":13.638618,"timing_error":""}
+  ok   (config-empty-section) patches personal metadata color
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","name":"(config-empty-section) patches personal metadata tooltip","status":"pass","elapsed_ms":14.209721,"timing_error":""}
+  ok   (config-empty-section) patches personal metadata tooltip
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","name":"(config-empty-section) patches personal metadata priority","status":"pass","elapsed_ms":16.124658,"timing_error":""}
+  ok   (config-empty-section) patches personal metadata priority
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","name":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary","status":"pass","elapsed_ms":119.241712,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  14
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

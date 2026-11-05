@@ -1,0 +1,8 @@
+{
+	"schema_version": 1,
+	"scope": "macos-diagnostics",
+	"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/platform-parity/2026-11-05-native-ui/macos-diagnostics/report.md",
+	"findings": []
+}

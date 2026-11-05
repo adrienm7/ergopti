@@ -1,0 +1,1 @@
+[32m[OK] No hardcoded Ollama port — all 4 AHK and install-script files defer to defaults.json (stock 11434, owned 11435).[0m

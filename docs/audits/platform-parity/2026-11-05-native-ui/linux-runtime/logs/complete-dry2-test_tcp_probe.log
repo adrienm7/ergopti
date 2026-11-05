@@ -1,0 +1,6 @@
+  ok   a listening loopback port is reachable and the child settles once its handles close (tcp-probe)
+  ok   a closed loopback port answers unreachable with the connect reason (tcp-probe)
+  ok   a cancel answers nothing and still settles the child (tcp-probe)
+  ok   refuses invalid arguments without starting a handle (tcp-probe)
+  ok   reads the relay address of every relay form the policy admits (tcp-probe)
+AUDIT_TEST_RESULT	5	0

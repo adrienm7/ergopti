@@ -1,0 +1,76 @@
+
+=== Retained Archive Input Controls ===
+  ok   cancel before EOF retires only after exact reader child and timer ACKs
+
+=== Retained Archive Input Controls ===
+  ok   accepted abort never becomes reader EOF or child exit
+
+=== Retained Archive Input Controls ===
+  ok   reader close ACK alone never becomes physical producer settlement
+
+=== Retained Archive Input Controls ===
+  ok   child exit ACK alone never becomes actual read handle close
+
+=== Retained Archive Input Controls ===
+  ok   abort refusal revokes writes but retains debt until independent ACKs
+
+=== Retained Archive Input Controls ===
+  ok   throwing abort cannot cause retry or manufacture physical closure
+
+=== Retained Archive Input Controls ===
+  ok   reentrant abort cancels exact input once without recursive native signal
+
+=== Retained Archive Input Controls ===
+  ok   foreign attempt cannot bind a reader or revoke current child
+
+=== Retained Archive Input Controls ===
+  ok   queued close notification without actual native close state retires nothing
+
+=== Retained Archive Input Controls ===
+  ok   pending filesystem ACK remains necessary after reader and child close
+
+=== Retained Archive Input Controls ===
+  ok   physical read closure without EOF cannot publish or admit another attempt
+
+=== Retained Archive Input Controls ===
+  ok   owner change during write ACK aborts captured child and never resumes
+
+=== Retained Archive Input Controls ===
+  ok   subscription reentry retires exact attempt before bind success
+
+=== Retained Archive Input Controls ===
+  ok   native close-state probe reentry cannot close retained integer twice
+
+=== Retained Archive Input Controls ===
+  ok   full write ACK after reentrant EOF preserves bytes but refuses resume
+
+=== Retained Archive Input Controls ===
+  ok   original monotonic deadline aborts exact producer without replacing budget
+
+=== Retained Archive Input Controls ===
+  ok   captured input abort cannot be replaced by a foreign public method
+
+=== Retained Archive Input Controls ===
+  ok   malformed input owner refuses without binding or calling abort
+
+=== Retained Archive Input Controls ===
+  ok   native close-state must be literal true even after child exit
+
+=== Retained Archive Input Controls ===
+  ok   captured producer settlement method survives unrelated public mutation
+
+=== Retained Archive Input Controls ===
+  ok   exact reader closure without EOF forbids every future parent write
+
+=== Retained Archive Input Controls ===
+  ok   read-close ACK during full write probe preserves bytes and denies resume
+
+=== Retained Archive Input Controls ===
+  ok   slow native reader probe cannot launch initial write after deadline
+
+=== Retained Archive Input Controls ===
+  ok   slow native reader probe cannot launch next partial write after deadline
+
+=== Retained Archive Input Controls ===
+  ok   slow native reader probe cannot resume full ACK beyond original deadline
+AUDIT_TEST_RESULT	25	0

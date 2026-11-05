@@ -1,0 +1,20 @@
+Selecting exact test module: "tests.unit.modules.diagnostics.test_crash_reporter_no_modal"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.diagnostics.test_crash_reporter_no_modal
+
+=== crash_reporter — the outcome is announced without a blocking modal ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_reporter_no_modal","name":"notifies with the saved report path instead of opening an alert","status":"pass","elapsed_ms":9.240376,"timing_error":""}
+  ok   notifies with the saved report path instead of opening an alert
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_reporter_no_modal","name":"still notifies without a modal when the report cannot be saved","status":"pass","elapsed_ms":2.417723,"timing_error":""}
+  ok   still notifies without a modal when the report cannot be saved
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.diagnostics.test_crash_reporter_no_modal","name":"tests.unit.modules.diagnostics.test_crash_reporter_no_modal","status":"pass","elapsed_ms":11.914784,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  2
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

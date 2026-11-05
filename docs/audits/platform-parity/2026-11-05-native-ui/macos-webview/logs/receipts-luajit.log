@@ -1,0 +1,7 @@
+/workspace/scratch/parity-toolchain/LuaJIT-2.1/src/luajit: .../static/ergopti_plus/macos/tests/support/source_file.lua:20: attempt to call field 'pack' (a nil value)
+stack traceback:
+	.../static/ergopti_plus/macos/tests/support/source_file.lua:20: in function 'read'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:170: in main chunk
+	[C]: in function 'require'
+	...ratch/parity-native-ui/macos-webview/probes/receipts.lua:5: in main chunk
+	[C]: at 0x555811b72360

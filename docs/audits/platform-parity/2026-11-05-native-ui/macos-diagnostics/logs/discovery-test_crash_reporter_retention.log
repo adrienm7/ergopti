@@ -1,0 +1,24 @@
+Selecting exact test module: "tests.unit.modules.diagnostics.test_crash_reporter_retention"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.diagnostics.test_crash_reporter_retention
+
+=== crash_reporter retention (macOS) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_reporter_retention","name":"deletes the oldest reports beyond the shared cap and nothing else","status":"pass","elapsed_ms":1.007420,"timing_error":""}
+  ok   deletes the oldest reports beyond the shared cap and nothing else
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_reporter_retention","name":"keeps everything while the folder is within the cap","status":"pass","elapsed_ms":0.274071,"timing_error":""}
+  ok   keeps everything while the folder is within the cap
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_reporter_retention","name":"still returns the saved path when a deletion is refused, and says so","status":"pass","elapsed_ms":0.336314,"timing_error":""}
+  ok   still returns the saved path when a deletion is refused, and says so
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_reporter_retention","name":"writes the shared JSON document with every field in the shared order","status":"pass","elapsed_ms":0.306340,"timing_error":""}
+  ok   writes the shared JSON document with every field in the shared order
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.diagnostics.test_crash_reporter_retention","name":"tests.unit.modules.diagnostics.test_crash_reporter_retention","status":"pass","elapsed_ms":2.136262,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  4
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

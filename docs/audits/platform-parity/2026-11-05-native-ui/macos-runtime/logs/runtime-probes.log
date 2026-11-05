@@ -1,0 +1,20 @@
+MRT-001 delayed listings: timeout=900 simulated_elapsed=2104s looks=301
+MRT-001 control zero-latency stops at 900s; activation after deadline still reloads at 1005s
+MRT-002 native timer refusal: command_started=true callback_count=0 terminate_attempts=0
+MRT-002 duplicate install remains queued behind unsettled request: role_calls=1 answers=0
+MRT-002 control committed timer delivers exactly one timeout callback
+receipt control/probe suffix="\
+" cache_success=true commands=0 swift_exact_contract=true
+receipt control/probe suffix="\
+extra" cache_success=true commands=0 swift_exact_contract=false
+receipt control/probe suffix="\
+\
+" cache_success=true commands=0 swift_exact_contract=false
+receipt control/probe suffix=" extra\
+" cache_success=true commands=0 swift_exact_contract=false
+PASS all retained runtime probes (virtual boundary timings; not Darwin qualification)
+MRT-004 real owner existing files/unloaded job => runtime_job_not_loaded; exact facade function projection still offers first-install request
+PASS source-projected public retry join (not native helper execution)
+MRT-005 timeout terminal dispatched before exact child exit; retry starts second role with two native handles physically pending
+PASS native-return-contract timeout overlap probe (injected SIGTERM-pending boundary; no privileged process)
+MRT-006 native open_settings=false is accepted without any error diagnostic; watch_started=true errors=0

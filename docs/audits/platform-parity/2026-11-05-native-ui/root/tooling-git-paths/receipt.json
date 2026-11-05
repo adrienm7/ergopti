@@ -1,0 +1,86 @@
+{
+	"files": [
+		"tools/lib/git-paths.cjs",
+		"tools/test/test-git-paths.cjs",
+		"tools/test/test-ahk-runners-are-invoked.cjs",
+		"tools/test/test-no-plan-refs-in-source.cjs",
+		"tools/test/test-source-trees-are-scanned.cjs",
+		"tools/test/test-drift-guard-covers-every-output.cjs",
+		"tools/test/test-ahk-runner-scan-streaming.cjs",
+		"tools/test/features/test-infrastructure/suite.json",
+		"package.json"
+	],
+	"targeted_checks": [
+		{
+			"command": "node tools/test/test-git-paths.cjs",
+			"exit_code": 0,
+			"log": "test-git-paths.cjs.txt"
+		},
+		{
+			"command": "node tools/test/test-ahk-runners-are-invoked.cjs",
+			"exit_code": 0,
+			"log": "test-ahk-runners-are-invoked.cjs.txt"
+		},
+		{
+			"command": "node tools/test/test-no-plan-refs-in-source.cjs",
+			"exit_code": 0,
+			"log": "test-no-plan-refs-in-source.cjs.txt"
+		},
+		{
+			"command": "node tools/test/test-source-trees-are-scanned.cjs",
+			"exit_code": 0,
+			"log": "test-source-trees-are-scanned.cjs.txt"
+		},
+		{
+			"command": "node tools/test/test-drift-guard-covers-every-output.cjs",
+			"exit_code": 0,
+			"log": "test-drift-guard-covers-every-output.cjs.txt"
+		},
+		{
+			"command": "node tools/test/test-untracked-driver-artifacts-do-not-affect-gates.cjs",
+			"exit_code": 0,
+			"log": "test-untracked-driver-artifacts-do-not-affect-gates.cjs.txt"
+		},
+		{
+			"command": "node tools/test/test-ahk-runner-scan-streaming.cjs",
+			"exit_code": 0,
+			"log": "test-ahk-runner-scan-streaming.cjs.txt"
+		},
+		{
+			"command": "node tools/test/test-drift-guard-isolation-skips-directory-links.cjs",
+			"exit_code": 0,
+			"log": "test-drift-guard-isolation-skips-directory-links.cjs.txt"
+		},
+		{
+			"command": "node tools/test/test-drift-guard-coverage-oracle.cjs",
+			"exit_code": 0,
+			"log": "test-drift-guard-coverage-oracle.cjs.txt"
+		},
+		{
+			"command": "node tools/test/test-js-feature-inventory.cjs",
+			"exit_code": 0,
+			"log": "test-js-feature-inventory.cjs.txt"
+		},
+		{
+			"command": "node tools/test/find-false-greens.cjs",
+			"exit_code": 0,
+			"log": "find-false-greens.cjs.txt"
+		},
+		{
+			"command": "node tools/test/test-bash-resolution.cjs",
+			"exit_code": 0,
+			"log": "test-bash-resolution.cjs.txt"
+		}
+	],
+	"registration": {
+		"all_platform_checks": 575,
+		"linux_planned_checks": 572,
+		"added_ordinal": 575
+	},
+	"red_controls": {
+		"old_default_buffer": "actual private Git index, ENOBUFS observed inside regression",
+		"streaming_fixture_before": "streaming-before.txt: Unexpected dependency ../lib/git-paths.cjs"
+	},
+	"staged": false,
+	"committed": false
+}

@@ -1,0 +1,1 @@
+PASS campaign schema, WDG-001 fields/enums, actual partial-write proof, two dry passes and 26 unchanged source identities

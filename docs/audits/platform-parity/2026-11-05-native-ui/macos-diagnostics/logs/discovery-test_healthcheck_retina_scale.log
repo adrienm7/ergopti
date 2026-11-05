@@ -1,0 +1,27 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_retina_scale"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_retina_scale
+
+=== healthcheck-retina-scale ===
+2026-11-05 00:52:21:000 [WARNING] [healthcheck] Diagnostics could not read the memory statistics: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:157: attempt to call a nil value (field 'vmStat').
+[logger] unified log write refused: /tmp/lua_y6oqmd_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_y6oqmd_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_retina_scale","name":"reports native scale 1 with usable width 1200","status":"pass","elapsed_ms":5.625690,"timing_error":""}
+  ok   reports native scale 1 with usable width 1200
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_retina_scale","name":"reports native scale 1 with usable width 1440","status":"pass","elapsed_ms":2.732896,"timing_error":""}
+  ok   reports native scale 1 with usable width 1440
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_retina_scale","name":"reports native scale 2 with usable width 1200","status":"pass","elapsed_ms":2.609290,"timing_error":""}
+  ok   reports native scale 2 with usable width 1200
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_retina_scale","name":"reports native scale 2 with usable width 1440","status":"pass","elapsed_ms":3.509148,"timing_error":""}
+  ok   reports native scale 2 with usable width 1440
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_retina_scale","name":"tests.unit.ui.healthcheck.test_healthcheck_retina_scale","status":"pass","elapsed_ms":14.681450,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  4
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

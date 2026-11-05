@@ -1,0 +1,17 @@
+
+=== linux: crash_reporter diagnostics ===
+  ok   resolves the crash folder inside the logs folder, from HOME
+  ok   protect returns the wrapped result on success
+  ok   protect reports failure and routes the throw through dump
+  ok   protect rejects a non-function payload
+  ok   dump writes the shared JSON report with the expected fields
+  ok   a second report within the same second gets the numeric suffix
+  ok   tells the user where the report landed, and says so when it cannot be saved
+  ok   keeps at most the shared cap of reports and never deletes another file
+  ok   dump ignores calls with a non-string or empty error
+  ok   get_crash_count counts report names only
+  ok   removes exactly the legacy text dumps and nothing else (legacy-crash-cleanup)
+  ok   a refused legacy delete is a warning, and a missing folder is not an error (legacy-crash-cleanup)
+  ok   captures the stack where the error was RAISED
+AUDIT_TEST_RESULT	13	0
+[crash_reporter] Crash dump refused; privacy or output acknowledgement unavailable.

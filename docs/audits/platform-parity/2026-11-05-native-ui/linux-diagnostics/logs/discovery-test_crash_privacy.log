@@ -1,0 +1,45 @@
+
+=== crash privacy admission ===
+  ok   keeps file-sink admission false when canonical logger acquisition is refused
+  ok   redacts protected errors and stack while preserving technical diagnostics
+  ok   refuses private output when sink is cold
+  ok   refuses private output when sink is closed
+  ok   never substitutes the successor redactor for an in-progress dump
+  ok   retires a dump revoked during open
+  ok   retires a dump revoked during write
+  ok   retires a dump revoked during close
+  ok   retires a dump revoked during image
+  ok   refuses failed open without announcing or exposing private partial bytes
+  ok   refuses failed write without announcing or exposing private partial bytes
+  ok   refuses failed close without announcing or exposing private partial bytes
+  ok   refuses redaction provider throw without raw fallback
+  ok   refuses redaction provider nil without raw fallback
+  ok   refuses redaction provider truthy without raw fallback
+  ok   retains an explicitly fresh successor report published during the old close
+  ok   does not retry exclusive acquisition refusal 13
+  ok   does not retry exclusive acquisition refusal EACCES
+  ok   does not retry exclusive acquisition refusal EINVAL
+  ok   does not reacquire after sink revocation during an EEXIST receipt
+  ok   refuses failed publication image throw
+  ok   refuses failed publication image truthy
+  ok   refuses failed publication image false
+  ok   refuses failed publication image nil
+  ok   refuses failed publication image missing
+  ok   redacts module filenames and optional context as well as the error
+
+=== native crash history ===
+2026-11-05 00:54:00:000 [DEBUG] [adapters.file_system] read(): cannot open '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/../_shared/build_stamp.txt' — ENOENT: no such file or directory: /workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/../_shared/build_stamp.txt
+2026-11-05 00:54:00:000 [DEBUG] [logger] ↑ 1 identical line suppressed
+2026-11-05 00:54:00:000 [ERROR] [diagnostics.crash_reporter] Crash report written: /workspace/scratch/parity-native-ui/linux-diagnostics/probes/owned-home-z1r9gi_q/ergopti-crash-image-E1G00K/crash_reports/2026-11-05T00-54-00Z.json
+  ok   acknowledges only a retained redacted report image (crash-published-image)
+2026-11-05 00:54:00:000 [DEBUG] [adapters.file_system] read(): cannot open '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/../_shared/build_stamp.txt' — ENOENT: no such file or directory: /workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/../_shared/build_stamp.txt
+2026-11-05 00:54:00:000 [ERROR] [diagnostics.crash_reporter] Crash report written: /workspace/scratch/parity-native-ui/linux-diagnostics/probes/owned-home-z1r9gi_q/ergopti-crash-history-wabj5U/crash_reports/2026-10-25T12-00-00Z.json
+2026-11-05 00:54:00:000 [ERROR] [diagnostics.crash_reporter] Crash report written: /workspace/scratch/parity-native-ui/linux-diagnostics/probes/owned-home-z1r9gi_q/ergopti-crash-history-wabj5U/crash_reports/2026-10-25T12-00-00Z-2.json
+2026-11-05 00:54:00:000 [ERROR] [diagnostics.crash_reporter] Crash report written: /workspace/scratch/parity-native-ui/linux-diagnostics/probes/owned-home-z1r9gi_q/ergopti-crash-history-wabj5U/crash_reports/2026-10-25T12-00-00Z-3.json
+2026-11-05 00:54:00:000 [ERROR] [diagnostics.crash_reporter] Crash report written: /workspace/scratch/parity-native-ui/linux-diagnostics/probes/owned-home-z1r9gi_q/ergopti-crash-history-wabj5U/crash_reports/2026-10-25T12-00-01Z.json
+2026-11-05 00:54:00:000 [ERROR] [diagnostics.crash_reporter] Crash report written: /workspace/scratch/parity-native-ui/linux-diagnostics/probes/owned-home-z1r9gi_q/ergopti-crash-history-wabj5U/crash_reports/2026-10-25T12-00-00Z-4.json
+2026-11-05 00:54:00:000 [ERROR] [diagnostics.crash_reporter] Crash report written: /workspace/scratch/parity-native-ui/linux-diagnostics/probes/owned-home-z1r9gi_q/ergopti-crash-history-wabj5U/crash_reports/2026-10-25T12-00-00Z-6.json
+  ok   preserves same-second reports across reporter reloads (crash-exclusive-history)
+AUDIT_TEST_RESULT	28	0
+[crash_reporter] Crash dump refused; privacy or output acknowledgement unavailable.
+[crash_reporter] Crash dump refused; privacy or output acknowledgement unavailable.

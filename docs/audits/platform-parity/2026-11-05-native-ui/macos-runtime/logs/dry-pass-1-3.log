@@ -1,0 +1,140 @@
+{
+  "audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+  "kind": "source joins only, not native execution",
+  "sources": [
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeDownloadedHelper.swift",
+      "sha256": "ed8374765b10616a266fbccbccffd1ef98ce3a637d22fb8a9c50f4e711d70acf",
+      "joins": [
+        {
+          "line": 85,
+          "text": "guard receipt == Data((pin.sha256 + \"\\n\").utf8) else { return .failure(.receiptMismatch) }"
+        },
+        {
+          "line": 111,
+          "text": "let selection = LuaSourceSelection.resolve("
+        },
+        {
+          "line": 117,
+          "text": "guard let home = accountHome()"
+        },
+        {
+          "line": 177,
+          "text": "let descriptor = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)"
+        }
+      ]
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeFirstInstallOwner.swift",
+      "sha256": "74db6b1cf71bd180740ba880d65591e7133d86d72a9eff86d8f81e7c5a25e5fc",
+      "joins": [
+        {
+          "line": 62,
+          "text": "guard fstatat(parentDescriptor, \"Runtime\", &existing, AT_SYMLINK_NOFOLLOW) == -1, errno == ENOENT else { throw OwnedRuntimeInstallFailure.destination }"
+        },
+        {
+          "line": 79,
+          "text": "try scratch.publishRuntime()"
+        },
+        {
+          "line": 88,
+          "text": "state = .filesPublished"
+        }
+      ]
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeIdleServiceEntry.swift",
+      "sha256": "a9567315a3190f2beabb4aa3eaa645c86b92281a63bf8b849555304aad2cdae9",
+      "joins": [
+        {
+          "line": 28,
+          "text": "try publication.publishFirstInstallation()"
+        },
+        {
+          "line": 30,
+          "text": "result = .filesPublishedServiceCleanupPending"
+        },
+        {
+          "line": 36,
+          "text": "let core = try provision.provisionAndStartCore()"
+        },
+        {
+          "line": 39,
+          "text": "try OwnedRuntimeVirtualHIDProvisionOwner.provision(within: provision)"
+        }
+      ]
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstallMainOperation.swift",
+      "sha256": "820516ae7baa873230031df0d4c54dec6c6bbc56a23465bbc7885bf82aa7f095",
+      "joins": [
+        {
+          "line": 66,
+          "text": "switch OwnedRuntimeDownloadedHelper.current()"
+        },
+        {
+          "line": 77,
+          "text": "driverStep = Self.driverProgram(package)"
+        },
+        {
+          "line": 105,
+          "text": "driverStep + \"task_status=0;"
+        },
+        {
+          "line": 106,
+          "text": " --owned-install-first)"
+        },
+        {
+          "line": 81,
+          "text": "let source = try OwnedRuntimeInstallTree(root: helper, protected: false)"
+        },
+        {
+          "line": 87,
+          "text": "SecCertificateCopyData(certificate) as Data == publisher.leaf"
+        }
+      ]
+    },
+    {
+      "path": "static/ergopti_plus/macos/platform/remap/init.lua",
+      "sha256": "18082e82568983bbd93847843a0f309719d51da7909f4145541275edd197923b",
+      "joins": [
+        {
+          "line": 5226,
+          "text": "runtime_job_not_loaded = true,"
+        },
+        {
+          "line": 5236,
+          "text": "function M.install_owned_runtime(on_done)"
+        }
+      ]
+    },
+    {
+      "path": "static/ergopti_plus/macos/platform/remap/runtime_artifact_fetch.lua",
+      "sha256": "89f3f424567e52d289572f5b399b02c005f065d8d43ed5039d01d1c9ebae4cea",
+      "joins": [
+        {
+          "line": 174,
+          "text": "receipt:match(\"^(%x+)\") ~= pin.sha256"
+        },
+        {
+          "line": 187,
+          "text": "if kept(home, pin) then"
+        }
+      ]
+    },
+    {
+      "path": "static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua",
+      "sha256": "ac391baa4071af3b97e81313201d05bca1eb102a444a1a2b224b76e7dfa1765d",
+      "joins": [
+        {
+          "line": 1138,
+          "text": "runtime_job_not_loaded = NOT_INSTALLED,"
+        },
+        {
+          "line": 1192,
+          "text": "require(\"ui.owned_runtime_install\").open(karabiner)"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+  ok   nil legacy admission preserves existing publication (ollama-runtime)
+  ok   captured final admission permits exact current publication (ollama-runtime)
+  ok   last fallback classified read revocation prevents native publication (ollama-runtime)
+  ok   last fallback classified read app lifetime revocation prevents rename (ollama-runtime)
+  ok   unchanged acknowledgment requires current final admission (ollama-runtime)
+  ok   final admission exception refuses and retires own staging (ollama-runtime)
+  ok   nonliteral final verdict refuses publication (ollama-runtime)
+  ok   malformed admission acquires no staging or native IO (ollama-runtime)
+  ok   ordinary conditional adapter cannot silently discard final guard (ollama-runtime)
+  ok   advertised adapter receives the exact captured guard (ollama-runtime)
+  ok   legacy adapter keeps its authoritative four-argument conditional invocation (ollama-runtime)
+  ok   classified adapter read cannot replace the captured admission publisher (ollama-runtime)
+AUDIT_TEST_RESULT	12	0

@@ -1,0 +1,77 @@
+Selecting exact test module: "tests.unit.infra.logger.test_crash_reporter_wired"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.infra.logger.test_crash_reporter_wired
+
+=== logger: a recoverable timer-callback error must NOT reach the crash reporter (audit H-06) ===
+2026-11-05 00:53:42:000 [ERROR] [runtime] Uncaught error in hs.timer.doAfter callback: ...os/tests/unit/infra/logger/test_crash_reporter_wired.lua:47: boom-xyz
+stack traceback:
+	[C]: in function 'error'
+	...os/tests/unit/infra/logger/test_crash_reporter_wired.lua:47: in function <...os/tests/unit/infra/logger/test_crash_reporter_wired.lua:47>
+	[C]: in function 'xpcall'
+	...macos-webview/static/ergopti_plus/macos/infra/logger.lua:2035: in field 'fn'
+	...cos-webview/static/ergopti_plus/macos/tests/stubs/hs.lua:133: in method 'fire'
+	...os/tests/unit/infra/logger/test_crash_reporter_wired.lua:49: in upvalue 'callback'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:110: in function <...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:108>
+	[C]: in function 'pcall'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in function <...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:74>
+	(...tail calls...)
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:841: in function 'tests.helpers.it'
+	...os/tests/unit/infra/logger/test_crash_reporter_wired.lua:34: in function <...os/tests/unit/infra/logger/test_crash_reporter_wired.lua:33>
+	[C]: in function 'pcall'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...os/tests/unit/infra/logger/test_crash_reporter_wired.lua:33: in main chunk
+	[C]: in function 'require'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in function <...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181>
+	[C]: in function 'pcall'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in field 'measure'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:965: in function 'tests.helpers.measure_module'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in main chunk
+	[C]: in ?
+[logger] unified log write refused: /tmp/lua_VArtEl_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_VArtEl_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.infra.logger.test_crash_reporter_wired","name":"logs an uncaught hs.timer callback error to the errors sink instead of reporting a crash","status":"pass","elapsed_ms":8.212885,"timing_error":""}
+  ok   logs an uncaught hs.timer callback error to the errors sink instead of reporting a crash
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.infra.logger.test_crash_reporter_wired","name":"does not invoke the reporter for a clean timer callback","status":"pass","elapsed_ms":2.437257,"timing_error":""}
+  ok   does not invoke the reporter for a clean timer callback
+[logger] unified log write refused: /tmp/lua_VArtEl_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+
+=== shell_runner: the crash reporter stays reachable for genuine task failures (F-HIGH-5) ===
+2026-11-05 00:53:42:000 [ERROR] [adapters.shell_runner] on_done callback threw for '/bin/echo': ...os/tests/unit/infra/logger/test_crash_reporter_wired.lua:117: task-boom
+stack traceback:
+	[C]: in function 'error'
+	...os/tests/unit/infra/logger/test_crash_reporter_wired.lua:117: in function <...os/tests/unit/infra/logger/test_crash_reporter_wired.lua:117>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...view/static/ergopti_plus/macos/adapters/shell_runner.lua:653: in upvalue '_deliver_business_completion'
+	...view/static/ergopti_plus/macos/adapters/shell_runner.lua:690: in local 'captured_on_done'
+	...os/tests/unit/infra/logger/test_crash_reporter_wired.lua:120: in upvalue 'callback'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:110: in function <...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:108>
+	[C]: in function 'pcall'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in function <...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:74>
+	(...tail calls...)
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:841: in function 'tests.helpers.it'
+	...os/tests/unit/infra/logger/test_crash_reporter_wired.lua:94: in function <...os/tests/unit/infra/logger/test_crash_reporter_wired.lua:93>
+	[C]: in function 'pcall'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...os/tests/unit/infra/logger/test_crash_reporter_wired.lua:93: in main chunk
+	[C]: in function 'require'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in function <...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181>
+	[C]: in function 'pcall'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in field 'measure'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:965: in function 'tests.helpers.measure_module'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in main chunk
+	[C]: in ?
+[logger] errors-only log write refused: /tmp/lua_VArtEl_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.infra.logger.test_crash_reporter_wired","name":"forwards an hs.task callback throw to _G.ergopti_report_crash","status":"pass","elapsed_ms":4.019843,"timing_error":""}
+  ok   forwards an hs.task callback throw to _G.ergopti_report_crash
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.infra.logger.test_crash_reporter_wired","name":"tests.unit.infra.logger.test_crash_reporter_wired","status":"pass","elapsed_ms":15.390717,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  3
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

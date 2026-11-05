@@ -1,0 +1,1 @@
+{"schema":1,"scope":"windows-webview","findings":2,"valid":true,"limitation":"repository workflow validator only admits repository docs/audits/{ahk,hammerspoon}; scratch custom scope validated privately"}

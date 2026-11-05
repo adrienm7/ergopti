@@ -1,0 +1,3 @@
+PASS schema=1 scope=macos-diagnostics SHA/date/report identity exact; confirmed findings empty.
+PASS finalA/finalB:46 commands each,39 Lua modules and596 registered passes each,6 focused Node scripts,1 private actual-owner proof.
+PASS both final canary proofs contain typed-document/daylog cleanup controls; no generated crash JSON retained.

@@ -36,6 +36,52 @@ the field-run step or the hand action that proves it and the commits it confirms
 - [ ] **Windows and Linux:** evaluate equivalents of the macOS bundled App Cloner (isolated application copies and profiles) and Encryptor (file encryption/decryption by drag-and-drop). These are bundled apps, distinct from the shared text and metrics encryption features.
 - [ ] Triage each OS-specific configuration entry, action and greyed menu item in the generated [feature inventory](docs/feature-inventory.md). The recorded reason and equivalent distinguish OS-specific mechanisms from actual product gaps. Recheck runtime and hardware behavior before declaring parity.
 
+## Native runtime, editor and diagnostics parity follow-up
+
+[November 5 audit](docs/audits/platform-parity/2026-11-05-native-ui/report.md): nine bounded OS × module scopes at `3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a`; 15 qualified findings, including one shared frontend root affecting all three OSes. These are source/model/private native-port findings, not 15 native desktop reproductions. [Capability and intentional-difference comparison](docs/audits/platform-parity/2026-11-05-native-ui/capabilities.md). The canonical manifests exclude counterchecked LVB-002 and MRT-005.
+
+### windows-webview
+
+- [ ] **[CODE] WVB-001:** Personal editor save refusal emits invalid JavaScript and leaves Saved visible. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/windows-webview/report.md).
+- [ ] **[CODE] WVB-002:** Hotstring settings replace an unlimited zero delay with the default in the displayed control. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/windows-webview/report.md).
+
+### windows-diagnostics
+
+- [ ] **[CODE] WDG-001:** Both crash worker writers retain truncated canonical JSON after partial write refusal. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/windows-diagnostics/report.md).
+
+### macos-runtime
+
+- [ ] **[CODE] MRT-001:** Approval-watch deadline counts polling intervals rather than elapsed time. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md).
+- [ ] **[CODE] MRT-002:** Refused command watchdog leaves pending installation without its local deadline. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md).
+- [ ] **[CODE] MRT-003:** Malformed cached receipt is accepted by Lua but permanently refused by the Swift install source. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md).
+- [ ] **[CODE] MRT-004:** Advertised reinstall route always refuses an already published runtime needing service recovery. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md).
+- [ ] **[CODE] MRT-006:** False native System Settings opener result is accepted without failure diagnostics. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md).
+
+### macos-webview
+
+- [ ] **[CODE] MVB-001:** Action picker silently drops failed initial data delivery. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-webview/report.md).
+- [ ] **[CODE] MVB-002:** Shortcut auto-close destroys the unsaved draft after a refused hotstring save. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-webview/report.md).
+
+### linux-runtime
+
+- [ ] **[CODE] LRT-001:** First managed install leaves the model browser using stale absence ancestry. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-runtime/report.md).
+
+### linux-webview
+
+- [ ] **[CODE] LVB-001:** Shortcut hotstring auto-close is admitted but never closes its Linux page. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-webview/report.md).
+
+### linux-diagnostics
+
+- [ ] **[CODE] LDG-001:** API diagnostics report and probe the Ollama backend instead of the selected backend. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-diagnostics/report.md).
+- [ ] **[CODE] LDG-002:** Disabled AI becomes unknown in diagnostics and disappears from its export. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-diagnostics/report.md).
+- [ ] **[CODE] LDG-003:** Refused timer admission leaves the configuration diagnostic pending without a completion path. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-diagnostics/report.md).
+
+### Qualification and policy follow-up
+
+- [ ] **[NATIVE]** Exercise the retained runtime/editor/diagnostics receiving boundaries on Windows and macOS, and the Linux live GTK/session flows. Replay refused writes, native timer admission, stale epochs and physical cleanup; the private models do not certify these boundaries.
+- [ ] **[POLICY] macOS local crash reports:** clarify raw local error/stack retention versus the existing no-PII comment; Windows explicitly keeps full local crash detail and Linux redacts before persistence. Shared exported diagnostics and day logs pass the canary control. No network disclosure or mandatory identical local retention policy is established.
+- [ ] **[COVERAGE] Windows managed-runtime fixture:** update or retire the unregistered legacy direct-child bootstrap fixture; the registered current fixture correctly uses the nested managed path. Do not treat the old fixture as a product install failure.
+
 ## Migration and update parity follow-up
 
 Evidence: [six-scope recovery/lifecycle audit](docs/audits/platform-parity/2026-11-04-recovery/report.md). These 17 OS manifestations include shared causes; keep intentional platform policies and all current refusal guards.

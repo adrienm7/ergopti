@@ -1,0 +1,48 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_permissions"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_permissions
+
+=== healthcheck: macOS privacy permissions ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_permissions","name":"the collector's ids are the schema's, in its order","status":"pass","elapsed_ms":11.039087,"timing_error":""}
+  ok   the collector's ids are the schema's, in its order
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_permissions","name":"reports a missing Screen Recording grant without prompting","status":"pass","elapsed_ms":4.732304,"timing_error":""}
+  ok   reports a missing Screen Recording grant without prompting
+2026-11-05 00:52:55:000 [WARNING] [healthcheck] The accessibility permission could not be read: ax down.
+[logger] unified log write refused: /tmp/lua_24rZQ2_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_24rZQ2_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+2026-11-05 00:52:55:000 [WARNING] [healthcheck] The screen_recording permission could not be read: tcc down.
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_permissions","name":"reports a failed query as unknown","status":"pass","elapsed_ms":6.413234,"timing_error":""}
+  ok   reports a failed query as unknown
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_permissions","name":"never claims Input Monitoring: Hammerspoon cannot ask without prompting","status":"pass","elapsed_ms":4.846225,"timing_error":""}
+  ok   never claims Input Monitoring: Hammerspoon cannot ask without prompting
+
+=== healthcheck: remap approval state ===
+2026-11-05 00:52:55:000 [WARNING] [healthcheck] Diagnostics could not read the CapsLock state: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:263: ...webview/static/ergopti_plus/macos/adapters/key_state.lua:259: hs.hid.capslock.get is unavailable.
+[logger] unified log write refused: /tmp/lua_24rZQ2_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_24rZQ2_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_permissions","name":"reports a helper that requires Login Items approval as missing","status":"pass","elapsed_ms":37.656805,"timing_error":""}
+  ok   reports a helper that requires Login Items approval as missing
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_permissions","name":"reports an approved helper as granted","status":"pass","elapsed_ms":5.166887,"timing_error":""}
+  ok   reports an approved helper as granted
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_permissions","name":"reports an unavailable helper as unavailable, not as unknown","status":"pass","elapsed_ms":4.808228,"timing_error":""}
+  ok   reports an unavailable helper as unavailable, not as unknown
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_permissions","name":"reports the helper as not used while Ergopti does not use Karabiner","status":"pass","elapsed_ms":7.445478,"timing_error":""}
+  ok   reports the helper as not used while Ergopti does not use Karabiner
+2026-11-05 00:52:55:000 [WARNING] [healthcheck] Diagnostics could not read the permission login_items: ...sts/unit/ui/healthcheck/test_healthcheck_permissions.lua:46: not initialised.
+[logger] unified log write refused: /tmp/lua_24rZQ2_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_24rZQ2_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+2026-11-05 00:52:55:000 [WARNING] [healthcheck] Diagnostics could not read the CapsLock state: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:263: ...webview/static/ergopti_plus/macos/adapters/key_state.lua:259: hs.hid.capslock.get is unavailable.
+2026-11-05 00:52:55:000 [WARNING] [healthcheck] Diagnostics could not read the remapping lease: ...sts/unit/ui/healthcheck/test_healthcheck_permissions.lua:38: not initialised.
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_permissions","name":"degrades to unknown when the lease cannot be read","status":"pass","elapsed_ms":41.791720,"timing_error":""}
+  ok   degrades to unknown when the lease cannot be read
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_permissions","name":"tests.unit.ui.healthcheck.test_healthcheck_permissions","status":"pass","elapsed_ms":124.316944,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  9
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

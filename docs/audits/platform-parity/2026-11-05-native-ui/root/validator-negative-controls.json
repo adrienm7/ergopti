@@ -1,0 +1,130 @@
+{
+	"baseline": "PASS metadata: 9 scopes, 15 canonical unique IDs, 28 capability rows; source/TODO/dispositions/evidence confinement/encoding/rendered table/links.\nRevision-pinned artifact validation only; no native, exhaustiveness or current-runtime certification.",
+	"mutation_scope": "Parser/text return values only; no real files changed",
+	"controls": [
+		{
+			"case": "invalid-source-identity",
+			"refused": true
+		},
+		{
+			"case": "wrong-revision-even-if-well-formed",
+			"refused": true
+		},
+		{
+			"case": "wrong-campaign-date",
+			"refused": true
+		},
+		{
+			"case": "duplicate-os-module-scope",
+			"refused": true
+		},
+		{
+			"case": "manifest-id-missing-from-authoritative-index",
+			"refused": true
+		},
+		{
+			"case": "duplicate-finding-id",
+			"refused": true
+		},
+		{
+			"case": "invalid-severity",
+			"refused": true
+		},
+		{
+			"case": "invalid-confidence",
+			"refused": true
+		},
+		{
+			"case": "empty-root-cause",
+			"refused": true
+		},
+		{
+			"case": "unknown-guarantee",
+			"refused": true
+		},
+		{
+			"case": "duplicate-guarantee",
+			"refused": true
+		},
+		{
+			"case": "malformed-additional-properties",
+			"refused": true
+		},
+		{
+			"case": "unclassified-additional-property",
+			"refused": true
+		},
+		{
+			"case": "missing-native-limits",
+			"refused": true
+		},
+		{
+			"case": "wrong-source-report",
+			"refused": true
+		},
+		{
+			"case": "missing-evidence-list",
+			"refused": true
+		},
+		{
+			"case": "missing-evidence-file",
+			"refused": true
+		},
+		{
+			"case": "evidence-parent-escape",
+			"refused": true
+		},
+		{
+			"case": "evidence-absolute-escape",
+			"refused": true
+		},
+		{
+			"case": "evidence-unportable-backslash",
+			"refused": true
+		},
+		{
+			"case": "evidence-path-duplicate",
+			"refused": true
+		},
+		{
+			"case": "excluded-disposition-LVB-002",
+			"refused": true
+		},
+		{
+			"case": "excluded-disposition-MRT-005",
+			"refused": true
+		},
+		{
+			"case": "missing-capability-evidence-report",
+			"refused": true
+		},
+		{
+			"case": "capability-revision-mismatch",
+			"refused": true
+		},
+		{
+			"case": "shared-group-foreign-id",
+			"refused": true
+		},
+		{
+			"case": "canonical-id-missing-from-todo",
+			"refused": true
+		},
+		{
+			"case": "missing-report-source-sha",
+			"refused": true
+		},
+		{
+			"case": "markdown-local-path-escape",
+			"refused": true
+		},
+		{
+			"case": "rendered-capabilities-stale",
+			"refused": true
+		},
+		{
+			"case": "canonical-ids-authoritative-zero-findings-allowed",
+			"refused": false
+		}
+	]
+}

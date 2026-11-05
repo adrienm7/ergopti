@@ -1,0 +1,6 @@
+cas_autoclose: actual_host_mode=shortcut auto_close=true messages=save,close CAS_calls=1 errors=2 notifications=1 native_delete_requested=true draft_restored_on_reopen=false reloads=0
+write_autoclose: actual_host_mode=shortcut auto_close=true messages=save,close CAS_calls=1 errors=2 notifications=1 native_delete_requested=true draft_restored_on_reopen=false reloads=0
+healthy_autoclose: actual_host_mode=shortcut auto_close=true messages=save,close CAS_calls=1 errors=0 notifications=0 native_delete_requested=true draft_restored_on_reopen=true reloads=1
+cas_no_autoclose: actual_host_mode=shortcut auto_close=false messages=save CAS_calls=1 errors=2 notifications=1 native_delete_requested=false page_draft_retained=true reloads=0
+cas_menu: actual_host_mode=menu auto_close=true messages=save CAS_calls=1 errors=2 notifications=1 native_delete_requested=false page_draft_retained=true reloads=0
+actual production JS saveEntry/persist/toLua and public macOS editor+real parser/writer; private real-file CAS boundary; native WebKit receiving not exercised

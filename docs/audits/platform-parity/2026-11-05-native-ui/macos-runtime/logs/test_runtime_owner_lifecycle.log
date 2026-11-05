@@ -1,0 +1,72 @@
+Selecting exact test module: "tests/unit/platform/remap/runtime_owner/test_runtime_owner_lifecycle.lua"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle
+
+=== owned runtime owner: the capture request ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"refuses a request before admission and starts nothing","status":"pass","elapsed_ms":0.870410,"timing_error":""}
+  ok   refuses a request before admission and starts nothing
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"refuses a request after an unavailable admission","status":"pass","elapsed_ms":0.479902,"timing_error":""}
+  ok   refuses a request after an unavailable admission
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"does not start the capture while the owned configuration is missing","status":"pass","elapsed_ms":0.551139,"timing_error":""}
+  ok   does not start the capture while the owned configuration is missing
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"requests the pinned capture once and spawns no process of its own","status":"pass","elapsed_ms":0.699863,"timing_error":""}
+  ok   requests the pinned capture once and spawns no process of its own
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"is ready only once the capture admits its first stream","status":"pass","elapsed_ms":1.407738,"timing_error":""}
+  ok   is ready only once the capture admits its first stream
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"is idempotent once ready and shares one start between callers","status":"pass","elapsed_ms":0.732863,"timing_error":""}
+  ok   is idempotent once ready and shares one start between callers
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"fails without a retry when the capture refuses to start","status":"pass","elapsed_ms":0.664880,"timing_error":""}
+  ok   fails without a retry when the capture refuses to start
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"fails once, and revokes the capture, when no stream is admitted in time","status":"pass","elapsed_ms":0.774225,"timing_error":""}
+  ok   fails once, and revokes the capture, when no stream is admitted in time
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"fails when the capture ends before it admitted a stream","status":"pass","elapsed_ms":0.431619,"timing_error":""}
+  ok   fails when the capture ends before it admitted a stream
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"treats an unreadable capture status as a lost capture, never as progress","status":"pass","elapsed_ms":0.641496,"timing_error":""}
+  ok   treats an unreadable capture status as a lost capture, never as progress
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"fails and revokes the capture when the readiness check cannot be scheduled","status":"pass","elapsed_ms":0.559161,"timing_error":""}
+  ok   fails and revokes the capture when the readiness check cannot be scheduled
+
+=== owned runtime owner: a lost capture ===
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"reports the loss once, revokes the capture and never restarts by itself","status":"pass","elapsed_ms":0.645221,"timing_error":""}
+  ok   reports the loss once, revokes the capture and never restarts by itself
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"answers the waiting callers with the loss when it happens before readiness","status":"pass","elapsed_ms":0.888637,"timing_error":""}
+  ok   answers the waiting callers with the loss when it happens before readiness
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"ignores a loss report while nothing was started, after a stop and after a release","status":"pass","elapsed_ms":0.581835,"timing_error":""}
+  ok   ignores a loss report while nothing was started, after a stop and after a release
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"refuses a new admission while the lost capture is retained","status":"pass","elapsed_ms":1.176991,"timing_error":""}
+  ok   refuses a new admission while the lost capture is retained
+
+=== owned runtime owner: stop ===
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"stops the capture and settles only when it is observed settled","status":"pass","elapsed_ms":0.530048,"timing_error":""}
+  ok   stops the capture and settles only when it is observed settled
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"retries the same capture while its stop is pending and never starts another","status":"pass","elapsed_ms":0.445480,"timing_error":""}
+  ok   retries the same capture while its stop is pending and never starts another
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"cancels the readiness poll and answers the waiting callers","status":"pass","elapsed_ms":0.579131,"timing_error":""}
+  ok   cancels the readiness poll and answers the waiting callers
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"settles at once when nothing was started","status":"pass","elapsed_ms":0.528815,"timing_error":""}
+  ok   settles at once when nothing was started
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"is idempotent once stopped and never calls the observer twice","status":"pass","elapsed_ms":0.519972,"timing_error":""}
+  ok   is idempotent once stopped and never calls the observer twice
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"refuses a second, different stop observer while one is pending","status":"pass","elapsed_ms":0.696609,"timing_error":""}
+  ok   refuses a second, different stop observer while one is pending
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"restarts only on request, through a settled stop, and asks the capture port again","status":"pass","elapsed_ms":0.444418,"timing_error":""}
+  ok   restarts only on request, through a settled stop, and asks the capture port again
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"names the capture port's refusal of a second capture in one Lua VM instead of hiding it","status":"pass","elapsed_ms":0.547043,"timing_error":""}
+  ok   names the capture port's refusal of a second capture in one Lua VM instead of hiding it
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"refuses a restart while the previous stop is pending","status":"pass","elapsed_ms":0.588405,"timing_error":""}
+  ok   refuses a restart while the previous stop is pending
+
+=== owned runtime owner: release ===
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"refuses while a capture is retained and allows a new binding after the stop","status":"pass","elapsed_ms":0.458620,"timing_error":""}
+  ok   refuses while a capture is retained and allows a new binding after the stop
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","status":"pass","elapsed_ms":17.409305,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  25
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

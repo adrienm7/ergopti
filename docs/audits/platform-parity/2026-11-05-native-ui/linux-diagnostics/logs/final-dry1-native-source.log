@@ -1,0 +1,27 @@
+PASS native diagnostic stamp regular
+PASS native diagnostic stamp file-link
+PASS native diagnostic stamp fifo
+PASS native diagnostic stamp fifo-link
+PASS native diagnostic stamp fifo-peer
+PASS native diagnostic stamp directory
+PASS native diagnostic stamp socket
+PASS native diagnostic stamp missing
+PASS native diagnostic head regular
+PASS native diagnostic head file-link
+PASS native diagnostic head fifo
+PASS native diagnostic head fifo-link
+PASS native diagnostic head fifo-peer
+PASS native diagnostic head directory
+PASS native diagnostic head socket
+PASS native diagnostic head missing
+PASS native diagnostic pointer regular
+PASS native diagnostic pointer file-link
+PASS native diagnostic pointer fifo
+PASS native diagnostic pointer fifo-link
+PASS native diagnostic pointer fifo-peer
+PASS native diagnostic pointer directory
+PASS native diagnostic pointer socket
+PASS native diagnostic pointer missing
+PASS native diagnostic pid
+PASS native diagnostic facts
+Native diagnostic sources: 26 checks, 0 failures

@@ -1,0 +1,136 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_report_issue"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_report_issue
+
+=== macOS diagnostics native opener completion (macos-opener-terminal) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"refuses a throwing timing reader before constructing a native capability","status":"pass","elapsed_ms":6.427612,"timing_error":""}
+  ok   refuses a throwing timing reader before constructing a native capability
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"receives exit 23 instead of acknowledging start","status":"pass","elapsed_ms":7.412217,"timing_error":""}
+  ok   receives exit 23 instead of acknowledging start
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"admits the canonical deadline before starting the native opener","status":"pass","elapsed_ms":5.762695,"timing_error":""}
+  ok   admits the canonical deadline before starting the native opener
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"cancel fences completion while retaining pending native retirement","status":"pass","elapsed_ms":6.290165,"timing_error":""}
+  ok   cancel fences completion while retaining pending native retirement
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"independent current owners retain both concurrent opener children","status":"pass","elapsed_ms":5.602395,"timing_error":""}
+  ok   independent current owners retain both concurrent opener children
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"cancelling one concurrent opener cannot cancel its independent sibling","status":"pass","elapsed_ms":6.068173,"timing_error":""}
+  ok   cancelling one concurrent opener cannot cancel its independent sibling
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"an inline terminal followed by start throw logs once without a second outcome","status":"pass","elapsed_ms":5.428043,"timing_error":""}
+  ok   an inline terminal followed by start throw logs once without a second outcome
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"native opener admission refuses without hanging: timer_refuse","status":"pass","elapsed_ms":5.841223,"timing_error":""}
+  ok   native opener admission refuses without hanging: timer_refuse
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"native opener admission refuses without hanging: timer_throw","status":"pass","elapsed_ms":6.080040,"timing_error":""}
+  ok   native opener admission refuses without hanging: timer_throw
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"native opener admission refuses without hanging: construct_refuse","status":"pass","elapsed_ms":6.241653,"timing_error":""}
+  ok   native opener admission refuses without hanging: construct_refuse
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"native opener admission refuses without hanging: construct_throw","status":"pass","elapsed_ms":5.731107,"timing_error":""}
+  ok   native opener admission refuses without hanging: construct_throw
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"native opener admission refuses without hanging: start_refuse","status":"pass","elapsed_ms":8.391565,"timing_error":""}
+  ok   native opener admission refuses without hanging: start_refuse
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"native opener admission refuses without hanging: start_throw","status":"pass","elapsed_ms":5.178029,"timing_error":""}
+  ok   native opener admission refuses without hanging: start_throw
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"deadline exists before native start and uses the shared timing","status":"pass","elapsed_ms":5.663897,"timing_error":""}
+  ok   deadline exists before native start and uses the shared timing
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"timer admission reentry cannot start a retired owner's opener","status":"pass","elapsed_ms":5.946151,"timing_error":""}
+  ok   timer admission reentry cannot start a retired owner's opener
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"a duplicate child terminal cannot acknowledge twice","status":"pass","elapsed_ms":5.569506,"timing_error":""}
+  ok   a duplicate child terminal cannot acknowledge twice
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"retained cleanup retries only a retired child and preserves its successor","status":"pass","elapsed_ms":5.739710,"timing_error":""}
+  ok   retained cleanup retries only a retired child and preserves its successor
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"a timed-out reveal with pending retirement never opens the browser","status":"pass","elapsed_ms":24.325480,"timing_error":""}
+  ok   a timed-out reveal with pending retirement never opens the browser
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"report waits for reveal terminal and preserves its warning-only refusal","status":"pass","elapsed_ms":22.244072,"timing_error":""}
+  ok   report waits for reveal terminal and preserves its warning-only refusal
+
+=== native opener fixture restoration ===
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"restores exact native modules and global state after an assertion throws","status":"pass","elapsed_ms":4.654214,"timing_error":""}
+  ok   restores exact native modules and global state after an assertion throws
+
+=== healthcheck page actions (report-bug-flow) ===
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"report copies, then opens the bug form with the whole report, all redacted (report-bug-flow)","status":"pass","elapsed_ms":129.217959,"timing_error":""}
+  ok   report copies, then opens the bug form with the whole report, all redacted (report-bug-flow)
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"report saves its attachment and opens the browser last (report-focus)","status":"pass","elapsed_ms":82.795146,"timing_error":""}
+  ok   report saves its attachment and opens the browser last (report-focus)
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"report cuts a long report in the URL and keeps it whole in the clipboard (report-bug-flow)","status":"pass","elapsed_ms":218.098974,"timing_error":""}
+  ok   report cuts a long report in the URL and keeps it whole in the clipboard (report-bug-flow)
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"report stops before the browser when the clipboard refuses (report-bug-flow)","status":"pass","elapsed_ms":90.484458,"timing_error":""}
+  ok   report stops before the browser when the clipboard refuses (report-bug-flow)
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"save writes the redacted report under the diagnostics folder and reveals it","status":"pass","elapsed_ms":67.735871,"timing_error":""}
+  ok   save writes the redacted report under the diagnostics folder and reveals it
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"open_path opens the folder the host collected, creating it first","status":"pass","elapsed_ms":18.422585,"timing_error":""}
+  ok   open_path opens the folder the host collected, creating it first
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"open_path refuses a field the snapshot has no value for","status":"pass","elapsed_ms":19.281743,"timing_error":""}
+  ok   open_path refuses a field the snapshot has no value for
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"open_path on a file not created yet says so, without an error (open-missing-file)","status":"pass","elapsed_ms":20.051437,"timing_error":""}
+  ok   open_path on a file not created yet says so, without an error (open-missing-file)
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"open_settings opens the page the schema declares","status":"pass","elapsed_ms":20.337215,"timing_error":""}
+  ok   open_settings opens the page the schema declares
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"refuses to redact without the home folder (report-bug-flow)","status":"pass","elapsed_ms":2.714538,"timing_error":""}
+  ok   refuses to redact without the home folder (report-bug-flow)
+
+=== healthcheck debug menu reports (report-bug-flow) ===
+# lua_timing {"schema":1,"driver":"macos","id":32,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"Report a bug copies, saves and opens the prefilled bug form (menu-report-bug)","status":"pass","elapsed_ms":68.048690,"timing_error":""}
+  ok   Report a bug copies, saves and opens the prefilled bug form (menu-report-bug)
+# lua_timing {"schema":1,"driver":"macos","id":33,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"Report a bug notifies instead of opening the form when the clipboard refuses (menu-report-bug)","status":"pass","elapsed_ms":19.372679,"timing_error":""}
+  ok   Report a bug notifies instead of opening the form when the clipboard refuses (menu-report-bug)
+# lua_timing {"schema":1,"driver":"macos","id":34,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"Suggest a feature opens the feature form with the version and the system","status":"pass","elapsed_ms":36.834135,"timing_error":""}
+  ok   Suggest a feature opens the feature form with the version and the system
+
+=== closed diagnostic sharing corpus ===
+# lua_timing {"schema":1,"driver":"macos","id":35,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"excludes synthetic private fields on all driver snapshots","status":"pass","elapsed_ms":25.404698,"timing_error":""}
+  ok   excludes synthetic private fields on all driver snapshots
+
+=== English attachment export boundaries ===
+# lua_timing {"schema":1,"driver":"macos","id":36,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"does not consult localized labels or copy free private fields","status":"pass","elapsed_ms":17.148947,"timing_error":""}
+  ok   does not consult localized labels or copy free private fields
+# lua_timing {"schema":1,"driver":"macos","id":37,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"retains clipboard and refuses browser when attachment save fails","status":"pass","elapsed_ms":76.392161,"timing_error":""}
+  ok   retains clipboard and refuses browser when attachment save fails
+# lua_timing {"schema":1,"driver":"macos","id":38,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"browser refusal never claims successful report after saving attachment","status":"pass","elapsed_ms":67.946486,"timing_error":""}
+  ok   browser refusal never claims successful report after saving attachment
+
+=== default attachment completion ===
+# lua_timing {"schema":1,"driver":"macos","id":39,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"requires write and close acknowledgement before reveal or browser","status":"pass","elapsed_ms":78.562893,"timing_error":""}
+  ok   requires write and close acknowledgement before reveal or browser
+
+=== stable-metadata report URL ===
+# lua_timing {"schema":1,"driver":"macos","id":40,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"stable-metadata report URL keeps complete output local and rejects page-derived query fields","status":"pass","elapsed_ms":104.722984,"timing_error":""}
+  ok   stable-metadata report URL keeps complete output local and rejects page-derived query fields
+
+=== retained installed-page observations ===
+# lua_timing {"schema":1,"driver":"macos","id":41,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"keeps useful page outcomes without qualifying suites and refuses stale identity","status":"pass","elapsed_ms":18.163918,"timing_error":""}
+  ok   keeps useful page outcomes without qualifying suites and refuses stale identity
+
+=== closed recent error facts ===
+# lua_timing {"schema":1,"driver":"macos","id":42,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"keeps observed technical failure codes and excludes every private message","status":"pass","elapsed_ms":44.249246,"timing_error":""}
+  ok   keeps observed technical failure codes and excludes every private message
+
+=== redaction context carries the configuration directory (config-dir-masking) ===
+# lua_timing {"schema":1,"driver":"macos","id":43,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"a hotstring pack name under the configuration directory never reaches a report (config-dir-masking)","status":"pass","elapsed_ms":21.071715,"timing_error":""}
+  ok   a hotstring pack name under the configuration directory never reaches a report (config-dir-masking)
+
+=== opt-in day log in the report actions (day-log-host) ===
+# lua_timing {"schema":1,"driver":"macos","id":44,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"collecting redacts the log, keeps its text away from the snapshot and records only the closed record (day-log-host)","status":"pass","elapsed_ms":19.624818,"timing_error":""}
+  ok   collecting redacts the log, keeps its text away from the snapshot and records only the closed record (day-log-host)
+# lua_timing {"schema":1,"driver":"macos","id":45,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"a log over the cap, an empty one and a missing one are refused with their reason (day-log-host)","status":"pass","elapsed_ms":17.674735,"timing_error":""}
+  ok   a log over the cap, an empty one and a missing one are refused with their reason (day-log-host)
+# lua_timing {"schema":1,"driver":"macos","id":46,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"save writes the log first, then the report, and the report records the log (day-log-host)","status":"pass","elapsed_ms":22.454448,"timing_error":""}
+  ok   save writes the log first, then the report, and the report records the log (day-log-host)
+# lua_timing {"schema":1,"driver":"macos","id":47,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"without the flag nothing about the log is saved or recorded, even when it was prepared (day-log-host)","status":"pass","elapsed_ms":21.036603,"timing_error":""}
+  ok   without the flag nothing about the log is saved or recorded, even when it was prepared (day-log-host)
+# lua_timing {"schema":1,"driver":"macos","id":48,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"copy never carries the log and an unprepared log is refused before any file is written (day-log-host)","status":"pass","elapsed_ms":39.502844,"timing_error":""}
+  ok   copy never carries the log and an unprepared log is refused before any file is written (day-log-host)
+# lua_timing {"schema":1,"driver":"macos","id":49,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"a collection prepared for another snapshot is never saved (day-log-host)","status":"pass","elapsed_ms":17.966952,"timing_error":""}
+  ok   a collection prepared for another snapshot is never saved (day-log-host)
+# lua_timing {"schema":1,"driver":"macos","id":50,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"reading the file distinguishes missing, unreadable, too large and read (day-log-host)","status":"pass","elapsed_ms":0.018228,"timing_error":""}
+  ok   reading the file distinguishes missing, unreadable, too large and read (day-log-host)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","name":"tests.unit.ui.healthcheck.test_healthcheck_report_issue","status":"pass","elapsed_ms":1543.500579,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  49
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

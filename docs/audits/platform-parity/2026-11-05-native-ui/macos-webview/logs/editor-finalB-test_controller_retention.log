@@ -1,0 +1,28 @@
+Selecting exact test module: "tests.unit.ui.action_picker.lifecycle.test_controller_retention"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.action_picker.lifecycle.test_controller_retention
+
+=== action picker bounds retained native controllers ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_retention","name":"retains only one UCC across six explicit close cycles","status":"pass","elapsed_ms":1.976320,"timing_error":""}
+  ok   retains only one UCC across six explicit close cycles
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_retention","name":"retains only one UCC across six user close cycles","status":"pass","elapsed_ms":2.014446,"timing_error":""}
+  ok   retains only one UCC across six user close cycles
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_retention","name":"keeps healthy ready and confirmation while removing its callback","status":"pass","elapsed_ms":1.716008,"timing_error":""}
+  ok   keeps healthy ready and confirmation while removing its callback
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_retention","name":"rejects an old native page after the controller is rebound to B","status":"pass","elapsed_ms":1.272507,"timing_error":""}
+  ok   rejects an old native page after the controller is rebound to B
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_retention","name":"retains nil-applied-then-throw debt and reuses only after acknowledgement","status":"pass","elapsed_ms":2.282980,"timing_error":""}
+  ok   retains nil-applied-then-throw debt and reuses only after acknowledgement
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_retention","name":"releases the real picker's private confirmation owner after native-shaped disposal","status":"pass","elapsed_ms":3.816370,"timing_error":""}
+  ok   releases the real picker's private confirmation owner after native-shaped disposal
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.action_picker.lifecycle.test_controller_retention","name":"tests.unit.ui.action_picker.lifecycle.test_controller_retention","status":"pass","elapsed_ms":14.089424,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  6
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

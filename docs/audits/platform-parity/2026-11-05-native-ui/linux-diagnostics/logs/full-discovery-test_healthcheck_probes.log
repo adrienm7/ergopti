@@ -1,0 +1,13 @@
+
+=== diagnostics probes (linux) ===
+  ok   reads GitHub's rate limit under the probe's own owner
+  ok   reads the free space from one asynchronous df and starts no kanata (owned-runtimes-kanata-probe)
+  ok   answers unsupported without libuv rather than blocking the loop
+  ok   reads the processor load and the daemon's share from two /proc samples (system-load)
+  ok   computes the shares from the /proc fields, whatever the command name (system-load)
+  ok   reports unreadable /proc files as an error, not a load of zero (system-load)
+  ok   a cancelled run publishes nothing and stops its requests and children
+  ok   judges the desktop's PAC like the managed download without reporting its URL
+  ok   asks no gsettings outside GNOME and answers that no PAC is configured
+  ok   names the failing PAC step and answers when no PAC is configured
+AUDIT_TEST_RESULT	10	0

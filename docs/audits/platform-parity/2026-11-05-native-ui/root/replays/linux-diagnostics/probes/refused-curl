@@ -1,0 +1,4 @@
+#!/bin/sh
+cat >/dev/null
+printf '%s\n' '{}' 'ERGOPTI_HTTP_STATUS:503'
+exit 22

@@ -1,0 +1,38 @@
+
+=== native shared LLM loader sources ===
+  ok   shared-loader-source local_servers.json regular
+  ok   shared-loader-source local_servers.json symlink
+  ok   shared-loader-source local_servers.json fifo
+  ok   shared-loader-source local_servers.json symlink-fifo
+  ok   shared-loader-source local_servers.json eacces
+  ok   shared-loader-source local_servers.json directory
+  ok   shared-loader-source local_servers.json close-refusal
+  ok   shared-loader-source api_providers.json regular
+  ok   shared-loader-source api_providers.json symlink
+  ok   shared-loader-source api_providers.json fifo
+  ok   shared-loader-source api_providers.json symlink-fifo
+  ok   shared-loader-source api_providers.json eacces
+  ok   shared-loader-source api_providers.json directory
+  ok   shared-loader-source api_providers.json close-refusal
+  ok   shared-loader-source managed_ollama_environment.json regular
+  ok   shared-loader-source managed_ollama_environment.json symlink
+  ok   shared-loader-source managed_ollama_environment.json fifo
+  ok   shared-loader-source managed_ollama_environment.json symlink-fifo
+  ok   shared-loader-source managed_ollama_environment.json eacces
+  ok   shared-loader-source managed_ollama_environment.json directory
+  ok   shared-loader-source managed_ollama_environment.json close-refusal
+  ok   shared-loader-source models.json regular
+  ok   shared-loader-source models.json symlink
+  ok   shared-loader-source models.json fifo
+  ok   shared-loader-source models.json symlink-fifo
+  ok   shared-loader-source models.json eacces
+  ok   shared-loader-source models.json directory
+  ok   shared-loader-source models.json close-refusal
+  ok   shared-loader-source inference.json regular
+  ok   shared-loader-source inference.json symlink
+  ok   shared-loader-source inference.json fifo
+  ok   shared-loader-source inference.json symlink-fifo
+  ok   shared-loader-source inference.json eacces
+  ok   shared-loader-source inference.json directory
+  ok   shared-loader-source inference.json close-refusal
+AUDIT_TEST_RESULT	35	0

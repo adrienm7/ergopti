@@ -1,0 +1,4 @@
+#!/bin/sh
+cat >/dev/null
+printf '%s\n' '{"version":"synthetic","resources":{"core":{"remaining":1,"limit":60}}}' 'ERGOPTI_HTTP_STATUS:200'
+exit 18

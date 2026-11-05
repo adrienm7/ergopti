@@ -1,0 +1,2 @@
+[OK] complete 10003-path, 1470069-byte real inventory; old reader ENOBUFS
+[OK] empty, Unicode/space names, newline Git tree, untracked policy, refusal and cleanup

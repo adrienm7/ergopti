@@ -1,0 +1,20 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_unavailable"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_unavailable
+
+=== healthcheck: unavailable features (macOS) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_unavailable","name":"lists explained and silent absences, sorted, with their platforms","status":"pass","elapsed_ms":5.121636,"timing_error":""}
+  ok   lists explained and silent absences, sorted, with their platforms
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_unavailable","name":"refuses a platform code it cannot name","status":"pass","elapsed_ms":3.761175,"timing_error":""}
+  ok   refuses a platform code it cannot name
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_unavailable","name":"tests.unit.ui.healthcheck.test_healthcheck_unavailable","status":"pass","elapsed_ms":9.022080,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  2
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

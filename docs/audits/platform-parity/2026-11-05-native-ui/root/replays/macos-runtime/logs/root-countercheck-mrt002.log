@@ -1,0 +1,3 @@
+BEFORE native completion: actual ShellRunner+TimerScheduler+FieldCheckPorts+Install, tasks=1 answers=0 signals=0 scheduler_errors=1
+AFTER natural role and activation completion: answers=2 success=true live_task_pins=0; duplicate answer ignored
+PASS timer refusal removes local deadline but does not prevent eventual actual ShellRunner callback settlement

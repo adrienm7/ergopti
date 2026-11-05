@@ -1,0 +1,10 @@
+  ok   rejected false sync close cannot settle or borrow fresh admission
+  ok   rejected false delayed close cannot settle or borrow fresh admission
+  ok   rejected nil-error sync close cannot settle or borrow fresh admission
+  ok   rejected nil-error delayed close cannot settle or borrow fresh admission
+  ok   rejected exception sync close cannot settle or borrow fresh admission
+  ok   rejected exception delayed close cannot settle or borrow fresh admission
+  ok   accepted synchronous native close ACK retires without a lost callback
+  ok   nil close needs independent native closing transition and exact ACK
+  ok   nil close without native transition cannot borrow synchronous ACK
+AUDIT_TEST_RESULT	9	0

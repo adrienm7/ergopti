@@ -1,0 +1,140 @@
+PASS parser static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1
+PASS parser static/ergopti_plus/windows/modules/llm/ollama_download_archive.ps1
+PASS parser static/ergopti_plus/windows/modules/llm/ollama_managed_acquisition.ps1
+PASS parser static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1
+PASS parser static/ergopti_plus/windows/modules/llm/ollama-model-pull.ps1
+PASS parser static/ergopti_plus/windows/vendor/ergopti_uninstall.ps1
+PASS genuine ZIP namespace portable refused=False
+PASS genuine ZIP namespace traversal refused=True
+PASS genuine ZIP namespace ads refused=True
+PASS genuine ZIP namespace rooted refused=True
+PASS genuine ZIP namespace device refused=True
+PASS genuine ZIP namespace collision refused=True
+PASS genuine ZIP namespace trailing-dot refused=True
+PASS genuine ZIP namespace receipt-collision refused=True
+PASS genuine ZIP namespace directory-cli refused=True
+PASS genuine ZIP namespace symlink refused=True
+PASS genuine ZIP namespace file-ancestor-cli refused=True
+PASS genuine ZIP namespace file-ancestor-library refused=True
+PASS genuine ZIP namespace file-ancestor-reverse refused=True
+PASS genuine ZIP namespace file-ancestor-case refused=True
+PASS genuine ZIP namespace prepared-receipt-descendant refused=True
+PASS genuine ZIP namespace owner-receipt-descendant refused=True
+PASS genuine private-file create-only, exact hash, cursor preservation, JSON reset
+RESULT 17 passed; native Windows functions NOT invoked
+{
+  "pass": 2,
+  "source_count": 19,
+  "sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+  "reviewed_phases": [
+    "public install and AI-enable admission",
+    "captured source and archive auth",
+    "nested parent/ancestor ACL and handle custody",
+    "ZIP complete namespace",
+    "prepare and creation WAL",
+    "immutable publish and target revalidation",
+    "foreground launch and listener lineage",
+    "pull observer versus launcher leases",
+    "cancel/reload retirement",
+    "application uninstall retention"
+  ],
+  "new_confirmed_findings": 0,
+  "native_windows_executed": false,
+  "sources": [
+    {
+      "path": "static/ergopti_plus/windows/ui/menu/menu_llm/enable_admission.ahk",
+      "sha256": "8fe47e018338d1838ff3a85845a1f06bd1a62ba85acd44051f36adfcbe364aa6",
+      "bytes": 9822
+    },
+    {
+      "path": "static/ergopti_plus/windows/ui/menu/menu_llm/backend_lifecycle.ahk",
+      "sha256": "6ff37facc45c89fc3ea779004c1d06ddc17d369bfdccfe2dd3491b1dff38c962",
+      "bytes": 10529
+    },
+    {
+      "path": "static/ergopti_plus/windows/ui/model_browser/init.ahk",
+      "sha256": "dbdb54d9c314c885ac796c6532ad2fb29bde669f97ddb65561542c95f0b538ee",
+      "bytes": 52431
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/llm/ollama_deps_checker.ahk",
+      "sha256": "6180c2c89e83a103207c5c83ebe344206bab6c60da22c977e6b53dc00612bfab",
+      "bytes": 12879
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/llm/ollama_managed_bootstrap.ahk",
+      "sha256": "c2580fca1da1738b7fd92412e69ec2d05b359ac92e2e5cbc0deb1898d17a3b99",
+      "bytes": 52317
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/llm/ollama_runtime_owner.ahk",
+      "sha256": "8fdad3e297b19f66b80283edb1710af1936aa594ef1ac64d49ecf336f82ad5d5",
+      "bytes": 21422
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/llm/ollama_install_files_port.ahk",
+      "sha256": "4c5bf56a5ac22ed50cad886fe00ab252bb70178201a315913db55358cd3a8ee1",
+      "bytes": 13705
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1",
+      "sha256": "4580e61456f6680e68bd2b4f30b28787f54505174c7bd95502a5d171882043e8",
+      "bytes": 60084
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/llm/ollama_download_archive.ps1",
+      "sha256": "4e79e1e1e53acfc3d6c40322942ed741303cb0ae9bc67a9fec950e46a13d869b",
+      "bytes": 8563
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/llm/ollama_managed_acquisition.ps1",
+      "sha256": "fcf505710fe63c2727b3f1018e3544c6a444417e2cf26ebb121e13972144074a",
+      "bytes": 7161
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1",
+      "sha256": "1f205212b57fd590f2c0409081ef3f0d24f1e03df70407d69e59cf0ab2d93297",
+      "bytes": 29359
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/llm/ollama-model-pull.ps1",
+      "sha256": "1935733cc799377d28fd0b04ddbdda93ac6af2802506920c4a63ed732ce052d1",
+      "bytes": 8655
+    },
+    {
+      "path": "static/ergopti_plus/windows/adapters/ollama_identity.ahk",
+      "sha256": "36662955fd9c6f7b9564e4b525f8485e42e8b07ed39e58df1a8b3bde397198f8",
+      "bytes": 3712
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/app_folders.ahk",
+      "sha256": "2280e771cc2eda0325ecdc9a3d55074c00c15da06ec6dbf3e9ecbb6b59da4112",
+      "bytes": 2910
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/legacy_folder_migration.ahk",
+      "sha256": "9762073be38a6872f6d75706cf2112591a189c10a14633a859abf3a0d7e4706c",
+      "bytes": 11982
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/uninstall.ahk",
+      "sha256": "051d8ff55736bc395095c541d02c5d0a5c8e26b0545a47698ce25baa65440715",
+      "bytes": 7842
+    },
+    {
+      "path": "static/ergopti_plus/windows/vendor/ergopti_uninstall.ps1",
+      "sha256": "3dcb3ed1d65df6ba76217e6111dc12e855ec81009c9720a805728712ea713d1b",
+      "bytes": 6237
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/paths/app_dirs.toml",
+      "sha256": "9e35a868c1f25e52d7c7fe243f78033974ea24ff0e3244270484285dc097cadc",
+      "bytes": 11856
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/llm/ollama_release.json",
+      "sha256": "6e26933a166a77239cac50da304cdcb005a4f0e91a082f7c5fd24d1fa80c6d0a",
+      "bytes": 921
+    }
+  ]
+}

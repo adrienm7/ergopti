@@ -1,0 +1,32 @@
+
+=== WebView2 Host Teardown Order ===
+  ✓  static/ergopti_plus/windows/infra/webview_browser_warmup.ahk — closes a controller, stores no subscription handle
+  ✓  static/ergopti_plus/windows/infra/webview_utils.ahk — MsgSub, NavSub released before Controller.Close()
+  ✓  static/ergopti_plus/windows/modules/keystats/keystats_webview.ahk — closes a controller, stores no subscription handle
+  ✓  static/ergopti_plus/windows/modules/llm/ollama_webview.ahk — _OllamaWV_MsgSub released before _OllamaWV_Controller.Close()
+  ✓  static/ergopti_plus/windows/ui/action_picker_webview.ahk — MsgSub, NavSub released before Controller.Close()
+  ✓  static/ergopti_plus/windows/ui/action_picker_webview.ahk — MsgSub, NavSub released before Controller.Close()
+  ✓  static/ergopti_plus/windows/ui/changelog/init.ahk — CreatedController.Close() owns no subscription handle
+  ✓  static/ergopti_plus/windows/ui/changelog/init.ahk — CreatedController.Close() owns no subscription handle
+  ✓  static/ergopti_plus/windows/ui/changelog/init.ahk — _CLW_MsgSub released before _CLW_Controller.Close()
+  ✓  static/ergopti_plus/windows/ui/error_dialog/init.ahk — Controller.Close() owns no subscription handle
+  ✓  static/ergopti_plus/windows/ui/healthcheck/core.ahk — _HC_MsgSub released before _HC_Controller.Close()
+  ✓  static/ergopti_plus/windows/ui/hotstrings_config_window/webview.ahk — MsgSub, NavSub released before Controller.Close()
+  ✓  static/ergopti_plus/windows/ui/hotstrings_config_window/webview.ahk — RetiredMsgSub, RetiredNavSub released before RetiredController.Close()
+  ✓  static/ergopti_plus/windows/ui/layout_manager/init.ahk — CreatedController.Close() owns no subscription handle
+  ✓  static/ergopti_plus/windows/ui/layout_manager/init.ahk — _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub released before _LayMgrWeb_Controller.Close()
+  ✓  static/ergopti_plus/windows/ui/model_browser/init.ahk — MsgSub released before Controller.Close()
+  ✓  static/ergopti_plus/windows/ui/model_browser/init.ahk — RetiredMsgSub released before RetiredController.Close()
+  ✓  static/ergopti_plus/windows/ui/onboarding/webview.ahk — CreatedController.Close() owns no subscription handle
+  ✓  static/ergopti_plus/windows/ui/onboarding/webview.ahk — _OnbWeb_MsgSub released before _OnbWeb_Controller.Close()
+  ✓  static/ergopti_plus/windows/ui/paths_editor/init.ahk — MsgSub, NavSub released before Controller.Close()
+  ✓  static/ergopti_plus/windows/ui/paths_editor/init.ahk — _PathsEdWeb_MsgSub, _PathsEdWeb_NavSub released before _PathsEdWeb_Controller.Close()
+  ✓  static/ergopti_plus/windows/ui/personal_info_editor/init.ahk — MsgSub released before Controller.Close()
+  ✓  static/ergopti_plus/windows/ui/personal_info_editor/init.ahk — _PiEdWeb_MsgSub, _PiEdWeb_NavSub released before _PiEdWeb_Controller.Close()
+  ✓  static/ergopti_plus/windows/ui/personal_toml_editor_webview.ahk — MsgSub, NavSub released before Controller.Close()
+  ✓  static/ergopti_plus/windows/ui/personal_toml_editor_webview.ahk — RetiredMsgSub, RetiredNavSub released before RetiredController.Close()
+  ✓  static/ergopti_plus/windows/ui/prompt_editor/init.ahk — MsgSub, NavSub released before Controller.Close()
+  ✓  static/ergopti_plus/windows/ui/prompt_editor/init.ahk — RetiredMsgSub, RetiredNavSub released before RetiredController.Close()
+  ✓  static/ergopti_plus/windows/ui/update_check/init.ahk — _UC_MsgSub released before _UC_Controller.Close()
+
+Results: 28 passed, 0 failed (17 hosts discovered).

@@ -1,0 +1,36 @@
+
+=== linux-process-poll-demand ===
+  ok   linux-process-poll-demand: focus-only users never read the process table
+  ok   linux-process-poll-demand: a late subscriber adopts a fresh baseline before emitting changes
+
+=== linux-native-focus-identity ===
+  ok   (linux-focus-coherent-poll) queries one native snapshot per unchanged lifecycle tick
+  ok   (linux-native-focus-identity) emits focus changes between identical metadata windows
+
+=== linux-process-table-receipts ===
+  ok   linux-process-table-receipts: snapshots fork no program
+  ok   linux-process-table-receipts: a zombie has quit before its parent reaps it
+  ok   linux-process-table-receipts: a name with parentheses and spaces is read whole
+  ok   linux-process-table-receipts: an unreadable stat line fails the whole snapshot
+  ok   linux-process-table-receipts: a process gone between listing and read is absent, not a failure
+
+=== linux-process-snapshot-receipts ===
+  ok   linux-process-snapshot-receipts: a failed table cannot replace a successful baseline
+  ok   linux-process-snapshot-receipts: a failed table cannot seed startup ownership
+
+=== linux-process-header-receipts ===
+  ok   linux-process-header-receipts: COMMAND launches and quits as an ordinary process
+
+=== linux-process-name-byte-receipts ===
+  ok   linux-process-name-byte-receipts: native whitespace case 1 launches and quits exactly
+  ok   linux-process-name-byte-receipts: native whitespace case 2 launches and quits exactly
+  ok   linux-process-name-byte-receipts: native whitespace case 3 launches and quits exactly
+  ok   linux-process-name-byte-receipts: native whitespace case 4 launches and quits exactly
+  ok   linux-process-name-byte-receipts: a live neighbor cannot hide a distinct whitespace identity
+
+=== process_lifecycle: a failed snapshot fires nothing (ps-storm) ===
+  ok   ps-storm: a failed table reports no quits and no launches
+  ok   ps-storm: recovery after a failure reports only the real delta
+  ok   ps-storm: an empty table is a failure, not an empty desktop
+  ok   ps-storm: the ordinary diff still reports real launches and quits
+AUDIT_TEST_RESULT	21	0

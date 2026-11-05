@@ -1,0 +1,48 @@
+PASS slot=2 mode=raised
+PASS slot=3 mode=raised
+PASS slot=4 mode=raised
+PASS slot=2 mode=nil
+PASS slot=3 mode=nil
+PASS slot=4 mode=nil
+ProcessRunner native allocation: 6 checks, 0 failures; actual output/reaping and foreign timer pass
+
+=== process_runner: asynchronous argv processes ===
+  ok   linux-process-allocation: actual partial handles retire before refusal returns
+  ok   linux-process-allocation: raised constructor at 1 releases prior handles
+  ok   linux-process-allocation: raised constructor at 2 releases prior handles
+  ok   linux-process-allocation: raised constructor at 3 releases prior handles
+  ok   linux-process-allocation: raised constructor at 4 releases prior handles
+  ok   linux-process-allocation: nil constructor at 1 releases prior handles
+  ok   linux-process-allocation: nil constructor at 2 releases prior handles
+  ok   linux-process-allocation: nil constructor at 3 releases prior handles
+  ok   linux-process-allocation: nil constructor at 4 releases prior handles
+  ok   linux-process-supervision: returned nil from timer refuses dispatch once
+  ok   linux-process-supervision: returned false from timer refuses dispatch once
+  ok   linux-process-supervision: returned nil from stdout refuses dispatch once
+  ok   linux-process-supervision: returned false from stdout refuses dispatch once
+  ok   linux-process-supervision: returned nil from stderr refuses dispatch once
+  ok   linux-process-supervision: returned false from stderr refuses dispatch once
+  ok   linux-relative-clock: simulated refresh exception refuses before native allocation
+  ok   dispatches without waiting and reports the exit code and output once (layout-registry-convert)
+  ok   reports a failing program with its exit code (layout-registry-convert)
+  ok   reports a signalled child as failed (linux-signalled-child-exit)
+  ok   tells a program that cannot start from one that fails (layout-registry-convert)
+  ok   kills the process group at its deadline (layout-registry-convert)
+  ok   refuses an ill-typed argument vector before spawning (layout-registry-convert)
+  ok   kills descendants after their leader exits (linux-orphaned-process-group)
+
+=== layout helper terminal native ownership ===
+  ok   (layout-helper-shutdown) retains exit and close ACK while suppressing late delivery
+  ok   (layout-helper-shutdown) closes admission during constructor spawn
+  ok   (layout-helper-shutdown) closes admission during constructor refresh
+  ok   (layout-helper-shutdown) cancelled partial construction still awaits native close ACK
+  ok   (layout-helper-shutdown) normal error waits for close callbacks before publication
+  ok   (layout-helper-shutdown) inline partial close settles only after its constructor returns
+  ok   (layout-helper-shutdown) a completion can stop before attempting a successor
+  ok   (layout-helper-shutdown) ENOENT text cannot override a different native errno
+
+=== runner shutdown snapshots exact native claims ===
+  ok   (layout-helper-shutdown) cancelling one settled claim cannot skip another
+  ok   (layout-helper-shutdown) a throwing constructor cannot manufacture physical settlement
+  ok   (layout-helper-shutdown) a replaced public query cannot acknowledge pending native claims
+AUDIT_TEST_RESULT	34	0

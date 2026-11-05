@@ -1,0 +1,18 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_phase_a_no_subprocess"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_phase_a_no_subprocess
+
+=== healthcheck (macOS): phase A never starts a child process ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_phase_a_no_subprocess","name":"collects the snapshot without hs.execute, io.popen or os.execute (phase-a-no-subprocess)","status":"pass","elapsed_ms":136.466635,"timing_error":""}
+  ok   collects the snapshot without hs.execute, io.popen or os.execute (phase-a-no-subprocess)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_phase_a_no_subprocess","name":"tests.unit.ui.healthcheck.test_healthcheck_phase_a_no_subprocess","status":"pass","elapsed_ms":136.589331,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  1
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

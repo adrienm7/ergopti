@@ -1,0 +1,1 @@
+PASS windows-runtime scratch report schema, empty confirmed set, two dry receipts and 19 identical source identities

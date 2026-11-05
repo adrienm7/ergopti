@@ -1,0 +1,13 @@
+
+=== desktop-report actual Main confirmation owner ===
+  ok   desktop-report cold shutdown never imports a desktop launcher
+  ok   desktop-report actual Main retains nil helper acknowledgements
+  ok   desktop-report actual Main retains false helper acknowledgements
+  ok   desktop-report actual Main retains zero helper acknowledgements
+  ok   desktop-report actual Main pins its initial module and method across module
+  ok   desktop-report actual Main pins its initial module and method across method
+  ok   desktop-report actual Main pins its initial module and method across unloaded
+
+=== desktop-report default opener authority ===
+  ok   desktop-report default ports retain the exact action predicate and cancellation
+AUDIT_TEST_RESULT	8	0

@@ -1,0 +1,73 @@
+Selecting exact test module: "tests.unit.modules.diagnostics.test_crash_report_deferred_off_hot_path"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.diagnostics.test_crash_report_deferred_off_hot_path
+
+=== logger: a recoverable timer-callback error never reaches the crash reporter ===
+2026-11-05 00:52:21:000 [ERROR] [runtime] Uncaught error in hs.timer.doAfter callback: .../diagnostics/test_crash_report_deferred_off_hot_path.lua:81: boom-recoverable
+stack traceback:
+	[C]: in function 'error'
+	.../diagnostics/test_crash_report_deferred_off_hot_path.lua:81: in function <.../diagnostics/test_crash_report_deferred_off_hot_path.lua:81>
+	[C]: in function 'xpcall'
+	...macos-webview/static/ergopti_plus/macos/infra/logger.lua:2035: in field 'fn'
+	...cos-webview/static/ergopti_plus/macos/tests/stubs/hs.lua:133: in method 'fire'
+	.../diagnostics/test_crash_report_deferred_off_hot_path.lua:82: in upvalue 'callback'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:110: in function <...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:108>
+	[C]: in function 'pcall'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in function <...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:74>
+	(...tail calls...)
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:841: in function 'tests.helpers.it'
+	.../diagnostics/test_crash_report_deferred_off_hot_path.lua:60: in function <.../diagnostics/test_crash_report_deferred_off_hot_path.lua:59>
+	[C]: in function 'pcall'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../diagnostics/test_crash_report_deferred_off_hot_path.lua:59: in main chunk
+	[C]: in function 'require'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in function <...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181>
+	[C]: in function 'pcall'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in field 'measure'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:965: in function 'tests.helpers.measure_module'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in main chunk
+	[C]: in ?
+[logger] unified log write refused: /tmp/lua_eVjoff_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_eVjoff_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_report_deferred_off_hot_path","name":"logs one ERROR/runtime line and leaves the reporter unreached even after every timer is drained","status":"pass","elapsed_ms":4.869556,"timing_error":""}
+  ok   logs one ERROR/runtime line and leaves the reporter unreached even after every timer is drained
+
+=== shell_runner: crash report is deferred off the hs.task completion callback (F-HIGH-20) ===
+2026-11-05 00:52:21:000 [ERROR] [adapters.shell_runner] on_done callback threw for '/usr/bin/true': .../diagnostics/test_crash_report_deferred_off_hot_path.lua:152: boom-from-on-done
+stack traceback:
+	[C]: in function 'error'
+	.../diagnostics/test_crash_report_deferred_off_hot_path.lua:152: in function <.../diagnostics/test_crash_report_deferred_off_hot_path.lua:151>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...view/static/ergopti_plus/macos/adapters/shell_runner.lua:653: in upvalue '_deliver_business_completion'
+	...view/static/ergopti_plus/macos/adapters/shell_runner.lua:525: in field 'start'
+	.../diagnostics/test_crash_report_deferred_off_hot_path.lua:154: in upvalue 'callback'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:110: in function <...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:108>
+	[C]: in function 'pcall'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in function <...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:74>
+	(...tail calls...)
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:841: in function 'tests.helpers.it'
+	.../diagnostics/test_crash_report_deferred_off_hot_path.lua:122: in function <.../diagnostics/test_crash_report_deferred_off_hot_path.lua:121>
+	[C]: in function 'pcall'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	.../diagnostics/test_crash_report_deferred_off_hot_path.lua:121: in main chunk
+	[C]: in function 'require'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in function <...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181>
+	[C]: in function 'pcall'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in field 'measure'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:965: in function 'tests.helpers.measure_module'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in main chunk
+	[C]: in ?
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_report_deferred_off_hot_path","name":"does NOT invoke the reporter synchronously when on_done throws","status":"pass","elapsed_ms":3.072365,"timing_error":""}
+  ok   does NOT invoke the reporter synchronously when on_done throws
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.diagnostics.test_crash_report_deferred_off_hot_path","name":"tests.unit.modules.diagnostics.test_crash_report_deferred_off_hot_path","status":"pass","elapsed_ms":8.488951,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  2
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

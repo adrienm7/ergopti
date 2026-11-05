@@ -1,0 +1,470 @@
+Selecting exact test module: "tests.meta.corpus.test_corpus_diagnostics"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.meta.corpus.test_corpus_diagnostics
+
+=== diagnostics corpus: errors-file tail (errors-tail-corpus) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"has vectors (errors-tail-corpus)","status":"pass","elapsed_ms":0.001882,"timing_error":""}
+  ok   has vectors (errors-tail-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"parse_errors_tail: whole_file_lf (errors-tail-corpus)","status":"pass","elapsed_ms":0.013280,"timing_error":""}
+  ok   parse_errors_tail: whole_file_lf (errors-tail-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"parse_errors_tail: windows_crlf (errors-tail-corpus)","status":"pass","elapsed_ms":0.006900,"timing_error":""}
+  ok   parse_errors_tail: windows_crlf (errors-tail-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"parse_errors_tail: bom_at_file_start (errors-tail-corpus)","status":"pass","elapsed_ms":0.004096,"timing_error":""}
+  ok   parse_errors_tail: bom_at_file_start (errors-tail-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"parse_errors_tail: cut_inside_first_line (errors-tail-corpus)","status":"pass","elapsed_ms":0.004266,"timing_error":""}
+  ok   parse_errors_tail: cut_inside_first_line (errors-tail-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"parse_errors_tail: cut_inside_utf8_sequence (errors-tail-corpus)","status":"pass","elapsed_ms":0.009164,"timing_error":""}
+  ok   parse_errors_tail: cut_inside_utf8_sequence (errors-tail-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"parse_errors_tail: cut_exactly_on_a_line_start (errors-tail-corpus)","status":"pass","elapsed_ms":0.004297,"timing_error":""}
+  ok   parse_errors_tail: cut_exactly_on_a_line_start (errors-tail-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"parse_errors_tail: partial_last_line_is_kept (errors-tail-corpus)","status":"pass","elapsed_ms":0.005278,"timing_error":""}
+  ok   parse_errors_tail: partial_last_line_is_kept (errors-tail-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"parse_errors_tail: multi_line_message (errors-tail-corpus)","status":"pass","elapsed_ms":0.007061,"timing_error":""}
+  ok   parse_errors_tail: multi_line_message (errors-tail-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"parse_errors_tail: orphan_continuation_after_cut (errors-tail-corpus)","status":"pass","elapsed_ms":0.004607,"timing_error":""}
+  ok   parse_errors_tail: orphan_continuation_after_cut (errors-tail-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"parse_errors_tail: dedup_summary_is_an_entry (errors-tail-corpus)","status":"pass","elapsed_ms":0.005178,"timing_error":""}
+  ok   parse_errors_tail: dedup_summary_is_an_entry (errors-tail-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"parse_errors_tail: other_levels_and_their_continuations_are_dropped (errors-tail-corpus)","status":"pass","elapsed_ms":0.005128,"timing_error":""}
+  ok   parse_errors_tail: other_levels_and_their_continuations_are_dropped (errors-tail-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"parse_errors_tail: blank_lines_are_skipped (errors-tail-corpus)","status":"pass","elapsed_ms":0.005338,"timing_error":""}
+  ok   parse_errors_tail: blank_lines_are_skipped (errors-tail-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"parse_errors_tail: keeps_the_newest_entries (errors-tail-corpus)","status":"pass","elapsed_ms":0.012008,"timing_error":""}
+  ok   parse_errors_tail: keeps_the_newest_entries (errors-tail-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"parse_errors_tail: empty_file (errors-tail-corpus)","status":"pass","elapsed_ms":0.001993,"timing_error":""}
+  ok   parse_errors_tail: empty_file (errors-tail-corpus)
+
+=== diagnostics corpus: GitHub issue link (issue-link-corpus) ===
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"has vectors (issue-link-corpus)","status":"pass","elapsed_ms":0.001572,"timing_error":""}
+  ok   has vectors (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"percent_encode: unreserved_untouched (issue-link-corpus)","status":"pass","elapsed_ms":0.007211,"timing_error":""}
+  ok   percent_encode: unreserved_untouched (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"percent_encode: space (issue-link-corpus)","status":"pass","elapsed_ms":0.004577,"timing_error":""}
+  ok   percent_encode: space (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"percent_encode: two_byte (issue-link-corpus)","status":"pass","elapsed_ms":0.003525,"timing_error":""}
+  ok   percent_encode: two_byte (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"percent_encode: three_byte (issue-link-corpus)","status":"pass","elapsed_ms":0.003385,"timing_error":""}
+  ok   percent_encode: three_byte (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"percent_encode: four_byte (issue-link-corpus)","status":"pass","elapsed_ms":0.003345,"timing_error":""}
+  ok   percent_encode: four_byte (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"percent_encode: reserved (issue-link-corpus)","status":"pass","elapsed_ms":0.007441,"timing_error":""}
+  ok   percent_encode: reserved (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"percent_encode: newline_and_tab (issue-link-corpus)","status":"pass","elapsed_ms":0.005729,"timing_error":""}
+  ok   percent_encode: newline_and_tab (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"percent_encode: sub_delims_js_leaves_alone (issue-link-corpus)","status":"pass","elapsed_ms":0.003976,"timing_error":""}
+  ok   percent_encode: sub_delims_js_leaves_alone (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"build_url: bug_all_fields_fit (issue-link-corpus)","status":"pass","elapsed_ms":0.078648,"timing_error":""}
+  ok   build_url: bug_all_fields_fit (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"build_url: empty_values_are_omitted (issue-link-corpus)","status":"pass","elapsed_ms":0.017997,"timing_error":""}
+  ok   build_url: empty_values_are_omitted (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"build_url: feature_ignores_undeclared_fields (issue-link-corpus)","status":"pass","elapsed_ms":0.032529,"timing_error":""}
+  ok   build_url: feature_ignores_undeclared_fields (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"build_url: last_field_truncated_first (issue-link-corpus)","status":"pass","elapsed_ms":0.104697,"timing_error":""}
+  ok   build_url: last_field_truncated_first (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"build_url: truncation_keeps_whole_code_points (issue-link-corpus)","status":"pass","elapsed_ms":0.078298,"timing_error":""}
+  ok   build_url: truncation_keeps_whole_code_points (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"build_url: truncation_keeps_whole_emoji (issue-link-corpus)","status":"pass","elapsed_ms":0.058928,"timing_error":""}
+  ok   build_url: truncation_keeps_whole_emoji (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":32,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"build_url: field_dropped_when_nothing_fits (issue-link-corpus)","status":"pass","elapsed_ms":0.067782,"timing_error":""}
+  ok   build_url: field_dropped_when_nothing_fits (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":33,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"build_url: earlier_field_truncated_after_later_dropped (issue-link-corpus)","status":"pass","elapsed_ms":0.529865,"timing_error":""}
+  ok   build_url: earlier_field_truncated_after_later_dropped (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":34,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"build_url: title_truncated_last (issue-link-corpus)","status":"pass","elapsed_ms":0.648543,"timing_error":""}
+  ok   build_url: title_truncated_last (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":35,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"build_url: note_follows_marker_when_cut (issue-link-corpus)","status":"pass","elapsed_ms":0.613781,"timing_error":""}
+  ok   build_url: note_follows_marker_when_cut (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":36,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"build_url: note_absent_when_nothing_is_cut (issue-link-corpus)","status":"pass","elapsed_ms":0.029945,"timing_error":""}
+  ok   build_url: note_absent_when_nothing_is_cut (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":37,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"build_url: note_only_for_its_own_field (issue-link-corpus)","status":"pass","elapsed_ms":0.173681,"timing_error":""}
+  ok   build_url: note_only_for_its_own_field (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":38,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"build_url: note_dropped_with_its_field (issue-link-corpus)","status":"pass","elapsed_ms":0.082083,"timing_error":""}
+  ok   build_url: note_dropped_with_its_field (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":39,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"build_url: note_counted_in_the_budget_with_accents (issue-link-corpus)","status":"pass","elapsed_ms":0.537276,"timing_error":""}
+  ok   build_url: note_counted_in_the_budget_with_accents (issue-link-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":40,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"build_url: base_alone_too_long_is_an_error (issue-link-corpus)","status":"pass","elapsed_ms":0.026299,"timing_error":""}
+  ok   build_url: base_alone_too_long_is_an_error (issue-link-corpus)
+
+=== diagnostics corpus: redaction (redaction-corpus) ===
+# lua_timing {"schema":1,"driver":"macos","id":41,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"has vectors (redaction-corpus)","status":"pass","elapsed_ms":0.002223,"timing_error":""}
+  ok   has vectors (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":42,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: mac_home_everywhere_in_free_text (redaction-corpus)","status":"pass","elapsed_ms":0.034803,"timing_error":""}
+  ok   apply: mac_home_everywhere_in_free_text (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":43,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: home_alone_and_trailing_slash_in_context (redaction-corpus)","status":"pass","elapsed_ms":0.025418,"timing_error":""}
+  ok   apply: home_alone_and_trailing_slash_in_context (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":44,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: a_sibling_folder_is_another_account_not_the_home (redaction-corpus)","status":"pass","elapsed_ms":0.042184,"timing_error":""}
+  ok   apply: a_sibling_folder_is_another_account_not_the_home (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":45,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: windows_home_both_slashes_any_case (redaction-corpus)","status":"pass","elapsed_ms":0.028012,"timing_error":""}
+  ok   apply: windows_home_both_slashes_any_case (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":46,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: account_name_outside_the_home (redaction-corpus)","status":"pass","elapsed_ms":0.070516,"timing_error":""}
+  ok   apply: account_name_outside_the_home (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":47,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: account_name_only_as_a_whole_word (redaction-corpus)","status":"pass","elapsed_ms":0.027281,"timing_error":""}
+  ok   apply: account_name_only_as_a_whole_word (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":48,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: account_name_case_folded_on_windows (redaction-corpus)","status":"pass","elapsed_ms":0.025989,"timing_error":""}
+  ok   apply: account_name_case_folded_on_windows (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":49,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: short_account_name_is_never_redacted (redaction-corpus)","status":"pass","elapsed_ms":0.019850,"timing_error":""}
+  ok   apply: short_account_name_is_never_redacted (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":50,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: no_context_still_redacts_another_accounts_profile (redaction-corpus)","status":"pass","elapsed_ms":0.050997,"timing_error":""}
+  ok   apply: no_context_still_redacts_another_accounts_profile (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":51,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: token_prefixes (redaction-corpus)","status":"pass","elapsed_ms":0.056444,"timing_error":""}
+  ok   apply: token_prefixes (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":52,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: stateless_github_installation_token (redaction-corpus)","status":"pass","elapsed_ms":0.031527,"timing_error":""}
+  ok   apply: stateless_github_installation_token (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":53,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: token_prefix_needs_a_long_body_and_a_word_start (redaction-corpus)","status":"pass","elapsed_ms":0.127712,"timing_error":""}
+  ok   apply: token_prefix_needs_a_long_body_and_a_word_start (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":54,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: bearer_credential (redaction-corpus)","status":"pass","elapsed_ms":0.025599,"timing_error":""}
+  ok   apply: bearer_credential (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":55,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: key_value_secrets (redaction-corpus)","status":"pass","elapsed_ms":0.091627,"timing_error":""}
+  ok   apply: key_value_secrets (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":56,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: key_value_needs_a_whole_key_and_a_long_value (redaction-corpus)","status":"pass","elapsed_ms":0.026740,"timing_error":""}
+  ok   apply: key_value_needs_a_whole_key_and_a_long_value (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":57,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: secret_containing_the_account_name_is_removed_whole (redaction-corpus)","status":"pass","elapsed_ms":0.027722,"timing_error":""}
+  ok   apply: secret_containing_the_account_name_is_removed_whole (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":58,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: non_ascii_text_is_kept_byte_for_byte (redaction-corpus)","status":"pass","elapsed_ms":0.019279,"timing_error":""}
+  ok   apply: non_ascii_text_is_kept_byte_for_byte (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":59,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: email_addresses (redaction-corpus)","status":"pass","elapsed_ms":0.151247,"timing_error":""}
+  ok   apply: email_addresses (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":60,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: email_needs_a_dotted_domain_and_a_letter_tld (redaction-corpus)","status":"pass","elapsed_ms":0.500972,"timing_error":""}
+  ok   apply: email_needs_a_dotted_domain_and_a_letter_tld (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":61,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: url_credentials (redaction-corpus)","status":"pass","elapsed_ms":0.034031,"timing_error":""}
+  ok   apply: url_credentials (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":62,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: url_without_credentials_is_kept (redaction-corpus)","status":"pass","elapsed_ms":0.025629,"timing_error":""}
+  ok   apply: url_without_credentials_is_kept (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":63,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: another_accounts_profile_every_style (redaction-corpus)","status":"pass","elapsed_ms":0.107021,"timing_error":""}
+  ok   apply: another_accounts_profile_every_style (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":64,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: shared_profiles_are_kept (redaction-corpus)","status":"pass","elapsed_ms":0.037186,"timing_error":""}
+  ok   apply: shared_profiles_are_kept (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":65,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: own_home_wins_over_the_foreign_rule (redaction-corpus)","status":"pass","elapsed_ms":0.075253,"timing_error":""}
+  ok   apply: own_home_wins_over_the_foreign_rule (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":66,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: log_line_temp_folder_of_the_account (redaction-corpus)","status":"pass","elapsed_ms":0.029404,"timing_error":""}
+  ok   apply: log_line_temp_folder_of_the_account (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":67,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: log_line_report_attachment_with_a_support_mail (redaction-corpus)","status":"pass","elapsed_ms":0.041452,"timing_error":""}
+  ok   apply: log_line_report_attachment_with_a_support_mail (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":68,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: log_line_other_profile_in_a_crash_path (redaction-corpus)","status":"pass","elapsed_ms":0.033761,"timing_error":""}
+  ok   apply: log_line_other_profile_in_a_crash_path (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":69,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: config_dir_masks_pack_and_file_names_after_a_quote (redaction-corpus)","status":"pass","elapsed_ms":0.051217,"timing_error":""}
+  ok   apply: config_dir_masks_pack_and_file_names_after_a_quote (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":70,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: config_dir_keeps_the_names_the_product_ships (redaction-corpus)","status":"pass","elapsed_ms":0.122874,"timing_error":""}
+  ok   apply: config_dir_keeps_the_names_the_product_ships (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":71,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: config_dir_bare_names_may_hold_spaces_before_a_separator (redaction-corpus)","status":"pass","elapsed_ms":0.078458,"timing_error":""}
+  ok   apply: config_dir_bare_names_may_hold_spaces_before_a_separator (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":72,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: config_dir_quoted_names_may_hold_spaces_and_apostrophes (redaction-corpus)","status":"pass","elapsed_ms":0.127471,"timing_error":""}
+  ok   apply: config_dir_quoted_names_may_hold_spaces_and_apostrophes (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":73,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: config_dir_under_home_is_found_raw_and_after_the_home_pass (redaction-corpus)","status":"pass","elapsed_ms":0.154391,"timing_error":""}
+  ok   apply: config_dir_under_home_is_found_raw_and_after_the_home_pass (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":74,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: config_dir_compares_like_the_file_system (redaction-corpus)","status":"pass","elapsed_ms":0.044827,"timing_error":""}
+  ok   apply: config_dir_compares_like_the_file_system (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":75,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: config_dir_posix_compares_exactly (redaction-corpus)","status":"pass","elapsed_ms":0.037496,"timing_error":""}
+  ok   apply: config_dir_posix_compares_exactly (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":76,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: config_dir_a_shortened_path_keeps_its_known_name (redaction-corpus)","status":"pass","elapsed_ms":0.045868,"timing_error":""}
+  ok   apply: config_dir_a_shortened_path_keeps_its_known_name (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":77,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: config_dir_without_context_is_untouched (redaction-corpus)","status":"pass","elapsed_ms":0.012689,"timing_error":""}
+  ok   apply: config_dir_without_context_is_untouched (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":78,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: config_dir_prefix_lookalike_is_untouched (redaction-corpus)","status":"pass","elapsed_ms":0.028973,"timing_error":""}
+  ok   apply: config_dir_prefix_lookalike_is_untouched (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":79,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: config_dir_trailing_separator_in_context (redaction-corpus)","status":"pass","elapsed_ms":0.037376,"timing_error":""}
+  ok   apply: config_dir_trailing_separator_in_context (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":80,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: config_dir_non_ascii_names_are_masked_whole (redaction-corpus)","status":"pass","elapsed_ms":0.039670,"timing_error":""}
+  ok   apply: config_dir_non_ascii_names_are_masked_whole (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":81,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: profile_folder_with_a_space_is_redacted_whole (redaction-corpus)","status":"pass","elapsed_ms":0.042023,"timing_error":""}
+  ok   apply: profile_folder_with_a_space_is_redacted_whole (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":82,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: profile_folder_with_non_ascii_letters_is_redacted_whole (redaction-corpus)","status":"pass","elapsed_ms":0.024226,"timing_error":""}
+  ok   apply: profile_folder_with_non_ascii_letters_is_redacted_whole (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":83,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: profile_folder_keeps_the_sentence_that_follows (redaction-corpus)","status":"pass","elapsed_ms":0.144066,"timing_error":""}
+  ok   apply: profile_folder_keeps_the_sentence_that_follows (redaction-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":84,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"apply: profile_folder_with_a_space_at_the_end_of_the_line (redaction-corpus)","status":"pass","elapsed_ms":0.019750,"timing_error":""}
+  ok   apply: profile_folder_with_a_space_at_the_end_of_the_line (redaction-corpus)
+
+=== diagnostics corpus: bug report text (issue-report-corpus) ===
+# lua_timing {"schema":1,"driver":"macos","id":85,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"has vectors (issue-report-corpus)","status":"pass","elapsed_ms":0.001843,"timing_error":""}
+  ok   has vectors (issue-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":86,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"dump: sorted_nested_and_lists (issue-report-corpus)","status":"pass","elapsed_ms":0.025458,"timing_error":""}
+  ok   dump: sorted_nested_and_lists (issue-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":87,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"dump: multi_line_values (issue-report-corpus)","status":"pass","elapsed_ms":0.007021,"timing_error":""}
+  ok   dump: multi_line_values (issue-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":88,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"dump: list_of_tables (issue-report-corpus)","status":"pass","elapsed_ms":0.016334,"timing_error":""}
+  ok   dump: list_of_tables (issue-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":89,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"markdown: report_document (issue-report-corpus)","status":"pass","elapsed_ms":0.007661,"timing_error":""}
+  ok   markdown: report_document (issue-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":90,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"markdown: fence_outgrows_backticks (issue-report-corpus)","status":"pass","elapsed_ms":0.005459,"timing_error":""}
+  ok   markdown: fence_outgrows_backticks (issue-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":91,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"dump preserves sparse list entries and keyed diagnostic facts (issue-report-corpus)","status":"pass","elapsed_ms":0.012780,"timing_error":""}
+  ok   dump preserves sparse list entries and keyed diagnostic facts (issue-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":92,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"dump preserves numeric keys outside a sparse sequence (issue-report-corpus)","status":"pass","elapsed_ms":0.008984,"timing_error":""}
+  ok   dump preserves numeric keys outside a sparse sequence (issue-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":93,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"has no summary and no file name of its own (issue-report-corpus)","status":"pass","elapsed_ms":0.000972,"timing_error":""}
+  ok   has no summary and no file name of its own (issue-report-corpus)
+
+=== diagnostics corpus: page actions (page-actions-corpus) ===
+# lua_timing {"schema":1,"driver":"macos","id":94,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"has vectors (page-actions-corpus)","status":"pass","elapsed_ms":0.002674,"timing_error":""}
+  ok   has vectors (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":95,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: copy_ok (page-actions-corpus)","status":"pass","elapsed_ms":0.009574,"timing_error":""}
+  ok   validate: copy_ok (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":96,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: copy_empty_text (page-actions-corpus)","status":"pass","elapsed_ms":0.004657,"timing_error":""}
+  ok   validate: copy_empty_text (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":97,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: copy_text_not_a_string (page-actions-corpus)","status":"pass","elapsed_ms":0.002584,"timing_error":""}
+  ok   validate: copy_text_not_a_string (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":98,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: copy_text_at_the_bound (page-actions-corpus)","status":"pass","elapsed_ms":0.005859,"timing_error":""}
+  ok   validate: copy_text_at_the_bound (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":99,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: copy_text_over_the_bound (page-actions-corpus)","status":"pass","elapsed_ms":0.002284,"timing_error":""}
+  ok   validate: copy_text_over_the_bound (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":100,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: copy_bound_counts_utf8_bytes (page-actions-corpus)","status":"pass","elapsed_ms":0.002223,"timing_error":""}
+  ok   validate: copy_bound_counts_utf8_bytes (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":101,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: copy_multibyte_within_bound (page-actions-corpus)","status":"pass","elapsed_ms":0.003676,"timing_error":""}
+  ok   validate: copy_multibyte_within_bound (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":102,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: save_ok (page-actions-corpus)","status":"pass","elapsed_ms":0.008663,"timing_error":""}
+  ok   validate: save_ok (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":103,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: save_name_with_a_slash (page-actions-corpus)","status":"pass","elapsed_ms":0.003876,"timing_error":""}
+  ok   validate: save_name_with_a_slash (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":104,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: save_name_with_a_backslash (page-actions-corpus)","status":"pass","elapsed_ms":0.003686,"timing_error":""}
+  ok   validate: save_name_with_a_backslash (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":105,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: save_name_with_a_colon (page-actions-corpus)","status":"pass","elapsed_ms":0.003225,"timing_error":""}
+  ok   validate: save_name_with_a_colon (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":106,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: save_name_wrong_prefix (page-actions-corpus)","status":"pass","elapsed_ms":0.002935,"timing_error":""}
+  ok   validate: save_name_wrong_prefix (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":107,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: save_name_wrong_suffix (page-actions-corpus)","status":"pass","elapsed_ms":0.002965,"timing_error":""}
+  ok   validate: save_name_wrong_suffix (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":108,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: save_name_without_a_body (page-actions-corpus)","status":"pass","elapsed_ms":0.002714,"timing_error":""}
+  ok   validate: save_name_without_a_body (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":109,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: save_name_too_long (page-actions-corpus)","status":"pass","elapsed_ms":0.002443,"timing_error":""}
+  ok   validate: save_name_too_long (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":110,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: save_without_a_name (page-actions-corpus)","status":"pass","elapsed_ms":0.002284,"timing_error":""}
+  ok   validate: save_without_a_name (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":111,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: report_ok (page-actions-corpus)","status":"pass","elapsed_ms":0.012048,"timing_error":""}
+  ok   validate: report_ok (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":112,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: report_ignores_a_file_name (page-actions-corpus)","status":"pass","elapsed_ms":0.007411,"timing_error":""}
+  ok   validate: report_ignores_a_file_name (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":113,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: report_field_filled_by_the_host (page-actions-corpus)","status":"pass","elapsed_ms":0.003556,"timing_error":""}
+  ok   validate: report_field_filled_by_the_host (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":114,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: report_unknown_field (page-actions-corpus)","status":"pass","elapsed_ms":0.003315,"timing_error":""}
+  ok   validate: report_unknown_field (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":115,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: report_fields_not_an_object (page-actions-corpus)","status":"pass","elapsed_ms":0.002204,"timing_error":""}
+  ok   validate: report_fields_not_an_object (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":116,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: report_empty_field (page-actions-corpus)","status":"pass","elapsed_ms":0.004827,"timing_error":""}
+  ok   validate: report_empty_field (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":117,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: report_empty_text (page-actions-corpus)","status":"pass","elapsed_ms":0.002444,"timing_error":""}
+  ok   validate: report_empty_text (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":118,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: open_path_ok (page-actions-corpus)","status":"pass","elapsed_ms":0.008313,"timing_error":""}
+  ok   validate: open_path_ok (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":119,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: open_path_platform_field (page-actions-corpus)","status":"pass","elapsed_ms":0.006480,"timing_error":""}
+  ok   validate: open_path_platform_field (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":120,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: open_path_field_of_another_platform (page-actions-corpus)","status":"pass","elapsed_ms":0.004487,"timing_error":""}
+  ok   validate: open_path_field_of_another_platform (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":121,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: open_path_raw_path (page-actions-corpus)","status":"pass","elapsed_ms":0.004256,"timing_error":""}
+  ok   validate: open_path_raw_path (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":122,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: open_path_not_a_path_field (page-actions-corpus)","status":"pass","elapsed_ms":0.005178,"timing_error":""}
+  ok   validate: open_path_not_a_path_field (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":123,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: open_settings_ok (page-actions-corpus)","status":"pass","elapsed_ms":0.005418,"timing_error":""}
+  ok   validate: open_settings_ok (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":124,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: open_settings_without_a_page (page-actions-corpus)","status":"pass","elapsed_ms":0.002414,"timing_error":""}
+  ok   validate: open_settings_without_a_page (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":125,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: open_settings_raw_url (page-actions-corpus)","status":"pass","elapsed_ms":0.002424,"timing_error":""}
+  ok   validate: open_settings_raw_url (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":126,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: open_settings_on_windows (page-actions-corpus)","status":"pass","elapsed_ms":0.002193,"timing_error":""}
+  ok   validate: open_settings_on_windows (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":127,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: refresh_default (page-actions-corpus)","status":"pass","elapsed_ms":0.004938,"timing_error":""}
+  ok   validate: refresh_default (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":128,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: refresh_detailed (page-actions-corpus)","status":"pass","elapsed_ms":0.004227,"timing_error":""}
+  ok   validate: refresh_detailed (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":129,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: refresh_detailed_not_a_boolean (page-actions-corpus)","status":"pass","elapsed_ms":0.001953,"timing_error":""}
+  ok   validate: refresh_detailed_not_a_boolean (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":130,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: close_ok (page-actions-corpus)","status":"pass","elapsed_ms":0.003225,"timing_error":""}
+  ok   validate: close_ok (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":131,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: unknown_action (page-actions-corpus)","status":"pass","elapsed_ms":0.002084,"timing_error":""}
+  ok   validate: unknown_action (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":132,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: missing_action (page-actions-corpus)","status":"pass","elapsed_ms":0.002053,"timing_error":""}
+  ok   validate: missing_action (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":133,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: not_a_message (page-actions-corpus)","status":"pass","elapsed_ms":0.001903,"timing_error":""}
+  ok   validate: not_a_message (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":134,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: extensive_true_windows (page-actions-corpus)","status":"pass","elapsed_ms":0.004187,"timing_error":""}
+  ok   validate: extensive_true_windows (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":135,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: extensive_string_refused_windows (page-actions-corpus)","status":"pass","elapsed_ms":0.002003,"timing_error":""}
+  ok   validate: extensive_string_refused_windows (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":136,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: cancel_windows (page-actions-corpus)","status":"pass","elapsed_ms":0.002935,"timing_error":""}
+  ok   validate: cancel_windows (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":137,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: extensive_true_macos (page-actions-corpus)","status":"pass","elapsed_ms":0.004457,"timing_error":""}
+  ok   validate: extensive_true_macos (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":138,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: extensive_string_refused_macos (page-actions-corpus)","status":"pass","elapsed_ms":0.001933,"timing_error":""}
+  ok   validate: extensive_string_refused_macos (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":139,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: cancel_macos (page-actions-corpus)","status":"pass","elapsed_ms":0.003545,"timing_error":""}
+  ok   validate: cancel_macos (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":140,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: extensive_true_linux (page-actions-corpus)","status":"pass","elapsed_ms":0.004927,"timing_error":""}
+  ok   validate: extensive_true_linux (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":141,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: extensive_string_refused_linux (page-actions-corpus)","status":"pass","elapsed_ms":0.002094,"timing_error":""}
+  ok   validate: extensive_string_refused_linux (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":142,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: cancel_linux (page-actions-corpus)","status":"pass","elapsed_ms":0.004146,"timing_error":""}
+  ok   validate: cancel_linux (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":143,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: export_snapshot_windows (page-actions-corpus)","status":"pass","elapsed_ms":0.005648,"timing_error":""}
+  ok   validate: export_snapshot_windows (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":144,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: export_snapshot_string_windows (page-actions-corpus)","status":"pass","elapsed_ms":0.002925,"timing_error":""}
+  ok   validate: export_snapshot_string_windows (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":145,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: export_snapshot_macos (page-actions-corpus)","status":"pass","elapsed_ms":0.004336,"timing_error":""}
+  ok   validate: export_snapshot_macos (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":146,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: export_snapshot_string_macos (page-actions-corpus)","status":"pass","elapsed_ms":0.001983,"timing_error":""}
+  ok   validate: export_snapshot_string_macos (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":147,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: export_snapshot_linux (page-actions-corpus)","status":"pass","elapsed_ms":0.003796,"timing_error":""}
+  ok   validate: export_snapshot_linux (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":148,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: export_snapshot_string_linux (page-actions-corpus)","status":"pass","elapsed_ms":0.002244,"timing_error":""}
+  ok   validate: export_snapshot_string_linux (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":149,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: export_sequence_above_shared_max (page-actions-corpus)","status":"pass","elapsed_ms":0.002143,"timing_error":""}
+  ok   validate: export_sequence_above_shared_max (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":150,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: export captures closed installed-page observations (page-actions-corpus)","status":"pass","elapsed_ms":0.505409,"timing_error":""}
+  ok   validate: export captures closed installed-page observations (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":151,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: export refuses unknown free field (page-actions-corpus)","status":"pass","elapsed_ms":0.007411,"timing_error":""}
+  ok   validate: export refuses unknown free field (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":152,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: export refuses forged suite pass (page-actions-corpus)","status":"pass","elapsed_ms":0.019138,"timing_error":""}
+  ok   validate: export refuses forged suite pass (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":153,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: export refuses wrong scope (page-actions-corpus)","status":"pass","elapsed_ms":0.003705,"timing_error":""}
+  ok   validate: export refuses wrong scope (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":154,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: export refuses missing known row (page-actions-corpus)","status":"pass","elapsed_ms":0.010936,"timing_error":""}
+  ok   validate: export refuses missing known row (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":155,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: export refuses negative duration (page-actions-corpus)","status":"pass","elapsed_ms":0.015023,"timing_error":""}
+  ok   validate: export refuses negative duration (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":156,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: day_log_enable (page-actions-corpus)","status":"pass","elapsed_ms":0.005649,"timing_error":""}
+  ok   validate: day_log_enable (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":157,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: day_log_disable (page-actions-corpus)","status":"pass","elapsed_ms":0.004597,"timing_error":""}
+  ok   validate: day_log_disable (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":158,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: day_log_without_enabled (page-actions-corpus)","status":"pass","elapsed_ms":0.002534,"timing_error":""}
+  ok   validate: day_log_without_enabled (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":159,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: day_log_enabled_must_be_a_boolean (page-actions-corpus)","status":"pass","elapsed_ms":0.002314,"timing_error":""}
+  ok   validate: day_log_enabled_must_be_a_boolean (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":160,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: day_log_carries_nothing_else (page-actions-corpus)","status":"pass","elapsed_ms":0.002344,"timing_error":""}
+  ok   validate: day_log_carries_nothing_else (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":161,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: save_with_the_day_log (page-actions-corpus)","status":"pass","elapsed_ms":0.007922,"timing_error":""}
+  ok   validate: save_with_the_day_log (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":162,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: save_with_day_log_false_drops_the_flag (page-actions-corpus)","status":"pass","elapsed_ms":0.006620,"timing_error":""}
+  ok   validate: save_with_day_log_false_drops_the_flag (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":163,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: save_day_log_must_be_a_boolean (page-actions-corpus)","status":"pass","elapsed_ms":0.003555,"timing_error":""}
+  ok   validate: save_day_log_must_be_a_boolean (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":164,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: report_with_the_day_log (page-actions-corpus)","status":"pass","elapsed_ms":0.007761,"timing_error":""}
+  ok   validate: report_with_the_day_log (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":165,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: report_day_log_must_be_a_boolean (page-actions-corpus)","status":"pass","elapsed_ms":0.003515,"timing_error":""}
+  ok   validate: report_day_log_must_be_a_boolean (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":166,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: copy_never_carries_the_day_log (page-actions-corpus)","status":"pass","elapsed_ms":0.002543,"timing_error":""}
+  ok   validate: copy_never_carries_the_day_log (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":167,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: export_snapshot_with_the_day_log (page-actions-corpus)","status":"pass","elapsed_ms":0.004958,"timing_error":""}
+  ok   validate: export_snapshot_with_the_day_log (page-actions-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":168,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate: export_snapshot_day_log_must_be_a_boolean (page-actions-corpus)","status":"pass","elapsed_ms":0.002063,"timing_error":""}
+  ok   validate: export_snapshot_day_log_must_be_a_boolean (page-actions-corpus)
+
+=== diagnostics corpus: issue form identity (form-identity-corpus) ===
+# lua_timing {"schema":1,"driver":"macos","id":169,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"has vectors (form-identity-corpus)","status":"pass","elapsed_ms":0.003224,"timing_error":""}
+  ok   has vectors (form-identity-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":170,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"form fields: macos_release (form-identity-corpus)","status":"pass","elapsed_ms":0.120331,"timing_error":""}
+  ok   form fields: macos_release (form-identity-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":171,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"form fields: macos_source_run_names_its_commit (form-identity-corpus)","status":"pass","elapsed_ms":0.057817,"timing_error":""}
+  ok   form fields: macos_source_run_names_its_commit (form-identity-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":172,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"form fields: source_run_without_a_readable_commit (form-identity-corpus)","status":"pass","elapsed_ms":0.030015,"timing_error":""}
+  ok   form fields: source_run_without_a_readable_commit (form-identity-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":173,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"form fields: no_version_no_source_marker_stays_unknown (form-identity-corpus)","status":"pass","elapsed_ms":0.034872,"timing_error":""}
+  ok   form fields: no_version_no_source_marker_stays_unknown (form-identity-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":174,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"form fields: windows_build (form-identity-corpus)","status":"pass","elapsed_ms":0.056565,"timing_error":""}
+  ok   form fields: windows_build (form-identity-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":175,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"form fields: linux_distro_desktop_and_session (form-identity-corpus)","status":"pass","elapsed_ms":0.064076,"timing_error":""}
+  ok   form fields: linux_distro_desktop_and_session (form-identity-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":176,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"form fields: linux_x11_session (form-identity-corpus)","status":"pass","elapsed_ms":0.066330,"timing_error":""}
+  ok   form fields: linux_x11_session (form-identity-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":177,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"form fields: unknown_session_and_arch_are_left_out (form-identity-corpus)","status":"pass","elapsed_ms":0.052920,"timing_error":""}
+  ok   form fields: unknown_session_and_arch_are_left_out (form-identity-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":178,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"form fields: a_path_is_not_a_system_name (form-identity-corpus)","status":"pass","elapsed_ms":0.057567,"timing_error":""}
+  ok   form fields: a_path_is_not_a_system_name (form-identity-corpus)
+
+=== diagnostics corpus: error window policy (error-policy-corpus) ===
+# lua_timing {"schema":1,"driver":"macos","id":179,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"has vectors (error-policy-corpus)","status":"pass","elapsed_ms":0.001863,"timing_error":""}
+  ok   has vectors (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":180,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"the shipped policy is valid (error-policy-corpus)","status":"pass","elapsed_ms":0.045028,"timing_error":""}
+  ok   the shipped policy is valid (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":181,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"signature: module_and_template (error-policy-corpus)","status":"pass","elapsed_ms":0.001563,"timing_error":""}
+  ok   signature: module_and_template (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":182,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"signature: ahk_placeholders_stay (error-policy-corpus)","status":"pass","elapsed_ms":0.001082,"timing_error":""}
+  ok   signature: ahk_placeholders_stay (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":183,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"signature: separator_inside_template (error-policy-corpus)","status":"pass","elapsed_ms":0.000841,"timing_error":""}
+  ok   signature: separator_inside_template (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":184,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"signature: empty_template (error-policy-corpus)","status":"pass","elapsed_ms":0.000911,"timing_error":""}
+  ok   signature: empty_template (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":185,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"signature: non_ascii_template (error-policy-corpus)","status":"pass","elapsed_ms":0.000911,"timing_error":""}
+  ok   signature: non_ascii_template (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":186,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"signature: other_separator (error-policy-corpus)","status":"pass","elapsed_ms":0.000741,"timing_error":""}
+  ok   signature: other_separator (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":187,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"decide: once_per_session (error-policy-corpus)","status":"pass","elapsed_ms":0.008022,"timing_error":""}
+  ok   decide: once_per_session (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":188,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"decide: budget_per_window (error-policy-corpus)","status":"pass","elapsed_ms":0.009725,"timing_error":""}
+  ok   decide: budget_per_window (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":189,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"decide: folded_while_open (error-policy-corpus)","status":"pass","elapsed_ms":0.005248,"timing_error":""}
+  ok   decide: folded_while_open (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":190,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"decide: folded_spends_no_budget (error-policy-corpus)","status":"pass","elapsed_ms":0.005619,"timing_error":""}
+  ok   decide: folded_spends_no_budget (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":191,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"decide: disabled_records_nothing (error-policy-corpus)","status":"pass","elapsed_ms":0.004747,"timing_error":""}
+  ok   decide: disabled_records_nothing (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":192,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"decide: rate_limited_is_not_recorded (error-policy-corpus)","status":"pass","elapsed_ms":0.004737,"timing_error":""}
+  ok   decide: rate_limited_is_not_recorded (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":193,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate refuses: no_budget (error-policy-corpus)","status":"pass","elapsed_ms":0.002584,"timing_error":""}
+  ok   validate refuses: no_budget (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":194,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate refuses: fractional_budget (error-policy-corpus)","status":"pass","elapsed_ms":0.001513,"timing_error":""}
+  ok   validate refuses: fractional_budget (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":195,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate refuses: missing_budget (error-policy-corpus)","status":"pass","elapsed_ms":0.001352,"timing_error":""}
+  ok   validate refuses: missing_budget (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":196,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate refuses: empty_window (error-policy-corpus)","status":"pass","elapsed_ms":0.002333,"timing_error":""}
+  ok   validate refuses: empty_window (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":197,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate refuses: negative_window (error-policy-corpus)","status":"pass","elapsed_ms":0.001872,"timing_error":""}
+  ok   validate refuses: negative_window (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":198,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate refuses: negative_delay (error-policy-corpus)","status":"pass","elapsed_ms":0.001242,"timing_error":""}
+  ok   validate refuses: negative_delay (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":199,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate refuses: text_delay (error-policy-corpus)","status":"pass","elapsed_ms":0.001482,"timing_error":""}
+  ok   validate refuses: text_delay (error-policy-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":200,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"validate refuses: empty_separator (error-policy-corpus)","status":"pass","elapsed_ms":0.001232,"timing_error":""}
+  ok   validate refuses: empty_separator (error-policy-corpus)
+
+=== diagnostics corpus: error report (error-report-corpus) ===
+# lua_timing {"schema":1,"driver":"macos","id":201,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"has vectors (error-report-corpus)","status":"pass","elapsed_ms":0.001162,"timing_error":""}
+  ok   has vectors (error-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":202,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"compose: error_with_recent_issues (error-report-corpus)","status":"pass","elapsed_ms":0.041682,"timing_error":""}
+  ok   compose: error_with_recent_issues (error-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":203,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"compose: error_multi_line_without_recent_issues (error-report-corpus)","status":"pass","elapsed_ms":0.025799,"timing_error":""}
+  ok   compose: error_multi_line_without_recent_issues (error-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":204,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"compose: backticks_lengthen_the_fence (error-report-corpus)","status":"pass","elapsed_ms":0.024136,"timing_error":""}
+  ok   compose: backticks_lengthen_the_fence (error-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":205,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"compose refuses: retired_crash_kind (error-report-corpus)","status":"pass","elapsed_ms":0.002554,"timing_error":""}
+  ok   compose refuses: retired_crash_kind (error-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":206,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"compose refuses: unknown_kind (error-report-corpus)","status":"pass","elapsed_ms":0.001412,"timing_error":""}
+  ok   compose refuses: unknown_kind (error-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":207,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"compose refuses: message_not_text (error-report-corpus)","status":"pass","elapsed_ms":0.001542,"timing_error":""}
+  ok   compose refuses: message_not_text (error-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":208,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"compose refuses: no_module (error-report-corpus)","status":"pass","elapsed_ms":0.001582,"timing_error":""}
+  ok   compose refuses: no_module (error-report-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":209,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"compose refuses: recent_not_a_list (error-report-corpus)","status":"pass","elapsed_ms":0.001653,"timing_error":""}
+  ok   compose refuses: recent_not_a_list (error-report-corpus)
+
+=== diagnostics corpus: day log attachment (day-log-corpus) ===
+# lua_timing {"schema":1,"driver":"macos","id":210,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"has vectors (day-log-corpus)","status":"pass","elapsed_ms":0.001623,"timing_error":""}
+  ok   has vectors (day-log-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":211,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"collect: bom_and_crlf_are_normalized_and_every_line_is_redacted (day-log-corpus)","status":"pass","elapsed_ms":0.178668,"timing_error":""}
+  ok   collect: bom_and_crlf_are_normalized_and_every_line_is_redacted (day-log-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":212,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"collect: an_empty_file_attaches_nothing (day-log-corpus)","status":"pass","elapsed_ms":0.015043,"timing_error":""}
+  ok   collect: an_empty_file_attaches_nothing (day-log-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":213,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"collect: a_file_of_only_a_byte_order_mark_attaches_nothing (day-log-corpus)","status":"pass","elapsed_ms":0.013590,"timing_error":""}
+  ok   collect: a_file_of_only_a_byte_order_mark_attaches_nothing (day-log-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":214,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"collect: a_file_over_the_cap_is_refused_unread (day-log-corpus)","status":"pass","elapsed_ms":0.013520,"timing_error":""}
+  ok   collect: a_file_over_the_cap_is_refused_unread (day-log-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":215,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"collect: redaction_that_grows_the_text_past_the_cap_is_refused (day-log-corpus)","status":"pass","elapsed_ms":0.357156,"timing_error":""}
+  ok   collect: redaction_that_grows_the_text_past_the_cap_is_refused (day-log-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":216,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"collect: the_preview_is_the_first_and_last_lines (day-log-corpus)","status":"pass","elapsed_ms":0.243325,"timing_error":""}
+  ok   collect: the_preview_is_the_first_and_last_lines (day-log-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":217,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"collect: a_short_log_is_all_head_and_no_tail (day-log-corpus)","status":"pass","elapsed_ms":0.160611,"timing_error":""}
+  ok   collect: a_short_log_is_all_head_and_no_tail (day-log-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":218,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"collect: a_long_line_is_cut_in_the_preview_only (day-log-corpus)","status":"pass","elapsed_ms":0.150266,"timing_error":""}
+  ok   collect: a_long_line_is_cut_in_the_preview_only (day-log-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":219,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"collect: pack_names_under_the_configuration_directory_never_reach_the_attachment (day-log-corpus)","status":"pass","elapsed_ms":0.496385,"timing_error":""}
+  ok   collect: pack_names_under_the_configuration_directory_never_reach_the_attachment (day-log-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":220,"kind":"case","module":"tests.meta.corpus.test_corpus_diagnostics","name":"collect: no_rule_reaches_across_a_line_break (day-log-corpus)","status":"pass","elapsed_ms":0.184146,"timing_error":""}
+  ok   collect: no_rule_reaches_across_a_line_break (day-log-corpus)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.meta.corpus.test_corpus_diagnostics","name":"tests.meta.corpus.test_corpus_diagnostics","status":"pass","elapsed_ms":48.703964,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  219
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

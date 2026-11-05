@@ -1,0 +1,11 @@
+
+=== ui.bridge_handlers ===
+
+=== healthcheck_bridge ===
+  ok   has correct bridge_name
+  ok   'ready' answers the page's configuration and a snapshot the schema declares
+  ok   carries the live figures it was given
+  ok   the page's refresh answers a new snapshot
+  ok   still answers with nothing wired at all, and says so
+  ok   names the parts that are wired
+AUDIT_TEST_RESULT	6	0

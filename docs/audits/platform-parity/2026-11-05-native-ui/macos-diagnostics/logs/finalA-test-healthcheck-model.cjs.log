@@ -1,0 +1,25 @@
+[OK] diagnostic sharing: 21 synthetic three-driver vectors; no native collection.
+[OK] diagnostic-checks: quick export never schedules tests even with privacy opt-in
+[OK] diagnostic-checks: explicit opt-in runs three checks and retains two unavailable suites
+[OK] diagnostic-checks: missing canonical section fails the real schema control
+[OK] diagnostic-checks: undeclared host probe fails exact inventory
+[OK] diagnostic-checks: identity redactor cannot pass the independent synthetic oracle
+[OK] diagnostic-checks: cancel suppresses an already dequeued continuation and retains completed data
+[OK] diagnostic-checks: same report formatter carries precise scope, cancellation and cleanup debt
+[OK] diagnostic-checks: invalid host result remains exportable and cannot produce PASS
+[OK] diagnostic-checks: Markdown preserves exact cleanup uncertainty for current and retired probes
+[OK] diagnostics-summary: intentional quick NOT_RUN is neutral on windows
+[OK] diagnostics-summary: intentional quick NOT_RUN is neutral on macos
+[OK] diagnostics-summary: intentional quick NOT_RUN is neutral on linux
+[OK] diagnostics-summary: schema_fields failure cannot be overall green
+[OK] diagnostics-summary: redaction failure cannot be overall green
+[OK] diagnostics-summary: AppleEvent error
+[OK] diagnostics-summary: AppleEvent timeout
+[OK] diagnostics-summary: AppleEvent cancelled
+[OK] diagnostics-summary: AppleEvent not_run
+[OK] diagnostics-summary: AppleEvent pending
+[OK] diagnostics-summary: archived cleanup debt remains incomplete
+[OK] diagnostics-summary: unconfirmed cleanup cannot turn a completed result green
+[OK] diagnostics-summary: healthy recorded controls retain a limited positive scope
+diagnostics-summary-controls=13; passed=13; failed=0
+[OK] diagnostics page model: 16 section(s), 79 field(s) and 216 label(s) in 21 locales; page, summary, report and issue text agree with the schema on the three drivers.

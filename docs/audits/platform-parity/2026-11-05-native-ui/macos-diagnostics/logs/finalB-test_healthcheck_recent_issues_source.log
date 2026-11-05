@@ -1,0 +1,60 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source
+
+=== healthcheck recent issues source (errors-file-issues) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"reads today's errors file when it exists (errors-file-issues)","status":"pass","elapsed_ms":27.427769,"timing_error":""}
+  ok   reads today's errors file when it exists (errors-file-issues)
+2026-11-05 00:54:05:000 [WARNING] [probe] ring fallback marker
+[logger] unified log write refused: /tmp/lua_fP8Bkg_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_fP8Bkg_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"falls back to the ring only when the file is absent (errors-file-issues)","status":"pass","elapsed_ms":23.588397,"timing_error":""}
+  ok   falls back to the ring only when the file is absent (errors-file-issues)
+2026-11-05 00:54:05:000 [WARNING] [probe] ring entry that must not stand in for the file
+[logger] unified log write refused: /tmp/lua_fP8Bkg_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_fP8Bkg_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"reports an errors file that exists but cannot be read, never the ring (errors-file-issues)","status":"pass","elapsed_ms":24.340960,"timing_error":""}
+  ok   reports an errors file that exists but cannot be read, never the ring (errors-file-issues)
+
+=== healthcheck closed recent-file IO ===
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"(errors-file-io-receipts) refuses seek_end_nil without a ring fallback","status":"pass","elapsed_ms":24.854774,"timing_error":""}
+  ok   (errors-file-io-receipts) refuses seek_end_nil without a ring fallback
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"(errors-file-io-receipts) refuses seek_set_nil without a ring fallback","status":"pass","elapsed_ms":23.274805,"timing_error":""}
+  ok   (errors-file-io-receipts) refuses seek_set_nil without a ring fallback
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"(errors-file-io-receipts) refuses seek_end_raise without a ring fallback","status":"pass","elapsed_ms":26.385319,"timing_error":""}
+  ok   (errors-file-io-receipts) refuses seek_end_raise without a ring fallback
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"(errors-file-io-receipts) refuses read_nil without a ring fallback","status":"pass","elapsed_ms":24.165897,"timing_error":""}
+  ok   (errors-file-io-receipts) refuses read_nil without a ring fallback
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"(errors-file-io-receipts) refuses read_errno2 without a ring fallback","status":"pass","elapsed_ms":25.744895,"timing_error":""}
+  ok   (errors-file-io-receipts) refuses read_errno2 without a ring fallback
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"(errors-file-io-receipts) refuses read_raise without a ring fallback","status":"pass","elapsed_ms":22.565116,"timing_error":""}
+  ok   (errors-file-io-receipts) refuses read_raise without a ring fallback
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"(errors-file-io-receipts) refuses read_short without a ring fallback","status":"pass","elapsed_ms":24.873462,"timing_error":""}
+  ok   (errors-file-io-receipts) refuses read_short without a ring fallback
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"(errors-file-io-receipts) refuses close_nil without a ring fallback","status":"pass","elapsed_ms":23.855790,"timing_error":""}
+  ok   (errors-file-io-receipts) refuses close_nil without a ring fallback
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"(errors-file-io-receipts) refuses close_errno2 without a ring fallback","status":"pass","elapsed_ms":26.640173,"timing_error":""}
+  ok   (errors-file-io-receipts) refuses close_errno2 without a ring fallback
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"(errors-file-io-receipts) refuses close_false without a ring fallback","status":"pass","elapsed_ms":24.501493,"timing_error":""}
+  ok   (errors-file-io-receipts) refuses close_false without a ring fallback
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"(errors-file-io-receipts) refuses close_raise without a ring fallback","status":"pass","elapsed_ms":29.401071,"timing_error":""}
+  ok   (errors-file-io-receipts) refuses close_raise without a ring fallback
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"(errors-file-io-receipts) refuses read_close_nil without a ring fallback","status":"pass","elapsed_ms":25.753659,"timing_error":""}
+  ok   (errors-file-io-receipts) refuses read_close_nil without a ring fallback
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"(errors-file-io-receipts) admits an empty closed file without inventing entries","status":"pass","elapsed_ms":26.142664,"timing_error":""}
+  ok   (errors-file-io-receipts) admits an empty closed file without inventing entries
+
+=== healthcheck simultaneous source refusals ===
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"(errors-file-io-receipts) preserves both read and close refusal details","status":"pass","elapsed_ms":0.130386,"timing_error":""}
+  ok   (errors-file-io-receipts) preserves both read and close refusal details
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","name":"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source","status":"pass","elapsed_ms":404.446266,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  17
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

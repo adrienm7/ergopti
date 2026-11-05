@@ -1,0 +1,22 @@
+{
+  "source_root": "/workspace/worktrees/parity-2026-11-05/linux-runtime",
+  "sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+  "status": "?? node_modules\n",
+  "uid": 1000,
+  "sources": {
+    "linux/ui/healthcheck/bridge.lua": "ebb5ac257f4281ec6b2b3862bd472abe24b22d8379705800af4237d482fc1099",
+    "linux/ui/healthcheck/probes.lua": "8a155481014f68f4ac01f4299c39dfb5081e09ae24dc8e8b93cefc38fe30ce3b",
+    "linux/ui/healthcheck/report.lua": "e2132c543a1180f858baed25818f554d939c2769930b784206723bde2d035ac3",
+    "linux/ui/error_dialog/bridge.lua": "ed25f01d78a94ec7a6037ea59c2a967f07c24e370b9e303670bdf5d55a010f7c",
+    "linux/modules/diagnostics/crash_reporter.lua": "12951712fb8d88b14ff1364e9ee152029c5b37b4330fa097f57d9c548382ef45",
+    "linux/infra/diagnostic_snapshot.lua": "c2eb3e639d5a67c8a8aa9d243a183928b55277488123a62180f8aa977c4ae0d6",
+    "linux/adapters/timer_scheduler.lua": "54bb8c0461c2e2c6233acd8c991d5cd3e55add9f4b68ade85ea2e4ff028fe667",
+    "linux/adapters/http_client.lua": "18bac45cce87ac8be1b3b1b73adadcea3a2e64795a1fdbfba6b6721b1fd096eb",
+    "linux/infra/managed_http.lua": "b2ec045f7b0acb39450e1c2a82ede9ed8c932f0f474b46d0cf5958eefd517194",
+    "linux/adapters/curl_http_client.lua": "6b2baf7427c4205c4fc8519186fd0112618e6b59f32c3fcdf5a2535617c03edb",
+    "_shared/lua/healthcheck/share.lua": "597f2050375cac432c1300ffe20ba745c05161240da88bfe801e1478caefd46f",
+    "_shared/lua/healthcheck/report.lua": "e1d1181955014b9b71ed670196fc8c4a1583700814e3402b0978c2b0dd29b045",
+    "_shared/ui/healthcheck/model.js": "4d93d308cc504dddd8ed948d6cafd10981b0e9ac7307a9186cfd7ac077fe4b99",
+    "_shared/modules/diagnostics/schema.json": "c688a21437962dfd1de960d49aeae1f9f72bc79274284ae57ff4eca4e1061bc7"
+  }
+}

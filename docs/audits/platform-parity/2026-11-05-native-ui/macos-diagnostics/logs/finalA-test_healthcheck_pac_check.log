@@ -1,0 +1,30 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_pac_check"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_pac_check
+
+=== PAC check ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_pac_check","name":"accepts an ASCII PAC that defines FindProxyForURL","status":"pass","elapsed_ms":0.010826,"timing_error":""}
+  ok   accepts an ASCII PAC that defines FindProxyForURL
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_pac_check","name":"accepts UTF-8 accents and a byte-order mark","status":"pass","elapsed_ms":0.007071,"timing_error":""}
+  ok   accepts UTF-8 accents and a byte-order mark
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_pac_check","name":"refuses a Windows-1252 accent like the managed download","status":"pass","elapsed_ms":0.002354,"timing_error":""}
+  ok   refuses a Windows-1252 accent like the managed download
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_pac_check","name":"refuses overlong forms and surrogates","status":"pass","elapsed_ms":0.002364,"timing_error":""}
+  ok   refuses overlong forms and surrogates
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_pac_check","name":"names a missing function, an empty body, a bad status and an oversized script","status":"pass","elapsed_ms":6.392063,"timing_error":""}
+  ok   names a missing function, an empty body, a bad status and an oversized script
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_pac_check","name":"tells that the downloads go direct after a PAC failure","status":"pass","elapsed_ms":167.390460,"timing_error":""}
+  ok   tells that the downloads go direct after a PAC failure
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_pac_check","name":"reads the PAC URL only when the system PAC is enabled","status":"pass","elapsed_ms":0.011337,"timing_error":""}
+  ok   reads the PAC URL only when the system PAC is enabled
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_pac_check","name":"tests.unit.ui.healthcheck.test_healthcheck_pac_check","status":"pass","elapsed_ms":174.168302,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  7
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

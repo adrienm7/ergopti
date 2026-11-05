@@ -1,0 +1,8 @@
+
+=== diagnostics runner (Linux) ===
+  ok   refuses a runner built without its ports
+  ok   completes an unknown action as a failure
+  ok   opens the URL of an action through the effect kind its port names
+  ok   does not know an extra action the port did not declare
+  ok   never completes a cancelled request
+AUDIT_TEST_RESULT	5	0

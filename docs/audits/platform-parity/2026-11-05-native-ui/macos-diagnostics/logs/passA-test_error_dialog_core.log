@@ -1,0 +1,34 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_error_dialog_core"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_error_dialog_core
+
+=== shared error window core (error-dialog-core) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog_core","name":"loads the shipped policy and refuses a missing one","status":"pass","elapsed_ms":0.097596,"timing_error":""}
+  ok   loads the shipped policy and refuses a missing one
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog_core","name":"initialises once under the host's lifecycle lines","status":"pass","elapsed_ms":0.086110,"timing_error":""}
+  ok   initialises once under the host's lifecycle lines
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog_core","name":"answers false and logs why when the policy cannot be loaded","status":"pass","elapsed_ms":0.010856,"timing_error":""}
+  ok   answers false and logs why when the policy cannot be loaded
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog_core","name":"reads the stored switch first, then the manifest's boolean default","status":"pass","elapsed_ms":0.005929,"timing_error":""}
+  ok   reads the stored switch first, then the manifest's boolean default
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog_core","name":"persists only a boolean and only reports a saved one","status":"pass","elapsed_ms":0.015604,"timing_error":""}
+  ok   persists only a boolean and only reports a saved one
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog_core","name":"composes the report and the file an error is logged in","status":"pass","elapsed_ms":0.117627,"timing_error":""}
+  ok   composes the report and the file an error is logged in
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog_core","name":"redacts every text of the page's first message","status":"pass","elapsed_ms":0.007601,"timing_error":""}
+  ok   redacts every text of the page's first message
+
+=== the error window host delegates to the shared core (error-dialog-core) ===
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog_core","name":"the macOS error window requires error_dialog.core and keeps no copy","status":"pass","elapsed_ms":170.914498,"timing_error":""}
+  ok   the macOS error window requires error_dialog.core and keeps no copy
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_error_dialog_core","name":"tests.unit.ui.healthcheck.test_error_dialog_core","status":"pass","elapsed_ms":172.465513,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  8
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

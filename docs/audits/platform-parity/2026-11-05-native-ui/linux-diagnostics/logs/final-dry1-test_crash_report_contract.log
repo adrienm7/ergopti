@@ -1,0 +1,11 @@
+
+=== Crash report format and retention ===
+  ok   keeps the cap and the field list of the corpus
+  ok   derives the file stem from the UTC timestamp
+  ok   names a report and parses the name back
+  ok   refuses every name that is not a report
+  ok   deletes the oldest reports beyond the cap, and only reports
+  ok   applies the shared cap by default
+  ok   serialises a record in the documented order with the documented defaults
+  ok   raises on an unknown field and converts a non-string value
+AUDIT_TEST_RESULT	8	0

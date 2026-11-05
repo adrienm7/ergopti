@@ -1,0 +1,18 @@
+PASS genuine ZIP namespace portable refused=False
+PASS genuine ZIP namespace traversal refused=True
+PASS genuine ZIP namespace ads refused=True
+PASS genuine ZIP namespace rooted refused=True
+PASS genuine ZIP namespace device refused=True
+PASS genuine ZIP namespace collision refused=True
+PASS genuine ZIP namespace trailing-dot refused=True
+PASS genuine ZIP namespace receipt-collision refused=True
+PASS genuine ZIP namespace directory-cli refused=True
+PASS genuine ZIP namespace symlink refused=True
+PASS genuine ZIP namespace file-ancestor-cli refused=True
+PASS genuine ZIP namespace file-ancestor-library refused=True
+PASS genuine ZIP namespace file-ancestor-reverse refused=True
+PASS genuine ZIP namespace file-ancestor-case refused=True
+PASS genuine ZIP namespace prepared-receipt-descendant refused=True
+PASS genuine ZIP namespace owner-receipt-descendant refused=True
+PASS genuine private-file create-only, exact hash, cursor preservation, JSON reset
+RESULT 17 passed; native Windows functions NOT invoked

@@ -1,0 +1,20 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_identity_rows"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_identity_rows
+
+=== healthcheck: macOS identity rows ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_identity_rows","name":"reports the ErgoptiPlus version, and Hammerspoon's only as the runtime","status":"pass","elapsed_ms":9.205657,"timing_error":""}
+  ok   reports the ErgoptiPlus version, and Hammerspoon's only as the runtime
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_identity_rows","name":"reports the bundle directory as the app dir","status":"pass","elapsed_ms":6.397791,"timing_error":""}
+  ok   reports the bundle directory as the app dir
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_identity_rows","name":"tests.unit.ui.healthcheck.test_healthcheck_identity_rows","status":"pass","elapsed_ms":15.756207,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  2
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

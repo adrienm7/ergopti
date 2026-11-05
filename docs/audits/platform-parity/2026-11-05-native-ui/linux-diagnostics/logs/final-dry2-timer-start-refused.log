@@ -1,0 +1,2 @@
+ADVERSE native_timer=start-refused callbacks=0 live_handles=0 configuration_terminal=missing snapshot=pending
+VISIBILITY trace:Probe 'configuration' started… | debug:Parsing TOML file… | info:TOML file parsed successfully. | info:Shared timings registry loaded (16 section(s)). | error:after(): timer allocation/start failed — ...e/static/ergopti_plus/linux/adapters/timer_scheduler.lua:134: luv.timer_start rejected the timer

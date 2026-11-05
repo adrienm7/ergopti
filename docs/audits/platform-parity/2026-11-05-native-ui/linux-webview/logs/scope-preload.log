@@ -1,0 +1,417 @@
+
+=== Actual native WebView acquisition and retirement debt ===
+# lua_timing {"schema":1,"driver":"linux","id":1,"kind":"case","module":"","name":"(native-refocus-owner) repeated show acknowledges only its retained native owner: close","status":"pass","elapsed_ms":3.104940,"timing_error":""}
+  ok   (native-refocus-owner) repeated show acknowledges only its retained native owner: close
+# lua_timing {"schema":1,"driver":"linux","id":2,"kind":"case","module":"","name":"(native-refocus-owner) repeated show acknowledges only its retained native owner: replace","status":"pass","elapsed_ms":3.076057,"timing_error":""}
+  ok   (native-refocus-owner) repeated show acknowledges only its retained native owner: replace
+# lua_timing {"schema":1,"driver":"linux","id":3,"kind":"case","module":"","name":"(native-refocus-owner) repeated show acknowledges only its retained native owner: retain","status":"pass","elapsed_ms":2.264817,"timing_error":""}
+  ok   (native-refocus-owner) repeated show acknowledges only its retained native owner: retain
+# lua_timing {"schema":1,"driver":"linux","id":4,"kind":"case","module":"","name":"(native-refocus-owner) repeated show acknowledges only its retained native owner: refused","status":"pass","elapsed_ms":2.570065,"timing_error":""}
+  ok   (native-refocus-owner) repeated show acknowledges only its retained native owner: refused
+# lua_timing {"schema":1,"driver":"linux","id":5,"kind":"case","module":"","name":"(native-refocus-owner) repeated show acknowledges only its retained native owner: debt","status":"pass","elapsed_ms":2.256554,"timing_error":""}
+  ok   (native-refocus-owner) repeated show acknowledges only its retained native owner: debt
+# lua_timing {"schema":1,"driver":"linux","id":6,"kind":"case","module":"","name":"(native-refocus-owner) configuration cleanup reopen refuses a synchronously closed page","status":"pass","elapsed_ms":8.406093,"timing_error":""}
+  ok   (native-refocus-owner) configuration cleanup reopen refuses a synchronously closed page
+# lua_timing {"schema":1,"driver":"linux","id":7,"kind":"case","module":"","name":"(native-push-admission) asynchronous diagnostics probe cannot push into live","status":"pass","elapsed_ms":4.908442,"timing_error":""}
+  ok   (native-push-admission) asynchronous diagnostics probe cannot push into live
+# lua_timing {"schema":1,"driver":"linux","id":8,"kind":"case","module":"","name":"(native-push-admission) asynchronous diagnostics probe cannot push into close_debt","status":"pass","elapsed_ms":4.888813,"timing_error":""}
+  ok   (native-push-admission) asynchronous diagnostics probe cannot push into close_debt
+# lua_timing {"schema":1,"driver":"linux","id":9,"kind":"case","module":"","name":"(native-push-admission) asynchronous diagnostics probe cannot push into renderer_debt","status":"pass","elapsed_ms":5.235154,"timing_error":""}
+  ok   (native-push-admission) asynchronous diagnostics probe cannot push into renderer_debt
+# lua_timing {"schema":1,"driver":"linux","id":10,"kind":"case","module":"","name":"(native-push-admission) asynchronous diagnostics probe cannot push into closing","status":"pass","elapsed_ms":4.781472,"timing_error":""}
+  ok   (native-push-admission) asynchronous diagnostics probe cannot push into closing
+# lua_timing {"schema":1,"driver":"linux","id":11,"kind":"case","module":"","name":"(native-push-admission) asynchronous diagnostics probe cannot push into successor","status":"pass","elapsed_ms":5.143947,"timing_error":""}
+  ok   (native-push-admission) asynchronous diagnostics probe cannot push into successor
+# lua_timing {"schema":1,"driver":"linux","id":12,"kind":"case","module":"","name":"(native-push-admission) synchronous diagnostics ready preserves only live acquisition: false","status":"pass","elapsed_ms":4.601150,"timing_error":""}
+  ok   (native-push-admission) synchronous diagnostics ready preserves only live acquisition: false
+# lua_timing {"schema":1,"driver":"linux","id":13,"kind":"case","module":"","name":"(native-push-admission) synchronous diagnostics ready preserves only live acquisition: true","status":"pass","elapsed_ms":4.820961,"timing_error":""}
+  ok   (native-push-admission) synchronous diagnostics ready preserves only live acquisition: true
+# lua_timing {"schema":1,"driver":"linux","id":14,"kind":"case","module":"","name":"(native-push-admission) native JavaScript dispatch acknowledges only its retained owner: close","status":"pass","elapsed_ms":7.475043,"timing_error":""}
+  ok   (native-push-admission) native JavaScript dispatch acknowledges only its retained owner: close
+# lua_timing {"schema":1,"driver":"linux","id":15,"kind":"case","module":"","name":"(native-push-admission) native JavaScript dispatch acknowledges only its retained owner: replace","status":"pass","elapsed_ms":8.237761,"timing_error":""}
+  ok   (native-push-admission) native JavaScript dispatch acknowledges only its retained owner: replace
+# lua_timing {"schema":1,"driver":"linux","id":16,"kind":"case","module":"","name":"(native-push-admission) native JavaScript dispatch acknowledges only its retained owner: retain","status":"pass","elapsed_ms":7.137695,"timing_error":""}
+  ok   (native-push-admission) native JavaScript dispatch acknowledges only its retained owner: retain
+# lua_timing {"schema":1,"driver":"linux","id":17,"kind":"case","module":"","name":"(native-window-owner) renderer termination retires an ordinary page before retry","status":"pass","elapsed_ms":3.657792,"timing_error":""}
+  ok   (native-window-owner) renderer termination retires an ordinary page before retry
+# lua_timing {"schema":1,"driver":"linux","id":18,"kind":"case","module":"","name":"(native-window-owner) renderer retirement refusal retains debt and blocks stale writes","status":"pass","elapsed_ms":2.780562,"timing_error":""}
+  ok   (native-window-owner) renderer retirement refusal retains debt and blocks stale writes
+# lua_timing {"schema":1,"driver":"linux","id":19,"kind":"case","module":"","name":"(native-window-owner) bridge response retains source owner through handler callback: close","status":"pass","elapsed_ms":2.175252,"timing_error":""}
+  ok   (native-window-owner) bridge response retains source owner through handler callback: close
+# lua_timing {"schema":1,"driver":"linux","id":20,"kind":"case","module":"","name":"(native-window-owner) bridge response retains source owner through handler callback: replace","status":"pass","elapsed_ms":3.814487,"timing_error":""}
+  ok   (native-window-owner) bridge response retains source owner through handler callback: replace
+# lua_timing {"schema":1,"driver":"linux","id":21,"kind":"case","module":"","name":"(native-window-owner) bridge response retains source owner through handler callback: same","status":"pass","elapsed_ms":2.673672,"timing_error":""}
+  ok   (native-window-owner) bridge response retains source owner through handler callback: same
+# lua_timing {"schema":1,"driver":"linux","id":22,"kind":"case","module":"","name":"(bridge-retirement-admission) queued native messages cannot save during close_debt","status":"pass","elapsed_ms":2.208712,"timing_error":""}
+  ok   (bridge-retirement-admission) queued native messages cannot save during close_debt
+# lua_timing {"schema":1,"driver":"linux","id":23,"kind":"case","module":"","name":"(bridge-retirement-admission) queued native messages cannot save during renderer_debt","status":"pass","elapsed_ms":2.641844,"timing_error":""}
+  ok   (bridge-retirement-admission) queued native messages cannot save during renderer_debt
+# lua_timing {"schema":1,"driver":"linux","id":24,"kind":"case","module":"","name":"(bridge-retirement-admission) queued native messages cannot save during closing","status":"pass","elapsed_ms":2.757157,"timing_error":""}
+  ok   (bridge-retirement-admission) queued native messages cannot save during closing
+# lua_timing {"schema":1,"driver":"linux","id":25,"kind":"case","module":"","name":"(bridge-retirement-admission) queued native messages cannot save during cancelled_acquisition","status":"pass","elapsed_ms":2.262864,"timing_error":""}
+  ok   (bridge-retirement-admission) queued native messages cannot save during cancelled_acquisition
+# lua_timing {"schema":1,"driver":"linux","id":26,"kind":"case","module":"","name":"(bridge-retirement-admission) queued native messages cannot save during failed_acquisition","status":"pass","elapsed_ms":3.022456,"timing_error":""}
+  ok   (bridge-retirement-admission) queued native messages cannot save during failed_acquisition
+# lua_timing {"schema":1,"driver":"linux","id":27,"kind":"case","module":"","name":"(bridge-retirement-admission) live native acquisition still admits its ready callback","status":"pass","elapsed_ms":2.621283,"timing_error":""}
+  ok   (bridge-retirement-admission) live native acquisition still admits its ready callback
+# lua_timing {"schema":1,"driver":"linux","id":28,"kind":"case","module":"","name":"(webview-single-pump) reopening pages retains one process-wide GTK handler","status":"pass","elapsed_ms":10.257398,"timing_error":""}
+  ok   (webview-single-pump) reopening pages retains one process-wide GTK handler
+# lua_timing {"schema":1,"driver":"linux","id":29,"kind":"case","module":"","name":"(webview-single-pump) refused event-loop integration cannot acknowledge a frozen window","status":"pass","elapsed_ms":3.837281,"timing_error":""}
+  ok   (webview-single-pump) refused event-loop integration cannot acknowledge a frozen window
+# lua_timing {"schema":1,"driver":"linux","id":30,"kind":"case","module":"","name":"(native-window-owner) acquisition refusal retains exact physical window: ucm","status":"pass","elapsed_ms":4.395636,"timing_error":""}
+  ok   (native-window-owner) acquisition refusal retains exact physical window: ucm
+# lua_timing {"schema":1,"driver":"linux","id":31,"kind":"case","module":"","name":"(native-window-owner) acquisition refusal retains exact physical window: register_false","status":"pass","elapsed_ms":2.560010,"timing_error":""}
+  ok   (native-window-owner) acquisition refusal retains exact physical window: register_false
+# lua_timing {"schema":1,"driver":"linux","id":32,"kind":"case","module":"","name":"(native-window-owner) acquisition refusal retains exact physical window: register_throw","status":"pass","elapsed_ms":3.428396,"timing_error":""}
+  ok   (native-window-owner) acquisition refusal retains exact physical window: register_throw
+# lua_timing {"schema":1,"driver":"linux","id":33,"kind":"case","module":"","name":"(native-window-owner) acquisition refusal retains exact physical window: signal","status":"pass","elapsed_ms":2.761283,"timing_error":""}
+  ok   (native-window-owner) acquisition refusal retains exact physical window: signal
+# lua_timing {"schema":1,"driver":"linux","id":34,"kind":"case","module":"","name":"(native-window-owner) acquisition refusal retains exact physical window: present","status":"pass","elapsed_ms":2.748975,"timing_error":""}
+  ok   (native-window-owner) acquisition refusal retains exact physical window: present
+# lua_timing {"schema":1,"driver":"linux","id":35,"kind":"case","module":"","name":"(native-window-owner) destruction refusal preserves exact live page: throw","status":"pass","elapsed_ms":3.388266,"timing_error":""}
+  ok   (native-window-owner) destruction refusal preserves exact live page: throw
+# lua_timing {"schema":1,"driver":"linux","id":36,"kind":"case","module":"","name":"(native-window-owner) destruction refusal preserves exact live page: false","status":"pass","elapsed_ms":2.928905,"timing_error":""}
+  ok   (native-window-owner) destruction refusal preserves exact live page: false
+# lua_timing {"schema":1,"driver":"linux","id":37,"kind":"case","module":"","name":"(native-window-owner) capture release refusal retains logical debt: throw","status":"pass","elapsed_ms":2.308392,"timing_error":""}
+  ok   (native-window-owner) capture release refusal retains logical debt: throw
+# lua_timing {"schema":1,"driver":"linux","id":38,"kind":"case","module":"","name":"(native-window-owner) capture release refusal retains logical debt: false","status":"pass","elapsed_ms":2.314601,"timing_error":""}
+  ok   (native-window-owner) capture release refusal retains logical debt: false
+# lua_timing {"schema":1,"driver":"linux","id":39,"kind":"case","module":"","name":"(native-window-owner) construction reentry cannot acknowledge a provisional page","status":"pass","elapsed_ms":2.488202,"timing_error":""}
+  ok   (native-window-owner) construction reentry cannot acknowledge a provisional page
+# lua_timing {"schema":1,"driver":"linux","id":40,"kind":"case","module":"","name":"(native-window-owner) synchronous close during presentation cannot resurrect acquired page","status":"pass","elapsed_ms":2.037995,"timing_error":""}
+  ok   (native-window-owner) synchronous close during presentation cannot resurrect acquired page
+# lua_timing {"schema":1,"driver":"linux","id":41,"kind":"case","module":"","name":"(native-window-owner) shutdown retains refused exact debt: destroy","status":"pass","elapsed_ms":2.098296,"timing_error":""}
+  ok   (native-window-owner) shutdown retains refused exact debt: destroy
+# lua_timing {"schema":1,"driver":"linux","id":42,"kind":"case","module":"","name":"(native-window-owner) shutdown retains refused exact debt: release","status":"pass","elapsed_ms":2.717928,"timing_error":""}
+  ok   (native-window-owner) shutdown retains refused exact debt: release
+# lua_timing {"schema":1,"driver":"linux","id":43,"kind":"case","module":"","name":"(native-window-owner) release callback cannot reacquire retiring page","status":"pass","elapsed_ms":2.323865,"timing_error":""}
+  ok   (native-window-owner) release callback cannot reacquire retiring page
+# lua_timing {"schema":1,"driver":"linux","id":44,"kind":"case","module":"","name":"(native-window-owner) unattached acquired WebView retains exact child debt: load/throw","status":"pass","elapsed_ms":2.407531,"timing_error":""}
+  ok   (native-window-owner) unattached acquired WebView retains exact child debt: load/throw
+# lua_timing {"schema":1,"driver":"linux","id":45,"kind":"case","module":"","name":"(native-window-owner) unattached acquired WebView retains exact child debt: load/false","status":"pass","elapsed_ms":2.839751,"timing_error":""}
+  ok   (native-window-owner) unattached acquired WebView retains exact child debt: load/false
+# lua_timing {"schema":1,"driver":"linux","id":46,"kind":"case","module":"","name":"(native-window-owner) unattached acquired WebView retains exact child debt: load/no_ack","status":"pass","elapsed_ms":2.729775,"timing_error":""}
+  ok   (native-window-owner) unattached acquired WebView retains exact child debt: load/no_ack
+# lua_timing {"schema":1,"driver":"linux","id":47,"kind":"case","module":"","name":"(native-window-owner) unattached acquired WebView retains exact child debt: add/throw","status":"pass","elapsed_ms":2.420029,"timing_error":""}
+  ok   (native-window-owner) unattached acquired WebView retains exact child debt: add/throw
+# lua_timing {"schema":1,"driver":"linux","id":48,"kind":"case","module":"","name":"(native-window-owner) unattached acquired WebView retains exact child debt: add/false","status":"pass","elapsed_ms":1.996092,"timing_error":""}
+  ok   (native-window-owner) unattached acquired WebView retains exact child debt: add/false
+# lua_timing {"schema":1,"driver":"linux","id":49,"kind":"case","module":"","name":"(native-window-owner) unattached acquired WebView retains exact child debt: add/no_ack","status":"pass","elapsed_ms":2.689966,"timing_error":""}
+  ok   (native-window-owner) unattached acquired WebView retains exact child debt: add/no_ack
+# lua_timing {"schema":1,"driver":"linux","id":50,"kind":"case","module":"","name":"(native-window-owner) synchronous WebView retirement cannot acknowledge a destroyed page","status":"pass","elapsed_ms":2.056793,"timing_error":""}
+  ok   (native-window-owner) synchronous WebView retirement cannot acknowledge a destroyed page
+# lua_timing {"schema":1,"driver":"linux","id":51,"kind":"case","module":"","name":"(native-window-owner) native WebView destruction retires exact live page","status":"pass","elapsed_ms":2.275743,"timing_error":""}
+  ok   (native-window-owner) native WebView destruction retires exact live page
+# lua_timing {"schema":1,"driver":"linux","id":52,"kind":"case","module":"","name":"(native-window-owner) constructor cancellation adopts child destroy observer before inverse","status":"pass","elapsed_ms":2.201681,"timing_error":""}
+  ok   (native-window-owner) constructor cancellation adopts child destroy observer before inverse
+# lua_timing {"schema":1,"driver":"linux","id":53,"kind":"case","module":"","name":"(native-window-owner) failed child observer installation retries before destructive retirement","status":"pass","elapsed_ms":2.772990,"timing_error":""}
+  ok   (native-window-owner) failed child observer installation retries before destructive retirement
+# lua_timing {"schema":1,"driver":"linux","id":54,"kind":"case","module":"","name":"(native-window-owner) retains exact bridge capability when unregister refuses throw","status":"pass","elapsed_ms":2.080960,"timing_error":""}
+  ok   (native-window-owner) retains exact bridge capability when unregister refuses throw
+# lua_timing {"schema":1,"driver":"linux","id":55,"kind":"case","module":"","name":"(native-window-owner) retains exact bridge capability when unregister refuses false","status":"pass","elapsed_ms":2.045867,"timing_error":""}
+  ok   (native-window-owner) retains exact bridge capability when unregister refuses false
+# lua_timing {"schema":1,"driver":"linux","id":56,"kind":"case","module":"","name":"(native-window-owner) retains exact bridge capability when disconnect refuses throw","status":"pass","elapsed_ms":2.213770,"timing_error":""}
+  ok   (native-window-owner) retains exact bridge capability when disconnect refuses throw
+# lua_timing {"schema":1,"driver":"linux","id":57,"kind":"case","module":"","name":"(native-window-owner) retains exact bridge capability when disconnect refuses false","status":"pass","elapsed_ms":2.890007,"timing_error":""}
+  ok   (native-window-owner) retains exact bridge capability when disconnect refuses false
+# lua_timing {"schema":1,"driver":"linux","id":58,"kind":"case","module":"","name":"(native-window-owner) native disconnect return alone cannot replace exact signal readback","status":"pass","elapsed_ms":2.112577,"timing_error":""}
+  ok   (native-window-owner) native disconnect return alone cannot replace exact signal readback
+# lua_timing {"schema":1,"driver":"linux","id":59,"kind":"case","module":"","name":"(native-window-owner) actual physical host refuses delivery authority before allocation: missing","status":"pass","elapsed_ms":2.907463,"timing_error":""}
+  ok   (native-window-owner) actual physical host refuses delivery authority before allocation: missing
+# lua_timing {"schema":1,"driver":"linux","id":60,"kind":"case","module":"","name":"(native-window-owner) actual physical host refuses delivery authority before allocation: false","status":"pass","elapsed_ms":3.046362,"timing_error":""}
+  ok   (native-window-owner) actual physical host refuses delivery authority before allocation: false
+# lua_timing {"schema":1,"driver":"linux","id":61,"kind":"case","module":"","name":"(native-window-owner) actual physical host refuses delivery authority before allocation: unknown","status":"pass","elapsed_ms":3.016367,"timing_error":""}
+  ok   (native-window-owner) actual physical host refuses delivery authority before allocation: unknown
+# lua_timing {"schema":1,"driver":"linux","id":62,"kind":"case","module":"","name":"(native-window-owner) actual physical host refuses delivery authority before allocation: throw","status":"pass","elapsed_ms":2.719240,"timing_error":""}
+  ok   (native-window-owner) actual physical host refuses delivery authority before allocation: throw
+# lua_timing {"schema":1,"driver":"linux","id":63,"kind":"case","module":"","name":"(native-window-owner) actual physical host retains failed acquisition debt: destroy","status":"pass","elapsed_ms":24.460049,"timing_error":""}
+  ok   (native-window-owner) actual physical host retains failed acquisition debt: destroy
+# lua_timing {"schema":1,"driver":"linux","id":64,"kind":"case","module":"","name":"(native-window-owner) actual physical host retains failed acquisition debt: release","status":"pass","elapsed_ms":24.279909,"timing_error":""}
+  ok   (native-window-owner) actual physical host retains failed acquisition debt: release
+# lua_timing {"schema":1,"driver":"linux","id":65,"kind":"case","module":"","name":"(native-window-owner) actual host adopts epoch before synchronous ready and close","status":"pass","elapsed_ms":26.515871,"timing_error":""}
+  ok   (native-window-owner) actual host adopts epoch before synchronous ready and close
+# lua_timing {"schema":1,"driver":"linux","id":66,"kind":"case","module":"","name":"(native-window-owner) old native callbacks cannot retire successor","status":"pass","elapsed_ms":3.984272,"timing_error":""}
+  ok   (native-window-owner) old native callbacks cannot retire successor
+
+=== native bridge messages retain their page epoch ===
+# lua_timing {"schema":1,"driver":"linux","id":67,"kind":"case","module":"","name":"linux-retired-bridge: refuses a native message after public hide","status":"pass","elapsed_ms":1.649591,"timing_error":""}
+  ok   linux-retired-bridge: refuses a native message after public hide
+# lua_timing {"schema":1,"driver":"linux","id":68,"kind":"case","module":"","name":"linux-retired-bridge: refuses an epoch without a live page","status":"pass","elapsed_ms":0.760523,"timing_error":""}
+  ok   linux-retired-bridge: refuses an epoch without a live page
+# lua_timing {"schema":1,"driver":"linux","id":69,"kind":"case","module":"","name":"linux-retired-bridge: refuses a replaced native page","status":"pass","elapsed_ms":0.721796,"timing_error":""}
+  ok   linux-retired-bridge: refuses a replaced native page
+# lua_timing {"schema":1,"driver":"linux","id":70,"kind":"case","module":"","name":"linux-retired-bridge: accepts the current native page","status":"pass","elapsed_ms":0.657208,"timing_error":""}
+  ok   linux-retired-bridge: accepts the current native page
+# lua_timing {"schema":1,"driver":"linux","id":71,"kind":"case","module":"","name":"linux-retired-bridge: preserves legacy epochless routing","status":"pass","elapsed_ms":0.664980,"timing_error":""}
+  ok   linux-retired-bridge: preserves legacy epochless routing
+
+=== download progress native page closure ===
+# lua_timing {"schema":1,"driver":"linux","id":72,"kind":"case","module":"","name":"linux-download-page-close: pre-ready close preserves background completion","status":"pass","elapsed_ms":19.505437,"timing_error":""}
+  ok   linux-download-page-close: pre-ready close preserves background completion
+# lua_timing {"schema":1,"driver":"linux","id":73,"kind":"case","module":"","name":"linux-download-page-close: ready close acknowledges complete without a stale push","status":"pass","elapsed_ms":2.668263,"timing_error":""}
+  ok   linux-download-page-close: ready close acknowledges complete without a stale push
+# lua_timing {"schema":1,"driver":"linux","id":74,"kind":"case","module":"","name":"linux-download-page-close: ready close permits exact operation retirement","status":"pass","elapsed_ms":2.605119,"timing_error":""}
+  ok   linux-download-page-close: ready close permits exact operation retirement
+# lua_timing {"schema":1,"driver":"linux","id":75,"kind":"case","module":"","name":"linux-download-page-close: focus reopens a fresh page with retained terminal data","status":"pass","elapsed_ms":3.215727,"timing_error":""}
+  ok   linux-download-page-close: focus reopens a fresh page with retained terminal data
+# lua_timing {"schema":1,"driver":"linux","id":76,"kind":"case","module":"","name":"linux-download-page-close: delayed old close cannot clear reopened readiness","status":"pass","elapsed_ms":3.149928,"timing_error":""}
+  ok   linux-download-page-close: delayed old close cannot clear reopened readiness
+# lua_timing {"schema":1,"driver":"linux","id":77,"kind":"case","module":"","name":"linux-download-page-close: delayed close cannot clear a foreign session page","status":"pass","elapsed_ms":3.379223,"timing_error":""}
+  ok   linux-download-page-close: delayed close cannot clear a foreign session page
+# lua_timing {"schema":1,"driver":"linux","id":78,"kind":"case","module":"","name":"linux-download-page-close: focusing a live page retains its exact close owner","status":"pass","elapsed_ms":2.868695,"timing_error":""}
+  ok   linux-download-page-close: focusing a live page retains its exact close owner
+# lua_timing {"schema":1,"driver":"linux","id":79,"kind":"case","module":"","name":"linux-download-page-close: closing a page does not infer explicit cancellation","status":"pass","elapsed_ms":5.370177,"timing_error":""}
+  ok   linux-download-page-close: closing a page does not infer explicit cancellation
+
+=== webview pages: messages and replies cross the bridge ===
+# lua_timing {"schema":1,"driver":"linux","id":80,"kind":"case","module":"","name":"decodes an object a page posts","status":"pass","elapsed_ms":0.800283,"timing_error":""}
+  ok   decodes an object a page posts
+# lua_timing {"schema":1,"driver":"linux","id":81,"kind":"case","module":"","name":"sends a reply the page can decode","status":"pass","elapsed_ms":0.088713,"timing_error":""}
+  ok   sends a reply the page can decode
+
+=== webview pages: shown in the interface's language ===
+# lua_timing {"schema":1,"driver":"linux","id":82,"kind":"case","module":"","name":"builds the page in the tray's locale when the caller names none","status":"pass","elapsed_ms":0.976549,"timing_error":""}
+  ok   builds the page in the tray's locale when the caller names none
+
+=== webview toggle (Linux) ===
+# lua_timing {"schema":1,"driver":"linux","id":83,"kind":"case","module":"","name":"opens a closed page, raises a covered one and closes a frontmost one","status":"pass","elapsed_ms":33.916723,"timing_error":""}
+  ok   opens a closed page, raises a covered one and closes a frontmost one
+# lua_timing {"schema":1,"driver":"linux","id":84,"kind":"case","module":"","name":"a closed page with its own opener opens through it, not show()","status":"pass","elapsed_ms":0.003635,"timing_error":""}
+  ok   a closed page with its own opener opens through it, not show()
+
+=== window actions reach the toggle (Linux) ===
+# lua_timing {"schema":1,"driver":"linux","id":85,"kind":"case","module":"","name":"each catalogue window action toggles its own page","status":"pass","elapsed_ms":16.729903,"timing_error":""}
+  ok   each catalogue window action toggles its own page
+
+=== ui.webkit_host ===
+# lua_timing {"schema":1,"driver":"linux","id":86,"kind":"case","module":"","name":"provides the Base64 codec used by native response envelopes","status":"pass","elapsed_ms":0.081723,"timing_error":""}
+  ok   provides the Base64 codec used by native response envelopes
+
+=== get_bridge_names() ===
+# lua_timing {"schema":1,"driver":"linux","id":87,"kind":"case","module":"","name":"returns an array","status":"pass","elapsed_ms":0.000621,"timing_error":""}
+  ok   returns an array
+# lua_timing {"schema":1,"driver":"linux","id":88,"kind":"case","module":"","name":"contains all expected bridge names from host_bridge.js","status":"pass","elapsed_ms":0.017376,"timing_error":""}
+  ok   contains all expected bridge names from host_bridge.js
+# lua_timing {"schema":1,"driver":"linux","id":89,"kind":"case","module":"","name":"has exactly 21 bridges including the physical editor","status":"pass","elapsed_ms":0.003715,"timing_error":""}
+  ok   has exactly 21 bridges including the physical editor
+
+=== independent physical bridge registry contract ===
+# lua_timing {"schema":1,"driver":"linux","id":90,"kind":"case","module":"","name":"owns the explicit physical editor bridge","status":"pass","elapsed_ms":0.000821,"timing_error":""}
+  ok   owns the explicit physical editor bridge
+# lua_timing {"schema":1,"driver":"linux","id":91,"kind":"case","module":"","name":"refuses a missing physical bridge and a duplicate legacy bridge","status":"pass","elapsed_ms":0.045479,"timing_error":""}
+  ok   refuses a missing physical bridge and a duplicate legacy bridge
+
+=== is_valid_bridge() ===
+# lua_timing {"schema":1,"driver":"linux","id":92,"kind":"case","module":"","name":"returns true for known bridges","status":"pass","elapsed_ms":0.009475,"timing_error":""}
+  ok   returns true for known bridges
+# lua_timing {"schema":1,"driver":"linux","id":93,"kind":"case","module":"","name":"returns false for unknown bridges","status":"pass","elapsed_ms":0.010636,"timing_error":""}
+  ok   returns false for unknown bridges
+
+=== bridge_for_app() ===
+# lua_timing {"schema":1,"driver":"linux","id":94,"kind":"case","module":"","name":"assigns exactly one bridge to every real webview app","status":"pass","elapsed_ms":0.033480,"timing_error":""}
+  ok   assigns exactly one bridge to every real webview app
+
+=== resolve_ui_root() ===
+# lua_timing {"schema":1,"driver":"linux","id":95,"kind":"case","module":"","name":"resolves _shared/ui/ from the driver root","status":"pass","elapsed_ms":0.015694,"timing_error":""}
+  ok   resolves _shared/ui/ from the driver root
+# lua_timing {"schema":1,"driver":"linux","id":96,"kind":"case","module":"","name":"preserves native path bytes after successful probes (webview-native-path)","status":"pass","elapsed_ms":0.003335,"timing_error":""}
+  ok   preserves native path bytes after successful probes (webview-native-path)
+# lua_timing {"schema":1,"driver":"linux","id":97,"kind":"case","module":"","name":"returns empty for nonexistent roots","status":"pass","elapsed_ms":0.018528,"timing_error":""}
+  ok   returns empty for nonexistent roots
+
+=== resolve_app_dir() ===
+# lua_timing {"schema":1,"driver":"linux","id":98,"kind":"case","module":"","name":"resolves an existing app directory","status":"pass","elapsed_ms":0.010375,"timing_error":""}
+  ok   resolves an existing app directory
+# lua_timing {"schema":1,"driver":"linux","id":99,"kind":"case","module":"","name":"returns empty for nonexistent app","status":"pass","elapsed_ms":0.004988,"timing_error":""}
+  ok   returns empty for nonexistent app
+# lua_timing {"schema":1,"driver":"linux","id":100,"kind":"case","module":"","name":"returns empty when ui_root is empty","status":"pass","elapsed_ms":0.000281,"timing_error":""}
+  ok   returns empty when ui_root is empty
+
+=== resolve_locales_dir() ===
+# lua_timing {"schema":1,"driver":"linux","id":101,"kind":"case","module":"","name":"resolves _shared/data/locales/ from the driver root","status":"pass","elapsed_ms":0.007571,"timing_error":""}
+  ok   resolves _shared/data/locales/ from the driver root
+
+=== build_injected_html() ===
+# lua_timing {"schema":1,"driver":"linux","id":102,"kind":"case","module":"","name":"returns error page for empty assets_dir","status":"pass","elapsed_ms":0.000621,"timing_error":""}
+  ok   returns error page for empty assets_dir
+# lua_timing {"schema":1,"driver":"linux","id":103,"kind":"case","module":"","name":"returns error page for nonexistent index.html","status":"pass","elapsed_ms":0.002193,"timing_error":""}
+  ok   returns error page for nonexistent index.html
+# lua_timing {"schema":1,"driver":"linux","id":104,"kind":"case","module":"","name":"loads a real index.html from action_picker","status":"pass","elapsed_ms":0.291950,"timing_error":""}
+  ok   loads a real index.html from action_picker
+# lua_timing {"schema":1,"driver":"linux","id":105,"kind":"case","module":"","name":"inlines local CSS files as <style> blocks","status":"pass","elapsed_ms":0.234393,"timing_error":""}
+  ok   inlines local CSS files as <style> blocks
+# lua_timing {"schema":1,"driver":"linux","id":106,"kind":"case","module":"","name":"fails closed when a page names a remote executable asset","status":"pass","elapsed_ms":0.022293,"timing_error":""}
+  ok   fails closed when a page names a remote executable asset
+# lua_timing {"schema":1,"driver":"linux","id":107,"kind":"case","module":"","name":"inlines local JS files as <script> blocks","status":"pass","elapsed_ms":0.551179,"timing_error":""}
+  ok   inlines local JS files as <script> blocks
+# lua_timing {"schema":1,"driver":"linux","id":108,"kind":"case","module":"","name":"builds both metrics pages from pinned local chart code","status":"pass","elapsed_ms":5.851280,"timing_error":""}
+  ok   builds both metrics pages from pinned local chart code
+# lua_timing {"schema":1,"driver":"linux","id":109,"kind":"case","module":"","name":"fails closed when a required local vendor is absent","status":"pass","elapsed_ms":1.292183,"timing_error":""}
+  ok   fails closed when a required local vendor is absent
+
+=== build_i18n_boot_script() ===
+# lua_timing {"schema":1,"driver":"linux","id":110,"kind":"case","module":"","name":"encodes native filenames before embedding a file URI (webview-bootstrap-path)","status":"pass","elapsed_ms":0.129094,"timing_error":""}
+  ok   encodes native filenames before embedding a file URI (webview-bootstrap-path)
+# lua_timing {"schema":1,"driver":"linux","id":111,"kind":"case","module":"","name":"builds a script tag with locale and base URL","status":"pass","elapsed_ms":0.052019,"timing_error":""}
+  ok   builds a script tag with locale and base URL
+# lua_timing {"schema":1,"driver":"linux","id":112,"kind":"case","module":"","name":"uses en locale when specified","status":"pass","elapsed_ms":0.033971,"timing_error":""}
+  ok   uses en locale when specified
+# lua_timing {"schema":1,"driver":"linux","id":113,"kind":"case","module":"","name":"defaults to fr when locale not provided","status":"pass","elapsed_ms":0.030045,"timing_error":""}
+  ok   defaults to fr when locale not provided
+# lua_timing {"schema":1,"driver":"linux","id":114,"kind":"case","module":"","name":"handles empty locales_dir gracefully","status":"pass","elapsed_ms":0.010766,"timing_error":""}
+  ok   handles empty locales_dir gracefully
+
+=== inject_i18n_boot() ===
+# lua_timing {"schema":1,"driver":"linux","id":115,"kind":"case","module":"","name":"injects script after <head> tag","status":"pass","elapsed_ms":0.009484,"timing_error":""}
+  ok   injects script after <head> tag
+# lua_timing {"schema":1,"driver":"linux","id":116,"kind":"case","module":"","name":"injects after <head> with attributes","status":"pass","elapsed_ms":0.022074,"timing_error":""}
+  ok   injects after <head> with attributes
+# lua_timing {"schema":1,"driver":"linux","id":117,"kind":"case","module":"","name":"returns original HTML when i18n_script is not a string","status":"pass","elapsed_ms":0.001442,"timing_error":""}
+  ok   returns original HTML when i18n_script is not a string
+# lua_timing {"schema":1,"driver":"linux","id":118,"kind":"case","module":"","name":"handles HTML without <head> gracefully","status":"pass","elapsed_ms":0.005999,"timing_error":""}
+  ok   handles HTML without <head> gracefully
+
+=== inject_no_remote_csp() ===
+# lua_timing {"schema":1,"driver":"linux","id":119,"kind":"case","module":"","name":"denies remote script and connection origins","status":"pass","elapsed_ms":0.017947,"timing_error":""}
+  ok   denies remote script and connection origins
+
+=== build_app_html() ===
+# lua_timing {"schema":1,"driver":"linux","id":120,"kind":"case","module":"","name":"returns error HTML when _shared/ui/ not found","status":"pass","elapsed_ms":0.017827,"timing_error":""}
+  ok   returns error HTML when _shared/ui/ not found
+# lua_timing {"schema":1,"driver":"linux","id":121,"kind":"case","module":"","name":"returns error HTML for nonexistent app","status":"pass","elapsed_ms":0.037496,"timing_error":""}
+  ok   returns error HTML for nonexistent app
+# lua_timing {"schema":1,"driver":"linux","id":122,"kind":"case","module":"","name":"builds complete HTML for a real app (action_picker)","status":"pass","elapsed_ms":1.544603,"timing_error":""}
+  ok   builds complete HTML for a real app (action_picker)
+# lua_timing {"schema":1,"driver":"linux","id":123,"kind":"case","module":"","name":"builds complete HTML for healthcheck app","status":"pass","elapsed_ms":2.081371,"timing_error":""}
+  ok   builds complete HTML for healthcheck app
+# lua_timing {"schema":1,"driver":"linux","id":124,"kind":"case","module":"","name":"publishes one executable CSP for the inlined changelog","status":"pass","elapsed_ms":9.636193,"timing_error":""}
+  ok   publishes one executable CSP for the inlined changelog
+# lua_timing {"schema":1,"driver":"linux","id":125,"kind":"case","module":"","name":"injects i18n boot script with correct locale","status":"pass","elapsed_ms":1.192273,"timing_error":""}
+  ok   injects i18n boot script with correct locale
+# lua_timing {"schema":1,"driver":"linux","id":126,"kind":"case","module":"","name":"declares the document bridge capability on generated pages","status":"pass","elapsed_ms":6.101216,"timing_error":""}
+  ok   declares the document bridge capability on generated pages
+# lua_timing {"schema":1,"driver":"linux","id":127,"kind":"case","module":"","name":"seeds the page's strings before any of its scripts (page-carries-strings)","status":"pass","elapsed_ms":2.090945,"timing_error":""}
+  ok   seeds the page's strings before any of its scripts (page-carries-strings)
+# lua_timing {"schema":1,"driver":"linux","id":128,"kind":"case","module":"","name":"seeds nothing when the host supplies no strings","status":"pass","elapsed_ms":1.633307,"timing_error":""}
+  ok   seeds nothing when the host supplies no strings
+
+=== webview_manager.show() ===
+# lua_timing {"schema":1,"driver":"linux","id":129,"kind":"case","module":"","name":"hands the page builder the locale catalogue (host-delivers-catalogue)","status":"pass","elapsed_ms":9.427119,"timing_error":""}
+  ok   hands the page builder the locale catalogue (host-delivers-catalogue)
+
+=== webview_manager.build_page_html() ===
+# lua_timing {"schema":1,"driver":"linux","id":130,"kind":"case","module":"","name":"builds the page a window loads, with the whole catalogue seeded (harness-loads-production-page)","status":"pass","elapsed_ms":52.344308,"timing_error":""}
+  ok   builds the page a window loads, with the whole catalogue seeded (harness-loads-production-page)
+# lua_timing {"schema":1,"driver":"linux","id":131,"kind":"case","module":"","name":"is what the WebKitGTK page-error harness loads (harness-loads-production-page)","status":"pass","elapsed_ms":0.091197,"timing_error":""}
+  ok   is what the WebKitGTK page-error harness loads (harness-loads-production-page)
+
+=== personal editor fixture process ABI ===
+# lua_timing {"schema":1,"driver":"linux","id":132,"kind":"case","module":"","name":"requires physical mkdir, exact data readback and cleanup through the existing status owner","status":"pass","elapsed_ms":8.505834,"timing_error":""}
+  ok   requires physical mkdir, exact data readback and cleanup through the existing status owner
+# lua_timing {"schema":1,"driver":"linux","id":133,"kind":"case","module":"","name":"refuses a non-success process receipt false","status":"pass","elapsed_ms":0.414383,"timing_error":""}
+  ok   refuses a non-success process receipt false
+# lua_timing {"schema":1,"driver":"linux","id":134,"kind":"case","module":"","name":"refuses a non-success process receipt nil","status":"pass","elapsed_ms":0.352751,"timing_error":""}
+  ok   refuses a non-success process receipt nil
+# lua_timing {"schema":1,"driver":"linux","id":135,"kind":"case","module":"","name":"refuses a non-success process receipt number","status":"pass","elapsed_ms":0.243085,"timing_error":""}
+  ok   refuses a non-success process receipt number
+# lua_timing {"schema":1,"driver":"linux","id":136,"kind":"case","module":"","name":"refuses a non-success process receipt text","status":"pass","elapsed_ms":0.277227,"timing_error":""}
+  ok   refuses a non-success process receipt text
+# lua_timing {"schema":1,"driver":"linux","id":137,"kind":"case","module":"","name":"refuses a non-success process receipt throw","status":"pass","elapsed_ms":0.366011,"timing_error":""}
+  ok   refuses a non-success process receipt throw
+
+=== personal editor opening-source admission ===
+# lua_timing {"schema":1,"driver":"linux","id":138,"kind":"case","module":"","name":"refuses a foreign section added after the actual displayed model","status":"pass","elapsed_ms":6.937705,"timing_error":""}
+  ok   refuses a foreign section added after the actual displayed model
+# lua_timing {"schema":1,"driver":"linux","id":139,"kind":"case","module":"","name":"advances only our committed payload for a second actual save","status":"pass","elapsed_ms":10.017502,"timing_error":""}
+  ok   advances only our committed payload for a second actual save
+# lua_timing {"schema":1,"driver":"linux","id":140,"kind":"case","module":"","name":"fresh reopening admits the new source while the old held view refuses","status":"pass","elapsed_ms":7.807303,"timing_error":""}
+  ok   fresh reopening admits the new source while the old held view refuses
+# lua_timing {"schema":1,"driver":"linux","id":141,"kind":"case","module":"","name":"refuses a retired opening owner: epoch","status":"pass","elapsed_ms":5.333562,"timing_error":""}
+  ok   refuses a retired opening owner: epoch
+# lua_timing {"schema":1,"driver":"linux","id":142,"kind":"case","module":"","name":"refuses a retired opening owner: route","status":"pass","elapsed_ms":4.620349,"timing_error":""}
+  ok   refuses a retired opening owner: route
+# lua_timing {"schema":1,"driver":"linux","id":143,"kind":"case","module":"","name":"refuses a retired opening owner: context","status":"pass","elapsed_ms":5.249971,"timing_error":""}
+  ok   refuses a retired opening owner: context
+# lua_timing {"schema":1,"driver":"linux","id":144,"kind":"case","module":"","name":"refuses a retired opening owner: missing","status":"pass","elapsed_ms":4.663213,"timing_error":""}
+  ok   refuses a retired opening owner: missing
+# lua_timing {"schema":1,"driver":"linux","id":145,"kind":"case","module":"","name":"failed initData cannot lend editable authority: false","status":"pass","elapsed_ms":4.639152,"timing_error":""}
+  ok   failed initData cannot lend editable authority: false
+# lua_timing {"schema":1,"driver":"linux","id":146,"kind":"case","module":"","name":"failed initData cannot lend editable authority: nil","status":"pass","elapsed_ms":3.940231,"timing_error":""}
+  ok   failed initData cannot lend editable authority: nil
+# lua_timing {"schema":1,"driver":"linux","id":147,"kind":"case","module":"","name":"failed initData cannot lend editable authority: number","status":"pass","elapsed_ms":4.399458,"timing_error":""}
+  ok   failed initData cannot lend editable authority: number
+# lua_timing {"schema":1,"driver":"linux","id":148,"kind":"case","module":"","name":"failed initData cannot lend editable authority: throw","status":"pass","elapsed_ms":4.382065,"timing_error":""}
+  ok   failed initData cannot lend editable authority: throw
+# lua_timing {"schema":1,"driver":"linux","id":149,"kind":"case","module":"","name":"classifies the opening source before displaying it: malformed","status":"pass","elapsed_ms":3.680926,"timing_error":""}
+  ok   classifies the opening source before displaying it: malformed
+# lua_timing {"schema":1,"driver":"linux","id":150,"kind":"case","module":"","name":"classifies the opening source before displaying it: read_refusal","status":"pass","elapsed_ms":4.389713,"timing_error":""}
+  ok   classifies the opening source before displaying it: read_refusal
+# lua_timing {"schema":1,"driver":"linux","id":151,"kind":"case","module":"","name":"classifies the opening source before displaying it: absent","status":"pass","elapsed_ms":5.679632,"timing_error":""}
+  ok   classifies the opening source before displaying it: absent
+# lua_timing {"schema":1,"driver":"linux","id":152,"kind":"case","module":"","name":"refused publication preserves opening authority and supports owned retry: false","status":"pass","elapsed_ms":7.120145,"timing_error":""}
+  ok   refused publication preserves opening authority and supports owned retry: false
+# lua_timing {"schema":1,"driver":"linux","id":153,"kind":"case","module":"","name":"refused publication preserves opening authority and supports owned retry: nil","status":"pass","elapsed_ms":6.203385,"timing_error":""}
+  ok   refused publication preserves opening authority and supports owned retry: nil
+# lua_timing {"schema":1,"driver":"linux","id":154,"kind":"case","module":"","name":"refused publication preserves opening authority and supports owned retry: number","status":"pass","elapsed_ms":5.037227,"timing_error":""}
+  ok   refused publication preserves opening authority and supports owned retry: number
+# lua_timing {"schema":1,"driver":"linux","id":155,"kind":"case","module":"","name":"refused publication preserves opening authority and supports owned retry: text","status":"pass","elapsed_ms":7.215778,"timing_error":""}
+  ok   refused publication preserves opening authority and supports owned retry: text
+# lua_timing {"schema":1,"driver":"linux","id":156,"kind":"case","module":"","name":"refused publication preserves opening authority and supports owned retry: throw","status":"pass","elapsed_ms":8.311221,"timing_error":""}
+  ok   refused publication preserves opening authority and supports owned retry: throw
+# lua_timing {"schema":1,"driver":"linux","id":157,"kind":"case","module":"","name":"passes the retained source into the actual stage-time CAS owner","status":"pass","elapsed_ms":5.219270,"timing_error":""}
+  ok   passes the retained source into the actual stage-time CAS owner
+# lua_timing {"schema":1,"driver":"linux","id":158,"kind":"case","module":"","name":"post-ACK foreign bytes cannot become our next-save authority","status":"pass","elapsed_ms":6.528339,"timing_error":""}
+  ok   post-ACK foreign bytes cannot become our next-save authority
+# lua_timing {"schema":1,"driver":"linux","id":159,"kind":"case","module":"","name":"keeps the existing saved-but-reload-refused policy","status":"pass","elapsed_ms":8.277880,"timing_error":""}
+  ok   keeps the existing saved-but-reload-refused policy
+
+=== personal editor opening-source admission ===
+# lua_timing {"schema":1,"driver":"linux","id":160,"kind":"case","module":"","name":"uses the actual manager route and rejects retired page epochs","status":"pass","elapsed_ms":8.801648,"timing_error":""}
+  ok   uses the actual manager route and rejects retired page epochs
+# lua_timing {"schema":1,"driver":"linux","id":161,"kind":"case","module":"","name":"missing committed-payload receipt does not invent a next-save source","status":"pass","elapsed_ms":7.324957,"timing_error":""}
+  ok   missing committed-payload receipt does not invent a next-save source
+# lua_timing {"schema":1,"driver":"linux","id":162,"kind":"case","module":"","name":"a failed reentrant opening cannot be revived by an older write ACK","status":"pass","elapsed_ms":7.215523,"timing_error":""}
+  ok   a failed reentrant opening cannot be revived by an older write ACK
+
+=== personal info editor close ownership (linux-personal-close) ===
+# lua_timing {"schema":1,"driver":"linux","id":163,"kind":"case","module":"","name":"a foreign epoch close keeps the open page's retained source","status":"pass","elapsed_ms":0.379541,"timing_error":""}
+  ok   a foreign epoch close keeps the open page's retained source
+# lua_timing {"schema":1,"driver":"linux","id":164,"kind":"case","module":"","name":"the exact epoch close revokes the source before any persistence","status":"pass","elapsed_ms":0.363998,"timing_error":""}
+  ok   the exact epoch close revokes the source before any persistence
+# lua_timing {"schema":1,"driver":"linux","id":165,"kind":"case","module":"","name":"a fresh opening after close captures and saves with its own source","status":"pass","elapsed_ms":0.300752,"timing_error":""}
+  ok   a fresh opening after close captures and saves with its own source
+# lua_timing {"schema":1,"driver":"linux","id":166,"kind":"case","module":"","name":"cancel closes the exact page without persistence","status":"pass","elapsed_ms":0.157437,"timing_error":""}
+  ok   cancel closes the exact page without persistence
+
+=== personal info editor opening payload (linux-personal-payload) ===
+# lua_timing {"schema":1,"driver":"linux","id":167,"kind":"case","module":"","name":"lists the fields sorted by key with the trigger hint of aliased ones only","status":"pass","elapsed_ms":0.468345,"timing_error":""}
+  ok   lists the fields sorted by key with the trigger hint of aliased ones only
+# lua_timing {"schema":1,"driver":"linux","id":168,"kind":"case","module":"","name":"translates the three window strings through the i18n owner","status":"pass","elapsed_ms":0.230216,"timing_error":""}
+  ok   translates the three window strings through the i18n owner
+# lua_timing {"schema":1,"driver":"linux","id":169,"kind":"case","module":"","name":"reports a page that could not receive the data","status":"pass","elapsed_ms":0.581595,"timing_error":""}
+  ok   reports a page that could not receive the data
+
+=== personal info editor save outcomes (linux-personal-save) ===
+# lua_timing {"schema":1,"driver":"linux","id":170,"kind":"case","module":"","name":"a committed save reloads, announces the change and closes the page","status":"pass","elapsed_ms":0.278469,"timing_error":""}
+  ok   a committed save reloads, announces the change and closes the page
+# lua_timing {"schema":1,"driver":"linux","id":171,"kind":"case","module":"","name":"a refused save keeps the editor open and notifies once","status":"pass","elapsed_ms":0.189004,"timing_error":""}
+  ok   a refused save keeps the editor open and notifies once
+# lua_timing {"schema":1,"driver":"linux","id":172,"kind":"case","module":"","name":"a raising persistence layer is a refused save, not a crash","status":"pass","elapsed_ms":0.245299,"timing_error":""}
+  ok   a raising persistence layer is a refused save, not a crash
+# lua_timing {"schema":1,"driver":"linux","id":173,"kind":"case","module":"","name":"a save without a values table never reaches persistence","status":"pass","elapsed_ms":0.313241,"timing_error":""}
+  ok   a save without a values table never reaches persistence
+# lua_timing {"schema":1,"driver":"linux","id":174,"kind":"case","module":"","name":"a catalogue that does not reload leaves the page open and says so","status":"pass","elapsed_ms":0.186110,"timing_error":""}
+  ok   a catalogue that does not reload leaves the page open and says so
+# lua_timing {"schema":1,"driver":"linux","id":175,"kind":"case","module":"","name":"ignores an unknown action and a payload that is not a table","status":"pass","elapsed_ms":0.166260,"timing_error":""}
+  ok   ignores an unknown action and a payload that is not a table
+
+=== Action picker exact close successor ===
+# lua_timing {"schema":1,"driver":"linux","id":176,"kind":"case","module":"","name":"(picker-close-successor) keeps the replacement opened during confirm","status":"pass","elapsed_ms":0.933534,"timing_error":""}
+  ok   (picker-close-successor) keeps the replacement opened during confirm
+# lua_timing {"schema":1,"driver":"linux","id":177,"kind":"case","module":"","name":"(picker-close-successor) keeps the replacement opened during cancel","status":"pass","elapsed_ms":0.361884,"timing_error":""}
+  ok   (picker-close-successor) keeps the replacement opened during cancel
+# lua_timing {"schema":1,"driver":"linux","id":178,"kind":"case","module":"","name":"(picker-close-successor) an older replacement opener yields to native close reentry","status":"pass","elapsed_ms":0.256486,"timing_error":""}
+  ok   (picker-close-successor) an older replacement opener yields to native close reentry
+# lua_timing {"schema":1,"driver":"linux","id":179,"kind":"case","module":"","name":"(picker-close-successor) an older native show cannot claim a later picker","status":"pass","elapsed_ms":0.459381,"timing_error":""}
+  ok   (picker-close-successor) an older native show cannot claim a later picker
+SCOPE_RECEIPT passed=179 failed=0

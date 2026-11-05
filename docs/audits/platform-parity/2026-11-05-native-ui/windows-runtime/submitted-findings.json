@@ -1,0 +1,8 @@
+{
+	"schema_version": 1,
+	"scope": "windows-runtime",
+	"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+	"created_at": "2026-11-05",
+	"report_path": "/workspace/scratch/parity-native-ui/windows-runtime/report.md",
+	"findings": []
+}

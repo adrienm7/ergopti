@@ -1,0 +1,4 @@
+  ok   predicate replacement cannot borrow original consent for later mkdir (ollama-install)
+  ok   table replacement cannot revoke a still-current captured predicate (ollama-install)
+  ok   reentrant prepare cannot acquire a second admission (ollama-install)
+AUDIT_TEST_RESULT	3	0

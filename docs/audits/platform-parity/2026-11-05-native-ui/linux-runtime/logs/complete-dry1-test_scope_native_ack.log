@@ -1,0 +1,7 @@
+
+=== LLM scope native acknowledgements ===
+  ok   retains api_ollama ownership when transport cancellation refuses
+  ok   retains api_remote ownership when transport cancellation refuses
+  ok   retains an offer when its actual renderer refuses to hide
+  ok   requires native GTK hide readback and retains a failed window for retry
+AUDIT_TEST_RESULT	4	0

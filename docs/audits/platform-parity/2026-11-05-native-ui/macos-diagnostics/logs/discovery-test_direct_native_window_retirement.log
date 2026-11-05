@@ -1,0 +1,70 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement
+
+=== direct diagnostics windows retire their native roots ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"healthcheck retires exact ownership before a reentrant close diagnostic","status":"pass","elapsed_ms":3.400095,"timing_error":""}
+  ok   healthcheck retires exact ownership before a reentrant close diagnostic
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"healthcheck releases a user-closed native window before the next admission","status":"pass","elapsed_ms":2.412709,"timing_error":""}
+  ok   healthcheck releases a user-closed native window before the next admission
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"healthcheck keeps a successor outside an older native close continuation","status":"pass","elapsed_ms":3.128006,"timing_error":""}
+  ok   healthcheck keeps a successor outside an older native close continuation
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"healthcheck preserves explicit close and exact native fade completion","status":"pass","elapsed_ms":2.686171,"timing_error":""}
+  ok   healthcheck preserves explicit close and exact native fade completion
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"healthcheck retains a refused deferred close until exact cleanup can succeed","status":"pass","elapsed_ms":2.574744,"timing_error":""}
+  ok   healthcheck retains a refused deferred close until exact cleanup can succeed
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"healthcheck retains a fade accepted before a wrapper raises","status":"pass","elapsed_ms":2.992051,"timing_error":""}
+  ok   healthcheck retains a fade accepted before a wrapper raises
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"healthcheck rolls back a refused native closing callback: false","status":"pass","elapsed_ms":2.737257,"timing_error":""}
+  ok   healthcheck rolls back a refused native closing callback: false
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"healthcheck retains an exact refused explicit delete: false","status":"pass","elapsed_ms":2.861956,"timing_error":""}
+  ok   healthcheck retains an exact refused explicit delete: false
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"healthcheck rolls back a refused native closing callback: throw","status":"pass","elapsed_ms":2.475905,"timing_error":""}
+  ok   healthcheck rolls back a refused native closing callback: throw
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"healthcheck retains an exact refused explicit delete: throw","status":"pass","elapsed_ms":3.106083,"timing_error":""}
+  ok   healthcheck retains an exact refused explicit delete: throw
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"healthcheck refuses the native child policy before page publication: false","status":"pass","elapsed_ms":2.823106,"timing_error":""}
+  ok   healthcheck refuses the native child policy before page publication: false
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"healthcheck refuses the native child policy before page publication: nil","status":"pass","elapsed_ms":2.735074,"timing_error":""}
+  ok   healthcheck refuses the native child policy before page publication: nil
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"healthcheck refuses the native child policy before page publication: throw","status":"pass","elapsed_ms":2.996638,"timing_error":""}
+  ok   healthcheck refuses the native child policy before page publication: throw
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"healthcheck refuses the native child policy before page publication: unapplied","status":"pass","elapsed_ms":2.604247,"timing_error":""}
+  ok   healthcheck refuses the native child policy before page publication: unapplied
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"error releases a user-closed native window before the next admission","status":"pass","elapsed_ms":8.553267,"timing_error":""}
+  ok   error releases a user-closed native window before the next admission
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"error keeps a successor outside an older native close continuation","status":"pass","elapsed_ms":5.247544,"timing_error":""}
+  ok   error keeps a successor outside an older native close continuation
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"error preserves explicit close and exact native fade completion","status":"pass","elapsed_ms":2.613512,"timing_error":""}
+  ok   error preserves explicit close and exact native fade completion
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"error retains a refused deferred close until exact cleanup can succeed","status":"pass","elapsed_ms":2.943609,"timing_error":""}
+  ok   error retains a refused deferred close until exact cleanup can succeed
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"error retains a fade accepted before a wrapper raises","status":"pass","elapsed_ms":3.280455,"timing_error":""}
+  ok   error retains a fade accepted before a wrapper raises
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"error rolls back a refused native closing callback: false","status":"pass","elapsed_ms":3.231361,"timing_error":""}
+  ok   error rolls back a refused native closing callback: false
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"error retains an exact refused explicit delete: false","status":"pass","elapsed_ms":2.716236,"timing_error":""}
+  ok   error retains an exact refused explicit delete: false
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"error rolls back a refused native closing callback: throw","status":"pass","elapsed_ms":2.949837,"timing_error":""}
+  ok   error rolls back a refused native closing callback: throw
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"error retains an exact refused explicit delete: throw","status":"pass","elapsed_ms":3.501327,"timing_error":""}
+  ok   error retains an exact refused explicit delete: throw
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"error refuses the native child policy before page publication: false","status":"pass","elapsed_ms":2.908806,"timing_error":""}
+  ok   error refuses the native child policy before page publication: false
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"error refuses the native child policy before page publication: nil","status":"pass","elapsed_ms":3.833918,"timing_error":""}
+  ok   error refuses the native child policy before page publication: nil
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"error refuses the native child policy before page publication: throw","status":"pass","elapsed_ms":3.235998,"timing_error":""}
+  ok   error refuses the native child policy before page publication: throw
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"error refuses the native child policy before page publication: unapplied","status":"pass","elapsed_ms":2.711589,"timing_error":""}
+  ok   error refuses the native child policy before page publication: unapplied
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","name":"tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement","status":"pass","elapsed_ms":88.707354,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  27
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

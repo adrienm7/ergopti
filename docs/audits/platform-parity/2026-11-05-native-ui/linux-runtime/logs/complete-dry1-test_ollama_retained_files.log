@@ -1,0 +1,8 @@
+
+=== Retained installation stage native receipts ===
+  ok   prepares only original owned stage without archive descriptor or pathname
+  ok   reentrant source admission cannot substitute stage after first identity probe
+  ok   substituted stage identity refuses reader destination before extraction
+  ok   retained physical extraction still requires complete native runtime tree
+  ok   withdrawn branded reader admission cannot enable publication
+AUDIT_TEST_RESULT	5	0

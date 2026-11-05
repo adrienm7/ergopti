@@ -1,0 +1,4 @@
+scope.lua exit=0 lines=504
+editor.lua exit=0 lines=6
+personal.lua exit=0 lines=4
+SWEEP_RECEIPT root-replay all_three_processes_exit=0

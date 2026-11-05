@@ -1,0 +1,48 @@
+Selecting exact test module: "tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript
+
+=== hotstring editor JavaScript failures ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"observes ready throw (hotstring-editor-javascript)","status":"pass","elapsed_ms":2.005716,"timing_error":""}
+  ok   observes ready throw (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"observes ready nil (hotstring-editor-javascript)","status":"pass","elapsed_ms":2.055742,"timing_error":""}
+  ok   observes ready nil (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"observes ready false (hotstring-editor-javascript)","status":"pass","elapsed_ms":1.900629,"timing_error":""}
+  ok   observes ready false (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"observes ready async (hotstring-editor-javascript)","status":"pass","elapsed_ms":3.020714,"timing_error":""}
+  ok   observes ready async (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"observes ready success (hotstring-editor-javascript)","status":"pass","elapsed_ms":1.741620,"timing_error":""}
+  ok   observes ready success (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"observes ready encode_throw (hotstring-editor-javascript)","status":"pass","elapsed_ms":1.989973,"timing_error":""}
+  ok   observes ready encode_throw (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"observes ready encode_nil (hotstring-editor-javascript)","status":"pass","elapsed_ms":1.890844,"timing_error":""}
+  ok   observes ready encode_nil (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"observes update throw (hotstring-editor-javascript)","status":"pass","elapsed_ms":1.933969,"timing_error":""}
+  ok   observes update throw (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"observes update nil (hotstring-editor-javascript)","status":"pass","elapsed_ms":1.592945,"timing_error":""}
+  ok   observes update nil (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"observes update false (hotstring-editor-javascript)","status":"pass","elapsed_ms":2.003543,"timing_error":""}
+  ok   observes update false (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"observes update async (hotstring-editor-javascript)","status":"pass","elapsed_ms":1.786477,"timing_error":""}
+  ok   observes update async (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"observes update success (hotstring-editor-javascript)","status":"pass","elapsed_ms":2.067720,"timing_error":""}
+  ok   observes update success (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"observes update encode_throw (hotstring-editor-javascript)","status":"pass","elapsed_ms":1.916273,"timing_error":""}
+  ok   observes update encode_throw (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"observes update encode_nil (hotstring-editor-javascript)","status":"pass","elapsed_ms":3.315837,"timing_error":""}
+  ok   observes update encode_nil (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"fences encoding reentry (hotstring-editor-javascript)","status":"pass","elapsed_ms":3.987307,"timing_error":""}
+  ok   fences encoding reentry (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"late completion cannot mutate a successor (hotstring-editor-javascript)","status":"pass","elapsed_ms":2.007870,"timing_error":""}
+  ok   late completion cannot mutate a successor (hotstring-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","name":"tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript","status":"pass","elapsed_ms":36.027695,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  16
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

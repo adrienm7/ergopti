@@ -1,0 +1,2 @@
+HEALTHY native_curl_ok=true status=200 github=ok ai=ok closed=true
+ADVERSE AI_TARGET input_backend=api actual_target=http://127.0.0.1:11435/api/version state=ok

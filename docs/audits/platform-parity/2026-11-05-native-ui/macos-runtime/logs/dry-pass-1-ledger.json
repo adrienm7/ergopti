@@ -1,0 +1,64 @@
+{
+  "pass": "dry-pass-1",
+  "start_utc": "2026-11-05T00:47:23.753894+00:00",
+  "source_root": "/workspace/worktrees/parity-2026-11-05/macos-runtime",
+  "new_confirmed_roots": 0,
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "log": "logs/dry-pass-1-0.log"
+    },
+    {
+      "argv": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-native-ui/macos-runtime/probes/runtime-probes.lua",
+        "/workspace/worktrees/parity-2026-11-05/macos-runtime"
+      ],
+      "exit_code": 0,
+      "log": "logs/dry-pass-1-1.log"
+    },
+    {
+      "argv": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-native-ui/macos-runtime/probes/approval-wall-clock.lua",
+        "/workspace/worktrees/parity-2026-11-05/macos-runtime"
+      ],
+      "exit_code": 0,
+      "log": "logs/dry-pass-1-2.log"
+    },
+    {
+      "argv": [
+        "python3",
+        "/workspace/scratch/parity-native-ui/macos-runtime/probes/source-joins.py",
+        "/workspace/worktrees/parity-2026-11-05/macos-runtime"
+      ],
+      "exit_code": 0,
+      "log": "logs/dry-pass-1-3.log"
+    },
+    {
+      "argv": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-native-ui/macos-runtime/probes/run-group.lua",
+        "/workspace/worktrees/parity-2026-11-05/macos-runtime",
+        "/workspace/scratch/parity-native-ui/macos-runtime"
+      ],
+      "exit_code": 0,
+      "log": "logs/dry-pass-1-4.log"
+    },
+    {
+      "argv": [
+        "git",
+        "status",
+        "--porcelain"
+      ],
+      "exit_code": 0,
+      "log": "logs/dry-pass-1-5.log"
+    }
+  ],
+  "end_utc": "2026-11-05T00:47:26.441921+00:00"
+}

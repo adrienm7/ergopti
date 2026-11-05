@@ -1,0 +1,6 @@
+assert(loadfile(assert(arg[1])..'/bootstrap.lua'))()
+local helpers=require('tests.helpers')
+require(assert(arg[2]))
+local r=helpers.get_results()
+print('AUDIT_TEST_RESULT',r.passed,r.failed)
+assert(r.failed==0)

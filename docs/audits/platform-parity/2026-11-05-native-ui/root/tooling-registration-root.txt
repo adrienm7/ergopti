@@ -1,0 +1,1 @@
+PASS: native qualification JS owner union and direct CLI routing; all platform/control bodies UNRUN.

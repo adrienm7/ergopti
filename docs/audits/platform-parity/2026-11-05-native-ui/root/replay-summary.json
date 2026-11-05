@@ -1,0 +1,63 @@
+{
+	"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+	"date": "2026-11-05",
+	"meaning": "Independent root replay receipts at the pinned source; source-projected Windows and modeled Darwin controls are not native receiving. Only Linux host filesystem/timers/PowerShell are genuine where explicitly stated.",
+	"scopes": [
+		{
+			"scope": "windows-runtime",
+			"decisive_receipts": ["replays/windows-runtime/logs/root-output.txt"]
+		},
+		{
+			"scope": "macos-runtime",
+			"decisive_receipts": [
+				"replays/macos-runtime/logs/root-replay-ledger.json",
+				"replays/macos-runtime/logs/root-countercheck-mrt002.log"
+			]
+		},
+		{
+			"scope": "linux-runtime",
+			"decisive_receipts": ["replays/linux-runtime/logs/root-state-cache.log"]
+		},
+		{
+			"scope": "windows-webview",
+			"decisive_receipts": [
+				"replays/windows-webview/logs/root-refusal-script.cjs.log",
+				"replays/windows-webview/logs/root-zero-delay.cjs.log",
+				"replays/windows-webview/logs/root-autoclose-reachability.cjs.log"
+			]
+		},
+		{
+			"scope": "macos-webview",
+			"decisive_receipts": [
+				"replays/macos-webview/logs/root-output.txt",
+				"replays/macos-webview/logs/root-autoclose.log"
+			]
+		},
+		{
+			"scope": "linux-webview",
+			"decisive_receipts": [
+				"replays/linux-webview/logs/root-replay-editor.lua.log",
+				"replays/linux-webview/logs/root-replay-personal.lua.log",
+				"replays/linux-webview/logs/root-countercheck.log"
+			]
+		},
+		{
+			"scope": "windows-diagnostics",
+			"decisive_receipts": ["replays/windows-diagnostics/logs/root-output.txt"]
+		},
+		{
+			"scope": "macos-diagnostics",
+			"decisive_receipts": ["replays/macos-diagnostics/logs/root-canary.log"]
+		},
+		{
+			"scope": "linux-diagnostics",
+			"decisive_receipts": ["replays/linux-diagnostics/logs/root-replay-results.json"]
+		}
+	],
+	"retained_setup_failures": [
+		{
+			"path": "replays/windows-webview/logs/root-validate-manifest.cjs.log",
+			"disposition": "Wrong argument supplied to helper validator; ENOENT before subject. Decisive three actual WebView programs passed; canonical and official manifest validators separately passed."
+		}
+	]
+}

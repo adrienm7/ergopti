@@ -1,0 +1,454 @@
+[
+  {
+    "name": "test_desktop_report_shutdown",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.ui.healthcheck.test_desktop_report_shutdown"
+    ],
+    "exit_code": 0,
+    "seconds": 0.013,
+    "summary": [
+      "AUDIT_TEST_RESULT\t8\t0"
+    ]
+  },
+  {
+    "name": "test_diagnostics_runner",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.ui.healthcheck.test_diagnostics_runner"
+    ],
+    "exit_code": 0,
+    "seconds": 0.005,
+    "summary": [
+      "AUDIT_TEST_RESULT\t5\t0"
+    ]
+  },
+  {
+    "name": "test_diagnostics_window_title",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.ui.healthcheck.test_diagnostics_window_title"
+    ],
+    "exit_code": 0,
+    "seconds": 0.43,
+    "summary": [
+      "AUDIT_TEST_RESULT\t1\t0"
+    ]
+  },
+  {
+    "name": "test_healthcheck_bridge_actions",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.ui.healthcheck.test_healthcheck_bridge_actions"
+    ],
+    "exit_code": 0,
+    "seconds": 0.586,
+    "summary": [
+      "AUDIT_TEST_RESULT\t29\t0"
+    ]
+  },
+  {
+    "name": "test_healthcheck_configuration",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.ui.healthcheck.test_healthcheck_configuration"
+    ],
+    "exit_code": 0,
+    "seconds": 0.149,
+    "summary": [
+      "AUDIT_TEST_RESULT\t47\t0"
+    ]
+  },
+  {
+    "name": "test_healthcheck_device_probe",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.ui.healthcheck.test_healthcheck_device_probe"
+    ],
+    "exit_code": 0,
+    "seconds": 0.009,
+    "summary": [
+      "AUDIT_TEST_RESULT\t2\t0"
+    ]
+  },
+  {
+    "name": "test_healthcheck_last_error_wired",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.ui.healthcheck.test_healthcheck_last_error_wired"
+    ],
+    "exit_code": 0,
+    "seconds": 0.078,
+    "summary": [
+      "AUDIT_TEST_RESULT\t3\t0"
+    ]
+  },
+  {
+    "name": "test_healthcheck_linux_rows",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.ui.healthcheck.test_healthcheck_linux_rows"
+    ],
+    "exit_code": 0,
+    "seconds": 0.16,
+    "summary": [
+      "AUDIT_TEST_RESULT\t13\t0"
+    ]
+  },
+  {
+    "name": "test_healthcheck_probes",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.ui.healthcheck.test_healthcheck_probes"
+    ],
+    "exit_code": 0,
+    "seconds": 0.159,
+    "summary": [
+      "AUDIT_TEST_RESULT\t10\t0"
+    ]
+  },
+  {
+    "name": "test_healthcheck_recent_issues_source",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source"
+    ],
+    "exit_code": 0,
+    "seconds": 0.268,
+    "summary": [
+      "AUDIT_TEST_RESULT\t17\t0"
+    ]
+  },
+  {
+    "name": "test_healthcheck_report_issue",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.ui.healthcheck.test_healthcheck_report_issue"
+    ],
+    "exit_code": 0,
+    "seconds": 1.165,
+    "summary": [
+      "AUDIT_TEST_RESULT\t42\t0"
+    ]
+  },
+  {
+    "name": "test_crash_privacy",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.modules.diagnostics.test_crash_privacy"
+    ],
+    "exit_code": 0,
+    "seconds": 0.122,
+    "summary": [
+      "AUDIT_TEST_RESULT\t28\t0"
+    ]
+  },
+  {
+    "name": "test_crash_report_contract",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.modules.diagnostics.test_crash_report_contract"
+    ],
+    "exit_code": 0,
+    "seconds": 0.005,
+    "summary": [
+      "AUDIT_TEST_RESULT\t8\t0"
+    ]
+  },
+  {
+    "name": "test_crash_reporter",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.modules.diagnostics.test_crash_reporter"
+    ],
+    "exit_code": 0,
+    "seconds": 0.026,
+    "summary": [
+      "AUDIT_TEST_RESULT\t13\t0"
+    ]
+  },
+  {
+    "name": "test_error_dialog_core",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.ui.webview.test_error_dialog_core"
+    ],
+    "exit_code": 0,
+    "seconds": 0.014,
+    "summary": [
+      "AUDIT_TEST_RESULT\t8\t0"
+    ]
+  },
+  {
+    "name": "test_error_dialog_bridge",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.ui.webview.test_error_dialog_bridge"
+    ],
+    "exit_code": 0,
+    "seconds": 0.269,
+    "summary": [
+      "AUDIT_TEST_RESULT\t18\t0"
+    ]
+  },
+  {
+    "name": "test_ui_bridge_handlers_healthcheck_bridge",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.ui.editors.test_ui_bridge_handlers_healthcheck_bridge"
+    ],
+    "exit_code": 0,
+    "seconds": 0.117,
+    "summary": [
+      "AUDIT_TEST_RESULT\t6\t0"
+    ]
+  },
+  {
+    "name": "test_diagnostic_snapshot",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.infra.lifecycle.test_diagnostic_snapshot"
+    ],
+    "exit_code": 0,
+    "seconds": 0.031,
+    "summary": [
+      "AUDIT_TEST_RESULT\t24\t0"
+    ]
+  },
+  {
+    "name": "test_runtime_diagnostics",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.unit.infra.lifecycle.test_runtime_diagnostics"
+    ],
+    "exit_code": 0,
+    "seconds": 0.023,
+    "summary": [
+      "AUDIT_TEST_RESULT\t12\t0"
+    ]
+  },
+  {
+    "name": "test_corpus_diagnostics",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.meta.corpus.test_corpus_diagnostics"
+    ],
+    "exit_code": 0,
+    "seconds": 0.036,
+    "summary": [
+      "AUDIT_TEST_RESULT\t219\t0"
+    ]
+  },
+  {
+    "name": "test_error_dialog_wiring",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/run-test.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "tests.meta.boot.test_error_dialog_wiring"
+    ],
+    "exit_code": 0,
+    "seconds": 0.006,
+    "summary": [
+      "AUDIT_TEST_RESULT\t3\t0"
+    ]
+  },
+  {
+    "name": "ai-projection",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/ai-projection.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/owned-home-juyr767e",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/owned-home-juyr767e/projection.json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.028,
+    "summary": [
+      "ADVERSE backend input=api snapshot=ollama export=ollama get_backend_calls=0",
+      "HEALTHY backend input=ollama snapshot=ollama",
+      "ADVERSE enabled input=false ai_field=nil export_field=nil feature_field=false",
+      "REFUSAL absent llm ai_enabled=nil",
+      "PRIVACY exported_private_model=false"
+    ]
+  },
+  {
+    "name": "page-model",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/node",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/page-model.cjs",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/owned-home-juyr767e/projection.json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.033,
+    "summary": [
+      "ADVERSE actual_page enabled=false renders=unknown/muted; api renders=ollama",
+      "HEALTHY actual_page preserved_false renders=no/value",
+      "REFUSAL actual_page absent_llm renders=unknown/muted"
+    ]
+  },
+  {
+    "name": "http-partial",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/partial-http.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/partial-curl",
+      "partial"
+    ],
+    "exit_code": 0,
+    "seconds": 0.025,
+    "summary": [
+      "ADVERSE native_curl_ok=false status=200 github=ok ai=ok closed=true"
+    ]
+  },
+  {
+    "name": "http-healthy",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/partial-http.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/healthy-curl",
+      "healthy"
+    ],
+    "exit_code": 0,
+    "seconds": 0.031,
+    "summary": [
+      "HEALTHY native_curl_ok=true status=200 github=ok ai=ok closed=true"
+    ]
+  },
+  {
+    "name": "http-refused",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/partial-http.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/refused-curl",
+      "refused"
+    ],
+    "exit_code": 0,
+    "seconds": 0.029,
+    "summary": [
+      "REFUSAL native_curl_ok=false status=503 github=error ai=error closed=true"
+    ]
+  },
+  {
+    "name": "api-health",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/partial-http.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/healthy-curl",
+      "healthy",
+      "api"
+    ],
+    "exit_code": 0,
+    "seconds": 0.026,
+    "summary": [
+      "HEALTHY native_curl_ok=true status=200 github=ok ai=ok closed=true",
+      "ADVERSE AI_TARGET input_backend=api actual_target=http://127.0.0.1:11435/api/version state=ok"
+    ]
+  },
+  {
+    "name": "timer-refused",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/timer-admission.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "refused"
+    ],
+    "exit_code": 0,
+    "seconds": 0.011,
+    "summary": [
+      "ADVERSE native_timer=refused callbacks=0 live_handles=0 configuration_terminal=missing snapshot=pending"
+    ]
+  },
+  {
+    "name": "timer-start-refused",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/timer-admission.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "start-refused"
+    ],
+    "exit_code": 0,
+    "seconds": 0.012,
+    "summary": [
+      "ADVERSE native_timer=start-refused callbacks=0 live_handles=0 configuration_terminal=missing snapshot=pending"
+    ]
+  },
+  {
+    "name": "timer-healthy",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/timer-admission.lua",
+      "/workspace/scratch/parity-native-ui/linux-diagnostics/probes",
+      "healthy"
+    ],
+    "exit_code": 0,
+    "seconds": 0.017,
+    "summary": [
+      "HEALTHY native_timer callbacks=1 configuration=ok live_handles=0"
+    ]
+  },
+  {
+    "name": "native-source",
+    "command": [
+      "python3",
+      "/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/tests/hardware/run_diagnostic_source_receipts.py"
+    ],
+    "exit_code": 0,
+    "seconds": 0.29,
+    "summary": []
+  },
+  {
+    "name": "native-save",
+    "command": [
+      "python3",
+      "/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/tests/hardware/run_diagnostics_save_receipts.py"
+    ],
+    "exit_code": 0,
+    "seconds": 0.264,
+    "summary": []
+  }
+]

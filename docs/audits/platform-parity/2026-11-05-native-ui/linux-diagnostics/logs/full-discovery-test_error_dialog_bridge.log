@@ -1,0 +1,33 @@
+
+=== error window bridge (linux): policy and deferral (error-dialog-linux) ===
+  ok   disabling invalidates queued windows across reactivation (error-dialog-cancel)
+  ok   a logged ERROR defers the window; nothing opens inside the logging call (error-dialog-linux)
+  ok   the same signature opens once; errors while pending or open are folded (error-dialog-linux)
+  ok   nothing opens while the setting is unticked (error-dialog-linux)
+  ok   a window that cannot open is announced and frees the policy (error-dialog-linux)
+
+=== error window bridge (linux): page and actions (error-dialog-linux) ===
+  ok   ready answers with the error and its report, redacted (error-dialog-linux)
+  ok   copy, report and open act on the report the page showed (error-dialog-linux)
+  ok   an unknown action is refused; the page cannot choose the text (error-dialog-linux)
+  ok   the close box frees the policy (error-dialog-linux)
+
+=== error window bridge (linux): no next-start crash notice (error-dialog-linux) ===
+  ok   offers no crash dialog: a crash is announced by the crash reporter's notification only (error-dialog-linux)
+
+=== error window sharing uses the real report sink ===
+  ok   retains the host snapshot and excludes the local error from the issue (error-sharing-owner)
+
+=== error window retains its captured sharing identity ===
+  ok   keeps local details and shares its own snapshot after another collection (error-sharing-owner)
+
+=== error report asynchronous ownership ===
+  ok   (error-opener-session) ready rejects old action completion
+  ok   (error-opener-session) close rejects old action completion
+  ok   (error-opener-session) epoch rejects old action completion
+
+=== error opener cancellation reentry ===
+  ok   (opener-cancel-reentry) error report preserves a replacement
+  ok   (opener-cancel-reentry) error ready preserves a replacement
+  ok   (opener-cancel-reentry) error native_close preserves a replacement
+AUDIT_TEST_RESULT	18	0

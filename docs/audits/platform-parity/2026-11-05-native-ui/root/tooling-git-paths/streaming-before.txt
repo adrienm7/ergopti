@@ -1,0 +1,17 @@
+/workspace/ergopti/tools/test/test-ahk-runner-scan-streaming.cjs:71
+					throw new Error('Unexpected dependency: ' + name);
+					^
+
+Error: Unexpected dependency: ../lib/git-paths.cjs
+    at require (/workspace/ergopti/tools/test/test-ahk-runner-scan-streaming.cjs:71:12)
+    at /workspace/ergopti/tools/test/test-ahk-runners-are-invoked.cjs:35:22
+    at Script.runInContext (node:vm:149:12)
+    at Script.runInNewContext (node:vm:154:17)
+    at Object.runInNewContext (node:vm:310:38)
+    at run (/workspace/ergopti/tools/test/test-ahk-runner-scan-streaming.cjs:63:6)
+    at Object.<anonymous> (/workspace/ergopti/tools/test/test-ahk-runner-scan-streaming.cjs:95:2)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+
+Node.js v22.22.2

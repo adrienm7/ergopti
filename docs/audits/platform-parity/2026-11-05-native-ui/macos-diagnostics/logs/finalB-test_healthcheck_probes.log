@@ -1,0 +1,42 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_probes"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_probes
+
+=== diagnostics probes (macOS) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_probes","name":"reads GitHub's rate limit into the network section","status":"pass","elapsed_ms":31.232851,"timing_error":""}
+  ok   reads GitHub's rate limit into the network section
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_probes","name":"reports a failed GitHub request as an error with its status","status":"pass","elapsed_ms":27.131844,"timing_error":""}
+  ok   reports a failed GitHub request as an error with its status
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_probes","name":"does not ask the AI backend when the AI is off","status":"pass","elapsed_ms":29.664278,"timing_error":""}
+  ok   does not ask the AI backend when the AI is off
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_probes","name":"parses sysctl and df from tasks","status":"pass","elapsed_ms":32.734483,"timing_error":""}
+  ok   parses sysctl and df from tasks
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_probes","name":"answers once: a timeout wins over a late answer","status":"pass","elapsed_ms":109.257055,"timing_error":""}
+  ok   answers once: a timeout wins over a late answer
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_probes","name":"adds the connected Bluetooth keyboards and mice to the USB devices (bluetooth-peripherals)","status":"pass","elapsed_ms":35.588481,"timing_error":""}
+  ok   adds the connected Bluetooth keyboards and mice to the USB devices (bluetooth-peripherals)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_probes","name":"names the Bluetooth devices only when details are included (bluetooth-peripherals)","status":"pass","elapsed_ms":21.450887,"timing_error":""}
+  ok   names the Bluetooth devices only when details are included (bluetooth-peripherals)
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_probes","name":"reports an unreadable Bluetooth report as an error (bluetooth-peripherals)","status":"pass","elapsed_ms":23.209757,"timing_error":""}
+  ok   reports an unreadable Bluetooth report as an error (bluetooth-peripherals)
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_probes","name":"reads the processor load and ErgoptiPlus's share and memory (system-load)","status":"pass","elapsed_ms":33.983623,"timing_error":""}
+  ok   reads the processor load and ErgoptiPlus's share and memory (system-load)
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_probes","name":"a cancelled run publishes nothing and stops its requests and tasks","status":"pass","elapsed_ms":23.551551,"timing_error":""}
+  ok   a cancelled run publishes nothing and stops its requests and tasks
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_probes","name":"passes the original start clock to the separately controlled AppleEvent collaborator","status":"pass","elapsed_ms":24.822085,"timing_error":""}
+  ok   passes the original start clock to the separately controlled AppleEvent collaborator
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_probes","name":"repeated Cancel retries exact retained actor and watchdog without reviving business results","status":"pass","elapsed_ms":46.909803,"timing_error":""}
+  ok   repeated Cancel retries exact retained actor and watchdog without reviving business results
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_probes","name":"Cancel retries archived cohort capabilities before releasing their cleanup owner","status":"pass","elapsed_ms":24.259688,"timing_error":""}
+  ok   Cancel retries archived cohort capabilities before releasing their cleanup owner
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_probes","name":"tests.unit.ui.healthcheck.test_healthcheck_probes","status":"pass","elapsed_ms":464.814848,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  13
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

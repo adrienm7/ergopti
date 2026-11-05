@@ -1,0 +1,62 @@
+[
+	{
+		"scope": "windows-runtime",
+		"source_root": "/workspace/worktrees/parity-2026-11-05/windows-runtime",
+		"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+		"artifacts": "/workspace/scratch/parity-native-ui/windows-runtime",
+		"dependencies": "read-only shared node_modules symlink; no npm install in audit worktrees",
+		"archive_ref": "refs/audit/parity-2026-11-05/windows-runtime",
+		"lifecycle": "Archived source commit; task-created dependency symlink removed; clean owned worktree retired after all audit replays.",
+		"reused_for": ["windows-diagnostics"]
+	},
+	{
+		"scope": "macos-runtime",
+		"source_root": "/workspace/worktrees/parity-2026-11-05/macos-runtime",
+		"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+		"artifacts": "/workspace/scratch/parity-native-ui/macos-runtime",
+		"dependencies": "read-only shared node_modules symlink; no npm install in audit worktrees",
+		"archive_ref": "refs/audit/parity-2026-11-05/macos-runtime",
+		"lifecycle": "Archived source commit; task-created dependency symlink removed; clean owned worktree retired after all audit replays.",
+		"reused_for": []
+	},
+	{
+		"scope": "linux-runtime",
+		"source_root": "/workspace/worktrees/parity-2026-11-05/linux-runtime",
+		"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+		"artifacts": "/workspace/scratch/parity-native-ui/linux-runtime",
+		"dependencies": "read-only shared node_modules symlink; no npm install in audit worktrees",
+		"archive_ref": "refs/audit/parity-2026-11-05/linux-runtime",
+		"lifecycle": "Archived source commit; task-created dependency symlink removed; clean owned worktree retired after all audit replays.",
+		"reused_for": ["linux-diagnostics"]
+	},
+	{
+		"scope": "windows-webview",
+		"source_root": "/workspace/worktrees/parity-2026-11-05/windows-webview",
+		"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+		"artifacts": "/workspace/scratch/parity-native-ui/windows-webview",
+		"dependencies": "read-only shared node_modules symlink; no npm install in audit worktrees",
+		"archive_ref": "refs/audit/parity-2026-11-05/windows-webview",
+		"lifecycle": "Archived source commit; task-created dependency symlink removed; clean owned worktree retired after all audit replays.",
+		"reused_for": []
+	},
+	{
+		"scope": "macos-webview",
+		"source_root": "/workspace/worktrees/parity-2026-11-05/macos-webview",
+		"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+		"artifacts": "/workspace/scratch/parity-native-ui/macos-webview",
+		"dependencies": "read-only shared node_modules symlink; no npm install in audit worktrees",
+		"archive_ref": "refs/audit/parity-2026-11-05/macos-webview",
+		"lifecycle": "Archived source commit; task-created dependency symlink removed; clean owned worktree retired after all audit replays.",
+		"reused_for": ["macos-diagnostics"]
+	},
+	{
+		"scope": "linux-webview",
+		"source_root": "/workspace/worktrees/parity-2026-11-05/linux-webview",
+		"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+		"artifacts": "/workspace/scratch/parity-native-ui/linux-webview",
+		"dependencies": "read-only shared node_modules symlink; no npm install in audit worktrees",
+		"archive_ref": "refs/audit/parity-2026-11-05/linux-webview",
+		"lifecycle": "Archived source commit; task-created dependency symlink removed; clean owned worktree retired after all audit replays.",
+		"reused_for": []
+	}
+]

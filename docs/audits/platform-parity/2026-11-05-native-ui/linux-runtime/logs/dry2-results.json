@@ -1,0 +1,509 @@
+[
+  {
+    "name": "test_enable_admission",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_enable_admission"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t58\t0"
+    ]
+  },
+  {
+    "name": "test_enable_admission_policy",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_enable_admission_policy"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t32\t0"
+    ]
+  },
+  {
+    "name": "test_finite_process_port",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_finite_process_port"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t19\t0"
+    ]
+  },
+  {
+    "name": "test_managed_ollama_proxy",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_managed_ollama_proxy"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t44\t0"
+    ]
+  },
+  {
+    "name": "test_owned_ollama_coexistence",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_owned_ollama_coexistence"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t5\t0"
+    ]
+  },
+  {
+    "name": "test_owned_timer_slots",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_owned_timer_slots"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t6\t0"
+    ]
+  },
+  {
+    "name": "test_process_limits",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_process_limits"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t3\t0"
+    ]
+  },
+  {
+    "name": "test_runtime_bootstrap_budget",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_runtime_bootstrap_budget"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t23\t0"
+    ]
+  },
+  {
+    "name": "test_runtime_bootstrap_deadline",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_runtime_bootstrap_deadline"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t6\t0"
+    ]
+  },
+  {
+    "name": "test_runtime_composition",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_runtime_composition"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t24\t0"
+    ]
+  },
+  {
+    "name": "test_runtime_engine_acquisition_managed_inventory_getter",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_runtime_engine_acquisition_managed_inventory_getter"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t50\t0"
+    ]
+  },
+  {
+    "name": "test_runtime_engine_acquisition_reserves_actual_teardown",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_runtime_engine_acquisition_reserves_actual_teardown"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t43\t0"
+    ]
+  },
+  {
+    "name": "test_runtime_native_claim",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_runtime_native_claim"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t8\t0"
+    ]
+  },
+  {
+    "name": "test_runtime_owned_timer",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_runtime_owned_timer"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t20\t0"
+    ]
+  },
+  {
+    "name": "test_runtime_publication_admission",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_runtime_publication_admission"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t12\t0"
+    ]
+  },
+  {
+    "name": "test_runtime_repair",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_runtime_repair"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t63\t0"
+    ]
+  },
+  {
+    "name": "test_runtime_source",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_runtime_source"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t49\t0"
+    ]
+  },
+  {
+    "name": "test_runtime_source_snapshot",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_runtime_source_snapshot"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t12\t0"
+    ]
+  },
+  {
+    "name": "test_scope_native_ack",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_scope_native_ack"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t4\t0"
+    ]
+  },
+  {
+    "name": "test_service_process_port",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_service_process_port"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t14\t0"
+    ]
+  },
+  {
+    "name": "test_service_process_running",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_service_process_running"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t5\t0"
+    ]
+  },
+  {
+    "name": "test_shared_loader_sources",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.runtime.test_shared_loader_sources"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t35\t0"
+    ]
+  },
+  {
+    "name": "test_ollama_archive_installer",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.ollama.test_ollama_archive_installer"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t21\t0"
+    ]
+  },
+  {
+    "name": "test_ollama_install_admission",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.ollama.test_ollama_install_admission"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t9\t0"
+    ]
+  },
+  {
+    "name": "test_ollama_install_authorization",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.ollama.test_ollama_install_authorization"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t3\t0"
+    ]
+  },
+  {
+    "name": "test_ollama_install_boundaries",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.ollama.test_ollama_install_boundaries"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t8\t0"
+    ]
+  },
+  {
+    "name": "test_ollama_install_files",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.ollama.test_ollama_install_files"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t22\t0"
+    ]
+  },
+  {
+    "name": "test_ollama_install_phase",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.ollama.test_ollama_install_phase"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t12\t0"
+    ]
+  },
+  {
+    "name": "test_ollama_install_resolver",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.ollama.test_ollama_install_resolver"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t20\t0"
+    ]
+  },
+  {
+    "name": "test_ollama_installed_runtime",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.ollama.test_ollama_installed_runtime"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t15\t0"
+    ]
+  },
+  {
+    "name": "test_ollama_retained_composition",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.ollama.test_ollama_retained_composition"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t1\t0"
+    ]
+  },
+  {
+    "name": "test_ollama_retained_files",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.ollama.test_ollama_retained_files"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t5\t0"
+    ]
+  },
+  {
+    "name": "test_ollama_retained_installer",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.ollama.test_ollama_retained_installer"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t9\t0"
+    ]
+  },
+  {
+    "name": "test_ollama_retained_phase",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.modules.llm.ollama.test_ollama_retained_phase"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t3\t0"
+    ]
+  },
+  {
+    "name": "test_owned_process",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.adapters.processes.test_owned_process"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t28\t0"
+    ]
+  },
+  {
+    "name": "test_owned_process_close_attempts",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.adapters.processes.test_owned_process_close_attempts"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t9\t0"
+    ]
+  },
+  {
+    "name": "test_owned_process_deadline",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.adapters.processes.test_owned_process_deadline"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t3\t0"
+    ]
+  },
+  {
+    "name": "test_owned_process_running",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.adapters.processes.test_owned_process_running"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t7\t0"
+    ]
+  },
+  {
+    "name": "test_process_lifecycle",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.adapters.processes.test_process_lifecycle"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t21\t0"
+    ]
+  },
+  {
+    "name": "test_process_runner",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/run-test.lua",
+      "tests.unit.adapters.processes.test_process_runner"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "AUDIT_TEST_RESULT\t34\t0"
+    ]
+  },
+  {
+    "name": "state-cache",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/state-cache.lua",
+      "/workspace/scratch/parity-native-ui/linux-runtime/probes/owned-state-zbr3imtv"
+    ],
+    "exit_code": 0,
+    "summary": [
+      "ADVERSE installed=true observer_current=false cause=absent reason=model_browser.reason_ollama_missing",
+      "VISIBILITY Local Ollama install state: absent.",
+      "HEALTHY fresh_observer cause=installed",
+      "REFUSAL nonexecutable cause=absent"
+    ]
+  },
+  {
+    "name": "native-files",
+    "command": [
+      "python3",
+      "/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/tests/hardware/run_ollama_install_files_native.py",
+      "/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux",
+      "--lua",
+      "/workspace/scratch/parity-toolchain/ci-bin/luajit"
+    ],
+    "exit_code": 0,
+    "summary": []
+  }
+]
