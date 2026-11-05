@@ -249,4 +249,54 @@ test('moving entries sorts Unicode triggers without stripping their letters', ()
 	assert.deepStrictEqual(Array.from(context.__result), ['New', 'éclair', '漢字']);
 });
 
+test('opening and saving output retains explicit trailing Enter tokens', () => {
+	function node(tag) {
+		return {
+			nodeType: 1,
+			tagName: tag.toUpperCase(),
+			dataset: {},
+			classList: { contains: () => false },
+			textContent: ''
+		};
+	}
+	const context = vm.createContext({
+		console,
+		document: {
+			createElement: node,
+			createTextNode: (text) => ({ nodeType: 3, textContent: text })
+		},
+		makeHostBridge: () => function () {},
+		setTimeout: () => 1,
+		clearTimeout() {}
+	});
+	context.window = context;
+	vm.runInContext(modelSource, context, { filename: SCRIPT });
+	context.original = 'Café\t"漢字"\r\nline{Enter}{Enter}';
+	vm.runInContext('result = serializeEditor({childNodes: parseToNodes(original)})', context);
+	assert.strictEqual(context.result, context.original);
+	vm.runInContext(
+		"result = serializeEditor({childNodes: [...parseToNodes(original), document.createElement('br')]})",
+		context
+	);
+	assert.strictEqual(
+		context.result,
+		context.original,
+		'a trailing browser placeholder is still discarded'
+	);
+	const editor = {
+		childNodes: [],
+		focus() {},
+		appendChild(child) {
+			this.childNodes.push(child);
+		}
+	};
+	context.document.getElementById = () => editor;
+	context.getSelection = () => null;
+	vm.runInContext(
+		'checkPh = function () {}; insertBrAtCursor(); result = serializeEditor(document.getElementById("e-out"))',
+		context
+	);
+	assert.strictEqual(context.result, '{Enter}', 'a new Enter at the end is explicit');
+});
+
 console.log(`\nResults: ${passed} passed, 0 failed.`);
