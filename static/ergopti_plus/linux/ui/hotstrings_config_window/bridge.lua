@@ -391,6 +391,13 @@ function M.on_message(payload, state, context)
 	if type(payload) ~= "table" then return nil end
 
 	local action = payload.action
+	local section_action = action == "set_delay" or action == "clear_delay" or action == "set_color"
+		or action == "clear_color" or action == "set_tooltip" or action == "clear_tooltip"
+		or action == "set_priority" or action == "clear_priority"
+	if section_action and payload.section ~= nil and type(payload.section) ~= "string" then
+		Logger.warn(LOG, "Refusing an invalid hotstring section identifier.")
+		return push_state(state, context)
+	end
 
 	-- The shared settings window speaks eleven actions; this bridge answered four
 	-- of them, so every delay, colour and preview control in it was inert on this

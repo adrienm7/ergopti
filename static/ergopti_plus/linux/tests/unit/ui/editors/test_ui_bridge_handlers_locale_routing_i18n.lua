@@ -131,6 +131,17 @@ helpers.describe("ui.bridge_handlers", function()
       handler.on_message({ action = "set_color", category = "accents", section = "", hex = "#00ff00" }, s2)
       helpers.assert_eq(seen[1].sec, nil, "the empty string must become nil, not a section key")
     end)
+		helpers.it("(hotstring-config-input) refuses malformed section identifiers instead of editing the category", function()
+			local seen, s2 = {}, build_mock_state()
+			s2.config.set_override = function(...) seen[#seen + 1] = { ... }; return true end
+			for _, action in ipairs({ "set_delay", "clear_delay", "set_color", "clear_color", "set_tooltip", "clear_tooltip", "set_priority", "clear_priority" }) do
+				for _, section in ipairs({ false, 3, {} }) do
+					handler.on_message({ action = action, category = "accents", section = section,
+						ms = 300, hex = "#123456", show_tooltip = true, priority = 1 }, s2)
+				end
+			end
+			helpers.assert_eq(#seen, 0)
+		end)
     helpers.it("'set_priority' accepts a value in range and refuses one outside it", function()
       local seen = {}
       local s2 = build_mock_state()
