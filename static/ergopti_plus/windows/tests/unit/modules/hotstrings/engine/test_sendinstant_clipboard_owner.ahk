@@ -262,3 +262,114 @@ _SIPRT_Case(Mode) {
 
 for _SIPRT_Mode in ["current", "different-copy", "same-text-copy"]
 	Test("SendInstant native post-receipt copy: " . _SIPRT_Mode . " (sendinstant-post-receipt-owner)", _SIPRT_Case.Bind(_SIPRT_Mode))
+
+_SISCT_ChildSource() {
+	global _DriverDir
+	Code := _SICOT_ChildSource()
+	Code := StrReplace(Code, "CB_SaveAll() {", "_SISC_ActualSaveAll() {", true, &Snapshots)
+	AssertEqual(1, Snapshots, "Only the complete real all-format snapshot may receive an unlocked-return observer")
+	OldInclude := "#Include " . _DriverDir . "\tests\fixtures\sendinstant_clipboard_owner_body.ahk`n"
+	NewInclude := "#Include " . _DriverDir . "\tests\fixtures\sendinstant_snapshot_copy_body.ahk`n"
+	Code := StrReplace(Code, OldInclude, NewInclude, true, &Fixtures)
+	AssertEqual(1, Fixtures, "The public sender, actual native paste and deferred restore remain unchanged")
+	return Code
+}
+_SISCT_Case(Mode) {
+	global _DriverDir, SEND_INSTANT_PASTE_DELAY_MS
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unresolved clipboard child tree cannot be replaced")
+	Directory := A_Temp . "\ergopti_sendinstant_snapshot_copy_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := false
+	Script := Directory . "\subject.ahk"
+	Subject := {Calls: 0, Code: -1, Output: "", ErrorText: ""}
+	Writer := {Calls: 0, Code: -1, Output: "", ErrorText: ""}
+	Handles := [], Primary := 0, ExportFailure := 0, Retired := true, AtDeadline := 0
+	PreviousCritical := Critical("Off")
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Directory)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The snapshot/copy actors require an exclusively acquired private directory")
+		AssertTrue(SEND_INSTANT_PASTE_DELAY_MS is Integer && SEND_INSTANT_PASTE_DELAY_MS > 0
+			&& SEND_INSTANT_PASTE_DELAY_MS <= 1000, "The real deferred restore delay must fit the private child deadline")
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _SISCT_ChildSource()) != 0)
+		_TestPrint("# sendinstant-clipboard-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
+			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\sendinstant_snapshot_copy_body.ahk")))
+		for Spec in [{Role: "writer", State: Writer}, {Role: "subject", State: Subject}] {
+			Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+				["/ErrorStdOut=UTF-8", Script, Spec.Role, Directory, Mode, String(SEND_INSTANT_PASTE_DELAY_MS)], _SICOT_Complete.Bind(Spec.State))
+			Handles.Push(Handle)
+			AssertTrue(Handle.start(), "Each exact owned native process must start")
+		}
+		Started := A_TickCount
+		while (Subject.Calls == 0 || Writer.Calls == 0) && TickElapsed(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AtDeadline := {Subject: {Calls: Subject.Calls, Code: Subject.Code, Output: Subject.Output, ErrorText: Subject.ErrorText},
+			Writer: {Calls: Writer.Calls, Code: Writer.Code, Output: Writer.Output, ErrorText: Writer.ErrorText}}
+		if Subject.Calls == 0 || Writer.Calls == 0
+			Primary := Error("The exact clipboard subject and writer did not settle within their 15000 ms deadline.")
+	} catch Any as Failure {
+		Primary := Failure
+	} finally {
+		if !IsObject(AtDeadline) || AtDeadline.Subject.Calls == 0 || AtDeadline.Writer.Calls == 0 {
+			for Handle in Handles {
+				try Handle.requestTerminate()
+				catch Any as Failure {
+					if !IsObject(Primary)
+						Primary := Failure
+				}
+			}
+		}
+		for Handle in Handles {
+			try {
+				Receipt := Handle.terminate()
+				if !(Receipt is Integer && Receipt == 1)
+					Retired := false
+			} catch Any as Failure {
+				Retired := false
+				if !IsObject(Primary)
+					Primary := Failure
+			}
+		}
+		try {
+			; Failed/unknown cleanup preserves the private protocol evidence.
+			if Created && Retired && IsObject(AtDeadline) && AtDeadline.Subject.Calls == 1 && AtDeadline.Subject.Code == 0
+				&& AtDeadline.Writer.Calls == 1 && AtDeadline.Writer.Code == 0
+				DirDelete(Directory, true)
+		} catch Any as Failure {
+			if !IsObject(Primary)
+				Primary := Failure
+		} finally {
+			if Created && !Retired
+				RetirementDebt := {Handles: Handles, Directory: Directory}
+			Critical(PreviousCritical)
+		}
+	}
+	try {
+		for Spec in [{Role: "subject", State: Subject}, {Role: "writer", State: Writer}]
+			if Spec.State.Calls == 1
+				for Line in StrSplit(Spec.State.Output, "`n", "`r")
+					if Line != ""
+						_TestPrint("# sendinstant-clipboard-" . Spec.Role . "-combined " . Line)
+	} catch Any as Failure
+		ExportFailure := Failure
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "Both exact native process trees must acknowledge retirement")
+	AssertEqual(1, AtDeadline.Subject.Calls)
+	AssertEqual("", AtDeadline.Subject.ErrorText, AtDeadline.Subject.Output)
+	AssertEqual(0, AtDeadline.Subject.Code, AtDeadline.Subject.Output)
+	AssertContains(AtDeadline.Subject.Output, "CLEANUP sendinstant-snapshot-copy ")
+	AssertContains(AtDeadline.Subject.Output, "PASS sendinstant-snapshot-copy " . Mode)
+	AssertEqual(1, AtDeadline.Writer.Calls)
+	AssertEqual("", AtDeadline.Writer.ErrorText, AtDeadline.Writer.Output)
+	AssertEqual(0, AtDeadline.Writer.Code, AtDeadline.Writer.Output)
+	AssertContains(AtDeadline.Writer.Output, "PASS sendinstant-snapshot-writer " . Mode)
+	if IsObject(ExportFailure)
+		throw ExportFailure
+}
+
+for _SISCT_Mode in ["current", "different-copy", "same-text-copy"]
+	Test("SendInstant native copy after snapshot: " . _SISCT_Mode . " (sendinstant-native-snapshot-copy)", _SISCT_Case.Bind(_SISCT_Mode))

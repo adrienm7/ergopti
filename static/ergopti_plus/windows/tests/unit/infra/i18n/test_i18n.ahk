@@ -678,3 +678,61 @@ _I18nSLP_RapidSwitchLogsNothingSynchronously() {
 	_I18nTestReset()
 }
 Test("i18n I18nSetLocale: rapid switches log nothing synchronously (F51)", _I18nSLP_RapidSwitchLogsNothingSynchronously)
+
+; Actual locale JSON, parser, lazy public accessor and fast-cache ownership.
+; Invalid shape is source failure, not a partial catalogue or a thrown menu.
+_I18nShape_Case(Mode) {
+	global _SharedDir, _I18nLocale, _I18nCache, _I18nCacheLoaded, _I18nActiveCacheIdentity
+	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
+	global _I18nFallbacksWarmed, _I18nMissWarned
+	Saved := [_SharedDir, _I18nLocale, _I18nCache, _I18nCacheLoaded, _I18nActiveCacheIdentity,
+		_I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded,
+		_I18nFallbacksWarmed, _I18nMissWarned]
+	Root := A_Temp . "\ergopti_i18n_shape_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	PreviousCritical := Critical("Off")
+	Owned := false
+	Sources := Map("root-boolean", "true", "root-array", '["not a catalogue"]',
+		"nested-value", '{"fixture.key":{"nested":"invalid"}}',
+		"numeric-value", '{"fixture.key":7}', "null-value", '{"fixture.key":null}',
+		"flat-control", '{"fixture.key":"valid translation"}', "empty-control", '{}')
+	try {
+		Created := FSCreateDirectoryExclusiveStrict(Root)
+		Owned := Created is Integer && Created == 1
+		AssertTrue(Owned, "Acquire the private root before creating or deleting any locale artifact")
+		DirCreate(Root . "\data\locales")
+		Path := Root . "\data\locales\de.json"
+		AssertTrue(FSWriteCreateDurable(Path, Sources[Mode]))
+		_SharedDir := Root
+		_I18nLocale := "de"
+		_I18nCache := Map(), _I18nCacheLoaded := false, _I18nActiveCacheIdentity := false
+		_I18nCacheEn := Map(), _I18nCacheEnLoaded := false
+		_I18nCacheFr := Map(), _I18nCacheFrLoaded := false
+		_I18nFallbacksWarmed := false, _I18nMissWarned := Map()
+		; No replacement reader/parser/loader/translator is installed. A UI's
+		; ordinary t() call must remain safe even when its file decodes to bad data.
+		_TestPrint("# i18n-shape-enter mode=" . Mode . " source_exists=" . FSExists(Path))
+		Actual := t("fixture.key")
+		_TestPrint("# i18n-shape mode=" . Mode . " loaded=" . _I18nCacheLoaded
+			. " result_type=" . Type(Actual) . " keys=" . _I18nCache.Count)
+		AssertTrue(Actual is String)
+		Valid := Mode == "flat-control" || Mode == "empty-control"
+		AssertEqual(Valid, _I18nCacheLoaded, "Only a complete flat String-to-String source is a loaded catalogue")
+		AssertEqual(Mode == "flat-control" ? "valid translation" : "fixture.key", Actual)
+		if !Valid {
+			AssertEqual(0, _I18nCache.Count, "An invalid entry cannot publish a partial active catalogue")
+			AssertFalse(FSExists(Root . "\data\locales\de.tsv"), "An invalid JSON shape cannot be promoted into the self-healing fast cache")
+		}
+	} finally {
+		_SharedDir := Saved[1], _I18nLocale := Saved[2]
+		_I18nCache := Saved[3], _I18nCacheLoaded := Saved[4], _I18nActiveCacheIdentity := Saved[5]
+		_I18nCacheEn := Saved[6], _I18nCacheEnLoaded := Saved[7]
+		_I18nCacheFr := Saved[8], _I18nCacheFrLoaded := Saved[9]
+		_I18nFallbacksWarmed := Saved[10], _I18nMissWarned := Saved[11]
+		try {
+			if Owned
+				DirDelete(Root, true)
+		} finally Critical(PreviousCritical)
+	}
+}
+for _I18nShape_Mode in ["root-boolean", "root-array", "nested-value", "numeric-value", "null-value", "flat-control", "empty-control"]
+	Test("i18n public lookup: " . _I18nShape_Mode . " preserves safe source fallback (i18n-source-shape)", _I18nShape_Case.Bind(_I18nShape_Mode))
