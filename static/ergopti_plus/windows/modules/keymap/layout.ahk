@@ -67,6 +67,9 @@ DeadKey(Mapping) {
 		try {
 			NamedKeys := "{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Insert}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
 			ih := InputHook("L2 E C T2", _SIHO_ScalarEndKeys() . NamedKeys)
+			; Ending controls are replayed below. Suppress these exact keys,
+			; leaving non-ending native controls and modifiers visible.
+			ih.KeyOpt(NamedKeys, "S")
 			OwnerToken := SIHO_StartOwned(ih, "dead-key", true)
 			if !OwnerToken
 				return
