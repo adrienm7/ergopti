@@ -130,3 +130,7 @@ for _APST_Mode in ["current", "close-create", "close-create-reject", "reopen-cre
 for _APST_SubscriptionMode in ["subscription-current", "subscription-close"]
 	Test("Action picker add-event retirement: " . _APST_SubscriptionMode . " owns the actual HWND (action-picker-native-subscription-retirement-owner)",
 		_APST_Case.Bind(_APST_SubscriptionMode))
+
+for _APST_SdkMode in ["subscription-sdk-current", "subscription-sdk-retired", "subscription-reset-retain"]
+	Test("Action picker SDK/Reset contract: " . _APST_SdkMode . " preserves its exact owner (action-picker-subscription-sdk-owner)",
+		_APST_Case.Bind(_APST_SdkMode))
