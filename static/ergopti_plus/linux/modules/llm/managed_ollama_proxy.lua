@@ -142,7 +142,7 @@ function M.new(deps)
 		-- `inner` is the current lookup child; the operation settles once the
 		-- logical answer is out and that child is physically retired.
 		local operation = { finished = false, listeners = {} }
-		local inner, step = nil, 0
+		local inner, step, watched = nil, 0, nil
 		function operation:is_settled()
 			if inner then return inner.is_settled() == true end
 			return self.finished
@@ -150,18 +150,34 @@ function M.new(deps)
 		local function release()
 			local listeners = operation.listeners
 			operation.listeners = {}
-			for _, listener in ipairs(listeners) do listener() end
+			for _, listener in ipairs(listeners) do
+				local ok = pcall(listener)
+				if not ok then pcall(Logger.error, LOG, "Managed Ollama proxy settlement listener failed.") end
+			end
 		end
 		function operation:on_settled(listener)
 			if type(listener) ~= "function" then return false end
 			if not self.finished then self.listeners[#self.listeners + 1] = listener; return true end
 			-- Once the answer is out the current child is the last one.
 			if inner and inner.is_settled() ~= true then return inner.on_settled(listener) end
-			listener()
+			local ok = pcall(listener)
+			if not ok then pcall(Logger.error, LOG, "Managed Ollama proxy settlement listener failed.") end
 			return true
 		end
 		local function settle_later()
-			if inner and inner.is_settled() ~= true then inner.on_settled(release) else release() end
+			local child = inner
+			if not child or child.is_settled() == true then watched = nil; release(); return end
+			if watched == child then return end
+			-- Reserve before registration: the child can report settlement inline.
+			watched = child
+			local called, accepted = pcall(child.on_settled, function()
+				if watched ~= child then return end
+				watched = nil
+				if inner ~= child then settle_later() else release() end
+			end)
+			-- A literal refusal can be retried. A throw has unknown registration
+			-- state, so keep the reservation rather than duplicating observers.
+			if called and accepted == false and watched == child then watched = nil end
 		end
 		function operation:cancel()
 			self.finished = true
@@ -173,7 +189,8 @@ function M.new(deps)
 		local function finish(result)
 			if operation.finished then return end
 			operation.finished = true
-			done(result)
+			local ok = pcall(done, result)
+			if not ok then pcall(Logger.error, LOG, "Managed Ollama proxy result listener failed.") end
 			settle_later()
 		end
 		local rows = deps.environment()
