@@ -13,6 +13,7 @@ local M = {}
 local HttpBridge = require("infra.llm_bridge")
 local HttpClient = require("adapters.http_client")
 local Json = require("json")
+local NumberPolicy = require("number_policy")
 local Logger = require("logger.shim")
 local DownloadWindow = require("ui.download_window.bridge")
 local WindowSessionId, RetireWindow, CompleteWindow = DownloadWindow.session_id, DownloadWindow.retire, DownloadWindow.complete
@@ -131,7 +132,10 @@ local function consume_line(request, line)
 	local completed = tonumber(message.completed)
 	local total = tonumber(message.total)
 	local percentage = nil
-	if completed and total and total > 0 then percentage = completed * 100 / total end
+	if NumberPolicy.is_finite(completed) and NumberPolicy.is_finite(total)
+		and completed >= 0 and total > 0 then
+		percentage = math.min(completed / total, 1) * 100
+	end
 	if not current(request, request.attempt) or _active ~= request then return end
 	if percentage then tell(request, percentage) end
 	DownloadWindow.update(request.session_id, percentage,
