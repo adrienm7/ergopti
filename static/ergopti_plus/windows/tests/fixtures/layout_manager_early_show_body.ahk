@@ -28,7 +28,33 @@ _LMSO_BootError(Failure, Mode) {
 ; window, host, shared environment owner, SDK create and Promise await are real.
 class _LMSO_Core {
 	__New() {
-		this.Settings := {}
+		this.SettingsValue := {}
+	}
+	Settings {
+		get {
+			global _LMSO, _LayMgrWeb_Gui, _LayMgrWeb_SessionEpoch
+			if HasProp(_LMSO, "SettingsMode") {
+				_LMSO.SettingsCalls += 1
+				Window := _LayMgrWeb_Gui
+				_LMSO.Window := Window, _LMSO.Hwnd := Window.Hwnd
+				_LMSO_Require(DllCall("IsWindow", "Ptr", _LMSO.Hwnd, "Int")
+					&& WinGetPID("ahk_id " . _LMSO.Hwnd) == ProcessExist(),
+					"The browser settings port must still name the exact owned native window")
+				if _LMSO.SettingsMode == "settings-close" {
+					_LMSO_Require(!_LMSO.ClosePosted, "The COM boundary may post exactly one native Close")
+					_LMSO.ClosePosted := true
+					Before := _LayMgrWeb_SessionEpoch
+					_LMSO_Require(DllCall("PostMessageW", "Ptr", _LMSO.Hwnd, "UInt", 0x10, "UPtr", 0, "Ptr", 0, "Int"),
+						"The existing settings effect boundary must accept exact native WM_CLOSE")
+					Started := A_TickCount
+					while _LayMgrWeb_SessionEpoch == Before && A_TickCount - Started < 1000
+						Sleep(1)
+					_LMSO.CloseObserved := _LayMgrWeb_SessionEpoch != Before
+						&& !DllCall("IsWindow", "Ptr", _LMSO.Hwnd, "Int")
+				}
+			}
+			return this.SettingsValue
+		}
 	}
 	WebMessageReceived(Callback) => {Callback: Callback}
 	NavigationCompleted(Callback) => {Callback: Callback}
@@ -178,6 +204,56 @@ _LMSO_OpenGeneration(Mode) {
 	}
 }
 
+
+; The browser property is an existing COM-effect port; only its delivery of a
+; genuine WM_CLOSE is controlled. No actual WebView2 RPC pump is claimed here.
+_LMSO_SettingsGeneration(Mode) {
+	global _LMSO, _WebView_SharedEnv, _WebView_SharedEnvRetired
+	global _LayMgrWeb_Gui, _LayMgrWeb_Controller, _LayMgrWeb_WebView
+	_LMSO_Refuse(!!_LayMgrWeb_Gui, "A settings opening starts without a foreign native host")
+	PreviousEnv := _WebView_SharedEnv, PreviousRetired := _WebView_SharedEnvRetired
+	PreviousCritical := Critical("Off"), Environment := _LMSO_Environment()
+	_LMSO := {SettingsMode: Mode, SettingsCalls: 0, Window: 0, Hwnd: 0, ClosePosted: false, CloseObserved: false}
+	Started := false, OpeningFailure := 0
+	try {
+		_WebView_SharedEnv := Environment, _WebView_SharedEnvRetired := false
+		_LMSO_Require(_LayMgrWeb_Available(), "The genuine vendored SDK loader must be present")
+		Thread("Interrupt", 0)
+		try Started := LayoutManager_Open()
+		catch Any as Failure
+			OpeningFailure := Failure
+		FileAppend("OBSERVATION layout-settings mode=" . Mode . " settings_calls=" . _LMSO.SettingsCalls
+			. " close_posted=" . _LMSO.ClosePosted . " close_observed=" . _LMSO.CloseObserved
+			. " controllers=" . Environment.Controllers.Length . " started=" . Started
+			. " caught=" . (IsObject(OpeningFailure) ? Type(OpeningFailure) : "none") . "`n", "*")
+		_LMSO_Equal(1, _LMSO.SettingsCalls, "The real host must reach its actual settings property exactly once")
+		_LMSO_Equal(1, Environment.Controllers.Length, "The settings cutpoint requires genuine SDK controller creation")
+		if Mode == "settings-close" {
+			_LMSO_Require(_LMSO.ClosePosted && _LMSO.CloseObserved,
+				"A genuine native Close must retire its exact GUI and epoch before judging the older opening")
+			_LMSO_Equal(1, Environment.Controllers[1].Closed, "The exact admitted controller must close once")
+			_LMSO_Refuse(IsObject(OpeningFailure), "A retired settings continuation must return cancellation rather than dereferencing withdrawn globals")
+			_LMSO_Refuse(!!Started || !!_LayMgrWeb_Gui || IsSet(_LayMgrWeb_Controller) || IsSet(_LayMgrWeb_WebView),
+				"A genuinely closed host cannot report a live opening or republish its controller")
+		} else {
+			_LMSO_Refuse(IsObject(OpeningFailure), "The current settings continuation must remain usable")
+			_LMSO_Require(Started && _LayMgrWeb_Gui == _LMSO.Window
+				&& _LayMgrWeb_Controller == Environment.Controllers[1]
+				&& DllCall("IsWindow", "Ptr", _LMSO.Hwnd, "Int"), "The current opening must retain its exact native owner")
+			_LMSO_Equal(0, Environment.Controllers[1].Closed)
+		}
+	} finally {
+		_LayMgrWeb_Close()
+		for Controller in Environment.Controllers
+			if !Controller.Closed
+				Controller.Close()
+		if IsObject(_LMSO.Window)
+			try _LMSO.Window.Destroy()
+		_WebView_SharedEnv := PreviousEnv, _WebView_SharedEnvRetired := PreviousRetired
+		Critical(PreviousCritical)
+	}
+}
+
 if A_Args.Length != 2 || A_Args[2] != _LMSO_Root
 	ExitApp(2)
 try {
@@ -185,7 +261,10 @@ try {
 	_LMSO_Require(!FileExist(ConfigurationFile) && !ConfigMigrateBoot(ConfigurationFile, "known"),
 		"The isolated UI role must remain genuinely outside primary configuration admission.")
 	LoggerInit()
-	_LMSO_OpenGeneration(A_Args[1])
+	if A_Args[1] == "settings-current" || A_Args[1] == "settings-close"
+		_LMSO_SettingsGeneration(A_Args[1])
+	else
+		_LMSO_OpenGeneration(A_Args[1])
 	_LMSO_Require(!FileExist(ConfigurationFile) && !ConfigMigrateBoot(ConfigurationFile, "known"),
 		"The UI component must preserve the absent constructor role.")
 	FileAppend("PASS layout-early-show " . A_Args[1] . "`n", "*", "UTF-8")
