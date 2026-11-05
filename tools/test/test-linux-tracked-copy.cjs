@@ -291,6 +291,28 @@ try {
 	);
 	assert.notEqual(absent.status, 0, 'empty inventories must not report a successful copy');
 	assert.match(absent.stderr, /No tracked files/);
+	if (process.platform === 'linux') {
+		const sourceDirectory = path.join(scratch, 'source/private-parent');
+		const savedDirectory = path.join(scratch, 'saved-parent');
+		const foreignDirectory = path.join(scratch, 'foreign-parent');
+		fs.mkdirSync(sourceDirectory);
+		fs.mkdirSync(foreignDirectory);
+		fs.writeFileSync(path.join(sourceDirectory, 'tracked.txt'), 'tracked source\n');
+		fs.writeFileSync(path.join(foreignDirectory, 'tracked.txt'), 'private user data\n');
+		git('add', '--', 'source/private-parent/tracked.txt');
+		fs.renameSync(sourceDirectory, savedDirectory);
+		fs.symlinkSync(foreignDirectory, sourceDirectory);
+		try {
+			const output = path.join(scratch, 'source-alias-output');
+			const copied = spawnSync(process.execPath, [helper, scratch, path.join(scratch, 'source'), output], { encoding: 'utf8' });
+			assert.notEqual(copied.status, 0, 'a source directory replaced by a symlink must be refused');
+			assert.equal(fs.existsSync(path.join(output, 'private-parent/tracked.txt')), false);
+		} finally {
+			fs.unlinkSync(sourceDirectory);
+			fs.renameSync(savedDirectory, sourceDirectory);
+			git('reset', '--', 'source/private-parent/tracked.txt');
+		}
+	}
 	if (process.platform !== 'win32') {
 		fs.symlinkSync(names[0], path.join(scratch, 'source', 'relative-link'));
 		git('add', '--', 'source/relative-link');

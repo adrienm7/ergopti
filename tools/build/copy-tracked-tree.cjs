@@ -67,6 +67,18 @@ function ensureDirectory(directory) {
 	directories.add(directory);
 }
 
+// Tracked directory names are not Git objects. A replaced parent link must
+// not redirect the copy to unrelated files that happen to share tracked names.
+function admitSourceParents(file) {
+	let directory = path.dirname(file);
+	while (directory !== root) {
+		const stat = fs.lstatSync(directory);
+		if (!stat.isDirectory() || stat.isSymbolicLink())
+			throw new Error(`Unsafe copy source directory: ${directory}`);
+		directory = path.dirname(directory);
+	}
+}
+
 let copied = 0;
 for (const tracked of inventory) {
 	if (!tracked.startsWith(relativeSource + '/'))
@@ -79,6 +91,7 @@ for (const tracked of inventory) {
 	relativeWithin(source, from);
 	relativeWithin(destination, to);
 	ensureDirectory(path.dirname(to));
+	admitSourceParents(from);
 	const stat = fs.lstatSync(from);
 	if (fs.existsSync(to) || fs.lstatSync(to, { throwIfNoEntry: false })) {
 		throw new Error(`Copy destination already exists: ${to}`);
