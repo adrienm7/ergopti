@@ -249,6 +249,17 @@ helpers.describe("AI agent connectors: one program per action, never a shell", f
 		end)
 	end)
 
+	helpers.it("refreshes the tool cache when the wall clock moves backwards", function()
+		with_connectors({ tools = { "valid" } }, function(Connectors, world)
+			local cfg = config()
+			world.clock = 1000
+			Connectors.tools(cfg)
+			world.clock = 500
+			Connectors.tools(cfg)
+			helpers.assert_eq(world.listed, 2, "a backwards clock must not extend cache lifetime")
+		end)
+	end)
+
 	helpers.it("the tools list is capped, and read again after ten minutes or a refresh", function()
 		local names = {}
 		for index = 1, 60 do names[index] = string.format("tool%02d", index) end
