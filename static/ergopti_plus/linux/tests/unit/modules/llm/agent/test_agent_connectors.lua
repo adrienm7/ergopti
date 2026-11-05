@@ -214,6 +214,25 @@ helpers.describe("AI agent connectors: one program per action, never a shell", f
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("omits executable tool names that are not valid UTF-8", function()
+		local uv = require("luv")
+		local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-tools-XXXXXX"))
+		local invalid, valid = dir .. "/bad" .. string.char(0xff), dir .. "/valid"
+		for _, path in ipairs({ invalid, valid }) do
+			local file = assert(io.open(path, "wb")); assert(file:write("#!/bin/sh\n")); assert(file:close())
+			assert(uv.fs_chmod(path, 448))
+		end
+		local previous = package.loaded["modules.llm.agent_connectors"]
+		package.loaded["modules.llm.agent_connectors"] = nil
+		local connectors = require("modules.llm.agent_connectors")
+		connectors._set_deps_for_test({ tools_dir = function() return dir end })
+		local ok, err = pcall(function() helpers.assert_eq(connectors.tools(config()), { "valid" }) end)
+		connectors._set_deps_for_test(nil)
+		package.loaded["modules.llm.agent_connectors"] = previous
+		assert(uv.fs_unlink(invalid)); assert(uv.fs_unlink(valid)); assert(uv.fs_rmdir(dir))
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("refuses a cached tool replaced by a symlink before execution", function()
 		local uv = require("luv")
 		local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-tools-XXXXXX"))

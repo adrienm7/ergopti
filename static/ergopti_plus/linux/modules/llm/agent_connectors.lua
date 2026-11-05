@@ -29,6 +29,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Agent = require("llm.agent")
+local Utf8 = require("compat.utf8")
 local ShellRunner = require("adapters.shell_runner")
 
 local LOG = "modules.llm.agent_connectors"
@@ -249,12 +250,15 @@ function M.tools(config)
 		Logger.warn(LOG, "The agent's tools could not be listed: %s.", tostring(reason))
 	else
 		table.sort(names)
+		local invalid_utf8 = false
 		for _, name in ipairs(names) do
 			if #kept >= limit then break end
 			if type(name) == "string" and name:match(TOOL_NAME_PATTERN) and name ~= "." and name ~= ".." then
-				kept[#kept + 1] = name
+				if Utf8.len(name) then kept[#kept + 1] = name
+				else invalid_utf8 = true end
 			end
 		end
+		if invalid_utf8 then Logger.warn(LOG, "Agent tools with invalid UTF-8 filenames were ignored.") end
 	end
 	_tools_cache = { at = now, names = kept }
 	return copy_tools(kept)
