@@ -370,6 +370,11 @@ end
 --- @param page_current function|nil Exact page projection owner.
 --- @return table api { rows, providers, tools }
 function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
+	local function page_owned()
+		if page_current == nil then return true end
+		local ok, current = pcall(page_current)
+		return ok and current == true
+	end
 	local function changed() if type(on_changed) == "function" then on_changed() end end
 	local ok_remote, remote = pcall(require, "modules.llm.api_remote")
 	local ok_entries, entries = pcall(require, "modules.llm.api_entries")
@@ -418,10 +423,11 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 				return run_test(remote, dialogs, active, active_name, function() return entries.active() == active end, page_current)
 			end }
 			actions[2] = { id = "remove", text = tr("menu.llm.api_remove_entry"), run = function()
+				if not page_owned() then return false end
 				local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return active_name end))
 				if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
-				if not active_commands_ready() then return false end
-				if llm.set_backend("api") ~= true or not active_commands_ready() then return false end
+				if not page_owned() or not active_commands_ready() then return false end
+				if llm.set_backend("api") ~= true or not page_owned() or not active_commands_ready() then return false end
 				if entries.remove(active.id) ~= true then return false end
 				changed()
 				return true
@@ -431,10 +437,10 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 			actions[1] = { id = "test", text = tr("menu.llm.api_test_entry"),
 				run = function() return run_test(remote, dialogs, entry, label, function() return entry_retained(entries, entry) end, page_current) end }
 			actions[2] = { id = "remove", text = tr("menu.llm.api_remove_entry"), run = function()
-				if not entry_retained(entries, entry) then return false end
+				if not page_owned() or not entry_retained(entries, entry) then return false end
 				local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return label end))
 				if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
-				if not entry_retained(entries, entry) then return false end
+				if not page_owned() or not entry_retained(entries, entry) then return false end
 				if entries.remove(entry.id) ~= true then return false end
 				changed()
 				return true
