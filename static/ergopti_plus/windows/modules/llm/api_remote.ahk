@@ -2449,7 +2449,23 @@ _LLMRemoteParseStructuredRootState(Format, Root) {
         if (Choice is Map) and Choice.Has("message") and (Choice["message"] is Map) {
             Message := Choice["message"]
             if Message.Has("content") {
-                Text := Type(Message["content"]) == "String" ? Message["content"] : ""
+                Content := Message["content"]
+                Text := Type(Content) == "String" ? Content : ""
+                if Content is Array {
+                    ; Mistral's assistant content is a sequence: its ordinary
+                    ; text chunks concatenate verbatim; thinking is separate.
+                    ; A malformed text chunk cannot authorize a partial answer.
+                    for Chunk in Content {
+                        if !(Chunk is Map)
+                            return Map("recognized", true, "text", "", "reason", "canonical_empty")
+                        Kind := Chunk.Get("type", 0)
+                        if !(Kind is String) || StrCompare(Kind, "text", true) != 0
+                            continue
+                        if Type(Chunk.Get("text", 0)) != "String"
+                            return Map("recognized", true, "text", "", "reason", "canonical_empty")
+                        Text .= Chunk["text"]
+                    }
+                }
                 return Map("recognized", true, "text", Text, "reason", "canonical_empty")
             }
         }

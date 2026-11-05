@@ -1,7 +1,7 @@
 {
 	"provider": "mistral",
 	"sdk_version": "v1.9.11",
-	"status": "Response schema evidence; native regression qualification pending.",
+	"status": "Native fail-before demonstrated; Windows implementation admits ordered ordinary text chunks. Post-fix qualification pending.",
 	"schema_chain": [
 		"ChatCompletionResponse.choices",
 		"ChatCompletionChoice.message",
@@ -38,5 +38,23 @@
 			"url": "https://raw.githubusercontent.com/mistralai/client-python/v1.9.11/src/mistralai/models/thinkchunk.py",
 			"sha256": "1e90f6dcb940cc84d1b53408da7696629e270c34a7cd5ed4f7b4285d26f2d858"
 		}
-	]
+	],
+	"multipart_semantics": {
+		"url": "https://docs.mistral.ai/capabilities/reasoning/",
+		"sha256": "be59091d392eadca8f7b8e40faaebbdb12aee97514a1e9d9b4a66bd78092ad24",
+		"excerpts": [
+			{
+				"section": "Handling thinking chunks",
+				"text": "When reasoning_effort is set to \"high\", the response message.content is a list of chunks instead of a plain string. ThinkChunk (type: \"thinking\") contains the reasoning trace; TextChunk (type: \"text\") contains the final answer."
+			},
+			{
+				"section": "Multi-turn conversations / final-answer display",
+				"python": "answer = \"\".join(\n    c.text for c in (content or []) if isinstance(c, TextChunk)\n)\nprint(answer)"
+			},
+			{
+				"section": "zai-glm-5-3",
+				"text": "message.content is always returned as a list of chunks (thinking + text) regardless of the reasoning_effort value; there is no plain-string mode."
+			}
+		]
+	}
 }
