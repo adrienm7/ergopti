@@ -371,6 +371,13 @@ local function with_repoint_receipts(case, body)
 end
 
 helpers.describe("linux-logger-repoint-owner", function()
+	helpers.it("linux-logger-repoint-owner: closed stderr cannot abort stdout-only installation", function()
+		with_repoint_receipts({ mode = "stdout", stderr_throws = true }, function(Sink, state)
+			helpers.assert_true(not Sink.is_file_sink_active())
+			state.emit("still available on stdout", "info")
+			helpers.assert_eq(#state.console, 1)
+		end)
+	end)
 	local failure = setmetatable({}, { __tostring = function() error("foreign error formatting must not execute") end })
 	for _, case in ipairs({
 		{ name = "nil main", channel = "main" },

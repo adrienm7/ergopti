@@ -555,10 +555,12 @@ function M.install(logger, opts)
 	M.follow_config_dir(require("infra.config_paths").get_config_dir())
 
 	if _stdout_only then
-		io.stderr:write(_redact(
-			"[logger_sink] Could not open a log file under " .. tostring(_dir) ..
-			" — logging to stdout only.\n"
-		))
+		pcall(function()
+			io.stderr:write(_redact(
+				"[logger_sink] Could not open a log file under " .. tostring(_dir) ..
+				" — logging to stdout only.\n"
+			))
+		end)
 		return false
 	end
 	return true
