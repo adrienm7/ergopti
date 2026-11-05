@@ -313,10 +313,10 @@ end
 function M.validate_action(config, action, opts)
 	if type(action) ~= "table" then return nil, "not an object" end
 	local schema = config.actions[action.type]
-	if schema == nil then return nil, "unknown type " .. tostring(action.type) end
+	if schema == nil then return nil, "unknown type" end
 	local out = { type = action.type }
 	for name, value in pairs(action) do
-		if name ~= "type" and schema[name] == nil then return nil, "unknown field " .. tostring(name) end
+		if name ~= "type" and schema[name] == nil then return nil, "unknown field" end
 	end
 	for name, rule in pairs(schema) do
 		local value = action[name]
