@@ -34,14 +34,18 @@ _PFI_NativeInputTick(Step) {
 		return
 	Step.Busy := true
 	try {
-		for Hwnd in WinGetList("ahk_class #32770 ahk_pid " . ProcessExist()) {
+		for Hwnd in WinGetList("ahk_pid " . ProcessExist()) {
 			if WinGetTitle("ahk_id " . Hwnd) != Step.Title
 				continue
 			Step.Hwnd := Hwnd
 			EditHwnd := ControlGetHwnd("Edit1", "ahk_id " . Hwnd)
 			Step.Multiline := !!(DllCall("User32\GetWindowLongW", "Ptr", EditHwnd, "Int", -16, "UInt") & 4)
+			NativeBox := WinGetClass("ahk_id " . Hwnd) == "#32770"
 			if Step.Cancel {
-				PostMessage(0x111, 2, 0, , "ahk_id " . Hwnd)
+				if NativeBox
+					PostMessage(0x111, 2, 0, , "ahk_id " . Hwnd)
+				else
+					PostMessage(0xF5, 0, 0, "Button2", "ahk_id " . Hwnd)
 			} else {
 				if Step.Label
 					ControlSetText("Edited A", "Edit1", "ahk_id " . Hwnd)
@@ -52,7 +56,10 @@ _PFI_NativeInputTick(Step) {
 					SendMessage(0x302, 0, 0, "Edit1", "ahk_id " . Hwnd)
 				}
 				Step.Observed := ControlGetText("Edit1", "ahk_id " . Hwnd)
-				PostMessage(0x111, 1, 0, , "ahk_id " . Hwnd)
+				if NativeBox
+					PostMessage(0x111, 1, 0, , "ahk_id " . Hwnd)
+				else
+					PostMessage(0xF5, 0, 0, "Button1", "ahk_id " . Hwnd)
 			}
 			Step.Submitted := true
 			return
@@ -60,7 +67,7 @@ _PFI_NativeInputTick(Step) {
 	} catch as Failure {
 		Step.Failure := Failure
 		if Step.Hwnd
-			DllCall("User32\PostMessageW", "Ptr", Step.Hwnd, "UInt", 0x111, "Ptr", 2, "Ptr", 0, "Int")
+			DllCall("User32\PostMessageW", "Ptr", Step.Hwnd, "UInt", 0x10, "Ptr", 0, "Ptr", 0, "Int")
 		Step.Submitted := true
 	} finally Step.Busy := false
 }
@@ -81,7 +88,8 @@ _PFI_NativeInput(State, Prompt, Title, Options, Default) {
 		SetTimer(Tick, 10)
 		; T5 bounds automation failure without changing the dialog's text or
 		; control styles. Both dimensions come unchanged from production.
-		Box := Ui_InputBox(Prompt, Title, Options . " T5", Default)
+		NativeInput := Step.Label ? Ui_InputBox : _LLM_Menu_ProfilePromptInput
+		Box := NativeInput.Call(Prompt, Title, Options . " T5", Default)
 		if Step.Failure is Error
 			throw Step.Failure
 		AssertTrue(Step.Submitted && Step.Hwnd != 0, "The real production InputBox must receive native automation")
@@ -177,6 +185,8 @@ _PFI_Run(Mode) {
 		; bless the old live profile array as the source of those newer bytes.
 		if Mode == "edit-preopen-external"
 			_PFI_External(State)
+		if Mode == "edit-preopen-unrepresentable"
+			_PFI_ExternalUnknownProfileField(State)
 		MenuBefore := _LLM_Menu
 		Port := Map("input", _PFI_Input.Bind(State), "confirm", _PFI_Confirm.Bind(State),
 			"notify", _PFI_Notify.Bind(State), "collect", _PFI_Collect.Bind(State),
@@ -259,6 +269,7 @@ _PFI_Run(Mode) {
 					: "first prompt line`nsecond prompt line"
 				AssertEqual(2, State.NativeCaptures.Length)
 				Input := State.NativeCaptures[2]
+				AssertTrue(Input.Multiline, "The actual native prompt Edit must retain multiline paste")
 				SavedPrompt := StrReplace(Saved[1]["system_single"], "`r`n", "`n")
 				_TestPrint("# native-profile-paste mode=" . Mode . " multiline_style=" . Input.Multiline
 					. " paste_control_lines=" . StrSplit(StrReplace(Input.Observed, "`r`n", "`n"), "`n").Length
@@ -269,7 +280,11 @@ _PFI_Run(Mode) {
 				AssertEqual("Edited A", Saved[1]["label"])
 			}
 		}
-		if Mode == "edit-preopen-external" {
+		if Mode == "edit-preopen-unrepresentable" {
+			AssertEqual(0, State.Inputs, "The public editor must refuse before authorizing native inputs from a lossy profile projection")
+			AssertEqual(0, State.Collects, "No complete profile-array effect may be built from an unrepresentable source")
+			AssertTrue(State.Notices.Length > 0, "The actual public failure must visibly explain the refused source")
+		} else if Mode == "edit-preopen-external" {
 			AssertTrue(State.Inputs <= 2, "A refused stale opening may stop before the native inputs")
 			if Accepted
 				AssertEqual(2, State.Inputs, "A source-reconciled successful edit must still consume both actual inputs")
@@ -285,7 +300,7 @@ _PFI_Run(Mode) {
 			AssertTrue(State.Collects <= 1, "A refused stale image must never retry its full projection automatically")
 			if Accepted
 				AssertEqual(1, State.Collects, "A successful reconciled edit must serialize its actual candidate")
-		} else if !Cancelled && Mode != "web-successor"
+		} else if !Cancelled && Mode != "web-successor" && Mode != "edit-preopen-unrepresentable"
 			AssertEqual(1, State.Collects, "The actual profile collector must run before native image refusal.")
 		AssertFalse(_ConfigWriteTerminalIsActive(), "Every path must release its exact borrowed configuration lease.")
 	} finally {
@@ -345,3 +360,27 @@ Test("LLM profile opening source: prior external sibling edit survives (llm-prof
 	_PFI_Run.Bind("edit-preopen-external"))
 Test("LLM profile opening source: matching live and physical images still edit (llm-profile-preopen-source)",
 	_PFI_Run.Bind("edit-current"))
+
+; Author a valid forward-compatible JSON object through the real scalar TOML
+; writer. The public opening owner must preserve bytes the strict codec cannot
+; represent, rather than treating the payload as an empty or filtered array.
+_PFI_ExternalUnknownProfileField(State) {
+	Encoded := _LLM_Menu_SerializeUserProfiles(State.InitialProfiles)
+	Bytes := CryptoBase64Decode(SubStr(Encoded, 4))
+	Json := StrGet(Bytes, Bytes.Size, "UTF-8")
+	AssertEqual("[{", SubStr(Json, 1, 2))
+	Json := '[{"future_profile_field":{"owned":true},' . SubStr(Json, 3)
+	Parsed := JsonParse(Json)
+	AssertTrue(Parsed is Array && Parsed.Length == 2 && Parsed[1].Has("future_profile_field"),
+		"The external profile source is genuine valid JSON with a user-owned future member")
+	Payload := "v1:" . CryptoBase64EncodeUtf8(Json)
+	AssertTrue(TOML_ConfigBatchWrite(State.World.ConfigPath,
+		[{Section: "llm", Key: "user_profiles", Value: Payload}]))
+	State.ExternalImage := FSReadUtf8Exact(State.World.ConfigPath)
+	AssertTrue(ConfigFullStateCanPersist(), "The scalar schema remains READY for the actual external envelope")
+	Document := TOML_ParseFreshFileTyped(State.World.ConfigPath)
+	AssertEqual(Payload, Document["llm"]["user_profiles"], "The physical typed TOML retained the exact authored envelope")
+}
+
+Test("LLM profile opening source: unknown JSON profile members refuse without projection loss (llm-profile-source-representation)",
+	_PFI_Run.Bind("edit-preopen-unrepresentable"))
