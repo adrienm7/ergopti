@@ -142,11 +142,13 @@ ScreenBrightnessPoll() {
 }
 
 ; ShellRunner invokes this only after the child tree and its resources settle.
-ScreenBrightnessCompleted(Id, ExitCode, Stdout, Stderr) {
+ScreenBrightnessCompleted(Id, ExitCode, Stdout, Stderr, BeforeStopFn := 0) {
 	Job := ScreenBrightnessOwner.job
 	if !IsObject(Job) || Job["id"] != Id
 		return
 	ScreenBrightnessOwner.job := 0
+	if HasMethod(BeforeStopFn, "Call")
+		BeforeStopFn.Call()
 	SetTimer(ScreenBrightnessPoll, 0)
 	Receipt := 0
 	if ExitCode == 0 && StrLen(Stdout) <= Job["data"]["max_receipt_bytes"] {
