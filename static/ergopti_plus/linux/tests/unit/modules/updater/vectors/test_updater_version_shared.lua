@@ -54,4 +54,13 @@ helpers.describe("_shared/lua/updater/version.lua", function()
 		helpers.assert_eq(V.is_newer_version("2.5.0", "2.6.0"), false)
 		helpers.assert_eq(V.is_newer_version("2.5.0", "2.5.0"), false)
 	end)
+
+	helpers.it("replays the shared comparison vectors", function()
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/updater/version_vectors.json", "rb"))
+		local raw = file:read("*a"); assert(file:close())
+		local vectors = assert(require("json").decode(raw)).vectors
+		for _, row in ipairs(vectors) do
+			helpers.assert_eq(V.compare_versions(row.a, row.b), row.expect, row.id)
+		end
+	end)
 end)

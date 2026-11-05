@@ -16,6 +16,20 @@
 		{ "id": "nonsemver_pair", "a": "foo", "b": "bar", "expect": 0 },
 		{ "id": "nonsemver_identical", "a": "rolling", "b": "rolling", "expect": 0 },
 		{ "id": "semver_vs_nonsemver", "a": "2.5.0", "b": "garbage", "expect": 0 },
-		{ "id": "nonsemver_vs_semver", "a": "garbage", "b": "2.5.0", "expect": 0 }
+		{ "id": "nonsemver_vs_semver", "a": "garbage", "b": "2.5.0", "expect": 0 },
+		{ "id": "missing_prerelease_separator", "a": "1.2.3", "b": "1.2.3foo", "expect": 0 },
+		{ "id": "empty_prerelease", "a": "1.2.3", "b": "1.2.3-", "expect": 0 },
+		{
+			"id": "numeric_before_hyphenated_identifier",
+			"a": "1.2.3-9",
+			"b": "1.2.3--alpha",
+			"expect": -1
+		},
+		{
+			"id": "hyphenated_identifier_after_numeric",
+			"a": "1.2.3--alpha",
+			"b": "1.2.3-9",
+			"expect": 1
+		}
 	]
 }

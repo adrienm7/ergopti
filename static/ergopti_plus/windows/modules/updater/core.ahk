@@ -1730,7 +1730,9 @@ _Updater_ParseVersion(Tag) {
 
 ; Compares two prerelease identifier segments (numeric when all digits).
 _Updater_ComparePreId(A, B) {
-	if RegExMatch(A, "^\d+$") and RegExMatch(B, "^\d+$") {
+	ANumeric := RegExMatch(A, "^\d+$") != 0
+	BNumeric := RegExMatch(B, "^\d+$") != 0
+	if ANumeric and BNumeric {
 		ai := Integer(A), bi := Integer(B)
 		if (ai > bi)
 			return 1
@@ -1738,6 +1740,8 @@ _Updater_ComparePreId(A, B) {
 			return -1
 		return 0
 	}
+	if (ANumeric != BNumeric)
+		return ANumeric ? -1 : 1
 	Cmp := StrCompare(A, B)
 	return (Cmp > 0) ? 1 : (Cmp < 0) ? -1 : 0
 }

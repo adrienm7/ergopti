@@ -57,12 +57,15 @@ var ReleaseVersionOrder = (function () {
 
 	/** Orders two prerelease identifiers, numerically when both are digits. */
 	function compareIdentifier(a, b) {
-		if (DIGITS.test(a) && DIGITS.test(b)) {
+		var aNumeric = DIGITS.test(a);
+		var bNumeric = DIGITS.test(b);
+		if (aNumeric && bNumeric) {
 			var left = Number(a);
 			var right = Number(b);
 			if (left === right) return 0;
 			return left > right ? 1 : -1;
 		}
+		if (aNumeric !== bNumeric) return aNumeric ? -1 : 1;
 		if (a === b) return 0;
 		return a > b ? 1 : -1;
 	}
