@@ -158,6 +158,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/webview_utils.ahk
 #Include ../ui/console_window.ahk
 #Include ../infra/wall_clock.ahk
+#Include ../infra/field_run.ahk
 ; Compiled-mode bundle bootstrapper — included this early (matching its real
 ; position right after app_state.ahk in ErgoptiPlus.ahk) so its functions are
 ; actually exercised by meta/infra/lifecycle/test_bundle_resolve_dir_local_appdata.ahk instead
@@ -436,6 +437,7 @@ InstallSendNoOps()
 #Include unit/infra/logger/test_logger.ahk
 #Include unit/infra/logger/test_logger_shutdown_sinks.ahk
 #Include unit/infra/dispatch/test_wall_clock_snapshot.ahk
+#Include unit/infra/dispatch/test_field_run_utc.ahk
 #Include unit/platform/network/test_promise_timeout_budget.ahk
 #Include unit/infra/logger/test_logger_format_failure_is_visible.ahk
 #Include unit/infra/logger/test_logger_contract.ahk
@@ -1211,6 +1213,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/test_keystats_app_categories.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader_manifest_contract.ahk
+#Include unit/modules/keystats/test_context_nonempty_prepare_owner.ahk
 #Include unit/modules/keystats/reader/test_keystats_query_catalogue.ahk
 #Include unit/modules/keystats/reader/test_klr_manifest_switches_to.ahk
 #Include unit/modules/keystats/test_keystats_llm_accepted_metrics.ahk
