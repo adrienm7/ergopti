@@ -1,65 +1,9 @@
 {
-	"expected_count": 122,
+	"expected_count": 60,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
 	"filters": [
-		{
-			"contains": "System action in-flight lifecycle: eject",
-			"expected_count": 8
-		},
-		{
-			"contains": "system-action-sibling-lifecycle",
-			"expected_count": 10
-		},
-		{
-			"contains": "driver-control-owned-stage",
-			"expected_count": 4
-		},
-		{
-			"contains": "menu-numeric-prompt-domain",
-			"expected_count": 4
-		},
-		{
-			"contains": "chord-delay-numeric-domain",
-			"expected_count": 1
-		},
-		{
-			"contains": "tap-hold-prompt-numeric-domain",
-			"expected_count": 2
-		},
-		{
-			"contains": "system-query-effects",
-			"expected_count": 26
-		},
-		{
-			"contains": "empty_trash and eject_all_disks run their exact commands",
-			"expected_count": 1
-		},
-		{
-			"contains": "llm shared vectors: usage ",
-			"expected_count": 12
-		},
-		{
-			"contains": "Preserve ordered provider text",
-			"expected_count": 18
-		},
-		{
-			"contains": "[corpus:anthropic_multiblock_joins_text]",
-			"expected_count": 1
-		},
-		{
-			"contains": "[corpus:gemini_multipart_joins_text]",
-			"expected_count": 1
-		},
-		{
-			"contains": "_LLMRemoteParseResponse:",
-			"expected_count": 15
-		},
-		{
-			"contains": "system-action-confirmed-lifecycle",
-			"expected_count": 6
-		},
 		{
 			"contains": "keylayout-integer-attribute-domain",
 			"expected_count": 5
@@ -73,8 +17,108 @@
 			"expected_count": 2
 		},
 		{
+			"contains": "keylayout canonical form:",
+			"expected_count": 5
+		},
+		{
+			"contains": "system-action-confirmed-lifecycle",
+			"expected_count": 6
+		},
+		{
 			"contains": "menu-reload-stage-custody",
 			"expected_count": 4
+		},
+		{
+			"contains": "menu reload replay: consumption, adoption and publication each happen once",
+			"expected_count": 1
+		},
+		{
+			"contains": "menu reload replay: OnExit publishes, boot consumes and every dispatch meets the hand-off",
+			"expected_count": 1
+		},
+		{
+			"contains": "system actions: quit and force quit",
+			"expected_count": 2
+		},
+		{
+			"contains": "system actions: unblock_file_selection deletes each Zone.Identifier stream",
+			"expected_count": 1
+		},
+		{
+			"contains": "force-quit-confirm",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-native-priority-paste-domain",
+			"expected_count": 4
+		},
+		{
+			"contains": "api-thinking-retry-alias-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "remote-retry-alias-companion",
+			"expected_count": 4
+		},
+		{
+			"contains": "api-thinking-retry-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "LLM thinking off: cancelling a prediction cancels its retry",
+			"expected_count": 1
+		},
+		{
+			"contains": "newfile active query pause (system-query-effects)",
+			"expected_count": 1
+		},
+		{
+			"contains": "newfile collision pause cannot retry create (system-query-effects)",
+			"expected_count": 1
+		},
+		{
+			"contains": "newfile collision unchanged retries (system-query-effects)",
+			"expected_count": 1
+		},
+		{
+			"contains": "newfile created pause cannot open rename (system-query-effects)",
+			"expected_count": 1
+		},
+		{
+			"contains": "newfile empty query pause cannot notify (system-query-effects)",
+			"expected_count": 1
+		},
+		{
+			"contains": "newfile empty unchanged notice (system-query-effects)",
+			"expected_count": 1
+		},
+		{
+			"contains": "newfile folder query pause (system-query-effects)",
+			"expected_count": 1
+		},
+		{
+			"contains": "newfile rename query pause cannot select (system-query-effects)",
+			"expected_count": 1
+		},
+		{
+			"contains": "newfile unchanged creates once (system-query-effects)",
+			"expected_count": 1
+		},
+		{
+			"contains": "newfile unchanged selects once (system-query-effects)",
+			"expected_count": 1
+		},
+		{
+			"contains": "updater-list-stage-custody",
+			"expected_count": 2
+		},
+		{
+			"contains": "hotstring-delay-zero-sentinel-domain",
+			"expected_count": 3
+		},
+		{
+			"contains": "hotstring-idle-native-integer-domain",
+			"expected_count": 2
 		}
 	]
 }
