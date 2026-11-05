@@ -401,6 +401,9 @@ UserActionFirstLine(Text, Maximum) {
 			continue
 		if (_UserActionBytes(Line) <= Maximum)
 			return Line
+		; A UTF-8 byte budget cannot retain more UTF-16 units than bytes.
+		; Bound the repair loop before repeatedly encoding a long capture.
+		Line := SubStr(Line, 1, Max(0, Maximum))
 		while (Line != "" && _UserActionBytes(Line) > Maximum)
 			Line := SubStr(Line, 1, -1)
 		; A cut must not leave half of a surrogate pair.
