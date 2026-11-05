@@ -1053,6 +1053,11 @@ if [ "$SRC_DRIVER" = "${NATIVE_OUTPUT_REPO}/static/ergopti_plus/linux" ]; then
 	}
 	_ensure_native_output_toolchain || exit 1
 	NATIVE_OUTPUT_STAGE="$(mktemp -d)"
+	# mktemp accepts relative TMPDIR, but the native builder requires an
+	# absolute stage. Resolve that existing directory without losing path bytes.
+	if [[ "$NATIVE_OUTPUT_STAGE" != /* ]]; then
+		IFS= read -r -d '' NATIVE_OUTPUT_STAGE < <(CDPATH= cd -Pe -- "$NATIVE_OUTPUT_STAGE" && printf '%s\0' "$PWD")
+	fi
 	# A failed/uncertain compiler leaves its private stage for explicit cleanup;
 	# no recursive trap can erase an unobserved compiler descendant's resources.
 	if ! bash "$NATIVE_OUTPUT_BUILD" --source-directory "${SRC_DRIVER}/native/archive_output" \
