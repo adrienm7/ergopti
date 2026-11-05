@@ -660,6 +660,10 @@ try {
 			'startup-receipt-transaction: refusal preserves startup settings, ownership and service state'
 		);
 		const disagreements = [];
+		const configLua = ['luajit', 'lua5.4', 'lua'].find((candidate) =>
+			spawnSync(candidate, ['-v'], { encoding: 'utf8', timeout: 10000 }).status === 0
+		);
+		assert.ok(configLua, 'a Lua runtime is required to compare configuration roots');
 		for (const [index, value] of [
 			'',
 			'relative settings',
@@ -673,7 +677,7 @@ try {
 			fs.mkdirSync(cwd, { recursive: true });
 			const variables = { HOME: home, XDG_CONFIG_HOME: value };
 			const resolved = spawnSync(
-				'lua',
+				configLua,
 				[
 					'-e',
 					'package.path="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;"..package.path; io.write(require("infra.config_paths").config_home())'
