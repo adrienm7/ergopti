@@ -404,7 +404,10 @@ _GCPO_Run(Mode) {
 		. 'gesture__tap_4__open_url = "https://old-b.example/"`n'
 		. '[shortcuts.caps_word]`nidle_timeout_seconds = 2`n'
 		. '[shortcuts.caps_word.pointer]`nleft_click = false`n')
-	Owner := Mode == "capsword" ? ManifestCloneValue : _GestureCloneActionParameters
+	; The generic ManifestCloneValue belongs to the native schema owner's
+	; integrity graph. Observe only the actual CapsWord value-clone API so
+	; schema admission and its canonical clone remain untouched.
+	Owner := Mode == "capsword" ? CapsWordAutoOffValues : _GestureCloneActionParameters
 	HadCall := Object.Prototype.HasOwnProp.Call(Owner, "Call")
 	SavedCall := HadCall ? Object.Prototype.GetOwnPropDesc.Call(Owner, "Call") : false
 	State := {Mode: Mode, Active: true, Fired: false, Depth: 0, Timers: [], Arms: 0,
@@ -430,6 +433,9 @@ _GCPO_Run(Mode) {
 					"key", "gesture__tap_3__open_url", "value", "https://new-a.example/"))
 		else
 			AResult := CapsWordAutoOffStore(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS, 3)
+		_TestPrint("# cached-candidate-entry mode=" . Mode . " a_result=" . AResult
+			. " observed=" . State.Fired . " busy_at_clone=" . State.BusyAtClone
+			. " b_calls_at_clone=" . State.BCallsAtClone . " b_result=" . State.BResult)
 		AssertTrue(AResult, "The actual first writer must acknowledge its private durable mutation")
 		AssertTrue(State.Fired, "The real candidate clone must pass through its delegated observation")
 		Started := A_TickCount

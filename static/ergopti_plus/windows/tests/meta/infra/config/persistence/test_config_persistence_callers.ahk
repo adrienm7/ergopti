@@ -446,25 +446,38 @@ Test("AHK-15-persistence: bulk mutations publish candidates only after commit",
 	_CPC_BulkMutationsStageBeforePublishing)
 
 _CPC_GestureAssignmentIsOneRelatedFieldBatch() {
-	Body := _StripFullLineComments(_DriverFuncBody("_GestureCommitAssignment"))
-	Assert(Body != "", "_GestureCommitAssignment must exist")
-	PersistPos := InStr(Body, "ConfigCommitUpdates(")
-	AssignmentPublish := InStr(Body, "AssignmentsTarget := CandidateAssignments")
-	ParameterPublish := InStr(Body, "ParametersTarget := CandidateParameters")
-	Assert(InStr(Body, "Section: AssignmentSection") > 0,
-		"the assignment update must be in the shared batch")
-	Assert(InStr(Body, 'Section: "action_parameters"') > 0,
-		"the related parameter update must be in the same shared batch")
-	AssertEqual(1, _CPC_CountOccurrences(Body, "ConfigCommitUpdates("),
-		"one logical assignment must perform one TOML batch")
-	Assert(PersistPos > 0 and PersistPos < AssignmentPublish and PersistPos < ParameterPublish,
-		"both detached Maps must be published only after the shared batch succeeds")
-	CriticalPos := InStr(Body, 'Critical("On")')
-	ReleasePos := InStr(Body, "Critical(PreviousCritical)")
-	Assert(CriticalPos > PersistPos and CriticalPos < AssignmentPublish
-		and ParameterPublish < ReleasePos,
-		"the two related Maps must be published in one short non-yielding window")
+	Parts := Map()
+	for Name in ["GestureSetActionParameter", "_GestureBuildActionParameterPlan", "_GesturePublishActionParameters",
+			"_GestureCommitAssignment", "_GestureBuildAssignmentPlan", "_GesturePublishAssignment"] {
+		Parts[Name] := _StripFullLineComments(_DriverFuncBody(Name))
+		Assert(Parts[Name] != "", Name . " must remain source-visible")
+	}
+	Entry := Parts["_GestureCommitAssignment"]
+	Builder := Parts["_GestureBuildAssignmentPlan"]
+	Publish := Parts["_GesturePublishAssignment"]
+	AssertEqual(1, _CPC_CountOccurrences(Entry, "ConfigCommitBuilt("),
+		"one related assignment must enter one path-owned builder")
+	Assert(InStr(Entry, "_GestureBuildAssignmentPlan.Bind(&AssignmentsTarget, &ParametersTarget,") > 0,
+		"the builder must keep both actual caller VarRefs")
+	Assert(InStr(Entry, "CandidateAssignments :=") == 0 && InStr(Entry, "CandidateParameters :=") == 0,
+		"candidate snapshots must not escape before builder admission")
+	Assert(InStr(Builder, "Section: AssignmentSection") > 0
+			&& InStr(Builder, 'Section: "action_parameters"') > 0,
+		"assignment and related parameter belong to the same durable update batch")
+	Assert(InStr(Builder, "_GesturePublishAssignment.Bind(&AssignmentsTarget, &ParametersTarget,") > 0,
+		"publication must retain the same two caller targets through the native gateway")
+	Assert(InStr(Publish, "AssignmentsTarget := CandidateAssignments") > 0
+			&& InStr(Publish, "ParametersTarget := CandidateParameters") > 0,
+		"the gateway publisher swaps both detached Maps in its existing atomic memory span")
+	AssertEqual(1, _CPC_CountOccurrences(Parts["GestureSetActionParameter"], "ConfigCommitBuilt("),
+		"the standalone parameter producer must use the same builder ownership")
+	Assert(InStr(Parts["GestureSetActionParameter"], "CandidateParameters :=") == 0,
+		"the standalone parameter candidate must also be cloned after admission")
+	Assert(InStr(Parts["_GestureBuildActionParameterPlan"], "_GestureCloneActionParameters(GestureActionParameters)") > 0
+			&& InStr(Parts["_GestureBuildActionParameterPlan"], "_GesturePublishActionParameters.Bind(CandidateParameters)") > 0,
+		"the standalone builder must bind its real snapshot into gateway publication")
 }
+
 Test("AHK-15-persistence: parameter and assignment share one commit",
 	_CPC_GestureAssignmentIsOneRelatedFieldBatch)
 
