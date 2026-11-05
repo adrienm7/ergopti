@@ -113,7 +113,7 @@ _KRCTX_ChildSource() {
 	PruneOwner := _DriverProductionFileForSymbol("KL_Roi_IncrementWordCount", _DriverDir)
 	AssertTrue(PruneOwner != "")
 	Source .= "#Include " . PruneOwner . "`n"
-	for Symbol in ["KL_Roi_RequireInit", "KL_Roi_OnChar", "KL_Roi_ProcessWord", "KL_Roi_PruneWordCounts", "_TextCodepointWidth"] {
+	for Symbol in ["KL_MarkSynthetic", "KL_ClearSynthetic", "KL_Roi_RequireInit", "KL_Roi_DiscardWord", "KL_Roi_AdmitWordContext", "KL_Roi_OnChar", "KL_Roi_ProcessWord", "KL_Roi_PruneWordCounts", "_TextCodepointWidth"] {
 		Body := _DriverFuncBody(Symbol)
 		AssertTrue(Body != "", "The complete real ROI path must resolve: " . Symbol)
 		Source .= Body . "`n"
@@ -185,6 +185,9 @@ _KRCTX_Case(Mode) {
 	return AtDeadline.Output
 }
 
-for _KRCTX_Mode in ["same-app", "cross-app"]
+for _KRCTX_Mode in ["same-app", "cross-app", "same-context-refresh", "cross-window", "cross-title"]
 	Test("Keystats ROI word context: " . _KRCTX_Mode . " proposes only complete typed words (roi-context-word-owner)",
 		_KRCTX_Case.Bind(_KRCTX_Mode))
+
+Test("Keystats ROI word context: synthetic marker without hook callbacks retires the fragment (roi-context-word-owner)",
+	_KRCTX_Case.Bind("synthetic-gap"))

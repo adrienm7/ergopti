@@ -137,6 +137,7 @@ KL_Net_ReduceWifiSample(previous_status, previous_hash, previous_signal, sample)
 				if (previous_status = NI_WIFI_STATUS_CONNECTED) {
 						result["event"] := Map(
 								"connection_state", NI_WIFI_STATUS_DISCONNECTED,
+								"prev_connection_state", previous_status,
 								"ssid_hash",        "",
 								"signal",           "",
 								"prev_ssid_hash",   previous_hash
@@ -169,6 +170,7 @@ KL_Net_ReduceWifiSample(previous_status, previous_hash, previous_signal, sample)
 				or ssid_hash != previous_hash or signal != previous_signal) {
 				result["event"] := Map(
 						"connection_state", NI_WIFI_STATUS_CONNECTED,
+						"prev_connection_state", previous_status,
 						"ssid_hash",        ssid_hash,
 						"signal",           signal
 				)

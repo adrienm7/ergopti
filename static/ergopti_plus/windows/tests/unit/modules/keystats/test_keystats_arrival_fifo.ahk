@@ -22,7 +22,7 @@ _KLF_WithState(Body) {
 	Owners := [Keystats, KLHook, KLWatch, KLPasswordCache, MetricsFocusCache, MetricsFilters]
 	Fields := [["initialized", "_shutting_down", "lifecycle_generation", "buffer_events", "buffer_text",
 		"synth_active", "synth_type", "synth_private", "health_privacy_hits"],
-		["last_tick", "last_vk", "last_sc", "last_hint_lifecycle", "capture_queue", "capture_owner", "capture_generation", "capture_stopping"],
+		["last_tick", "last_vk", "last_sc", "last_hint_lifecycle", "capture_queue", "capture_owner", "capture_generation", "capture_stopping", "control_char_echo"],
 		["is_session_active", "session_started_at", "session_generation", "last_authorized_tick", "is_idle", "idle_started_at", "idle_generation",
 		"privacy_interrupted", "privacy_started_at", "session_close", "session_close_draining", "idle_close", "system_events", "system_failure_reported"],
 		["generation", "focus_generation"], ["generation", "state"],
@@ -52,6 +52,7 @@ _KLF_WithState(Body) {
 		KLHook.last_tick := 100
 		KLHook.last_vk := 0x41
 		KLHook.last_sc := 0x1E
+		KLHook.control_char_echo := false
 		KLHook.last_hint_lifecycle := Keystats.lifecycle_generation
 		if KLHook.HasOwnProp("capture_queue") {
 			KLHook.capture_queue := []
@@ -524,7 +525,7 @@ _KID_ChildSource() {
 		"_KL_Hook_InputLifecycleCurrent", "_KL_Hook_PrepareInput", "_KL_Hook_InputCurrent",
 		"_KL_Hook_InvalidateTabInput", "_KL_Hook_FinishInput", "_KL_Hook_CompleteInput",
 		"_KL_Hook_DrainInput", "_KL_Hook_CommitInput", "KL_Hook_OnChar", "KL_Hook_OnKeyDown",
-		"KL_Hook_RecordedChar", "_KL_CaptureLlmJournalPrivacy", "_KL_LlmJournalPrivacyStillCurrent",
+		"KL_Hook_OnKeyUp", "KL_Hook_RecordedChar", "_KL_CaptureLlmJournalPrivacy", "_KL_LlmJournalPrivacyStillCurrent",
 		"KL_InvalidatePasswordFocus", "KLW_PopLast"] {
 		Body := _DriverFuncBody(Symbol)
 		AssertTrue(Body != "", "The actual callback graph requires its genuine definition: " . Symbol)
@@ -600,3 +601,145 @@ _KID_Case(Mode) {
 for _KID_Mode in ["letter", "backspace", "enter", "tab"]
 	Test("Keystats real InputHook: " . _KID_Mode . " records one delivered native keystroke (keystats-native-key-char-owner)",
 		_KID_Case.Bind(_KID_Mode))
+
+_KPU_ChildSource() {
+	global _DriverDir
+	Source := _KID_ChildSource()
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\keystats_native_key_char_body.ahk`n"
+	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
+	return SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
+		. "#Include " . _DriverDir . "\tests\fixtures\keystats_unicode_packet_owner_body.ahk`n"
+}
+
+_KPU_Case(Mode) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unresolved old child cannot be replaced")
+	Directory := A_Temp . "\ergopti_native_unicode_packet_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Creation := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue(Creation is Integer && Creation == 1, "The child must exclusively acquire its directory before writing or recursive cleanup.")
+	Script := Directory . "\subject.ahk"
+	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
+	AtDeadline := 0, ExportFailure := 0
+	PreviousCritical := Critical("Off")
+	try {
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KPU_ChildSource()) != 0)
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, Mode, Directory, "--allow-explicit-owned-edit-unicode-input"], _KSD_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The real private child must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AtDeadline := {Calls: State.Calls, Code: State.Code, Output: State.Output, ErrorText: State.ErrorText}
+		if State.Calls == 0
+			Primary := Error("The exact native-keyboard child did not settle within its 15000 ms deadline.")
+	} catch Any as Failure {
+		Primary := Failure
+	} finally {
+		try {
+			if IsObject(Handle) && State.Calls == 0
+				Handle.requestTerminate()
+			Receipt := IsObject(Handle) ? Handle.terminate() : 1
+			Retired := (Receipt is Integer) && Receipt == 1
+			if Retired
+				DirDelete(Directory, true)
+		} catch Any as Failure {
+			if !IsObject(Primary)
+				Primary := Failure
+		} finally {
+			if IsObject(Handle) && !Retired
+				RetirementDebt := {Handle: Handle, Directory: Directory}
+			Critical(PreviousCritical)
+		}
+	}
+	try {
+		if State.Calls == 1 {
+			; The tree adapter combines its native stdout/stderr captures. This is
+			; not an independently measured stderr channel.
+			for Line in StrSplit(State.Output, "`n", "`r")
+				if Line != ""
+					_TestPrint("# native-keystats-child " . Line)
+		}
+	} catch Any as Failure
+		ExportFailure := Failure
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired)
+	AssertEqual(1, AtDeadline.Calls)
+	AssertEqual("", AtDeadline.ErrorText, AtDeadline.Output)
+	AssertEqual(0, AtDeadline.Code, AtDeadline.Output)
+	AssertContains(AtDeadline.Output, "PASS native-keystats " . Mode)
+	if IsObject(ExportFailure)
+		throw ExportFailure
+	return AtDeadline.Output
+}
+
+for _KPU_Mode in ["packet-lf", "packet-tab"]
+	Test("Keystats real Unicode packet: " . _KPU_Mode . " retains standalone control text (keystats-native-unicode-packet)",
+		_KPU_Case.Bind(_KPU_Mode))
+
+
+; These are public-callback protocol controls, not fabricated native-delivery
+; proof. The four existing child-owned real InputHook cases remain unchanged.
+_KCE_ReenterCharThenRelease(Hook, Character, Vk, Sc) {
+	KL_Hook_OnChar(Hook, Character, _KLF_Allow, 1001)
+	KL_Hook_OnKeyUp(Hook, Vk, Sc)
+	return false
+}
+
+_KCE_Run(Mode) {
+	Hook := InputHook("V L0 I1") ; genuine identity; never started by protocol tests
+	if Mode == "char-only" {
+		KL_Hook_OnChar(Hook, "`n", _KLF_Allow, 1000)
+		AssertEqual(1, Keystats.buffer_events.Length)
+		AssertEqual("`n", Keystats.buffer_events[1][1])
+		AssertEqual("`n", Keystats.buffer_text)
+		return
+	}
+	Vk := Mode == "reenter-tab" ? 0x09 : 0x0D
+	Sc := Vk == 0x09 ? 0x0F : 0x1C
+	Char := Vk == 0x09 ? "`t" : "`n"
+	if InStr(Mode, "reenter-") == 1 {
+		KL_Hook_OnKeyDown(Hook, Vk, Sc, _KCE_ReenterCharThenRelease.Bind(Hook, Char, Vk, Sc), 1000, _KLF_NoShortcut)
+		AssertEqual(1, Keystats.buffer_events.Length,
+			"A queued native echo retains its exact predecessor after a later KeyUp during classification")
+		AssertEqual(Vk == 0x09 ? "[TAB]" : "[ENTER]", Keystats.buffer_events[1][1])
+		AssertEqual(Char, Keystats.buffer_text)
+		return
+	}
+	KL_Hook_OnKeyDown(Hook, Vk, Sc, _KLF_Allow, 1000, _KLF_NoShortcut)
+	if Mode == "modifier-release" {
+		KL_Hook_OnKeyUp(Hook, 0x10, 0x2A)
+		KL_Hook_OnChar(Hook, Char, _KLF_Allow, 1002)
+		AssertEqual(1, Keystats.buffer_events.Length,
+			"An unrelated modifier release cannot revoke a pending named key echo")
+		AssertEqual("[ENTER]", Keystats.buffer_events[1][1])
+		AssertEqual("`n", Keystats.buffer_text)
+		return
+	}
+	switch Mode {
+		case "released":
+			KL_Hook_OnKeyUp(Hook, Vk, Sc)
+		case "packet-key":
+			KL_Hook_OnKeyDown(Hook, 0xE7, 0, _KLF_Allow, 1001, _KLF_NoShortcut)
+		case "different-hook":
+			Hook := InputHook("V L0 I1")
+		case "multi-char":
+			Char := "`nx"
+		case "one-use":
+			KL_Hook_OnChar(Hook, Char, _KLF_Allow, 1001)
+		default:
+			throw Error("Unknown private control-char protocol mode.")
+	}
+	KL_Hook_OnChar(Hook, Char, _KLF_Allow, 1002)
+	AssertEqual(2, Keystats.buffer_events.Length,
+		"Only a one-use exact native named-key echo may be discarded; standalone payloads remain")
+	AssertEqual("[ENTER]", Keystats.buffer_events[1][1])
+	AssertEqual(Char, Keystats.buffer_events[2][1])
+	AssertEqual("`n" . Char, Keystats.buffer_text)
+}
+
+for _KCE_Mode in ["char-only", "modifier-release", "released", "packet-key", "different-hook", "multi-char", "one-use", "reenter-enter", "reenter-tab"]
+	Test("Keystats named control echo: " . _KCE_Mode . " preserves exact FIFO ownership (keystats-control-char-echo)",
+		_KLF_WithState.Bind(_KCE_Run.Bind(_KCE_Mode)))

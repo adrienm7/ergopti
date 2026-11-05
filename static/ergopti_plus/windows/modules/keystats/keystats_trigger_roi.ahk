@@ -101,6 +101,7 @@ class KLRoi {
 		; survivor Map only when this still matches the snapshot generation.
 		static word_counts_generation := 0
 		static current_word         := ""   ; in-progress word buffer
+		static word_context         := false ; immutable canonical focus identity
 
 		; Set true once the in-progress run exceeds MAX_INPROGRESS_WORD_LEN. The
 		; whole run (not a 64-char fragment of it) is then discarded at the next
@@ -206,10 +207,42 @@ KL_Roi_OnHotstring(trigger, net_saved, is_private := false) {
 ; ===========================================
 ; ===========================================
 
+; A discontinuity discards a fragment; it never promotes it to a candidate.
+; RAM-only so privacy, pointer and lifecycle barriers can use it without I/O.
+KL_Roi_DiscardWord() {
+	PreviousCritical := Critical("On")
+	try {
+		KLRoi.current_word := ""
+		KLRoi.word_overflowed := false
+		KLRoi.word_context := false
+	} finally Critical(PreviousCritical)
+}
+
+; Read the already published immutable focus value, without a new OS query.
+; Its generation changes on ordinary polls; only app/title/HWND ownership breaks
+; the word. RefreshContext also calls this for A→B→A gaps containing no chars.
+KL_Roi_AdmitWordContext(Snapshot := unset) {
+	PreviousCritical := Critical("On")
+	try {
+		if !IsSet(Snapshot)
+			Snapshot := MetricsFocusCache.state
+		if KL_CaptureHeld() || !IsObject(Snapshot) || !Snapshot.HasOwnProp("valid") || !Snapshot.valid {
+			KL_Roi_DiscardWord()
+			return false
+		}
+		Previous := KLRoi.word_context
+		if IsObject(Previous) && (Previous.hwnd != Snapshot.hwnd
+				|| Previous.process_name !== Snapshot.process_name || Previous.title !== Snapshot.title)
+			KL_Roi_DiscardWord()
+		KLRoi.word_context := Snapshot
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 ; Called from KL_Hook_OnChar on every character. Accumulates the current
 ; word and flushes it at word boundaries.
 KL_Roi_OnChar(Text) {
-	if !KL_Roi_RequireInit("KL_Roi_OnChar")
+	if !KL_Roi_RequireInit("KL_Roi_OnChar") || !KL_Roi_AdmitWordContext()
 		return
 	; A failed dead-key composition can deliver several characters in one callback.
 	Position := 1, Units := StrLen(Text)
@@ -242,7 +275,7 @@ KL_Roi_OnChar(Text) {
 
 ; Special keys arrive through OnKeyDown rather than the character callback.
 KL_Roi_OnKey(vk) {
-	if !KL_Roi_RequireInit("KL_Roi_OnKey")
+	if !KL_Roi_RequireInit("KL_Roi_OnKey") || !KL_Roi_AdmitWordContext()
 		return
 	switch vk {
 		case 0x08:
@@ -251,6 +284,8 @@ KL_Roi_OnKey(vk) {
 				KLRoi.current_word := KLW_PopLast(KLRoi.current_word)
 		case 0x0D: KL_Roi_OnChar("`n")
 		case 0x09: KL_Roi_OnChar("`t")
+		case 0x1B, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2E:
+			KL_Roi_DiscardWord()
 	}
 }
 

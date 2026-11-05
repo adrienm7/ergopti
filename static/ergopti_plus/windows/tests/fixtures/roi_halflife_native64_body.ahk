@@ -24,6 +24,26 @@ LoggerWarn(Source, Message, Values*) {
 	LoggerError(Source, Message, Values*)
 }
 
+LoggerInfo(Source, Message, Values*) {
+	global _RHL
+	FileAppend("info " . Source . " " . Format(Message, Values*) . "`n", _RHL.Log, "UTF-8")
+}
+
+_RHL_FocusPort(App, Title, TimeoutMs) {
+	_RHL_Require(TimeoutMs == WI_FOCUS_TITLE_TIMEOUT_MS && !A_IsCritical,
+		"The genuine focus owner must perform its bounded acquisition outside Critical.")
+	return {ok: true, hwnd: 91, process_name: App, title: Title, class: "Fixture",
+		failure_reason: "", timed_out: false}
+}
+
+_RHL_AcquireFocus(App, Title) {
+	_RHL_Require(MF_RefreshFocus(true, _RHL_FocusPort.Bind(App, Title)),
+		"The actual MF normalizer and publisher must admit the private fixture's full identity.")
+	Snapshot := MF_GetFocusSnapshot()
+	_RHL_Require(Snapshot.valid && Snapshot.hwnd == 91 && Snapshot.process_name == App && Snapshot.title == Title,
+		"Only a complete genuinely published snapshot can admit the ROI producer.")
+}
+
 _RHL_Now(Producer) {
 	global _RHL
 	NativeNow := A_TickCount
@@ -109,7 +129,7 @@ _RHL_Exercise() {
 	Keystats.initialized := true
 	Keystats.session_app := "roi-clock-fixture.exe"
 	MetricsFilters.secure_field := false
-	MetricsFocusCache.state := {valid: true, process_name: "roi-clock-fixture.exe", title: "private ROI fixture", class: "Fixture"}
+	_RHL_AcquireFocus("roi-clock-fixture.exe", "private ROI fixture")
 	_RHL_Require(!A_IsSuspended && KLRoi.trigger_last_use.Count == 0
 		&& KLRoi.session_fired_count == 0 && Keystats._pending_entries.Length == 0,
 		"Fresh real state, not historical persisted dates or a previous run, must own the fixture.")
@@ -238,6 +258,7 @@ _RHL_Key(vk, Private := false) {
 _RHL_ClearWords() {
 	KLRoi.current_word := ""
 	KLRoi.word_overflowed := false
+	KLRoi.word_context := false
 	KLRoi.word_counts := Map()
 	KLRoi.word_counts_generation += 1
 }
@@ -251,8 +272,7 @@ _RHL_Keys() {
 	KLWatch.last_authorized_tick := A_TickCount
 	KLHook.last_tick := A_TickCount
 	MetricsFilters.secure_field := false
-	MetricsFocusCache.state := {valid: true, process_name: Keystats.session_app,
-		title: "ROI keys fixture", class: "Fixture"}
+	_RHL_AcquireFocus(Keystats.session_app, "ROI keys fixture")
 	for Separator in [0x0D, 0x09] {
 		_RHL_ClearWords()
 		_RHL_Type("hello")
@@ -292,8 +312,8 @@ _RHL_Keys() {
 		_RHL_Key(0x09)
 		_RHL_Type("x ")
 	} finally Keystats.synth_active := false
-	_RHL_Require(KLRoi.current_word == "hello" && KLRoi.word_counts.Count == 0,
-		"Synthetic key and character intents must not modify public ROI.")
+	_RHL_Require(KLRoi.current_word == "" && KLRoi.word_counts.Count == 0,
+		"Synthetic input retires the fragment without counting its output as a public word.")
 	for Payload in ["^z", Chr(0x1F600)] {
 		_RHL_ClearWords()
 		Loop KLRoiConst.MAX_INPROGRESS_WORD_LEN - 1
@@ -316,17 +336,23 @@ _RHL_Keys() {
 		BeforeWpm := _RHL_KeyWpm
 		try KL_Hook_OnChar(0, " ", _RHL_Public, A_TickCount, _RHL_RevokeInput.Bind(Mode))
 		finally Suspend(false)
-		_RHL_Require(KLRoi.current_word == "hello" && KLRoi.word_counts.Count == 0,
-			"Ergonomic callout revocation must fence subsequent ROI: " . Mode)
+		_RHL_Require(KLRoi.current_word == "" && KLRoi.word_counts.Count == 0,
+			"Ergonomic callout revocation retires the fragment and fences subsequent ROI: " . Mode)
 		_RHL_Require(_RHL_KeyWpm == BeforeWpm,
 			"Ergonomic callout revocation must fence subsequent WPM: " . Mode)
 	}
+	_RHL_ClearWords()
+	_RHL_Type("hello")
 	_RHL_Key(0x08, true)
 	_RHL_Key(0x0D, true)
 	_RHL_Key(0x09, true)
 	_RHL_Type("x ", true)
-	_RHL_Require(KLRoi.current_word == "hello" && KLRoi.word_counts.Count == 0,
-		"Private key and character intents must not modify public ROI.")
+	_RHL_Require(KLRoi.current_word == "" && KLRoi.word_counts.Count == 0,
+		"Private input retires the fragment without counting or exposing its content.")
+	_RHL_Type("world ")
+	_RHL_Require(KLRoi.word_counts.Count == 1 && KLRoi.word_counts.Get("world", 0) == 1
+		&& !KLRoi.word_counts.Has("helloworld"),
+		"A fresh accepted word after the private gap cannot reuse its public prefix.")
 	_RHL_Require(_RHL.Errors == 0, "No swallowed hook dependency error may qualify the assertions.")
 }
 

@@ -248,6 +248,9 @@ _KL_Mouse_MeasureGesture(Gesture, X, Y, NowTick?) {
 }
 
 KL_Mouse_OnLDown(*) {
+		; Any pointer selection can move the caret, even in the same control.
+		if IsSet(KL_Roi_DiscardWord)
+			KL_Roi_DiscardWord()
 		KL_InvalidatePasswordFocus()
 		KLMouse.lbtn_held := false
 		KLMouse.lbtn_authorized := false
@@ -312,6 +315,9 @@ KL_Mouse_OnLUp(*) {
 }
 
 KL_Mouse_OnRDown(*) {
+		; Any pointer selection can move the caret, even in the same control.
+		if IsSet(KL_Roi_DiscardWord)
+			KL_Roi_DiscardWord()
 		KL_InvalidatePasswordFocus()
 		KLMouse.rbtn_held := false
 		KLMouse.rbtn_authorized := false
@@ -376,6 +382,9 @@ KL_Mouse_OnRUp(*) {
 }
 
 KL_Mouse_OnMDown(*) {
+		; Any pointer selection can move the caret, even in the same control.
+		if IsSet(KL_Roi_DiscardWord)
+			KL_Roi_DiscardWord()
 		KL_InvalidatePasswordFocus()
 		KLMouse.mbtn_held := false
 		KLMouse.mbtn_authorized := false

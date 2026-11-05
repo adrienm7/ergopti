@@ -120,6 +120,8 @@ class KLHook {
 		static capture_owner := false
 		static capture_generation := 1
 		static capture_stopping := false
+		; A one-use named-key receipt, never an inference from last_vk hints.
+		static control_char_echo := false
 		static ih := unset           ; the live InputHook object
 		static flush_timer := unset  ; bound function reference for SetTimer
 		static context_timer := unset  ; bound ref for the memory-only context projection
@@ -225,8 +227,13 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 						"Canonical focus snapshot read failed: {1}.", Err.Message)
 				return false
 		}
-		if !IsObject(Snapshot) || !Snapshot.HasOwnProp("valid") || !Snapshot.valid
-				return false
+		if !IsObject(Snapshot) || !Snapshot.HasOwnProp("valid") || !Snapshot.valid {
+			if IsSet(KL_Roi_DiscardWord)
+				KL_Roi_DiscardWord()
+			return false
+		}
+		if IsSet(KL_Roi_AdmitWordContext)
+			KL_Roi_AdmitWordContext(Snapshot)
 		NewTitle := Snapshot.title
 		NewApp := Snapshot.process_name
 		Now := A_TickCount
@@ -375,16 +382,19 @@ KL_Hook_InvalidateCapture(Stopping := false) {
 	PreviousCritical := Critical("On")
 	try {
 		KLHook.capture_generation += 1
+		if IsSet(KL_Roi_DiscardWord)
+			KL_Roi_DiscardWord()
 		KLHook.last_vk := 0
 		KLHook.last_sc := 0
 		KLHook.last_hint_lifecycle := 0
+		KLHook.control_char_echo := false
 		if Stopping
 			KLHook.capture_stopping := true
 	}
 	finally Critical(PreviousCritical)
 }
 
-_KL_Hook_CaptureInput(Kind, Character, vk, sc, FilterFn := unset, NowTick := unset, ErgoFn := unset) {
+_KL_Hook_CaptureInput(Kind, Character, vk, sc, FilterFn := unset, NowTick := unset, ErgoFn := unset, SourceHook := 0) {
 	PreviousCritical := Critical("On")
 	try {
 		if KL_CaptureHeld()
@@ -417,7 +427,20 @@ _KL_Hook_CaptureInput(Kind, Character, vk, sc, FilterFn := unset, NowTick := uns
 			privacy: false, ready: false, cancelled: true, filtered: true,
 			shortcut: "", activity: Kind = "char",
 			filter_fn: IsSet(FilterFn) ? FilterFn : 0,
-			ergo_fn: IsSet(ErgoFn) ? ErgoFn : 0
+			ergo_fn: IsSet(ErgoFn) ? ErgoFn : 0,
+			source_hook: SourceHook, echo_of: false, recorded: false
+		}
+		if Kind = "key" {
+			; Every other native keydown revokes an unconsumed named-key echo.
+			KLHook.control_char_echo := IsObject(SourceHook) && (vk = 0x0D || vk = 0x09) ? Intent : false
+		} else {
+			Echo := KLHook.control_char_echo
+			KLHook.control_char_echo := false
+			if IsObject(Echo) && IsObject(SourceHook) && Echo.source_hook == SourceHook
+					&& Echo.lifecycle = Intent.lifecycle && Echo.generation = Intent.generation
+					&& ((Echo.vk = 0x0D && (Character = "`n" || Character = "`r"))
+						|| (Echo.vk = 0x09 && Character = "`t"))
+				Intent.echo_of := Echo
 		}
 		KLHook.capture_queue.Push(Intent)
 		return Intent
@@ -538,6 +561,11 @@ _KL_Hook_DrainInput() {
 _KL_Hook_CommitInput(Intent) {
 	if Intent.cancelled || !_KL_Hook_InputLifecycleCurrent(Intent) || !Intent.activity
 		return false
+	; FIFO commits the named predecessor first. Only its actual canonical
+	; publication can consume the matching native control-character echo.
+	if Intent.kind = "char" && IsObject(Intent.echo_of) && Intent.echo_of.recorded
+			&& _KL_Hook_InputLifecycleCurrent(Intent.echo_of)
+		return true
 	if !Intent.filtered && !_KL_LlmJournalPrivacyStillCurrent(Intent.privacy)
 		Intent.filtered := true
 	GuardFn := _KL_Hook_InputCurrent.Bind(Intent)
@@ -553,6 +581,8 @@ _KL_Hook_CommitInput(Intent) {
 			return false
 	}
 	if Intent.filtered {
+		if IsSet(KL_Roi_DiscardWord)
+			KL_Roi_DiscardWord()
 		KL_RecordPrivacyHit()
 		return true
 	}
@@ -577,10 +607,13 @@ _KL_Hook_CommitInput(Intent) {
 				meta["sk"] := Intent.arrival_sc
 		}
 		if Intent.synth_active {
+			if IsSet(KL_Roi_DiscardWord)
+				KL_Roi_DiscardWord()
 			meta["s"] := 1
 			meta["st"] := Intent.synth_type
 		}
 		Keystats.buffer_events.Push([Recorded, delay, meta])
+		Intent.recorded := true
 		if Intent.kind = "char"
 			Keystats.buffer_text .= Recorded
 		else {
@@ -605,8 +638,11 @@ _KL_Hook_CommitInput(Intent) {
 				ErgoFn.Call(delay, Intent.vk, Intent.sc, Intent.vk = 0x08)
 		}
 		; Ergonomic publication can yield and revoke this arrival.
-		if !GuardFn.Call()
+		if !GuardFn.Call() {
+			if IsSet(KL_Roi_DiscardWord)
+				KL_Roi_DiscardWord()
 			return false
+		}
 		if Intent.kind = "char" {
 			try KL_Roi_OnChar(Intent.character)
 			if !GuardFn.Call()
@@ -624,7 +660,7 @@ KL_Hook_OnChar(ih, c, FilterFn := unset, NowTick := unset, ErgoFn := unset) {
 	Intent := false
 	_hpKlIngest := HotPath_Now()
 	try {
-		Intent := _KL_Hook_CaptureInput("char", c, 0, 0, FilterFn?, NowTick?, ErgoFn?)
+		Intent := _KL_Hook_CaptureInput("char", c, 0, 0, FilterFn?, NowTick?, ErgoFn?, ih)
 		if !IsObject(Intent)
 			return
 		try Intent.filtered := HasMethod(Intent.filter_fn, "Call")
@@ -647,7 +683,7 @@ KL_Hook_OnKeyDown(ih, vk, sc, FilterFn := unset, NowTick := unset, ShortcutFn :=
 	Intent := false
 	PotentialFocusMove := vk = 0x09
 	try {
-		Intent := _KL_Hook_CaptureInput("key", "", vk, sc, FilterFn?, NowTick?, ErgoFn?)
+		Intent := _KL_Hook_CaptureInput("key", "", vk, sc, FilterFn?, NowTick?, ErgoFn?, ih)
 		if !IsObject(Intent)
 			return
 		try Intent.shortcut := IsSet(ShortcutFn)
@@ -671,6 +707,17 @@ KL_Hook_OnKeyDown(ih, vk, sc, FilterFn := unset, NowTick := unset, ShortcutFn :=
 		if IsObject(Intent)
 			_KL_Hook_CompleteInput(Intent)
 	}
+}
+
+
+; A released key cannot authorize dropping a later standalone LF/Tab payload.
+KL_Hook_OnKeyUp(ih, vk, sc) {
+	PreviousCritical := Critical("On")
+	try {
+		Echo := KLHook.control_char_echo
+		if IsObject(Echo) && IsObject(ih) && Echo.source_hook == ih && Echo.vk = vk && Echo.sc = sc
+			KLHook.control_char_echo := false
+	} finally Critical(PreviousCritical)
 }
 
 
@@ -781,12 +828,15 @@ KL_Hook_Start() {
 			KLHook.last_vk := 0
 			KLHook.last_sc := 0
 			KLHook.last_hint_lifecycle := Keystats.lifecycle_generation
+			KLHook.control_char_echo := false
 			KLHook.last_tick := A_TickCount
 		} finally Critical(PreviousCritical)
 		KLHook.cb_char := KL_Hook_OnChar.Bind()
 		KLHook.cb_down := KL_Hook_OnKeyDown.Bind()
+		KLHook.cb_up := KL_Hook_OnKeyUp.Bind()
 		HookDispatcher.Register(HookDispatcherConst.EVT_KB_CHAR, KLHook.cb_char)
 		HookDispatcher.Register(HookDispatcherConst.EVT_KB_DOWN, KLHook.cb_down)
+		HookDispatcher.Register(HookDispatcherConst.EVT_KB_UP, KLHook.cb_up)
 		KLHook.registered := true
 
 		; Bind the flush callback once and keep the reference around so
@@ -818,6 +868,8 @@ KL_Hook_Stop() {
 				try HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_CHAR, KLHook.cb_char)
 				try HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_DOWN, KLHook.cb_down)
 		}
+		if KLHook.HasOwnProp("cb_up")
+			try HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_UP, KLHook.cb_up)
 		KLHook.registered := false
 		; Final flush so the in-RAM buffer hits today.log before we leave.
 		try KL_FlushBuffer()

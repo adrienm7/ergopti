@@ -205,6 +205,8 @@ KL_MarkSynthetic(source, is_private := false) {
     Owner := Map("source", source, "private", is_private ? true : false)
     local _c := Critical("On")
     try {
+        if IsSet(KL_Roi_DiscardWord)
+            KL_Roi_DiscardWord()
         Keystats.synth_owners.Push(Owner)
         Keystats.synth_active := Keystats.synth_owners.Length
         Keystats.synth_type := source

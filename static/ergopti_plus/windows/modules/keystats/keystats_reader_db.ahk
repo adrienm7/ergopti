@@ -1562,6 +1562,33 @@ KLR_RebuildAggregates(db, Dates := 0) {
 		. "wifi_changes=excluded.wifi_changes,locked_ms=excluded.locked_ms,"
 		. "sleep_ms=excluded.sleep_ms,awake_ms=excluded.awake_ms;")
 		return false
+	; The actual Wi-Fi poll emits network_change, including a first baseline
+	; and signal-only rows. Count only known connectivity or SSID identity changes;
+	; prior connectivity is explicit so reconnects count without treating startup
+	; baselines as transitions. Legacy rows retain only provable hash changes.
+	; Retain historical wifi_change system rows from earlier/imported journals.
+	NetworkHash := "json_extract(meta_json,'$.ssid_hash')"
+	PreviousHash := "json_extract(meta_json,'$.prev_ssid_hash')"
+	NetworkState := "json_extract(meta_json,'$.connection_state')"
+	PreviousState := "json_extract(meta_json,'$.prev_connection_state')"
+	if !KLR_ExecAggregateStep(db, "wifi-day",
+		"INSERT INTO agg_system_day(device_id,date,wifi_changes) "
+		. "SELECT device_id,date,COUNT(*) FROM ("
+		. "SELECT device_id,date FROM events_system WHERE action='wifi_change'"
+		. _KLR_DateScope(Dates, "date")
+		. " UNION ALL SELECT device_id,date FROM events_network WHERE kind='network_change'"
+		. " AND ((" . NetworkState . "='connected' AND " . PreviousState . "='disconnected')"
+		. " OR (" . NetworkState . "='disconnected' AND " . PreviousState . "='connected')"
+		. " OR (" . NetworkState . "='connected' AND (" . PreviousState . "='connected' OR " . PreviousState . " IS NULL)"
+		. " AND typeof(" . NetworkHash . ")='text' AND " . NetworkHash . "!=''"
+		. " AND typeof(" . PreviousHash . ")='text' AND " . PreviousHash . "!=''"
+		. " AND " . NetworkHash . "!=" . PreviousHash . ")"
+		. " OR (" . NetworkState . "='disconnected' AND " . PreviousState . " IS NULL"
+		. " AND typeof(" . PreviousHash . ")='text' AND " . PreviousHash . "!=''))"
+		. _KLR_DateScope(Dates, "date")
+		. ") GROUP BY device_id,date ON CONFLICT(device_id,date) DO UPDATE SET wifi_changes=excluded.wifi_changes;")
+		return false
+
 	return true
 }
 
