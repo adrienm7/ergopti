@@ -8,6 +8,17 @@ set -euo pipefail
 # The sentences this script prints, in the user's language (install/messages.sh).
 source "$(dirname -- "${BASH_SOURCE[0]}")/messages.sh"
 DRIVER_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+unset ERGOPTI_LITERAL_DIRECT ERGOPTI_LITERAL_DAEMON
+case "$DRIVER_ROOT${ERGOPTI_RUNTIME_PREFIX:-}" in
+	*[\;\?]*)
+		export ERGOPTI_LITERAL_DRIVER_ROOT="$DRIVER_ROOT"
+		if [ -f "$DRIVER_ROOT/../_shared/data/locales/en.json" ]; then
+			export ERGOPTI_LITERAL_SHARED_ROOT="$DRIVER_ROOT/../_shared/lua"
+		else
+			export ERGOPTI_LITERAL_SHARED_ROOT="$DRIVER_ROOT/_shared/lua"
+		fi ;;
+	*) unset ERGOPTI_LITERAL_DRIVER_ROOT ERGOPTI_LITERAL_SHARED_ROOT ERGOPTI_LITERAL_NATIVE_MODULES ;;
+esac
 GROUPS_REFRESHED=false
 if [ "${1:-}" = --groups-refreshed ]; then GROUPS_REFRESHED=true; shift; fi
 SESSION_START=false

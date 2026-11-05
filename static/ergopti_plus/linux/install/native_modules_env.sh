@@ -23,7 +23,10 @@ ergopti_admit_native_modules() {
 	case "$2" in
 		required) ;;
 		optional)
-			if [ ! -e "$modules" ] && [ ! -L "$modules" ]; then return 0; fi
+			if [ ! -e "$modules" ] && [ ! -L "$modules" ]; then
+				unset ERGOPTI_LITERAL_NATIVE_MODULES
+				return 0
+			fi
 			;;
 		*)
 			ergopti_msg native_modules.call_refused >&2
@@ -35,5 +38,8 @@ ergopti_admit_native_modules() {
 		ergopti_msg native_modules.module_unpublished "$modules/luv.so" >&2
 		return 1
 	fi
-	export LUA_CPATH="$modules/?.so;${LUA_CPATH:-;;}"
+	case "$modules" in
+		*[\;\?]*) export ERGOPTI_LITERAL_NATIVE_MODULES=1 LUA_CPATH="${LUA_CPATH:-;;}" ;;
+		*) unset ERGOPTI_LITERAL_NATIVE_MODULES; export LUA_CPATH="$modules/?.so;${LUA_CPATH:-;;}" ;;
+	esac
 }

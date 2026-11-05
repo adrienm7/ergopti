@@ -1,4 +1,11 @@
 --- platform/network/system_proxy_probe.lua
+-- The application-owned child is invoked directly, without a global Lua init.
+local literal_driver = os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT")
+if literal_driver and literal_driver ~= "" then
+	local literal_shared = assert(os.getenv("ERGOPTI_LITERAL_SHARED_ROOT"), "literal shared root unavailable")
+	assert(loadfile(literal_driver .. "/infra/literal_module_loader.lua"))().install(literal_driver, literal_shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), os.getenv("ERGOPTI_LITERAL_DIRECT") == "1" and "child-direct" or (os.getenv("ERGOPTI_LITERAL_DAEMON") == "1" and "daemon" or nil))
+end
+
 
 --- ==============================================================================
 --- MODULE: Native GIO Proxy Lookup Child (Linux)
@@ -12,7 +19,11 @@
 
 local shared_root = arg[1]
 if type(shared_root) ~= "string" or shared_root == "" then os.exit(2) end
-package.path = shared_root .. "/lua/?.lua;" .. package.path
+if literal_driver then
+	assert(package.loaded["infra.literal_module_loader"]).prepend({ { shared_root .. "/lua", ".lua" } })
+else
+	package.path = shared_root .. "/lua/?.lua;" .. package.path
+end
 local Json = require("json")
 
 -- Resolve the installed native module only from this helper's actual source.
@@ -23,7 +34,11 @@ local driver_root = type(helper_source) == "string"
 	and helper_source:match("^@(/.+)/platform/network/system_proxy_probe%.lua$") or nil
 local ExactIdentity
 if driver_root then
-	package.path = driver_root .. "/?.lua;" .. package.path
+	if literal_driver then
+		assert(package.loaded["infra.literal_module_loader"]).prepend({ { driver_root, ".lua" } })
+	else
+		package.path = driver_root .. "/?.lua;" .. package.path
+	end
 	local loaded, module = pcall(require, "infra.curl_identity")
 	if loaded then ExactIdentity = module end
 end
