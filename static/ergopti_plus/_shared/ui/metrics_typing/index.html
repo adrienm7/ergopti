@@ -1333,6 +1333,15 @@
 							incoming_today = window.translate_win_today(incoming_today);
 							incoming_hist = window.translate_win_today(incoming_hist);
 						}
+						// An explicit partial delivery reuses the current selected history,
+						// which may have changed through a native range response.
+						if (
+							!Object.hasOwn(incoming, 'historical') &&
+							Object.hasOwn(incoming, 'today_partial_types')
+						) {
+							next_historical = app_state.historical_cache;
+							next_historical_incomplete = app_state.historical_cache_incomplete;
+						}
 						// Omission is a live delta; an explicit empty object clears history.
 						if (Object.prototype.hasOwnProperty.call(incoming, 'historical')) {
 							next_historical = incoming_hist;
@@ -1341,6 +1350,10 @@
 						merged = {
 							historical: next_historical || incoming_hist || {},
 							today: incoming_today,
+							...(Object.hasOwn(incoming, 'today_partial_types')
+								? { today_partial_types: incoming.today_partial_types }
+								: {}),
+							...(Object.hasOwn(incoming, 'today_date') ? { today_date: incoming.today_date } : {}),
 							incomplete: next_historical_incomplete || incoming.incomplete === true
 						};
 						window._prefetch_data = merged;

@@ -409,6 +409,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-write-catalogue.cjs"],
 			"repro": "npm run test:keystats-write-catalogue"
+		},
+		{
+			"id": "typing-metrics-partial-live",
+			"ordinal": 572,
+			"name": "typing metrics partial live slots preserve calendar and selected-range ownership",
+			"cmd": "node",
+			"args": ["tools/test/test-typing-metrics-partial-live.cjs"],
+			"repro": "node tools/test/test-typing-metrics-partial-live.cjs"
 		}
 	]
 }

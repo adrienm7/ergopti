@@ -430,6 +430,8 @@ function compute_key_km_per_stroke(key, char_km_map, is_kc_tab, is_sc_tab) {
  * represents the full manifest period, not just the current tab's subset.
  */
 function render_current_tab() {
+	if (app_state.today_partial_types?.includes(app_state.current_tab))
+		request_partial_today_refresh();
 	// "mods" draws from sc data and derives modifier patterns; "sc"/"sc_bg"/"w_bg" show as-is
 	// New word-ngram and shortcut-ngram tabs fall back to empty if backend hasn't produced data yet
 	const source_key = app_state.current_tab === 'mods' ? 'sc' : app_state.current_tab;
