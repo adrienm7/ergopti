@@ -1,0 +1,1044 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"role": "shared",
+	"qualification": "Frozen source/artifact custody plus actual archived shared Lua and declaration/source probes replayed against main. No AutoHotkey/native keyboard/timer receiving.",
+	"handoff_sha256": "9337f6a2b81bfdee80a573284413c1911ef13b2eb6de1b538bd1d69585bf16ba",
+	"listed_artifacts": [
+		{
+			"path": "capabilities.json",
+			"sha256": "416985aa8b2222e61524ae55479e17b0c32378976f48d86ecb741d3946609400",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "coverage.json",
+			"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "declaration-probe.cjs",
+			"sha256": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "declarations.txt",
+			"sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A-declarations.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A-declarations.txt",
+			"sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A-magic-lua54.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A-magic-lua54.txt",
+			"sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A-magic-luajit.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A-magic-luajit.txt",
+			"sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A-pinned-source.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A-pinned-source.txt",
+			"sha256": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A-policy-lua54.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A-policy-lua54.txt",
+			"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A-policy-luajit.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A-policy-luajit.txt",
+			"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B-declarations.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B-declarations.txt",
+			"sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B-magic-lua54.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B-magic-lua54.txt",
+			"sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B-magic-luajit.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B-magic-luajit.txt",
+			"sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B-pinned-source.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B-pinned-source.txt",
+			"sha256": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B-policy-lua54.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B-policy-lua54.txt",
+			"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B-policy-luajit.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B-policy-luajit.txt",
+			"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-format.txt",
+			"sha256": "bde5ac6c92de79a956d5b0368979c6bf86682b0043fb53d1b3dcf0764291894f",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-receipts.json",
+			"sha256": "a5d5de64363234a44bf19f759dfe123e105c61d0381befde377e59f162d762d6",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "false-greens.txt",
+			"sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "final-format.txt",
+			"sha256": "59861b7ea2e6100122aa6ad9cd4a196f4677dc81bee63ba38a8a3b0b08ea538b",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "findings.json",
+			"sha256": "f2563fc5c68fe5ee0f54a54b492ce813650c1821fb91097194bac33896e69d99",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "format.txt",
+			"sha256": "826384b55271325bce9c9152abf3caf262303d0d4d5ebd0af936ae531d67b715",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "handoff-format.txt",
+			"sha256": "13afb27a07e61bf9065e3ef4fd351af6e8c14d2a478e0ae1ad6dcb151b749834",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "magic-key-lua54.txt",
+			"sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "magic-key-luajit.txt",
+			"sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "magic-key-policy.lua",
+			"sha256": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "policy-lua54.txt",
+			"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "policy-luajit.txt",
+			"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "policy-probe.lua",
+			"sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "report.md",
+			"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "ruff-check.txt",
+			"sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "ruff-format.txt",
+			"sha256": "96a977f329ec3c59092d40e041a019b49dcf03ca04055e177aa0ccb8c27234df",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "run-dry.py",
+			"sha256": "bb7b0d9cbb46246dc1593ded7428381d3740eded270380745b929624cb810469",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "single-source-gate.txt",
+			"sha256": "5415f06627ee7f77437588395924c27f0b14f49a61dc295d32fc3e3b34457772",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "source-contract.py",
+			"sha256": "a453c9252b9ca4dd393fca5238b91f67bff63bf03cbf958ce0a40fa32debb3df",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "source-contract.txt",
+			"sha256": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "source-receipt.json",
+			"sha256": "03eb82c4b22e758717f36306e44c67d60205f1f0929ade0839c3e495f1cbecf4",
+			"scratch_matches": true,
+			"archive_matches": true
+		}
+	],
+	"additional_archive": ["handoff.json"],
+	"source_claims": [
+		{
+			"path": "docs/memory/linux-web-release.md",
+			"sha256": "eec06e1f26814576e0e0e71bc517abb556dc36794d5f9021754462d7a9f4c5ef",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "src/routes/ergopti-plus/feature-inventory.json",
+			"sha256": "5edb4101f1523786323fba71a5c2f40ab26eb329b7f4183da1ca121dc5d0241f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/core/domain/Terminators.spec.js",
+			"sha256": "fecbe89672d0d8bee62813658faa7cdab131815efe49a437e2750de8246dac8a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ar.json",
+			"sha256": "8fad378966bd4980f4e4982ff10b3284a36a920a1e80d82e21170ae1256c2e72",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/cs.json",
+			"sha256": "a3e2dd8782d71ed1b4a70a960e77fe3633a2af6ae4f25cd1b64ebea10b0bfcfd",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/da.json",
+			"sha256": "6f7d53870f42dfe0de3157835c9360120936823ff9a345afc3898daf40ecee49",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/de.json",
+			"sha256": "9f9461f5a0851ed10c9dfadeab90a48e3739692e8d3a25b1cb5c3535177bafbc",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/en.json",
+			"sha256": "750425bc132f156baa8e7fbc2db1e4ccb331a47c565972822955c0547c47c196",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/es.json",
+			"sha256": "9df0c3b132d4158475f865283f30ce65aa6a9d9b5a439ba3c63099d0d587c8d0",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/fr.json",
+			"sha256": "a2be5769ea4a97a358ca6c60e2334c4b9be5d92f2932cc6d7709f030fe2a150a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/he.json",
+			"sha256": "0e1b74543eab765748aef1c86929e7b63d7df8edc8aef85a7121217d545e828b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/hi.json",
+			"sha256": "2e261f8206cfa17923d045b01f899acc8550aa437494e7783d3c53b391915b23",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/it.json",
+			"sha256": "355dfa41cfd31bc7c6d2cf71c4deb302ea687c03f2bafc700368aecd262b3bca",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ja.json",
+			"sha256": "24339ab31789883b12e5246e284b0ca4c9b567f2f7080b2298f4b73c6c900d2c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ko.json",
+			"sha256": "e85a6df6ef0978aee9f61261482c57304028790859ff29397110ea60c979bb08",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/nl.json",
+			"sha256": "4bfaa6b7c70ce7bd876659ebe5c728c26e559a3bbc4c7ebb89f703ee04ecfc54",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/no.json",
+			"sha256": "ebc07222f88986e62c0129156788951622723e15ec0860c23e201eb72bd730d3",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/pl.json",
+			"sha256": "be7570add9ce0aaa06f0c4bbbccac96ab5e1e7b55ee95a1ce3249e9eaf3ddf78",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/pt.json",
+			"sha256": "7f12011d58218a2dc4b486c92aa64685e85ca5f1ec32193d6520cfd5d92967e9",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ru.json",
+			"sha256": "8d445586e1653f68abd565dc56cf33b96f9586787bee37cdb56b837789d1fff1",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/sv.json",
+			"sha256": "0ec292589efb5a9914d3d6918aacd25fb8009b06432f3d7fe798739776600607",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/tr.json",
+			"sha256": "758a6934543171e6a500acb77fc362a00ec266a28b89a95ce823817dfc2c6bb0",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/uk.json",
+			"sha256": "02465bcaefe1a5b973de62137347aee898e69e33d7f0b6fdfb517fdce08e75b1",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/zh.json",
+			"sha256": "0d11ca3f442a3ae34994cbc2043a348f2dcc726be774730968f1dfe9c2823c50",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/caps_word/auto_off.lua",
+			"sha256": "5de39128197d584604dae2afa4fcc2afaf17c7ced7c37b34c492c91649f03acc",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators.lua",
+			"sha256": "a45d8d0107d88573d3056b7a802e8fd5dc936813fa0e6b8e754897cc0eaa2d3f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators_catalogue.lua",
+			"sha256": "20defcf3f766d45dbbacf21d90a4237a8edcc0f904867b750256b01e198c8a0c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/test/caps_word_auto_off_contract.lua",
+			"sha256": "41a802394a6f4fa32b6dfabc1cdcbe7092e49d037b6aca61fedfaa020f56ffb9",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/actions/README.md",
+			"sha256": "8df4d0a1f4d2241e73be8f2977e6d05568369f6c8e928f4cd24ccb589ae1fb79",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+			"sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/caps_word_auto_off_policy.ahk",
+			"sha256": "9c61753db5c6d0113667e6938f1cf4e0b2040b98b09740a20191f4c61cde85ba",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/menu/menu.toml",
+			"sha256": "2650137e463b4d56da5f2bbd7bb777ca4f5e2916bccb6ae2571174e4f981b197",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/menu/menu_manifest.json",
+			"sha256": "544782751c80291ac36158a1e3b07b5507d42a1fde349c73859a2097427741d3",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/caps_word/auto_off_vectors.json",
+			"sha256": "eb7f557528eea55eff84f819979f5d2731de30f833235070acb0bd82482b892e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/shortcuts/caps_word_auto_off.lua",
+			"sha256": "17e0e4b8c29663c8e85acf0a0a7a5c95ef1bdfff477447d960ae645309670f7b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+			"sha256": "069112cb304c5c522c69c3a51768319993ab051fc9e1f391c7830e832f5d8dbb",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/ui/menu/menu_shortcuts.lua",
+			"sha256": "645352b9ab68db6262eae3797c6a1ca9cabb4bc0223981438d6109254344920a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/capsword_auto_off.lua",
+			"sha256": "e0d6a7b0d9feeceb22d344d9bf2dd376485b5798efd0faeecff3541f6a00ab6d",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/gestures/actions.lua",
+			"sha256": "3e9fa4e342016389ab8ba639e8f84e4a37e39c794f61a5b91aeb865e89124a9c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/data/actions.json",
+			"sha256": "d353c6688da5fef97792e07a433defff19ff21408094eb985a8f0a1e904a0331",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_caps_word.lua",
+			"sha256": "b4fe09cac794a6677881488f6687814e64b25a84960b19807afabe209103ec7e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/capsword_state.ahk",
+			"sha256": "f11ecbdeb90cd33812d0821bc366a9127b979731232dc30f4e446430958d49d5",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/gestures/actions.ahk",
+			"sha256": "38ac49e062182b7e57a4b50642f2fc817fa933a7c04d12c8ccbf744f10070224",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/shortcuts/capsword.ahk",
+			"sha256": "431f4a6b0d715a6a3672fbcf4ed84d60552a2adfe5d4f4874dd3cc2ea7b25954",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/shortcuts/capsword_auto_off.ahk",
+			"sha256": "90512aa92d5f2fbe3048acec3de911ceb75ecb5d48c182c7249f9f99dcd989c1",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk",
+			"sha256": "d0adc3d14e14ef0d33b6e6b83b176bdbbd318505c989229230b98d2e040b59e8",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "tools/build/build-features-manifest.js",
+			"sha256": "102d3db701ca3a55a46addf9f5e3c98394d68d3a2c0bb76cdce3bee5e9edd03a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "tools/test/test-caps-word-auto-off-single-source.cjs",
+			"sha256": "32b9eeb429c596a072d9a49cc4b35d7f60c69e64be5ed7354b6ca10d2c2fd092",
+			"pinned_matches": true,
+			"current_matches": true
+		}
+	],
+	"counts": {
+		"coverage_rows": 25,
+		"distinct_aspects": 25,
+		"findings": 2,
+		"finding_ids": ["CW-S001", "CW-S002"],
+		"capability_candidates": 8,
+		"source_files": 49
+	},
+	"actual_policy_logs": [
+		{
+			"runtime": "lua54",
+			"cases": 8,
+			"registered_assertions": 166,
+			"extended_assertions": 116,
+			"total": 282
+		},
+		{
+			"runtime": "luajit",
+			"cases": 8,
+			"registered_assertions": 166,
+			"extended_assertions": 116,
+			"total": 282
+		}
+	],
+	"final_dry_processes": [
+		{
+			"sweep": "A",
+			"name": "policy-lua54",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "A",
+			"name": "policy-luajit",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "A",
+			"name": "magic-lua54",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "A",
+			"name": "magic-luajit",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "A",
+			"name": "declarations",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "A",
+			"name": "pinned-source",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "B",
+			"name": "policy-lua54",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "B",
+			"name": "policy-luajit",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "B",
+			"name": "magic-lua54",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "B",
+			"name": "magic-luajit",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "B",
+			"name": "declarations",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "B",
+			"name": "pinned-source",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		}
+	],
+	"independent_replays": [
+		{
+			"name": "policy-lua54",
+			"program": "policy-probe.lua",
+			"exit_code": 0,
+			"stdout_matches_archived_worker": true,
+			"stderr_bytes": 0
+		},
+		{
+			"name": "policy-luajit",
+			"program": "policy-probe.lua",
+			"exit_code": 0,
+			"stdout_matches_archived_worker": true,
+			"stderr_bytes": 0
+		},
+		{
+			"name": "magic-lua54",
+			"program": "magic-key-policy.lua",
+			"exit_code": 0,
+			"stdout_matches_archived_worker": true,
+			"stderr_bytes": 0
+		},
+		{
+			"name": "magic-luajit",
+			"program": "magic-key-policy.lua",
+			"exit_code": 0,
+			"stdout_matches_archived_worker": true,
+			"stderr_bytes": 0
+		},
+		{
+			"name": "declarations",
+			"program": "declaration-probe.cjs",
+			"exit_code": 0,
+			"stdout_matches_archived_worker": true,
+			"stderr_bytes": 0
+		},
+		{
+			"name": "source",
+			"program": "source-contract.py",
+			"exit_code": 0,
+			"stdout_matches_archived_worker": true,
+			"stderr_bytes": 0
+		}
+	],
+	"final_worker_hash_resolutions": [
+		{
+			"path": "shared/capabilities.json",
+			"expected": "416985aa8b2222e61524ae55479e17b0c32378976f48d86ecb741d3946609400",
+			"current": "416985aa8b2222e61524ae55479e17b0c32378976f48d86ecb741d3946609400",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/coverage.json",
+			"expected": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652",
+			"current": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/declaration-probe.cjs",
+			"expected": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a",
+			"current": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/declarations.txt",
+			"expected": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"current": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-declarations.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-declarations.txt",
+			"expected": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"current": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-magic-lua54.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-magic-lua54.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-magic-luajit.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-magic-luajit.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-pinned-source.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-pinned-source.txt",
+			"expected": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"current": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-policy-lua54.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-policy-lua54.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-policy-luajit.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-policy-luajit.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-declarations.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-declarations.txt",
+			"expected": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"current": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-magic-lua54.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-magic-lua54.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-magic-luajit.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-magic-luajit.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-pinned-source.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-pinned-source.txt",
+			"expected": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"current": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-policy-lua54.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-policy-lua54.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-policy-luajit.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-policy-luajit.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-format.txt",
+			"expected": "bde5ac6c92de79a956d5b0368979c6bf86682b0043fb53d1b3dcf0764291894f",
+			"current": "bde5ac6c92de79a956d5b0368979c6bf86682b0043fb53d1b3dcf0764291894f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-receipts.json",
+			"expected": "a5d5de64363234a44bf19f759dfe123e105c61d0381befde377e59f162d762d6",
+			"current": "a5d5de64363234a44bf19f759dfe123e105c61d0381befde377e59f162d762d6",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/false-greens.txt",
+			"expected": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"current": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/final-format.txt",
+			"expected": "59861b7ea2e6100122aa6ad9cd4a196f4677dc81bee63ba38a8a3b0b08ea538b",
+			"current": "59861b7ea2e6100122aa6ad9cd4a196f4677dc81bee63ba38a8a3b0b08ea538b",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/findings.json",
+			"expected": "f2563fc5c68fe5ee0f54a54b492ce813650c1821fb91097194bac33896e69d99",
+			"current": "f2563fc5c68fe5ee0f54a54b492ce813650c1821fb91097194bac33896e69d99",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/format.txt",
+			"expected": "826384b55271325bce9c9152abf3caf262303d0d4d5ebd0af936ae531d67b715",
+			"current": "826384b55271325bce9c9152abf3caf262303d0d4d5ebd0af936ae531d67b715",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/handoff-format.txt",
+			"expected": "13afb27a07e61bf9065e3ef4fd351af6e8c14d2a478e0ae1ad6dcb151b749834",
+			"current": "13afb27a07e61bf9065e3ef4fd351af6e8c14d2a478e0ae1ad6dcb151b749834",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/magic-key-lua54.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/magic-key-luajit.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/magic-key-policy.lua",
+			"expected": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+			"current": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/policy-lua54.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/policy-luajit.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/policy-probe.lua",
+			"expected": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+			"current": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/report.md",
+			"expected": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe",
+			"current": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/ruff-check.txt",
+			"expected": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+			"current": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/ruff-format.txt",
+			"expected": "96a977f329ec3c59092d40e041a019b49dcf03ca04055e177aa0ccb8c27234df",
+			"current": "96a977f329ec3c59092d40e041a019b49dcf03ca04055e177aa0ccb8c27234df",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/run-dry.py",
+			"expected": "bb7b0d9cbb46246dc1593ded7428381d3740eded270380745b929624cb810469",
+			"current": "bb7b0d9cbb46246dc1593ded7428381d3740eded270380745b929624cb810469",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/single-source-gate.txt",
+			"expected": "5415f06627ee7f77437588395924c27f0b14f49a61dc295d32fc3e3b34457772",
+			"current": "5415f06627ee7f77437588395924c27f0b14f49a61dc295d32fc3e3b34457772",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/source-contract.py",
+			"expected": "a453c9252b9ca4dd393fca5238b91f67bff63bf03cbf958ce0a40fa32debb3df",
+			"current": "a453c9252b9ca4dd393fca5238b91f67bff63bf03cbf958ce0a40fa32debb3df",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/source-contract.txt",
+			"expected": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"current": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/source-receipt.json",
+			"expected": "03eb82c4b22e758717f36306e44c67d60205f1f0929ade0839c3e495f1cbecf4",
+			"current": "03eb82c4b22e758717f36306e44c67d60205f1f0929ade0839c3e495f1cbecf4",
+			"resolution": "current_archive"
+		}
+	],
+	"handoff_byte_resolution": {
+		"path": "shared/handoff.json",
+		"expected": "9337f6a2b81bfdee80a573284413c1911ef13b2eb6de1b538bd1d69585bf16ba",
+		"current": "9337f6a2b81bfdee80a573284413c1911ef13b2eb6de1b538bd1d69585bf16ba",
+		"resolution": "current_archive"
+	},
+	"final_format_qualification": "Every frozen shared artifact was already formatted under explicit repository config; none changed during archive formatting check. All49 handoff-listed hashes and handoff custody hash resolve to current archive."
+}

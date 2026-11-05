@@ -1,0 +1,335 @@
+{
+  "audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+  "sweep": "A",
+  "basis": "source",
+  "qualification": "Python authenticates exact Git bytes and lexical relationships only. No AHK, native CapsLock, keyboard, editor or wall-clock behavior executed.",
+  "sources": [
+    {
+      "path": "static/ergopti_plus/windows/modules/shortcuts/capsword.ahk",
+      "sha256": "431f4a6b0d715a6a3672fbcf4ed84d60552a2adfe5d4f4874dd3cc2ea7b25954"
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/shortcuts/capsword_auto_off.ahk",
+      "sha256": "90512aa92d5f2fbe3048acec3de911ceb75ecb5d48c182c7249f9f99dcd989c1"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/capsword_state.ahk",
+      "sha256": "f11ecbdeb90cd33812d0821bc366a9127b979731232dc30f4e446430958d49d5"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hook_dispatcher.ahk",
+      "sha256": "815b776cfa26935041130add0447994adacef4685be9f1670891de302112e79c"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+      "sha256": "82f831243cc220a81da56ad61fe5ee97d2eb84d1790ce2d9f35bd30c44bf1b8f"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/error_net.ahk",
+      "sha256": "247476b9bc6f58912ffc8d97e0065891e811dbe94b1efcd45c2102c3ad928bf7"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_buffer_effects.ahk",
+      "sha256": "334ef8e027b2e1691166e7dd838053e286dbddb0eb57e485ef34589d62d2af3f"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
+      "sha256": "b1f46fb50f3ca84f6a17a9bd10a180dc42845486049afdbe9c7920c7f64e2832"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_send.ahk",
+      "sha256": "dcc3b043ac6fdd16099edda1d3f225335daf2b4f797e1feb568cbeead047915e"
+    },
+    {
+      "path": "static/ergopti_plus/windows/platform/remap/constants.ahk",
+      "sha256": "3c094b62641fa76bbdd53782e0d243a6697492c025a99476b036d6622b52835c"
+    },
+    {
+      "path": "static/ergopti_plus/windows/platform/remap/space.ahk",
+      "sha256": "6dca1d47a45e3812937615aaea3ba7d3765e01ecb106b0e1b22c340983426dae"
+    },
+    {
+      "path": "static/ergopti_plus/windows/platform/remap/tab.ahk",
+      "sha256": "50564663982a6b9652577dda003269230702d89df10e818dca6e5d28df5f7cca"
+    },
+    {
+      "path": "static/ergopti_plus/windows/platform/remap/altgr.ahk",
+      "sha256": "012721c98190cc52d5b0ae57736db28d7cf55baadd7a783c1b9d254bf7cf2ddb"
+    },
+    {
+      "path": "static/ergopti_plus/windows/platform/remap/capslock.ahk",
+      "sha256": "db29014b9c4cc2d9ecbbfeaa11009c4fd77a40ef5e5dab044b42544ecba275e9"
+    },
+    {
+      "path": "static/ergopti_plus/windows/platform/remap/one_shot_shift.ahk",
+      "sha256": "458c21c994de1d2794b62d1f70dabd6f8b26305c174c6641429cb8c07a994b5b"
+    },
+    {
+      "path": "static/ergopti_plus/windows/platform/remap/tap_hold_loader.ahk",
+      "sha256": "76d475638cc48a101e8d18cff17cf02ee7ebb87536fde78e47abc9dd23bf285c"
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/gestures/actions.ahk",
+      "sha256": "38ac49e062182b7e57a4b50642f2fc817fa933a7c04d12c8ccbf744f10070224"
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
+      "sha256": "edfbf6d0f4633915217cf03bd0490092613d3c9cf474914ee423f535ca0e0661"
+    },
+    {
+      "path": "static/ergopti_plus/windows/adapters/text_sender.ahk",
+      "sha256": "0721bdeb5445797f3ca698428278dfd598964bd2ba5cea63d34e6bc7b93132ad"
+    },
+    {
+      "path": "static/ergopti_plus/windows/adapters/editor_replace.ahk",
+      "sha256": "39532999a1909117fae6be31f92acbbe45e8ca146ab7a8c9b8a56a1a80490cf3"
+    },
+    {
+      "path": "static/ergopti_plus/windows/adapters/key_state.ahk",
+      "sha256": "5f9426ebd47a57fd3c66066e77bed1399fa5c47021d94a031c819ee2c8291050"
+    },
+    {
+      "path": "static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk",
+      "sha256": "d0adc3d14e14ef0d33b6e6b83b176bdbbd318505c989229230b98d2e040b59e8"
+    },
+    {
+      "path": "static/ergopti_plus/windows/ErgoptiPlus.ahk",
+      "sha256": "520ed68623d143edd1ea55c5f3727cf636a8162287cdf65d517671bece545161"
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/unit/modules/shortcuts/test_capsword_auto_off.ahk",
+      "sha256": "4e10b85d4b3656724994723c154c3e784983c629bd46f267837195dc8ff61347"
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/unit/modules/shortcuts/test_capsword_auto_off_ownership.ahk",
+      "sha256": "8f47fb993bbaf59a36168702fc567985c6bea577c271abc37cc477c3191ad6ee"
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/unit/modules/shortcuts/test_capsword_state.ahk",
+      "sha256": "6da6684053ac87eccbd50acedb68fbe379e0476a5828c87936851fef54facc83"
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/unit/platform/remap/keys/test_capsword_taphold_unlatch.ahk",
+      "sha256": "96fb9a789e87aee64d3e24afc4c5603adb308d92ecdcbfa579f9611eba7263bc"
+    },
+    {
+      "path": "static/ergopti_plus/windows/tests/meta/modules/shortcuts/test_capsword_auto_off_single_source.ahk",
+      "sha256": "ae7b52d3e2e7bb67f53360c6ed8536ef84aa4e5df5aeb7eedf339c4bc2818258"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+      "sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/features/caps_word_auto_off_policy.ahk",
+      "sha256": "9c61753db5c6d0113667e6938f1cf4e0b2040b98b09740a20191f4c61cde85ba"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+      "sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/tap_hold/defaults.toml",
+      "sha256": "c4f4a6678703dada0e58179124c0c956770ca35c6129d18d62179730d9952799"
+    }
+  ],
+  "checks": [
+    {
+      "name": "Shared defaults:10 seconds, eight typed delimiters, all three platforms",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Shared contract names actual typed character regardless source key/layer",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Backspace and Enter are real all-platform unmodified keystroke actions",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "CapsWord action is declared for Windows/Linux with macOS equivalent",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Tap loader accepts live catalogue actions rather than only native physical key",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Space's custom action enters the generic tap-action path",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Tab custom tap-only action reaches generic physical-tab dispatch",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "An empty AI tooltip declines Tab acceptance before configured dispatch",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "CapsLock configured Enter takes generic branch without genuine CapsLock toggle",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Native CapsWord delimiter bindings do not intercept physical Tab or CapsLock",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Generic tap forwards original physical carrier id into guarded dispatcher",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Tap guard rejects suspended/activity-cancelled presses before deactivation",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "CW-W001:CapsWord deactivation precedes configured output callback",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "CW-W001:predicate asks physical KeyId,not configured action or sent key",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Configured action resolves its own emitted key after physical-id decision",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Pure CapsWord toggle flips current state and synchronizes native CapsLock",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Pure deactivation clears state before disarming and native state sync",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "CW-W002:an accepted isolated AltGr tap unconditionally disables before dispatch",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "AltGr dispatch uses its configured generic action",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Real Windows catalogue CapsWord action invokes ToggleCapsWord",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Existing tap regression passes marker callback rather than emitted action",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Non-Tab keystroke tap emits its action key through TextPressKey",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Synthetic key sender runs level0; real dispatcher ignores that level",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Synthetic key funnel/commit does not publish CapsWord literal output",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Setting write must succeed before next-activation policy publication",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Documented config snapshot:publication changes Configured,not Armed or timers",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Activation snapshots configured policy and subscribes key-down only for nonzero idle",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Every keyboard key-down rearms armed idle period",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Old callbacks require exact generation before borrowing active owner",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Retirement precedes logging; terminal callback rechecks its own retired generation",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Native delimiter carries original generation across send/wait finally",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Dispatcher gates all event callbacks while suspended",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Suspend explicitly deactivates CapsWord through required lifecycle step",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Genuine CapsLock intent seeded before write-owning includes",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Native CapsLock intent flips recorded intent,not own LED feedback",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Pointer scroll maps to pointer_motion and five declared Windows kinds",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Motion poll ignores unchanged coordinates and suspended state",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Typed callback evaluates entire payload through shared character policy",
+      "passed": true,
+      "basis": "source"
+    },
+    {
+      "name": "Literal driver-output observer evaluates same armed delimiter policy",
+      "passed": true,
+      "basis": "source"
+    }
+  ],
+  "check_count": 39,
+  "program_sha256": "56aca858f306bec79a9d5666b910af08a7fe1637a3b55dafe50edc27be815c36"
+}

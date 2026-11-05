@@ -1,0 +1,24 @@
+
+=== CapsWord native activation reaches the pointer owner ===
+  ok   clears a Karabiner activation only after the exact writer acknowledges
+  ok   rejects bare, unrelated, retired-listener and foreign-lease activation signals
+  ok   does not clear the LED for an old writer after a newer native activation
+
+=== watchers CapsWord clears only a known activation ===
+  ok   (capsword-no-cli-reader) a pointer event without a known activation runs nothing
+  ok   CapsWord watcher: supersedes a local activation through the writer
+  ok   CapsWord watcher: a clear in flight holds the guard until it settles
+  ok   CapsWord watcher: a failed serialized clear never changes the LED
+  ok   CapsWord watcher: a raising writer is reported and releases the guard
+
+=== watchers CapsWord fences stale asynchronous callbacks ===
+  ok   CapsWord watcher: ignores a clear settlement delivered after watcher stop
+  ok   CapsWord watcher: cancels delayed LED correction when a newer revision appears
+  ok   CapsWord watcher: stopped lease A callbacks cannot act on restarted lease B
+
+=== watchers CapsWord resource failures are fail-closed ===
+  ok   CapsWord watcher: failed teardown retains every exact resource for retry
+  ok   CapsWord watcher: eventtap constructor failure returns nil without installing a hook
+  ok   CapsWord watcher: eventtap start refusal stops the partial tap and installs no hook
+  ok   CapsWord watcher: touch-hook failure stops the eventtap and removes any partial hook
+AUDIT_RESULT	15	0

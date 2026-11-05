@@ -1,0 +1,1784 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"role": "linux",
+	"qualification": "Original worker claims and source authentication, actual recorded Lua owners over controlled native ports. Main wiring is source-only. No native keyboard/compositor receiving.",
+	"handoff_sha256": "fc8da6ba3a6037f8abd0443d994b3e48af55a6431bc450ac66f1af08bf904f41",
+	"top_level_listed_files": 10,
+	"copied": [
+		{
+			"path": "owner-probe.lua",
+			"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "top-level worker claim"
+		},
+		{
+			"path": "run-registered.lua",
+			"sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "top-level worker claim"
+		},
+		{
+			"path": "run-proofs.py",
+			"sha256": "3bee53b32036bf4d19fa86f5d62a4d149e489ff7b180045665acebd8fee6b858",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "top-level worker claim"
+		},
+		{
+			"path": "source-probe.py",
+			"sha256": "98323f37fea813d97928c5b9340d9363c8e9ec0d2bf276976268e8d76aa365ed",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "top-level worker claim"
+		},
+		{
+			"path": "source-receipt.json",
+			"sha256": "fd42494d7e1ab4884ed8cb41d1cd8df26c885a4ecb287480dd15f6e63dcf6e7b",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "top-level worker claim"
+		},
+		{
+			"path": "coverage.json",
+			"sha256": "80484a424d6cf974501a948c205918ed9ebdd6751c9e5f29b829e74f7c91155c",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "top-level worker claim"
+		},
+		{
+			"path": "findings.json",
+			"sha256": "23c5928f286e95bf101611e809d7174d152a6a796c245df24d7067a94c7d3a1e",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "top-level worker claim"
+		},
+		{
+			"path": "report.md",
+			"sha256": "73493878ee5c20a3a19b06be800707875887a89d4d1862d4b4883d83069fc1cd",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "top-level worker claim"
+		},
+		{
+			"path": "final-proofs/receipts.json",
+			"sha256": "248954f92f93f115ddc6624890339c6f8226c8b447b686b7c3383fd0dc53f935",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "top-level worker claim"
+		},
+		{
+			"path": "false-green-baseline.txt",
+			"sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "top-level worker claim"
+		},
+		{
+			"path": "handoff.json",
+			"sha256": "fc8da6ba3a6037f8abd0443d994b3e48af55a6431bc450ac66f1af08bf904f41",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "handoff envelope custody"
+		},
+		{
+			"path": "final-proofs/A-lua-owner.stdout.txt",
+			"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-owner.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_caps_word_auto_off.stdout.txt",
+			"sha256": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_caps_word_auto_off.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_caps_word_auto_off_policy.stdout.txt",
+			"sha256": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_caps_word_auto_off_policy.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"sha256": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"sha256": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"sha256": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_injector_caps_lock.stdout.txt",
+			"sha256": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_injector_caps_lock.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_injector_output_observer.stdout.txt",
+			"sha256": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_injector_output_observer.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_caps_word_auto_off_menu.stdout.txt",
+			"sha256": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-lua-test_caps_word_auto_off_menu.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-owner.stdout.txt",
+			"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-owner.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_caps_word_auto_off.stdout.txt",
+			"sha256": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_caps_word_auto_off.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_caps_word_auto_off_policy.stdout.txt",
+			"sha256": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_caps_word_auto_off_policy.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"sha256": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"sha256": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"sha256": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_injector_caps_lock.stdout.txt",
+			"sha256": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_injector_caps_lock.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_injector_output_observer.stdout.txt",
+			"sha256": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_injector_output_observer.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_caps_word_auto_off_menu.stdout.txt",
+			"sha256": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/A-luajit-test_caps_word_auto_off_menu.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-owner.stdout.txt",
+			"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-owner.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_caps_word_auto_off.stdout.txt",
+			"sha256": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_caps_word_auto_off.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_caps_word_auto_off_policy.stdout.txt",
+			"sha256": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_caps_word_auto_off_policy.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"sha256": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"sha256": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"sha256": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_injector_caps_lock.stdout.txt",
+			"sha256": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_injector_caps_lock.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_injector_output_observer.stdout.txt",
+			"sha256": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_injector_output_observer.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_caps_word_auto_off_menu.stdout.txt",
+			"sha256": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-lua-test_caps_word_auto_off_menu.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-owner.stdout.txt",
+			"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-owner.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_caps_word_auto_off.stdout.txt",
+			"sha256": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_caps_word_auto_off.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_caps_word_auto_off_policy.stdout.txt",
+			"sha256": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_caps_word_auto_off_policy.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"sha256": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"sha256": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"sha256": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_injector_caps_lock.stdout.txt",
+			"sha256": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_injector_caps_lock.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_injector_output_observer.stdout.txt",
+			"sha256": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_injector_output_observer.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_caps_word_auto_off_menu.stdout.txt",
+			"sha256": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "final-proofs/B-luajit-test_caps_word_auto_off_menu.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "nested final-process worker hash"
+		},
+		{
+			"path": "pre-isolation-proofs/receipts.json",
+			"sha256": "9f8929e8148e9b7912fb7d93ef08a974ef798e549f3348c6bbf2b8ebe4f156e0",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "compact retained unsuccessful-batch receipt"
+		},
+		{
+			"path": "pre-isolation-proofs/A-luajit-owner.stdout.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "retained original failed-process hash"
+		},
+		{
+			"path": "pre-isolation-proofs/A-luajit-owner.stderr.txt",
+			"sha256": "91b3e4285f53dbef132f6844fed4cac86888ea7e538b27b8d25fcd3d9dd510b6",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "retained original failed-process hash"
+		},
+		{
+			"path": "owner-initial.lua.txt",
+			"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "byte-identical initial owner snapshot"
+		},
+		{
+			"path": "final-proof-run.txt",
+			"sha256": "8751da209fa3e8bedca55112ba170344dce09cff9c92dcb00f4e47ff593fbb5f",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "initial unsuccessful-batch summary"
+		},
+		{
+			"path": "final-proof-isolated.txt",
+			"sha256": "186e908177fee0d4571bf8694911c547d7c57d8a139a3eeaca539eff2c5bd6e8",
+			"scratch_matches": true,
+			"archive_matches": true,
+			"custody_basis": "later isolated-process batch summary"
+		}
+	],
+	"source_claims": [
+		{
+			"path": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+			"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+			"sha256": "069112cb304c5c522c69c3a51768319993ab051fc9e1f391c7830e832f5d8dbb",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/shortcuts/caps_word_auto_off.lua",
+			"sha256": "17e0e4b8c29663c8e85acf0a0a7a5c95ef1bdfff477447d960ae645309670f7b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+			"sha256": "fe64d1d6985da694281e21d3b09614fc7f346947dbfb24a2a136a05e98c455b7",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
+			"sha256": "cb6b98f7a76e7b47d8ddfacc546a058c3c83961050ff4d8716d04aaa2b028de6",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/uinput_writer.lua",
+			"sha256": "d5cd2ebaba30e1f27bffbf3c215ffeea8173c3d31e824c923a2c86c3c4532ba4",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/modifier_broker.lua",
+			"sha256": "71d6384cf91985d7c404022f053017db0fb85a04ca9775848a5d7209a86bf736",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/evdev_reader.lua",
+			"sha256": "114af1d0ff1daa21df141a8e006f10e19cdc3e30a1de32a5f18f718f06b891bb",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/event_loop.lua",
+			"sha256": "d9583f9e74735bf287b46da5c74f3359e15d30c87d1daf78d044d69737ecd5f2",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/infra/input_event.lua",
+			"sha256": "ed7f21f545f682607bde2626c9c327935bb5996910b2b813f259cbe830b2fbe7",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/infra/evdev_codes.lua",
+			"sha256": "0ccc74128959cf544abc809f35fd763eebf9aac0e3369669b926f0943ccb63b8",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/infra/monotonic.lua",
+			"sha256": "4adacad769b9958666143fe8519b09da000778fd594539c9a401b6d59b9ed767",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/infra/hotstring_preferences.lua",
+			"sha256": "d15fbe1e2a5af2ca23023e097625b4dff5266bd3012dda7ab57e58879e6b332d",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/infra/manifest_reader.lua",
+			"sha256": "90a161f14bf6056bf8255a85338f6310864fd3d25801c496384586d18adfc85e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/infra/manifest_menu.lua",
+			"sha256": "e5dfdc5a694b1dc8b7d49dc8460b6fe62e71443f3842638aecac8e0a53cc3849",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/gestures/combo_emitter.lua",
+			"sha256": "729f390c6d84f9b88050dc885c2f9f93ac1f621d2081349aad60f7911a06edee",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/device_finder.lua",
+			"sha256": "a5d0c4830dd56868f0f5881f988e60b066106cea30d9e95cbf5d5e4bf3150931",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/injector.lua",
+			"sha256": "0e7fd57730f818ac710c41d60079ef023453e181c0dfac9ca8a8c17edba07445",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/magic_key.lua",
+			"sha256": "6f1be4b49903f625aef71919bcd595ca9e1c9c132716545d3d0973c2ce741db9",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
+			"sha256": "1d28167df7eabbc1be798067269c03706cc41c8e1abd812102977784006404f7",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/ui/menu/menu_shortcuts.lua",
+			"sha256": "645352b9ab68db6262eae3797c6a1ca9cabb4bc0223981438d6109254344920a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/ui/menu/builder.lua",
+			"sha256": "a64d1140a9f5c1371cffab6303644e5b4921c9a77b085e9a94b07a5ca47b2fa3",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/caps_word/auto_off.lua",
+			"sha256": "5de39128197d584604dae2afa4fcc2afaf17c7ced7c37b34c492c91649f03acc",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators.lua",
+			"sha256": "a45d8d0107d88573d3056b7a802e8fd5dc936813fa0e6b8e754897cc0eaa2d3f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators_catalogue.lua",
+			"sha256": "20defcf3f766d45dbbacf21d90a4237a8edcc0f904867b750256b01e198c8a0c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/caps_word/auto_off_vectors.json",
+			"sha256": "eb7f557528eea55eff84f819979f5d2731de30f833235070acb0bd82482b892e",
+			"pinned_matches": true,
+			"current_matches": true
+		}
+	],
+	"counts": {
+		"coverage_rows": 55,
+		"distinct_aspects": 55,
+		"findings": 2,
+		"finding_ids": ["CW-L001", "CW-L002"],
+		"source_files": 27,
+		"lexical_wiring_relationships": 5,
+		"final_processes": 36,
+		"retained_final_process_logs": 72
+	},
+	"owner_observations": [
+		{
+			"process": "A-lua-owner",
+			"rows": 55,
+			"names": [
+				"normal-10-second-idle",
+				"zero-never-idle",
+				"tiny-positive",
+				"one-ms-positive",
+				"live-idle-zero-to-one",
+				"live-idle-ten-to-one",
+				"live-uncheck-space",
+				"live-uncheck-pointer",
+				"modifier-does-not-wake",
+				"arrow-wakes",
+				"text-delimiter- ",
+				"text-delimiter-\u00a0",
+				"text-delimiter-\u202f",
+				"text-delimiter-\t",
+				"text-delimiter-\n",
+				"text-delimiter-,",
+				"text-delimiter-;",
+				"text-delimiter-.",
+				"text-delimiter-\u00a0:",
+				"text-delimiter-A\u202f!",
+				"unchecked-text--",
+				"unchecked-text-A",
+				"unchecked-text-9",
+				"unchecked-text-\u00e9",
+				"unchecked-text-",
+				"pointer-checked-left_click",
+				"pointer-unchecked-left_click",
+				"pointer-checked-right_click",
+				"pointer-unchecked-right_click",
+				"pointer-checked-middle_click",
+				"pointer-unchecked-middle_click",
+				"pointer-checked-other_buttons",
+				"pointer-unchecked-other_buttons",
+				"pointer-checked-gesture",
+				"pointer-unchecked-gesture",
+				"native-tab-checked",
+				"native-enter-checked",
+				"ctrl-tab-checked",
+				"native-tab-unchecked",
+				"preexisting-user-caps",
+				"nonlocking-map-refusal",
+				"user-caps-press",
+				"lifecycle-stop",
+				"lifecycle-cancel",
+				"lifecycle-init",
+				"lifecycle-disable",
+				"public-menu-uncheck-space",
+				"public-menu-space-next-session-control",
+				"public-menu-enable-left-click",
+				"public-menu-left-click-next-session-control",
+				"configured-magic-star-label",
+				"literal-star-still-ends",
+				"absolute-pointer-motion-ignored",
+				"relative-pointer-motion-control",
+				"touch-gesture-default-control"
+			]
+		},
+		{
+			"process": "A-luajit-owner",
+			"rows": 55,
+			"names": [
+				"normal-10-second-idle",
+				"zero-never-idle",
+				"tiny-positive",
+				"one-ms-positive",
+				"live-idle-zero-to-one",
+				"live-idle-ten-to-one",
+				"live-uncheck-space",
+				"live-uncheck-pointer",
+				"modifier-does-not-wake",
+				"arrow-wakes",
+				"text-delimiter- ",
+				"text-delimiter-\u00a0",
+				"text-delimiter-\u202f",
+				"text-delimiter-\t",
+				"text-delimiter-\n",
+				"text-delimiter-,",
+				"text-delimiter-;",
+				"text-delimiter-.",
+				"text-delimiter-\u00a0:",
+				"text-delimiter-A\u202f!",
+				"unchecked-text--",
+				"unchecked-text-A",
+				"unchecked-text-9",
+				"unchecked-text-\u00e9",
+				"unchecked-text-",
+				"pointer-checked-left_click",
+				"pointer-unchecked-left_click",
+				"pointer-checked-right_click",
+				"pointer-unchecked-right_click",
+				"pointer-checked-middle_click",
+				"pointer-unchecked-middle_click",
+				"pointer-checked-other_buttons",
+				"pointer-unchecked-other_buttons",
+				"pointer-checked-gesture",
+				"pointer-unchecked-gesture",
+				"native-tab-checked",
+				"native-enter-checked",
+				"ctrl-tab-checked",
+				"native-tab-unchecked",
+				"preexisting-user-caps",
+				"nonlocking-map-refusal",
+				"user-caps-press",
+				"lifecycle-stop",
+				"lifecycle-cancel",
+				"lifecycle-init",
+				"lifecycle-disable",
+				"public-menu-uncheck-space",
+				"public-menu-space-next-session-control",
+				"public-menu-enable-left-click",
+				"public-menu-left-click-next-session-control",
+				"configured-magic-star-label",
+				"literal-star-still-ends",
+				"absolute-pointer-motion-ignored",
+				"relative-pointer-motion-control",
+				"touch-gesture-default-control"
+			]
+		},
+		{
+			"process": "B-lua-owner",
+			"rows": 55,
+			"names": [
+				"normal-10-second-idle",
+				"zero-never-idle",
+				"tiny-positive",
+				"one-ms-positive",
+				"live-idle-zero-to-one",
+				"live-idle-ten-to-one",
+				"live-uncheck-space",
+				"live-uncheck-pointer",
+				"modifier-does-not-wake",
+				"arrow-wakes",
+				"text-delimiter- ",
+				"text-delimiter-\u00a0",
+				"text-delimiter-\u202f",
+				"text-delimiter-\t",
+				"text-delimiter-\n",
+				"text-delimiter-,",
+				"text-delimiter-;",
+				"text-delimiter-.",
+				"text-delimiter-\u00a0:",
+				"text-delimiter-A\u202f!",
+				"unchecked-text--",
+				"unchecked-text-A",
+				"unchecked-text-9",
+				"unchecked-text-\u00e9",
+				"unchecked-text-",
+				"pointer-checked-left_click",
+				"pointer-unchecked-left_click",
+				"pointer-checked-right_click",
+				"pointer-unchecked-right_click",
+				"pointer-checked-middle_click",
+				"pointer-unchecked-middle_click",
+				"pointer-checked-other_buttons",
+				"pointer-unchecked-other_buttons",
+				"pointer-checked-gesture",
+				"pointer-unchecked-gesture",
+				"native-tab-checked",
+				"native-enter-checked",
+				"ctrl-tab-checked",
+				"native-tab-unchecked",
+				"preexisting-user-caps",
+				"nonlocking-map-refusal",
+				"user-caps-press",
+				"lifecycle-stop",
+				"lifecycle-cancel",
+				"lifecycle-init",
+				"lifecycle-disable",
+				"public-menu-uncheck-space",
+				"public-menu-space-next-session-control",
+				"public-menu-enable-left-click",
+				"public-menu-left-click-next-session-control",
+				"configured-magic-star-label",
+				"literal-star-still-ends",
+				"absolute-pointer-motion-ignored",
+				"relative-pointer-motion-control",
+				"touch-gesture-default-control"
+			]
+		},
+		{
+			"process": "B-luajit-owner",
+			"rows": 55,
+			"names": [
+				"normal-10-second-idle",
+				"zero-never-idle",
+				"tiny-positive",
+				"one-ms-positive",
+				"live-idle-zero-to-one",
+				"live-idle-ten-to-one",
+				"live-uncheck-space",
+				"live-uncheck-pointer",
+				"modifier-does-not-wake",
+				"arrow-wakes",
+				"text-delimiter- ",
+				"text-delimiter-\u00a0",
+				"text-delimiter-\u202f",
+				"text-delimiter-\t",
+				"text-delimiter-\n",
+				"text-delimiter-,",
+				"text-delimiter-;",
+				"text-delimiter-.",
+				"text-delimiter-\u00a0:",
+				"text-delimiter-A\u202f!",
+				"unchecked-text--",
+				"unchecked-text-A",
+				"unchecked-text-9",
+				"unchecked-text-\u00e9",
+				"unchecked-text-",
+				"pointer-checked-left_click",
+				"pointer-unchecked-left_click",
+				"pointer-checked-right_click",
+				"pointer-unchecked-right_click",
+				"pointer-checked-middle_click",
+				"pointer-unchecked-middle_click",
+				"pointer-checked-other_buttons",
+				"pointer-unchecked-other_buttons",
+				"pointer-checked-gesture",
+				"pointer-unchecked-gesture",
+				"native-tab-checked",
+				"native-enter-checked",
+				"ctrl-tab-checked",
+				"native-tab-unchecked",
+				"preexisting-user-caps",
+				"nonlocking-map-refusal",
+				"user-caps-press",
+				"lifecycle-stop",
+				"lifecycle-cancel",
+				"lifecycle-init",
+				"lifecycle-disable",
+				"public-menu-uncheck-space",
+				"public-menu-space-next-session-control",
+				"public-menu-enable-left-click",
+				"public-menu-left-click-next-session-control",
+				"configured-magic-star-label",
+				"literal-star-still-ends",
+				"absolute-pointer-motion-ignored",
+				"relative-pointer-motion-control",
+				"touch-gesture-default-control"
+			]
+		}
+	],
+	"registered_modules_per_group": {
+		"A-lua": [
+			{
+				"module": "tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off",
+				"passed": 34
+			},
+			{
+				"module": "tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off_policy",
+				"passed": 8
+			},
+			{
+				"module": "tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_word_lock",
+				"passed": 28
+			},
+			{
+				"module": "tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_state",
+				"passed": 1
+			},
+			{
+				"module": "tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_seed",
+				"passed": 8
+			},
+			{
+				"module": "tests.unit.modules.hotstrings.injector.test_injector_caps_lock",
+				"passed": 2
+			},
+			{
+				"module": "tests.unit.modules.hotstrings.injector.test_injector_output_observer",
+				"passed": 4
+			},
+			{
+				"module": "tests.unit.ui.menu.shortcuts.test_caps_word_auto_off_menu",
+				"passed": 3
+			}
+		],
+		"A-luajit": [
+			{
+				"module": "tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off",
+				"passed": 34
+			},
+			{
+				"module": "tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off_policy",
+				"passed": 8
+			},
+			{
+				"module": "tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_word_lock",
+				"passed": 28
+			},
+			{
+				"module": "tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_state",
+				"passed": 1
+			},
+			{
+				"module": "tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_seed",
+				"passed": 8
+			},
+			{
+				"module": "tests.unit.modules.hotstrings.injector.test_injector_caps_lock",
+				"passed": 2
+			},
+			{
+				"module": "tests.unit.modules.hotstrings.injector.test_injector_output_observer",
+				"passed": 4
+			},
+			{
+				"module": "tests.unit.ui.menu.shortcuts.test_caps_word_auto_off_menu",
+				"passed": 3
+			}
+		],
+		"B-lua": [
+			{
+				"module": "tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off",
+				"passed": 34
+			},
+			{
+				"module": "tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off_policy",
+				"passed": 8
+			},
+			{
+				"module": "tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_word_lock",
+				"passed": 28
+			},
+			{
+				"module": "tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_state",
+				"passed": 1
+			},
+			{
+				"module": "tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_seed",
+				"passed": 8
+			},
+			{
+				"module": "tests.unit.modules.hotstrings.injector.test_injector_caps_lock",
+				"passed": 2
+			},
+			{
+				"module": "tests.unit.modules.hotstrings.injector.test_injector_output_observer",
+				"passed": 4
+			},
+			{
+				"module": "tests.unit.ui.menu.shortcuts.test_caps_word_auto_off_menu",
+				"passed": 3
+			}
+		],
+		"B-luajit": [
+			{
+				"module": "tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off",
+				"passed": 34
+			},
+			{
+				"module": "tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off_policy",
+				"passed": 8
+			},
+			{
+				"module": "tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_word_lock",
+				"passed": 28
+			},
+			{
+				"module": "tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_state",
+				"passed": 1
+			},
+			{
+				"module": "tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_seed",
+				"passed": 8
+			},
+			{
+				"module": "tests.unit.modules.hotstrings.injector.test_injector_caps_lock",
+				"passed": 2
+			},
+			{
+				"module": "tests.unit.modules.hotstrings.injector.test_injector_output_observer",
+				"passed": 4
+			},
+			{
+				"module": "tests.unit.ui.menu.shortcuts.test_caps_word_auto_off_menu",
+				"passed": 3
+			}
+		]
+	},
+	"initial_unsuccessful_batch": {
+		"receipt": "pre-isolation-proofs/receipts.json",
+		"recorded_processes": 18,
+		"failed": [
+			{
+				"name": "A-luajit-owner",
+				"command": [
+					"luajit",
+					"/workspace/scratch/parity-capsword-2026-11-05/linux/owner-probe.lua",
+					"/workspace/worktrees/parity-capsword-2026-11-05/linux"
+				],
+				"exit_code": 1,
+				"stdout": "A-luajit-owner.stdout.txt",
+				"stderr": "A-luajit-owner.stderr.txt",
+				"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+				"stderr_sha256": "91b3e4285f53dbef132f6844fed4cac86888ea7e538b27b8d25fcd3d9dd510b6"
+			}
+		],
+		"source_identical_owner_snapshot": true,
+		"qualification": "Only the failed process stdout/stderr and complete batch receipt retained; duplicate successful old logs are not archived. Temporary-name collision is a hypothesis, not a reproduced root cause or established repair. Final process-private TMPDIR controls pass without altered assertions or deadlines."
+	},
+	"final_worker_hash_resolutions": [
+		{
+			"path": "linux/owner-probe.lua",
+			"expected": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50",
+			"current": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/run-registered.lua",
+			"expected": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"current": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/run-proofs.py",
+			"expected": "3bee53b32036bf4d19fa86f5d62a4d149e489ff7b180045665acebd8fee6b858",
+			"current": "3bee53b32036bf4d19fa86f5d62a4d149e489ff7b180045665acebd8fee6b858",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/source-probe.py",
+			"expected": "98323f37fea813d97928c5b9340d9363c8e9ec0d2bf276976268e8d76aa365ed",
+			"current": "98323f37fea813d97928c5b9340d9363c8e9ec0d2bf276976268e8d76aa365ed",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/source-receipt.json",
+			"expected": "fd42494d7e1ab4884ed8cb41d1cd8df26c885a4ecb287480dd15f6e63dcf6e7b",
+			"current": "1b5b7bb1b4b0e614c692f188c134253f5d7cfb455df2ead74342977414506c50",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/linux/source-receipt.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "linux/coverage.json",
+			"expected": "80484a424d6cf974501a948c205918ed9ebdd6751c9e5f29b829e74f7c91155c",
+			"current": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/linux/coverage.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "linux/findings.json",
+			"expected": "23c5928f286e95bf101611e809d7174d152a6a796c245df24d7067a94c7d3a1e",
+			"current": "e2d520d4ea5804a262fd620343d44780cc8631817775b4053fa197965120da86",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/linux/findings.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "linux/report.md",
+			"expected": "73493878ee5c20a3a19b06be800707875887a89d4d1862d4b4883d83069fc1cd",
+			"current": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8",
+			"resolution": "exact_original_copy_with_explicit_editorial_correction",
+			"original_bytes": "validation/original-submissions/linux/report.md.txt",
+			"custody_notes": "validation/custody-notes.md"
+		},
+		{
+			"path": "linux/final-proofs/receipts.json",
+			"expected": "248954f92f93f115ddc6624890339c6f8226c8b447b686b7c3383fd0dc53f935",
+			"current": "3570f789a083f989d7224f0223f765ca24de53e307cb78c72c7b78abfe5148a3",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/linux/final-proofs/receipts.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "linux/false-green-baseline.txt",
+			"expected": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"current": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/handoff.json",
+			"expected": "fc8da6ba3a6037f8abd0443d994b3e48af55a6431bc450ac66f1af08bf904f41",
+			"current": "f9ad6ed847cdbd6b5511b43f2036f5ea7d88da7f44b26ecc4ca826ad5b5901d7",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/linux/handoff.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+			"expected": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"current": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-owner.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_caps_word_auto_off.stdout.txt",
+			"expected": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"current": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_caps_word_auto_off.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_caps_word_auto_off_policy.stdout.txt",
+			"expected": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"current": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_caps_word_auto_off_policy.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"expected": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"current": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"expected": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"current": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"expected": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"current": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_injector_caps_lock.stdout.txt",
+			"expected": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"current": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_injector_caps_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_injector_output_observer.stdout.txt",
+			"expected": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"current": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_injector_output_observer.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_caps_word_auto_off_menu.stdout.txt",
+			"expected": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"current": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_caps_word_auto_off_menu.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-owner.stdout.txt",
+			"expected": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"current": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-owner.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_caps_word_auto_off.stdout.txt",
+			"expected": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"current": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_caps_word_auto_off.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_caps_word_auto_off_policy.stdout.txt",
+			"expected": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"current": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_caps_word_auto_off_policy.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"expected": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"current": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"expected": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"current": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"expected": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"current": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_injector_caps_lock.stdout.txt",
+			"expected": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"current": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_injector_caps_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_injector_output_observer.stdout.txt",
+			"expected": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"current": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_injector_output_observer.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_caps_word_auto_off_menu.stdout.txt",
+			"expected": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"current": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_caps_word_auto_off_menu.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-owner.stdout.txt",
+			"expected": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"current": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-owner.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_caps_word_auto_off.stdout.txt",
+			"expected": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"current": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_caps_word_auto_off.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_caps_word_auto_off_policy.stdout.txt",
+			"expected": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"current": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_caps_word_auto_off_policy.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"expected": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"current": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"expected": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"current": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"expected": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"current": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_injector_caps_lock.stdout.txt",
+			"expected": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"current": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_injector_caps_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_injector_output_observer.stdout.txt",
+			"expected": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"current": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_injector_output_observer.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_caps_word_auto_off_menu.stdout.txt",
+			"expected": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"current": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_caps_word_auto_off_menu.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-owner.stdout.txt",
+			"expected": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"current": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-owner.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_caps_word_auto_off.stdout.txt",
+			"expected": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"current": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_caps_word_auto_off.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_caps_word_auto_off_policy.stdout.txt",
+			"expected": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"current": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_caps_word_auto_off_policy.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"expected": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"current": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"expected": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"current": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"expected": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"current": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_injector_caps_lock.stdout.txt",
+			"expected": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"current": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_injector_caps_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_injector_output_observer.stdout.txt",
+			"expected": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"current": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_injector_output_observer.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_caps_word_auto_off_menu.stdout.txt",
+			"expected": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"current": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_caps_word_auto_off_menu.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/pre-isolation-proofs/receipts.json",
+			"expected": "9f8929e8148e9b7912fb7d93ef08a974ef798e549f3348c6bbf2b8ebe4f156e0",
+			"current": "886dd5e71f7ee70a720cf2476abdc5d4bc5c44239d94073d0da4a80d81e5e05b",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/linux/pre-isolation-proofs/receipts.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-owner.stdout.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-owner.stderr.txt",
+			"expected": "91b3e4285f53dbef132f6844fed4cac86888ea7e538b27b8d25fcd3d9dd510b6",
+			"current": "91b3e4285f53dbef132f6844fed4cac86888ea7e538b27b8d25fcd3d9dd510b6",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/owner-initial.lua.txt",
+			"expected": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50",
+			"current": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proof-run.txt",
+			"expected": "8751da209fa3e8bedca55112ba170344dce09cff9c92dcb00f4e47ff593fbb5f",
+			"current": "8751da209fa3e8bedca55112ba170344dce09cff9c92dcb00f4e47ff593fbb5f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proof-isolated.txt",
+			"expected": "186e908177fee0d4571bf8694911c547d7c57d8a139a3eeaca539eff2c5bd6e8",
+			"current": "186e908177fee0d4571bf8694911c547d7c57d8a139a3eeaca539eff2c5bd6e8",
+			"resolution": "current_archive"
+		}
+	],
+	"handoff_byte_resolution": {
+		"path": "linux/handoff.json",
+		"expected": "fc8da6ba3a6037f8abd0443d994b3e48af55a6431bc450ac66f1af08bf904f41",
+		"current": "f9ad6ed847cdbd6b5511b43f2036f5ea7d88da7f44b26ecc4ca826ad5b5901d7",
+		"resolution": "exact_original_copy",
+		"original_bytes": "validation/original-submissions/linux/handoff.json.txt",
+		"json_values_equal": true
+	},
+	"final_format_qualification": "Six JSON files changed presentation with JSON value equality and exact originals retained. Original worker/receipt hashes remain unchanged. Python, Lua, Markdown and raw output files were not rewritten.",
+	"independent_source_replay": {
+		"exit_code": 0,
+		"parsed_matches_worker": true,
+		"source_files": 27,
+		"wiring_contracts": 5
+	},
+	"editorial_correction": {
+		"path": "linux/report.md",
+		"original_bytes": "validation/original-submissions/linux/report.md.txt",
+		"original_sha256": "73493878ee5c20a3a19b06be800707875887a89d4d1862d4b4883d83069fc1cd",
+		"corrected_sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8",
+		"notes": "validation/custody-notes.md",
+		"qualification": "Editorial correction of unsupported byte-identical standalone claim; not formatting-only or semantic-equivalence proof. Actual unchanged owner later passed both process-private TMPDIR sweeps. Suspected temporary-name collision was not reconstructed."
+	}
+}

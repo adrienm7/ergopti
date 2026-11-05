@@ -1,0 +1,33 @@
+
+=== CapsWord watcher: pointer kinds follow the settings ===
+  ok   pointer motion ends CapsWord only while it is checked
+  ok   maps button 2 to the middle click and every other button to other buttons
+  ok   the bare-touch hook is a gesture kind
+  ok   watches keystrokes too, so a delimiter needs no Karabiner exit
+
+=== CapsWord watcher: a typed delimiter ends CapsWord only when checked ===
+  ok   Space ends CapsWord at once, CapsLock off before the next letter
+  ok   an unchecked Space leaves CapsWord on
+  ok   a no-break space ends CapsWord only through its own entry
+  ok   a keystroke without an active CapsWord costs no write
+
+=== CapsWord watcher: the inactivity delay ===
+  ok   never arms a timer at 0 (never)
+  ok   ends CapsWord when the delay passes after the activation
+  ok   measures from the last keystroke
+  ok   a Karabiner exit and the watcher stop cancel the timer
+  ok   a CapsWord the driver switched on itself starts the delay
+
+=== CapsWord watcher: the shipped defaults end CapsWord on typed punctuation ===
+  ok   ends CapsWord on "."
+  ok   ends CapsWord on ","
+  ok   ends CapsWord on ";"
+  ok   ends CapsWord on " ;"
+  ok   ends CapsWord on " "
+  ok   ends CapsWord on " "
+  ok   arms the shipped inactivity delay at the activation
+
+=== CapsWord watcher: text the driver types ends CapsWord on a delimiter ===
+  ok   a hotstring or replayed delimiter in the driver's output ends CapsWord
+  ok   the relay is inert without an active CapsWord and after the watcher stops
+AUDIT_RESULT	22	0

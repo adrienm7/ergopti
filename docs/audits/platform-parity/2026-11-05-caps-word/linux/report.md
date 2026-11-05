@@ -1,0 +1,209 @@
+> **Custody clarification added during root integration:** The submitted report
+> below overstates the earlier standalone diagnostic as using the exact owner
+> program. That diagnostic used an instrumented program with different bytes; no
+> retained byte-identical standalone receipt predates TMPDIR isolation. The owner
+> SHA is identical in the failed parallel batch and both later process-private
+> TMPDIR sweeps, so no owner assertion was changed between those runs. The
+> suspected temporary-name collision was not reconstructed and is not an
+> established causal repair. This is an editorial correction, not a claim of
+> formatting-only or semantic equivalence to the original submission. The exact
+> original report and worker handoff hash remain preserved; see
+> [custody notes](../validation/custody-notes.md).
+
+# Linux CapsWord caller and settings audit
+
+Audited source: `f2a7dba5fc580aad61e6a0ed16ede84406aed2b0`.
+Date: November 5, 2026. Scope: Linux CapsWord only.
+
+## Result
+
+Two actionable Linux roots are retained: absolute pointer motion never reaches
+the declared motion auto-off option, and acknowledged menu changes do not reach
+the active session's policy. Both execute actual owning Lua code; neither claims
+a physical compositor or receiving application result. The shared reviewer owns
+fractional-delay rounding and renamed-magic-key discrepancies; their Linux
+controls are corroboration, not two more Linux findings.
+
+The retained program has **55 observation rows**. Eight existing registered
+modules execute **88 positive cases per runtime per sweep**. Two final bounded
+sweeps each run the decisive program and all eight modules under genuine Lua 5.4
+and LuaJIT: **36 processes, all exit zero**. Repeated assertions and rows are not
+silently counted as distinct features or defects. Source receipts authenticate
+27 selected files and five grouped lexical wiring relationships; they do not
+cover every transitive dependency.
+
+## CW-L001 — absolute pointer motion is omitted
+
+Severity: low. Confidence: high. Guarantee: G2. Additional property: declared
+pointer-motion coverage.
+
+Before activation, set idle timeout to zero, `gesture=false` and
+`pointer_motion=true`. An actual `device_finder.parse_devices` /
+`select_pointers` call accepts a real-format Synaptics touchpad block with
+`B: EV=b`, selecting `/dev/input/event7`; no physical node is opened. Activate
+CapsWord. Feed the original pointer dispatch a `BTN_TOUCH` down, initial
+`EV_ABS/ABS_X=100`, `ABS_Y=200`, `SYN_REPORT`, followed by changed coordinates
+127 and 212 and another report. The recorded callback sees the press and frames,
+but no motion; CapsWord and the capture CapsLock remain on. A relative-mouse
+`EV_REL/REL_X=1` control sends motion and ends/unlocks that same session. Keeping
+the default gesture option checked ends the session on the initial touch, which
+explains why the omission can be masked by default settings.
+
+The original `adapters.keyboard_hook._dispatch_pointer` only publishes a motion
+callback for EV_REL. It has no EV_ABS branch. The declared Linux pointer-motion
+setting is not restricted to relative devices, and discovery explicitly accepts
+absolute pointers. Main's original source forwards the observed pointer kind to
+Manager and drops report frames; it cannot recover coordinates never published
+by Hook. The stream can continue normally with report callbacks, with no source
+branch reporting the omitted absolute classification.
+
+The ABI names are genuine Linux UAPI: EV_ABS=3, ABS_X=0, ABS_Y=1 and
+BTN_TOUCH=0x14a, independently checked against this host's kernel header and
+recorded separately from the Git-pinned sources. The coordinate change is
+meaningful, not just a repeated initial position. The prior Linux gesture audit
+owns a different root: clearing retained per-slot multitouch coordinates. This
+finding does not count that root again.
+
+Future regression: drive accepted absolute pointer input through the actual
+reader/pump, establish prior coordinates, change one axis, and publish the frame.
+With gesture disabled, motion checked and idle zero, end/unlock exactly once;
+unchecking motion must keep the session. Preserve relative-mouse and default
+contact controls. Native pointer acquisition/compositor receiving remains a
+separate qualification.
+
+## CW-L002 — menu publication and active policy disagree
+
+Severity: medium. Confidence: high. Guarantee: G2. Additional property: live
+configuration consistency.
+
+The physical menu precondition matters: **disable all six pointer auto-off kinds
+before activation**, so moving to and clicking the menu does not already end the
+session. The probe then activates CapsWord through Manager's actual catalogue
+handler. Two original submenu callbacks are decisive:
+
+1. Space is initially checked. Invoke its original callback, which acknowledges
+   its write and updates the cached settings/policy to unchecked. The next typed
+   space nevertheless ends/unlocks the running session. After a fresh activation,
+   the same unchecked space correctly keeps CapsWord on.
+2. Left-click is initially unchecked. Invoke its original callback to enable it.
+   The actual rebuilt submenu is checked; the cached policy says true and a menu
+   change notification occurred. The next original Hook BTN_LEFT dispatch still
+   keeps the session/lock on. After restarting CapsWord, the same click ends it.
+
+These callbacks are obtained from the original `ui.menu.menu_shortcuts.build`
+code. The outer renderer call selecting the unrelated full shortcuts menu is
+intercepted to retain its actual CapsWord group closure. The actual group closure,
+settings owner and shared renderer execute unchanged. The real root menu module
+installs its production translation helper. No production function body is copied
+or reimplemented, and no native tray click is claimed.
+
+The exact contradiction is documented in `ui/menu/menu_shortcuts.lua`: each
+change "applies to the CapsWord running now from its next event". The settings
+owner writes successfully and `publish` replaces its policy table, but
+`manager.start_caps_word` retains the earlier table in `_caps_word_policy`.
+Subsequent text, control and pointer observers continue using it. A new activation
+reads the new policy and works, which refutes a persistence failure.
+
+The same root appears in direct public-setting controls: idle zero changed to
+one second leaves an active zero-timeout session with no expiry chain; ten
+seconds changed to one still uses the old ten-second expiry. These are not extra
+findings, and the direct setter controls alone do not claim native menu receiving.
+The different documented treatment of an external file edit taking effect at the
+next activation does not settle the explicitly promised live menu path.
+
+Existing menu tests assert saved values/rebuilt checkboxes. Existing session
+cases choose their policy before activation, and the hand-edit case stops the
+first session before changing its file. Thus all those cases can pass while the
+publication-to-live-session transition is wrong.
+
+Future regression: exercise original callbacks against an active Manager/Hook,
+with the all-pointer-off precondition, for both directions of every pointer and
+terminator choice. After acknowledgement, the next event must follow the new
+setting without restarting. Cover idle zero-to-positive, shorter/longer and
+positive-to-zero, native timer admission and old-session generation protection;
+keep write-refusal and next-activation controls.
+
+## Other precise comparisons and refutations
+
+- **Modifier-only idle:** a physical Shift press/release at 9 seconds reaches the
+  actual Hook physical callback but no semantic text/control callback. The
+  ten-second session therefore expires at 10 seconds. A physical Left-arrow at
+  9 seconds produces a real control event and moves expiry to 19 seconds. Main's
+  source stamps CapsWord only from text/control input, not physical metrics.
+  This is an observed cross-OS difference with product intent not established;
+  no additional defect is forced from the broad word "keystroke".
+- **Tiny positive delay:** 0.0001 seconds compiles to idle_ms zero and the actual
+  high-resolution fixture queues immediate work; running it at the same clock
+  ends/unlocks. Exact zero creates no idle work and stays active at 100 seconds;
+  0.001 seconds expires at one millisecond. The shared reviewer owns this common
+  rounding root. This controls monotonic time/resolution; it is not a native
+  latency measurement.
+- **Renamed magic key:** real `MagicKey.set("§")` persists and reports §, and
+  real `HotstringsConfig.set_magic_key` accepts it before fresh activation with
+  only `star` checked. The original submenu draws checked "§ : Touche magique".
+  § nevertheless keeps CapsWord on while literal ★ ends it. Linux's config
+  setter stores magic-key catalogue metadata; no Linux production caller of
+  `Terminators.update_magic_key` was found in the source search. This differs
+  from the macOS mutation path and must not be described as the same exercised
+  call chain. Shared adjudication owns the comparison.
+- **Existing CapsLock:** the actual Hook rides a lock already on without native
+  CapsLock taps, then leaves the user's lock on. This is explicit documented
+  ownership, not failure to unlock.
+- **Non-locking keymap:** an XKB backend where CapsLock changes no lock refuses
+  activation before a desktop CapsLock tap; no phantom active session is kept.
+- **Manual CapsLock:** a physical CapsLock ends the hold and session without a
+  compensating second toggle. Stop, public pause cancellation, manager init and
+  disabling shortcuts all end/unlock the owned session.
+- **Pointer classes:** checked/unchecked left, right, middle, other buttons and
+  contact gesture controls use the original dispatch and actual policy/manager.
+  Absolute motion is the omitted route; report frames are not motion. The
+  general pointer stream remains a recording port, not physical acquisition.
+- **Delimiters:** all eight defaults, NBSP/NNBSP, multi-scalar spaced punctuation,
+  bare Tab/Enter, modified Ctrl+Tab, unchecked Tab, and non-delimiter text have
+  executable positive/refusal controls. Text payload controls do not claim an
+  actual IME or remapped-layout commit occurred.
+- **Synthetic output/lock debt:** the existing registered injector CapsLock and
+  output-observer modules execute positive event-sequence controls. The original
+  Hook lock module covers pre-output retry, unknown-output debt, recursive
+  retirement, reseed and modal custody. These are retained positive coverage,
+  not a claim that an indeterminate desktop lock is somehow acknowledged.
+
+## Test trust, replay and limits
+
+The actual Hook pointer function is retrieved from `Hook.pump` using Lua debug
+upvalues, and its source identity is authenticated before use. Only its native
+callback ports are replaced. The callback records the original notifications
+and forwards their kinds to the actual Manager. Main itself is not booted;
+its forwarding is source evidence checked separately. The physical-key seam
+runs the actual input-event encoder, reader and Hook dispatch over a recording
+reader backend. The actual XKB adapter, emitter, broker and uinput writer run
+over faithful native ports, with a manually controlled clock/deferred queue.
+The small XKB backend models CapsLock/Shift and a few text keys, not an arbitrary
+system layout. Full device enumeration, kernel lock LEDs, input composition,
+Wayland/X11 policy and receiving application behavior remain unexecuted.
+
+An initial parallel verification batch had one LuaJIT owner fixture assertion
+fail in the zero-idle control; the exact owner program passed standalone. The
+shared sandbox source constructs names from time, random and sequence, without
+process identity, so concurrent processes sharing /tmp can collide. The exact
+collision was not reconstructed and no driver root is inferred from that failure.
+The final orchestrator gives each process an exclusive fresh TMPDIR, preserving
+all assertions and deadlines. Both final sweeps pass. The unsuccessful batch,
+its raw failure, source-identical owner snapshot and standalone diagnostic remain
+retained rather than being turned into a fictitious first-pass success.
+
+Replay with the repository's genuine Lua 5.4/LuaJIT/native Lua modules on PATH,
+LOGNAME=agent and a process-private TMPDIR:
+
+```sh
+python3 source-probe.py /path/to/ergopti --output /tmp/capsword-sources.json
+python3 run-proofs.py /path/to/ergopti --output /tmp/capsword-proofs
+```
+
+`run-proofs.py` owns per-process scratch isolation. The mechanical false-green
+ratchet remains zero versus zero, but cannot certify semantic stub adequacy.
+All 55 observation assertions, actual native-port shapes and existing test
+exports were inspected with that limit in mind. No production source or
+registered test was changed. No performance log, G4 latency or long-duration
+memory measurement is claimed; queued retired-session closures/native timer and
+CapsLock custody remain a qualified memory/lifecycle watch-list.

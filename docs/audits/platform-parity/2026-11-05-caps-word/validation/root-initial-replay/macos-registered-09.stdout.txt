@@ -1,0 +1,4 @@
+
+=== TextSender reports driver output to CapsWord ===
+  ok   an accepted text reaches the CapsWord relay, a refused one does not
+AUDIT_RESULT	1	0

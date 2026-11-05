@@ -1,0 +1,52 @@
+{
+	"schema_version": 1,
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"role": "macos",
+	"findings": [
+		{
+			"id": "CW-M001",
+			"title": "Changing the live idle delay can leave CapsWord without an expiry timer",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["live_applied_idle_policy"],
+			"basis": "actual-owner",
+			"qualification": "Actual menu renderer/callback, settings policy and watcher; recorded timer/eventtap/writer ports. All pointer auto-off kinds are disabled before activation so using the menu does not end the session. Persistence is an accepted save port, not a disk receipt. No native CapsLock receiving or elapsed-latency measurement.",
+			"reproduction": "Set every shortcuts.caps_word.pointer kind false and idle_timeout_seconds=0, activate CapsWord, choose the real menu 1-second preset, accept saving, type an ordinary letter, and advance controlled monotonic time more than 1 second after it. The real policy is now1000ms and the menu accepted, but no timer exists and no clear is requested. Alternatively start10seconds, choose1, type a letter, and cross the new idle deadline: the old10-second timer is the first chance to clear. Positive controls: a fresh1-second activation clears;1\u21920 suppresses the existing timer;1\u219210 reschedules; the next activation acquires1second; refused save restores0; delimiter checkbox changes act on the next key.",
+			"root_cause": "menu_caps_word.commit calls CapsWordAutoOff.apply_state, replacing the policy immediately. No timer owner is notified. start_capsword_idle_clock runs only on activation and note_capsword_activated; handle_capsword_event/output update the last-activity timestamp but never acquire a missing timer or reschedule an earlier deadline. An existing callback reads the new policy, producing asymmetric live behavior rather than a deliberate per-session snapshot.",
+			"silent_failure": "The menu applies/saves/refreshes successfully. Timer absence is not an error and no callback later diagnoses an active session lacking its newly selected deadline.",
+			"regression_test": "Drive actual menu callback with pointer exits disabled, an active session, and recorded native scheduler. Test0\u21921,10\u21921,1\u21920,1\u219210,1\u21920\u21921, successful/refused save, next typed key, activation and lifecycle teardown. Assert the chosen effective deadline is enforced without duplicate/stale timers; preserve deliberately different Windows next-activation policy.",
+			"evidence": ["public-idle.lua", "dry-B/public-idle.lua.stdout.txt"]
+		},
+		{
+			"id": "CW-M002",
+			"title": "Inactive pointer traffic masks the first checked pointer event after activation",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["checked_pointer_deactivation"],
+			"basis": "actual-owner",
+			"qualification": "Actual watcher, real serialized variable owner and real control-sentinel owner over recorded CLI/timer/eventtap/LED ports. Controlled timestamps establish ordering; no measured native timing or physical lock outcome.",
+			"reproduction": "With default pointer kinds enabled and idle0, send mouseMoved while CapsWord is inactive at1000s. Activate through the exact-token native control signal at1000.01s; send one checked click/gesture/scroll at1000.05s. CapsWord remains logically active, no CLI clear task exists, and no LED-off request occurs. Fresh activation without the earlier inactive pointer clears on that same click; a click at1000.1s clears; a typed delimiter at50ms bypasses the throttle.",
+			"root_cause": "deactivate_capsword updates _capsword_last_check_ns before asking supersede_capsword_activation whether any active intent exists. Activation does not reset that throttle. The shared100ms check is applied to all non-immediate pointer kinds, including discrete clicks and touch/gesture events, not only repeated motion.",
+			"silent_failure": "The early return neither logs nor retains the discrete event. A later physical pointer event or another terminator can clear it; that later success does not replay the lost event.",
+			"regression_test": "Exercise inactive pointer\u2192activation\u2192single checked discrete pointer inside100ms through actual control/event owners, every enabled/disabled pointer kind, exact threshold, continuous-motion coalescing and a fresh activation. Preserve cheap motion throttling while never borrowing a prior inactive session timestamp to discard a new session exit.",
+			"evidence": ["public-admission.lua", "dry-B/public-admission.lua.stdout.txt"]
+		},
+		{
+			"id": "CW-M003",
+			"title": "A previous clear pending completion masks a fresh activation's delimiter",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G3"],
+			"additional_properties": ["capsword_deactivation_admission"],
+			"basis": "actual-owner",
+			"qualification": "Actual watcher plus real KeVariables/control-sentinel owners. The native-port fixture explicitly separates a published CLI payload from its pending process-exit callback, permitting the generated variable_unless activation path. The native ordering window is controlled, not physically reproduced.",
+			"reproduction": "Idle0 and a checked space. Activate CapsWord, let a pointer request an asynchronous clear, then publish that task's exact capsword0 payload while holding its completion callback. With the native variable now0, deliver a valid new activation1 control edge. Type a checked space while the previous clear completion is still pending. Logical activation remains1, no second clear is queued and no immediate LED-off is requested. Complete the old task without applying its already-published payload twice: revision guards correctly preserve the newer activation, but the space is never replayed. A later second space clears it.",
+			"root_cause": "_capsword_check_pending represents the previous asynchronous clear but is not reset/revision-scoped on a newly observed activation. deactivate_capsword returns at that flag even for an immediate typed delimiter. The old callback eventually releases the flag and discards its stale LED effect, but there is no retained latest deactivation intent to retry.",
+			"silent_failure": "The intended pending-operation suppression emits no refusal and retains no deferred delimiter intent. Old-writer completion reports successful settlement even though the newer activation's exit was dropped.",
+			"regression_test": "Split actual serialized writer publication and callback delivery, admit a newer exact-token activation only after publication0, then deliver a checked delimiter or accepted driver-output delimiter before old completion. Assert current-generation clear is retained/admitted and eventually enforced, with no stale LED reset, duplicate native writes, wrong-token publication or replay after teardown.",
+			"evidence": ["public-admission.lua", "dry-B/public-admission.lua.stdout.txt"]
+		}
+	]
+}

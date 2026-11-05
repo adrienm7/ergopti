@@ -1,0 +1,25 @@
+find-false-greens: tests that cannot fail
+
+  ok        0  tautology        baseline 0
+         Assertion that cannot fail (Assert(true) / assert_true(true))
+
+  ok        0  vacuous-absence  baseline 0
+         Absence assertion on a _DriverFuncBodyOrEmpty() that may be empty
+
+  ok        0  dead-test        baseline 0
+         Test body that asserts nothing, or a Test() never registered
+
+  ok        0  pcall-only       baseline 0
+         Assertion on a pcall status — proves "did not crash", nothing else
+
+  ok        0  corpus-skip      baseline 0
+         Early return when a corpus could not be loaded — a missing contract passes
+
+  ok        0  unfloored-scan   baseline 0
+         Source-scan loop that never asserts it matched anything
+
+  Not detectable here — hunt these by hand (see the false-green-tests skill):
+   - a harness that stubs the very function the test claims to verify
+   - a source-grep pinning the current SPELLING of the code, not the invariant
+
+find-false-greens: within baseline (0 vs 0).

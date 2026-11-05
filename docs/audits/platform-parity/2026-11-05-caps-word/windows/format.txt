@@ -1,0 +1,8 @@
+../../../scratch/parity-capsword-2026-11-05/windows/report.md 157ms (unchanged)
+../../../scratch/parity-capsword-2026-11-05/windows/coverage.json 232ms (unchanged)
+../../../scratch/parity-capsword-2026-11-05/windows/findings.json 9ms
+../../../scratch/parity-capsword-2026-11-05/windows/source-contract.json 14ms (unchanged)
+../../../scratch/parity-capsword-2026-11-05/windows/dry-A.json 17ms (unchanged)
+../../../scratch/parity-capsword-2026-11-05/windows/dry-B.json 8ms (unchanged)
+../../../scratch/parity-capsword-2026-11-05/windows/reader-controls.json 4ms (unchanged)
+../../../scratch/parity-capsword-2026-11-05/windows/prior-search.json 3ms (unchanged)

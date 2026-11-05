@@ -1,0 +1,6 @@
+
+=== CapsWord auto-off settings owner ===
+  ok   takes the pointer kinds and defaults from the manifest
+  ok   applies a valid state and keeps the previous one on refusal
+  ok   persists through Preferences at the manifest paths
+AUDIT_RESULT	3	0

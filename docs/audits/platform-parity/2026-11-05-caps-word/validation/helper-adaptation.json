@@ -1,0 +1,34 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"module": "caps-word",
+	"roles": ["windows", "macos", "linux", "shared"],
+	"files": [
+		{
+			"path": "project.py",
+			"sha256": "71af0c4422830cd68ecbc2fc1562d5c3a8f32ad2231eb590ed1872cf3e7c2260",
+			"adapted_from": "docs/audits/platform-parity/2026-11-05-undo-repeat/project.py",
+			"source_sha256": "9e4409b9542a67e8d465e133c0e4e2d34df7000720dfff4114e9f7e055dbacab"
+		},
+		{
+			"path": "check_project.py",
+			"sha256": "fd33058bb255d06223ae3cc44bce466a864d104c634574224e80c9a69dd03892",
+			"adapted_from": "docs/audits/platform-parity/2026-11-05-undo-repeat/check_project.py",
+			"source_sha256": "19aa74e36d2b46194558b6e93b4180d1efd4c885f641e986e2c0e4f9aa567133"
+		},
+		{
+			"path": "sample-owner.json",
+			"sha256": "edeba45db2bbecd9270957aa4c56b8ec6331bc0c10d3a44cce0701b12cd3af22",
+			"adapted_from": "docs/audits/platform-parity/2026-11-05-undo-repeat/sample-owner.json",
+			"source_sha256": "96528e60aeb10083416856be5a729bb65891a83e518a0fcb62b19177b748678e"
+		},
+		{
+			"path": "README.md",
+			"sha256": "aecc12f0ef0b0963d12c926e3a3febb50b165e817d549d1754e56c77c65622a9",
+			"adapted_from": "docs/audits/platform-parity/2026-11-05-undo-repeat/README.md",
+			"source_sha256": "0b0818f76a51b2b047187ed1035c4399345506e3c1bfdb605c74b78bb68eb00e"
+		}
+	],
+	"python_adaptation": "AST-identical to the previous helpers after explicit source/module/title/test-fixture label rebinding; no validator or rejection control logic relaxed.",
+	"limits": "This is a custom composite metadata and artifact custody validator, not the legacy AHK/HS report envelope or a runtime/native parity certificate.",
+	"synthetic_sample": "sample-owner.json and the temporary metadata fixtures are illustrative only, never audit evidence."
+}

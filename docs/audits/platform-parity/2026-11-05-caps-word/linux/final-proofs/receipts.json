@@ -1,0 +1,672 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"program_sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50",
+	"runner_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+	"qualification": "Actual Lua owners over controlled native ports; no native compositor or receiving application. Registered cases are existing test coverage, not new independently observed defects.",
+	"processes": [
+		{
+			"name": "A-lua-owner",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/owner-probe.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux"
+			],
+			"exit_code": 0,
+			"stdout": "A-lua-owner.stdout.txt",
+			"stderr": "A-lua-owner.stderr.txt",
+			"stdout_sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": 55
+		},
+		{
+			"name": "A-lua-test_caps_word_auto_off",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off"
+			],
+			"exit_code": 0,
+			"stdout": "A-lua-test_caps_word_auto_off.stdout.txt",
+			"stderr": "A-lua-test_caps_word_auto_off.stderr.txt",
+			"stdout_sha256": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 34
+			}
+		},
+		{
+			"name": "A-lua-test_caps_word_auto_off_policy",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off_policy"
+			],
+			"exit_code": 0,
+			"stdout": "A-lua-test_caps_word_auto_off_policy.stdout.txt",
+			"stderr": "A-lua-test_caps_word_auto_off_policy.stderr.txt",
+			"stdout_sha256": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 8
+			}
+		},
+		{
+			"name": "A-lua-test_keyboard_hook_caps_word_lock",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_word_lock"
+			],
+			"exit_code": 0,
+			"stdout": "A-lua-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"stderr": "A-lua-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"stdout_sha256": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 28
+			}
+		},
+		{
+			"name": "A-lua-test_keyboard_hook_caps_lock_state",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_state"
+			],
+			"exit_code": 0,
+			"stdout": "A-lua-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"stderr": "A-lua-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"stdout_sha256": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 1
+			}
+		},
+		{
+			"name": "A-lua-test_keyboard_hook_caps_lock_seed",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_seed"
+			],
+			"exit_code": 0,
+			"stdout": "A-lua-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"stderr": "A-lua-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"stdout_sha256": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 8
+			}
+		},
+		{
+			"name": "A-lua-test_injector_caps_lock",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.injector.test_injector_caps_lock"
+			],
+			"exit_code": 0,
+			"stdout": "A-lua-test_injector_caps_lock.stdout.txt",
+			"stderr": "A-lua-test_injector_caps_lock.stderr.txt",
+			"stdout_sha256": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 2
+			}
+		},
+		{
+			"name": "A-lua-test_injector_output_observer",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.injector.test_injector_output_observer"
+			],
+			"exit_code": 0,
+			"stdout": "A-lua-test_injector_output_observer.stdout.txt",
+			"stderr": "A-lua-test_injector_output_observer.stderr.txt",
+			"stdout_sha256": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 4
+			}
+		},
+		{
+			"name": "A-lua-test_caps_word_auto_off_menu",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.ui.menu.shortcuts.test_caps_word_auto_off_menu"
+			],
+			"exit_code": 0,
+			"stdout": "A-lua-test_caps_word_auto_off_menu.stdout.txt",
+			"stderr": "A-lua-test_caps_word_auto_off_menu.stderr.txt",
+			"stdout_sha256": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 3
+			}
+		},
+		{
+			"name": "A-luajit-owner",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/owner-probe.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux"
+			],
+			"exit_code": 0,
+			"stdout": "A-luajit-owner.stdout.txt",
+			"stderr": "A-luajit-owner.stderr.txt",
+			"stdout_sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": 55
+		},
+		{
+			"name": "A-luajit-test_caps_word_auto_off",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off"
+			],
+			"exit_code": 0,
+			"stdout": "A-luajit-test_caps_word_auto_off.stdout.txt",
+			"stderr": "A-luajit-test_caps_word_auto_off.stderr.txt",
+			"stdout_sha256": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 34
+			}
+		},
+		{
+			"name": "A-luajit-test_caps_word_auto_off_policy",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off_policy"
+			],
+			"exit_code": 0,
+			"stdout": "A-luajit-test_caps_word_auto_off_policy.stdout.txt",
+			"stderr": "A-luajit-test_caps_word_auto_off_policy.stderr.txt",
+			"stdout_sha256": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 8
+			}
+		},
+		{
+			"name": "A-luajit-test_keyboard_hook_caps_word_lock",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_word_lock"
+			],
+			"exit_code": 0,
+			"stdout": "A-luajit-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"stderr": "A-luajit-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"stdout_sha256": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 28
+			}
+		},
+		{
+			"name": "A-luajit-test_keyboard_hook_caps_lock_state",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_state"
+			],
+			"exit_code": 0,
+			"stdout": "A-luajit-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"stderr": "A-luajit-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"stdout_sha256": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 1
+			}
+		},
+		{
+			"name": "A-luajit-test_keyboard_hook_caps_lock_seed",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_seed"
+			],
+			"exit_code": 0,
+			"stdout": "A-luajit-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"stderr": "A-luajit-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"stdout_sha256": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 8
+			}
+		},
+		{
+			"name": "A-luajit-test_injector_caps_lock",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.injector.test_injector_caps_lock"
+			],
+			"exit_code": 0,
+			"stdout": "A-luajit-test_injector_caps_lock.stdout.txt",
+			"stderr": "A-luajit-test_injector_caps_lock.stderr.txt",
+			"stdout_sha256": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 2
+			}
+		},
+		{
+			"name": "A-luajit-test_injector_output_observer",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.injector.test_injector_output_observer"
+			],
+			"exit_code": 0,
+			"stdout": "A-luajit-test_injector_output_observer.stdout.txt",
+			"stderr": "A-luajit-test_injector_output_observer.stderr.txt",
+			"stdout_sha256": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 4
+			}
+		},
+		{
+			"name": "A-luajit-test_caps_word_auto_off_menu",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.ui.menu.shortcuts.test_caps_word_auto_off_menu"
+			],
+			"exit_code": 0,
+			"stdout": "A-luajit-test_caps_word_auto_off_menu.stdout.txt",
+			"stderr": "A-luajit-test_caps_word_auto_off_menu.stderr.txt",
+			"stdout_sha256": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 3
+			}
+		},
+		{
+			"name": "B-lua-owner",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/owner-probe.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux"
+			],
+			"exit_code": 0,
+			"stdout": "B-lua-owner.stdout.txt",
+			"stderr": "B-lua-owner.stderr.txt",
+			"stdout_sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": 55
+		},
+		{
+			"name": "B-lua-test_caps_word_auto_off",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off"
+			],
+			"exit_code": 0,
+			"stdout": "B-lua-test_caps_word_auto_off.stdout.txt",
+			"stderr": "B-lua-test_caps_word_auto_off.stderr.txt",
+			"stdout_sha256": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 34
+			}
+		},
+		{
+			"name": "B-lua-test_caps_word_auto_off_policy",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off_policy"
+			],
+			"exit_code": 0,
+			"stdout": "B-lua-test_caps_word_auto_off_policy.stdout.txt",
+			"stderr": "B-lua-test_caps_word_auto_off_policy.stderr.txt",
+			"stdout_sha256": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 8
+			}
+		},
+		{
+			"name": "B-lua-test_keyboard_hook_caps_word_lock",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_word_lock"
+			],
+			"exit_code": 0,
+			"stdout": "B-lua-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"stderr": "B-lua-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"stdout_sha256": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 28
+			}
+		},
+		{
+			"name": "B-lua-test_keyboard_hook_caps_lock_state",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_state"
+			],
+			"exit_code": 0,
+			"stdout": "B-lua-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"stderr": "B-lua-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"stdout_sha256": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 1
+			}
+		},
+		{
+			"name": "B-lua-test_keyboard_hook_caps_lock_seed",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_seed"
+			],
+			"exit_code": 0,
+			"stdout": "B-lua-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"stderr": "B-lua-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"stdout_sha256": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 8
+			}
+		},
+		{
+			"name": "B-lua-test_injector_caps_lock",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.injector.test_injector_caps_lock"
+			],
+			"exit_code": 0,
+			"stdout": "B-lua-test_injector_caps_lock.stdout.txt",
+			"stderr": "B-lua-test_injector_caps_lock.stderr.txt",
+			"stdout_sha256": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 2
+			}
+		},
+		{
+			"name": "B-lua-test_injector_output_observer",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.injector.test_injector_output_observer"
+			],
+			"exit_code": 0,
+			"stdout": "B-lua-test_injector_output_observer.stdout.txt",
+			"stderr": "B-lua-test_injector_output_observer.stderr.txt",
+			"stdout_sha256": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 4
+			}
+		},
+		{
+			"name": "B-lua-test_caps_word_auto_off_menu",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.ui.menu.shortcuts.test_caps_word_auto_off_menu"
+			],
+			"exit_code": 0,
+			"stdout": "B-lua-test_caps_word_auto_off_menu.stdout.txt",
+			"stderr": "B-lua-test_caps_word_auto_off_menu.stderr.txt",
+			"stdout_sha256": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 3
+			}
+		},
+		{
+			"name": "B-luajit-owner",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/owner-probe.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux"
+			],
+			"exit_code": 0,
+			"stdout": "B-luajit-owner.stdout.txt",
+			"stderr": "B-luajit-owner.stderr.txt",
+			"stdout_sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": 55
+		},
+		{
+			"name": "B-luajit-test_caps_word_auto_off",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off"
+			],
+			"exit_code": 0,
+			"stdout": "B-luajit-test_caps_word_auto_off.stdout.txt",
+			"stderr": "B-luajit-test_caps_word_auto_off.stderr.txt",
+			"stdout_sha256": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 34
+			}
+		},
+		{
+			"name": "B-luajit-test_caps_word_auto_off_policy",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off_policy"
+			],
+			"exit_code": 0,
+			"stdout": "B-luajit-test_caps_word_auto_off_policy.stdout.txt",
+			"stderr": "B-luajit-test_caps_word_auto_off_policy.stderr.txt",
+			"stdout_sha256": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 8
+			}
+		},
+		{
+			"name": "B-luajit-test_keyboard_hook_caps_word_lock",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_word_lock"
+			],
+			"exit_code": 0,
+			"stdout": "B-luajit-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"stderr": "B-luajit-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"stdout_sha256": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 28
+			}
+		},
+		{
+			"name": "B-luajit-test_keyboard_hook_caps_lock_state",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_state"
+			],
+			"exit_code": 0,
+			"stdout": "B-luajit-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"stderr": "B-luajit-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"stdout_sha256": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 1
+			}
+		},
+		{
+			"name": "B-luajit-test_keyboard_hook_caps_lock_seed",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_seed"
+			],
+			"exit_code": 0,
+			"stdout": "B-luajit-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"stderr": "B-luajit-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"stdout_sha256": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 8
+			}
+		},
+		{
+			"name": "B-luajit-test_injector_caps_lock",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.injector.test_injector_caps_lock"
+			],
+			"exit_code": 0,
+			"stdout": "B-luajit-test_injector_caps_lock.stdout.txt",
+			"stderr": "B-luajit-test_injector_caps_lock.stderr.txt",
+			"stdout_sha256": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 2
+			}
+		},
+		{
+			"name": "B-luajit-test_injector_output_observer",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.modules.hotstrings.injector.test_injector_output_observer"
+			],
+			"exit_code": 0,
+			"stdout": "B-luajit-test_injector_output_observer.stdout.txt",
+			"stderr": "B-luajit-test_injector_output_observer.stderr.txt",
+			"stdout_sha256": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 4
+			}
+		},
+		{
+			"name": "B-luajit-test_caps_word_auto_off_menu",
+			"command": [
+				"luajit",
+				"/workspace/scratch/parity-capsword-2026-11-05/linux/run-registered.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/linux",
+				"tests.unit.ui.menu.shortcuts.test_caps_word_auto_off_menu"
+			],
+			"exit_code": 0,
+			"stdout": "B-luajit-test_caps_word_auto_off_menu.stdout.txt",
+			"stderr": "B-luajit-test_caps_word_auto_off_menu.stderr.txt",
+			"stdout_sha256": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"observations": {
+				"failed": 0,
+				"failures": {},
+				"passed": 3
+			}
+		}
+	]
+}

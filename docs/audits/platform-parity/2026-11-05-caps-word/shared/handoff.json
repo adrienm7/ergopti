@@ -1,0 +1,229 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"role": "shared",
+	"module": "CapsWord",
+	"findings": ["CW-S001", "CW-S002"],
+	"coverage_rows": 25,
+	"source_paths": 49,
+	"actual_policy": {
+		"registered_cases": 8,
+		"corpus_assertions": 166,
+		"extended_assertions": 116,
+		"total_assertions_per_runtime": 282,
+		"runtimes": ["Lua5.4", "LuaJIT"],
+		"catalogue_keys": 25,
+		"catalogue_characters": 26
+	},
+	"declarations": {
+		"rows": 8,
+		"generated_os_flags": 24,
+		"locales": 21
+	},
+	"dry_sweeps": {
+		"count": 2,
+		"processes_each": 6,
+		"all_exit_zero": true,
+		"qualification": "After last new root CW-S002; repeated bounded evidence, no extra distinct coverage."
+	},
+	"source_qualification": "Actual shared owners; Windows expressions source-only; no physical native keyboard or timer receiving. Public menu/event consequences are qualified and re-derived in OS roles and by root.",
+	"worktree_state": "No tracked changes. Owned node_modules symlink to /workspace/ergopti/node_modules may be unlinked at retirement.",
+	"artifacts": [
+		{
+			"path": "capabilities.json",
+			"sha256": "416985aa8b2222e61524ae55479e17b0c32378976f48d86ecb741d3946609400"
+		},
+		{
+			"path": "coverage.json",
+			"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+		},
+		{
+			"path": "declaration-probe.cjs",
+			"sha256": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a"
+		},
+		{
+			"path": "declarations.txt",
+			"sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d"
+		},
+		{
+			"path": "dry-A-declarations.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-A-declarations.txt",
+			"sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d"
+		},
+		{
+			"path": "dry-A-magic-lua54.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-A-magic-lua54.txt",
+			"sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c"
+		},
+		{
+			"path": "dry-A-magic-luajit.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-A-magic-luajit.txt",
+			"sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c"
+		},
+		{
+			"path": "dry-A-pinned-source.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-A-pinned-source.txt",
+			"sha256": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b"
+		},
+		{
+			"path": "dry-A-policy-lua54.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-A-policy-lua54.txt",
+			"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+		},
+		{
+			"path": "dry-A-policy-luajit.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-A-policy-luajit.txt",
+			"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+		},
+		{
+			"path": "dry-B-declarations.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-B-declarations.txt",
+			"sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d"
+		},
+		{
+			"path": "dry-B-magic-lua54.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-B-magic-lua54.txt",
+			"sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c"
+		},
+		{
+			"path": "dry-B-magic-luajit.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-B-magic-luajit.txt",
+			"sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c"
+		},
+		{
+			"path": "dry-B-pinned-source.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-B-pinned-source.txt",
+			"sha256": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b"
+		},
+		{
+			"path": "dry-B-policy-lua54.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-B-policy-lua54.txt",
+			"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+		},
+		{
+			"path": "dry-B-policy-luajit.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-B-policy-luajit.txt",
+			"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+		},
+		{
+			"path": "dry-format.txt",
+			"sha256": "bde5ac6c92de79a956d5b0368979c6bf86682b0043fb53d1b3dcf0764291894f"
+		},
+		{
+			"path": "dry-receipts.json",
+			"sha256": "a5d5de64363234a44bf19f759dfe123e105c61d0381befde377e59f162d762d6"
+		},
+		{
+			"path": "false-greens.txt",
+			"sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a"
+		},
+		{
+			"path": "final-format.txt",
+			"sha256": "59861b7ea2e6100122aa6ad9cd4a196f4677dc81bee63ba38a8a3b0b08ea538b"
+		},
+		{
+			"path": "findings.json",
+			"sha256": "f2563fc5c68fe5ee0f54a54b492ce813650c1821fb91097194bac33896e69d99"
+		},
+		{
+			"path": "format.txt",
+			"sha256": "826384b55271325bce9c9152abf3caf262303d0d4d5ebd0af936ae531d67b715"
+		},
+		{
+			"path": "handoff-format.txt",
+			"sha256": "13afb27a07e61bf9065e3ef4fd351af6e8c14d2a478e0ae1ad6dcb151b749834"
+		},
+		{
+			"path": "magic-key-lua54.txt",
+			"sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c"
+		},
+		{
+			"path": "magic-key-luajit.txt",
+			"sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c"
+		},
+		{
+			"path": "magic-key-policy.lua",
+			"sha256": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d"
+		},
+		{
+			"path": "policy-lua54.txt",
+			"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+		},
+		{
+			"path": "policy-luajit.txt",
+			"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+		},
+		{
+			"path": "policy-probe.lua",
+			"sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1"
+		},
+		{
+			"path": "report.md",
+			"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+		},
+		{
+			"path": "ruff-check.txt",
+			"sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+		},
+		{
+			"path": "ruff-format.txt",
+			"sha256": "96a977f329ec3c59092d40e041a019b49dcf03ca04055e177aa0ccb8c27234df"
+		},
+		{
+			"path": "run-dry.py",
+			"sha256": "bb7b0d9cbb46246dc1593ded7428381d3740eded270380745b929624cb810469"
+		},
+		{
+			"path": "single-source-gate.txt",
+			"sha256": "5415f06627ee7f77437588395924c27f0b14f49a61dc295d32fc3e3b34457772"
+		},
+		{
+			"path": "source-contract.py",
+			"sha256": "a453c9252b9ca4dd393fca5238b91f67bff63bf03cbf958ce0a40fa32debb3df"
+		},
+		{
+			"path": "source-contract.txt",
+			"sha256": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b"
+		},
+		{
+			"path": "source-receipt.json",
+			"sha256": "03eb82c4b22e758717f36306e44c67d60205f1f0929ade0839c3e495f1cbecf4"
+		}
+	],
+	"capability_candidates": 8
+}

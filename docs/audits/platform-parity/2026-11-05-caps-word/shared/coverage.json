@@ -1,0 +1,207 @@
+[
+	{
+		"id": "CW-S-C01",
+		"aspect": "Eight parameter declarations and requirements",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["declaration-probe.cjs", "declarations.txt"],
+		"qualification": "Actual feature model: all eight are settings. Supported macOS rows require Karabiner, Linux requires evdev/uinput, and Windows requires none. No native availability certification."
+	},
+	{
+		"id": "CW-S-C02",
+		"aspect": "Idle default/recommended/neutral and closed presets",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["declaration-probe.cjs", "declarations.txt"],
+		"qualification": "Both default and recommended are 10 s; presets are 0, 1, 3, 5, 10, 30, 60. A setting does not independently activate CapsWord. The actual menu has no free-entry command."
+	},
+	{
+		"id": "CW-S-C03",
+		"aspect": "Zero idle is disabled",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["policy-probe.lua", "dry-A-policy-lua54.txt", "dry-A-policy-luajit.txt"],
+		"qualification": "Actual shared corpus and extended zero control; AHK uses a zero sentinel rather than Lua nil."
+	},
+	{
+		"id": "CW-S-C04",
+		"aspect": "Exact idle thresholds and fraction2.5s",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["policy-probe.lua", "dry-A-policy-lua54.txt"],
+		"qualification": "Corpus covers before, at and after thresholds; extended 0.5 ms and 1 ms accepted values expire at 1 ms after quantization. Controlled numeric clocks only."
+	},
+	{
+		"id": "CW-S-C05",
+		"aspect": "Sub-millisecond positive idle quantization",
+		"outcome": "observed-defect",
+		"basis": "actual-owner",
+		"evidence": ["policy-probe.lua", "source-contract.txt"],
+		"qualification": "CW-S001: measured Lua policy outputs, source-only AHK comparison. Handwritten configuration edge; no shipped preset affected."
+	},
+	{
+		"id": "CW-S-C06",
+		"aspect": "Finite upper-edge millisecond overflow",
+		"outcome": "qualified-gap",
+		"basis": "actual-owner",
+		"evidence": ["policy-probe.lua", "dry-A-policy-luajit.txt"],
+		"qualification": "1e308 seconds is accepted and converted to positive infinity. Policy-only result; native timer admission and Windows arithmetic are unexecuted. No separate confirmed finding."
+	},
+	{
+		"id": "CW-S-C07",
+		"aspect": "Eight shipped delimiters",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["declaration-probe.cjs", "declarations.txt"],
+		"qualification": "Shared-model default and recommended lists agree: space, nbsp, nnbsp, tab, enter, comma, semicolon, period."
+	},
+	{
+		"id": "CW-S-C08",
+		"aspect": "Every built-in character selectable and uncheckable",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["policy-probe.lua", "dry-A-policy-lua54.txt"],
+		"qualification": "All 25 built-in slots and 26 characters; generated catalogue source, not native key delivery."
+	},
+	{
+		"id": "CW-S-C09",
+		"aspect": "CR and LF share one Enter slot",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["policy-probe.lua", "dry-A-policy-luajit.txt"],
+		"qualification": "One Enter key owns two scalar spellings. A mixed CRLF text payload is covered. Physical Return and keypad receiving are driver-owned."
+	},
+	{
+		"id": "CW-S-C10",
+		"aspect": "Unicode French spaces and mixed scalar payloads",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["policy-probe.lua", "dry-A-policy-lua54.txt"],
+		"qualification": "Independent NBSP/NNBSP and astral-prefix controls prove any checked character anywhere in a valid UTF-8 payload can terminate."
+	},
+	{
+		"id": "CW-S-C11",
+		"aspect": "Unchecked punctuation remains active",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["policy-probe.lua", "dry-A-policy-luajit.txt"],
+		"qualification": "Unchecked dot versus comma, star versus section sign, and the empty-policy controls. Physical remap decoding is not covered by the shared policy."
+	},
+	{
+		"id": "CW-S-C12",
+		"aspect": "Unknown native semantic keys refuse",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["policy-probe.lua", "dry-A-policy-lua54.txt"],
+		"qualification": "Actual registered corpus asserts throws for spacebar, return, empty and separator: these are not accepted semantic aliases."
+	},
+	{
+		"id": "CW-S-C13",
+		"aspect": "Only built-in delimiters offered",
+		"outcome": "explicit-intent",
+		"basis": "actual-owner",
+		"evidence": ["policy-probe.lua", "dry-A-policy-luajit.txt"],
+		"qualification": "A custom hotstring delimiter appended at runtime has no CapsWord choice and cannot compile. The built-in-only rule is explicit in policy and corpus."
+	},
+	{
+		"id": "CW-S-C14",
+		"aspect": "Six pointer identities declared",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["declaration-probe.cjs", "declarations.txt"],
+		"qualification": "Gesture, pointer_motion, left_click, right_click, middle_click, other_buttons. Driver mapping and native event delivery remain separate."
+	},
+	{
+		"id": "CW-S-C15",
+		"aspect": "Windows gesture exclusion and reason",
+		"outcome": "explicit-intent",
+		"basis": "actual-owner",
+		"evidence": ["declaration-probe.cjs", "declarations.txt"],
+		"qualification": "Gesture is declared only for macOS/Linux because Windows keeps touchpad gestures. Its shared reason is present in all 21 locales."
+	},
+	{
+		"id": "CW-S-C16",
+		"aspect": "Pointer false/true and undeclared-kind refusal",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["policy-probe.lua", "dry-A-policy-lua54.txt"],
+		"qualification": "Actual corpus covers all-true, all-false and gesture-only switches, plus undeclared-kind throws. No native pointer input executed."
+	},
+	{
+		"id": "CW-S-C17",
+		"aspect": "Malformed policy values refuse by reason",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["policy-probe.lua", "dry-A-policy-luajit.txt"],
+		"qualification": "Actual 14 compile vectors plus NaN, infinite, negative and type controls. Not every malformed developer-owned pointer array is covered."
+	},
+	{
+		"id": "CW-S-C18",
+		"aspect": "Canonical checkbox list order and duplicates",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["policy-probe.lua", "dry-A-policy-lua54.txt"],
+		"qualification": "Registered corpus checks addition, removal and order, and refuses duplicate, unknown and type cases. Configuration-load cleanup is driver-owned."
+	},
+	{
+		"id": "CW-S-C19",
+		"aspect": "Site projection matches8\u00d73platformflags",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["declaration-probe.cjs", "declarations.txt"],
+		"qualification": "Twenty-four actual generated flags agree with the shared model. Declaration is not semantic or hardware proof."
+	},
+	{
+		"id": "CW-S-C20",
+		"aspect": "Every required caption/reason exists in21locales",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["declaration-probe.cjs", "declarations.txt"],
+		"qualification": "Actual caption and required reason values are nonempty in all current 21 locale JSON files. Translation quality is not measured."
+	},
+	{
+		"id": "CW-S-C21",
+		"aspect": "CapsWord action aliases are equivalents",
+		"outcome": "explicit-intent",
+		"basis": "actual-owner",
+		"evidence": ["declaration-probe.cjs", "declarations.txt"],
+		"qualification": "The aliases are explicitly equivalent action identities, not identical repeated-invocation semantics: Windows and Linux toggle; macOS catalogue activation sets the variable to one, while generated physical Karabiner activation is guarded when already active. Common intended re-invocation policy is not established."
+	},
+	{
+		"id": "CW-S-C22",
+		"aspect": "CapsLock action remains distinct",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["declaration-probe.cjs", "declarations.txt"],
+		"qualification": "toggle_capslock is declared on all OSes; caps_lock spelling differs by OS. Existing-user-lock restoration requires actual driver receipts."
+	},
+	{
+		"id": "CW-S-C23",
+		"aspect": "Policy snapshot versus live-apply ownership",
+		"outcome": "documentation-only",
+		"basis": "source",
+		"evidence": ["source-contract.py", "source-contract.txt"],
+		"qualification": "Windows explicitly publishes settings for the next activation. Linux Manager stores an activation snapshot, but its real menu promises changes apply to the running session on the next event; this contradiction is being adjudicated in the Linux scope. macOS owner explicitly publishes live apply for the next event. Shared policy alone does not establish all driver timer scheduling."
+	},
+	{
+		"id": "CW-S-C24",
+		"aspect": "Two final bounded dry sweeps",
+		"outcome": "present",
+		"basis": "actual-owner",
+		"evidence": ["run-dry.py", "dry-receipts.json"],
+		"qualification": "Final A/B sweeps each run six processes, including both magic-key characterizations after CW-S002. No additional root was found in this bounded scope; repetitions do not add distinct coverage or certify native parity."
+	},
+	{
+		"id": "CW-S-C25",
+		"aspect": "Renamed magic-key caption versus active CapsWord delimiter",
+		"outcome": "observed-defect",
+		"basis": "actual-owner",
+		"evidence": [
+			"magic-key-policy.lua",
+			"magic-key-lua54.txt",
+			"magic-key-luajit.txt",
+			"source-receipt.json"
+		],
+		"qualification": "CW-S002: actual shared load/mutation characterization and exact menu source; public caller corroboration belongs to the macOS/Linux roles and root replay. Local literal-versus-dynamic intent remains unresolved. Windows fresh literal catalogue is explicit, full caption not claimed."
+	}
+]

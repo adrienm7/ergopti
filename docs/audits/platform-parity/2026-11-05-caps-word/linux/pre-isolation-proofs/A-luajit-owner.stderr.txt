@@ -1,0 +1,6 @@
+/workspace/scratch/parity-toolchain/LuaJIT-2.1/src/luajit: ...scratch/parity-capsword-2026-11-05/linux/owner-probe.lua:70: zero-never-idle: ...scratch/parity-capsword-2026-11-05/linux/owner-probe.lua:77: assertion failed!
+stack traceback:
+	[C]: in function 'assert'
+	...scratch/parity-capsword-2026-11-05/linux/owner-probe.lua:70: in function 'scenario'
+	...scratch/parity-capsword-2026-11-05/linux/owner-probe.lua:77: in main chunk
+	[C]: at 0x55c428c4c360

@@ -1,0 +1,826 @@
+{
+	"source_head": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"qualification": "Actual owners over controlled native ports and registered tests; Windows lexical only. Source checks authenticate their named owners, not every transitive dependency. Repeated registered cases are not additional unique coverage or desktop receiving.",
+	"processes": [
+		{
+			"name": "windows-source",
+			"program": "windows/source-contract.py",
+			"program_sha256": "56aca858f306bec79a9d5666b910af08a7fe1637a3b55dafe50edc27be815c36",
+			"command": [
+				"python3",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/windows/source-contract.py",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "7a1671cad69f7dbf6d1e3c5eef454c0bf3682b02473d1da5ab8a8940d6d72ccd",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-public-idle",
+			"program": "macos/public-idle.lua",
+			"program_sha256": "aab48159ff81b48b2574e0d2ece6f38d4d46f4f48ef953906280fb0b12e7be92",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/public-idle.lua",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "9710ad985fc56ce56266416387be05babdf47cf4cd4f6adc5c3d68d86d411f5d",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-public-admission",
+			"program": "macos/public-admission.lua",
+			"program_sha256": "5f3cf50a5ace190fb6f76805347d04ed951fbab304bb6725c06f04aafb62eec4",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/public-admission.lua",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-public-payload",
+			"program": "macos/public-payload.lua",
+			"program_sha256": "359a223dda1ba16dde70b591ba53efbd0036577f435ca090e48ed1b912e7737a",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/public-payload.lua",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "1a7cbb8368ed6c946304d8378c3ce028d0901c853d22a037cd072b129955603c",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-public-magic-menu",
+			"program": "macos/public-magic-menu.lua",
+			"program_sha256": "d0c0e45567325400fced7045d75413cf22099a63b788d78181ffe0e4943b2429",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/public-magic-menu.lua",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-activation-graph",
+			"program": "macos/activation-graph.lua",
+			"program_sha256": "c77c851812240d83dfef6c5bf7a455aa392734de61927ef347b36a2710f4bda0",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/activation-graph.lua",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-owner-lua",
+			"program": "linux/owner-probe.lua",
+			"program_sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/owner-probe.lua",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "shared-policy-lua",
+			"program": "shared/policy-probe.lua",
+			"program_sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/shared/policy-probe.lua",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "shared-magic-lua",
+			"program": "shared/magic-key-policy.lua",
+			"program_sha256": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/shared/magic-key-policy.lua",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "root-policy-lua",
+			"program": "validation/root-policy-boundaries.lua",
+			"program_sha256": "2af33cc3c1e50253b07762e7af77b93a25bc4e4997964def19bbc480315d6895",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/validation/root-policy-boundaries.lua",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "56b1b39a4ab1041c33ce33e9b483642a5f52dce52daabf1e7bd8e152f8d97fe3",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "root-fixed-exits-lua",
+			"program": "validation/root-fixed-exits.lua",
+			"program_sha256": "c3fbaf3bdd37a3af0ccc699168bd0ce35c64c16d9381a6c3252a0f662f62be5f",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/validation/root-fixed-exits.lua",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "3db661641ecab69ae80882b88b8a5135d338d4f9a9bfe5323ad19aae6599103d",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-owner-luajit",
+			"program": "linux/owner-probe.lua",
+			"program_sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/owner-probe.lua",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "shared-policy-luajit",
+			"program": "shared/policy-probe.lua",
+			"program_sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/shared/policy-probe.lua",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "shared-magic-luajit",
+			"program": "shared/magic-key-policy.lua",
+			"program_sha256": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/shared/magic-key-policy.lua",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "root-policy-luajit",
+			"program": "validation/root-policy-boundaries.lua",
+			"program_sha256": "2af33cc3c1e50253b07762e7af77b93a25bc4e4997964def19bbc480315d6895",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/validation/root-policy-boundaries.lua",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "56b1b39a4ab1041c33ce33e9b483642a5f52dce52daabf1e7bd8e152f8d97fe3",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "root-fixed-exits-luajit",
+			"program": "validation/root-fixed-exits.lua",
+			"program_sha256": "c3fbaf3bdd37a3af0ccc699168bd0ce35c64c16d9381a6c3252a0f662f62be5f",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/validation/root-fixed-exits.lua",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "3db661641ecab69ae80882b88b8a5135d338d4f9a9bfe5323ad19aae6599103d",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-source",
+			"program": "linux/source-probe.py",
+			"program_sha256": "98323f37fea813d97928c5b9340d9363c8e9ec0d2bf276976268e8d76aa365ed",
+			"command": [
+				"python3",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/source-probe.py",
+				"/workspace/ergopti"
+			],
+			"exit_code": 2,
+			"registered_counts": null,
+			"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stderr_sha256": "810ea0d6ff365375ecf42b9d916f14a98676d0da3011aaa0b386d90bcf6bcce1"
+		},
+		{
+			"name": "shared-source",
+			"program": "shared/source-contract.py",
+			"program_sha256": "a453c9252b9ca4dd393fca5238b91f67bff63bf03cbf958ce0a40fa32debb3df",
+			"command": [
+				"python3",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/shared/source-contract.py",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "shared-declarations",
+			"program": "shared/declaration-probe.cjs",
+			"program_sha256": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a",
+			"command": [
+				"node",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/shared/declaration-probe.cjs",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "metadata-controls",
+			"program": "check_project.py",
+			"program_sha256": "fd33058bb255d06223ae3cc44bce466a864d104c634574224e80c9a69dd03892",
+			"command": [
+				"python3",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/check_project.py",
+				"/workspace/ergopti"
+			],
+			"exit_code": 0,
+			"registered_counts": null,
+			"stdout_sha256": "b4adb90622bb6ef54a0b44c51b25e7354d30d4f1b85d5314fa1a9ba1aa17619b",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-registered-00",
+			"program": "macos/run-module.lua",
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests/unit/platform/remap/watchers/test_watchers_capsword"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 5,
+				"failed": 0
+			},
+			"stdout_sha256": "3e3eed9e196d80a836419fcd593b27d76eb695e21ae06b515afcc6d64cc1ea31",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-registered-01",
+			"program": "macos/run-module.lua",
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests/unit/platform/remap/watchers/test_watchers_capsword_auto_off"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 22,
+				"failed": 0
+			},
+			"stdout_sha256": "11b2f52d48dc7b5a8bc3f72e03a102808c5970904f04e34d20ba06acf4486b80",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-registered-02",
+			"program": "macos/run-module.lua",
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests/unit/platform/remap/watchers/test_watchers_capsword_release_race"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 15,
+				"failed": 0
+			},
+			"stdout_sha256": "42648aed25fa24834aa7c95f0ffda2a4ba071a57d51f76907e79bdc6aa94d801",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-registered-03",
+			"program": "macos/run-module.lua",
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests/unit/platform/remap/watchers/test_capsword_control_signal"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 2,
+				"failed": 0
+			},
+			"stdout_sha256": "86a040e48eb469f911d77e3f879f86476d6fc0d09109a85e79567b0fe74c4dee",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-registered-04",
+			"program": "macos/run-module.lua",
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests/unit/platform/remap/watchers/test_caps_word_auto_off_policy"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 8,
+				"failed": 0
+			},
+			"stdout_sha256": "18726e480113e4cbfc9e88d040ec754ab302643c1116c8635341582d73b6ec71",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-registered-05",
+			"program": "macos/run-module.lua",
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests/unit/platform/remap/watchers/test_watchers_teardown_retry"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 25,
+				"failed": 0
+			},
+			"stdout_sha256": "227cc495f08c87f2b8867b1b81e791a47f5607b19ff4dd4f0c162bf69a316c87",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-registered-06",
+			"program": "macos/run-module.lua",
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests/unit/platform/remap/generator/test_generator_capsword_setting_exits"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 2,
+				"failed": 0
+			},
+			"stdout_sha256": "4bebc4b31373df1237b98fb03059dd17898d00b04e1dfa2a4055d31cb187f52a",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-registered-07",
+			"program": "macos/run-module.lua",
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests/unit/infra/config/test_capsword_auto_off_settings"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 3,
+				"failed": 0
+			},
+			"stdout_sha256": "cb8b9b07a90cc6d8f4dbc5923af6920b5ec83e2940378841ce183847d9b6aa6a",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-registered-08",
+			"program": "macos/run-module.lua",
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests/unit/ui/menu/shortcuts/test_menu_caps_word"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 3,
+				"failed": 0
+			},
+			"stdout_sha256": "b31220758435ef1bd66ccf63aceea5bd09bfc589c5f8715dfe0a7fdd346d8a05",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-registered-09",
+			"program": "macos/run-module.lua",
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests/unit/adapters/synthetic_input/test_text_sender_capsword_output"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 1,
+				"failed": 0
+			},
+			"stdout_sha256": "0100a39c0c19d35c2ec3c310387c290e51bc1725693d9ab3d575dad5fd7c4f61",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-registered-10",
+			"program": "macos/run-module.lua",
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests/unit/modules/gestures/actions/test_karabiner_actions_reachable"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 25,
+				"failed": 0
+			},
+			"stdout_sha256": "9dcd3dff8e4fb47d44306ab8d3ffe2f2a7f94cd2cf01fbc58526ffdda7b6fcb4",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-registered-11",
+			"program": "macos/run-module.lua",
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests/unit/platform/remap/ke_lifecycle/test_ke_variables_serialized_batches"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 31,
+				"failed": 0
+			},
+			"stdout_sha256": "35c9bd365d7efc87f1b0f9dc6ebc1cf9f34ef2bc33e41aeea2583aaa179f6f93",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-registered-12",
+			"program": "macos/run-module.lua",
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests/meta/architecture/test_capsword_auto_off_single_source"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 3,
+				"failed": 0
+			},
+			"stdout_sha256": "46d88426486f89419bbcf2743190a20b57083def5e18edac93f87a5b5b88ffeb",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-registered-13",
+			"program": "macos/run-module.lua",
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests/meta/architecture/test_karabiner_capsword_lock_release"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 3,
+				"failed": 0
+			},
+			"stdout_sha256": "0c8805b9b221ec7f76caf04a7916c00e5aaad662c838369e0fc62be74156d45c",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-lua-00",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_seed"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 8,
+				"failed": 0
+			},
+			"stdout_sha256": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-lua-01",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_state"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 1,
+				"failed": 0
+			},
+			"stdout_sha256": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-lua-02",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_word_lock"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 28,
+				"failed": 0
+			},
+			"stdout_sha256": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-lua-03",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.modules.hotstrings.injector.test_injector_caps_lock"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 2,
+				"failed": 0
+			},
+			"stdout_sha256": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-lua-04",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.modules.hotstrings.injector.test_injector_output_observer"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 4,
+				"failed": 0
+			},
+			"stdout_sha256": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-lua-05",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 34,
+				"failed": 0
+			},
+			"stdout_sha256": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-lua-06",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off_policy"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 8,
+				"failed": 0
+			},
+			"stdout_sha256": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-lua-07",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.ui.menu.shortcuts.test_caps_word_auto_off_menu"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 3,
+				"failed": 0
+			},
+			"stdout_sha256": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-luajit-00",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_seed"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 8,
+				"failed": 0
+			},
+			"stdout_sha256": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-luajit-01",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_state"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 1,
+				"failed": 0
+			},
+			"stdout_sha256": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-luajit-02",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_word_lock"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 28,
+				"failed": 0
+			},
+			"stdout_sha256": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-luajit-03",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.modules.hotstrings.injector.test_injector_caps_lock"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 2,
+				"failed": 0
+			},
+			"stdout_sha256": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-luajit-04",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.modules.hotstrings.injector.test_injector_output_observer"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 4,
+				"failed": 0
+			},
+			"stdout_sha256": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-luajit-05",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 34,
+				"failed": 0
+			},
+			"stdout_sha256": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-luajit-06",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off_policy"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 8,
+				"failed": 0
+			},
+			"stdout_sha256": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-registered-luajit-07",
+			"program": "linux/run-registered.lua",
+			"program_sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-caps-word/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.ui.menu.shortcuts.test_caps_word_auto_off_menu"
+			],
+			"exit_code": 0,
+			"registered_counts": {
+				"passed": 3,
+				"failed": 0
+			},
+			"stdout_sha256": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		}
+	]
+}
