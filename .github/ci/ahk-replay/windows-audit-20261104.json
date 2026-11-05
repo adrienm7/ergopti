@@ -1,8 +1,8 @@
 {
 	"expected_count": 107,
-	"native_http_client_e2e": false,
+	"native_http_client_e2e": true,
 	"native_hotstring_e2e": true,
-	"native_proxy_relay_owner_e2e": false,
+	"native_proxy_relay_owner_e2e": true,
 	"filters": [
 		{
 			"contains": "model-browser-close-pause-owner",
