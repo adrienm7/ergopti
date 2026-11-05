@@ -104,7 +104,18 @@ elif command -v loginctl >/dev/null 2>&1; then
 				esac
 			done <<< "$properties"
 			case "$type:$remote:$class:$active" in
-				x11:no:user:yes|wayland:no:user:yes) enroll_user "$uid" ;;
+				x11:no:user:yes|wayland:no:user:yes)
+					# Incomplete sessions and system accounts are not candidates for
+					# keyboard access and must not abort setup for other users.
+					if [[ "$uid" =~ ^[0-9]+$ ]]; then
+						if [ "$uid" -ge 1000 ] && [ "$uid" -ne 65534 ]; then
+							enroll_user "$uid"
+						else
+							ergopti_msg permissions.non_desktop_account >&2
+						fi
+					else
+						ergopti_msg permissions.session_uninspectable "$session" >&2
+					fi ;;
 			esac
 		done <<< "$sessions"
 	else
