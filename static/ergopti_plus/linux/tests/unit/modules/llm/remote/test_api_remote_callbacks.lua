@@ -41,13 +41,14 @@ local function isolated(test, real_logger)
 	local calls, logs = {}, {}
 	package.loaded["adapters.http_client"] = {
 		post = function(url, headers, body, callback, options)
-			calls[#calls + 1] = { callback = callback, options = options }
+			calls[#calls + 1] = { url = url, callback = callback, options = options }
 			return true
 		end,
 		cancel = function() error("a settled callback must not cancel its successor") end,
 	}
 	local logger = real_logger and helpers.fresh_module("logger") or helpers.make_logger_stub()
 	if real_logger then
+		logger.set_level("debug")
 		logger.set_sink(function(line) logs[#logs + 1] = line end)
 	else
 		logger.error = function(owner, message, detail)
@@ -118,6 +119,18 @@ local function check_delivery(delivered, chunks, text, reason)
 end
 
 helpers.describe("api_remote_callbacks: safe reporting and callback ownership", function()
+	helpers.it("keeps private endpoint path out of real debug logs", function()
+		isolated(function(remote, calls, logs)
+			local secret = "private-path-token-729"
+			local url = "https://example.invalid/" .. secret
+			assert(remote.chat({ provider = "openai_compat", base_url = url, token = "fixture-key", model = "fixture-model" },
+				nil, { { role = "user", content = "hello" } }, { temperature = 0.2, max_tokens = 40 }, nil, function() end))
+			helpers.assert_contains(calls[1].url, secret, "the actual request still uses the configured path")
+			local lines = table.concat(logs, "\n")
+			helpers.assert_contains(lines, "chat()")
+			helpers.assert_nil(lines:find(secret, 1, true))
+		end, true)
+	end)
 	helpers.it("withholds callback text in the real formatted logger", function()
 		isolated(function(remote, calls, logs)
 			assert(start(remote, "openai", nil, function(text) error(text, 0) end))

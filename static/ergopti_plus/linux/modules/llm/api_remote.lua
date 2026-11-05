@@ -368,11 +368,11 @@ end
 --- Percent-encodes every byte outside the unreserved set.
 local percent_encode = TextUtils.percent_encode
 
---- Replaces credential-bearing query values before a URL is logged.
+--- Keeps user-configured endpoint addresses and credentials out of logs.
 --- @param url string
 --- @return string
-function M.redact_url(url)
-	return (tostring(url):gsub("([?&][Kk][Ee][Yy]=)[^&#]*", "%1<redacted>"))
+function M.redact_url(_url)
+	return "<endpoint redacted>"
 end
 
 --- The model an entry sends: its own, else the provider's default.
