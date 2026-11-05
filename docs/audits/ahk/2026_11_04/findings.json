@@ -1126,6 +1126,17 @@
 			"root_cause": "_I18nWriteTsvCache writes raw keys into tab/newline-delimited records; _I18nParseTSV treats those key characters as separators and still accepts the matching entry-count sentinel.",
 			"silent_failure": "Native run41969593070 at320cd51a8171a8b8ed84f74c46acb7e198768865 admits both corrupted caches with warm_ok1/warm_fast1/count1 but exact_key0. Cold JSON decoding and all three carriage/backslash/value controls pass; inverse order reproduces both failures.",
 			"regression_test": "Escape both cache fields through one codec, decode full keys, distinguish sentinel records from data and retire v2 caches. Five genuine cold/warm cases retain fail-before receipts; a sixth actual historical v2 control requires authoritative JSON regeneration. Windows owns this TSV format; the Lua drivers do not consume it. Post-fix native qualification pending."
+		},
+		{
+			"id": "AHK-103",
+			"title": "A physical wrapping trigger invalidates its own prewarmed selection capability",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Prewarm a nonempty current selection snapshot, then press its physical wrapping key in a later native clock tick while the snapshot is otherwise current. The callback observes a different physical input epoch and emits the bare symbol.",
+			"root_cause": "The strict UIASW_ConsumeSelectionSnapshot epoch guard is necessary, but WrapTextIfSelected has no fresh selection acquisition route for the triggering key itself. AutoHotkey2.0.26 hook.cpp updates g_TimeLastInputPhysical in KeybdEventIsPhysical before posting the hotkey callback, including a suppressed nonmodifier.",
+			"silent_failure": "Production reachability is source-derived from upstream v2.0.26 hook.cpp (SHA256 a57af3904a523710eed8872a62789c76583f2da41f79e5431439e5e404417a58), lines428/3056 before1807/2060. Native runs41954012438 and41960804242 reproduce the analogous no-hook RegisterHotKey/injected-input composition while the direct control passes. Neither is a physical-hardware or installed-hook input measurement; same-tick inputs can still match.",
+			"regression_test": "Keep the strict snapshot getter. Only an otherwise-valid epoch mismatch starts a new default async copy of the actual selection. Retain original target, lifecycle owner, command id and physical generation through final SendInstant; a settled same-context timeout alone may emit the original bare symbol. Four native fresh/current-empty/timeout/supersession cases and nine private cleanup/cancellation controls are integrated. Gesture transforms also retain their original target/admission across transformation as an098 sibling. Native post-fix qualification pending."
 		}
 	]
 }

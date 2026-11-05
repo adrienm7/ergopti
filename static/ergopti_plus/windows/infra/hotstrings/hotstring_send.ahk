@@ -504,9 +504,14 @@ _SendInstantTargetCurrent(Target) {
 	Current := _SendInstantCaptureTarget()
 	return Current is Map && Current["hwnd"] == Target["hwnd"]
 		&& Current["control"] == Target["control"] && Current["pid"] == Target["pid"]
+		&& (!Target.Has("admission") || (HasMethod(Target["admission"], "Call") && Target["admission"].Call()))
 }
 
-SendInstant(Text, Prefix := "") {
+SendInstant(Text, Prefix := "", ExpectedTarget := unset) {
+	; A deferred caller may narrow output to a target captured before its work.
+	; Never replace that older receipt with whatever became foreground later.
+	if IsSet(ExpectedTarget) && !_SendInstantTargetCurrent(ExpectedTarget)
+		return false
 	; Sends a large text through the clipboard while keeping Prefix (typically the
 	; hotstring erase sequence) in the SAME SendInput burst as Ctrl+V. Splitting
 	; these two injections lets a physical key land between erase and paste.
@@ -523,7 +528,7 @@ SendInstant(Text, Prefix := "") {
 			return false
 		}
 	}
-	Target := _SendInstantCaptureTarget()
+	Target := IsSet(ExpectedTarget) ? ExpectedTarget : _SendInstantCaptureTarget()
 	if !(Target is Map)
 		return false
 	; Reentrancy guard: a previous SendInstant's deferred restore has not run
@@ -781,6 +786,11 @@ GetSelectionAsync(OnReady, Ports := 0) {
 				return false
 		if !IsObject(OnReady)
 				throw TypeError("GetSelectionAsync requires a callback object")
+		if !(Ports is Map)
+				Ports := Map()
+		OnEmpty := Ports.Get("on_empty", 0)
+		if !((OnEmpty is Integer) && OnEmpty == 0) && !HasMethod(OnEmpty, "Call")
+				throw TypeError("The private selection on_empty option must be callable or zero")
 		CaptureId := ++_SelectionCaptureNextId
 
 		; The newest user command owns the clipboard capture. Finishing the prior
@@ -795,8 +805,6 @@ GetSelectionAsync(OnReady, Ports := 0) {
 		}
 		if A_IsSuspended or _SelectionCaptureNextId != CaptureId
 				return false
-		if !(Ports is Map)
-				Ports := Map()
 		SaveFn := Ports.Get("save", CB_SaveAll)
 		ClearFn := Ports.Get("clear", CB_ClearWithReceipt)
 		SendFn := Ports.Get("send", _SelectionSendCopy)
@@ -813,6 +821,7 @@ GetSelectionAsync(OnReady, Ports := 0) {
 		Job := Map(
 				"id", CaptureId,
 				"callback", OnReady,
+				"on_empty", OnEmpty,
 				"started", A_TickCount,
 				"physical_generation", GenerationFn.Call(),
 				"generation_fn", GenerationFn,
@@ -1090,13 +1099,19 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason, RestoreFn := 0,
 		if Job["expected_change"]
 				CB_CancelExpectedChange(Job["expected_change"])
 		OwnedSequence := Job["owned_sequence"]
-		if !CB_RestoreOwnedAllEventually(Job["clipboard"], OwnedSequence,
+		RestoreSettled := CB_RestoreOwnedAllEventually(Job["clipboard"], OwnedSequence,
 				Job["owner_token"], "selection_capture_" . Reason, true,
 				!OwnedSequence, RestoreFn, SequenceFn)
+		if !RestoreSettled
 				try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed ({1}).", Reason)
 		Job["clipboard"] := ""
 
-		if !Deliver || A_IsSuspended
+		; A timeout may spend its original key only after acknowledged cleanup.
+		; Cancellation and errors never become a late bare-symbol continuation.
+		OnEmpty := Job.Get("on_empty", 0)
+		DeliverEmpty := !Deliver && Reason == "timeout" && RestoreSettled
+				&& HasMethod(OnEmpty, "Call")
+		if (!Deliver && !DeliverEmpty) || A_IsSuspended
 				return
 		; Restoring ClipboardAll can yield after the job was retired. Reacquire
 		; its input context, then fence revocations which happened during either
@@ -1121,8 +1136,12 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason, RestoreFn := 0,
 		}
 		if A_IsSuspended or _SelectionCaptureNextId != Job["id"]
 				return
-		try Job["callback"].Call(Text)
-		catch as Err {
+		try {
+				if Deliver
+						Job["callback"].Call(Text)
+				else
+						OnEmpty.Call()
+		} catch as Err {
 				try LoggerError("hotstring_engine", "GetSelectionAsync callback failed: {1}", Err.Message)
 		}
 }

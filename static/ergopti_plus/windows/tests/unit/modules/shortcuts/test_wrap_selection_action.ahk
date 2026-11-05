@@ -99,7 +99,7 @@ _WRCF_ChildSource() {
 		AssertTrue(Owner != "", "The real native wrap dependency must exist: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["TickElapsed", "TickElapsed64", "WrapTextIfSelected", "WrapSymbols_IsEnabled", "GetUIASelection",
+	for Name in ["TickElapsed", "TickElapsed64", "WrapTextIfSelected", "_WrapSelectionNeedsFreshRead", "_WrapSelectionReady", "_WrapSelectionEmpty", "WrapSymbols_IsEnabled", "GetUIASelection",
 		"UIASW_ConsumeSelectionSnapshot", "_UIA_CurrentInputEpoch", "KS_GetPhysicalInputEpoch", "_SendInstantCaptureTarget", "_SendInstantTargetCurrent", "WIGetForegroundHwnd",
 		"WIGetFocusedControlToken", "_TextSenderNativeFocus", "_SendVerdictSucceeded", "_SendInstantReport", "_SendInstant_RestoreClipboard"] {
 		Definition := _DriverFuncBody(Name)
@@ -200,7 +200,7 @@ _WTE_ChildSource() {
 	Source := FSReadStrict(_DriverProductionFileForSymbol("GetUIASelection"))
 	AssertTrue(RegExMatch(Source, "m)^global UIA_SELECTION_MAX_AGE_MS := ([0-9]+)[ `t]*$", &Age))
 	Code .= "global UIA_SELECTION_MAX_AGE_MS := " . Integer(Age[1]) . "`n"
-	for Name in ["ErgoptiLayout_Action", "WrapTextIfSelected", "WrapSymbols_IsEnabled", "GetUIASelection",
+	for Name in ["ErgoptiLayout_Action", "WrapTextIfSelected", "_WrapSelectionNeedsFreshRead", "_WrapSelectionReady", "_WrapSelectionEmpty", "WrapSymbols_IsEnabled", "GetUIASelection",
 		"UIASW_ConsumeSelectionSnapshot", "_UIA_CurrentInputEpoch", "KS_GetPhysicalInputEpoch", "_SendInstantCaptureTarget", "_SendInstantTargetCurrent", "WIGetForegroundHwnd",
 		"WIGetFocusedControlToken", "TickElapsed", "SendInstant", "_SendInstantReport", "SendNewResult", "_SendVerdictSucceeded"] {
 		Definition := _DriverFuncBody(Name)
@@ -255,7 +255,7 @@ _WTE_Case(Mode) {
 	AssertTrue(Retired)
 }
 
-for _WTE_Mode in ["direct", "registered-hotkey"]
+for _WTE_Mode in ["direct"]
 	Test("wrap native trigger admission: " . _WTE_Mode . " (wrap-native-trigger-epoch)", _WTE_Case.Bind(_WTE_Mode))
 
 ; Real public gesture, real async clipboard capture; no fabricated admission ports.
@@ -272,14 +272,14 @@ _GTRF_ChildSource() {
 		"_SelectionCaptureStartCurrent", "_SelectionCaptureAbortStart", "_SelectionCaptureReleaseTimer",
 		"_SelectionCapturePoll", "_SelectionCaptureReadReady", "_SelectionCaptureProbeSequence",
 		"_SelectionCaptureFinish", "_SelectionCaptureCurrentContext", "_SelectionClipboardSequence",
-		"GetSelectionCancel", "KS_GetPhysicalInputGeneration", "_TextSenderAtSendLevel",
+		"GetSelectionCancel", "KS_GetPhysicalInputGeneration", "TapHoldNewOwner", "TapHoldOwnerCurrent", "_TextSenderAtSendLevel",
 		"KL_MarkSynthetic", "KL_ClearSynthetic", "TimingsGet", "IniCacheGet"]
 		Code .= _DriverFuncBody(Name) . "`n"
 	Copy := _DriverFuncBody("_SelectionSendCopy")
 	Copy := StrReplace(Copy, 'SendEvent.Bind("^c")', "_GTRF_NativeCopy", true, &Copies)
 	AssertEqual(1, Copies, "The real copy helper must delegate only its native transport to the owned-window guard.")
 	Code .= Copy . "`n"
-	Code .= "global _SelectionCaptureJob := false, _SelectionCaptureNextId := 0, _KS_PhysicalInputGeneration := 0`n"
+	Code .= "global _SelectionCaptureJob := false, _SelectionCaptureNextId := 0, _KS_PhysicalInputGeneration := 0, _TH_SyntheticEpoch := 0`n"
 	for Name in ["SELECTION_CAPTURE_POLL_MS", "GET_SELECTION_TIMEOUT_SEC", "TEXT_SENDER_SEND_LEVEL"] {
 		Pattern := "m)^global " . Name . " := ([0-9]+(?:\.[0-9]+)?)[ `t]*$"
 		Owner := Name == "SELECTION_CAPTURE_POLL_MS" ? "GetSelectionAsync" : Name == "GET_SELECTION_TIMEOUT_SEC" ? "HotstringEngineInit" : "_TextSenderAtSendLevel"
@@ -475,3 +475,67 @@ _GTTL_Case(Mode) {
 
 for _GTTL_Mode in ["current", "redirect"]
 	Test("gesture title transform native target: " . _GTTL_Mode . " (gesture-title-native-transform-target)", _GTTL_Case.Bind(_GTTL_Mode))
+
+
+_WFC_ChildSource() {
+	global _DriverDir
+	Code := _GTRF_ChildSource()
+	Suffix := FSReadStrict(_DriverDir . "\tests\fixtures\gesture_transform_render_focus_body.ahk")
+	AssertEqual(Suffix, SubStr(Code, -StrLen(Suffix)), "Only the unrelated renderer fixture entry may be replaced")
+	Code := SubStr(Code, 1, StrLen(Code) - StrLen(Suffix))
+	Code .= _DriverFuncBody("ErgoptiLayout_Action") . "`n"
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\wrap_fresh_selection_body.ahk")
+}
+_WFC_Case(Mode) {
+	global SEND_INSTANT_PASTE_DELAY_MS
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unretired owned clipboard probe prevents another native publisher.")
+	Root := A_Temp . "\ergopti_wrap_fresh_selection_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := false, Handle := 0, Primary := 0, Retired := false
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}
+	PreviousCritical := Critical("Off")
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The fixture must exclusively own its script and evidence directory.")
+		Script := Root . "\subject.ahk"
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _WFC_ChildSource()))
+		OwnerSource := FSReadStrict(_DriverProductionFileForSymbol("GetUIASelection"))
+		AssertTrue(RegExMatch(OwnerSource, "m)^global UIA_SELECTION_MAX_AGE_MS := ([0-9]+)[ `t]*$", &Age),
+			"The isolated child must receive the actual production snapshot age literal, not an unavailable harness global.")
+		MaxAge := Integer(Age[1])
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-wrap-fresh-selection", Mode,
+				String(SEND_INSTANT_PASTE_DELAY_MS), String(MaxAge)], _WRCF_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The exact native clipboard/render subject must start.")
+		Started := A_TickCount
+		while !State.Calls && TickElapsed(Started) < 12000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		_TestPrint("# wrap-fresh-selection " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+		AssertEqual(1, State.Calls, "The actual clipboard and native paste owner must settle exactly once.")
+		AssertEqual(0, State.Code, "The native wrap render focus probe failed: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText)
+		AssertContains(State.Output, "PASS wrap-fresh-selection " . Mode)
+	} catch as Err {
+		Primary := Err
+	}
+	try Retired := !IsObject(Handle) || ((Receipt := Handle.terminate()) is Integer && Receipt == 1)
+	catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	try {
+		if !Retired && Created
+			RetirementDebt := {Handle: Handle, Root: Root}
+		else if Retired && Created && !IsObject(Primary)
+			DirDelete(Root, true)
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The exact clipboard subject must retire before its script directory is removed.")
+}
+
+for _WFC_Mode in ["fresh", "empty", "timeout", "supersession"]
+	Test("wrap fresh selection native receiver: " . _WFC_Mode . " (wrap-native-fresh-selection)", _WFC_Case.Bind(_WFC_Mode))

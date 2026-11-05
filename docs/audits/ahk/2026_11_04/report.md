@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **102 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **103 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1715,3 +1715,15 @@ The correction escapes both fields with the same codec, decodes complete keys, d
 ## Personal-information encoding follow-up for AHK-068
 
 The same10-case native run proves an additional source-fidelity failure in the existing068 family: an unrelated public edit acknowledges success over invalid UTF-8 (92 original bytes become98) and an odd UTF-16 BOM image (191 become101). Neither reader latches refusal. All three genuine UTF-8, UTF-8 BOM and UTF-16 BOM controls pass, and both failures repeat in inverse order. Strict decoding of the same captured Buffer is being implemented; no extra distinct count is assigned to these source-preservation siblings.
+
+## AHK-103: A physical wrapping trigger invalidates its own prewarmed selection capability
+
+Severity: medium. Confidence: high. Evidence: production and upstream source ordering; analogous native composition.
+
+A physical wrapping key in a later clock tick invalidates the otherwise-current cached selection before its own callback consumes it. The epoch guard is necessary to refuse stale selection text. The missing part is a fresh acquisition path for this case.
+
+AutoHotkey2.0.26 [hook.cpp](https://github.com/AutoHotkey/AutoHotkey/blob/v2.0.26/source/hook.cpp) updates `g_TimeLastInputPhysical` in `KeybdEventIsPhysical` before posting the hotkey callback (lines428/3056 before1807/2060); the inspected file SHA256 is `a57af3904a523710eed8872a62789c76583f2da41f79e5431439e5e404417a58`. Suppressed nonmodifier keys still reach this update. The audited baseline already contains the strict consumer guard. Same-tick inputs and direct invocations can succeed; this finding does not claim every invocation fails.
+
+Runs41954012438 and41960804242 reproduce a no-hook RegisterHotKey/injected-input analogue with unchanged target and selection while the direct control passes. These runs are not physical-hardware or installed-hook input measurements. Production physical reachability is derived from the exact upstream ordering above.
+
+The correction retains the strict getter and starts a new default asynchronous copy only for an otherwise-valid snapshot rejected by epoch. It never promotes the old text or epoch. The original target, lifecycle owner, command id and input generation remain required at the final send. Only a same-context timeout whose cleanup debt has settled may type its original bare symbol; failed starts, empty successful captures, cancellation and supersession cannot. Four native composition cases and nine cleanup controls await post-fix qualification. Gesture transforms retain the same original-target admission across their actual work as a sibling of098.
