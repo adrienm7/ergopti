@@ -125,7 +125,10 @@ end
 function M.parse_system1(config, raw)
 	if type(raw) ~= "string" then return nil end
 	local intent = raw:match("[Ii][Nn][Tt][Ee][Nn][Tt]%s*:%s*([%a]+)")
-	local probability = tonumber(raw:match("[Pp][Rr][Oo][Bb][Aa][Bb][Ii][Ll][Ii][Tt][Yy]%s*:%s*([%d%.]+)"))
+	-- Read the whole token: stopping at the exponent of 0.7e-9 would turn
+	-- an almost-zero probability into 0.7 and spuriously wake System 2.
+	local token = raw:match("[Pp][Rr][Oo][Bb][Aa][Bb][Ii][Ll][Ii][Tt][Yy]%s*:%s*([^%s]+)")
+	local probability = token and token:match("^[%d%.eE%+%-]+$") and tonumber(token) or nil
 	if intent == nil or probability == nil then return nil end
 	intent = intent:lower()
 	local known = false

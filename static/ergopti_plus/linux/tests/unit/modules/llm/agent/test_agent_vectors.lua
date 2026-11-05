@@ -171,6 +171,15 @@ end)
 -- ============================================
 
 helpers.describe("agent actions stay inside the closed schema", function()
+	helpers.it("reads the full probability token before deciding whether to act", function()
+		local config = read_json("modules/llm/agent.json")
+		local result = Agent.parse_system1(config, "INTENT: calendar\nPROBABILITY: 0.7e-9")
+		helpers.assert_not_nil(result)
+		helpers.assert_eq(result.probability, 0.7e-9)
+		helpers.assert_eq(Agent.should_act(result, 0.7), false, "a tiny probability cannot trigger the agent")
+		helpers.assert_nil(Agent.parse_system1(config, "INTENT: mail\nPROBABILITY: 0.9%"))
+	end)
+
 	helpers.it("rejects malformed Unicode in model-generated action text", function()
 		local config = read_json("modules/llm/agent.json")
 		for _, invalid in ipairs({
