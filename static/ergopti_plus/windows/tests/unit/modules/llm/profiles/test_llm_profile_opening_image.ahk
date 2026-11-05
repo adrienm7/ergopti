@@ -609,15 +609,15 @@ _PFI_UnknownApiSelection(State) {
 Test("LLM profile opening source: explicit unknown API selection is preserved (llm-profile-projection-unknown-api)",
 	_PFI_Run.Bind("edit-preopen-api-unknown"))
 
-; Keep the default full-state collector: an LLM-only callback would hide the
-; actual non-LLM rows the public profile transaction writes in production.
+; Keep the production profile collector: this public regression first aligns
+; a real full-state source, then checks that editing LLM leaves other rows alone.
 _PFNL_Input(State, Prompt, Title, Options, Default := "") {
 	State.Inputs += 1
 	AssertTrue(Prompt != "" && Title != "")
 	return {Result: "OK", Value: State.Inputs == 1 ? "Edited A" : "edited-a"}
 }
 
-_PFNL_Case(External) {
+_PFNL_Case(External, Control := "") {
 	global Features, _LLM_Menu, _LLM_Menu_ProfileHotkeyOwner, _VendorDir
 	PreviousContext := _PEC_InstallFixture()
 	World := 0
@@ -656,8 +656,26 @@ _PFNL_Case(External) {
 		AssertTrue(ConfigFullStateCanPersist(), "The real current schema must admit this valid pre-opening external locale")
 		Port := Map("input", _PFNL_Input.Bind(State), "notify", _PFI_Notify.Bind(State),
 			"apply", ObjBindMethod(World, "ApplyCommitted"), "acquire", _LMT_Acquire, "settle", _LMT_Settle)
-		AssertFalse(Port.Has("collect"), "Only the genuine default full-save collector may serialize this public profile action")
+		if Control == "memory-rebase" {
+			State.MemoryRoot := Map("future_runtime_metadata", "retained")
+			Port["collect"] := _PFSC_CollectThenAddRoot.Bind(State)
+		} else if Control == "broad-collector"
+			Port["collect"] := _ConfigCollectFullSaveUpdates
+		else
+			AssertFalse(Port.Has("collect"), "Only the genuine production profile collector may serialize this public action")
 		Result := LLM_Menu_PromptEditProfile(Profiles[1], Port)
+		if Control == "memory-rebase"
+			AssertTrue(Features.Has("fixture_unknown_non_llm") && Features["fixture_unknown_non_llm"] == State.MemoryRoot,
+				"Scoped LLM publication must retain an unrelated current RAM root and its exact identity")
+		if Control == "broad-collector" {
+			AssertFalse(Result, "An injected complete collector cannot broaden the profile's configuration ownership")
+			AssertEqual(0, World.ApplyCalls)
+			AssertEqual(2, State.Inputs)
+			AssertEqual(InitialImage, FSConfigReadUtf8Exact(World.ConfigPath))
+			AssertTrue(_LLM_Menu == InitialMenu && ManifestValuesEqual(Profiles, _LLM_Menu["user_profiles"]))
+			AssertTrue(State.Notices.Length > 0)
+			return
+		}
 		Observed := TOML_ParseFreshFileTyped(World.ConfigPath)
 		LocaleRead := _TOML_DocumentLookup(Observed, ["script", "locale"])
 		ActualLocale := LocaleRead["found"] ? LocaleRead["value"] : ManifestDefaultFor("script.locale")
@@ -696,3 +714,15 @@ _PFNL_Case(External) {
 for _PFNL_External in [false, true]
 	Test("LLM full-state opening: " . (_PFNL_External ? "external locale" : "current control")
 		. " preserves non-LLM preferences (llm-profile-nonllm-source)", _PFNL_Case.Bind(_PFNL_External))
+
+; Memory-scope control only: this observer adds unknown unrelated metadata after
+; the real candidate was cloned. It makes no claim of an OS producer/race proof.
+_PFSC_CollectThenAddRoot(State, CandidateFeatures, CandidateMenu) {
+	global Features
+	Updates := _LLM_Menu_ProfileProjectionUpdates(CandidateFeatures, CandidateMenu)
+	Features["fixture_unknown_non_llm"] := State.MemoryRoot
+	return Updates
+}
+for _PFSC_Control in ["memory-rebase", "broad-collector"]
+	Test("LLM profile scoped ownership: " . _PFSC_Control . " preserves unrelated state (llm-profile-nonllm-scope)",
+		_PFNL_Case.Bind(false, _PFSC_Control))

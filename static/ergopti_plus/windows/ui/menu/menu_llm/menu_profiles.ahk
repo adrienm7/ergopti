@@ -399,11 +399,16 @@ _LLM_Menu_ProfilePreparePublication(Source, CandidateMenu) {
 ; The existing publication port rechecks the same memory receipt after native
 ; durability, so a later in-place runtime failure is never overwritten either.
 _LLM_Menu_ProfilePublishCandidate(Source, CandidateFeatures, CandidateMenu, PreparedSource) {
+	global Features
 	if PreparedSource != Source || !_LLM_Menu_ProfileSourceBound(Source) {
 		_LLM_Menu_ProfileRetainPublication(Source)
 		return false
 	}
-	Published := _LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu)
+	; The profile owns only the LLM subtree. Rebase its acknowledged result
+	; over the current other roots instead of publishing their older clone.
+	PublishedFeatures := Features.Clone()
+	PublishedFeatures["llm"] := CandidateFeatures["llm"]
+	Published := _LLM_Menu_PublishCandidate(PublishedFeatures, CandidateMenu)
 	if Published is Integer && Published == 1
 		Source["published"] := 1
 	return Published
@@ -566,6 +571,13 @@ _LLM_Menu_ProfileProjectionDefault(Path) {
 _LLM_Menu_WriteProfileSource(Source, Path, Updates) {
 	if !_LLM_Menu_ProfileSourceBound(Source) || !_LLM_Menu_ProfileSourceProjectionMatches(Source) || !(Path == Source["path"])
 		return false
+	; Even an injected collector cannot grant the profile ownership of other
+	; preferences. Canonical paths reject quoted/dotted aliases outside llm.
+	for Update in Updates {
+		Parts := _TOML_ConfigPath(Update.Section, Update.Key)
+		if Parts.Length < 2 || Parts[1] !== "llm"
+			return false
+	}
 	; The native writer retains this exact pre-dialog image through stage and
 	; replacement; a fresh schema admission must not adopt later external edits.
 	Committed := TOML_ConfigBatchWrite(Path, Updates, [],
@@ -611,7 +623,7 @@ LLM_Menu_OnUserProfileClick(profile, Port := 0) {
 			(Candidate) => _LLM_Menu_SetProfileCandidate(Candidate, pid),
 			Options.Get("apply", _LLM_Menu_ApplyManualProfileCommitted),
 			_LLM_Menu_WriteProfileSource.Bind(Source), _LLM_Menu_ProfileNotifyFailure.Bind(Source, Options.Get("notify", 0)),
-			Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0),
+			Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", _LLM_Menu_ProfileProjectionUpdates),
 		_LLM_Menu_ProfilePreparePublication.Bind(Source), _LLM_Menu_ProfilePublishCandidate.Bind(Source))
 	} else if (choice == "No") {
 		; Edit this profile
@@ -623,7 +635,7 @@ LLM_Menu_OnUserProfileClick(profile, Port := 0) {
 				(Candidate) => _LLM_Menu_DeleteProfileCandidate(Candidate, pid),
 				Options.Get("apply", _LLM_Menu_ApplyProfileCommitted),
 				_LLM_Menu_WriteProfileSource.Bind(Source), _LLM_Menu_ProfileNotifyFailure.Bind(Source, Options.Get("notify", 0)),
-				Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0),
+				Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", _LLM_Menu_ProfileProjectionUpdates),
 		_LLM_Menu_ProfilePreparePublication.Bind(Source), _LLM_Menu_ProfilePublishCandidate.Bind(Source))
 		}
 	}
@@ -999,7 +1011,7 @@ LLM_Menu_PromptCreateProfile(Port := 0) {
 		(Candidate) => _LLM_Menu_AddProfileCandidate(Candidate, new_profile),
 		Options.Get("apply", _LLM_Menu_ApplyProfileCommitted),
 		_LLM_Menu_WriteProfileSource.Bind(Source), _LLM_Menu_ProfileNotifyFailure.Bind(Source, Options.Get("notify", 0)),
-		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0),
+		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", _LLM_Menu_ProfileProjectionUpdates),
 		_LLM_Menu_ProfilePreparePublication.Bind(Source), _LLM_Menu_ProfilePublishCandidate.Bind(Source))
 }
 
@@ -1051,7 +1063,7 @@ LLM_Menu_PromptEditProfile(profile, Port := 0, OpeningSource := 0) {
 		(Candidate) => _LLM_Menu_EditProfileCandidate(Candidate, pid,
 			new_label, ib_prompt.Value), Options.Get("apply", _LLM_Menu_ApplyProfileCommitted),
 		_LLM_Menu_WriteProfileSource.Bind(Source), _LLM_Menu_ProfileNotifyFailure.Bind(Source, Options.Get("notify", 0)),
-		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0),
+		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", _LLM_Menu_ProfileProjectionUpdates),
 		_LLM_Menu_ProfilePreparePublication.Bind(Source), _LLM_Menu_ProfilePublishCandidate.Bind(Source))
 }
 

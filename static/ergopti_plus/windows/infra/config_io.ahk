@@ -156,6 +156,30 @@ _ConfigFullSaveCoordinator(Replacement := unset) {
 	return State
 }
 
+; Capture the already admitted boot image, never a fresh physical image as
+; authority for old RAM. Invalidated/replaced boot ownership simply makes the
+; optional canonicalizer dispensable; ordinary required saves keep their scope.
+_ConfigFullSaveCaptureOptionalBootSource(Path) {
+	global _BootConfigSnapshot
+	if !IsSet(_BootConfigSnapshot) || !IsObject(_BootConfigSnapshot)
+		return 0
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _ConfigFullSaveCaptureOptionalBootSource(Path)
+		finally Critical(InheritedCritical)
+	}
+	try {
+		Boot := _BootConfigSnapshot
+		Actual := ConfigTomlReadSnapshot(Path)
+		if Actual != Boot || _BootConfigSnapshot != Boot
+			return 0
+		return {source: Actual.Source, present: Actual.Present}
+	} catch {
+		return 0
+	}
+}
+
 _ConfigFullSaveRequest(TerminalRequired := true, Path := unset, InspectState := unset, RetireIntent := false) {
 	static MandatoryIntents := Map()
 	global ConfigurationFile
@@ -173,6 +197,26 @@ _ConfigFullSaveRequest(TerminalRequired := true, Path := unset, InspectState := 
 			if !MandatoryIntents.Has(InspectState)
 				return false
 			Intent := MandatoryIntents[InspectState]
+			if (RetireIntent is Integer) && (RetireIntent == 3 || RetireIntent == 4) {
+				if !_ConfigFullSaveCoordinatorDataAdmitted(InspectState)
+						|| InspectState != _ConfigFullSaveCoordinator()
+						|| !IsSet(Path) || !(Path is Integer) || Path != Intent.generation
+						|| Path != InspectState.requested_generation
+						|| InspectState.bound_path_key != Intent.path_key
+					return 0
+				if RetireIntent == 3 {
+					Boot := Intent.boot_source
+					return {optional: Intent.required == 0, admitted: Boot is Object,
+						present: Boot is Object ? Boot.present : false,
+						source: Boot is Object ? Boot.source : ""}
+				}
+				; Only this genuine boot-optional intention can be abandoned. A
+				; newer mandatory request changes the private generation/required.
+				if Intent.required != 0 || !_ConfigFullSaveAbandonThrough(Path)
+					return false
+				MandatoryIntents.Delete(InspectState)
+				return true
+			}
 			if (RetireIntent is Integer) && RetireIntent == 2 {
 				return _ConfigFullSaveCoordinatorDataAdmitted(InspectState)
 					&& InspectState.requested_generation == Intent.generation
@@ -201,12 +245,18 @@ _ConfigFullSaveRequest(TerminalRequired := true, Path := unset, InspectState := 
 		try LoggerError("ConfigIO", "Refusing a full-save request without a concrete configuration path.")
 		return 0
 	}
+	BootSource := TerminalRequired ? 0 : _ConfigFullSaveCaptureOptionalBootSource(RequestPath)
 	State := _ConfigFullSaveCoordinator()
 	if !_ConfigFullSaveCoordinatorDataAdmitted(State)
 		return 0
 	PreviousCritical := Critical("On")
 	try {
 		if !_ConfigFullSaveCoordinatorDataAdmitted(State) || State != _ConfigFullSaveCoordinator()
+			return 0
+		; Authenticating the boot reader may pump a relocation. An automatic
+		; request must still belong to the selected lexical path at admission.
+		if !TerminalRequired && (!IsSet(ConfigurationFile) || !(ConfigurationFile is String)
+				|| _ConfigWriteLeaseKey(ConfigurationFile) != RequestKey)
 			return 0
 		if State.reload_required || _ConfigWriteTerminalIsActive()
 			return 0
@@ -223,7 +273,8 @@ _ConfigFullSaveRequest(TerminalRequired := true, Path := unset, InspectState := 
 			State.terminal_required_generation := State.requested_generation
 			Required := State.requested_generation
 		}
-		MandatoryIntents[State] := { generation: State.requested_generation, required: Required, path: RequestPath }
+		MandatoryIntents[State] := { generation: State.requested_generation, required: Required, path: RequestPath,
+			path_key: RequestKey, boot_source: BootSource }
 		return State.requested_generation
 	} finally {
 		Critical(PreviousCritical)
@@ -1863,12 +1914,26 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 				try {
 				SourceImage := 0
 				if !HasMethod(WriterFn, "Call") {
+					BootIntent := _ConfigFullSaveRequest(false, TargetGeneration, State, 3)
+					if !(BootIntent is Object)
+						return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+							? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
 					; Bind full-snapshot preservation to one admitted generation
 					; before collection can run callbacks or change live state.
 					SourceImage := TOML_BuildConfigUpdatedContent(BoundPath, [])
 					if !(SourceImage is Map) || SourceImage.Get("status", "") != "ok"
 							|| SourceImage.Get("kind", "") != "rendered"
 						throw Error("The full configuration source could not be admitted.")
+					if BootIntent.optional && (!BootIntent.admitted
+							|| SourceImage["source_present"] != BootIntent.present
+							|| StrCompare(SourceImage["source_content"], BootIntent.source, true) != 0) {
+						; Settled optional work is not committed work. Do not collect
+						; stale RAM or produce a false user-facing "reverted" notice.
+						if _ConfigFullSaveRequest(false, TargetGeneration, State, 4)
+							return CONFIG_SAVE_OK
+						return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+							? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
+					}
 					ObsoleteSource := ConfigFullSnapshotCaptureObsoleteSource(SourceImage["source_content"])
 				}
 				Phase := "collector"
