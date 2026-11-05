@@ -1,0 +1,1 @@
+[32m[OK] macOS .app bundle mirrors the static/ergopti_plus layout (build script + launcher agree).[0m

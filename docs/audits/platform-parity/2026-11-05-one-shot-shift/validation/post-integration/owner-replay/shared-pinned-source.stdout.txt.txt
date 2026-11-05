@@ -1,0 +1,252 @@
+{
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"sources": [
+		{
+			"path": "static/ergopti_plus/_shared/tap_hold/one_shot_shift.json",
+			"sha256": "6c605b612374f4e21a3ad5edfea6c0c676c37c23cff32db78d867aef4e28d182"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/tap_hold/one_shot_shift.lua",
+			"sha256": "9ff4f097e014ada2c6755d774c5570b91239f611b4699bdbb317c5af84071b13"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/unicode_case/init.lua",
+			"sha256": "4bcde1859108a31bc5f1a61f102d8c57af2244b9475277b1420560275707fe9f"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/unicode_case/data.lua",
+			"sha256": "70a93d4956f5490c24bf35a1c73cccbb1f131260702cdb155f43ae6b95bc5026"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators.lua",
+			"sha256": "a45d8d0107d88573d3056b7a802e8fd5dc936813fa0e6b8e754897cc0eaa2d3f"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators_catalogue.lua",
+			"sha256": "20defcf3f766d45dbbacf21d90a4237a8edcc0f904867b750256b01e198c8a0c"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+			"sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tap_hold/defaults.toml",
+			"sha256": "c4f4a6678703dada0e58179124c0c956770ca35c6129d18d62179730d9952799"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+			"sha256": "0d28466a2306acc79dec7c8bcc39b49c07ba742f488aaea1bfc00727b498cf91"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/core/config_schema/config_key_extras.json",
+			"sha256": "fbabd262e9022eb7333c486b9e6ef8d2d2229f56da36d429418ebf9fc94eda24"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/menu/menu.toml",
+			"sha256": "2650137e463b4d56da5f2bbd7bb777ca4f5e2916bccb6ae2571174e4f981b197"
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/one_shot_shift.ahk",
+			"sha256": "458c21c994de1d2794b62d1f70dabd6f8b26305c174c6641429cb8c07a994b5b"
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/tap_hold_loader.ahk",
+			"sha256": "76d475638cc48a101e8d18cff17cf02ee7ebb87536fde78e47abc9dd23bf285c"
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/constants.ahk",
+			"sha256": "3c094b62641fa76bbdd53782e0d243a6697492c025a99476b036d6622b52835c"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/sticky_modifiers.ahk",
+			"sha256": "604ca225a666a52fcfd6d0ea80c6b9515a46a5202e7149e4a2210cfcf5948cd9"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/suppressive_inputhook_ownership.ahk",
+			"sha256": "9b580bc5420ee7e64af922d8124452199d8a1c941b7a680bb5eaeed18c28f711"
+		},
+		{
+			"path": "static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
+			"sha256": "e3d8970dd41e7e1239b370ecbc9e0d04edf2f8a1f2c4a4fbfb5a0ed6d3b1522b"
+		},
+		{
+			"path": "static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua",
+			"sha256": "b856fe543eece29449c3c736af6fed9f524e70466d812d5d5567c8ab52be97e7"
+		},
+		{
+			"path": "static/ergopti_plus/linux/ui/menu/menu_tap_holds.lua",
+			"sha256": "482f45303592a1267eabff9e09354480726c09383251da1784ef3d59f4022d1a"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
+			"sha256": "b83f459977dd92b208fc13ce8ffcb16a37286226bf4660ebed8a56d835194e88"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/one_shot_shift.lua",
+			"sha256": "645f3a237074fc49e3294579e09cd65aa45e4840664f59ffdc0b72152c992213"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/one_shot_shift.lua",
+			"sha256": "1b772c8608804b5962bcd038fcd621fdd095bb4803f930383b1660ffc3339aa0"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56"
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/defaults.lua",
+			"sha256": "e17bb640af9ca6d65a4bb1866d6d246077707e6e36c4126e84436316cf8eebe2"
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/init.lua",
+			"sha256": "18082e82568983bbd93847843a0f309719d51da7909f4145541275edd197923b"
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/config.lua",
+			"sha256": "05f383dff5598cb296bbdb3fdfc89594bb4731845a4350b5d1131c19c175bbc8"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua",
+			"sha256": "ac391baa4071af3b97e81313201d05bca1eb102a444a1a2b224b76e7dfa1765d"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/gestures/actions.lua",
+			"sha256": "3e9fa4e342016389ab8ba639e8f84e4a37e39c794f61a5b91aeb865e89124a9c"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/gestures/sticky_modifiers.lua",
+			"sha256": "778b46ecf8530111b26ff43bd21a9a5c0e3fc7ec93d186e56bf13fe78b580c1a"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/keymap/synthetic/test_one_shot_shift.lua",
+			"sha256": "122f4a7fc0e2d39bbd8dbf6068b9b0a08a05faceaa9bd1075392d14e968cc465"
+		},
+		{
+			"path": "tools/test/test-tap-hold-one-shot-results-single-source.cjs",
+			"sha256": "232f91b45edfcfb0e9cae21ed5703076b00111b89c3f8a655483740d11dd7da9"
+		},
+		{
+			"path": "tools/test/test-tap-hold-namespace-correspondence.cjs",
+			"sha256": "d048eafd36a3898297e9e85133d0b65ca3e2db919873fe454e0fbac6dcefffd4"
+		},
+		{
+			"path": "tools/codegen/codegen-feature-inventory.cjs",
+			"sha256": "91060ace8f5971a695beaa65771707bc5be1d00118d52c9f3b0970adc45d4095"
+		},
+		{
+			"path": "tools/build/build-features-manifest.js",
+			"sha256": "102d3db701ca3a55a46addf9f5e3c98394d68d3a2c0bb76cdce3bee5e9edd03a"
+		},
+		{
+			"path": "src/routes/ergopti-plus/action-inventory.json",
+			"sha256": "9df9eaeb3c0cdb15d0766004c34103a91005da905ff9dd568bb7b4d9bfbb01a9"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ar.json",
+			"sha256": "8fad378966bd4980f4e4982ff10b3284a36a920a1e80d82e21170ae1256c2e72"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/cs.json",
+			"sha256": "a3e2dd8782d71ed1b4a70a960e77fe3633a2af6ae4f25cd1b64ebea10b0bfcfd"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/da.json",
+			"sha256": "6f7d53870f42dfe0de3157835c9360120936823ff9a345afc3898daf40ecee49"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/de.json",
+			"sha256": "9f9461f5a0851ed10c9dfadeab90a48e3739692e8d3a25b1cb5c3535177bafbc"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/en.json",
+			"sha256": "750425bc132f156baa8e7fbc2db1e4ccb331a47c565972822955c0547c47c196"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/es.json",
+			"sha256": "9df0c3b132d4158475f865283f30ce65aa6a9d9b5a439ba3c63099d0d587c8d0"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/fr.json",
+			"sha256": "a2be5769ea4a97a358ca6c60e2334c4b9be5d92f2932cc6d7709f030fe2a150a"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/he.json",
+			"sha256": "0e1b74543eab765748aef1c86929e7b63d7df8edc8aef85a7121217d545e828b"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/hi.json",
+			"sha256": "2e261f8206cfa17923d045b01f899acc8550aa437494e7783d3c53b391915b23"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/it.json",
+			"sha256": "355dfa41cfd31bc7c6d2cf71c4deb302ea687c03f2bafc700368aecd262b3bca"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ja.json",
+			"sha256": "24339ab31789883b12e5246e284b0ca4c9b567f2f7080b2298f4b73c6c900d2c"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ko.json",
+			"sha256": "e85a6df6ef0978aee9f61261482c57304028790859ff29397110ea60c979bb08"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/nl.json",
+			"sha256": "4bfaa6b7c70ce7bd876659ebe5c728c26e559a3bbc4c7ebb89f703ee04ecfc54"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/no.json",
+			"sha256": "ebc07222f88986e62c0129156788951622723e15ec0860c23e201eb72bd730d3"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/pl.json",
+			"sha256": "be7570add9ce0aaa06f0c4bbbccac96ab5e1e7b55ee95a1ce3249e9eaf3ddf78"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/pt.json",
+			"sha256": "7f12011d58218a2dc4b486c92aa64685e85ca5f1ec32193d6520cfd5d92967e9"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ru.json",
+			"sha256": "8d445586e1653f68abd565dc56cf33b96f9586787bee37cdb56b837789d1fff1"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/sv.json",
+			"sha256": "0ec292589efb5a9914d3d6918aacd25fb8009b06432f3d7fe798739776600607"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/tr.json",
+			"sha256": "758a6934543171e6a500acb77fc362a00ec266a28b89a95ce823817dfc2c6bb0"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/uk.json",
+			"sha256": "02465bcaefe1a5b973de62137347aee898e69e33d7f0b6fdfb517fdce08e75b1"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/zh.json",
+			"sha256": "0d11ca3f442a3ae34994cbc2043a348f2dcc726be774730968f1dfe9c2823c50"
+		}
+	],
+	"checks": [
+		"Windows public capture exists",
+		"Windows delegates full-scalar result selection",
+		"Windows magic lookup precedes special lookup",
+		"Windows preloads its loader-owned catalogue",
+		"Linux tap namespace explicitly includes reserved single-use Shift",
+		"Linux reads the shared result file",
+		"Linux asks the live magic owner",
+		"Both Lua state consumers use the shared resolver",
+		"Five editing controls share spend-without-shifting declaration",
+		"Lua owners use inclusive deadline comparison",
+		"Mac actual owner rejects duplicate catalogue characters",
+		"Registered Mac real-data unit invokes the actual validating owner",
+		"Windows fallback for an uninitialized/nonpositive constant is two seconds",
+		"Mac source setter/arm contracts require positive timeout",
+		"Action catalogue declares Linux system-sticky alternative, not its tap-only path",
+		"Windows OneShotShift body does not own its sibling ToggleCapsLock CapsWord clear"
+	],
+	"qualification": "Named pinned/current source bytes and lexical relationships only. Actual shared policy, model and state execution are separate probes; no AHK or native desktop execution."
+}
