@@ -1387,6 +1387,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/platform/network/test_winhttp_transport.ahk
 #Include unit/platform/network/test_native_http_forward_proxy.ahk
 #Include unit/platform/network/test_native_relay_hop_branches.ahk
+#Include unit/platform/network/test_native_ipv6_relay_upstream.ahk
 #Include unit/modules/updater/test_updater_artifact_winhttp.ahk
 #Include unit/platform/network/test_managed_winhttp_proxy.ahk
 #Include meta/modules/llm/servers/test_remote_connect_timeout_bounded.ahk
