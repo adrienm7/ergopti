@@ -4959,4 +4959,41 @@ for (const host of ['windows', 'macos', 'linux']) {
 	});
 }
 
+test('apps muted duration is not presented as a focus-time percentage', () => {
+	const fixture = appsFixture(true);
+	const context = fixture.context;
+	for (const name of ['dom_utils.js', 'metrics_apps/modal.js', 'metrics_apps/charts.js'])
+		vm.runInContext(read(name), context);
+	const elements = {
+		'kpi-switches': {},
+		'kpi-unlocks': {},
+		'kpi-wifi': {},
+		'render-error-banner': {},
+		'kpi-sys-mute-detail': {}
+	};
+	context.document.getElementById = (id) => elements[id] || null;
+	context.document.createElement = () => ({ style: {}, appendChild() {}, addEventListener() {} });
+	context.window._i18n_strings = { 'ui_apps.kpi_pct_focus_time': '{pct}% du temps focus' };
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': {
+				Editor: { app_time_ms: 1000, category: 'Dev' },
+				Other: { app_time_ms: 29000, category: 'Other' },
+				_system: { audio_muted_ms: 30000 }
+			}
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all'; currentCategoryFilter = new Set(['Dev']);");
+	context.renderDashboard();
+	assert.ok(
+		!elements['render-error-banner'].textContent,
+		elements['render-error-banner'].textContent
+	);
+	assert.equal(elements['kpi-sys-mute-detail'].textContent, '');
+	fixture.set("currentCategoryFilter = new Set(['absent']);");
+	context.renderDashboard();
+	assert.equal(elements['kpi-sys-mute-detail'].textContent, '');
+});
 console.log(`${passed} passed, 0 failed.`);

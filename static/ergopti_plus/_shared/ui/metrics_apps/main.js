@@ -1005,17 +1005,11 @@ function renderDashboard() {
 				: _t('ui_apps.kpi_no_data')
 		);
 
-		const muted_pct = (rt.focus_ms || 0) > 0 ? ((sys.audio_muted_ms || 0) / rt.focus_ms) * 100 : 0;
 		setText(
 			'kpi-sys-mute',
 			(sys.audio_muted_ms || 0) > 0 ? formatDuration(sys.audio_muted_ms) : '—'
 		);
-		setText(
-			'kpi-sys-mute-detail',
-			(sys.audio_muted_ms || 0) > 0
-				? _t('ui_apps.kpi_pct_focus_time').replace('{pct}', muted_pct.toFixed(0))
-				: _t('ui_apps.kpi_no_mute')
-		);
+		setText('kpi-sys-mute-detail', (sys.audio_muted_ms || 0) > 0 ? '' : _t('ui_apps.kpi_no_mute'));
 
 		setText('kpi-sys-spaces', String(sys.space_switches || 0));
 		setText(
