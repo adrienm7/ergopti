@@ -302,13 +302,14 @@ function M.register_date_rules(trigger)
 	M.add_rule("td", "date", function() return os.date("%Y_%m_%d") end, true)
 	M.add_rule("dt", "datefr", function() return os.date("%d/%m/%Y") end, true)
 	M.add_rule("date", "datelongfr", function()
+		local instant = os.time()
 		local days   = { "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi" }
 		local months = { "janvier", "février", "mars", "avril", "mai", "juin",
 		                 "juillet", "août", "septembre", "octobre", "novembre", "décembre" }
-		local wday = tonumber(os.date("%w")) + 1  -- os.date %w: 0 = Sunday
-		local mday = tonumber(os.date("%d"))
-		local mon  = tonumber(os.date("%m"))
-		local year = os.date("%Y")
+		local wday = tonumber(os.date("%w", instant)) + 1  -- os.date %w: 0 = Sunday
+		local mday = tonumber(os.date("%d", instant))
+		local mon  = tonumber(os.date("%m", instant))
+		local year = os.date("%Y", instant)
 		return days[wday] .. " " .. mday .. " " .. months[mon] .. " " .. year
 	end, true)
 
@@ -321,16 +322,17 @@ end
 --- live date previews in UI section labels without reimplementing os.date logic.
 --- @return table {iso, fr, long_fr}
 function M.today_date_strings()
+	local instant = os.time()
 	local days   = { "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi" }
 	local months = { "janvier", "février", "mars", "avril", "mai", "juin",
 	                 "juillet", "août", "septembre", "octobre", "novembre", "décembre" }
-	local wday   = tonumber(os.date("%w")) + 1
-	local mday   = tonumber(os.date("%d"))
-	local mon    = tonumber(os.date("%m"))
-	local year   = os.date("%Y")
+	local wday   = tonumber(os.date("%w", instant)) + 1
+	local mday   = tonumber(os.date("%d", instant))
+	local mon    = tonumber(os.date("%m", instant))
+	local year   = os.date("%Y", instant)
 	return {
-		iso     = os.date("%Y_%m_%d"),
-		fr      = os.date("%d/%m/%Y"),
+		iso     = os.date("%Y_%m_%d", instant),
+		fr      = os.date("%d/%m/%Y", instant),
 		long_fr = days[wday] .. " " .. mday .. " " .. months[mon] .. " " .. year,
 	}
 end
