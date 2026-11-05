@@ -5266,4 +5266,27 @@ test('apps focus latency displays measured zero and distinguishes absence', () =
 	context.openAppDrilldown('Other');
 	assert.match(elements['app_modal_tiles'].innerHTML, />Focus<\/div>\s*<div[^>]*>—<\/div>/);
 });
+for (const host of ['linux', 'macos', 'windows'])
+	test(`${host} dominant category preserves a colon in the fallback name`, () => {
+		const previousTimezone = process.env.TZ;
+		process.env.TZ = 'UTC';
+		try {
+			const page = loadMetricsAppsPage(host);
+			freezePageClock(page, '2026-10-27T12:00:00Z');
+			page.elements.set('kpi-dom-cat', page.context.document.createElement('span'));
+			vm.runInContext("currentPeriod = 'all';", page.context);
+			publishLoadedAppsData(
+				page,
+				host,
+				{ '2026-10-25': { Editor: { app_time_ms: 1000 } } },
+				{},
+				1,
+				{ Editor: { type: 'Work : Code', score: 0 } }
+			);
+			assert.equal(page.elements.get('kpi-dom-cat').textContent, 'Work : Code');
+		} finally {
+			if (previousTimezone === undefined) delete process.env.TZ;
+			else process.env.TZ = previousTimezone;
+		}
+	});
 console.log(`${passed} passed, 0 failed.`);

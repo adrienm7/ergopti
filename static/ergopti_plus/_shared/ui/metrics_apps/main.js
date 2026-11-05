@@ -851,7 +851,8 @@ function renderDashboard() {
 		// #22 Dominant category per weekday — render as compact 7-day rundown
 		const DOW_LABELS = metricWeekdayLabels();
 		const wkLines = [];
-		let domToday = null;
+		let domToday = null,
+			firstCategory = null;
 		const todayDow = (new Date().getDay() + 6) % 7;
 		Object.entries(r.weekday_category || {}).forEach(([dow, cats]) => {
 			let topCat = null,
@@ -863,11 +864,12 @@ function renderDashboard() {
 				}
 			});
 			if (topCat) {
+				if (firstCategory === null) firstCategory = topCat;
 				wkLines.push(`${DOW_LABELS[+dow]} : ${topCat}`);
 				if (+dow === todayDow) domToday = topCat;
 			}
 		});
-		setText('kpi-dom-cat', domToday || (wkLines.length > 0 ? wkLines[0].split(' : ')[1] : '—'));
+		setText('kpi-dom-cat', domToday || firstCategory || '—');
 		setText(
 			'kpi-dom-cat-detail',
 			wkLines.length > 0 ? wkLines.join(' · ') : _t('ui_apps.kpi_no_day_data')
