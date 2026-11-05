@@ -68,6 +68,14 @@ try {
 		assert.ok(fs.existsSync(path.join(unusualOutput, 'libergopti_archive_publication.so')));
 		assert.equal(fs.existsSync(unusualOutput.trimEnd()), false);
 	}
+	if (process.platform === 'linux') {
+		const stageLine = /^\s*NATIVE_OUTPUT_STAGE="\$\([^\n]+\)"[\s\S]*?(?=\n\s*# A failed\/uncertain compiler)/m.exec(installer);
+		assert.ok(stageLine, 'actual native output stage allocation');
+		const relativeTemp = path.join(scratch, 'relative-tmp');
+		fs.mkdirSync(relativeTemp);
+		const result = run(`set -euo pipefail\ncd ${quote(bashPath(scratch))}\nexport TMPDIR=relative-tmp\n${stageLine[0]}\nbash ${quote(bashPath(copiedBuilder))} --source-directory ${quote(bashPath(sourceDirectory))} --output-directory "$NATIVE_OUTPUT_STAGE"`);
+		assert.equal(result.status, 0, `relative TMPDIR must permit source compilation: ${result.stderr}`);
+	}
 	const archiveDriver = path.join(scratch, 'archive/linux');
 	fs.mkdirSync(archiveDriver, { recursive: true });
 	for (const [label, selectedDriver, manager, skip, repair, ready, packageStatus, expected] of [
