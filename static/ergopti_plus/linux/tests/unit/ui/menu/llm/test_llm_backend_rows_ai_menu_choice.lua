@@ -50,6 +50,36 @@ end)
 
 
 helpers.describe("model selector test ownership", function()
+	helpers.it("does not remove an active API entry replaced during confirmation", function()
+		local build, state, restore = setup("api")
+		local old = { id = "chosen", provider = "cerebras", model = "qwen", token = "old", base_url = "" }
+		local replacement = { id = "chosen", provider = "cerebras", model = "new", token = "new", base_url = "" }
+		state.entries, state.active = { old }, old
+		local remove = find(build(), "🗑️").action
+		state.confirm = function() state.entries, state.active = { replacement }, replacement; return true end
+		local result = remove()
+		local kept, count = state.entries[1], state.removal_sets or 0
+		restore()
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(kept, replacement)
+		helpers.assert_eq(count, 0)
+	end)
+
+	helpers.it("does not remove a System 1 entry replaced during confirmation", function()
+		local build, state, restore = setup("api")
+		local old = { id = "system", provider = "typesafe", model = "jev-latest", token = "old", base_url = "" }
+		local replacement = { id = "system", provider = "typesafe", model = "new", token = "new", base_url = "" }
+		state.entries = { old }
+		local remove = find(build(), "🗑️").action
+		state.confirm = function() state.entries = { replacement }; return true end
+		local result = remove()
+		local kept, count = state.entries[1], state.removal_sets or 0
+		restore()
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(kept, replacement)
+		helpers.assert_eq(count, 0)
+	end)
+
 	helpers.it("suppresses a System 1 test when its entry is removed", function()
 		local build, state, restore = setup("api")
 		local entry = { id = "system", provider = "typesafe", model = "jev-latest", token = "test", base_url = "" }
