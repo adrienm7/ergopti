@@ -345,6 +345,29 @@ scenario({ month = 10, day = 25 }, function(k, writer)
 	assert(ok, failure)
 end)
 
+scenario({ month = 10, day = 25, hour = 12, min = 0, sec = 0 }, function(k, writer)
+	local log_dir = writer.get_db_path() .. ".logs"
+	assert(uv.fs_mkdir(log_dir, 448))
+	local path = log_dir .. "/keystrokes_2026-10-25.json"
+	local prior = assert(io.open(path, "wb")); prior:write("prior summary\n"); prior:close()
+	k.on_app_focus("éditeur", Monotonic.now_ms())
+	k.on_keydown("a", Monotonic.now_ms(), "éditeur")
+	local good = assert(require("json").decode(assert(k.export_json())))
+	equal(good.apps["éditeur"].keystrokes, 1)
+	k.on_app_focus("bad" .. string.char(255), Monotonic.now_ms())
+	k.on_keydown("a", Monotonic.now_ms(), "bad" .. string.char(255))
+	local json, reason = k.export_json()
+	equal(json, nil)
+	equal(type(reason), "string")
+	local debt = k._pending_buffer_count_for_test()
+	equal(debt > 0, true)
+	writer.close_db()
+	equal(k.flush(), false)
+	local file = assert(io.open(path, "rb")); local content = file:read("*a"); file:close()
+	equal(content, "prior summary\n")
+	equal(k._pending_buffer_count_for_test(), debt)
+end)
+
 for _, day in ipairs({ { month = 3, day = 29, hours = 23 }, { month = 10, day = 25, hours = 25 } }) do
 	scenario({ month = day.month, day = day.day, hour = 0, min = 0, sec = 0 }, function(k, _, advance, rows)
 		local clock = Calendar.capture()
@@ -361,4 +384,4 @@ for _, day in ipairs({ { month = 3, day = 29, hours = 23 }, { month = 10, day = 
 		equal(rows("SELECT ms FROM agg_app_day_titles WHERE title='dst' ORDER BY date;"), { string.format("%.0f", length), "1000" })
 	end)
 end
-print("native capture calendar: scenarios=12 checks=" .. checks)
+print("native capture calendar: scenarios=13 checks=" .. checks)

@@ -293,6 +293,17 @@ helpers.describe("dashboard bridges: the typing window answers from its cache", 
 end)
 
 helpers.describe("metrics apps bridge: every reply is dashboard data", function()
+	helpers.it("reports a refused metrics export without claiming success", function()
+		local Bridge = helpers.load_module("ui.metrics_apps.bridge")
+		local state = { keystats = require("tests.fakes.metrics_keystats").synchronous({
+			get_dashboard_payload = function() return { metrics_manifest = {} } end,
+			export_json = function() return nil, "invalid UTF-8" end,
+		}) }
+		local reply = Bridge.on_message({ action = "export" }, state)
+		helpers.assert_eq(reply.exported, false)
+		helpers.assert_eq(reply.json, nil)
+		helpers.assert_true(reply.metrics_manifest ~= nil)
+	end)
 
 	helpers.it("answers a category edit, the picker and a pause with the manifest", function()
 		local Bridge = helpers.load_module("ui.metrics_apps.bridge")
