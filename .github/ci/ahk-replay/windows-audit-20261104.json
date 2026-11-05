@@ -1,5 +1,5 @@
 {
-	"expected_count": 29,
+	"expected_count": 122,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
@@ -27,6 +27,54 @@
 		{
 			"contains": "tap-hold-prompt-numeric-domain",
 			"expected_count": 2
+		},
+		{
+			"contains": "system-query-effects",
+			"expected_count": 26
+		},
+		{
+			"contains": "empty_trash and eject_all_disks run their exact commands",
+			"expected_count": 1
+		},
+		{
+			"contains": "llm shared vectors: usage ",
+			"expected_count": 12
+		},
+		{
+			"contains": "Preserve ordered provider text",
+			"expected_count": 18
+		},
+		{
+			"contains": "[corpus:anthropic_multiblock_joins_text]",
+			"expected_count": 1
+		},
+		{
+			"contains": "[corpus:gemini_multipart_joins_text]",
+			"expected_count": 1
+		},
+		{
+			"contains": "_LLMRemoteParseResponse:",
+			"expected_count": 15
+		},
+		{
+			"contains": "system-action-confirmed-lifecycle",
+			"expected_count": 6
+		},
+		{
+			"contains": "keylayout-integer-attribute-domain",
+			"expected_count": 5
+		},
+		{
+			"contains": "keylayout-entity-integer-domain",
+			"expected_count": 2
+		},
+		{
+			"contains": "keylayout-entity-scalar-domain",
+			"expected_count": 2
+		},
+		{
+			"contains": "menu-reload-stage-custody",
+			"expected_count": 4
 		}
 	]
 }
