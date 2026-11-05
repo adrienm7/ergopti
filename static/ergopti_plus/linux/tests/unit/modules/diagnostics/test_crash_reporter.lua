@@ -287,7 +287,8 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 
 	helpers.it("keeps at most the shared cap of reports and never deletes another file", function()
 		local CrashReport = require("crash_report")
-		local listing, deleted = { { name = "notes.txt", kind = "file" }, { name = "sub", kind = "directory" } }, {}
+		local listing, deleted = { { name = "notes.txt", kind = "file" }, { name = "sub", kind = "directory" },
+			{ name = "2025-01-01T00-00-00Z42.json", kind = "file" } }, {}
 		for index = 1, CrashReport.MAX_REPORTS + 2 do
 			listing[#listing + 1] = { name = string.format("2026-10-24T10-00-%02dZ.json", index), kind = "file" }
 		end
