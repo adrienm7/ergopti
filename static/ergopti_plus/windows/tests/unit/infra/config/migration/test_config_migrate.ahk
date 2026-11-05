@@ -844,3 +844,90 @@ _CMG_RegistryHashCrossCheck() {
 }
 Test("config migrate: the registry cross-check matches by content hash and still refuses changed, invalid or removed sources (config-registry-hash)",
 	_CMG_RegistryHashCrossCheck)
+
+_CMGS_ForeignStage(Collision) {
+	Root := A_Temp . "\ergopti_config_migration_stage_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\config.toml", Created := false
+	Owner := FSWriteDurable, HadOwn := Owner.HasOwnProp("Call")
+	if HadOwn
+		SavedCall := Owner.GetOwnPropDesc("Call")
+	Installed := false
+	State := {hits: 0, stagePath: "", sentinelBytes: 0, createdSentinel: 0, originalEntered: 0, originalCompleted: 0}
+	Source := '[hotstrings.dynamic]`ndatefr = "Original"`n'
+	Sentinel := "Foreign migration stage: é😀 unchanged"
+	Observe(This, StagePath, Content, OpenFn := 0, DeleteFn := 0, FlushFn := 0, WriteFn := 0) {
+		Prefix := Path . "." . A_ScriptHwnd . "-migration-"
+		if SubStr(StagePath, 1, StrLen(Prefix)) == Prefix
+				&& RegExMatch(SubStr(StagePath, StrLen(Prefix) + 1), "^\d+\.stage$") {
+			State.hits += 1
+			State.stagePath := StagePath
+			if Collision {
+				State.createdSentinel := FSWriteCreateDurable(StagePath, Sentinel)
+				AssertEqual(1, State.createdSentinel, "the competing private file must actually be created exclusively")
+				State.sentinelBytes := FSReadBytesStrict(StagePath)
+			}
+		}
+		State.originalEntered += 1
+		NativeResult := Func.Prototype.Call.Call(This, StagePath, Content, OpenFn, DeleteFn, FlushFn, WriteFn)
+		State.originalCompleted += 1
+		return NativeResult
+	}
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Before := FSReadBytesStrict(Path)
+		Owner.DefineProp("Call", {Call: Observe})
+		Installed := true
+		Result := ConfigMigrateRun(Path, _CMG_OneStepRegistry(), "20990101-000000")
+		After := FSReadBytesStrict(Path)
+		StagePresent := State.stagePath != "" && FSStrictExists(State.stagePath)
+		StageBytes := StagePresent ? FSReadBytesStrict(State.stagePath) : Buffer(0)
+		_TestPrint("# config-migration-stage collision=" . Collision . " calls=" . State.hits
+			. " created_sentinel=" . State.createdSentinel . " original_entered=" . State.originalEntered
+			. " original_completed=" . State.originalCompleted
+			. " status=" . Result["status"] . " stage_present=" . StagePresent
+			. " before_bytes=" . Before.Size . " after_bytes=" . After.Size
+			. " detail=" . Result["detail"])
+		AssertEqual(1, State.hits, "the actual default migration publisher must reach its real native staging owner")
+		AssertEqual(1, State.originalEntered, "the real staging writer must be delegated exactly once")
+		AssertEqual(1, State.originalCompleted, "the real original writer must return before business assertions")
+		AssertEqual(Collision ? 1 : 0, State.createdSentinel)
+		AssertTrue(FSUtf8ExactMatches(Result["backup"], Source), "the actual backup retains the admitted original source")
+		if Collision {
+			AssertTrue(StagePresent, "a migration cannot rename or delete another owner's stage")
+			AssertEqual(State.sentinelBytes.Size, StageBytes.Size)
+			AssertEqual(StageBytes.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", State.sentinelBytes,
+				"Ptr", StageBytes, "UPtr", StageBytes.Size, "UPtr"), "foreign bytes must remain exact")
+			AssertEqual("failed", Result["status"])
+			AssertEqual(1, Result["read_only"])
+			AssertEqual(Before.Size, After.Size)
+			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+				"Ptr", After, "UPtr", Before.Size, "UPtr"), "collision refuses all target publication")
+		} else {
+			AssertEqual("migrated", Result["status"])
+			AssertFalse(StagePresent)
+			Actual := TOML_ParseDocument(FSReadUtf8Exact(Path))
+			AssertEqual(2, Actual["_meta"]["schema_version"])
+			AssertEqual("Original", Actual["hotstrings"]["dynamic"]["date_fr"])
+			AssertFalse(Actual["hotstrings"]["dynamic"].Has("datefr"))
+		}
+	} finally {
+		if Installed {
+			if HadOwn
+				Owner.DefineProp("Call", SavedCall)
+			else
+				Owner.DeleteProp("Call")
+		}
+		if Created {
+			_TOML_InvalidateParseCache(Path)
+			Refusals := _TOML_WriteRefusals(), RefusalKey := _TOML_WriteRefusalKey(Path)
+			if Refusals.Has(RefusalKey)
+				Refusals.Delete(RefusalKey)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _CMGS_Collision in [true, false]
+	Test("config migration stage: foreign collision=" . _CMGS_Collision . " (config-migration-stage-ownership)", _CMGS_ForeignStage.Bind(_CMGS_Collision))

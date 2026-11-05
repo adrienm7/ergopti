@@ -821,3 +821,57 @@ for _TWSC_Kind in ["nul", "control", "literal"] {
 	Test("TOML actual scalar render: " . _TWSC_Kind . " (toml-write-scalar)", _TWSC_Render.Bind(_TWSC_Kind))
 	Test("TOML actual ordinary scalar write: " . _TWSC_Kind . " (toml-write-scalar)", _TWSC_Write.Bind(_TWSC_Kind))
 }
+
+_TUNS_Case(Kind) {
+	Payload := JsonParse(Kind == "section" ? '{"section":"owned\u0000foreign","key":"value"}'
+		: Kind == "key" ? '{"section":"owned","key":"value\u0000foreign"}' : '{"section":"owned","key":"value"}')
+	if Kind != "control" {
+		Name := Payload[Kind == "section" ? "section" : "key"]
+		AssertEqual(13, StrLen(Name), "the actual JSON name retains its complete prefix, NUL and suffix")
+		AssertEqual(0, NumGet(StrPtr(Name), 10, "UShort"))
+		AssertEqual(Ord("f"), NumGet(StrPtr(Name), 12, "UShort"))
+	}
+	Root := A_Temp . "\ergopti_toml_update_name_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\source.toml", Created := false
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(Path, '[owned]`nvalue = "Original"`n'))
+		Before := FSReadBytesStrict(Path)
+		Result := 0, Failure := 0
+		try Result := TOML_BatchWrite(Path, [{Section: Payload["section"], Key: Payload["key"], Value: "Edited"}])
+		catch as Err
+			Failure := Err
+		After := FSReadBytesStrict(Path)
+		Actual := TOML_ParseDocument(FSReadUtf8Exact(Path))["owned"]["value"]
+		_TestPrint("# toml-update-name kind=" . Kind . " result=" . Result . " actual-neighbor=" . Actual
+			. " exception=" . (IsObject(Failure) ? Type(Failure) : "none")
+			. " before-bytes=" . Before.Size . " after-bytes=" . After.Size)
+		if Kind == "control" {
+			if IsObject(Failure)
+				throw Failure
+			AssertTrue(Result)
+			AssertEqual("Edited", Actual)
+		} else {
+			if IsObject(Failure)
+				AssertTrue(Failure is ValueError || Failure is TypeError, "invalid native identities may refuse at the typed admission boundary")
+			else
+				AssertTrue(Result is Integer && Result == 0, "an unsupported update name cannot receive a native write ACK")
+			AssertEqual("Original", Actual, "a JSON name cannot borrow the distinct shorter native section or key")
+			AssertEqual(Before.Size, After.Size)
+			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+				"Ptr", After, "UPtr", Before.Size, "UPtr"))
+		}
+	} finally {
+		if Created {
+			_TOML_InvalidateParseCache(Path)
+			Refusals := _TOML_WriteRefusals(), Key := _TOML_WriteRefusalKey(Path)
+			if Refusals.Has(Key)
+				Refusals.Delete(Key)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _TUNS_Kind in ["section", "key", "control"]
+	Test("TOML actual update-name admission: " . _TUNS_Kind . " (toml-update-name-scalar)", _TUNS_Case.Bind(_TUNS_Kind))
