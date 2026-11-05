@@ -52,7 +52,7 @@ local function with_wrap(options, body)
 			state.moved = true
 			if options.change == "focus" then
 				focus.path = "/field/successor"
-				if point == "ctrl-down" then guard.invalidate() end
+				if point == "ctrl-down" or point == "paste-down" then guard.invalidate() end
 			elseif options.change == "password" then
 				focus.role = 40; guard.invalidate()
 			elseif options.change == "pause" then
@@ -111,7 +111,10 @@ local function with_wrap(options, body)
 				if code == 29 and value == 1 then transition("ctrl-down") end
 				if (options.native_failure == true and code == 47 and value == 1)
 					or (options.native_failure == "ctrl-down" and code == 29 and value == 1) then return false end
-				if code == 47 and value == 1 then state.documents[focus.path] = state.clipboard end
+				if code == 47 and value == 1 then
+					state.documents[focus.path] = state.clipboard
+					transition("paste-down")
+				end
 				return true
 			end })
 			injector._set_nanosleep_for_test(function(seconds)
@@ -131,7 +134,9 @@ local function with_wrap(options, body)
 						return accepted
 					end
 				end
-				state.result = injector.inject(...); return state.result
+				state.result = injector.inject(...)
+				if options.throw_after_inject then error("controlled exception after output") end
+				return state.result
 			end }, { __index = injector })
 			local environment = setmetatable({ opts = { dry_run = false }, shortcuts = shortcuts,
 				script_actions = { is_paused = function() return state.paused == true end },
@@ -197,6 +202,20 @@ helpers.describe("wrap output publication ownership", function()
 		end
 	end
 
+	helpers.it("consumes the symbol when focus retires immediately after the paste DOWN (wrap-output-owner)", function()
+		with_wrap({ change = "focus", boundary = "paste-down" }, function(state)
+			helpers.assert_true(state.moved)
+			helpers.assert_eq(state.documents["/field/original"], "‘selected’")
+			helpers.assert_eq(state.documents["/field/successor"], "SAFE")
+			helpers.assert_eq(state.consumed, true)
+			helpers.assert_eq(state.result.ok, false)
+			helpers.assert_eq(state.result.cleanup_ok, true)
+			helpers.assert_true(state.result.payload_attempted)
+			helpers.assert_eq(state.resets, 0, "a retired field cannot reset a successor buffer")
+			helpers.assert_eq(state.stops, 0)
+		end)
+	end)
+
 	helpers.it("preserves a successor selection opened during clipboard I/O", function()
 		with_wrap({ change = "successor", boundary = "clipboard-read" }, function(state)
 			helpers.assert_eq(state.moved, true)
@@ -211,7 +230,9 @@ helpers.describe("wrap output publication ownership", function()
 	for _, failure in ipairs({ "false", "throw" }) do
 		helpers.it("keeps clipboard restoration " .. failure .. " observable and fatal", function()
 			with_wrap({ restore_failure = failure }, function(state)
-				helpers.assert_eq(state.consumed, false)
+				helpers.assert_eq(state.consumed, true, "the paste was already attempted")
+				helpers.assert_true(state.result.payload_attempted)
+				helpers.assert_eq(state.resets, 1, "attempted output invalidates the buffered caret")
 				helpers.assert_eq(state.result.ok, false)
 				helpers.assert_eq(state.stops, 1)
 				helpers.assert_true(state.errors > 0, "restoration failures must retain the real error observer")
@@ -219,6 +240,16 @@ helpers.describe("wrap output publication ownership", function()
 			end)
 		end)
 	end
+
+	helpers.it("consumes the symbol if the injector raises after emitting the replacement (wrap-output-owner)", function()
+		with_wrap({ throw_after_inject = true }, function(state)
+			helpers.assert_eq(state.consumed, true)
+			helpers.assert_true(state.result.payload_attempted)
+			helpers.assert_eq(state.documents["/field/original"], "‘selected’")
+			helpers.assert_eq(state.resets, 1)
+			helpers.assert_true(state.errors > 0)
+		end)
+	end)
 
 	helpers.it("keeps an exception from Main type_text observable as an error", function()
 		with_wrap({ throw_inject = true }, function(state)
@@ -244,7 +275,8 @@ helpers.describe("wrap output publication ownership", function()
 
 	helpers.it("keeps a real native paste failure fatal and restores the clipboard", function()
 		with_wrap({ native_failure = true }, function(state)
-			helpers.assert_eq(state.consumed, false)
+			helpers.assert_eq(state.consumed, true, "a failed DOWN acknowledgement may still have changed text")
+			helpers.assert_true(state.result.payload_attempted)
 			helpers.assert_eq(state.result.ok, false)
 			helpers.assert_eq(state.result.cleanup_ok, true)
 			helpers.assert_eq(state.stops, 1)
@@ -269,7 +301,7 @@ if os.getenv("ERGOPTI_WRAP_STORAGE_CHILD") ~= "1" then
 					.. "assert(package.loaded['adapters.storage'] == nil, 'the child store must start cold')\n"
 					.. "require('tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner')\n"
 					.. "local results = require('tests.helpers').get_results()\n"
-					.. "assert(results.passed == 33 and results.failed == 0, 'all actual wrap scenarios must pass')\n"
+					.. "assert(results.passed == 35 and results.failed == 0, 'all actual wrap scenarios must pass')\n"
 					.. "local storage = require('adapters.storage')\n"
 					.. "assert(storage.path() == os.getenv('XDG_CONFIG_HOME') .. '/ergopti_plus/storage.json', 'the store must remain private')\n"
 					.. "assert(storage.set('wrap_fixture_sentinel', 'kept') == true, 'the real store must acknowledge publication')\n"

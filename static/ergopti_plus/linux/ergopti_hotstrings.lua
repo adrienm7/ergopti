@@ -2031,7 +2031,7 @@ local function main()
 		end,
 		get_pair = function(char) return shortcuts and shortcuts.get_wrap_pair(char) or nil end,
 		read_primary = require("adapters.clipboard").read_primary,
-		type_text = function(text, owner)
+		type_text = function(text, owner, on_payload_attempt)
 			if opts.dry_run then return false end
 			if type(owner) ~= "table" or type(owner.current) ~= "function"
 				or type(owner.cached) ~= "function" then return false end
@@ -2046,13 +2046,20 @@ local function main()
 				current = function() return retained(current) and destination.current() and retained(current) end,
 				cached = function() return retained(cached) and destination.cached() and retained(cached) end,
 			}
-			local result = injector.inject(0, text, false, nil, publication)
-			if type(result) ~= "table" or result.ok ~= true then return false end
-			-- The caret moved over replaced text: what the engine buffered no longer
-			-- describes the line, and what precedes the caret is not known.
-			_undoable = nil
-			engine:reset(false)
-			return true
+			local attempted = false
+			local injected, result = pcall(injector.inject, 0, text, false, nil, publication, function()
+				attempted = true
+				if type(on_payload_attempt) == "function" then on_payload_attempt() end
+			end)
+			if injected and type(result) == "table" then attempted = attempted or result.payload_attempted == true end
+			if (attempted or (injected and type(result) == "table" and result.ok == true)) and publication.current() then
+				-- Invalidate the original caret state only while it is still owned;
+				-- a reentrant focus change may already have a successor buffer.
+				_undoable = nil
+				engine:reset(false)
+			end
+			if not injected then error(result, 0) end
+			return type(result) == "table" and result.ok == true, attempted
 		end,
 	})
 	privacy_owners.end_wrap_selection = wrap_on_type.end_selection_window

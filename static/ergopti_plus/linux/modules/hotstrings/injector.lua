@@ -883,7 +883,7 @@ end
 ---   log, which the driver keeps for 14 days at a level that prints TRACE.
 --- @param replay_terminator string|nil Exact non-consumed carrier to type last.
 --- @param publication table|nil Retained full-phase and cached-key admission guards.
-function M.inject(backspace_count, replacement_text, is_private, replay_terminator, publication)
+function M.inject(backspace_count, replacement_text, is_private, replay_terminator, publication, on_payload_attempt)
 	if type(backspace_count) ~= "number" or type(replacement_text) ~= "string"
 			or (replay_terminator ~= nil and type(replay_terminator) ~= "string") then
 		-- The TYPES, not the values. This branch is reached BECAUSE the arguments
@@ -925,6 +925,7 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 		return failure
 	end
 
+	local payload_attempted = false
 	local ran, result = pcall(run_transaction, "inject()", function(tx)
 		-- Phase 1: erase the trigger (and terminator if consumed).
 		if backspace_count > 0 then
@@ -943,8 +944,15 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 			require_publication(publication, false)
 			send_terminator(tx, replay_terminator)
 		end
-	end, publication, prepared, nil, is_private)
-	local clipboard_closed = prepared.close_clipboard()
+	end, publication, prepared, function(code, phase)
+		if phase == Errors.REPLACEMENT_KEY_DOWN
+			or (phase == Errors.CLIPBOARD_PASTE_CHORD and code ~= EvdevCodes.KEY_LEFTCTRL) then
+			payload_attempted = true
+			if type(on_payload_attempt) == "function" then on_payload_attempt() end
+		end
+	end, is_private)
+	local closed_ok, clipboard_closed = pcall(prepared.close_clipboard)
+	clipboard_closed = closed_ok and clipboard_closed == true
 	if not ran then
 		result = { ok = false, error = "output transaction raised before its cleanup receipt", failed_phase = "output transaction",
 			cleanup_ok = false, native_cleanup_ok = false }
@@ -955,6 +963,7 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 	end
 	if not ran or not clipboard_closed then stop_after_failure(result, "inject()") end
 
+	result.payload_attempted = payload_attempted
 	if result.ok then
 		Logger.done(LOG, "inject(): done (bc=%d).", backspace_count)
 		notify_output(replacement_text .. (replay_terminator or ""), is_private)
