@@ -363,10 +363,12 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("pushes the curated Ollama catalogue and routes exact page actions", function()
       local selected, download = nil, nil
+      local cache_identity = {}
       handler._reset()
       local state = {
         llm = {
           get_cached_models = function() return { "qwen3.5:0.8b" } end,
+          get_cached_models_status = function() return { "qwen3.5:0.8b" }, true, cache_identity end,
           get_current_model = function() return "qwen3.5:0.8b" end,
           refresh_models = function() return {} end,
           set_model = function(name) selected = name; return true end,

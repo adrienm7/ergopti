@@ -2327,6 +2327,7 @@
 	"model_browser.add_provider_label": "API-udbyder, der skal tilføjes",
 	"model_browser.add_provider_button": "Tilføj denne udbyder…",
 	"model_browser.status_downloading": "Henter…",
+	"model_browser.inventory_unavailable": "Listen over installerede modeller er ikke tilgængelig.",
 	"model_browser.install_runtime": "Installér %s",
 	"model_browser.install_installed": "Allerede installeret på denne computer.",
 	"model_browser.install_running": "Installerer {name}…",

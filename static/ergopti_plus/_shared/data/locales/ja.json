@@ -2327,6 +2327,7 @@
 	"model_browser.add_provider_label": "追加する API プロバイダー",
 	"model_browser.add_provider_button": "このプロバイダーを追加…",
 	"model_browser.status_downloading": "ダウンロード中…",
+	"model_browser.inventory_unavailable": "インストール済みモデルの一覧を取得できません。",
 	"model_browser.install_runtime": "%s をインストール",
 	"model_browser.install_installed": "このコンピューターにはインストール済みです。",
 	"model_browser.install_running": "{name} をインストール中…",

@@ -149,7 +149,7 @@ function M.new(context)
 		if not authorized(frame) then frame.finishing = false; cancel_frame(frame); return end
 		if follow_mutation(frame) then return end
 		if names then
-			cache = { frame = frame, models = models }
+			cache = { frame = frame, models = models, identity = {} }
 			Logger.info(LOG, "Fetched %d model(s) from Ollama.", #models)
 		else Logger.warn(LOG, "Ollama model inventory is unavailable.") end
 		if follow_mutation(frame) then return end
@@ -211,7 +211,7 @@ function M.new(context)
 		if not source_current(frame) or not unchanged() then return {} end
 		local cached = observed_cache and source_current(observed_cache.frame)
 		if not unchanged() then return {} end
-		if not explicit and cached then return copy_models(observed_cache.models) end
+		if not explicit and cached then return copy_models(observed_cache.models), true, observed_cache.identity end
 		if not explicit and not cold then return {} end
 		if observed_active then
 			if mutation and authorized(observed_active) and unchanged() and source_current(frame) and unchanged() then
@@ -232,10 +232,18 @@ function M.new(context)
 
 	--- Returns the validated cache and reserves at most one cold acquisition.
 	--- @return table models Immediate array projection.
-	function owner.get() return project(false, true) end
+	function owner.get() local models = project(false, true); return models end
 	--- Returns only a validated cache; never starts acquisition.
 	--- @return table models Immediate array projection.
-	function owner.peek() return project(false, false) end
+	function owner.peek() local models = project(false, false); return models end
+	--- Projects the cache and whether it belongs to the current source.
+	--- @return table models
+	--- @return boolean known
+	--- @return table|nil identity Opaque identity of the exact published cache.
+	function owner.peek_status()
+		local models, known, identity = project(false, false)
+		return models, known == true, identity
+	end
 	--- Requests one coalesced explicit acquisition and returns immediately.
 	--- @return table models Immediate array projection.
 	function owner.refresh() return project(true, false) end

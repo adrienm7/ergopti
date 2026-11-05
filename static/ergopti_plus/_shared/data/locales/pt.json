@@ -2327,6 +2327,7 @@
 	"model_browser.add_provider_label": "Fornecedor de API a adicionar",
 	"model_browser.add_provider_button": "Adicionar este fornecedor…",
 	"model_browser.status_downloading": "A transferir…",
+	"model_browser.inventory_unavailable": "A lista de modelos instalados não está disponível.",
 	"model_browser.install_runtime": "Instalar %s",
 	"model_browser.install_installed": "Já instalado neste computador.",
 	"model_browser.install_running": "A instalar {name}…",

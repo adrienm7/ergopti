@@ -2327,6 +2327,7 @@
 	"model_browser.add_provider_label": "要添加的 API 提供商",
 	"model_browser.add_provider_button": "添加此提供商…",
 	"model_browser.status_downloading": "正在下载…",
+	"model_browser.inventory_unavailable": "已安装模型的列表不可用。",
 	"model_browser.install_runtime": "安装 %s",
 	"model_browser.install_installed": "已安装在此电脑上。",
 	"model_browser.install_running": "正在安装 {name}…",

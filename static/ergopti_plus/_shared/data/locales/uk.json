@@ -2327,6 +2327,7 @@
 	"model_browser.add_provider_label": "Постачальник API для додавання",
 	"model_browser.add_provider_button": "Додати цього постачальника…",
 	"model_browser.status_downloading": "Завантаження…",
+	"model_browser.inventory_unavailable": "Список установлених моделей недоступний.",
 	"model_browser.install_runtime": "Встановити %s",
 	"model_browser.install_installed": "Уже встановлено на цьому комп’ютері.",
 	"model_browser.install_running": "Встановлення {name}…",

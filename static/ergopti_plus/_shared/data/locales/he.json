@@ -2327,6 +2327,7 @@
 	"model_browser.add_provider_label": "ספק API להוספה",
 	"model_browser.add_provider_button": "הוספת ספק זה…",
 	"model_browser.status_downloading": "מוריד…",
+	"model_browser.inventory_unavailable": "רשימת המודלים המותקנים אינה זמינה.",
 	"model_browser.install_runtime": "התקנת %s",
 	"model_browser.install_installed": "כבר מותקן במחשב זה.",
 	"model_browser.install_running": "מתקין את {name}…",

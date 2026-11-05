@@ -2327,6 +2327,7 @@
 	"model_browser.add_provider_label": "Eklenecek API sağlayıcısı",
 	"model_browser.add_provider_button": "Bu sağlayıcıyı ekle…",
 	"model_browser.status_downloading": "İndiriliyor…",
+	"model_browser.inventory_unavailable": "Yüklü modellerin listesi kullanılamıyor.",
 	"model_browser.install_runtime": "%s yükle",
 	"model_browser.install_installed": "Bu bilgisayarda zaten yüklü.",
 	"model_browser.install_running": "{name} yükleniyor…",

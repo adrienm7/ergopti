@@ -2327,6 +2327,7 @@
 	"model_browser.add_provider_label": "Toe te voegen API-aanbieder",
 	"model_browser.add_provider_button": "Deze aanbieder toevoegen…",
 	"model_browser.status_downloading": "Downloaden…",
+	"model_browser.inventory_unavailable": "De lijst met geïnstalleerde modellen is niet beschikbaar.",
 	"model_browser.install_runtime": "%s installeren",
 	"model_browser.install_installed": "Al geïnstalleerd op deze computer.",
 	"model_browser.install_running": "{name} wordt geïnstalleerd…",

@@ -2327,6 +2327,7 @@
 	"model_browser.add_provider_label": "추가할 API 공급자",
 	"model_browser.add_provider_button": "이 공급자 추가…",
 	"model_browser.status_downloading": "다운로드 중…",
+	"model_browser.inventory_unavailable": "설치된 모델 목록을 사용할 수 없습니다.",
 	"model_browser.install_runtime": "%s 설치",
 	"model_browser.install_installed": "이 컴퓨터에 이미 설치되어 있습니다.",
 	"model_browser.install_running": "{name} 설치 중…",
