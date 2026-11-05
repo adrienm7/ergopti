@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **131 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **132 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1961,3 +1961,15 @@ Replay42065111326 at e152e4ed passes74/75 selected cases in each order, with pro
 The original completion detaches A, an actual AHK timer admits B at the open cutpoint, then A stops the shared poller. B remains owned with0 retirements and0 completions after619ms despite its expired10ms fixture deadline. Both orders reproduce. Native scheduling is real; the process is an explicit passive port and no physical display effect is claimed. The same source separation exists at9154723b.
 
 Commit632b4b35 makes detach/disarm atomic and carries the observed id from poll to cancellation, keeping process retirement outside the short claim. A stale-poll successor control accompanies the original real-timer regression. Postfix native qualification is pending.
+
+### Native qualification: replay61
+
+Replay42068231096 at d89176eb passes54/61 selected cases in both orders. Production parsing passes; every E2E flag is unselected. It qualifies the6 constructor cases and8 prior bootstrap controls, all12 selected launch/path controls, all13 brightness controls and5 native PNG geometry cases. The brightness worker remains an explicit process port; generated PNGs are real GDI+ output and do not capture the desktop.
+
+Seven failures remain admitted: generic and display-sleep jobs execute after a fully settled Suspend/Resume (126), active Backspace ignores its fresh private receipt (128), a second model writer outlives its native window (129), older native Hide overwrites a newer Show (109), and two display discovery calls publish an effect while actually suspended (132). Their corresponding ordinary controls pass. Source0c1cb487,3d9c15e2,ba03a328,8dd602fe and64e3c737 address those scopes; their postfix qualification is pending. The actual WM_CLOSE dispatcher is tested separately because AutoHotkey may apply a default Cancel after a false GUI-event return; a direct handler call is not that proof.
+
+### AHK-132: Display discovery loses pause admission before its effect
+
+Both real display-buffer query stages can yield to native Suspend. The current action still applies one recorded topology and remembers it with suspended1. The private effect port protects the runner's screens; unchanged controls prove the ordinary action, and both orders repeat. This discovery-to-effect omission differs from126 stale deferred work after resume.
+
+Source64e3c737 revalidates suspension and the original canonical lifecycle after each native read, before the first apply. It leaves bookkeeping after acknowledged application intact. Selected native postfix qualification is pending. Other actions interrupted during discovery are new probes, not additional confirmed variants or counts.
