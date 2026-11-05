@@ -26,6 +26,30 @@ module.exports = function (sources, manifest, menuSources) {
 				nativeLinuxAiParentPublication({ ...sources, [file]: body }, manifest, kind, 'linux')
 		])
 	];
+	const agentFile = 'linux/ui/menu/agent_rows.lua';
+	const identityImport = 'local AppIdentity = require("llm.app_identity")';
+	assert.equal(
+		sources[agentFile].split(identityImport).length - 1,
+		1,
+		'one actual app identity import'
+	);
+	for (const [name, credits] of ports.slice(1)) {
+		const changed = sources[agentFile].replace(
+			identityImport,
+			'local AppIdentity = require("foreign.app_identity")'
+		);
+		const kind = name;
+		assert.equal(
+			nativeLinuxAiParentPublication({ ...sources, [agentFile]: changed }, manifest, kind, 'linux'),
+			false,
+			name + ': a foreign app identity owner cannot certify the route'
+		);
+		assert.equal(
+			credits(source),
+			true,
+			name + ': restoring the real app identity owner restores the route'
+		);
+	}
 	const imported = 'local NativePresentation = require("infra.native_presentation")';
 	const captured =
 		'local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title';
