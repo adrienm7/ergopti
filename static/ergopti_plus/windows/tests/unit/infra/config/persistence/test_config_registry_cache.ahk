@@ -227,3 +227,53 @@ _CRC_StaleIsInfoCorruptionWarns() {
 }
 Test("registry cache: a stale cache is an INFO miss, a tampered one warns (registry-cache-stale-info)",
 	_CRC_StaleIsInfoCorruptionWarns)
+
+_CRC_PendingOwnsSourceModel(MutateReturned) {
+	global _ConfigRegistryCachePending
+	SavedPending := _ConfigRegistryCachePending
+	Root := A_Temp . "\ergopti_registry_pending_owner_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	SourcePath := Root . "\registry.toml", CachePath := Root . "\registry.cache", Created := false
+	Source := '[registry]`ncurrent_version = 2`nunstamped_version = 1`n'
+		. '[steps.v1_to_v2]`nfrom = 1`nto = 2`ndrivers = ["ahk"]`nreason = "owned source"`n'
+		. 'ops = [{ op = "rename", section = "data", key = "old", to_key = "new" }]`n'
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(SourcePath, Source))
+		Before := FSReadBytesStrict(SourcePath)
+		Registry := ConfigRegistryCacheLoad(SourcePath, CachePath)
+		AssertEqual("new", Registry["steps"][1]["ops"][1]["to_key"])
+		Mutable := MutateReturned ? Registry : ManifestCloneValue(Registry)
+		Mutable["steps"][1]["ops"][1]["to_key"] := "foreign"
+		AssertTrue(ConfigRegistryCacheFlushPending(), "the real deferred encoder and native publication must complete")
+		Fresh := ConfigRegistryCacheLoad(SourcePath, CachePath)
+		Plan := ConfigMigratePlan('[data]`nold = "Original"`n', Fresh, "ahk")
+		ActualKey := Fresh["steps"][1]["ops"][1]["to_key"]
+		After := FSReadBytesStrict(SourcePath)
+		_TestPrint("# registry-pending-owner mutate_returned=" . MutateReturned
+			. " cached_to_key=" . ActualKey . " plan=" . Plan["outcome"]
+			. " has_new=" . (Plan.Has("model") && Plan["model"].Has("data") && Plan["model"]["data"].Has("new"))
+			. " has_foreign=" . (Plan.Has("model") && Plan["model"].Has("data") && Plan["model"]["data"].Has("foreign"))
+			. " before_bytes=" . Before.Size . " after_bytes=" . After.Size)
+		AssertEqual(Before.Size, After.Size)
+		AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+			"Ptr", After, "UPtr", Before.Size, "UPtr"), "the authoritative source must never be altered by this probe")
+		AssertEqual("new", ActualKey, "a cache must retain the source parse, independently of a returned runtime registry")
+		AssertEqual("migrated", Plan["outcome"])
+		AssertEqual("Original", Plan["model"]["data"]["new"])
+		AssertFalse(Plan["model"]["data"].Has("foreign"), "fresh migrations must follow the still-authoritative registry source")
+	} finally {
+		_ConfigRegistryCachePending := SavedPending
+		if Created {
+			Pristine := _ConfigRegistryPristineStore()
+			if Pristine.Has(SourcePath)
+				Pristine.Delete(SourcePath)
+			_TOML_InvalidateParseCache(SourcePath)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _CRC_MutateReturned in [true, false]
+	Test("registry cache: pending source model owns returned mutation=" . _CRC_MutateReturned
+		. " (registry-pending-source-ownership)", _CRC_PendingOwnsSourceModel.Bind(_CRC_MutateReturned))
