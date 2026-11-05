@@ -1935,6 +1935,7 @@ end
 --- @param at_ms number Original event time.
 local function _run_owned_tap_frame(frame, tap, binding, exact, original_generation, origin, origin_view, source, at_ms)
 	if tap and _on_tap then
+		local delivered
 		local callback = _on_tap
 		local prior = _live_input_context
 		_live_input_context = nil
@@ -1962,17 +1963,105 @@ local function _run_owned_tap_frame(frame, tap, binding, exact, original_generat
 		if tap == "one_shot_shift" then
 			-- The action callback returns semantic intent only. Retain construction
 			-- originals: a late Manager snapshot of public ports is not an issuer.
-			frame.run(function(action, selected)
+			local ran, result = pcall(function() return frame.run(function(action, selected)
 				local requested = callback(action, selected)
 				if requested ~= tap or action ~= tap then return false end
 				local lease = original_input_hook_ports.capture_input_owner()
 				if not lease or original_input_hook_ports.input_owner_current(lease) ~= true then return false end
 				return original_input_hook_ports.arm_one_shot(lease) == true
 					and original_input_hook_ports.input_owner_current(lease) == true
-			end, _combination_source(source))
-		else frame.run(callback, _combination_source(source)) end
+			end, _combination_source(source)) end)
+			delivered = ran and result == true
+		else
+			local ran, result = pcall(function() return frame.run(callback, _combination_source(source)) end)
+			delivered = ran and result == true
+		end
 		_live_input_context = prior
+		return delivered == true
 	end
+	return tap == nil
+end
+
+-- Delivers an original wrapper's ordered journal one acknowledged step at a
+-- time. Each step owns the receipt of its own physical DOWN; a later key must
+-- never lend its source to an earlier one.
+local function _run_owned_journal(frame, exact, generation)
+	local broker = _broker
+	local retire_broker = type(broker) == "table" and rawget(broker, "retire") or nil
+	local function current()
+		return _running and _intercept and _remapper == exact
+			and _remapper_generation == generation and _broker == broker
+	end
+	local function refuse()
+		if current() and type(frame.abort) == "function" then
+			local called, retired = pcall(frame.abort)
+			if called and type(retired) == "table" and type(retired.rows) == "table"
+				and type(retired.frame) == "table" and type(retired.frame.ack) == "function" and current() then
+				local delivered, accepted = pcall(_deliver_owned_rows, exact, retired.rows, _device)
+				local observed, acknowledged = pcall(retired.frame.ack, delivered and accepted == true)
+				if delivered and accepted == true and observed and acknowledged == true and current() then
+					for _, token in ipairs(retired.frame.orphans or {}) do
+						if original_input_hook_ports.retire_buffered_input(token, exact) ~= true then
+							M.emergency_stop("ordered remap input retirement refused"); return false
+						end
+					end
+					return false
+				end
+			end
+		end
+		if current() then M.emergency_stop("ordered remap delivery refused")
+		elseif type(retire_broker) == "function" then pcall(retire_broker) end
+		return false
+	end
+	for _ = 1, 64 do
+		if not current() then return refuse() end
+		local called, step, state = pcall(frame.next)
+		if not called then return refuse() end
+		if step == nil then
+			if state == "done" then return true end
+			return refuse()
+		end
+		if type(step) ~= "table" or type(step.rows) ~= "table" or type(step.ack) ~= "function"
+			or type(step.admit) ~= "function" or type(step.finish) ~= "function"
+			or type(step.restore) ~= "function" or not step.buffered then return refuse() end
+		local buffered = original_input_hook_ports.buffered_input_view(step.buffered)
+		if not buffered or not current() then return refuse() end
+		local source = buffered.source
+		local delivered, accepted = pcall(_deliver_owned_rows, exact, step.rows, source, step)
+		local acknowledged, ack = pcall(step.ack, delivered and accepted == true)
+		if not delivered or accepted ~= true or not acknowledged or ack ~= true or not current() then return refuse() end
+		local admitted, allowed = pcall(function() return step.admit(_combination_source(source)) end)
+		if not admitted or allowed ~= true or not current() then return refuse() end
+		if step.tap ~= nil then
+			if type(step.run) ~= "function" or type(step.fresh) ~= "function" then return refuse() end
+			local checked, fresh = pcall(step.fresh)
+			if not checked or fresh ~= true or not current() then return refuse() end
+			local ran, delivered = pcall(_run_owned_tap_frame, step, step.tap, step.binding,
+				exact, generation, buffered.origin, buffered.origin_view, source, buffered.at_ms)
+			if not ran or delivered ~= true or not current() then return refuse() end
+			checked, fresh = pcall(step.fresh)
+			if not checked or fresh ~= true or not current() then return refuse() end
+		end
+		local restored_ok, restored, restore_frame = pcall(function() return step.restore(_combination_source(source)) end)
+		if not restored_ok or type(restored) ~= "table" or not current() then return refuse() end
+		if restore_frame then
+			if type(restore_frame.delivery_current) ~= "function" or type(step.fresh) ~= "function" then return refuse() end
+			local delivery_frame = { buffered = step.buffered, delivery_current = restore_frame.delivery_current, fresh = step.fresh }
+			local delivered_restore, restored_ack = pcall(_deliver_owned_rows, exact, restored, source, delivery_frame)
+			local observed, ack_restore = pcall(restore_frame.ack, delivered_restore and restored_ack == true)
+			if not delivered_restore or restored_ack ~= true or not observed or ack_restore ~= true or not current() then return refuse() end
+		elseif #restored ~= 0 then return refuse() end
+		-- An empty step can still commit a held layer or a one-shot state.
+		-- Its source must be fresh before that invisible state survives.
+		if #step.rows == 0 and step.tap == nil then
+			if type(step.fresh) ~= "function" then return refuse() end
+			local checked, fresh = pcall(step.fresh)
+			if not checked or fresh ~= true or not current() then return refuse() end
+		end
+		local finished, done = pcall(function() return step.finish(_combination_source(source)) end)
+		if not finished or done ~= true or not current() then return refuse() end
+	end
+	return refuse()
 end
 
 -- Position capture observes the original stream. It never suppresses a key,
@@ -2255,6 +2344,11 @@ local function _dispatch_event(ev, source)
 		if out then
 			if frame and frame.owned then
 				local exact = _remapper
+				if type(frame.next) == "function" then
+					if not _run_owned_journal(frame, exact, original_generation) then return end
+					if frame.replay then _remap_owned[owned_key] = nil; _dispatch_event(ev, source) end
+					return
+				end
 				local buffered = frame.buffered and original_input_hook_ports.buffered_input_view(frame.buffered) or nil
 				if frame.buffered and not buffered then M.emergency_stop("buffered input source refused"); return end
 				local delivery_source = buffered and buffered.source or source
@@ -2350,8 +2444,13 @@ _dispatch_owned_rows = function(rows, source, exact, frame)
 		if original_input_hook_ports.buffered_input_current(frame.buffered,false) ~= true or frame.delivery_current() ~= true then return false end
 		return _remapper == exact and _remapper_generation == generation and _broker == output
 	end
+	local function fresh()
+		if not frame or type(frame.fresh) ~= "function" then return true end
+		local called, current = pcall(frame.fresh)
+		return called and current == true
+	end
 	for _, row in ipairs(rows) do
-		if not buffered_current() then return false end
+		if not buffered_current() or not fresh() or not buffered_current() then return false end
 		if armed and (_remapper ~= exact or _remapper_generation ~= generation or _broker ~= output
 			or row.value ~= InputEvent.VALUE_UP and not _input_guard_current(armed)) then
 			_withdraw_input_arm(armed); return false
@@ -2363,7 +2462,8 @@ _dispatch_owned_rows = function(rows, source, exact, frame)
 			holder = row.holder or (exact.output_holder and exact:output_holder(row)), handoff = row.handoff, original_owner = row.physical == true }, source)
 		_owned_row_receipt = prior
 		if not dispatched then return false end
-		if receipt.count ~= 1 or receipt.accepted ~= true or not buffered_current() then return false end
+		if receipt.count ~= 1 or receipt.accepted ~= true or not buffered_current()
+			or not fresh() or not buffered_current() then return false end
 		if armed and (_remapper ~= exact or _remapper_generation ~= generation or _broker ~= output
 			or not _input_guard_current(armed)) then _withdraw_input_arm(armed); return false end
 	end
@@ -2427,8 +2527,10 @@ end
 --- the holds that came due (RCtrl's one-shot Shift past its threshold), each
 --- on the keyboard its key went down on.
 --- @param now_ms number
-_tick_remapper = function(now_ms)
+_tick_remapper = function(now_ms, journal_count)
 	if not (_remapper and _intercept) then return end
+	journal_count = journal_count or 0
+	if journal_count >= 64 then M.emergency_stop("ordered remap timer did not settle"); return false end
 	Perf.count("taphold.ticks")
 	local exact, generation, output = _remapper, _remapper_generation, _broker
 	local due_rows = exact:tick(now_ms)
@@ -2438,6 +2540,11 @@ _tick_remapper = function(now_ms)
 	for _, due in ipairs(due_rows) do
 		if not _remapper_batch_current(exact, generation, output) then return false end
 		if due.owned_rows then
+			if due.frame and type(due.frame.next) == "function" then
+				if #due_rows ~= 1 then M.emergency_stop("ordered remap timer returned an ambiguous batch"); return false end
+				if not _run_owned_journal(due.frame, exact, generation) then return false end
+				return _tick_remapper(now_ms, journal_count + 1)
+			else
 			local buffered = due.frame.buffered and original_input_hook_ports.buffered_input_view(due.frame.buffered) or nil
 			if due.frame.buffered and not buffered then M.emergency_stop("buffered deadline source refused"); return false end
 			local source = buffered and buffered.source or _device
@@ -2451,6 +2558,7 @@ _tick_remapper = function(now_ms)
 			if buffered then
 				if due.frame.admit(_combination_source(source)) ~= true then M.emergency_stop("buffered deadline terminal source refused"); return false end
 				_run_owned_tap_frame(due.frame,due.tap,due.binding,exact,generation,buffered.origin,buffered.origin_view,source,buffered.at_ms)
+			end
 			end
 		elseif due.tap ~= nil then
 			-- The action of a key replayed under a hold that just came due.

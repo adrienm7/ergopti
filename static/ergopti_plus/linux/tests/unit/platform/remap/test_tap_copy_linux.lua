@@ -111,6 +111,17 @@ helpers.describe("Linux tap-hold copy (tap-copy-verified)", function()
 		helpers.assert_eq(w.sends, 0)
 	end)
 
+	helpers.it("refuses the first copy if its source retires during destination capture", function()
+		local w = world()
+		local initial = 0
+		w.on_capture = function() w.source_current = false end
+		local accepted = w.owner:run("tap_hold", function() initial = initial + 1 end,
+			function() return w.source_current ~= false end)
+		helpers.assert_eq(accepted, false)
+		helpers.assert_eq(initial, 0)
+		w.advance(1000); helpers.assert_eq(w.sends, 0)
+	end)
+
 	helpers.it("does not retry after the original remap is replaced", function()
 		local w = world()
 		w.tap()
@@ -218,6 +229,18 @@ helpers.describe("Linux tap-hold copy (tap-copy-verified)", function()
 		helpers.assert_eq(w.sends, 0)
 		helpers.assert_eq(w.warnings, 0)
 	end)
+
+	for _, unsupported in ipairs({ false, true }) do
+		helpers.it("propagates an explicit first-copy refusal: unsupported=" .. tostring(unsupported), function()
+			local w = world(unsupported and { reason = "unsupported" } or nil)
+			local calls = 0
+			local accepted = w.owner:run("tap_hold", function() calls = calls + 1; return false end, function() return true end)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(calls, 1)
+			w.advance(1000)
+			helpers.assert_eq(w.sends, 0)
+		end)
+	end
 
 	helpers.it("a newer unsupported copy cancels the previous retry", function()
 		local options = {}

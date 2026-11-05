@@ -78,6 +78,13 @@ helpers.describe("configured Linux ordered pair ownership", function()
 		local restored, ack = frame.restore(origin()); helpers.assert_eq(rows(restored),"29:1"); helpers.assert_true(ack.ack(true))
 		helpers.assert_eq(rows(process(state,58,0,150)),"29:0", "first tap remains cancelled")
 	end)
+	helpers.it("propagates an explicit action refusal from the owned frame", function()
+		local state = make(); take(state)
+		local _, action, _, frame = process(state, 15, 0, 100)
+		helpers.assert_eq(action, "run_program")
+		helpers.assert_true(frame.ack(true))
+		helpers.assert_eq(frame.run(function() return false end, origin()), false)
+	end)
 	helpers.it("does not lift another owner's reference to the same modifier", function()
 		local state = make(nil,{ caps_lock = { tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3 },
 			left_shift = { tap_action="copy",hold_modifier="ctrl",time_activation_seconds=.3 } })
@@ -2154,5 +2161,29 @@ helpers.describe("complete combination collision claim source", function()
 			helpers.assert_true(f.owner.release_configuration(token)); helpers.assert_eq(frame.current(), false)
 			helpers.assert_true(Owner.capture_collision_inventory().current())
 		end)
+	end)
+end)
+
+helpers.describe("owned roll journal action acknowledgement", function()
+	helpers.it("does not advance a roll after an action explicitly refuses", function()
+		local Engine = require("platform.remap.tap_hold_engine")
+		local Pair = require("platform.remap.key_combination_engine")
+		local base = Engine.new({ keys = { space = { hold_modifier = "shift" }, escape = { tap_action = "copy" },
+			delete = { tap_action = "paste" } }, roll_keys = { "space" }, tap_min_ms = 0,
+			lone_tap_max_ms = 0, one_shot_timeout_ms = 1000 })
+		local proof = function() return { current = function() return true end, sealed = function() return true end } end
+		local ports = { capture_buffered_input = function() return {} end,
+			buffered_input_current = function() return true end,
+			buffered_input_view = function() return { source = "a", physical_generation = 1 } end }
+		local options = { keys = {}, capture = function() return nil end, capture_action = function() return nil end }
+		local pair = Pair.new(base, options, ports, nil, { capture_runtime = proof, capture_tap = proof, current = function() return true end })
+		local receipt = { source = "a", generation = 1, ready = true, physical = true, physical_down = {} }
+		pair:process(57, 1, 0, receipt); pair:process(1, 1, 10, receipt)
+		local _, _, _, journal = pair:process(111, 1, 20, receipt)
+		local first = assert(journal.next()); helpers.assert_true(first.ack(true)); helpers.assert_true(first.finish(receipt))
+		local action = assert(journal.next()); helpers.assert_eq(action.tap, "copy"); helpers.assert_true(action.ack(true))
+		helpers.assert_eq(action.run(function() return false end, receipt), false)
+		helpers.assert_eq(action.finish(receipt), false)
+		local next_step, reason = journal.next(); helpers.assert_eq(next_step, nil); helpers.assert_eq(reason, "refused")
 	end)
 end)

@@ -1063,13 +1063,15 @@ local function main()
 		end,
 		execute_action = function(action, binding)
 			if not action_catalogue then error("the action catalogue (gestures module) is not loaded") end
-			action_catalogue.execute_action(action, binding)
+			local accepted = action_catalogue.execute_action(action, binding)
+			if accepted == false then return false end
 			-- The command's keys (Ctrl+V for paste) go straight to the virtual
 			-- keyboard and never reach the hook: hotstrings.tap_hold_resets_word
 			-- decides here whether the next key starts a word.
 			local effect = WordReset.apply_tap_action(engine, binding)
 			if effect == "word_start" then _undoable = nil end
 			Logger.debug(LOG, "Tap action '%s' — hotstring word %s.", tostring(action), effect)
+			return accepted
 		end,
 		-- Every action the catalogue runs here, not only the gesture picker's
 		-- list: a tap set to one of the others must not read as unsupported.

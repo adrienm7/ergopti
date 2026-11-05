@@ -50,6 +50,64 @@ local LoneTap = require("tap_hold.lone_tap")
 local InputEvent = require("infra.input_event")
 
 local M = {}
+-- Only the installed wrapper supplies the hook-backed port. Pure engine users
+-- have no native authority and can leave it unset.
+local roll_origin_ports = setmetatable({}, { __mode = "k" })
+local roll_replay_origins = setmetatable({}, { __mode = "k" })
+local roll_origins = setmetatable({}, { __mode = "k" })
+local roll_journaling = setmetatable({}, { __mode = "k" })
+
+--- Installs the original source-capture port only while the engine is idle.
+function M:set_roll_origin_capture(capture, current)
+	if type(capture) ~= "function" or type(current) ~= "function" or self.undecided
+		or next(self.held) or next(self.key_refs) or next(self.layer_keys) or next(self.instant_down)
+		or next(self.native_keys) or next(self.passed_down) or next(self.physical_down) or next(self.one_shot_keys)
+		or next(self.one_shot_swallowed) or self.one_shot_until ~= nil
+		or roll_origins[self] and next(roll_origins[self]) then return false end
+	roll_origin_ports[self] = { capture = capture, current = current }
+	return true
+end
+
+--- Marks an origin delivered only after its exact journal step is acknowledged.
+function M:commit_roll_origin(token)
+	local pending = roll_origins[self]
+	if not pending or not pending[token] then return false end
+	pending[token] = nil
+	return true, next(pending) == nil
+end
+
+--- Returns the original uncommitted origins for the wrapper's retirement.
+function M:take_roll_origins()
+	local pending, result = roll_origins[self], {}
+	if pending then
+		for token in pairs(pending) do result[#result + 1] = token end
+	end
+	roll_origins[self] = nil
+	return result
+end
+
+local function capture_roll_origin(self, code, at_ms, receipt)
+	local replay = roll_replay_origins[self]
+	if replay and replay.code == code and replay.at_ms == at_ms then return replay end
+	local source = type(receipt) == "table" and { source = receipt.source, generation = receipt.generation,
+		source_owner = receipt.source_owner } or nil
+	local ports = roll_origin_ports[self]
+	if not ports then return { code = code, at_ms = at_ms, receipt = source } end
+	local ok, token = pcall(ports.capture, code, at_ms)
+	if not ok or type(token) ~= "table" then return nil end
+	local pending = roll_origins[self] or {}
+	roll_origins[self] = pending
+	pending[token] = true
+	return { code = code, at_ms = at_ms, token = token, receipt = source }
+end
+
+local function roll_origin_current(self, origin)
+	local ports = roll_origin_ports[self]
+	if not ports then return true end
+	if not origin or not origin.token then return false end
+	local ok, current = pcall(ports.current, origin.token)
+	return ok and current == true
+end
 
 local UP, DOWN, REPEAT = 0, 1, 2
 
@@ -353,9 +411,14 @@ function M:output_holder(row)
 	return nil
 end
 
-local function custody(self, code, value, physical)
+local function custody(self, code, value, physical, out)
+	local row = { code = code, value = value, physical = physical == true, holder = "hold" }
+	if roll_journaling[self] then
+		if out then out[#out + 1] = row end
+		return row
+	end
 	self.output_custody = self.output_custody or {}
-	self.output_custody[#self.output_custody + 1] = { code = code, value = value, physical = physical == true, holder = "hold" }
+	self.output_custody[#self.output_custody + 1] = row
 end
 
 --- Returns explicit suppressed ownership edges; never invents a native ACK.
@@ -371,7 +434,7 @@ local function press(self, out, code)
 	self.key_refs[code] = refs
 	if refs == 1 then
 		self.key_order[#self.key_order + 1] = code
-		if self.passed_down[code] then custody(self, code, DOWN)
+		if self.passed_down[code] then custody(self, code, DOWN, false, out)
 		else hold_row(self, out, code, DOWN) end
 	end
 end
@@ -388,7 +451,7 @@ local function release(self, out, code)
 	for index = #self.key_order, 1, -1 do
 		if self.key_order[index] == code then table.remove(self.key_order, index); break end
 	end
-	if self.passed_down[code] then custody(self, code, UP)
+	if self.passed_down[code] then custody(self, code, UP, false, out)
 	else hold_row(self, out, code, UP) end
 end
 
@@ -427,7 +490,7 @@ local function pass(self, code, value)
 	if value == REPEAT then return nil end
 	if MODIFIER_KEYS[code] then self.modifiers_down[code] = value == DOWN or nil end
 	self.passed_down[code] = value == DOWN or nil
-	if self.key_refs[code] then custody(self, code, value, true); return {} end
+	if self.key_refs[code] then local row = custody(self, code, value, true); return row and { row } or {} end
 	return nil
 end
 
@@ -789,14 +852,26 @@ end
 --- Runs one event through the engine and appends what comes out, the event
 --- itself when the engine passes it unchanged.
 --- @return string|table|nil tap As M:process returns it.
-local function replay(self, out, code, value, now_ms)
-	local events, tap, binding = self:process(code, value, now_ms)
-	if events == nil then
-		out[#out + 1] = { code = code, value = value, physical = true }
-	else
-		for _, event in ipairs(events) do out[#out + 1] = event end
+local function replay(self, out, code, value, now_ms, origin)
+	local receipt = origin and origin.receipt
+	if type(receipt) == "table" and type(receipt.source) == "string" then
+		receipt = { source = receipt.source, generation = receipt.generation, source_owner = receipt.source_owner,
+			source_current = true, physical_down = self.physical_down }
 	end
-	return tap, binding
+	local previous, previous_journaling = roll_replay_origins[self], roll_journaling[self]
+	roll_replay_origins[self] = origin
+	if roll_origin_ports[self] then roll_journaling[self] = true end
+	local ok, events, tap, binding, journal = pcall(self.process, self, code, value, now_ms, receipt)
+	roll_replay_origins[self], roll_journaling[self] = previous, previous_journaling
+	if not ok then error(events, 0) end
+	local rows = {}
+	if events == nil then
+		rows[1] = { code = code, value = value, physical = true }
+	else
+		for _, event in ipairs(events) do rows[#rows + 1] = event end
+	end
+	for _, event in ipairs(rows) do out[#out + 1] = event end
+	return tap, binding, rows, journal
 end
 
 --- Decides an undecided roll key and replays the keys struck meanwhile, in
@@ -805,10 +880,14 @@ end
 --- @param decision string "tap" or "hold".
 --- @param released boolean|nil True when the key itself came up.
 --- @return table out, string|table|nil tap As M:process returns them.
-local function resolve_roll(self, code, decision, now_ms, released)
+local function resolve_roll_body(self, code, decision, now_ms, released)
 	local config, state = self.by_code[code], self.held[code]
 	local out, tap, binding = {}, nil, nil
 	local queue = state.queue
+	if not roll_origin_current(self, state.origin) then return {}, nil, nil, { refused = true } end
+	for _, queued in ipairs(queue) do
+		if not roll_origin_current(self, queued) then return {}, nil, nil, { refused = true } end
+	end
 	state.undecided, state.queue = nil, nil
 	self.undecided = nil
 	if released then self.held[code] = nil end
@@ -831,34 +910,60 @@ local function resolve_roll(self, code, decision, now_ms, released)
 			tap = type_key_tap(self, out, config, roll_tap == "" and code or M.KEY_TAPS[roll_tap], now_ms)
 		end
 	end
-	for _, queued_code in ipairs(queue) do
-		local queued_tap, queued_binding = replay(self, out, queued_code, DOWN, now_ms)
+	local journal = { { rows = out, tap = tap, binding = binding, origin = state.origin and state.origin.token } }
+	-- Keep the first segment detached: replay appends to the legacy output too.
+	journal[1].rows = {}; for _, event in ipairs(out) do journal[1].rows[#journal[1].rows + 1] = event end
+	for _, queued in ipairs(queue) do
+		local queued_tap, queued_binding, rows, nested = replay(self, out, queued.code, DOWN, queued.at_ms, queued)
+		if nested and nested.refused then return out, tap, binding, nested end
+		if nested then for _, segment in ipairs(nested) do journal[#journal + 1] = segment end
+		else journal[#journal + 1] = { rows = rows, tap = queued_tap, binding = queued_binding, origin = queued.token } end
 		if tap == nil then tap, binding = queued_tap, queued_binding end
 	end
-	return out, tap, binding
+	return out, tap, binding, roll_origin_ports[self] and journal or nil
+end
+
+
+-- Custody transitions generated while resolving belong to the same ordered,
+-- acknowledged segment as the rest of that original input's output.
+local function resolve_roll(self, code, decision, now_ms, released)
+	local previous = roll_journaling[self]
+	if roll_origin_ports[self] then roll_journaling[self] = true end
+	local ok, rows, tap, binding, journal = pcall(resolve_roll_body, self, code, decision, now_ms, released)
+	roll_journaling[self] = previous
+	if not ok then error(rows, 0) end
+	return rows, tap, binding, journal
 end
 
 --- Another key's event while a roll key is undecided.
 --- @return boolean handled False for an event of a key that was down before
 ---   the roll key: its repeats and its release are its own.
 --- @return table|nil out, string|table|nil tap As M:process returns them.
-local function roll_other_key(self, pending, code, value, now_ms)
+local function roll_other_key(self, pending, code, value, now_ms, receipt)
 	local state = self.held[pending]
 	if value == DOWN then
-		state.queue[#state.queue + 1] = code
+		local origin = capture_roll_origin(self, code, now_ms, receipt)
+		if not origin then return true, {}, nil, nil, { refused = true } end
+		state.queue[#state.queue + 1] = origin
 		-- A second key struck before either came up: typing rolling on.
 		if #state.queue >= 2 then return true, resolve_roll(self, pending, "tap", now_ms) end
 		return true, {}
 	end
 	local waiting = false
-	for _, queued_code in ipairs(state.queue) do waiting = waiting or queued_code == code end
+	local queued_origin
+	for _, queued in ipairs(state.queue) do if queued.code == code then waiting, queued_origin = true, queued end end
 	if not waiting then return false end
 	if value == REPEAT then return true, {} end
 	-- Struck and let go while the roll key is still down: its hold.
-	local out, tap, binding = resolve_roll(self, pending, "hold", now_ms)
-	local released_tap, released_binding = replay(self, out, code, UP, now_ms)
+	local out, tap, binding, journal = resolve_roll(self, pending, "hold", now_ms)
+	if journal and journal.refused then return true, out, tap, binding, journal end
+	local released_tap, released_binding, rows, nested = replay(self, out, code, UP, now_ms, queued_origin)
+	if journal then
+		if nested then for _, segment in ipairs(nested) do journal[#journal + 1] = segment end
+		else journal[#journal + 1] = { rows = rows, tap = released_tap, binding = released_binding, origin = queued_origin.token } end
+	end
 	if tap == nil then tap, binding = released_tap, released_binding end
-	return true, out, tap, binding
+	return true, out, tap, binding, journal
 end
 
 --- Presses a layer chord for `code` and remembers it until the key comes up.
@@ -889,7 +994,7 @@ end
 --- @return string|table|nil tap What to run after them: a catalogue action, or
 ---   { type_text } for text the layout cannot type
 --- @return string|nil binding Exact tap_hold__ source of a catalogue action.
-local function process(self, code, value, now_ms, scoped)
+local function process(self, code, value, now_ms, scoped, receipt)
 	local config = self.by_code[code]
 	local out = {}
 	if not scoped and value == DOWN then
@@ -900,8 +1005,8 @@ local function process(self, code, value, now_ms, scoped)
 
 	-- A roll key not yet decided: the keys struck meanwhile wait for it.
 	if self.undecided and code ~= self.undecided then
-		local handled, events, tap, binding = roll_other_key(self, self.undecided, code, value, now_ms)
-		if handled then return events, tap, binding end
+		local handled, events, tap, binding, journal = roll_other_key(self, self.undecided, code, value, now_ms, receipt)
+		if handled then return events, tap, binding, journal end
 	end
 
 	-- A release is activity too, as on Windows (hook_dispatcher's _OnKeyUp): a
@@ -980,7 +1085,9 @@ local function process(self, code, value, now_ms, scoped)
 			cancel_taps(self, code)
 			-- A roll key takes nothing yet: the next events decide (resolve_roll).
 			if config.roll then
-				self.held[code] = { down_at = now_ms, cancelled = false, emitted = {}, undecided = true, queue = {} }
+				local origin = capture_roll_origin(self, code, now_ms, receipt)
+				if not origin then self.native_keys[code] = true; return pass(self, code, value) end
+				self.held[code] = { down_at = now_ms, cancelled = false, emitted = {}, undecided = true, queue = {}, origin = origin }
 				self.undecided = code
 				return out
 			end
@@ -1140,19 +1247,19 @@ function M:process(code, value, now_ms, receipt)
 		elseif not own then return {}
 		elseif value == UP then
 			self.held[code], group[source] = own.state, nil
-			local out, tap, binding = process(self, code, value, now_ms, scoped)
-			if source_holds[self] ~= groups or groups[code] ~= group then return out, tap, binding end
+			local out, tap, binding, journal = process(self, code, value, now_ms, scoped, receipt)
+			if source_holds[self] ~= groups or groups[code] ~= group then return out, tap, binding, journal end
 			local _, remaining = next(group)
 			if remaining then self.held[code], self.physical_down[code] = remaining.state, true
 			else groups[code] = nil end
-			return out, tap, binding
+			return out, tap, binding, journal
 		end
 	end
-	local out, tap, binding = process(self, code, value, now_ms, scoped)
+	local out, tap, binding, journal = process(self, code, value, now_ms, scoped, receipt)
 	if scoped and source_holds[self] == groups and value == DOWN and self.held[code] and not group then
 		groups[code] = { [source] = { state = self.held[code], generation = generation, native_owner = native_owner } }
 	end
-	return out, tap, binding
+	return out, tap, binding, journal
 end
 
 --- A click, its release or a wheel turn: it makes every held tap-hold key a
@@ -1217,7 +1324,8 @@ function M:tick(now_ms)
 	local out = {}
 	local pending = self.undecided
 	if pending and now_ms - self.held[pending].down_at > self.by_code[pending].threshold_ms then
-		local events, tap, binding = resolve_roll(self, pending, "hold", now_ms)
+		local events, tap, binding, journal = resolve_roll(self, pending, "hold", now_ms)
+		if roll_origin_ports[self] and journal then return { { roll_journal = journal } } end
 		for _, event in ipairs(events) do
 			event.owner = pending
 			out[#out + 1] = event
@@ -1253,7 +1361,7 @@ function M:release_all()
 	-- Keys the hand still holds stay down: they are the kernel's to release.
 	for index = #self.key_order, 1, -1 do
 		local code = self.key_order[index]
-		if self.passed_down[code] then custody(self, code, UP)
+		if self.passed_down[code] then custody(self, code, UP, false, out)
 		else hold_row(self, out, code, UP) end
 	end
 	self.held, self.layer_keys, self.layer_depth = {}, {}, 0

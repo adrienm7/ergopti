@@ -400,6 +400,24 @@ helpers.describe("word reset: the daemon wiring", function()
 			"a typed newline empties the terminal line only when nothing fired")
 	end)
 
+	helpers.it("does not reset a word or authorize a later action when the catalogue refuses", function()
+		local text = source("ergopti_hotstrings.lua")
+		local start = assert(text:find("execute_action = function(action, binding)", 1, true)) + #"execute_action = "
+		local finish = assert(text:find("\n\t\tend,\n", start, true)) + #"\n\t\tend" - 1
+		local resets, result = 0, false
+		local env = { action_catalogue = { execute_action = function() return result end },
+			WordReset = { apply_tap_action = function() resets = resets + 1; return "word_start" end },
+			Logger = { debug = function() end }, tostring = tostring, error = error, engine = {}, LOG = "test" }
+		local chunk = assert(loadstring("return " .. text:sub(start, finish)))
+		setfenv(chunk, env)
+		local execute = chunk()
+		helpers.assert_eq(execute("copy", "tap_hold__escape"), false)
+		helpers.assert_eq(resets, 0)
+		result = true
+		helpers.assert_true(execute("copy", "tap_hold__escape"))
+		helpers.assert_eq(resets, 1)
+	end)
+
 	helpers.it("word reset, tells the engine of each tap-hold command the catalogue runs", function()
 		local text = source("ergopti_hotstrings.lua")
 		local start = text:find("execute_action = function(action, binding)", 1, true)
