@@ -545,3 +545,46 @@ Test("tap-hold source: genuinely reloaded tap control stays writable (tap-hold-e
 	() => _THSO_ActualSource("tap", true))
 Test("tap-hold source: genuinely reloaded global delay control stays writable (tap-hold-external-source)",
 	() => _THSO_ActualSource("global", true))
+
+
+_THSO_NativeInheritanceOwned(Inherit, TargetPath) {
+	global TapHold, _SharedDir, _TomlFileCache, _ParseTomlCache, _ConfigTomlSnapshots
+	SplitPath(TargetPath, , &Root)
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	Assert((Created is Integer) && Created == 1, "the native-mode fixture exclusively owns its private root")
+	try {
+		Defaults := _SharedDir . "\tap_hold\defaults.toml"
+		Source := "[_meta]`nschema_version = " . TapHoldMigrationRegistry()["current"]
+			. "`n[tap_hold]`ninherit_defaults = " . (Inherit ? "true" : "false")
+			. '`n[tap_hold.keys.caps_lock]`ntap_action = "enter"`nhold_modifier = "ctrl"`n'
+		AssertEqual(1, FSWriteCreateDurable(TargetPath, Source))
+		TapHold := LoadTapHoldToml(TargetPath, Defaults)
+		AssertEqual("ctrl", TapHold["keys"]["caps_lock"]["hold_modifier"], "the real starting owner has an active hold")
+		Result := WriteTapHoldNative("caps_lock")
+		for Cache in [_TomlFileCache, _ParseTomlCache, _ConfigTomlSnapshots]
+			if Cache.Has(TargetPath)
+				Cache.Delete(TargetPath)
+		Reloaded := LoadTapHoldToml(TargetPath, Defaults)
+		Entry := Reloaded["keys"].Get("caps_lock", Map())
+		Tap := Entry.Get("tap_action", ""), Modifier := Entry.Get("hold_modifier", ""), Layer := Entry.Get("hold_layer", "")
+		_TestPrint("# tap-hold native inherit=" . Inherit . " result=" . Result . " reloaded_tap=" . Tap
+			. " reloaded_modifier=" . Modifier . " reloaded_layer=" . Layer)
+		AssertEqual(1, Result, "the real native command must complete before its roundtrip is judged")
+		AssertEqual("", Tap, "native mode remains a native tap after reloading the actual file")
+		AssertEqual("", Modifier, "native mode cannot revive a modifier from the shipped defaults")
+		AssertEqual("", Layer, "native mode cannot revive a layer from the shipped defaults")
+	} finally {
+		for Cache in [_TomlFileCache, _ParseTomlCache, _ConfigTomlSnapshots]
+			if Cache.Has(TargetPath)
+				Cache.Delete(TargetPath)
+		if Created
+			DirDelete(Root, true)
+	}
+}
+
+_THSO_NativeInheritance(Inherit) {
+	return _THHS_WithNativeFixture(_THSO_NativeInheritanceOwned.Bind(Inherit))
+}
+for _THSO_Inherit in [true, false]
+	Test("tap-hold native: actual reload inheritance=" . _THSO_Inherit . " (tap-hold-native-inheritance)",
+		_THSO_NativeInheritance.Bind(_THSO_Inherit))
