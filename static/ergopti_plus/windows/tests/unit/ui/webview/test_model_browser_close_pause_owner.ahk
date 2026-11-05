@@ -315,3 +315,6 @@ Test("Native model backend admission: a newer public model setter supersedes the
 
 Test("Native model backend admission: pause/resume at the second schema entry cannot adopt new authority (model-browser-native-backend-second-admission)",
 	_MBPT_Case.Bind("native-backend-second-schema-pause"))
+
+Test("Native model backend admission: replacement at the real second writer entry cannot publish (model-browser-native-backend-writer-owner)",
+	_MBPT_Case.Bind("native-backend-second-writer-replaced"))
