@@ -4198,4 +4198,24 @@ for (const host of ['windows', 'macos', 'linux']) {
 		assert.equal(vm.runInContext('format_number_plain(1234.5)', page.context), '1\u00a0234,5');
 	});
 }
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} preserves fractional milliseconds in the exact table tooltip`, () => {
+		const page = loadMetricsTypingPage(host);
+		freezePageClock(page, '2026-10-27T12:00:00Z');
+		const manifest = { '2026-10-27': { 'Editor.exe': { chars: 2, time: 2469 } } };
+		publishTypingPage(page, host, manifest);
+		deliverTypingManifest(page, host, manifest, {
+			range: { historical: {}, today: { 'Editor.exe': { c: { a: { c: 2, t: 2469 } } } } }
+		});
+		vm.runInContext("app_state.current_tab = 'c';", page.context);
+		page.context.render_current_tab();
+		page.timers.at(-1)();
+		const html = page.elements.get('metrics_table_body').innerHTML;
+		assert.ok(html.includes('title="1\u202f234,5">1\u00a0234,5</span> ms'), html);
+		assert.match(
+			vm.runInContext('format_number(1000000.1234)', page.context),
+			/title="1\u202f000\u202f000,1234"/
+		);
+	});
+}
 console.log(`${passed} passed, 0 failed.`);
