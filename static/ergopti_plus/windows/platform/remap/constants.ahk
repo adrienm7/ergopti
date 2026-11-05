@@ -112,6 +112,10 @@ TapHoldLoneTapReadConfig(Cache) {
 		return
 	}
 	Value := Stored[ConfigLeaf.LONE_MODIFIER_TAP_MAX_MS]
+	; Native Boolean and numeric values share AHK Integer storage; the actual
+	; boot source owns the authored type. Detached runtime maps keep their reader.
+	if ConfigTomlTryReadBootValue(Cache, ConfigLeaf.TAP_HOLDS, ConfigLeaf.LONE_MODIFIER_TAP_MAX_MS, &Admitted)
+		Value := Admitted
 	try TapHoldSetLoneTapMaxMs(IsInteger(Value) ? Integer(Value) : Value)
 	catch as Err {
 		LoggerWarn("TapHold", "[tap_holds] lone_modifier_tap_max_ms = '{1}' is refused ({2}): the default {3} ms applies.",
