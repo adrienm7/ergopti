@@ -16,6 +16,16 @@ _TNLC_Source() {
  Start := InStr(Passive, "global _LCPC_World := 0"), Stop := InStr(Passive, "class _LCPC_Handle {")
  AssertTrue(Start > 0 && Stop > Start, "Only explicit unrelated lifecycle ports are copied")
  Source .= SubStr(Passive, Start, Stop - Start) . "`n"
+ LedgerOwner := _DriverProductionFileForSymbol("KeyboardArbiterEnsureForLedger", _DriverDir)
+ AssertTrue(LedgerOwner != "" && FileExist(LedgerOwner) != "", "The unrelated native resume owner must exist")
+ AssertTrue(_DriverFuncBody("KeyboardArbiterEnsureForLedger") != "", "The passive port corresponds to an actual production owner")
+ ; This child has no global keyboard hook. Count the unrelated resume request;
+ ; never install an owner or substitute TakeNote's lifecycle admission.
+ Source .= 'KeyboardArbiterEnsureForLedger(StartFn := 0) {' . "`n"
+  . '`tAck := _LCPC_Pass("keyboard-ledger")' . "`n"
+  . '`tif !(Ack is Integer) || Ack != 1' . "`n"
+  . '`t`tthrow Error("The passive keyboard ledger must acknowledge exactly 1")' . "`n"
+  . '`treturn Ack' . "`n}" . "`n"
  Owner := _DriverProductionFileForSymbol("TakeNoteRequest", _DriverDir)
  AssertTrue(Owner != "")
  Source .= "#Include " . Owner . "`n"
