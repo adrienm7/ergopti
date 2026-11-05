@@ -346,6 +346,16 @@ end)
 
 
 helpers.describe("sqlite_command — diagnostics carry no typed text", function()
+	helpers.it("linux-sqlite-error-privacy: never logs sqlite's echoed SQL source", function()
+		local diagnostic = [[Parse error near line 1: near ";": syntax error
+  SELECT 'private_token_456' FROM ;
+                    error here ---^
+]]
+		local msg = Cmd.sanitise_error(diagnostic)
+		assert_absent(msg, "private_token_456", "single-quoted user input must never reach logs")
+		helpers.assert_contains(msg, "syntax error")
+		helpers.assert_eq(Cmd.sanitise_error("unrecognized payload_private_789"), "SQLite command failed")
+	end)
 	helpers.it("redacts the SQL fragment sqlite3 echoes back", function()
 		local msg = Cmd.sanitise_error('Error: near line 1: near "my secret password": syntax error')
 		assert_absent(msg, "my secret password", "the echoed token is user-typed text")
