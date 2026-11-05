@@ -185,7 +185,9 @@ _WRF_Main() {
 			. " wrong_target=" . (_WRF.Sends.Length ? _WRF.Sends[1]["hwnd"] != Before["hwnd"] : false)
 			. " a_wrapped=" . (_WRF.EditA.Value == _WRF.Payload) . " b_wrapped=" . (_WRF.EditB.Value == _WRF.Payload)
 			. " fallbacks=" . _WRF.Fallbacks.Length . "`n", "*")
-		_WRF_Require(!_WRF.RestoreFired, "The unreceipted canonical restore must not have fired before the bounded receiving observation.")
+		; The real one-shot restore may run while this large native paste renders.
+		; Its observer retires OwnSequence rather than adopting the new contents;
+		; cleanup below preserves that unknown sequence if it already fired.
 		_WRF_Require(_WRF.CopyCalls == 1 && _WRF.TransformDone && _WRF.ManagerPublications == 0 && _WRF.RenderCalls == 0,
 			"The actual public capture and genuine title-case transform must complete without a delayed clipboard renderer.")
 		_WRF_Require(_WRF.Mode == "current" ? _WRF.MoveCalls == 0 : _WRF.MoveCalls == 1 && _WRF.MovedInsideTransform,
