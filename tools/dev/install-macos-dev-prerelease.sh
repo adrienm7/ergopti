@@ -17,8 +17,9 @@
 # macos-publication.json, and the unpacked app must pass a strict deep code
 # signature check whose designated requirement names the certificate leaf the
 # owned runtime manifest pins (the CI certificate). Anything else refuses and
-# changes nothing. It never writes a system preference and never asks for an
-# administrator password: /Applications must be writable by this account.
+# changes nothing. It never writes a system preference. When this account
+# cannot write /Applications (a managed Mac), it asks for the administrator
+# password once, before anything is quit or replaced, and copies with sudo.
 # ==============================================================================
 
 set -euo pipefail
@@ -40,6 +41,7 @@ repository="$(/usr/bin/python3 -c 'import json,sys; g=json.load(open(sys.argv[1]
 ARCHIVE="$ERGOPTI_APP_BUNDLE.zip"
 API="https://${ERGOPTI_HOST_GITHUB_API}/repos/$repository/releases?per_page=30"
 MANIFEST="$REPO_ROOT/static/ergopti_plus/macos/vendor/remap-runtime/manifest.json"
+as_admin=
 work="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-dev-prerelease.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
 
@@ -84,8 +86,12 @@ print(re.search(r"certificate leaf = H\"([0-9a-f]{40})\"", json.load(open(sys.ar
 		|| fail "the downloaded app is not $ERGOPTI_BUNDLE_ID_LAUNCHER."
 	printf '%s\n' "$requirement" | grep -qi "certificate leaf = H\"$leaf\"" \
 		|| fail "the downloaded app is not signed with the CI certificate the owned runtime trusts."
-	[ -w /Applications ] || fail "/Applications is not writable by this account; install $tag by hand once."
 	log "Verified $tag: size, SHA-256 and the CI certificate."
+	if [ ! -w /Applications ]; then
+		log "/Applications is not writable by this account: macOS asks for the administrator password once."
+		sudo -v || fail "the administrator password was refused; nothing was changed."
+		as_admin=sudo
+	fi
 fi
 
 # Quit the running copy the way its menu does, then the guardian launchd keeps alive.
@@ -99,10 +105,10 @@ if pgrep -f "/$ERGOPTI_APP_BUNDLE/Contents/" >/dev/null 2>&1; then
 fi
 
 if [ -n "${new:-}" ]; then
-	rm -rf "/Applications/.$ERGOPTI_APP_BUNDLE.new"
-	ditto "$new" "/Applications/.$ERGOPTI_APP_BUNDLE.new"
-	rm -rf "$APP"
-	mv "/Applications/.$ERGOPTI_APP_BUNDLE.new" "$APP"
+	$as_admin rm -rf "/Applications/.$ERGOPTI_APP_BUNDLE.new"
+	$as_admin ditto "$new" "/Applications/.$ERGOPTI_APP_BUNDLE.new"
+	$as_admin rm -rf "$APP"
+	$as_admin mv "/Applications/.$ERGOPTI_APP_BUNDLE.new" "$APP"
 	log "Installed $tag in $APP."
 fi
 
