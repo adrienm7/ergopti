@@ -2322,7 +2322,9 @@ function M.test_prediction()
 				end
 			end,
 			info = function(fmt, ...) Logger.info(LOG, fmt, ...) end,
-			warn = function(fmt, ...) Logger.warn(LOG, fmt, ...) end,
+			warn = function(fmt, id, reason)
+				Logger.warn(LOG, fmt, id, require("modules.llm.error_log").describe(reason))
+			end,
 		})
 	end
 	return M._test_prediction.run()
