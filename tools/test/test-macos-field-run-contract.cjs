@@ -531,6 +531,10 @@ function reportFolder(paths) {
 				/\[ -w \/Applications \] \|\| fail/,
 				'an unwritable /Applications must not refuse'
 			);
+			// A company proxy shares one address, whose anonymous REST API quota runs out
+			assert.doesNotMatch(installer, /HOST_GITHUB_API/, 'the installer must not need the REST API');
+			assert.match(installer, /git ls-remote --tags --refs "\$REMOTE\.git" 'v0\.0\.0-dev\.\*'/);
+			assert.match(installer, /"\$REMOTE\/releases\/download\/\$tag\/\$ARCHIVE"/);
 			const ask = installer.indexOf('sudo -v || fail');
 			assert(ask > 0, 'the installer must ask for the administrator password');
 			assert(
