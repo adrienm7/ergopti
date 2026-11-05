@@ -272,13 +272,13 @@ if command -v systemctl >/dev/null 2>&1; then
 	# list-unit-files works without a user bus; a failed query remains an error.
 	# A filtered query exits 1 for a missing unit on systemd 257, so select from
 	# the complete successful inventory instead of filtering the native query.
-	unit_files="$(systemctl --user --no-pager --no-legend list-unit-files)"
+	unit_files="$(SYSTEMD_COLORS=0 systemctl --user --no-pager --no-legend list-unit-files)"
 	unit_present=false
 	while read -r unit_name unit_state unit_metadata; do
 		if [ "$unit_name" = ergopti-hotstrings.service ]; then unit_present=true; break; fi
 	done <<< "$unit_files"
 	if "$unit_present"; then
-		if unit_properties="$(systemctl --user show ergopti-hotstrings.service --all -p FragmentPath -p DropInPaths 2>/dev/null)"; then
+		if unit_properties="$(SYSTEMD_COLORS=0 systemctl --user show ergopti-hotstrings.service --all -p FragmentPath -p DropInPaths 2>/dev/null)"; then
 			fragment= dropins= fragment_count=0 dropin_count=0
 			while IFS='=' read -r property value; do
 				case "$property" in

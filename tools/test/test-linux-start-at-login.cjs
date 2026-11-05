@@ -64,6 +64,7 @@ try {
 			'  if [ "${NO_UNIT:-0}" = 1 ]; then',
 			'    [ "$#" -eq 4 ] || exit 1',
 			'    printf "%s\\n" "fooergopti-hotstrings.service disabled enabled" "ergopti-hotstrings.service.other disabled enabled"',
+			'  elif [ "${SYSTEMD_COLORS:-0}" = 1 ]; then printf "ergopti-hotstrings.service \\033[31m%s\\033[0m enabled\\n" "${UNIT_STATE:-disabled}";',
 			'  else echo "ergopti-hotstrings.service ${UNIT_STATE:-disabled} enabled"; fi',
 			'  exit 0',
 			'fi',
@@ -237,6 +238,8 @@ try {
 	);
 	assert.doesNotMatch(fs.readFileSync(calls, 'utf8').slice(offlineCalls), /--no-reload disable/);
 	assert.equal(run('disable', { SHOW_REFUSE: '1' }).status, 0);
+	assert.equal(run('enable', { SHOW_REFUSE: '1', SYSTEMD_COLORS: '1' }).status, 0, 'forced systemd colors do not change offline state');
+	assert.equal(run('disable', { SHOW_REFUSE: '1', SYSTEMD_COLORS: '1' }).status, 0);
 	const ownedDesktop = fs.readFileSync(desktop, 'utf8');
 	const customized =
 		ownedDesktop.replace(
