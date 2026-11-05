@@ -506,7 +506,12 @@ _MBPO_NativeBackendPick() {
 			. " model_b=" . (_LLM_Menu["model"] == _MBPO.ModelB) . " caption_b=" . (Caption == _MBPO.ModelB)
 			. " visible=" . DllCall("User32\IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int")
 			. " writers=" . _MBPO.WriterConfirmed . " mutation_returns=" . _MBPO.MutationReturns
-			. " mutation_confirmed=" . _MBPO.MutationConfirmed . "`n", "*", "UTF-8-RAW")
+			. " mutation_confirmed=" . _MBPO.MutationConfirmed . " errors=" . _MBPO.Errors.Length . "`n", "*", "UTF-8-RAW")
+		; This private seeded child retains every original logger cause; export
+		; outside the sink before judging its unchanged zero-error contract.
+		for Index, Line in _MBPO.Errors
+			FileAppend("DIAGNOSTIC native-model-backend error_index=" . Index
+				. " logger_error=" . JsonStringLiteral(Line) . "`n", "*", "UTF-8-RAW")
 		_MBPO_Require(_MBPO.WriterConfirmed >= 1 && _MBPO.MutationReturns >= 1
 			&& _MBPO.MutationReturns == _MBPO.MutationConfirmed && _MBPO.Errors.Length == 0,
 			"Actual schema/collector/native writer and acknowledged model mutation must complete without errors")
