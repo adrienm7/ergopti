@@ -93,6 +93,9 @@ _WRCF_ChildSource() {
 	ClipboardSource := StrReplace(ClipboardSource, "CB_WriteTextWithReceipt(Text, &OwnedSequence := 0) {",
 		"_WRF_ActualWriteTextWithReceipt(Text, &OwnedSequence := 0) {", true, &Receipts)
 	AssertEqual(1, Receipts, "Only the actual authenticated publication receipt boundary may be observed")
+	ClipboardSource := StrReplace(ClipboardSource, "CB_WritePlainSnapshot(Capture, Text, &OwnedSequence) {",
+		"_WRF_ActualWritePlainSnapshot(Capture, Text, &OwnedSequence) {", true, &NativeReceipts)
+	AssertEqual(1, NativeReceipts, "Only the actual complete native CAS publication receipt may be observed")
 	Code .= ClipboardSource . "`n"
 	for Symbol in ["_TextTailCodeUnits"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)

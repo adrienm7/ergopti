@@ -16,7 +16,10 @@ _SICOT_ChildSource() {
 	AssertTrue(ClipboardOwner != "", "The complete genuine clipboard adapter must resolve")
 	ClipboardSource := FileRead(ClipboardOwner, "UTF-8")
 	ClipboardSource := StrReplace(ClipboardSource, "CB_Write(Text) {", "_SICO_ActualWrite(Text) {", true, &Writes)
-	AssertEqual(1, Writes, "Only the genuine publisher declaration may be decorated")
+	AssertEqual(1, Writes, "Only the genuine seed publisher declaration may be decorated")
+	ClipboardSource := StrReplace(ClipboardSource, "_CB_PlainNativeMutationCAS(Record, Text) {",
+		"_SICO_ActualNativeMutationCAS(Record, Text) {", true, &Mutations)
+	AssertEqual(1, Mutations, "Only the complete native CAS mutation return may be observed before authentication")
 	Code := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 	Code .= "LoggerWarn(*) => 0`nLoggerError(*) => 0`nLoggerDebug(*) => 0`nLoggerInfo(*) => 0`n"
 	Code .= "global _SendHook := 0`nglobal SEND_INSTANT_PASTE_DELAY_MS := Integer(A_Args[4])`n"
@@ -148,8 +151,8 @@ Test("SendInstant clipboard: same text from a foreign owner survives completion 
 _SIPRT_ChildSource() {
 	global _DriverDir
 	Code := _SICOT_ChildSource()
-	Code := StrReplace(Code, "CB_WriteTextWithReceipt(Text, &OwnedSequence := 0) {",
-		"_SIPR_ActualWriteTextWithReceipt(Text, &OwnedSequence := 0) {", true, &Publishers)
+	Code := StrReplace(Code, "CB_WritePlainSnapshot(Capture, Text, &OwnedSequence) {",
+		"_SIPR_ActualWritePlainSnapshot(Capture, Text, &OwnedSequence) {", true, &Publishers)
 	AssertEqual(1, Publishers, "Only the complete authenticated publisher declaration may be decorated")
 	Code := StrReplace(Code, "_SendInstant_RestoreClipboard(OldClip, OwnedSequence, OwnerToken) {",
 		"_SIPR_ActualRestoreClipboard(OldClip, OwnedSequence, OwnerToken) {", true, &Restores)

@@ -52,7 +52,7 @@ _SIRG_AssertSendInstantChecksGuard() {
 	Body := _DriverFuncBody("SendInstant")
 	Assert(Body != "", "SendInstant(Text) declaration must exist in hotstring_engine.ahk")
 	ClaimPos := InStr(Body, "CB_TryBeginPasteTransaction(")
-	SnapshotPos := InStr(Body, "CB_SaveAll()")
+	SnapshotPos := InStr(Body, "CB_SavePlainSnapshot(OwnerToken, &Captured)")
 	Assert(ClaimPos > 0 and SnapshotPos > ClaimPos,
 		"SendInstant must claim the exclusive paste token before its blocking clipboard snapshot")
 }
@@ -62,7 +62,7 @@ _SIRG_AssertRestoreClearsGuard() {
 	Src := _SIRG_ReadSource("hotstring_engine.ahk")
 	Body := _DriverFuncBody("_SendInstant_RestoreClipboard")
 	Assert(Body != "", "_SendInstant_RestoreClipboard(OldClip) declaration must exist in hotstring_engine.ahk")
-	Assert(InStr(Body, "CB_RestoreOwnedAllEventually") > 0
+	Assert(InStr(Body, "CB_RestorePlainSnapshotEventually") > 0
 		and InStr(Body, "OwnerToken") > 0,
 		"the deferred restore must transfer its exact token to retrying terminal cleanup")
 }

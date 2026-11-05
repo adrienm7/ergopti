@@ -54,12 +54,15 @@ _SICO_RequestCopy(Phase) {
 	_SICO.WriterSequence := Identity.Sequence
 }
 
-; Decorate only the complete genuine publisher. The native bool and every
-; value remain unchanged; this exposes its unlocked return to the real copier.
-CB_Write(Text) {
+; Keep the seed setter genuine. The actual payload publication uses native CAS;
+; observe its complete unlocked return before the original authentication step.
+CB_Write(Text) => _SICO_ActualWrite(Text)
+
+_CB_PlainNativeMutationCAS(Record, Text) {
 	global _SICO
 	try {
-		Published := _SICO_ActualWrite(Text)
+		Result := _SICO_ActualNativeMutationCAS(Record, Text)
+		Published := Record["published"] && !Record["lease_unknown"] && !IsObject(Record["failure"])
 		if Published && IsSet(_SICO) && _SICO.Armed {
 			_SICO_Require(A_IsCritical == _SICO.CallerCritical && A_IsCritical > 0,
 				"The setter boundary must retain the genuine caller's Critical state.")
@@ -77,7 +80,7 @@ CB_Write(Text) {
 			_SICO.SetterCalls += 1
 			_SICO.Armed := false
 		}
-		return Published
+		return Result
 	} catch Any as Failure {
 		if IsSet(_SICO) && !IsObject(_SICO.Failure)
 			_SICO.Failure := Failure
@@ -170,6 +173,14 @@ _SICO_Settle(CheckFailure := true) {
 _SICO_RestoreIncoming(Snapshot) {
 	global _SICO
 	_SIPR_DisarmRestore()
+	if IsObject(_SICO.RestoreCallback) && !_SICO.RestoreFired {
+		; The actual callback owns the exact native record's saved snapshot.
+		; Settle that record rather than registering an unrelated generic debt.
+		Callback := _SICO.RestoreCallback
+		_SICO.RestoreCallback := 0
+		Callback.Call()
+	}
+	_SICO_Settle(false)
 	Expected := _SICO.Copied ? _SICO.WriterSequence : _SICO.PayloadSequence
 	Observed := CB_GetSequenceNumber()
 	if Expected {
@@ -402,9 +413,9 @@ _SICO_Subject(Root, Mode) {
 
 ; Observe the complete authenticated publisher, not its lower-level setter.
 ; The independent process runs only AFTER a positive native sequence receipt.
-CB_WriteTextWithReceipt(Text, &OwnedSequence := 0) {
+CB_WritePlainSnapshot(Capture, Text, &OwnedSequence) {
 	global _SICO
-	Published := _SIPR_ActualWriteTextWithReceipt(Text, &OwnedSequence)
+	Published := _SIPR_ActualWritePlainSnapshot(Capture, Text, &OwnedSequence)
 	if Published && IsSet(_SICO) && _SICO.ReceiptArmed {
 		_SICO.ReceiptArmed := false
 		_SICO_Require(OwnedSequence > 0 && CB_GetSequenceNumber() == OwnedSequence
@@ -427,12 +438,12 @@ _SIPR_DisarmRestore() {
 	global _SICO
 	if IsObject(_SICO.RestoreCallback) && !_SICO.RestoreFired {
 		SetTimer(_SICO.RestoreCallback, 0)
-		_SICO.RestoreCallback := 0
 	}
 }
 _SendInstant_RestoreClipboard(OldClip, OwnedSequence, OwnerToken) {
 	global _SICO
 	_SICO.RestoreFired := true
+	_SICO.PayloadSequence := 0
 	return _SIPR_ActualRestoreClipboard(OldClip, OwnedSequence, OwnerToken)
 }
 

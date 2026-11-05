@@ -37,6 +37,14 @@ CB_WriteTextWithReceipt(Text, &OwnedSequence := 0) {
 	}
 	return Published
 }
+CB_WritePlainSnapshot(Capture, Text, &OwnedSequence) {
+	global _WFC
+	Published := _WRF_ActualWritePlainSnapshot(Capture, Text, &OwnedSequence)
+	_WFC.OwnSequence := Published && OwnedSequence ? OwnedSequence : 0
+	_WFC.OwnToken := CBClipboardOwner.paste_transaction
+	return Published
+}
+
 _WRF_ObserveRestoreTimer(Callback, Delay) {
 	global _WFC
 	_WFC.RestoreCallback := Callback
@@ -188,6 +196,11 @@ _WFC_Main() {
 		if IsObject(_WFC.RestoreCallback) && !_WFC.RestoreFired
 			SetTimer(_WFC.RestoreCallback, 0)
 		try {
+			if IsObject(_WFC.RestoreCallback) && !_WFC.RestoreFired {
+				Callback := _WFC.RestoreCallback
+				_WFC.RestoreCallback := 0
+				Callback.Call()
+			}
 			ExpectedSequence := _WFC.OwnSequence
 			ObservedSequence := CB_GetSequenceNumber()
 			if ExpectedSequence

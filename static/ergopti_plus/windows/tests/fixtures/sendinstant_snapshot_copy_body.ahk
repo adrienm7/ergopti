@@ -66,12 +66,15 @@ _SICO_RequestCopy(Phase) {
 	_SICO.WriterSequence := Identity.Sequence
 }
 
-; Decorate only the complete genuine publisher. The native bool and every
-; value remain unchanged; this exposes its unlocked return to the real copier.
-CB_Write(Text) {
+; Keep the seed setter genuine. The actual payload publication uses native CAS;
+; observe its complete unlocked return before the original authentication step.
+CB_Write(Text) => _SICO_ActualWrite(Text)
+
+_CB_PlainNativeMutationCAS(Record, Text) {
 	global _SICO
 	try {
-		Published := _SICO_ActualWrite(Text)
+		Result := _SICO_ActualNativeMutationCAS(Record, Text)
+		Published := Record["published"] && !Record["lease_unknown"] && !IsObject(Record["failure"])
 		if Published && IsSet(_SICO) && _SICO.PublicCall {
 			_SICO_Require(A_IsCritical == _SICO.CallerCritical && A_IsCritical > 0,
 				"The setter boundary must retain the genuine caller's Critical state.")
@@ -89,7 +92,7 @@ CB_Write(Text) {
 			_SICO.SetterCalls += 1
 			_SICO.Armed := false
 		}
-		return Published
+		return Result
 	} catch Any as Failure {
 		if IsSet(_SICO) && !IsObject(_SICO.Failure)
 			_SICO.Failure := Failure
