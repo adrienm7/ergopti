@@ -293,6 +293,16 @@ local function check_field(name, rule, value, tools)
 		return true, value
 	elseif rule.type == "emails" then
 		if type(value) ~= "table" or #value > rule.max then return false, nil, name .. " is not a short list" end
+		-- ipairs alone accepts an object or a sparse list as a shorter list,
+		-- silently dropping recipients from the draft.
+		local length, count = #value, 0
+		for index in pairs(value) do
+			if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length then
+				return false, nil, name .. " is not a short list"
+			end
+			count = count + 1
+		end
+		if count ~= length then return false, nil, name .. " is not a short list" end
 		local list = {}
 		for i, item in ipairs(value) do
 			if not is_email(item) then return false, nil, name .. " holds a non-address" end
