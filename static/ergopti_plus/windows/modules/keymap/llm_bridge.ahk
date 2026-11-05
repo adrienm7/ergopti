@@ -1397,19 +1397,17 @@ LLM_Bridge_FeedCharForPrefix(ch, ScheduleFn := TimerSetCallback, FocusFn := unse
 	; Buffer identity can reuse its old Map. Only this frame's fresh gateway
 	; receipt attests the native style; never rewrite an old receipt in place.
 	CapturedSecure := _LLM_Bridge_CachedTypingSecure(Source, FreshFocus)
-	NativePrivate := FreshFocus.Has("NativeConclusive") && FreshFocus.Has("NativeSecure")
-		&& FreshFocus.Get("NativeConclusive", false) is Integer
-		&& FreshFocus.Get("NativeConclusive", false) == true
-		&& FreshFocus.Get("NativeSecure", true) is Integer
-		&& FreshFocus.Get("NativeSecure", true) == true
-	RejectedNative := NativePrivate && (!Active || _LLM_Engine.Get("disable_password_fields", true))
-	if RejectedNative {
+	; Every refused character breaks continuity, including an unknown verdict.
+	; Retire the preceding context now: a later normal character can arrive
+	; before this frame's deferred observer and must start a new buffer.
+	RejectedPrivate := CapturedSecure && (!Active || _LLM_Engine.Get("disable_password_fields", true))
+	if RejectedPrivate {
 		Generation := Active ? _LLM_Bridge_ContentGeneration : _LLM_Bridge_AgentContentGeneration
 		_LLM_Bridge_RejectPrivateTyping(Active, Source, Generation)
 	} else {
 		_LLM_Bridge_PrepareInput(ch)
 	}
-	if Active && !RejectedNative {
+	if Active && !RejectedPrivate {
 		if !CapturedSecure || !_LLM_Engine.Get("disable_password_fields", true)
 			_LLM_Bridge_ApplyBufferEdit(0, ch)
 		if CapturedSecure && !_LLM_Engine.Get("disable_password_fields", true)
@@ -1418,7 +1416,7 @@ LLM_Bridge_FeedCharForPrefix(ch, ScheduleFn := TimerSetCallback, FocusFn := unse
 		LLM_Engine_CancelTimer()
 		_LLM_Engine["request_id"] := _LLM_Engine.Get("request_id", 0) + 1
 		_LLM_Engine["active_request_signature"] := ""
-	} else if !Active && !RejectedNative {
+	} else if !Active && !RejectedPrivate {
 		if !CapturedSecure
 			LLM_Bridge_MirrorAgentEdit(0, ch)
 	}
