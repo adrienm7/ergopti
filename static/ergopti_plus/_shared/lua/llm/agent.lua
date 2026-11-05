@@ -474,7 +474,9 @@ function M.ics(config, action, uid, stamp)
 	lines[#lines + 1] = "SUMMARY:" .. ics_text(action.title)
 	if action.location then lines[#lines + 1] = "LOCATION:" .. ics_text(action.location) end
 	if action.notes then lines[#lines + 1] = "DESCRIPTION:" .. ics_text(action.notes) end
-	for _, address in ipairs(action.attendees or {}) do lines[#lines + 1] = "ATTENDEE:mailto:" .. address end
+	for _, address in ipairs(action.attendees or {}) do
+		lines[#lines + 1] = "ATTENDEE:mailto:" .. (TextUtils.percent_encode(address):gsub("%%40", "@"))
+	end
 	lines[#lines + 1] = "END:" .. component
 	lines[#lines + 1] = "END:VCALENDAR"
 	for i, line in ipairs(lines) do lines[i] = ics_fold(line) end

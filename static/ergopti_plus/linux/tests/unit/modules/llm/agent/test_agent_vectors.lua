@@ -209,6 +209,18 @@ helpers.describe("agent actions stay inside the closed schema", function()
 		helpers.assert_nil(payload:find("first\rsecond", 1, true), "the iCalendar field cannot contain a bare CR")
 	end)
 
+	helpers.it("encodes reserved characters in calendar attendee addresses", function()
+		local config = read_json("modules/llm/agent.json")
+		local action = assert(Agent.validate_action(config, {
+			type = "calendar", title = "Meeting", start = "2026-10-01T14:00",
+			attendees = { "alice?tag@example.com", "bob#team@example.com", "carol+work@example.com" },
+		}, { tools = {} }))
+		local payload = Agent.ics(config, action, "test", "20260101T000000Z")
+		helpers.assert_contains(payload, "ATTENDEE:mailto:alice%3Ftag@example.com\r\n")
+		helpers.assert_contains(payload, "ATTENDEE:mailto:bob%23team@example.com\r\n")
+		helpers.assert_contains(payload, "ATTENDEE:mailto:carol%2Bwork@example.com\r\n")
+	end)
+
 	helpers.it("normalizes a lone carriage return in a mailto body", function()
 		local config = read_json("modules/llm/agent.json")
 		local action = assert(Agent.validate_action(config, { type = "mail", body = "first\rsecond" }, { tools = {} }))
