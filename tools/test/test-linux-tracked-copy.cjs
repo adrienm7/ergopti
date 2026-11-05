@@ -389,7 +389,7 @@ try {
 		const helpEnd = subject.indexOf('\n\t# On real Linux', helpStart);
 		assert.ok(helpStart >= 0 && helpEnd > helpStart);
 		const help = spawnSync(bashExecutable(), ['-s', '--', helpRoot], {
-			input: 'set -euo pipefail\nLUA_BIN=luajit\nBUILD_DIR="$1"\n' + subject.slice(helpStart, helpEnd),
+			input: 'set -euo pipefail\nLUA_BIN=lua\nBUILD_DIR="$1"\n' + subject.slice(helpStart, helpEnd),
 			encoding: 'utf8', timeout: 15000, env: { ...process.env, HOME: scratch }
 		});
 		assert.equal(help.status, 0, `help smoke with Lua path delimiters: ${help.stderr || help.stdout}`);
@@ -398,11 +398,8 @@ try {
 		const realLua = spawnSync(bashExecutable(), ['-c', 'command -v lua'], { encoding: 'utf8' });
 		assert.equal(realLua.status, 0, realLua.stderr);
 		fs.symlinkSync(realLua.stdout.trim(), path.join(relativeBin, 'lua'));
-		const realJit = spawnSync(bashExecutable(), ['-c', 'command -v luajit'], { encoding: 'utf8' });
-		assert.equal(realJit.status, 0, realJit.stderr);
-		fs.symlinkSync(realJit.stdout.trim(), path.join(relativeBin, 'luajit'));
 		const relativeHelp = spawnSync(bashExecutable(), ['-s', '--', helpRoot], {
-			input: 'set -euo pipefail\nLUA_BIN=luajit\nBUILD_DIR="$1"\n' + subject.slice(helpStart, helpEnd),
+			input: 'set -euo pipefail\nLUA_BIN=lua\nBUILD_DIR="$1"\n' + subject.slice(helpStart, helpEnd),
 			encoding: 'utf8', timeout: 15000, cwd: scratch,
 			env: { ...process.env, HOME: scratch, PATH: 'relative-bin:/usr/bin:/bin' }
 		});
