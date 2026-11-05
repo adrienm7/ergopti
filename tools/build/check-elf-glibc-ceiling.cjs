@@ -140,8 +140,8 @@ function isElf(file) {
 	}
 }
 
-/** Lists regular files under each root without following symbolic links. */
-function regularFiles(roots) {
+/** Lists regular files and optionally symlinks, without following symbolic links. */
+function regularFiles(roots, includeSymlinks = false) {
 	const files = [];
 	const pending = [...roots];
 	while (pending.length > 0) {
@@ -149,7 +149,7 @@ function regularFiles(roots) {
 		const stat = fs.lstatSync(current);
 		if (stat.isDirectory()) {
 			for (const entry of fs.readdirSync(current)) pending.push(path.join(current, entry));
-		} else if (stat.isFile()) {
+		} else if (stat.isFile() || (includeSymlinks && stat.isSymbolicLink())) {
 			files.push(current);
 		}
 	}
@@ -180,8 +180,11 @@ function checkTree(roots, readVersions, readInterpreter) {
 	const violations = [];
 	const loaders = [];
 	const bundledLibc = [];
-	for (const file of regularFiles(roots)) {
+	for (const file of regularFiles(roots, true)) {
 		if (isHostLibcFile(path.basename(file))) bundledLibc.push(file);
+		// A recipient-library name remains forbidden when it is an alias. Do not
+		// follow aliases here: targets may leave the package or form cycles.
+		if (fs.lstatSync(file).isSymbolicLink()) continue;
 		if (!isElf(file)) continue;
 		checked.push(file);
 		for (const need of parseVersionNeeds(readVersions(file))) {
@@ -242,7 +245,7 @@ function main(roots) {
 	}
 	for (const file of bundledLibc) {
 		console.error(
-			`[ERR] ${file} is a copy of the C library or its loader: the image uses the recipient's own, ` +
+			`[ERR] ${file} uses a reserved C library or loader name: the image uses the recipient's own, ` +
 				'because a second glibc breaks the host GTK, GL and NSS modules.'
 		);
 	}

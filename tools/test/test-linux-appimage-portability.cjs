@@ -193,6 +193,17 @@ passed++;
 			['ld-linux-x86-64.so.2', 'libc.so.6'],
 			'a staged C library or loader is refused'
 		);
+		fs.unlinkSync(path.join(tree, 'usr/lib/libc.so.6'));
+		fs.unlinkSync(path.join(tree, 'usr/lib/ld-linux-x86-64.so.2'));
+		fs.symlinkSync('libluv.so.1', path.join(tree, 'usr/lib/libc.so.6'));
+		fs.symlinkSync('missing-target', path.join(tree, 'usr/lib/ld-linux-x86-64.so.2'));
+		assert.deepEqual(
+			Ceiling.checkTree([tree], noNeeds, readInterpreter).bundledLibc.map((file) =>
+				path.basename(file)
+			),
+			['ld-linux-x86-64.so.2', 'libc.so.6'],
+			'recipient library aliases are refused without following their targets'
+		);
 	} finally {
 		fs.rmSync(tree, { recursive: true, force: true });
 	}
