@@ -267,9 +267,9 @@ _ConfigMigrateRecordValidateModel(Scan, Before, CurrentOpaqueStrings := false, D
 		Header := Record.Header
 		if !(Header is Object)
 			continue
-		Key := Record.Key
-		if StrLen(Key) >= 2 && SubStr(Key, 1, 1) == Chr(34) && SubStr(Key, -1) == Chr(34)
-			Key := SubStr(Key, 2, StrLen(Key) - 2)
+		; The native flat reader owns decoded key identities too. This grants
+		; no lexical edit authority: quoted records remain non-Addressable.
+		Key := TOML_DecodeKey(Record.Key)
 		if !Physical.Has(Header.ModelSection)
 			Physical[Header.ModelSection] := Map()
 		Physical[Header.ModelSection][Key] := true
