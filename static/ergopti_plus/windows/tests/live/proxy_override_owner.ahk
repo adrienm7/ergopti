@@ -38,6 +38,7 @@ t(Key) => _OwnerTexts[Key]
 
 global ConfigurationFile := ""
 global _OwnerCommitted := []
+global Features := Map()
 ; config_io is not part of this fixture's closure: the commit records what reaches the file.
 ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0, PublishFn := 0) {
 	_OwnerCommitted.Push(Updates[1].Value)
@@ -67,11 +68,13 @@ _OwnerFatal(Err, *) {
  * @param {String} PlanPath The JSON plan.
  */
 _OwnerMain(PlanPath) {
-	global _SharedDir, _VendorDir, _OwnerTexts
+	global _SharedDir, _VendorDir, _OwnerTexts, Features
 	Plan := JsonParse(FileRead(PlanPath, "UTF-8"))
 	_SharedDir := Plan["shared"]
 	_VendorDir := Plan["vendor"]
 	_OwnerTexts := JsonParse(FileRead(_SharedDir . "\data\locales\en.json", "UTF-8"))
+	Declaration := ProxyOverride_Declaration()
+	Features := Map(Declaration["section"], Map(Declaration["key"], Plan["stored"] is String ? Plan["stored"] : ""))
 	Result := Map("published", ProxyOverride_Publish(Plan["stored"]))
 	; Direct publication has no authenticated bootstrap source and cannot start
 	; an automatic migration. Positive boot sealing uses the native unit owner.
