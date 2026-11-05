@@ -1,5 +1,5 @@
 {
-	"expected_count": 96,
+	"expected_count": 104,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
@@ -106,6 +106,18 @@
 		{
 			"contains": "sendinstant-post-receipt-owner",
 			"expected_count": 3
+		},
+		{
+			"contains": "WPM compensation ownership:",
+			"expected_count": 4
+		},
+		{
+			"contains": "roi-context-word-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "selection-capture-native-control-focus",
+			"expected_count": 2
 		}
 	]
 }
