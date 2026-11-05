@@ -296,8 +296,10 @@ helpers.describe("metrics apps bridge: every reply is dashboard data", function(
 
 	helpers.it("answers a category edit, the picker and a pause with the manifest", function()
 		local Bridge = helpers.load_module("ui.metrics_apps.bridge")
+		Bridge._category_prompt = function(_, _, initial) return initial end
 		local state = { keystats = require("tests.fakes.metrics_keystats").synchronous({
 			get_dashboard_payload = function() return { metrics_manifest = { ["2026-09-24"] = {} } } end,
+			capture_app_category_edit = function() return {} end,
 			set_app_category = function() return true end,
 			suppress = function() end,
 		}) }
@@ -314,6 +316,7 @@ helpers.describe("metrics apps bridge: every reply is dashboard data", function(
 		end
 		helpers.assert_true(Bridge.on_message({ action = "edit", app = "firefox", cat = "web" }, state).saved)
 		helpers.assert_eq(Bridge.on_message({ action = "pick" }, state).supported, false)
+		Bridge._reset()
 	end)
 
 end)

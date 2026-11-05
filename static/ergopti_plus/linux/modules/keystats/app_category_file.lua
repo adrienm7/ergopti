@@ -78,6 +78,36 @@ function M.load()
 	return model, nil, source
 end
 
+--- Captures native identity along with bytes for a dialog edit.
+local function physical_identity(path)
+	local ok, uv = pcall(require, "luv")
+	if not ok or type(uv.fs_stat) ~= "function" then return nil end
+	local stat = uv.fs_stat(path)
+	if type(stat) ~= "table" or stat.type ~= "file" or stat.dev == nil or stat.ino == nil then return nil end
+	return tostring(stat.dev) .. ":" .. tostring(stat.ino)
+end
+
+--- Captures a category model and physical source receipt for an interactive edit.
+--- @return table|nil model Detached validated model, or nil on refused capture.
+--- @return string|nil reason Capture failure.
+--- @return table|nil source Source receipt for save().
+function M.load_owned()
+	local available, uv = pcall(require, "luv")
+	if not available or type(uv.fs_stat) ~= "function" then return nil, "source identity unavailable" end
+	local path = M.path()
+	local before = physical_identity(path)
+	local model, reason, source = M.load()
+	if not model or not source or source.path ~= path then return nil, reason end
+	local after = physical_identity(path)
+	if source.status == "ok" then
+		if not before or before ~= after then return nil, "source identity unavailable or changed" end
+		source.physical = before
+	elseif before ~= nil or after ~= nil then
+		return nil, "source identity changed"
+	end
+	return model, nil, source
+end
+
 --- Publishes the model.
 --- @param model table
 --- @param source table Exact receipt returned by load().
@@ -89,9 +119,10 @@ function M.save(model, source)
 		return false
 	end
 	local function source_current()
-		if M.path() ~= path then return false end
+		if M.path() ~= path or (source.physical and physical_identity(path) ~= source.physical) then return false end
 		local status, content = read_source(path)
 		return status == source.status and content == source.content
+			and (not source.physical or physical_identity(path) == source.physical)
 	end
 	if not source_current() then return false end
 	local text = Store.encode(model, Json.encode)
