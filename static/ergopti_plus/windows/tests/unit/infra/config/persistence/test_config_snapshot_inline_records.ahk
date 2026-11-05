@@ -695,3 +695,106 @@ _FMS_ConfigExactPersonalRowSelection() {
 }
 Test("configuration snapshot: exact fixture row selection rejects initialized siblings and semantic-name decoys",
 	_FMS_ConfigExactPersonalRowSelection)
+
+; Scalar decoding proves the full UTF-16 identity before any native Map sees it.
+; The production subject then uses the genuine boot constructor/cache/loader.
+_TNK_Boot(Kind) {
+	global ConfigurationFile, _DriverReady, _ConfigBootReadFailed
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
+	Runtime := _CFGFS_CaptureRuntime()
+	SavedRejected := _ConfigBootRejectedOverrides, SavedOutdated := _ConfigBootOutdatedEntries
+	Root := A_Temp . "\ergopti_toml_key_nul_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\config.toml", Created := false
+	try {
+		AssertFalse(_ConfigFullSaveHasPending(), "the private boot subject must not detach an accepted foreign full-save obligation")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		Default := ManifestDefaultFor("layout.ergopti_base"), Requested := !Default
+		Value := Requested ? "true" : "false"
+		RawName := Kind == "header-nul" ? "layout\u0000ignored"
+			: Kind == "escaped-spelling-control" ? "ergopti_base\\u0000ignored"
+			: Kind == "non-nul-control" ? "ergopti_base\u0001ignored"
+			: Kind == "known-control" ? "ergopti_base" : "ergopti_base\u0000ignored"
+		Decoded := TOML_UnescapeBasicStringContents(RawName)
+		Prefix := Kind == "header-nul" ? "layout" : "ergopti_base"
+		Negative := Kind == "leaf-nul" || Kind == "inline-nul" || Kind == "dotted-nul" || Kind == "header-nul"
+		if Negative || Kind == "non-nul-control" {
+			AssertEqual(StrLen(Prefix) + 1 + StrLen("ignored"), StrLen(Decoded),
+				"the scalar owner retains the complete decoded key before native Map insertion")
+			AssertEqual(Kind == "non-nul-control" ? 1 : 0,
+				NumGet(StrPtr(Decoded), StrLen(Prefix) * 2, "UShort"), "the actual decoded UTF-16 control unit is proved")
+			AssertEqual(Ord("i"), NumGet(StrPtr(Decoded), (StrLen(Prefix) + 1) * 2, "UShort"),
+				"the suffix must really exist past the control unit")
+		}
+		_TestPrint("# toml-key-premap kind=" . Kind . " decoded-units=" . StrLen(Decoded)
+			. " expected-control=" . ((Negative || Kind == "non-nul-control") ? (Kind == "non-nul-control" ? 1 : 0) : -1))
+		Header := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n"
+		if Kind == "inline-nul"
+			Source := Header . 'layout = { "' . RawName . '" = ' . Value . " }`n"
+		else if Kind == "dotted-nul"
+			Source := Header . 'layout."' . RawName . '" = ' . Value . "`n"
+		else if Kind == "header-nul"
+			Source := Header . '["' . RawName . '"]`nergopti_base = ' . Value . "`n"
+		else
+			Source := Header . '[layout]`n"' . RawName . '" = ' . Value . "`n"
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		AssertFalse(RegExMatch(Source, "\x00"), "the actual native source carries legal ASCII escapes, not literal NUL bytes")
+		ConfigurationFile := Path, _DriverReady := true, _ConfigBootReadFailed := false
+		_ConfigBootRejectedOverrides := 0, _ConfigBootOutdatedEntries := Map()
+		ConfigSchemaPrepareSource(Path)
+		Boot := Map("status", "threw"), BootThrew := false
+		try Boot := ConfigMigrateBoot(Path)
+		catch
+			BootThrew := true
+		Target := ManifestBuildFeaturesMap()
+		Target["layout"]["ergopti_base"] := Default
+		ReadThrew := false, ApplyThrew := false, Applied := -999
+		try Cache := ParseConfigTomlFile(Path)
+		catch
+			ReadThrew := true
+		try Applied := ApplyBootConfigToml(Target, Path, &Admitted)
+		catch
+			ApplyThrew := true
+		RowKeyUnits := -1, DocumentKnown := false, CacheKnown := false
+		if IsSet(Admitted) && Admitted is Object {
+			for Row in Admitted.Rows {
+				if Row.Section == "layout"
+					RowKeyUnits := Max(RowKeyUnits, StrLen(Row.Key))
+			}
+			DocumentLayout := Admitted.Document.Get("layout", 0)
+			CacheLayout := Admitted.Cache.Get("layout", 0)
+			DocumentKnown := DocumentLayout is Map && DocumentLayout.Has("ergopti_base")
+			CacheKnown := CacheLayout is Map && CacheLayout.Has("ergopti_base")
+		}
+		_TestPrint("# toml-key-native kind=" . Kind . " decoded-units=" . StrLen(Decoded)
+			. " boot=" . Boot.Get("status", "<missing>") . " read-threw=" . ReadThrew
+			. " apply-threw=" . ApplyThrew . " applied=" . Applied . " default=" . Default
+			. " requested=" . Requested . " actual=" . Target["layout"]["ergopti_base"]
+			. " row-key-units=" . RowKeyUnits . " document-known=" . DocumentKnown . " cache-known=" . CacheKnown)
+		AssertFalse(BootThrew, "the genuine boot constructor must classify unsupported source identity without escaping its refusal protocol")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "a boot observation must never rewrite the subject identity")
+		if Negative {
+			AssertEqual(Default, Target["layout"]["ergopti_base"],
+				"an unrepresentable quoted key must not borrow a shorter native manifest owner")
+		} else {
+			AssertEqual("current", Boot["status"], "representable quoted key controls must reach genuine current boot")
+			AssertFalse(ReadThrew || ApplyThrew, "ordinary and representable unknown keys remain supported")
+			AssertTrue(Applied >= 0)
+			AssertEqual(Kind == "known-control" ? Requested : Default, Target["layout"]["ergopti_base"])
+		}
+	} finally {
+		_ConfigBootRejectedOverrides := SavedRejected, _ConfigBootOutdatedEntries := SavedOutdated
+		_CFGFS_RestoreRuntime(Runtime)
+		if Created {
+			try {
+				_TOML_InvalidateParseCache(Path)
+				Refusals := _TOML_WriteRefusals()
+				if Refusals.Has(_TOML_WriteRefusalKey(Path))
+					Refusals.Delete(_TOML_WriteRefusalKey(Path))
+			} finally DirDelete(Root, true)
+		}
+	}
+}
+for _TNK_Kind in ["leaf-nul", "inline-nul", "dotted-nul", "header-nul", "known-control", "escaped-spelling-control", "non-nul-control"]
+	Test("TOML native decoded key admission: " . _TNK_Kind . " (toml-decoded-key-nul)", _TNK_Boot.Bind(_TNK_Kind))
