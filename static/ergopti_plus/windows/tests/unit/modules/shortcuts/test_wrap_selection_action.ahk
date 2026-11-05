@@ -134,7 +134,7 @@ _WRCF_Complete(State, Code, Output, ErrorText) {
 }
 
 _WRCF_Case(Mode) {
-	global SEND_INSTANT_PASTE_DELAY_MS, UIA_SELECTION_MAX_AGE_MS
+	global SEND_INSTANT_PASTE_DELAY_MS
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "An unretired owned clipboard probe prevents another native publisher.")
 	Root := A_Temp . "\ergopti_wrap_render_focus_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
@@ -147,9 +147,13 @@ _WRCF_Case(Mode) {
 		AssertTrue(Created, "The fixture must exclusively own its script and evidence directory.")
 		Script := Root . "\subject.ahk"
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _WRCF_ChildSource()))
+		OwnerSource := FSReadStrict(_DriverProductionFileForSymbol("GetUIASelection"))
+		AssertTrue(RegExMatch(OwnerSource, "m)^global UIA_SELECTION_MAX_AGE_MS := ([0-9]+)[ `t]*$", &Age),
+			"The isolated child must receive the actual production snapshot age literal, not an unavailable harness global.")
+		MaxAge := Integer(Age[1])
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-clipboard-render-focus", Mode,
-				String(SEND_INSTANT_PASTE_DELAY_MS), String(UIA_SELECTION_MAX_AGE_MS)], _WRCF_Complete.Bind(State))
+				String(SEND_INSTANT_PASTE_DELAY_MS), String(MaxAge)], _WRCF_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The exact native clipboard/render subject must start.")
 		Started := A_TickCount
 		while !State.Calls && TickElapsed(Started) < 12000 {
