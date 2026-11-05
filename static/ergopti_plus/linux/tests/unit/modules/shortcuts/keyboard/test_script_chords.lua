@@ -102,6 +102,34 @@ for _, initial in ipairs({ "absent", "false" }) do
 end
 
 helpers.describe("Linux script-management chords (script-chords-three-os-2026-09-30)", function()
+	helpers.it("script-chord: refuses an edit when the external switch differs from runtime", function()
+		with_chords(nil, function(Chords, log)
+			helpers.assert_eq(Chords.chords_enabled(), true)
+			local external = "[shortcuts.script_control]\nchords_enabled = false\n"
+			Sandbox.write_bytes(log.path, external)
+			helpers.assert_eq(Chords.set_action("script_altgr_enter", "script_reload"), false)
+			helpers.assert_eq(Sandbox.read_bytes(log.path), external)
+			helpers.assert_eq(Chords.chords_enabled(), true)
+		end)
+	end)
+
+	helpers.it("script-chord: refuses a switch change racing the file write", function()
+		with_chords(nil, function(Chords, log)
+			helpers.assert_eq(Chords.chords_enabled(), true)
+			local Writer = require("toml_codec.writer")
+			local original = Writer.batch_write
+			local external = "[shortcuts.script_control]\nchords_enabled = false\n"
+			local ok, err = pcall(function()
+				Writer.batch_write = function(...) Sandbox.write_bytes(log.path, external); return original(...) end
+				helpers.assert_eq(Chords.set_action("script_altgr_enter", "script_reload"), false)
+				helpers.assert_eq(Sandbox.read_bytes(log.path), external)
+				helpers.assert_eq(Chords.chords_enabled(), true)
+			end)
+			Writer.batch_write = original
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("script-chord: an empty configuration runs the four presets and keeps each chord from the application", function()
 		with_chords(nil, function(Chords, log)
 			helpers.assert_eq(Chords.chords_enabled(), true)

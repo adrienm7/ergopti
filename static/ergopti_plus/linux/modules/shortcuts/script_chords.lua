@@ -272,9 +272,25 @@ end
 --- @return boolean committed
 local function persist(key, value)
 	local path = require("infra.config_paths").config("config.toml")
+	local assignments, enabled, generation = _assignments, _chords_on, _dispatch_generation
+	local bytes, status = TomlWriter.read_classified(path)
+	if status ~= "ok" and status ~= "absent" then return false end
+	local ok, expected = pcall(function()
+		return M.configuration_candidate(TomlCodec.decode(bytes or ""))
+	end)
+	if not ok or type(expected) ~= "table" or type(expected.assignments) ~= "table"
+		or _assignments ~= assignments or _chords_on ~= enabled or _dispatch_generation ~= generation
+		or _configuration_owner ~= nil then return false end
+	local same = expected.chords_on == enabled
+	for id, action in pairs(assignments) do if expected.assignments[id] ~= action then same = false end end
+	for id, action in pairs(expected.assignments) do if assignments[id] ~= action then same = false end end
+	if not same then
+		Logger.warn(LOG, "Script chord configuration changed externally; reload shortcuts before editing.")
+		return false
+	end
 	local committed, detail = TomlWriter.batch_write(path, {
 		Manifest.sparse_operation(SECTION .. "." .. key, value),
-	})
+	}, nil, { status = status, content = bytes })
 	if committed ~= true then
 		Logger.error(LOG, "Could not persist script chord '%s': %s.", key, tostring(detail))
 		return false
