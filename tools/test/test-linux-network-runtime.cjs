@@ -50,7 +50,7 @@ function portable() {
 		if (process.platform !== 'linux') return;
 		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-runtime-link-target-'));
 		try {
-			for (const kind of ['inside', 'outside', 'dangling']) {
+			for (const kind of ['inside', 'outside', 'absolute-inside', 'dangling']) {
 				const root = path.join(scratch, kind), app = path.join(root, 'AppDir'), usr = path.join(app, 'usr');
 				for (const name of ['bin', 'lib/ergopti', 'share']) fs.mkdirSync(path.join(usr, name), { recursive: true });
 				fs.writeFileSync(path.join(usr, 'bin/luajit'), '#!/bin/sh\n', { mode: 0o755 });
@@ -58,15 +58,17 @@ function portable() {
 				fs.writeFileSync(path.join(usr, 'share/internal.lua'), 'return {}\n');
 				const external = path.join(root, 'external.lua');
 				fs.writeFileSync(external, 'return {}\n');
-				fs.symlinkSync(kind === 'inside' ? 'internal.lua' : kind === 'outside' ? external : 'missing.lua', path.join(usr, 'share/module.lua'));
 				const destination = path.join(root, 'runtime');
+				const target = kind === 'inside' ? 'internal.lua' : kind === 'outside' ? external :
+					kind === 'absolute-inside' ? path.join(destination, 'share/internal.lua') : 'missing.lua';
+				fs.symlinkSync(target, path.join(usr, 'share/module.lua'));
 				const result = spawnSync(bashExecutable(), [path.join(ROOT, 'tools/build/stage-linux-private-runtime.sh'), app, destination, '/usr/lib/ergopti'], { encoding: 'utf8', timeout: 10000 });
 				if (kind === 'inside') {
 					assert.equal(result.status, 0, result.stderr);
 					assert.equal(fs.readFileSync(path.join(destination, 'share/module.lua'), 'utf8'), 'return {}\n');
 				} else {
 					assert.notEqual(result.status, 0, kind);
-					assert.match(result.stderr, /link (leaves|contains)|contains an unresolved link/);
+					assert.match(result.stderr, /link (leaves|contains)|contains an unresolved link|nonrelocatable absolute link/);
 				}
 			}
 		} finally { fs.rmSync(scratch, { recursive: true, force: true }); }
