@@ -198,7 +198,7 @@ const HOSTS = {
 	linux: { executableSyntax: 'posix', commandIsPrimary: false }
 };
 
-function loadPage(host, current) {
+function loadPage(host, current, skipInit) {
 	const byId = {};
 	for (const id of IDS) byId[id] = new FakeElement('div', id);
 	const docListeners = {};
@@ -228,8 +228,9 @@ function loadPage(host, current) {
 	context.__vocabulary = JSON.parse(fs.readFileSync(VOCABULARY, 'utf8'));
 	context.__capabilities = HOSTS[host];
 	context.__current = current || 'none';
-	vm.runInContext(
-		`init({
+	if (!skipInit)
+		vm.runInContext(
+			`init({
 			title: 'T', cancelLabel: 'Cancel', current: __current, noneLabel: 'Nothing',
 			executableSyntax: __capabilities.executableSyntax,
 			commandIsPrimary: __capabilities.commandIsPrimary,
@@ -268,8 +269,8 @@ function loadPage(host, current) {
 				{ type: 'action', id: 'enter', label: 'Enter' }
 			]
 		})`,
-		context
-	);
+			context
+		);
 	const keydown = (event) => {
 		const e = Object.assign(
 			{
@@ -345,6 +346,24 @@ for (const id of ['send_text', 'send_key', 'send_shortcut', 'llm_prompt_predicti
 	const enter = page.keydown({ key: 'Enter', code: 'Enter', target: cancel });
 	check(!enter.prevented, 'Enter on Cancel must retain native button activation');
 	check(page.posted.length === 0, 'Enter on Cancel must not confirm the selected action');
+}
+
+// A delayed native navigation callback must not erase the draft opened after ready.
+{
+	const page = loadPage('hs');
+	vm.runInContext("doConfirm('send_text')", page.context);
+	page.byId['param-input'].value = 'my pending text';
+	vm.runInContext("init({ title: 'T', cancelLabel: 'Cancel', items: [] })", page.context);
+	check(page.byId.param.hidden === false, 'a duplicate init keeps the parameter editor open');
+	check(
+		page.byId['param-input'].value === 'my pending text',
+		'a duplicate init preserves its draft'
+	);
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 && page.posted[0].parameter === 'my pending text',
+		'the preserved draft can be confirmed'
+	);
 }
 
 // 2. Picking a parameterized action opens the editor instead of confirming.
@@ -889,7 +908,7 @@ for (const host of ['ahk', 'hs', 'linux']) {
 // 12b. A host that enables the editor must state its capabilities: the page
 // refuses to guess a path syntax or a primary modifier.
 for (const missing of ['executableSyntax', 'commandIsPrimary']) {
-	const page = loadPage('linux');
+	const page = loadPage('linux', null, true);
 	page.context.__missing = missing;
 	const refused = vm.runInContext(
 		`(() => {
@@ -1048,7 +1067,7 @@ for (const host of ['hs', 'linux', 'ahk']) {
 
 // Native assignment availability uses existing host hints and refusal delivery.
 {
-	const page = loadPage('hs');
+	const page = loadPage('hs', null, true);
 	page.context.__stored = JSON.stringify({
 		version: 1,
 		executable: '/usr/bin/shortcuts',
