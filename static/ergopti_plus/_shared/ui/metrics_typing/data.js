@@ -3043,7 +3043,7 @@ function render_charmix_kpi() {
 	set(
 		'charmix_val',
 		dominant && grand > 0
-			? `${((dom_n / grand) * 100).toFixed(0)}<span class="stat-unit">% ${_t(dominant.labelKey).toLowerCase()}</span>`
+			? `${((dom_n / grand) * 100).toFixed(0)}<span class="stat-unit">% ${escape_html(_t(dominant.labelKey).toLowerCase())}</span>`
 			: `—`
 	);
 
@@ -3068,13 +3068,15 @@ function render_charmix_kpi() {
 	const segments = CHARMIX_CATEGORIES.map((c) => {
 		const n = totals[c.key] || 0;
 		const pct = (n / grand) * 100;
-		const label = pct >= 6 ? `${_t(c.labelKey)} ${pct.toFixed(0)}%` : '';
-		return { ...c, n, pct, label };
+		const category = escape_html(_t(c.labelKey));
+		const label = pct >= 6 ? `${category} ${pct.toFixed(0)}%` : '';
+		const tooltip = `${category} ${pct.toFixed(2)}%`;
+		return { ...c, n, pct, label, tooltip };
 	}).filter((s) => s.pct > 0);
 	const bar_html = segments
 		.map(
 			(s) =>
-				`<div title="${s.label || (s.label || '') + ' ' + s.pct.toFixed(2) + '%'}" ` +
+				`<div title="${s.tooltip}" ` +
 				`style="flex-basis:${s.pct}%;background:${s.color};display:flex;align-items:center;justify-content:center;` +
 				`color:${ThemeTokens.color('hue-0f172a')};font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;">${s.label}</div>`
 		)

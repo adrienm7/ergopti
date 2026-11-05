@@ -5070,4 +5070,26 @@ for (const host of ['windows', 'macos', 'linux']) {
 	});
 }
 
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} narrow character-mix segment identifies its category on hover`, () => {
+		const page = loadMetricsTypingPage(host);
+		page.context.window._i18n_strings['ui_typing.charmix_digits'] = '<digits-label>';
+		page.context.window._i18n_strings['ui_typing.charmix_letters'] = '<letters-label>';
+		publishTypingPage(page, host, {
+			'2026-10-01': {
+				Editor: { chars: 100, char_letter: 99, char_digit: 1 }
+			}
+		});
+		page.elements.get('date_start').value = '2026-10-01';
+		page.elements.get('date_end').value = '2026-10-01';
+		page.context.render_charmix_kpi();
+		const html = page.elements.get('charmix_bar_container').innerHTML;
+		assert.match(html, /title="&lt;digits-label&gt; 1\.00%"/);
+		assert.doesNotMatch(html, /<digits-label>/);
+		assert.match(html, /title="&lt;letters-label&gt; 99\.00%"/);
+		assert.match(page.elements.get('charmix_val').innerHTML, /&lt;letters-label&gt;/);
+		assert.doesNotMatch(html, /<letters-label>/);
+	});
+}
+
 console.log(`${passed} passed, 0 failed.`);
