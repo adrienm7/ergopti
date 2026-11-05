@@ -142,3 +142,122 @@ _SICOT_Case(Mode) {
 Test("SendInstant clipboard: current paste restores the original formats (sendinstant-clipboard-owner)", _SICOT_Case.Bind("current"))
 Test("SendInstant clipboard: newer independent copy survives completion (sendinstant-clipboard-owner)", _SICOT_Case.Bind("different-copy"))
 Test("SendInstant clipboard: same text from a foreign owner survives completion (sendinstant-clipboard-owner)", _SICOT_Case.Bind("same-text-copy"))
+
+; A later real copier must not rename an already authenticated payload receipt.
+_SIPRT_ChildSource() {
+	global _DriverDir
+	Code := _SICOT_ChildSource()
+	Code := StrReplace(Code, "CB_WriteTextWithReceipt(Text, &OwnedSequence := 0) {",
+		"_SIPR_ActualWriteTextWithReceipt(Text, &OwnedSequence := 0) {", true, &Publishers)
+	AssertEqual(1, Publishers, "Only the complete authenticated publisher declaration may be decorated")
+	Code := StrReplace(Code, "_SendInstant_RestoreClipboard(OldClip, OwnedSequence, OwnerToken) {",
+		"_SIPR_ActualRestoreClipboard(OldClip, OwnedSequence, OwnerToken) {", true, &Restores)
+	AssertEqual(1, Restores, "The exact canonical restore may receive only a passive fire observer")
+	Code := StrReplace(Code, "SetTimer(RestoreCallback, -SEND_INSTANT_PASTE_DELAY_MS)",
+		"_SIPR_ObserveRestoreTimer(RestoreCallback, -SEND_INSTANT_PASTE_DELAY_MS)", true, &Timers)
+	AssertEqual(1, Timers, "The real restore timer registration must delegate unchanged")
+	OldInclude := "#Include " . _DriverDir . "\tests\fixtures\sendinstant_clipboard_owner_body.ahk`n"
+	NewInclude := "#Include " . _DriverDir . "\tests\fixtures\sendinstant_post_receipt_owner_body.ahk`n"
+	Code := StrReplace(Code, OldInclude, NewInclude, true, &Fixtures)
+	AssertEqual(1, Fixtures, "Only the isolated subject fixture may change")
+	return Code
+}
+_SIPRT_Case(Mode) {
+	global _DriverDir, SEND_INSTANT_PASTE_DELAY_MS
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unresolved clipboard child tree cannot be replaced")
+	Directory := A_Temp . "\ergopti_sendinstant_post_receipt_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := false
+	Script := Directory . "\subject.ahk"
+	Subject := {Calls: 0, Code: -1, Output: "", ErrorText: ""}
+	Writer := {Calls: 0, Code: -1, Output: "", ErrorText: ""}
+	Handles := [], Primary := 0, ExportFailure := 0, Retired := true, AtDeadline := 0
+	PreviousCritical := Critical("Off")
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Directory)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The post-receipt fixture must acquire its private protocol directory exclusively")
+		AssertTrue(SEND_INSTANT_PASTE_DELAY_MS is Integer && SEND_INSTANT_PASTE_DELAY_MS > 0
+			&& SEND_INSTANT_PASTE_DELAY_MS <= 1000, "The real deferred restore delay must fit the private child deadline")
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _SIPRT_ChildSource()) != 0)
+		_TestPrint("# sendinstant-clipboard-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
+			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\sendinstant_post_receipt_owner_body.ahk")))
+		for Spec in [{Role: "writer", State: Writer}, {Role: "subject", State: Subject}] {
+			Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+				["/ErrorStdOut=UTF-8", Script, Spec.Role, Directory, Mode, String(SEND_INSTANT_PASTE_DELAY_MS)], _SICOT_Complete.Bind(Spec.State))
+			Handles.Push(Handle)
+			AssertTrue(Handle.start(), "Each exact owned native process must start")
+		}
+		Started := A_TickCount
+		while (Subject.Calls == 0 || Writer.Calls == 0) && TickElapsed(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AtDeadline := {Subject: {Calls: Subject.Calls, Code: Subject.Code, Output: Subject.Output, ErrorText: Subject.ErrorText},
+			Writer: {Calls: Writer.Calls, Code: Writer.Code, Output: Writer.Output, ErrorText: Writer.ErrorText}}
+		if Subject.Calls == 0 || Writer.Calls == 0
+			Primary := Error("The exact clipboard subject and writer did not settle within their 15000 ms deadline.")
+	} catch Any as Failure {
+		Primary := Failure
+	} finally {
+		if !IsObject(AtDeadline) || AtDeadline.Subject.Calls == 0 || AtDeadline.Writer.Calls == 0 {
+			for Handle in Handles {
+				try Handle.requestTerminate()
+				catch Any as Failure {
+					if !IsObject(Primary)
+						Primary := Failure
+				}
+			}
+		}
+		for Handle in Handles {
+			try {
+				Receipt := Handle.terminate()
+				if !(Receipt is Integer && Receipt == 1)
+					Retired := false
+			} catch Any as Failure {
+				Retired := false
+				if !IsObject(Primary)
+					Primary := Failure
+			}
+		}
+		try {
+			; Failed/unknown cleanup preserves the private protocol evidence.
+			if Created && Retired && IsObject(AtDeadline) && AtDeadline.Subject.Calls == 1 && AtDeadline.Subject.Code == 0
+				&& AtDeadline.Writer.Calls == 1 && AtDeadline.Writer.Code == 0
+				DirDelete(Directory, true)
+		} catch Any as Failure {
+			if !IsObject(Primary)
+				Primary := Failure
+		} finally {
+			if Created && !Retired
+				RetirementDebt := {Handles: Handles, Directory: Directory}
+			Critical(PreviousCritical)
+		}
+	}
+	try {
+		for Spec in [{Role: "subject", State: Subject}, {Role: "writer", State: Writer}]
+			if Spec.State.Calls == 1
+				for Line in StrSplit(Spec.State.Output, "`n", "`r")
+					if Line != ""
+						_TestPrint("# sendinstant-clipboard-" . Spec.Role . "-combined " . Line)
+	} catch Any as Failure
+		ExportFailure := Failure
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "Both exact native process trees must acknowledge retirement")
+	AssertEqual(1, AtDeadline.Subject.Calls)
+	AssertEqual("", AtDeadline.Subject.ErrorText, AtDeadline.Subject.Output)
+	AssertEqual(0, AtDeadline.Subject.Code, AtDeadline.Subject.Output)
+	AssertContains(AtDeadline.Subject.Output, "CLEANUP sendinstant-post-receipt-owner ")
+	AssertContains(AtDeadline.Subject.Output, "PASS sendinstant-post-receipt-owner " . Mode)
+	AssertEqual(1, AtDeadline.Writer.Calls)
+	AssertEqual("", AtDeadline.Writer.ErrorText, AtDeadline.Writer.Output)
+	AssertEqual(0, AtDeadline.Writer.Code, AtDeadline.Writer.Output)
+	AssertContains(AtDeadline.Writer.Output, "PASS sendinstant-post-receipt-writer " . Mode)
+	if IsObject(ExportFailure)
+		throw ExportFailure
+}
+
+for _SIPRT_Mode in ["current", "different-copy", "same-text-copy"]
+	Test("SendInstant native post-receipt copy: " . _SIPRT_Mode . " (sendinstant-post-receipt-owner)", _SIPRT_Case.Bind(_SIPRT_Mode))
