@@ -571,11 +571,7 @@ function simultaneousLinuxAdmission(
 	);
 	return (
 		rows.length === 3 &&
-		rows.every(
-			(item) =>
-				item.platforms?.join(',') ===
-				(item.id === 'copy_tap_to_combo' ? 'hs,linux' : 'ahk,hs,linux')
-		) &&
+		rows.every((item) => item.platforms?.join(',') === 'ahk,hs,linux') &&
 		delay?.platforms?.join(',') === 'ahk,hs,linux' &&
 		delay.type === 'number' &&
 		delay.default === 100 &&

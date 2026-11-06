@@ -87,8 +87,7 @@ class FakeElement {
 	}
 }
 
-const byId = {};
-for (const id of [
+const ELEMENT_IDS = [
 	'title',
 	'subtitle',
 	'search',
@@ -129,26 +128,37 @@ for (const id of [
 	'param-program-provider-select',
 	'param-program-provider-hint',
 	'param-program-provider-status'
-]) {
-	byId[id] = new FakeElement('div', id);
-}
+];
+const byId = {};
 const docListeners = {};
 const posted = [];
-const context = {
-	document: {
-		getElementById: (id) => byId[id] || null,
-		createElement: (tag) => new FakeElement(tag),
-		addEventListener: (type, fn) => {
-			(docListeners[type] = docListeners[type] || []).push(fn);
-		}
-	},
-	setTimeout: () => 0,
-	makeHostBridge: () => (msg) => posted.push(msg),
-	console
-};
-vm.createContext(context);
-vm.runInContext(fs.readFileSync(SCRIPT, 'utf8'), context, { filename: SCRIPT });
-for (const fn of docListeners.DOMContentLoaded || []) fn();
+
+/**
+ * A fresh page: the picker admits one initialization per page, so every case
+ * that calls init() again loads its own copy of the script.
+ * @returns {object} The page's script context.
+ */
+function loadPage() {
+	for (const id of ELEMENT_IDS) byId[id] = new FakeElement('div', id);
+	for (const type of Object.keys(docListeners)) delete docListeners[type];
+	const page = {
+		document: {
+			getElementById: (id) => byId[id] || null,
+			createElement: (tag) => new FakeElement(tag),
+			addEventListener: (type, fn) => {
+				(docListeners[type] = docListeners[type] || []).push(fn);
+			}
+		},
+		setTimeout: () => 0,
+		makeHostBridge: () => (msg) => posted.push(msg),
+		console
+	};
+	vm.createContext(page);
+	vm.runInContext(fs.readFileSync(SCRIPT, 'utf8'), page, { filename: SCRIPT });
+	for (const fn of docListeners.DOMContentLoaded || []) fn();
+	return page;
+}
+let context = loadPage();
 posted.length = 0;
 
 vm.runInContext(
@@ -238,6 +248,7 @@ check(byId.empty.hidden === false, 'a search with no matching action still repor
 const french = JSON.parse(
 	fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/locales/fr.json'), 'utf8')
 );
+context = loadPage();
 context.frenchActionLabel = french['sg_actions.eject_all_disks'];
 vm.runInContext(
 	`init({ title: 'T', cancelLabel: 'Cancel', current: 'none', noneLabel: 'Nothing', items: [
@@ -252,6 +263,7 @@ check(
 	'a decomposed query must find the canonically equivalent localized action label'
 );
 
+context = loadPage();
 context.frenchActionLabel = french['sg_actions.eject_all_disks'].normalize('NFD');
 vm.runInContext(
 	`init({ title: 'T', cancelLabel: 'Cancel', current: 'none', noneLabel: 'Nothing', items: [
