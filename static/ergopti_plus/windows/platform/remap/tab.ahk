@@ -85,6 +85,9 @@ _TabHoldModKey() {
 SC00F::LAlt
 SC00F::
 {
+	; A visible prediction takes the press before any tap-hold owner exists.
+	if _TabAcceptVisiblePrediction()
+		return
 	global _TH_TabAltOwner
 	Owner := TapHoldNewOwner()
 	PreviousCritical := Critical("On")
@@ -94,8 +97,6 @@ SC00F::
 		_TH_TabAltOwner := Owner
 	} finally Critical(PreviousCritical)
 	try {
-		if _TabAcceptVisiblePrediction()
-			return
 		if !TapHoldSyntheticKeyDown("LAlt", Owner)
 			return
 		tap := KS_WaitReleased("SC00F", TapHoldDuration(TapHold, "tab"))
