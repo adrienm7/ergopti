@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Input Source Switch Tests
 --- DESCRIPTION:
---- Replays the GNOME and X11 backends of adapters/input_source_switch.lua
+--- Replays the GNOME, KDE and X11 backends of adapters/input_source_switch.lua
 --- through a fake port: the parsers, the commands a switch runs, and the
 --- switcher's ordering, replacement and refusal contract.
 --- ==============================================================================
@@ -22,6 +22,8 @@ end
 
 local GNOME_SOURCES = "[('xkb', 'fr'), ('xkb', 'fr+ergopti'), ('ibus', 'mozc-jp')]\n"
 local GNOME_MRU = "[('xkb', 'fr+ergopti'), ('xkb', 'fr')]\n"
+local KDE_CALL = "gdbus call --session --dest org.kde.keyboard --object-path /Layouts --method org.kde.KeyboardLayouts."
+local KDE_LIST = "([('fr', 'ergopti', 'French (Ergopti)'), ('us', '', \"English (US, int'l)\"), ('de', 'neo', 'German (Neo 2)')],)\n"
 local X11_QUERY = "rules:      evdev\nmodel:      pc105\nlayout:     fr,us,de\nvariant:    ergopti,,neo\n"
 
 --- A port whose commands answer from a table and are recorded in order.
@@ -71,6 +73,19 @@ helpers.describe("input source switch: parsers", function()
 		helpers.assert_eq(Switch.parse_gnome_sources("No such schema"), nil)
 		helpers.assert_eq(Switch.format_gnome_sources(sources), "[('xkb', 'fr'), ('xkb', 'fr+ergopti'), ('ibus', 'mozc-jp')]")
 		helpers.assert_eq(Switch.format_gnome_sources({}), "@a(ss) []")
+	end)
+
+	helpers.it("reads the KDE daemon's layouts and index, and refuses what it cannot read", function()
+		local layouts = Switch.parse_kde_layouts(KDE_LIST)
+		helpers.assert_eq(#layouts, 3)
+		helpers.assert_eq(layouts[1].variant, "ergopti")
+		helpers.assert_eq(layouts[2].name, "English (US, int'l)", "a double-quoted name keeps its apostrophe")
+		helpers.assert_eq(#Switch.parse_kde_layouts("([],)"), 0)
+		helpers.assert_eq(Switch.parse_kde_layouts("([('fr;rm', '', 'x')],)"), nil, "a name outside XKB's alphabet")
+		helpers.assert_eq(Switch.parse_kde_layouts("([('fr', '')],)"), nil, "a tuple of two strings")
+		helpers.assert_eq(Switch.parse_kde_layouts("Error: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown"), nil)
+		helpers.assert_eq(Switch.parse_kde_index("(uint32 1,)\n"), 1)
+		helpers.assert_eq(Switch.parse_kde_index("(int32 -1,)"), nil)
 	end)
 
 	helpers.it("reads setxkbmap groups with their aligned variants", function()
@@ -315,6 +330,42 @@ helpers.describe("input source switch: switcher", function()
 		helpers.assert_eq(#choices, 3)
 		helpers.assert_eq(choices[2].id, "xkb:fr+ergopti")
 		helpers.assert_eq(choices[2].label, "fr+ergopti")
+		helpers.assert_eq(choices[2].active, true, "GNOME's first recent source is the active one")
+		helpers.assert_eq(choices[1].active, false)
+	end)
+
+	helpers.it("lists a KDE session's layouts from the keyboard daemon with the active one", function()
+		local port, calls = fake_port(Switch.KDE, {
+			[KDE_CALL .. "getLayoutsList"] = KDE_LIST, [KDE_CALL .. "getLayout"] = "(uint32 2,)\n",
+		})
+		local switcher = Switch.new(port)
+		local changed
+		switcher.refresh(function(value) changed = value end)
+		helpers.assert_eq(changed, true)
+		local choices = switcher.choices()
+		helpers.assert_eq(#choices, 3)
+		helpers.assert_eq(choices[1].id, "fr(ergopti)")
+		helpers.assert_eq(choices[2].label, "English (US, int'l)")
+		helpers.assert_eq(choices[3].active, true)
+		helpers.assert_eq(choices[1].active, false)
+		helpers.assert_eq(#calls, 2)
+	end)
+
+	helpers.it("switches a KDE session by the daemon's index and fails when it refuses", function()
+		local answers = { [KDE_CALL .. "getLayoutsList"] = KDE_LIST, [KDE_CALL .. "getLayout"] = "(uint32 0,)",
+			[KDE_CALL .. "setLayout 2"] = "(true,)\n", [KDE_CALL .. "setLayout 1"] = "(false,)\n" }
+		local port, calls = fake_port(Switch.KDE, answers)
+		local switcher = Switch.new(port)
+		local result
+		switcher.select("de(neo)", function(ok, detail) result = { ok, detail } end)
+		helpers.assert_eq(result[1], true, tostring(result[2]))
+		helpers.assert_eq(calls[3], KDE_CALL .. "setLayout 2")
+		switcher.select("us", function(ok, detail) result = { ok, detail } end)
+		helpers.assert_eq(result[1], false, "a daemon answering false did not switch")
+		helpers.assert_true(tostring(result[2]):find("refused the switch", 1, true) ~= nil, tostring(result[2]))
+		switcher.select("it", function(ok, detail) result = { ok, detail } end)
+		helpers.assert_eq(result[1], false)
+		helpers.assert_true(tostring(result[2]):find("not configured in this KDE session", 1, true) ~= nil)
 	end)
 
 	helpers.it("reads the current sources before every switch and runs the plan in order", function()
