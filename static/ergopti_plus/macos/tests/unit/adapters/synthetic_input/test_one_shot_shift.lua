@@ -66,6 +66,40 @@ helpers.describe("one-shot native boundary", function()
 		adapter.finish(true)
 		helpers.assert_eq(emitted, { "É" })
 	end)
+	helpers.it("serializes the title when Caps Lock plus Shift would produce lowercase (one-shot-caps-lock, OSM-001)", function()
+		local CAPS, SHIFT = 65536, 2
+		local layout = { [0] = "a", [CAPS] = "A", [SHIFT] = "A", [CAPS | SHIFT] = "a" }
+		local function build(held, captured)
+			local emitted, raw, text = {}, held, captured or layout[held]
+			local event = {
+				getFlags = function() return {} end,
+				rawFlags = function(_, value) if value ~= nil then raw = value end; return raw end,
+				getCharacters = function() return text end,
+				setUnicodeString = function(_, value) text = value end,
+			}
+			local adapter = require("adapters.one_shot_shift").new({
+				data = data, magic = function() return "★" end, now = function() return 10 end,
+				event = { rawFlagMasks = { shift = SHIFT } }, is_repeat = function() return false end,
+				translate = function(_, flags) return layout[flags] end,
+				emit = function(value) emitted[#emitted + 1] = value; return true end,
+			})
+			adapter.arm(2)
+			return adapter, event, emitted, function() return raw end
+		end
+		-- The audit's capture: the key read as "a" while Caps Lock is held. Shift on
+		-- top would type "a" again, so the title is serialized.
+		local adapter, event, emitted, flags = build(CAPS, "a")
+		helpers.assert_true(adapter.key_down(event, 0), "the key is replaced by the serialized title")
+		adapter.finish(true)
+		helpers.assert_eq(emitted, { "A" }, "the first letter is a capital under Caps Lock")
+		helpers.assert_eq(flags(), CAPS, "the physical Caps Lock flag is not stripped")
+		-- Control: no Caps Lock, Shift alone is the title and stays a native flag.
+		adapter, event, emitted, flags = build(0)
+		helpers.assert_eq(adapter.key_down(event, 0), false, "an ordinary key gets the native Shift flag")
+		adapter.finish(true)
+		helpers.assert_eq(emitted, {})
+		helpers.assert_eq(flags(), SHIFT)
+	end)
 	helpers.it("keeps native translation probes private to the synthetic adapter (one-shot-probe)", function()
 		helpers.with_stub_scope({ "adapters.synthetic_input", "adapters.event_provenance", "tests.stubs.hs" }, function()
 			package.loaded["adapters.synthetic_input"] = nil
