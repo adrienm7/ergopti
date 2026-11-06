@@ -116,11 +116,14 @@ _SNR_Main() {
 				"The actual one-shot owner must admit its one expected output.")
 		} else {
 			Expected := _SNR.Mode == "letter" ? Chr(0x00E4) : Chr(0x00A8)
-			_SNR_Require(_SNR.Sends.Length == 1 && _SNR.Sends[1] == Expected,
+			_SNR_Require(_SNR.Sends.Length >= 1 && _SNR.Sends[1] == Expected,
 				"The actual dead-key owner must admit its mapped letter or base character.")
-			_SNR_Require(_SNR.Controls.Length == (_SNR.Mode == "letter" ? 0 : 1), "The actual dead-key control replay must be retained exactly once.")
+			; The ending control is replayed through the result sender, with its
+			; held modifiers, as OneShotShift does (OSW-001).
+			_SNR_Require(_SNR.Sends.Length == (_SNR.Mode == "letter" ? 1 : 2) && _SNR.Controls.Length == 0,
+				"The actual dead-key control replay must be retained exactly once.")
 			if _SNR.Mode != "letter"
-				_SNR_Require(_SNR.Controls[1] == "{" . ExpectedKey . "}", "The consumed named key must be replayed unchanged.")
+				_SNR_Require(_SNR.Sends[2] == "{" . ExpectedKey . "}", "The consumed named key must be replayed unchanged.")
 		}
 
 		_SNR_Require(_SNR.Keys.Length == 0, "The original unmodified key must be suppressed before its scalar replay.")

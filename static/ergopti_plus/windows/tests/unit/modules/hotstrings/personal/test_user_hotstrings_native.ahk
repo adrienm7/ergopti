@@ -165,16 +165,24 @@ Test("programmable hotstrings: actual boot live persistence and cancellation ref
 
 _UCHActualSourceAdmission() {
 	global _ConfigDir, _UserHotstringsOwner, _UserHotstringsLoader, _UserHotstringsJobs, _UserHotstringsLoadEpoch
-	global _UserHotstringsLastRepair, _UserHotstringsProblem, _DriverMenuReady
+	global _UserHotstringsLastRepair, _UserHotstringsProblem, _DriverMenuReady, CategoryEnabled
 	AssertEqual(0, _UserHotstringsJobs.Count)
 	AssertFalse(IsObject(_UserHotstringsLoader), "source admission fixtures require prior loader retirement")
 	Saved := [_ConfigDir, _UserHotstringsOwner, _UserHotstringsLoader, _UserHotstringsLoadEpoch,
 		_UserHotstringsLastRepair, _UserHotstringsProblem]
 	SavedMenuReady := IsSet(_DriverMenuReady) ? _DriverMenuReady : unset
+	; A successful load restores the configured posture, so the fixture
+	; configures the enable it asks for, as the menu toggle persists it first.
+	Dynamic := Features["hotstrings"]["dynamic"], HadNode := Dynamic.Has("user_code")
+	if !HadNode
+		Dynamic["user_code"] := Map("enabled", false)
+	Node := Dynamic["user_code"], SavedEnabled := Node["enabled"]
+	SavedCategories := CategoryEnabled
 	PackageRoots := _UCHPackageRoots(), Fixture := _ScopeOwnerFixture(), Hold := 0
 	Sentinel := Fixture.directory . "\empty-factory-ran.txt"
 	try {
 		_ConfigDir := Fixture.directory . "\", _DriverMenuReady := false, _UserHotstringsProblem := ""
+		Node["enabled"] := true, CategoryEnabled := Map("Hotstrings", true)
 		_UserHotstringsOwner := UserHotstringOwner(Map("capture", _UserHotstringsCaptureRule,
 			"current", _UserHotstringsCurrent, "invoke", _UserHotstringsInvoke,
 			"commit", _UserHotstringsCommit, "report", _UserHotstringsReport))
@@ -243,6 +251,11 @@ _UCHActualSourceAdmission() {
 		_ConfigDir := Saved[1], _UserHotstringsOwner := Saved[2], _UserHotstringsLoader := Saved[3]
 		_UserHotstringsLoadEpoch := Saved[4], _UserHotstringsLastRepair := Saved[5], _UserHotstringsProblem := Saved[6]
 		_DriverMenuReady := IsSet(SavedMenuReady) ? SavedMenuReady : unset
+		if HadNode
+			Node["enabled"] := SavedEnabled
+		else
+			Dynamic.Delete("user_code")
+		CategoryEnabled := SavedCategories
 		_UCHRestorePackageRoots(PackageRoots)
 		_ScopeOwnerCleanup(Fixture)
 	}

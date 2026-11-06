@@ -641,6 +641,8 @@ _WSGT20260813_ControlNativeRefusal(Path) {
 	global _WSGT20260813_WriterCalls, _WSGT20260813_ReplaceCalls, _WSGT20260813_RebuildCalls
 	Rows := _WS_BuildSymbolRows()
 	Before := _WSGT20260813_LiveIdentity()
+	; The owned-source fixture seeds a real record: refusal must leave its bytes.
+	SeedBytes := FSReadStrict(Path)
 	Terminal := _ConfigWriteTerminalTryAcquire(Path . ".wrap-control-terminal")
 	AssertTrue(Terminal is Object)
 	try {
@@ -650,7 +652,7 @@ _WSGT20260813_ControlNativeRefusal(Path) {
 			_WSGT20260813_AssertRefused(Rows[5]["items"][Index]["action"].Call("discarded menu arg", 99), "captured group control")
 		_WSGT20260813_AssertRefused(Rows[13]["items"][1]["action"].Call("discarded menu arg", 99), "captured custom delete")
 		_WSGT20260813_AssertNoPublication(Before, "actual provider callbacks under terminal admission refusal")
-		AssertFalse(FileExist(Path), "no record can be written by a refused native owner")
+		AssertEqual(SeedBytes, FSReadStrict(Path), "no record can be written by a refused native owner")
 		AssertEqual(0, _WSGT20260813_WriterCalls + _WSGT20260813_ReplaceCalls + _WSGT20260813_RebuildCalls)
 	} finally _ConfigWriteTerminalRelease(Terminal)
 }

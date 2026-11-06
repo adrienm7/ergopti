@@ -292,7 +292,10 @@ _TPO_SealScheduledAfterReady() {
 	ProxyOverride_ScheduleSealAtStart((Seal) => Scheduled.Push(Seal))
 	AssertEqual(1, Scheduled.Length, "one sealing is scheduled")
 	Assert(Scheduled[1] == ProxyOverride_SealStoredAtStart, "what is scheduled is the sealing itself")
-	Assert(RegExMatch(_DriverSourceConcat(), 's)_DriverBootPhase := "ready".*\RProxyOverride_ScheduleSealAtStart\(\)'),
+	; Positional search: a dot-all regex over the whole driver exceeds PCRE's limit.
+	Src := _DriverSourceConcat()
+	ReadyPos := InStr(Src, '_DriverBootPhase := "ready"')
+	Assert(ReadyPos > 0 && RegExMatch(Src, "m)^ProxyOverride_ScheduleSealAtStart\(\)", , ReadyPos) > ReadyPos,
 		"a commit must not replace the snapshot the boot readers hold")
 }
 
