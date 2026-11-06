@@ -206,6 +206,9 @@ function M.walk_system_event(entry)
 		local duration = tonumber(entry.duration_ms) or 0
 		if entry.kind == "sleep" then s.sleep_ms = s.sleep_ms + duration
 		elseif entry.kind == "lock" then s.locked_ms = s.locked_ms + duration
+		-- A finished keep-awake session (shortcuts/actions/system.lua). Its
+		-- awake_focus companion names the app and is not a second interval.
+		elseif entry.kind == "awake" then s.awake_ms = s.awake_ms + duration
 		end
 	-- Legacy edges recorded before measured passive rows still carry their own
 	-- interval; a current edge has no duration and adds nothing.
