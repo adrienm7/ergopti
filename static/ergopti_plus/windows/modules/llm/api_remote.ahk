@@ -1554,7 +1554,7 @@ _LLMRemote_WaitForAccess(req_id, reservation, Resolved, on_fail, Dispatch) {
             if !_LLMRemote_RequestOwns(req_id, reservation)
                 return
             reservation["access_deadline"] := Deadline
-            SetTimer(Deadline, -Max(1, Delay))
+            TimerSetCallback(Deadline, -Max(1, Integer(Round(Delay))))
         } finally Critical(PreviousCritical)
     } catch as Err {
         ; Invalid/native-refused timer preparation cannot leave an unpublished
@@ -1578,7 +1578,7 @@ _LLMRemote_StopAccessDeadline(reservation) {
         if !reservation.Has("access_deadline")
             return false
         Deadline := reservation.Delete("access_deadline")
-        SetTimer(Deadline, 0)
+        TimerSetCallback(Deadline, 0)
         return true
     } finally Critical(PreviousCritical)
 }
@@ -1596,7 +1596,7 @@ _LLMRemote_AccessDeadline(req_id, reservation, on_fail) {
         PreviousCritical := Critical("On")
         try {
             if _LLMRemote_RequestOwns(req_id, reservation) && reservation.Has("access_deadline")
-                SetTimer(reservation["access_deadline"], -Max(1, Delay))
+                TimerSetCallback(reservation["access_deadline"], -Max(1, Integer(Round(Delay))))
         } finally Critical(PreviousCritical)
         return
     }

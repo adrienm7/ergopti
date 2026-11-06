@@ -948,12 +948,12 @@ _LLM_Menu_ProfilePromptInput(Prompt, Title, Options := "", Default := "") {
 		Dialog.Show("w" . Width . " h" . Height)
 		if !Finished {
 			if Timeout > 0
-				SetTimer(TimeoutFn, -Max(1, Round(Timeout * 1000)))
+				TimerSetCallback(TimeoutFn, -Max(1, Integer(Round(Timeout * 1000))))
 			WinWaitClose("ahk_id " . Hwnd)
 		}
 		return Receipt
 	} finally {
-		SetTimer(TimeoutFn, 0)
+		TimerSetCallback(TimeoutFn, 0)
 		try Dialog.Destroy()
 	}
 

@@ -246,6 +246,58 @@ FSWriteCreateDurable(Path, Content) {
 	}
 }
 
+; Creates one new UTF-8 file through the kernel CREATE_NEW admission and
+; flushes it before reporting success, so an existing path is never replaced.
+; Unlike FSWriteCreateDurable, a partial file is retained on failure: deleting
+; its path after the handle closed could delete a successor that took the name.
+; @param Path    {String} Absolute path of the file to create.
+; @param Content {String} Text to write as UTF-8 without a BOM.
+; @returns {Integer|String} 1 once written, flushed and closed; "exists" when
+;   the path is already taken; 0 on any other failure.
+FSWriteCreateNewDurable(Path, Content) {
+	if !FSPathIsAdmissible(Path) || !(Content is String)
+		return 0
+	static GENERIC_WRITE := 0x40000000
+	static CREATE_NEW := 1
+	static FILE_ATTRIBUTE_NORMAL := 0x00000080
+	static FILE_FLAG_WRITE_THROUGH := 0x80000000
+	static ERROR_FILE_EXISTS := 80
+	static ERROR_ALREADY_EXISTS := 183
+	Handle := -1
+	try {
+		Handle := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", GENERIC_WRITE,
+			"UInt", 0, "Ptr", 0, "UInt", CREATE_NEW, "UInt", FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH,
+			"Ptr", 0, "Ptr")
+		if Handle == -1 {
+			Code := A_LastError
+			return (Code == ERROR_FILE_EXISTS || Code == ERROR_ALREADY_EXISTS) ? "exists" : 0
+		}
+		Count := StrPut(Content, "UTF-8") - 1
+		Bytes := Buffer(Count + 1, 0)
+		if Count > 0
+			StrPut(Content, Bytes, Count + 1, "UTF-8")
+		Offset := 0
+		while Offset < Count {
+			Written := 0
+			if !DllCall("kernel32\WriteFile", "Ptr", Handle, "Ptr", Bytes.Ptr + Offset,
+				"UInt", Count - Offset, "UInt*", &Written, "Ptr", 0, "Int") || Written <= 0
+				return 0
+			Offset += Written
+		}
+		if !DllCall("kernel32\FlushFileBuffers", "Ptr", Handle, "Int")
+			return 0
+		if !DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int")
+			return 0
+		Handle := -1
+		return 1
+	} catch {
+		return 0
+	} finally {
+		if Handle != -1
+			try DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int")
+	}
+}
+
 ; Flushes one already-open writable file handle to stable storage. Callers use
 ; this before an atomic rename when the rename itself is a durable protocol
 ; boundary. The File object owns and closes the handle; this adapter only asks

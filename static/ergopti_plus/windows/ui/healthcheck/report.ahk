@@ -415,46 +415,6 @@ global HC_FOLDER_IDS := Map("config_dir", true, "logs_dir", true, "crash_dir", t
 ; ===============================
 ; ===============================
 
-; Creates one new attachment through the kernel CREATE_NEW admission.
-; A partial file is retained on failure: deleting its path after handle closure
-; could delete a successor. Only a full write, flush and close returns success.
-_HCReport_CreateNew(Path, Text) {
-	if !FSPathIsAdmissible(Path) || !(Text is String)
-		return 0
-	Handle := -1
-	try {
-		Handle := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0x40000000,
-			"UInt", 0, "Ptr", 0, "UInt", 1, "UInt", 0x80000080, "Ptr", 0, "Ptr")
-		if Handle == -1 {
-			Code := A_LastError
-			return (Code == 80 || Code == 183) ? "exists" : 0
-		}
-		Count := StrPut(Text, "UTF-8") - 1
-		Bytes := Buffer(Count + 1, 0)
-		if Count > 0
-			StrPut(Text, Bytes, Count + 1, "UTF-8")
-		Offset := 0
-		while Offset < Count {
-			Written := 0
-			if !DllCall("kernel32\WriteFile", "Ptr", Handle, "Ptr", Bytes.Ptr + Offset,
-				"UInt", Count - Offset, "UInt*", &Written, "Ptr", 0, "Int") || Written <= 0
-				return 0
-			Offset += Written
-		}
-		if !DllCall("kernel32\FlushFileBuffers", "Ptr", Handle, "Int")
-			return 0
-		if !DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int")
-			return 0
-		Handle := -1
-		return 1
-	} catch {
-		return 0
-	} finally {
-		if Handle != -1
-			try DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int")
-	}
-}
-
 ; Saves the report in Dir, creating the folder when it is missing.
 ; @param WriterFn {Func|Integer} Optional durable native writer for fault coverage.
 ; @returns {String} The saved file's path.
@@ -463,7 +423,7 @@ _HCReport_Save(Dir, Name, Text, WriterFn := 0) {
 	DirCreate(Dir)
 	if !(WriterFn is Integer && WriterFn == 0) && !HasMethod(WriterFn, "Call")
 		throw TypeError("The diagnostics attachment writer must be callable or zero.")
-	ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : _HCReport_CreateNew
+	ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteCreateNewDurable
 	SplitPath(Name, , , &Ext, &Stem)
 	Suffix := Ext == "" ? "" : "." . Ext
 	Loop 1000 {

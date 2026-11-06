@@ -150,7 +150,7 @@ _HCW_RetryRetiredNativeResets() {
 			; A retained old form cannot continue accepting edits or native focus.
 			try Window.Hide()
 			Window.Destroy()
-			if Host.hwnd && DllCall("IsWindow", "Ptr", Host.hwnd, "Int") {
+			if Host.hwnd && WMHandleExists(Host.hwnd) {
 				Remaining := GuiFromHwnd(Host.hwnd)
 				if !IsObject(Remaining) || Remaining == Window
 					throw Error("The retired hotstrings reset window has not closed.")

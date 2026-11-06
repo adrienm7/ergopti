@@ -93,6 +93,11 @@ WMHandleExists(HWnd) {
 	return _WMForegroundNative.IsWindow(HWnd)
 }
 
+/** Reports whether an existing HWND is visible, for owners that reconcile their own Show/Hide intent. */
+WMHandleVisible(HWnd) {
+	return _WMForegroundNative.IsWindowVisible(HWnd)
+}
+
 /**
  * Checks that HWnd names an existing window created by this process, even while
  * hidden. A handle Windows recycled for another process after our window closed
