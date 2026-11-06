@@ -240,7 +240,8 @@ window.publishTypingMetricsData = function (payload, metadata) {
 		metadata.assets_revision > appliedTypingAssetsRevision
 	) {
 		window.app_icons = payload.app_icons;
-		window.keycode_layout = payload.kc_layout;
+		window.keycode_layout_source = payload.kc_layout;
+		window.keycode_layout = name_keycode_layout(payload.kc_layout, window.driver_meta);
 		appliedTypingAssetsRevision = metadata.assets_revision;
 		assetsChanged = true;
 	}

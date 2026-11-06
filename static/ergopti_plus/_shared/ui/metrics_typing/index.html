@@ -1252,6 +1252,8 @@
 		<script src="../metrics_freshness.js"></script>
 		<script src="../dom_utils.js"></script>
 		<!-- Generated from _shared/data/keycodes/azerty.json (DC-1) — must load before state.js, which reads its KEYCODE_DATA global -->
+		<script src="../_generated/key_names.js"></script>
+		<script src="../key_names.js"></script>
 		<script src="_generated/keycode_data.js"></script>
 		<script src="_generated/keystats_tokens.js"></script>
 		<script src="key_tokens.js"></script>
@@ -1313,10 +1315,14 @@
 					// PC-scancode drivers render against macOS-style
 					// HS keycodes — translate the labels (and the n-gram
 					// data, below) so the heatmap geometry stays unchanged.
-					window.keycode_layout =
-						typeof window.build_keycode_layout_for_driver === 'function'
-							? window.build_keycode_layout_for_driver(window.driver_meta, blob.keycode_layout)
-							: blob.keycode_layout || {};
+					window.keycode_layout_source = window.build_keycode_layout_for_driver(
+						window.driver_meta,
+						blob.keycode_layout
+					);
+					window.keycode_layout = window.name_keycode_layout(
+						window.keycode_layout_source,
+						window.driver_meta
+					);
 					let merged = null;
 					let next_historical = cached_historical;
 					let next_historical_incomplete = cached_historical_incomplete;

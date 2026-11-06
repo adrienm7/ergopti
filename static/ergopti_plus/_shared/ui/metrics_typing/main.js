@@ -308,6 +308,12 @@ function find_in_page(forward) {
 // Generated media labels are rendered again after the actual locale changes.
 document.addEventListener('i18n:applied', render_media_keys);
 
+// The heatmap's key names come from the locale: name them again once it lands.
+document.addEventListener('i18n:applied', () => {
+	if (window.keycode_layout_source)
+		window.keycode_layout = name_keycode_layout(window.keycode_layout_source, window.driver_meta);
+});
+
 // The remaining record labels are rendered from accepted data rather than
 // data-i18n attributes. Refresh them after a late native locale delivery.
 document.addEventListener('i18n:applied', () => {

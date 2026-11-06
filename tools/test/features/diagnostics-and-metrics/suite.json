@@ -449,6 +449,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-crash-worker-partial-write.cjs"],
 			"repro": "node tools/test/test-crash-worker-partial-write.cjs"
+		},
+		{
+			"id": "js-metrics-key-names",
+			"ordinal": 594,
+			"name": "metrics heatmap names its special keys from the key name table in every locale",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-key-names.cjs"],
+			"repro": "node tools/test/test-metrics-key-names.cjs"
 		}
 	]
 }

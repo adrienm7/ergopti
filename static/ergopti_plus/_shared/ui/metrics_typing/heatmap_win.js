@@ -16,7 +16,7 @@
  * 1. Single physical-key map: SC_TO_KC covers every key the heatmap can
  *    colour. Modifier identities differ (Ctrl/Alt/Win vs ⌃/⌥/⌘) but the
  *    PHYSICAL position is identical, so the same KEY_POSITIONS entry is
- *    reused with a relabel via WIN_KEYCODE_LABELS.
+ *    reused with a relabel via PC_KEYCODE_KEY_IDS.
  * 2. No cross-driver leakage: the translator only kicks in for Windows and
  *    Linux physical-scancode payloads. Mac payloads
  *    fall through untouched.
@@ -143,31 +143,66 @@ const SC_TO_KC = {
 // ==============================================
 // ==============================================
 
-// Override macOS modifier glyphs with Windows names. Keys NOT listed fall
-// back to KEYCODE_NAMES (which already covers letters / digits / punct).
-const WIN_KEYCODE_LABELS = {
-	49: 'Espace',
-	36: 'Entrée',
-	48: 'Tab',
-	51: 'Retour arr.',
-	53: 'Échap',
-	56: 'Maj',
-	60: 'Maj',
-	57: 'Verr. Maj',
+// The named keys of a PC layout, at the macOS keycode its scan code is drawn
+// on: each is named from the shared key name table (key_names.js) in the
+// user's language. They read « Espace », « Entrée », « Maj » in French in
+// every locale. Keys NOT listed fall back to KEYCODE_NAMES (which already
+// covers letters / digits / punct); the arrows keep their glyph.
+const PC_KEYCODE_KEY_IDS = {
+	49: 'space',
+	36: 'enter',
+	48: 'tab',
+	51: 'backspace',
+	53: 'escape',
+	56: 'shift',
+	60: 'shift',
+	57: 'caps_lock',
 	// Windows thumb row (left→right): Ctrl | Fn | Win | Alt | Space | AltGr | (Menu)
 	// kc63=x0 → Ctrl (leftmost), kc59=x1 → Fn, kc58=x2 → Win, kc55=x3.25 → Alt
 	// kc54=x9.25 → AltGr (first key right of Space), kc61=x10.5 → Menu
-	63: 'Ctrl',
-	59: 'Fn',
-	58: 'Win',
-	55: 'Alt',
-	54: 'AltGr',
-	61: 'Menu',
+	63: 'ctrl',
+	59: 'fn',
+	58: 'win',
+	55: 'alt',
+	54: 'alt_gr',
+	61: 'context_menu'
+};
+
+const PC_KEYCODE_GLYPHS = {
 	123: '←',
 	126: '↑',
 	124: '→',
 	125: '↓'
 };
+
+// The named keys of a macOS layout: hs.keycodes.map and KEYCODE_NAMES spell
+// them as ids (`return`, `cmd`, `r-alt`), which the page used to print.
+const MAC_KEYCODE_KEY_IDS = {
+	36: 'enter',
+	48: 'tab',
+	49: 'space',
+	51: 'backspace',
+	53: 'escape',
+	54: 'right_command',
+	55: 'cmd',
+	56: 'shift',
+	57: 'caps_lock',
+	58: 'option',
+	59: 'ctrl',
+	60: 'right_shift',
+	61: 'right_option',
+	62: 'right_ctrl',
+	63: 'fn',
+	76: 'enter',
+	115: 'home',
+	116: 'page_up',
+	117: 'delete',
+	119: 'end_key',
+	121: 'page_down'
+};
+
+// The key name table's platform for each recording OS (driver_meta.os).
+const DRIVER_OS_PLATFORMS = { mac: 'macos', win: 'windows', linux: 'linux' };
 
 // The recording OSes whose dataset keys are PC scan codes (driver_meta.os of
 // the blob); every other dataset records macOS keycodes.
@@ -267,15 +302,15 @@ function translate_win_today(payload) {
 }
 
 /**
- * Build the keycode_layout map (kc_str → display label) appropriate for
- * the active driver.
+ * Build the unnamed keycode_layout map (kc_str → display label) appropriate
+ * for the active driver; name_keycode_layout then names its special keys.
  *
  *   macOS payloads return KEYCODE_NAMES untouched.
  *   Windows payloads merge three layers, in increasing priority:
  *     1. KEYCODE_NAMES                     — static QWERTY fallback
  *     2. AHK-provided sc → char (translated via SC_TO_KC) — reflects
  *        the user's active Windows layout (AZERTY, QWERTY-US, …).
- *     3. WIN_KEYCODE_LABELS                — explicit Win modifier names.
+ *     3. PC_KEYCODE_KEY_IDS / glyphs        — explicit key names.
  *
  * @param {Object} driver_meta - Optional `{ os, heatmap_id }` from blob.
  * @param {Object} ahk_layout - Optional `{ sc_str: char }` from blob.
@@ -292,11 +327,32 @@ function build_keycode_layout_for_driver(driver_meta, ahk_layout) {
 			out[String(kc)] = ch;
 		});
 	}
-	Object.entries(WIN_KEYCODE_LABELS).forEach(([k, v]) => {
+	Object.entries(PC_KEYCODE_GLYPHS).forEach(([k, v]) => {
 		out[k] = v;
+	});
+	return out;
+}
+
+/**
+ * Names the special keys of a keycode layout from the shared key name table,
+ * in the user's language and for the recording OS. Called again when the
+ * locale arrives (i18n:applied), so it keeps its unnamed source.
+ * @param {Object} layout - Map of `kc_str` → label (hs.keycodes.map or built).
+ * @param {Object|undefined} driver_meta - `{ os }`; absent means macOS.
+ * @returns {Object} A new map whose named keys read as key names.
+ */
+function name_keycode_layout(layout, driver_meta) {
+	const os = driver_meta && driver_meta.os ? driver_meta.os : 'mac';
+	const platform = DRIVER_OS_PLATFORMS[os];
+	if (!platform) throw new Error('metrics heatmap: unknown driver OS ' + os);
+	const ids = is_pc_scancode_driver(driver_meta) ? PC_KEYCODE_KEY_IDS : MAC_KEYCODE_KEY_IDS;
+	const out = { ...(layout || {}) };
+	Object.entries(ids).forEach(([kc, id]) => {
+		out[kc] = keyNameLabel(id, platform);
 	});
 	return out;
 }
 
 window.translate_win_today = translate_win_today;
 window.build_keycode_layout_for_driver = build_keycode_layout_for_driver;
+window.name_keycode_layout = name_keycode_layout;
