@@ -363,3 +363,19 @@ backup, the Windows factory defaults declared in
 `precision_touchpad_registry.toml`. The separate Configuration row « Restaurer
 les gestes du pavé tactile Windows » is gone. The Windows factory defaults stay
 the real Windows values; they are not Ergopti's recommended gestures.
+
+## Linux fires the horizontal axis gesture slots (6 November 2026)
+
+`swipe_3_horiz`, `swipe_4_horiz` and `swipe_5_horiz` stay offered on Linux and
+now fire (LIN-009 / LG-001): they are not hidden. An axis slot is the binding
+of both horizontal directions of its finger count. A straight left or right
+swipe whose own direction slot is unbound runs the axis slot's action; a bound
+`swipe_N_left` / `swipe_N_right` always wins, so one gesture never runs two
+actions. Diagonals, vertical swipes, taps and two fingers have no axis slot.
+The decoder's shared direction thresholds apply unchanged, and Linux fires once
+per completed gesture (no incremental repeat: modes and sensitivities stay
+macOS only). `linux/modules/gestures/manager.lua` (`dispatch_gesture`) owns the
+rule and `test_gesture_axis_slots.lua` pins it from evdev frames. The macOS
+engine does not read the axis slots yet (it resolves only direction slots);
+bringing it onto the same rule is a separate TODO item, not a reason to change
+the Linux rule.
