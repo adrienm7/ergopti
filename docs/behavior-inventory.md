@@ -19,19 +19,19 @@ Edit `_shared/modules/features/behaviors.json` after reviewing the named owners,
 
 - windows: [static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk](../static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk) — `HSE_TryRepeatKey(MagicKey)`, SHA-256 `54b6d880f365bf58bf4e245ea24b523693a99464c5db2e3aa79202cdcbcbffab`.
 - macos: [static/ergopti_plus/macos/modules/keymap/expander.lua](../static/ergopti_plus/macos/modules/keymap/expander.lua) — `function M.try_repeat_feature`, SHA-256 `8980c996eee776ab255fc7dad362b7599ef6219b684c7072ae6530f7fe593857`.
-- linux: [static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua](../static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua) — `function M.resolve`, SHA-256 `7ac497766961b3c735c4d8eb1ac9a60117f3011301c61499d6ddccf743b086ea`; [static/ergopti_plus/linux/ergopti_hotstrings.lua](../static/ergopti_plus/linux/ergopti_hotstrings.lua) — `local undo = _undoable`, SHA-256 `384b795d4183874b9dfaee926740939d92889948ce9376f62bf8b52013bc3803`.
+- linux: [static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua](../static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua) — `function M.resolve`, SHA-256 `7ac497766961b3c735c4d8eb1ac9a60117f3011301c61499d6ddccf743b086ea`; [static/ergopti_plus/linux/ergopti_hotstrings.lua](../static/ergopti_plus/linux/ergopti_hotstrings.lua) — `local undo = _undoable`, SHA-256 `018f9cea65aacf5253f84650f4cac12c7da6ca368466ad9a47a3329d3833215d`.
 
 ## hotstrings.backspace_restore
 
 - windows: [static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk](../static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk) — `_OnPrefixKeyDown`, SHA-256 `4cd2d7f8218564f39c55161a008e29301bb2563a1ed1e8c05ba3a85f4e6f97d6`.
 - macos: [static/ergopti_plus/macos/modules/keymap/init.lua](../static/ergopti_plus/macos/modules/keymap/init.lua) — `hotstrings.shortcut_resets_word`, SHA-256 `ca58752f4bff750256caf387a7be1e49f554a61e57261bbb88f993ba1d956f5f`.
-- linux: [static/ergopti_plus/linux/ergopti_hotstrings.lua](../static/ergopti_plus/linux/ergopti_hotstrings.lua) — `local undo = _undoable`, SHA-256 `384b795d4183874b9dfaee926740939d92889948ce9376f62bf8b52013bc3803`.
+- linux: [static/ergopti_plus/linux/ergopti_hotstrings.lua](../static/ergopti_plus/linux/ergopti_hotstrings.lua) — `local undo = _undoable`, SHA-256 `018f9cea65aacf5253f84650f4cac12c7da6ca368466ad9a47a3329d3833215d`.
 
 ## hotstrings.repeat_activation_window
 
 - windows: [static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk](../static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk) — `HSE_TryRepeatKey(MagicKey)`, SHA-256 `54b6d880f365bf58bf4e245ea24b523693a99464c5db2e3aa79202cdcbcbffab`.
 - macos: [static/ergopti_plus/macos/modules/keymap/expander.lua](../static/ergopti_plus/macos/modules/keymap/expander.lua) — `function M.try_repeat_feature`, SHA-256 `8980c996eee776ab255fc7dad362b7599ef6219b684c7072ae6530f7fe593857`; [static/ergopti_plus/macos/modules/keymap/init.lua](../static/ergopti_plus/macos/modules/keymap/init.lua) — `hotstrings.shortcut_resets_word`, SHA-256 `ca58752f4bff750256caf387a7be1e49f554a61e57261bbb88f993ba1d956f5f`.
-- linux: [static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua](../static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua) — `function M.resolve`, SHA-256 `7ac497766961b3c735c4d8eb1ac9a60117f3011301c61499d6ddccf743b086ea`; [static/ergopti_plus/linux/ergopti_hotstrings.lua](../static/ergopti_plus/linux/ergopti_hotstrings.lua) — `local undo = _undoable`, SHA-256 `384b795d4183874b9dfaee926740939d92889948ce9376f62bf8b52013bc3803`.
+- linux: [static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua](../static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua) — `function M.resolve`, SHA-256 `7ac497766961b3c735c4d8eb1ac9a60117f3011301c61499d6ddccf743b086ea`; [static/ergopti_plus/linux/ergopti_hotstrings.lua](../static/ergopti_plus/linux/ergopti_hotstrings.lua) — `local undo = _undoable`, SHA-256 `018f9cea65aacf5253f84650f4cac12c7da6ca368466ad9a47a3329d3833215d`.
 
 ## deadkeys.composition
 
