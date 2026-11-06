@@ -342,6 +342,11 @@ local function _build_layouts(ctx)
 		end
 		return { items = items }
 	end
+	-- « Rangées émulées »: the four layout.emulate_<row> switches of the
+	-- manifest's layout_emulated_rows_group, as Windows builds them.
+	group_builders["layout_emulated_rows"] = function()
+		return { items = ManifestMenu.build("layout_emulated_rows_group", "Layout", nil, nil, render_ctx, providers) or {} }
+	end
 	local rows = ManifestMenu
 		and ManifestMenu.build("layout_menu", "Layout", nil, group_builders, render_ctx, providers)
 		or {}
