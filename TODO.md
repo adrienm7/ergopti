@@ -12,6 +12,8 @@ the field-run step or the hand action that proves it and the commits it confirms
 
 Large project: an Ergopti equivalent of [kalamine](https://github.com/OneDeadKey/kalamine). Kalamine starts from a
 TOML file; Ergopti starts from a macOS `.keylayout` file, the single source of truth for a layout.
+Take ideas from kalamine, never its code: write every generator from the formats' own documentation, so that no
+MIT notice has to ship and the design can go further (one `.keylayout` source, golden vectors, live emulation).
 
 - [ ] **One generator, every target.** From one `.keylayout`, generate the macOS bundle, the Linux XKB files, the
       Windows `.klc` plus the keyboard DLL and its unsigned installer, the AutoHotkey emulation tables, the
