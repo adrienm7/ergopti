@@ -526,10 +526,14 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 		with_native_owners(function(c)
 			local handler = helpers.load_module("ui.personal_info_editor.bridge")
 			local epoch, closes, cancelled, duplicate = 41, 0, nil, nil
+			local document = {}
 			local host = { current_epoch = function() return epoch end,
 				page_current = function(_, expected) return epoch == expected end,
+				document_owner_current = function(owner) return owner == document and epoch == 41 end,
+				document_owner_retained = function(owner) return owner == document and epoch == 41 end,
+				eval_owned_js = function(_, owner) return owner == document end,
 				eval_js = function() return true end }
-			local context = { app_name = "personal_info_editor", epoch = epoch,
+			local context = { app_name = "personal_info_editor", epoch = epoch, document_owner = document,
 				close_owned_window = function() closes = closes + 1; epoch = nil; return true end }
 			local state = { dyn_hotstrings = c.dynamic, webview_manager = host,
 				config = { reload = function() return 0, true end }, i18n = { get = function(key) return key end } }
@@ -554,19 +558,23 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 			with_native_owners(function(c)
 				local handler = helpers.load_module("ui.personal_info_editor.bridge")
 				local epoch, closes, notices = 41, 0, 0
+				local document = {}
 				local host = {
 					current_epoch = function() return epoch end,
 					page_current = function(_, expected) return expected == epoch end,
+					document_owner_current = function(owner) return owner == document and epoch == 41 end,
+					document_owner_retained = function(owner) return owner == document and epoch == 41 end,
+					eval_owned_js = function(_, owner) return owner == document end,
 					eval_js = function() return true end,
 				}
-				local context = { app_name = "personal_info_editor", epoch = epoch,
+				local context = { app_name = "personal_info_editor", epoch = epoch, document_owner = document,
 					close_owned_window = function() closes = closes + 1;return true end }
 				local state = { dyn_hotstrings = c.dynamic, webview_manager = host,
 					config = { reload = function() return 0, true end },
 					i18n = { get = function(key) return key end },
 					notify_error = function(key) helpers.assert_eq(key, "dialog.personal_info.save_failed");notices = notices + 1 end }
-				if scenario == "ready-refused" then host.eval_js = function() return false end end
-				if scenario == "push-reentry" then host.eval_js = function() epoch = epoch + 1;return true end end
+				if scenario == "ready-refused" then host.eval_owned_js = function() return false end end
+				if scenario == "push-reentry" then host.eval_owned_js = function() epoch = epoch + 1;return true end end
 				local ready = handler.on_message({ action = "ready" }, state, context)
 				helpers.assert_eq(ready.pushed, scenario ~= "ready-refused" and scenario ~= "push-reentry")
 				helpers.assert_eq(ready.data.fields[1].value, "Ada")
@@ -644,6 +652,13 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 					if scenario == "root" then helpers.assert_eq(read(c.path), c.original) end
 					if scenario == "external" or scenario == "publication" then helpers.assert_eq(notices, 1) end
 					if scenario == "recovery" then
+						-- Reload creates a new document; a duplicate ready on the old page
+						-- must retain its original source rather than borrow this winner.
+						helpers.assert_true(handler.on_message({ action = "ready" }, state, context).pushed)
+						helpers.assert_eq(handler.on_message({ action = "save", values = { first_name = "Stale" } }, state, context).saved, false)
+						helpers.assert_eq(read(target), winner)
+						document = {}
+						context.document_owner = document
 						local fresh = handler.on_message({ action = "ready" }, state, context)
 						helpers.assert_true(fresh.pushed)
 						helpers.assert_eq(fresh.data.fields[1].value, "Independent")
