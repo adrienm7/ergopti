@@ -419,9 +419,11 @@ end
 --- @param prefix string The buffer without the trigger character.
 --- @param trigger string The trigger character that fired.
 --- @param publication table|nil Retained text destination captured with the trigger.
+--- @param within_delay function (group, section, count) -> boolean expansion-delay admission.
 --- @return boolean fired
 --- @return table|nil event Canonical event details when it fired.
-local function _fire_combo(prefix, trigger, publication)
+--- @return boolean|nil claimed True when the combo resolved but its delay expired.
+local function _fire_combo(prefix, trigger, publication, within_delay)
 	if not M.is_rule_enabled(DYNAMIC_GROUP, PERSONAL_SECTION) then return false end
 
 	local tag = M.trailing_tag(prefix)
@@ -447,6 +449,14 @@ local function _fire_combo(prefix, trigger, publication)
 	local total = 0
 	for _, value in ipairs(values) do total = total + #value end
 
+	-- "@" + the letters + the trigger: everything the user typed for this.
+	local backspace_count = tag_length + 2
+	if not within_delay(DYNAMIC_GROUP, PERSONAL_SECTION, backspace_count) then
+		Logger.debug(LOG, "@-combo '@%s' expired before the magic key (%d field(s), content withheld).",
+			tag, #values)
+		return false, nil, true
+	end
+
 	local ok_inj, injector = pcall(require, "modules.hotstrings.injector")
 	if not ok_inj or not injector or type(injector.inject_fields) ~= "function" then
 		Logger.warn(LOG,
@@ -455,8 +465,6 @@ local function _fire_combo(prefix, trigger, publication)
 		return false
 	end
 
-	-- "@" + the letters + the trigger: everything the user typed for this.
-	local backspace_count = tag_length + 2
 	-- is_private is not optional: every value here comes out of personal_info.toml,
 	-- so the payload is the user's own data by construction.
 	local delivery = injector.inject_fields(backspace_count, values, true, publication)
@@ -490,9 +498,16 @@ end
 ---   magic key, typically "★" or "\\").
 --- @param start_is_boundary boolean|nil Input owner state captured with the complete buffer.
 --- @param publication table|nil Original single-field text destination.
+--- @param within_delay function (group, section, count) -> boolean: whether the
+---   last `count` codepoints of the input owner (the trigger included) were typed
+---   within that category's expansion delay. The daemon owns the timing.
 --- @return boolean True if a dynamic expansion was performed.
 --- @return table|nil Canonical event details for a successful expansion.
-function M.on_trigger(buffer, trigger, start_is_boundary, publication)
+function M.on_trigger(buffer, trigger, start_is_boundary, publication, within_delay)
+	if type(within_delay) ~= "function" then
+		Logger.error(LOG, "Dynamic expansion refused: no expansion-delay admission (content withheld).")
+		return false
+	end
 	if not M.is_enabled() then return false end
 	if type(buffer) ~= "string" or buffer == "" then return false end
 
@@ -517,8 +532,10 @@ function M.on_trigger(buffer, trigger, start_is_boundary, publication)
 		-- Nothing registered claimed the sequence. Only now try the multi-letter
 		-- @-combo, so a registered tag always wins: "@dt" spells two valid alias
 		-- letters AND is the short-date rule, and the registration is what decides.
-		local expanded, event = _fire_combo(prefix, t, publication)
-		if expanded then return expanded, event end
+		-- A resolved combo whose delay expired still owns the sequence: the
+		-- programmable source is not a fallback for a late magic key.
+		local expanded, event, claimed = _fire_combo(prefix, t, publication, within_delay)
+		if expanded or claimed then return expanded, event end
 		if UserCode.request(prefix) then return true, { pending_user = true } end
 		return false
 	end
@@ -533,6 +550,13 @@ function M.on_trigger(buffer, trigger, start_is_boundary, publication)
 		return false
 	end
 	local backspace_count = suffix_length + 1  -- suffix + trigger
+	-- The same last-letter-to-expander gate as the static matcher and the
+	-- programmable source, under the family's own category and section.
+	if not within_delay(DYNAMIC_GROUP, match.rule.section, backspace_count) then
+		Logger.debug(LOG, "Dynamic rule '%s' expired before the magic key (family=%s, content withheld).",
+			match.rule.suffix, tostring(match.rule.section))
+		return false
+	end
 	if type(publication) ~= "table" or getmetatable(publication) ~= nil
 		or type(publication.current) ~= "function" or type(publication.cached) ~= "function" then
 		Logger.warn(LOG, "Dynamic single-field expansion refused: no retained text destination.")
