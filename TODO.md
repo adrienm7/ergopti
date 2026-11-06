@@ -216,7 +216,7 @@ Evidence: [six-scope recovery/lifecycle audit](docs/audits/platform-parity/2026-
 - [x] **[CODE] WFM-001:** Independent migration moves and locator publication can select an empty configuration after a refusal. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/windows-migration/report.md). A refused move keeps its key; paths.toml is staged and replaced atomically, a same-text backup is reused, and the configuration moves back when the file cannot follow.
 - [x] **[CODE] WFM-002:** Moving a legacy ancestor leaves a selected custom descendant pointing to its removed path. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/windows-migration/report.md). A folder chosen below a moved old folder is rebased to where that folder went (its backup included).
 - [x] **[CODE] WFM-003:** Valid quoted TOML locator keys are missed by the migration rewriter after data moves. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/windows-migration/report.md). The rewriter reads quoted keys, literal strings and escapes as the boot TOML reader does.
-- [ ] **[CODE] WFM-004:** Migrating only the locator hides the old configuration-transition recovery journal. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/windows-migration/report.md).
+- [x] **[CODE] WFM-004:** Migrating only the locator hides the old configuration-transition recovery journal. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/windows-migration/report.md). The boot recovery owner runs on the old locator before anything moves; quarantine refuses the migration.
 
 ### macOS
 
