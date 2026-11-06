@@ -1638,17 +1638,12 @@
 	{
 		"path": "sg_actions.one_shot_shift",
 		"labels": { "fr": "⇧ OneShotShift", "en": "⇧ OneShotShift" },
-		"platforms": { "windows": true, "macos": false, "linux": false },
+		"platforms": { "windows": true, "macos": false, "linux": true },
 		"reasons": {
 			"macos": {
 				"en": "This system offers the same action under another name: use the equivalent action.",
 				"fr": "Ce système propose la même action sous un autre nom : utilisez l’action équivalente.",
 				"equivalents": ["sticky_shift"]
-			},
-			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
 			}
 		}
 	},
@@ -1935,9 +1930,9 @@
 				"equivalents": ["one_shot_shift"]
 			},
 			"linux": {
-				"en": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
-				"fr": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
-				"equivalents": []
+				"en": "This system offers the same action under another name: use the equivalent action.",
+				"fr": "Ce système propose la même action sous un autre nom : utilisez l’action équivalente.",
+				"equivalents": ["one_shot_shift"]
 			}
 		}
 	},

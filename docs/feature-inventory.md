@@ -418,7 +418,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.open_list_vars`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 - [ ] `sg_actions.open_key_history`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 
-## linux — 75 actions not declared
+## linux — 74 actions not declared
 
 - [ ] `sg_actions.lookup`: macOS only: Look Up opens the system dictionary panel on the word under the pointer. Windows and Linux have no system dictionary panel.
 - [ ] `sg_actions.system_app_switcher`: macOS only: macOS switches between applications, each holding its windows. Windows and Linux switch between windows with Alt+Tab: use the equivalent action. Equivalent actions: `app_switcher`.
@@ -446,7 +446,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.display_mirror_toggle`: No toggle on Linux: GNOME and KDE choose Duplicate in their own Super+P display switcher; bind that key as a keystroke.
 - [ ] `sg_actions.spotlight_mouse`: Not on Linux: drawing over every window needs an overlay surface that Wayland compositors give no application.
 - [ ] `sg_actions.microsoft_bold`: Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”.
-- [ ] `sg_actions.one_shot_shift`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
 - [ ] `sg_actions.layer_on`: macOS only: these switch the navigation layer kept inside Karabiner-Elements. On Windows and Linux the layer follows the key held down and has no switch to set.
 - [ ] `sg_actions.layer_off`: macOS only: these switch the navigation layer kept inside Karabiner-Elements. On Windows and Linux the layer follows the key held down and has no switch to set.
 - [ ] `sg_actions.capsword`: This system offers the same action under another name: use the equivalent action. Equivalent actions: `caps_word`.
@@ -458,7 +457,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.cmd_shift_tab`: macOS only: macOS switches between applications, each holding its windows. Windows and Linux switch between windows with Alt+Tab: use the equivalent action. Equivalent actions: `app_switcher`.
 - [ ] `sg_actions.alt_tab_windows`: This system offers the same action under another name: use the equivalent action. Equivalent actions: `win_next`.
 - [ ] `sg_actions.spotlight`: macOS only: this action opens Spotlight, the search of macOS. On Windows or Linux, bind your desktop's own search shortcut as a keystroke instead.
-- [ ] `sg_actions.sticky_shift`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
+- [ ] `sg_actions.sticky_shift`: This system offers the same action under another name: use the equivalent action. Equivalent actions: `one_shot_shift`.
 - [ ] `sg_actions.sticky_ctrl`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
 - [ ] `sg_actions.sticky_cmd`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
 - [ ] `sg_actions.sticky_option`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
