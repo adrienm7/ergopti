@@ -1253,8 +1253,11 @@ function M.process_frame(touches, frame_stamp)
 					and (n <= gs.maxFingers + 1 or inert)
 					and not new_count_active_on_locked_axis
 				if use_fast_path then
-					Logger.info(LOG, string.format("Finger join (fast-path): %d → %d (inert_at_%d_on_%s=%s)",
-						gs.maxFingers, n, gs.maxFingers, tostring(gs.lockedDir), tostring(inert)))
+					-- Each contact's position and size calibrate the far or
+					-- oversized contact a resting thumb adds (field report 2026-11-05).
+					Logger.info(LOG, string.format("Finger join (fast-path): %d → %d (inert_at_%d_on_%s=%s), contacts %s",
+						gs.maxFingers, n, gs.maxFingers, tostring(gs.lockedDir), tostring(inert),
+						Geometry.describeContacts(touches)))
 					gs.maxFingers = n
 					gs.lifting    = false
 					gs.fingerCountChangedAt = now
@@ -1276,7 +1279,8 @@ function M.process_frame(touches, frame_stamp)
 							confirmed = gs.candidateFrames >= FINGER_CONFIRM_FRAMES and elapsed >= FINGER_CONFIRM_SEC
 						end
 						if confirmed then
-							Logger.info(LOG, string.format("Confirmed multi-finger join: %d → %d (frames=%d, %.3fs).", gs.maxFingers, n, gs.candidateFrames, elapsed))
+							Logger.info(LOG, string.format("Confirmed multi-finger join: %d → %d (frames=%d, %.3fs), contacts %s.",
+								gs.maxFingers, n, gs.candidateFrames, elapsed, Geometry.describeContacts(touches)))
 							gs.maxFingers = n
 							gs.lifting    = false
 							-- The candidate-confirmation period already enforced stability:

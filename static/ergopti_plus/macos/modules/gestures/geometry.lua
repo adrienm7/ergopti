@@ -129,6 +129,31 @@ function M.contactsAcross(touches, axis)
 	return contacts
 end
 
+--- Describes each contact of one frame for the log: its position and its
+--- major axis, the two values a far or oversized contact (a resting thumb
+--- joining a pair) can be told apart by. Ordered left to right.
+--- @param touches table Trackpad touch arrays.
+--- @return string One "(x, y major m)" group per contact, "none" when empty.
+function M.describeContacts(touches)
+	local contacts = {}
+	for _, t in ipairs(type(touches) == "table" and touches or {}) do
+		local p = type(t) == "table" and type(t.absoluteVector) == "table"
+			and t.absoluteVector.position or nil
+		if type(p) == "table" then
+			contacts[#contacts + 1] = { x = tonumber(p.x) or 0, y = tonumber(p.y) or 0,
+				major = tonumber(t.majorAxis) }
+		end
+	end
+	if #contacts == 0 then return "none" end
+	table.sort(contacts, function(a, b) return a.x < b.x end)
+	local parts = {}
+	for i, c in ipairs(contacts) do
+		parts[i] = string.format("(%.1f, %.1f major %s)", c.x, c.y,
+			c.major and string.format("%.2f", c.major) or "?")
+	end
+	return table.concat(parts, " ")
+end
+
 --- Tells whether every contact travelled along the axis with the centroid.
 --- @param origin table Contacts at the start, from contactsAcross().
 --- @param current table The same contacts now, from contactsAcross().
