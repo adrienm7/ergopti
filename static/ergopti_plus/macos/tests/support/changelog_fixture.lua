@@ -14,6 +14,7 @@ local SHARED_DEFAULTS = FIXTURE_DIR .. "/../../../_shared/modules/updater/defaul
 -- The real update-channel registry: the channel ids the window accepts.
 local SHARED_CHANNELS = FIXTURE_DIR .. "/../../../_shared/modules/updater/channels.json"
 local SHARED_NETWORK_POLICY = FIXTURE_DIR .. "/../../../_shared/modules/network/managed_network.json"
+local SHARED_HEADER_POLICY = FIXTURE_DIR .. "/../../../_shared/data/http/header_policy.json"
 
 --- The repository identity of the shared defaults, the updater's own source.
 local function read_shared_github()
@@ -131,13 +132,21 @@ local function with_changelog(callback)
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			-- The real adapter's symlink-safe inspection needs hs.fs; the fixture
 			-- only has to hand the controller the shared defaults bytes.
+			local function read_file(path)
+				local handle = io.open(path, "rb")
+				if not handle then return nil end
+				local text = handle:read("*a")
+				handle:close()
+				return text
+			end
 			package.loaded["adapters.file_system"] = {
-				read = function(path)
-					local handle = io.open(path, "rb")
-					if not handle then return nil end
-					local text = handle:read("*a")
-					handle:close()
-					return text
+				read = read_file,
+				-- The native header policy reads its shared law through this bound.
+				read_bounded = function(path, max_bytes)
+					local text = read_file(path)
+					if text == nil then return nil, "absent" end
+					if #text > max_bytes then return nil, "too_large" end
+					return text, "ok"
 				end,
 			}
 			package.loaded["infra.paths"] = {
@@ -145,6 +154,7 @@ local function with_changelog(callback)
 					if relative == "modules/updater/defaults.json" then return SHARED_DEFAULTS end
 					if relative == "modules/updater/channels.json" then return SHARED_CHANNELS end
 					if relative == "modules/network/managed_network.json" then return SHARED_NETWORK_POLICY end
+					if relative == "data/http/header_policy.json" then return SHARED_HEADER_POLICY end
 					return "/shared/" .. tostring(relative)
 				end,
 			}
