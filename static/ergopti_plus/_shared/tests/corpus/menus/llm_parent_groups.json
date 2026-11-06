@@ -45,6 +45,11 @@
 					"checked": false
 				},
 				{
+					"title": "menu.llm.inline_autotype",
+					"callback": true,
+					"checked": false
+				},
+				{
 					"title": "menu.llm.while_hotstring_tooltip: menu.llm.while_hotstring_tooltip_wait",
 					"callback": false,
 					"children": [
