@@ -32,9 +32,11 @@ function M.register(helpers, paths)
 
 	local function options_of(vector)
 		local keycodes = assert(Converter.keycodes(assert(Json.decode(read_all(paths.keycodes))), vector.convention))
+		local keysym_table = assert(Json.decode(read_all(paths.data_dir .. "/key_sym.json")))
 		return {
 			keycodes = keycodes,
-			keysyms = assert(Json.decode(read_all(paths.data_dir .. "/key_sym.json"))).keysyms,
+			keysyms = keysym_table.keysyms,
+			locale_extended_prefixes = keysym_table.locale_extended_prefixes,
 			template = read_all(paths.data_dir .. "/xkb_symbols.txt"),
 			layout_id = vector.layout_id,
 			display_name = vector.display_name,
@@ -78,6 +80,34 @@ function M.register(helpers, paths)
 			local text = vector.keylayout:gsub('action="acute"', 'action="missing"', 1)
 			local result, err = Converter.convert(assert(Keylayout.parse(text)), options_of(vector))
 			helpers.assert_true(result == nil and tostring(err):find("undefined action", 1, true) ~= nil, "refused: " .. tostring(err))
+		end)
+
+		-- DKS-001: the table includes the locale's, whose longer sequences make Compose
+		-- skip a shorter rule; the dead key starting it must not keep a standard keysym.
+		helpers.it("borrows the trigger of a dead key whose sequence the locale extends (dks-001)", function()
+			local vector = assert(Json.decode(read_all(paths.vectors))).vectors[1]
+			local canonical = assert(Keylayout.parse(vector.keylayout))
+			local options = options_of(vector)
+			options.locale_extended_prefixes = {}
+			local plain = assert(Converter.convert(canonical, options))
+			helpers.assert_true(plain.compose_text:find("\n<dead_circumflex> <dead_acute>\t", 1, true) ~= nil,
+				"control: without the locale list the standard trigger ends a written sequence")
+			options.locale_extended_prefixes = { "dead_circumflex dead_acute" }
+			local result = assert(Converter.convert(canonical, options))
+			helpers.assert_true(result.compose_text:find("<dead_circumflex> <dead_acute>", 1, true) == nil,
+				"no written sequence is one the locale extends")
+			helpers.assert_true(result.compose_text:find("<dead_acute>\t", 1, true) ~= nil,
+				"the other dead key keeps its standard keysym")
+			helpers.assert_true(result.symbols_text:find("dead_circumflex", 1, true) == nil,
+				"the shadowed dead key sends its borrowed trigger")
+		end)
+
+		helpers.it("refuses a conversion without the locale-extended prefixes", function()
+			local vector = assert(Json.decode(read_all(paths.vectors))).vectors[1]
+			local options = options_of(vector)
+			options.locale_extended_prefixes = nil
+			local result, err = Converter.convert(assert(Keylayout.parse(vector.keylayout)), options)
+			helpers.assert_true(result == nil and tostring(err):find("locale-extended", 1, true) ~= nil, "refused: " .. tostring(err))
 		end)
 
 		helpers.it("refuses an unknown keycode convention", function()

@@ -579,6 +579,12 @@ def load_keysym_table() -> Dict[str, str]:
     return json.loads((DATA_DIR / "key_sym.json").read_text(encoding="utf-8"))["keysyms"]
 
 
+def load_locale_extended_prefixes() -> frozenset:
+    """Keysym sequences the locale Compose table extends (key_sym.json)."""
+    data = json.loads((DATA_DIR / "key_sym.json").read_text(encoding="utf-8"))
+    return frozenset(tuple(entry.split(" ")) for entry in data["locale_extended_prefixes"])
+
+
 def unicode_keysym(char: str) -> str:
     return "U%04X" % ord(char)
 
@@ -620,8 +626,12 @@ class _Converter:
         layout: Keylayout,
         keycodes: Sequence[Tuple[str, int]],
         hints: XkbHints,
+        private_states: frozenset = frozenset(),
     ) -> None:
         self.layout = layout
+        # Dead states whose trigger is borrowed instead of standard, see
+        # convert_layout().
+        self.private_states = private_states
         self.keycodes = list(keycodes)
         self.keysyms = load_keysym_table()
         self.overrides = list(hints.keysym_overrides)
@@ -733,7 +743,9 @@ class _Converter:
             return self.dead_triggers[state]
         terminator = self.layout.terminators.get(state, "")
         keysym = None
-        if terminator in self.borrowed:
+        if state in self.private_states:
+            pass
+        elif terminator in self.borrowed:
             keysym = self.borrowed[terminator]
         elif "dead_" + state in KNOWN_DEAD_KEYSYMS:
             keysym = "dead_" + state
@@ -861,6 +873,7 @@ class _Converter:
         chain_heads = {tuple(seq) for seqs in sequences.values() for seq in seqs}
         first = True
         emitted: Dict[str, str] = {}
+        self.emitted = emitted
         for state in sorted(outputs):
             if state not in sequences:
                 continue
@@ -895,6 +908,16 @@ class _Converter:
                     emitted[sequence] = terminator + text
                     lines.append("%s\t: %s" % (sequence, compose_string(terminator + text)))
         return 'include "%L"\n\n' + "\n".join(lines) + "\n"
+
+    def shadowed_states(self, extended: frozenset) -> frozenset:
+        """Dead states starting a written sequence the locale extends."""
+        by_trigger = {keysym: state for state, keysym in self.dead_triggers.items()}
+        found = set()
+        for sequence in self.emitted:
+            keysyms = tuple(re.findall(r"<([^>]+)>", sequence))
+            if keysyms in extended and keysyms[0] in by_trigger:
+                found.add(by_trigger[keysyms[0]])
+        return frozenset(found)
 
     def _typed_texts(self) -> List[Tuple[str, str]]:
         """(keysym, text) of every key/level typing text, in keyboard order.
@@ -969,8 +992,31 @@ def convert_layout(
     """Convert a parsed Keylayout (from parse_keylayout or from_canonical)."""
     if not re.fullmatch(r"[A-Za-z0-9_]+", layout_id):
         raise KeylayoutError("layout id %r must be letters, digits and _" % layout_id)
-    converter = _Converter(layout, keycodes, hints or XkbHints())
     template = (DATA_DIR / "xkb_symbols.txt").read_text(encoding="utf-8")
+    extended = load_locale_extended_prefixes()
+    # The table starts with include "%L": a locale sequence longer than one
+    # of ours makes Compose skip ours (Bépo's monnaie then cedilla waits for
+    # the locale's cedi sign instead of typing ₢). The dead key starting such
+    # a sequence gets a borrowed trigger, which the locale does not extend,
+    # and the conversion runs again until no written sequence is shadowed.
+    private: frozenset = frozenset()
+    while True:
+        converter = _Converter(layout, keycodes, hints or XkbHints(), private)
+        result = _run_conversion(converter, layout, keycodes, template, layout_id, display_name)
+        shadowed = converter.shadowed_states(extended) - private
+        if not shadowed:
+            return result
+        private = private | shadowed
+
+
+def _run_conversion(
+    converter: "_Converter",
+    layout: Keylayout,
+    keycodes: Sequence[Tuple[str, int]],
+    template: str,
+    layout_id: str,
+    display_name: str,
+) -> Conversion:
     # Dead triggers first, in state order, so borrowed keysyms do not depend
     # on the order keys happen to be listed in.
     for state in sorted(

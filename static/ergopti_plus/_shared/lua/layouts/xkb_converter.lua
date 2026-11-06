@@ -302,9 +302,11 @@ end
 local Converter = {}
 Converter.__index = Converter
 
-local function new_converter(layout, keycodes, hints, keysyms)
+local function new_converter(layout, keycodes, hints, keysyms, private_states)
 	local self = setmetatable({}, Converter)
 	self.layout = layout
+	-- Dead states whose trigger is borrowed instead of standard, see M.convert.
+	self.private_states = private_states
 	self.keycodes = keycodes
 	self.keysyms = keysyms
 	self.base_level_only = set_of(hints.base_level_only or {})
@@ -433,7 +435,9 @@ function Converter:dead_trigger(state)
 	if self.dead_triggers[state] ~= nil then return self.dead_triggers[state] end
 	local terminator = self.layout.terminators[state] or ""
 	local keysym = nil
-	if self.borrowed.has(terminator) then
+	if self.private_states[state] then
+		keysym = nil
+	elseif self.borrowed.has(terminator) then
 		keysym = self.borrowed.get(terminator)
 	elseif KNOWN_DEAD_KEYSYMS["dead_" .. state] then
 		keysym = "dead_" .. state
@@ -642,7 +646,27 @@ function Converter:compose()
 		end
 	end
 	self.conflicts = conflicts
+	self.emitted = emitted
 	return 'include "%L"\n\n' .. table.concat(lines, "\n") .. "\n"
+end
+
+--- Dead states starting a written sequence the locale Compose table extends.
+--- @param extended table Set of space-joined keysym sequences.
+--- @return table states Array of state names, sorted.
+function Converter:shadowed_states(extended)
+	local by_trigger = {}
+	for state, keysym in pairs(self.dead_triggers) do by_trigger[keysym] = state end
+	local found = {}
+	for sequence in pairs(self.emitted) do
+		local keysyms = {}
+		for keysym in sequence:gmatch("<([^>]+)>") do keysyms[#keysyms + 1] = keysym end
+		local state = by_trigger[keysyms[1]]
+		if extended[table.concat(keysyms, " ")] and state ~= nil and not self.private_states[state] then
+			found[#found + 1] = state
+		end
+	end
+	table.sort(found)
+	return found
 end
 
 --- { keysym, text } of every key/level typing text, in keyboard order. Inside a dead
@@ -760,24 +784,12 @@ local function unplaced_codes(canonical, keycodes)
 	return codes
 end
 
---- Converts a canonical keylayout to XKB symbols and XCompose text.
---- @param canonical table The schema-1 form (layouts/keylayout.lua).
---- @param options table {
----   keycodes = array of { xkb_name, mac_code } (M.keycodes),
----   keysyms = table character -> keysym name (key_sym.json "keysyms"),
----   template = string (xkb_symbols.txt),
----   layout_id = string (letters, digits, "_"), display_name = string,
----   hints = { keysym_overrides = { {text, keysym}... }, base_level_only = { text... } } | nil }
---- @return table|nil result { symbols_text, compose_text, conflicts, unplaced }
---- @return string|nil err
-function M.convert(canonical, options)
-	if type(canonical) ~= "table" or canonical.schema ~= 1 then return nil, "canonical keylayout must be schema 1" end
-	if not tostring(options.layout_id):match("^[A-Za-z0-9_]+$") then
-		return nil, "layout id '" .. tostring(options.layout_id) .. "' must be letters, digits and _"
-	end
+--- One conversion pass with the given private dead states (see M.convert).
+local function convert_once(canonical, options, private_states)
+	local converter
 	local ok, result = pcall(function()
 		local layout = index_layout(canonical)
-		local converter = new_converter(layout, options.keycodes, options.hints or {}, options.keysyms)
+		converter = new_converter(layout, options.keycodes, options.hints or {}, options.keysyms, private_states)
 		local rows_report = options.rows ~= nil and converter:apply_rows(options.rows) or nil
 		-- Dead triggers first, in state order, so borrowed keysyms do not depend on the
 		-- order keys happen to be listed in.
@@ -802,9 +814,45 @@ function M.convert(canonical, options)
 			rows = rows_report,
 		}
 	end)
-	if ok then return result end
+	if ok then return result, nil, converter end
 	if type(result) == "table" and result.keylayout_error then return nil, result.keylayout_error end
 	error(result, 0)
+end
+
+--- Converts a canonical keylayout to XKB symbols and XCompose text.
+--- @param canonical table The schema-1 form (layouts/keylayout.lua).
+--- @param options table {
+---   keycodes = array of { xkb_name, mac_code } (M.keycodes),
+---   keysyms = table character -> keysym name (key_sym.json "keysyms"),
+---   template = string (xkb_symbols.txt),
+---   layout_id = string (letters, digits, "_"), display_name = string,
+---   locale_extended_prefixes = array of space-joined keysym sequences the locale
+---     Compose table extends (key_sym.json "locale_extended_prefixes"),
+---   hints = { keysym_overrides = { {text, keysym}... }, base_level_only = { text... } } | nil }
+--- @return table|nil result { symbols_text, compose_text, conflicts, unplaced }
+--- @return string|nil err
+function M.convert(canonical, options)
+	if type(canonical) ~= "table" or canonical.schema ~= 1 then return nil, "canonical keylayout must be schema 1" end
+	if not tostring(options.layout_id):match("^[A-Za-z0-9_]+$") then
+		return nil, "layout id '" .. tostring(options.layout_id) .. "' must be letters, digits and _"
+	end
+	if type(options.locale_extended_prefixes) ~= "table" then
+		return nil, "the locale-extended Compose prefixes (key_sym.json) are required"
+	end
+	local extended = set_of(options.locale_extended_prefixes)
+	-- The table starts with include "%L": a locale sequence longer than one of ours
+	-- makes Compose skip ours (Bépo's monnaie then cedilla waits for the locale's cedi
+	-- sign instead of typing ₢). The dead key starting such a sequence gets a borrowed
+	-- trigger, which the locale does not extend, and the conversion runs again until no
+	-- written sequence is shadowed.
+	local private_states = {}
+	while true do
+		local result, err, converter = convert_once(canonical, options, private_states)
+		if result == nil then return nil, err end
+		local shadowed = converter:shadowed_states(extended)
+		if #shadowed == 0 then return result end
+		for _, state in ipairs(shadowed) do private_states[state] = true end
+	end
 end
 
 return M

@@ -49,10 +49,12 @@ if os.getenv("ERGOPTI_ROWS") then
 	local order, edges = os.getenv("ERGOPTI_ROWS"):match("^(%a+),(%a+)$")
 	rows = { order = order, edges = edges == "true" }
 end
+local keysym_table = assert(Json.decode(read(data_dir .. "/key_sym.json")))
 local result, err = Converter.convert(canonical, {
 	rows = rows,
 	keycodes = keycodes,
-	keysyms = assert(Json.decode(read(data_dir .. "/key_sym.json"))).keysyms,
+	keysyms = keysym_table.keysyms,
+	locale_extended_prefixes = keysym_table.locale_extended_prefixes,
 	template = read(data_dir .. "/xkb_symbols.txt"),
 	layout_id = layout_id,
 	display_name = display_name,
