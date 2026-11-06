@@ -32,6 +32,18 @@ dead key types what macOS types (j, ξ, ʲ, ⱼ in the circumflex, Greek,
 superscript and subscript states) on Windows and Linux too, pinned by shared
 keystroke vectors.
 
+## Open parity questions follow the most complete OS (2026-11-06)
+
+Every Linux or macOS parity question left open in TODO (feature inventory,
+end-to-end, one-shot Shift) is settled by one rule: the OS whose existing
+implementation is the most complete defines the contract, and the others
+follow it. Do not ask again per feature. Where a follower cannot reach the
+contract with its native tools, it refuses loudly rather than degrade
+silently (Linux clipboard borrowers refuse a clipboard holding formats the
+text writers cannot restore, LCP-001), states the reason in the menu and
+diagnostics, and keeps the full implementation as a TODO follow-up. An item
+that needs real hardware goes under "To confirm on ...".
+
 ## The layout menu keeps layers and rows apart (2026-11-03)
 
 The Windows Keyboard layout menu read as a duplicate: the Base/Shift and AltGr
