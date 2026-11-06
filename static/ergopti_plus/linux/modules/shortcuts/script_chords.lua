@@ -69,6 +69,7 @@ local _chords_on = nil
 local function NEVER_PAUSED() return false end
 local _is_paused = NEVER_PAUSED
 local _defer = nil
+local _pause_epoch = nil
 
 local _configuration_owner = nil
 local _dispatch_generation = 0
@@ -362,13 +363,18 @@ end
 
 --- Wires the daemon's state in.
 --- @param opts table { is_paused = fn() -> boolean, defer = fn(fn) -> boolean }
+---   Optional pause_epoch = fn() -> number identifies the active pause lifetime.
 function M.init(opts)
 	if _configuration_owner ~= nil then return false end
 	if type(opts) ~= "table" or type(opts.is_paused) ~= "function" or type(opts.defer) ~= "function" then
 		error("script_chords.init() needs is_paused and defer functions")
 	end
+	if opts.pause_epoch ~= nil and type(opts.pause_epoch) ~= "function" then
+		error("script_chords.init() pause_epoch must be a function")
+	end
 	_is_paused = opts.is_paused
 	_defer = opts.defer
+	_pause_epoch = opts.pause_epoch
 	-- Read at boot, not at the first AltGr chord: a malformed catalogue stops
 	-- the daemon instead of a key press.
 	M.catalogue()
@@ -396,14 +402,27 @@ function M.on_key(detail)
 		Logger.error(LOG, "Script chord '%s' pressed before init() — the key goes to the application.", slot_id)
 		return false
 	end
-	local generation, paused, runs = _dispatch_generation, _is_paused, M.slot_runs
+	local generation, paused, runs, epoch_reader = _dispatch_generation, _is_paused, M.slot_runs, _pause_epoch
 	local action = _assignments[slot_id]
+	local script_action = require("modules.shortcuts.script_actions").is_script_action(action)
+	local epoch
+	if epoch_reader and not script_action then
+		local called, value = pcall(epoch_reader)
+		if not called or type(value) ~= "number" then return false end
+		epoch = value
+	end
+	local function epoch_current()
+		if _pause_epoch ~= epoch_reader then return false end
+		if script_action or not epoch_reader then return true end
+		local called, value = pcall(epoch_reader)
+		return called and value == epoch and _pause_epoch == epoch_reader
+	end
 	local function current()
 		if _configuration_owner ~= nil or generation ~= _dispatch_generation
-			or _is_paused ~= paused or M.slot_runs ~= runs then return false end
+			or _is_paused ~= paused or M.slot_runs ~= runs or not epoch_current() then return false end
 		local admitted = runs(slot_id)
 		return admitted == true and _configuration_owner == nil and generation == _dispatch_generation
-			and _is_paused == paused and M.slot_runs == runs
+			and _is_paused == paused and M.slot_runs == runs and epoch_current()
 	end
 	local queued = _defer(function()
 		-- A pause that began after the press: the chord was taken, and only a
@@ -437,6 +456,7 @@ function M._reset()
 	_chords_on = nil
 	_is_paused = NEVER_PAUSED
 	_defer = nil
+	_pause_epoch = nil
 end
 
 
