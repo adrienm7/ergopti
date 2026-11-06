@@ -444,6 +444,13 @@ three-OS CI is green on the final source. See the handoff above for the current 
       (`BOOT_OPERATION_CEILINGS`). Left, deliberate or rejected: parse, layout and hotstring registration (about
       4.4 s) are needed at the first key; the remote AI catalogue (212 ms, rejected while the AI root is eager); the
       boot's 9-13 registry deep compares (every write compares).
+      macOS, 6 November: the four script-chord slot rows open the shared action picker, as on Windows, instead of
+      inlining the 840-action catalogue each: the Shortcuts submenu fell from 3,537 to 177 rows (unit harness:
+      35.5 → 2.6 ms, 5.1 → 0.4 MB allocated per build; field rebuilds grew the heap 13-16 MB and the GC landed in
+      this stage, 320-342 ms). Left: the Windows AI submenu is still eager; the Linux tray builds every GTK row
+      (161 keyboard slots) and lazy dbusmenu children need a desktop check; macOS `menu_keyboard_layout.sources`
+      re-reads the bundle variants from disk per rebuild (57-415 ms spikes) and needs a proven cache contract;
+      hs.menubar has no per-row update, so a macOS toggle still rebuilds the root.
 - [ ] **AI menu.** "Test a prediction" under the profile row: group model, profile, test, never two separators in a row.
       The test uses a high temperature, bypasses the cache, never a fixed string, and shows the generation time.
 - [ ] **Generation parameters submenu.** Predictions count, min and max words with no separator; one separator; all the

@@ -173,7 +173,15 @@ local function with_provider(kind, options, body)
 				end,
 			}).assign
 			require("ui.menu.menu_shortcuts").build(ctx)
-			fixture.repeat_action = rows[1].items[1].action
+			-- The slot row opens the shared picker, as on Windows; the pick runs
+			-- the same transaction the inline row ran (menu-script-slots-picker).
+			helpers.assert_nil(rows[1].items, "a script slot row must not inline the action catalogue")
+			fixture.repeat_action = function()
+				picker_callback = nil
+				rows[1].action()
+				helpers.assert_type(picker_callback, "function")
+				return picker_callback(selected)
+			end
 			fixture.action_receipt = fixture.repeat_action()
 		end
 		if options.scalar and picker_callback then
