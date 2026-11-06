@@ -63,6 +63,11 @@ function M.tap_copy(ports, report, finish)
 	local keys = facts.keys or {}
 	if #keys == 0 then
 		report.step("copy_window", SKIP, "no_copy_tap")
+	elseif facts.deployed == false then
+		-- No configuration was generated this session (the owned runtime not
+		-- admitted yet): there is no deployed delay to compare, which the owned_*
+		-- and lease steps already report (field report 2026-11-06).
+		report.step("copy_window", SKIP, "not_deployed")
 	else
 		local window = facts.window_ms
 		local short = nil

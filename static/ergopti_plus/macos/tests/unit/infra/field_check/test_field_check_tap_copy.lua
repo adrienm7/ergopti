@@ -74,6 +74,18 @@ helpers.describe("field check: tap-hold copy (tap-copy-field-check)", function()
 		helpers.assert_eq(strict.copy_window.state, Report.STATE_PASS, "with the window off the delay is right")
 	end)
 
+	-- Field report 2026-11-06: with the owned runtime not installed, nothing was
+	-- generated and the window failed as "short:w1000:left_shift:nil".
+	helpers.it("skips the window when no configuration was generated this session (tap-copy-field-check)", function()
+		local steps = run({ window_ms = 1000, change_count = 1, deployed = false,
+			keys = { { id = "left_shift", eligible = true } }, stats = stats({}) })
+		helpers.assert_eq(steps.copy_window.state, Report.STATE_SKIP)
+		helpers.assert_eq(steps.copy_window.value, "not_deployed")
+		local generated = run({ window_ms = 1000, change_count = 1, deployed = true,
+			keys = { { id = "left_shift", eligible = true } }, stats = stats({}) })
+		helpers.assert_eq(generated.copy_window.state, Report.STATE_FAIL, "a generated config without the key's delay fails")
+	end)
+
 	helpers.it("is registered as a field check with a field run step (tap-copy-field-check)", function()
 		helpers.assert_eq(require("infra.field_check_checks").checks.tap_copy, Check.tap_copy)
 	end)

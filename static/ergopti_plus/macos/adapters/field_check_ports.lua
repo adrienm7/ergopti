@@ -161,7 +161,23 @@ local function tap_hold_threshold_facts()
 			facts.expected[key_code] = { id = key.id, ms = deployed[key.id] or ((own and own > 0) and own or global) }
 		end
 	end
-	local text = FileSystem.read(FileSystem.expand_path(KePaths.config_file_for(KePaths.selected_runtime())))
+	local runtime = KePaths.selected_runtime()
+	-- The owned runtime deploys nothing before its owner admits it: its folder
+	-- does not exist yet, and reading through it logged an error and failed the
+	-- thresholds for a runtime the owned_* steps already report (field report 2026-11-06).
+	if runtime == KePaths.RUNTIME_OWNED then
+		local status = type(Remap.owned_runtime_status) == "function" and Remap.owned_runtime_status() or nil
+		if type(status) ~= "table" or status.state ~= "ready" then
+			facts.reason = "owned_runtime_not_ready"
+			return facts
+		end
+	end
+	local path = FileSystem.expand_path(KePaths.config_file_for(runtime))
+	if FileSystem.exists(path) ~= true then
+		facts.reason = "not_deployed"
+		return facts
+	end
+	local text = FileSystem.read(path)
 	if type(text) ~= "string" then
 		facts.reason = "unreadable"
 		return facts
@@ -183,7 +199,7 @@ local function tap_copy_facts()
 	local Remap = require("platform.remap")
 	local deployed = require("platform.remap.generator").last_tap_timeouts() or {}
 	local rollover = require("platform.remap.defaults").rollover_keys
-	local facts = { window_ms = Remap.get_lone_modifier_tap_max_ms(), keys = {},
+	local facts = { window_ms = Remap.get_lone_modifier_tap_max_ms(), keys = {}, deployed = next(deployed) ~= nil,
 		change_count = (require("adapters.clipboard")._change_count()),
 		stats = require("modules.keymap").tap_copy_statistics() }
 	for _, key in ipairs(Remap.TAP_HOLD_KEYS or {}) do

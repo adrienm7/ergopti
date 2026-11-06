@@ -94,6 +94,18 @@ helpers.describe("field check: deployed tap-hold thresholds (PAR-15)", function(
 		helpers.assert_eq(none.thresholds_match.value, "no_managed_tap_hold")
 	end)
 
+	-- Field report 2026-11-06: the owned runtime was not installed, so no
+	-- configuration existed and the thresholds failed as "unreadable" on top of
+	-- the owned_* steps that already named the cause.
+	helpers.it("skips while the owned runtime is not ready and fails a ready runtime with no file", function()
+		local waiting = run({ enabled = true, reason = "owned_runtime_not_ready" }).thresholds_config
+		helpers.assert_eq(waiting.state, Report.STATE_SKIP)
+		helpers.assert_eq(waiting.value, "owned_runtime_not_ready")
+		local missing = run({ enabled = true, reason = "not_deployed" }).thresholds_config
+		helpers.assert_eq(missing.state, Report.STATE_FAIL)
+		helpers.assert_eq(missing.value, "not_deployed")
+	end)
+
 	helpers.it("is registered as a field check with a field run step", function()
 		helpers.assert_eq(require("infra.field_check_checks").checks.tap_hold_thresholds, Check.tap_hold_thresholds)
 	end)
