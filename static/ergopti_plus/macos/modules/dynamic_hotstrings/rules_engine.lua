@@ -518,13 +518,16 @@ local function register_prefix_entries()
 			local phone_opts  = opts_for("phone_number")
 			local phone_magic_opts = opts_for("phone_number", { is_magic_trigger = true })
 			local fphone_opts = opts_for("phone_number_clean")
+			-- A national trunk zero is not dialled after the French country code,
+			-- matching the Windows and Linux international output.
+			local international_phone = "+33" .. (phone:sub(1, 1) == "0" and phone:sub(2) or phone)
 			if text_utils.utf8_len(phone) >= 2 then
 				add_mapping(text_utils.utf8_sub(phone, 1, 2) .. _trigger, phone, phone_magic_opts)
-				add_mapping("+33" .. text_utils.utf8_sub(phone, 1, 2), "+33" .. phone, phone_opts)
+				add_mapping("+33" .. text_utils.utf8_sub(phone, 1, 2), international_phone, phone_opts)
 			end
 			if text_utils.utf8_len(phone) >= 4 then
 				add_mapping(text_utils.utf8_sub(phone, 1, 4), phone, phone_opts)
-				add_mapping("+33" .. text_utils.utf8_sub(phone, 2, 4), "+33" .. phone, phone_opts)
+				add_mapping("+33" .. text_utils.utf8_sub(phone, 2, 4), international_phone, phone_opts)
 			end
 			if text_utils.utf8_len(phone) >= 6 then
 				add_mapping(text_utils.utf8_sub(phone, 2, 5), phone, phone_opts)
