@@ -157,16 +157,34 @@ function M.reset_unanswered_for_tests()
 	_unanswered = nil
 end
 
+-- The answer of the latest live read, { trusted, detail }: nil before the
+-- boot's read. Diagnostics phase A reads memory only, and the live query
+-- alone overran its 5 ms budget (field report 2026-11-05).
+local _last_read = nil
+
 --- Reports whether this process is currently trusted for Accessibility.
 --- @return boolean|nil trusted Nil when the native query itself failed.
 --- @return string|nil detail Exact failure when trusted is nil.
 function M.is_trusted()
 	if type(hs) ~= "table" or type(hs.accessibilityState) ~= "function" then
-		return nil, "hs.accessibilityState is unavailable"
+		_last_read = { trusted = nil, detail = "hs.accessibilityState is unavailable" }
+		return nil, _last_read.detail
 	end
 	local ok, state = pcall(hs.accessibilityState, false)
-	if not ok then return nil, tostring(state) end
+	if not ok then
+		_last_read = { trusted = nil, detail = tostring(state) }
+		return nil, _last_read.detail
+	end
+	_last_read = { trusted = state == true }
 	return state == true
+end
+
+--- The answer of the latest live read, without asking macOS again.
+--- @return boolean|nil trusted Nil when no read answered yet or the last one failed.
+--- @return string|nil detail Why trusted is nil.
+function M.last_known()
+	if _last_read == nil then return nil, "not read yet" end
+	return _last_read.trusted, _last_read.detail
 end
 
 --- Asks macOS to show its Accessibility prompt for this process.

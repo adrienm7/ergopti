@@ -431,15 +431,18 @@ local function permission_state(id, granted, detail)
 end
 
 --- The macOS permissions, read without prompting, in the schema's order.
+--- Phase A reads memory only: Accessibility and Screen Recording are the
+--- answers of the boot's and the latest capture's live reads, unknown before
+--- one (field report 2026-11-05: the two live queries overran the budget).
 --- @param ids table The schema's permission ids for this driver, ordered.
 --- @return table
 function H.collect_permissions(ids)
 	local states = {
 		accessibility    = function()
-			return permission_state("accessibility", require("adapters.accessibility_permission").is_trusted())
+			return permission_state("accessibility", require("adapters.accessibility_permission").last_known())
 		end,
 		screen_recording = function()
-			return permission_state("screen_recording", require("adapters.screen_capture").permission_state())
+			return permission_state("screen_recording", require("adapters.screen_capture").last_known_permission())
 		end,
 		-- Hammerspoon has no query for Input Monitoring that does not prompt, and
 		-- the grant belongs to the Karabiner grabber rather than to this process

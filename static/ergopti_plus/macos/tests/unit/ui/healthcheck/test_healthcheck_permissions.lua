@@ -24,12 +24,15 @@ local function with_permissions(states, body)
 	local prompts = {}
 	local ok, err = xpcall(function()
 		helpers.load_with_stubs("infra.logger")
+		-- Phase A reads the cached answers only: a live query fails the case
 		package.loaded["adapters.accessibility_permission"] = {
-			is_trusted = function() return table.unpack(states.accessibility, 1, 2) end,
+			is_trusted = function() error("phase A must not query Accessibility live") end,
+			last_known = function() return table.unpack(states.accessibility, 1, 2) end,
 			request_prompt = function() prompts[#prompts + 1] = "accessibility" return true end,
 		}
 		package.loaded["adapters.screen_capture"] = {
-			permission_state = function() return table.unpack(states.screen_recording, 1, 2) end,
+			permission_state = function() error("phase A must not query Screen Recording live") end,
+			last_known_permission = function() return table.unpack(states.screen_recording, 1, 2) end,
 			request_permission = function() prompts[#prompts + 1] = "screen" return true end,
 		}
 		package.loaded["platform.remap.lease_controller"] = {
@@ -100,10 +103,64 @@ helpers.describe("healthcheck: macOS privacy permissions", function()
 			end)
 	end)
 
+	helpers.it("reports a permission no live read answered yet as unknown", function()
+		with_permissions({ accessibility = { nil, "not read yet" }, screen_recording = { nil, "not read yet" },
+			guardian = "ready" }, function(H)
+			local states = states_of(H.collect_permissions(IDS))
+			helpers.assert_eq(states.accessibility, "unknown")
+			helpers.assert_eq(states.screen_recording, "unknown")
+		end)
+	end)
+
 	helpers.it("never claims Input Monitoring: Hammerspoon cannot ask without prompting", function()
 		with_permissions({ accessibility = { true }, screen_recording = { true }, guardian = "ready" }, function(H)
 			helpers.assert_eq(states_of(H.collect_permissions(IDS)).input_monitoring, "unknown")
 		end)
+	end)
+end)
+
+-- Field report 2026-11-05: phase A took 5.2 ms against its 5 ms budget, the
+-- two live permission queries included.
+helpers.describe("healthcheck: permission answers are cached by their live reads", function()
+	--- Loads an adapter fresh over a scripted native answer.
+	local function fresh(name, native)
+		local saved_hs, saved_module = _G.hs, package.loaded[name]
+		_G.hs = native
+		package.loaded[name] = nil
+		local ok, module = pcall(require, name)
+		return ok and module or error(module, 0), function()
+			_G.hs, package.loaded[name] = saved_hs, saved_module
+		end
+	end
+
+	helpers.it("remembers the latest Accessibility answer (phase-a-permission-cache)", function()
+		local answer = true
+		local Permission, restore = fresh("adapters.accessibility_permission",
+			{ accessibilityState = function() return answer end })
+		local ok, err = pcall(function()
+			helpers.assert_eq(select(2, Permission.last_known()), "not read yet")
+			helpers.assert_eq(Permission.is_trusted(), true)
+			answer = false
+			helpers.assert_eq(Permission.last_known(), true, "no live read happens on last_known")
+			helpers.assert_eq(Permission.is_trusted(), false)
+			helpers.assert_eq(Permission.last_known(), false)
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("remembers the latest Screen Recording answer (phase-a-permission-cache)", function()
+		local Capture, restore = fresh("adapters.screen_capture",
+			{ screenRecordingState = function() error("tcc down") end })
+		local ok, err = pcall(function()
+			helpers.assert_eq(select(2, Capture.last_known_permission()), "not read yet")
+			helpers.assert_nil(Capture.permission_state())
+			local granted, detail = Capture.last_known_permission()
+			helpers.assert_nil(granted)
+			helpers.assert_true(tostring(detail):find("tcc down", 1, true) ~= nil)
+		end)
+		restore()
+		if not ok then error(err, 0) end
 	end)
 end)
 
