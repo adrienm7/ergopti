@@ -50,10 +50,16 @@ helpers.describe("menu_llm: wrong-typed modifier settings fail closed (F-HIGH-6)
 
 	helpers.it("build_modifier_menu type-guards current_mods BEFORE table.concat", function()
 		local src = read_src("local function generic_numeric_prompt") -- ui/menu/menu_llm/settings_manager.lua
-		local guard_pos  = src:find('type(current_mods) ~= "table"', 1, true)
+		-- The guard validates the whole array (a table holding a non-string also
+		-- raises in table.concat), then falls back on any invalid value.
+		local guard_pos  = src:find('local valid = type(current_mods) == "table"', 1, true)
+		local element_pos = src:find('type(value) ~= "string"', guard_pos or 1, true)
+		local fallback_pos = src:find("if not valid then", guard_pos or 1, true)
 		local concat_pos = src:find("table.concat(current_mods", 1, true)
 		helpers.assert_true(guard_pos ~= nil, "build_modifier_menu must type-guard current_mods")
-		helpers.assert_true(concat_pos ~= nil and guard_pos < concat_pos,
-			"the non-table guard must precede table.concat(current_mods)")
+		helpers.assert_true(element_pos ~= nil, "build_modifier_menu must reject non-string modifiers")
+		helpers.assert_true(fallback_pos ~= nil, "an invalid current_mods must fall back to the default")
+		helpers.assert_true(concat_pos ~= nil and guard_pos < element_pos and element_pos < fallback_pos
+			and fallback_pos < concat_pos, "the array guard must precede table.concat(current_mods)")
 	end)
 end)
