@@ -325,6 +325,22 @@
 			"cmd": "node",
 			"args": ["tools/test/test-app-cloner-families.cjs"],
 			"repro": "npm run test:app-cloner-families"
+		},
+		{
+			"id": "personal-info-editor-multiline",
+			"ordinal": 599,
+			"name": "personal-info editor preserves multiline values through its save bridge",
+			"cmd": "node",
+			"args": ["tools/test/test-personal-info-editor-multiline.cjs"],
+			"repro": "npm run test:personal-info-editor-multiline"
+		},
+		{
+			"id": "prompt-editor-raw-whitespace",
+			"ordinal": 600,
+			"name": "prompt editor preserves raw prompt whitespace",
+			"cmd": "node",
+			"args": ["tools/test/test-prompt-editor-raw-whitespace.cjs"],
+			"repro": "npm run test:prompt-editor-raw-whitespace"
 		}
 	]
 }
