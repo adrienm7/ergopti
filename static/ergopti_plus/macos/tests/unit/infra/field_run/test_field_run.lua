@@ -395,6 +395,19 @@ helpers.describe("field run: a disabled step", function()
 		end)
 	end)
 
+	-- Field report 2026-11-05: the lease check ran before the owned runtime
+	-- was installed and reloaded, and judged a runtime nobody had admitted yet.
+	helpers.it("ships the lease check after the owned install's reload (field-lease-after-install)", function()
+		helpers.with_stub_scope(MODULES, function()
+			local spec = Json.decode(SPEC_TEXT)
+			local index = {}
+			for position, step in ipairs(spec.steps) do index[step.id] = position end
+			helpers.assert_true(index.field_lease ~= nil and index.owned_install_reload ~= nil)
+			helpers.assert_true(index.field_lease > index.owned_install_reload,
+				"the lease must judge the runtime the reload admitted")
+		end)
+	end)
+
 	helpers.it("skips a disabled step by name and never asks for a reload", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
@@ -578,7 +591,11 @@ helpers.describe("field run: a run", function()
 				helpers.assert_nil(step.person, step.id .. " waits for a person: the field run must be automatic")
 				if step.kind ~= "reload" then helpers.assert_true(ran[step.id], step.id .. " did not run") end
 			end
-			local lease = state.json(result_path("r11", 1, "field_lease"))
+			local lease_index
+			for index, step in ipairs(spec.steps) do
+				if step.id == "field_lease" then lease_index = index end
+			end
+			local lease = state.json(result_path("r11", lease_index, "field_lease"))
 			helpers.assert_eq(lease.verdict, "pass")
 			helpers.assert_eq(lease.log_window.lines[1], "line of field_lease")
 			helpers.assert_eq(lease.report.step, "field_lease")
