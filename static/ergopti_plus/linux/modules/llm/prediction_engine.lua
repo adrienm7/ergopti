@@ -957,6 +957,12 @@ function M.predict(context, output_context, override, automatic)
 	local messages = PromptBuilder.build_messages(system_prompt, params.context, params.context_tail)
 	local candidates = {}
 	local request_index = 0
+	-- Sequential variants share the retry policy of inference.json: failed,
+	-- empty and duplicate answers spend attempts until the requested count is
+	-- filled or the budget is gone. A batch asks once, as before.
+	local max_attempts = is_batch and batching.calls or Inference.max_attempts(requested)
+	-- The budget the next attempt uses after a failed or empty one, or nil
+	local retry_call = nil
 	-- The token counts the backend reported, summed over this prediction's variants
 	local tokens = {}
 	local meta = {
@@ -1088,21 +1094,36 @@ function M.predict(context, output_context, override, automatic)
 		end
 		_inflight_backend = backend
 		local dispatch_index, terminal_seen = request_index, false
+		-- A batch asks once, at the builder's temperature. Sequential variants
+		-- each start from the user's own temperature and, when "raise the
+		-- temperature" is on, get a little warmer so they differ. Warming the
+		-- builder's already-raised value heated them twice, and warming with
+		-- the switch off made the switch do nothing.
+		local sent_temperature = is_batch and params.temperature
+			or (auto_raise and Inference.variant_temperature(base_temperature, request_index))
+			or base_temperature
+		-- A rewrite's budget follows its sentence; the continuation override
+		-- would truncate it and erase text it could not retype.
+		local sent_tokens = require("llm.request_plan.token_budget").for_call(
+			rewrite and params.max_tokens or _max_tokens or params.max_tokens, batching.per_call)
+		if retry_call then
+			sent_tokens, sent_temperature = retry_call.tokens, retry_call.temperature
+			retry_call = nil
+		end
+		--- Gives the next attempt the retry policy's room after this one yielded nothing.
+		local function arm_retry()
+			local tokens, temperature = Inference.retry_budget(sent_tokens, sent_temperature)
+			retry_call = { tokens = tokens, temperature = temperature }
+		end
+		--- Whether another sequential attempt may still fill the requested count.
+		local function attempts_remain()
+			return not is_batch and #candidates < requested and request_index < max_attempts
+		end
 		local dispatched = backend.chat(target, model, messages, {
 			runtime_response = runtime_response,
 			stream = DisplaySettings.get("streaming") == true,
-			-- A batch asks once, at the builder's temperature. Sequential variants
-			-- each start from the user's own temperature and, when "raise the
-			-- temperature" is on, get a little warmer so they differ. Warming the
-			-- builder's already-raised value heated them twice, and warming with
-			-- the switch off made the switch do nothing.
-			temperature = is_batch and params.temperature
-				or (auto_raise and Inference.variant_temperature(base_temperature, request_index))
-				or base_temperature,
-			-- A rewrite's budget follows its sentence; the continuation override
-			-- would truncate it and erase text it could not retype.
-			max_tokens = require("llm.request_plan.token_budget").for_call(
-				rewrite and params.max_tokens or _max_tokens or params.max_tokens, batching.per_call),
+			temperature = sent_temperature,
+			max_tokens = sent_tokens,
 			-- Decided from the prompt, as macOS does: one continuation, unless the
 			-- prompt asks for the two-line correction format or a batch. By id, a
 			-- user's copy of "basic" never got the single-line stops.
@@ -1123,18 +1144,30 @@ function M.predict(context, output_context, override, automatic)
 				tokens.cost = (tokens.cost or 0) + (tonumber(usage.est_cost_usd) or 0)
 			end
 			if err then
+				if err ~= "cancelled" then
+					Logger.warn(LOG, "Prediction variant %d/%d failed: %s", request_index, max_attempts,
+						require("modules.llm.error_log").describe(err))
+				end
+				if err ~= "cancelled" and attempts_remain() then
+					arm_retry()
+					dispatch()
+					return
+				end
 				_predicting = false
 				meta.loading = false
-				if err ~= "cancelled" then Logger.warn(LOG, "Prediction failed: %s", require("modules.llm.error_log").describe(err)) end
 				if #candidates > 0 then publish() else clear_offer() end
 				return
 			end
 			local clean = Parser.strip_thinking(full_text)
-			for _, candidate in ipairs(parse_response(clean, is_batch, trigger_chars)) do
+			local parsed = parse_response(clean, is_batch, trigger_chars)
+			for _, candidate in ipairs(parsed) do
 				append_unique(candidates, candidate, 0)
 			end
+			-- An empty or unusable answer is retried with more room; a duplicate
+			-- only spends its attempt, since its call was not too short.
+			if #parsed == 0 then arm_retry() end
 			Logger.info(LOG, "Prediction request complete: %d chars, %d candidates.", #clean, #candidates)
-			if request_index < batching.calls then
+			if attempts_remain() or (is_batch and request_index < batching.calls) then
 				-- Shown now: the next variant may wait for the backend's interval.
 				if #candidates > 0 and DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI) == true then publish() end
 				dispatch()
