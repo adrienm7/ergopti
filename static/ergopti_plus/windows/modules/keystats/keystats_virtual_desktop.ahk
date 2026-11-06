@@ -35,10 +35,12 @@ class KLDesktop {
 KL_Desktop_ReadCurrent() {
 	try return RegRead("HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\VirtualDesktops",
 		"CurrentVirtualDesktop")
-	SessionId := 0
-	if DllCall("ProcessIdToSessionId", "UInt", DllCall("GetCurrentProcessId", "UInt"), "UInt*", &SessionId)
-		try return RegRead("HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\SessionInfo\"
-			. SessionId . "\VirtualDesktops", "CurrentVirtualDesktop")
+	; An unreported session leaves no per-session key to read.
+	try SessionId := SystemControl().SessionId()
+	catch
+		return ""
+	try return RegRead("HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\SessionInfo\"
+		. SessionId . "\VirtualDesktops", "CurrentVirtualDesktop")
 	return ""
 }
 
