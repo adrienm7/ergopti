@@ -3425,16 +3425,6 @@ i18n = "menu.profiles.header_custom_profiles"
 
 [[menu.llm_profile_lua_frame]]
 type = "include"
-section = "llm_profile_recommendation"
-present_when = "llm_profile_recommendation_present"
-
-[[menu.llm_profile_lua_frame]]
-type = "include"
-section = "llm_profile_paused_recommendation"
-present_when = "llm_profile_recommendation_paused"
-
-[[menu.llm_profile_lua_frame]]
-type = "include"
 section = "llm_profile_auto_detect_control"
 
 [[menu.llm_profile_lua_frame]]
@@ -3545,27 +3535,11 @@ type = "include"
 section = "llm_profile_commands"
 row_id = "llm_profile_clone"
 
-[[menu.llm_profile_recommendation]]
-type = "command"
-id = "llm_profile_recommend"
-i18n = "menu.profiles.auto_detect"
-platforms = ["hs"]
-unavailable = "hide"
-
-[[menu.llm_profile_paused_recommendation]]
-type = "label"
-id = "llm_profile_recommend_paused"
-i18n = "menu.profiles.auto_detect"
-platforms = ["hs"]
-unavailable = "hide"
-
 [[menu.llm_profile_auto_detect_control]]
 type = "check"
 id = "llm_profile_auto_detect"
 i18n = "menu.profiles.auto_detect"
 checked_when = ["llm_profile_auto_detect_checked"]
-platforms = ["ahk", "linux"]
-unavailable = "hide"
 
 # Windows alone owns an ordered runtime registry of personal shortcut switches.
 # The other drivers keep their existing personal-file and general shortcut controls.

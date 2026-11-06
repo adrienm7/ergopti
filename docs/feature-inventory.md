@@ -141,13 +141,12 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.keys.wrap_text_if_selected` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keys.cmd_star` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 
-## macos — 65 paths not declared
+## macos — 64 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `hotstrings.magic_key_source_char` (setting; declared: windows; reason: `platform_reason.magic_key_detection_is_windows`)
 - [ ] `hotstrings.tap_hold_resets_word` (setting; declared: windows, linux; reason: `platform_reason.tap_hold_word_reset_not_on_macos`)
 - [ ] `llm.onboarding_seen` (setting; declared: windows; reason: `platform_reason.ai_menu_bookkeeping_is_windows`)
-- [ ] `llm.profiles.auto_profile_for_model` (setting; declared: windows, linux; reason: `platform_reason.llm_profile_follows_model_is_not_on_macos`)
 - [ ] `llm.trigger.inline_autotype` (setting; declared: windows; reason: `platform_reason.inline_autotype_is_windows`)
 - [ ] `shortcuts.wrap_text_if_selected` (feature; declared: windows, linux; reason: `platform_reason.wrap_selection_is_a_shortcut_key_on_macos`)
 - [ ] `shortcuts.search.search_engine` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -600,7 +599,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `llm_numeric_custom_rows.llm_numeric_custom_value` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `llm_debounce_never_row.llm_debounce_never` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `llm_profile_lua_app_overrides.llm_profile_app_overrides` (hide): Review the platform-specific presentation and equivalent.
-- [ ] `llm_profile_recommendation.llm_profile_recommend` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `hotstrings_delays_frame.parameter_delay_ai_acceptance` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `hotstrings_delays_frame.parameter_delay_autocompletion` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `hotstrings_delays_frame.parameter_delay_category_boundary` (hide): Review the platform-specific presentation and equivalent.
@@ -730,7 +728,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `llm_numeric_custom_rows.llm_numeric_custom_value` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `llm_debounce_never_row.llm_debounce_never` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `llm_profile_windows_frame.llm_profile_app_overrides` (hide): Review the platform-specific presentation and equivalent.
-- [ ] `llm_profile_auto_detect_control.llm_profile_auto_detect` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `personal_shortcuts_frame.personal_shortcuts_registered` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `hotstrings_delays_frame.parameter_delay_magic_key` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `hotstrings_delays_frame.parameter_delay_autocorrection` (hide): Review the platform-specific presentation and equivalent.
@@ -844,7 +841,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `layout_active_source_empty_commands.layout_open_preferences` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `llm_custom_profile_controls.llm_profile_shortcut` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `llm_profile_windows_frame.llm_profile_app_overrides` (hide): Review the platform-specific presentation and equivalent.
-- [ ] `llm_profile_recommendation.llm_profile_recommend` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `personal_shortcuts_frame.personal_shortcuts_registered` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `hotstrings_delays_frame.parameter_delay_ai_acceptance` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `hotstrings_delays_frame.parameter_delay_autocompletion` (hide): Review the platform-specific presentation and equivalent.

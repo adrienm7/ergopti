@@ -462,7 +462,6 @@ module.exports = Object.freeze({
 		LLM_PROFILE_DELETE: "llm_profile_delete",
 		LLM_PROFILE_EDIT: "llm_profile_edit",
 		LLM_PROFILE_OVERRIDE_ACTIVE_APP: "llm_profile_override_active_app",
-		LLM_PROFILE_RECOMMEND: "llm_profile_recommend",
 		LLM_PROFILE_SHORTCUT: "llm_profile_shortcut",
 		LLM_PROFILE_USE: "llm_profile_use",
 		LLM_RESET_ON_NAV: "llm_reset_on_nav",

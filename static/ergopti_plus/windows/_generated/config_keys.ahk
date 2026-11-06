@@ -453,7 +453,6 @@ class MenuCommand {
 	static LLM_PROFILE_DELETE := "llm_profile_delete"
 	static LLM_PROFILE_EDIT := "llm_profile_edit"
 	static LLM_PROFILE_OVERRIDE_ACTIVE_APP := "llm_profile_override_active_app"
-	static LLM_PROFILE_RECOMMEND := "llm_profile_recommend"
 	static LLM_PROFILE_SHORTCUT := "llm_profile_shortcut"
 	static LLM_PROFILE_USE := "llm_profile_use"
 	static LLM_RESET_ON_NAV := "llm_reset_on_nav"

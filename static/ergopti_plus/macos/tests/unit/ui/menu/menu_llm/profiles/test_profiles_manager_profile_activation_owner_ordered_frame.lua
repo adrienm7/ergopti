@@ -91,53 +91,54 @@ helpers.describe("complete ordered profile frame: actual macOS owner", function(
 			for key, value in pairs(oracle.sections) do helpers.assert_eq(f.document[key], value, key) end
 		end)
 	end)
-	helpers.it("preserves paused recommendation's inert nil action and hidden clone", function()
+	helpers.it("greys the automatic-profile check and hides clone while paused", function()
 		with_frame({ custom = true, paused = true }, function(f)
 			local rows = f.rows()
 			local auto = assert(at(rows, f.i18n.get(oracle.labels.auto_detect)))
-			helpers.assert_true(auto.disabled)
-			helpers.assert_nil(auto.fn)
-			helpers.assert_nil(auto.checked)
+			helpers.assert_eq(auto.fn ~= nil and auto.fn() or false, false, "a paused driver changes nothing")
+			helpers.assert_eq(f.fixture.direct_saves(), 0)
 			helpers.assert_nil(at(rows, f.i18n.get(oracle.labels.clone)))
 			helpers.assert_eq(#f.fixture.recommendations, 0)
 		end)
 	end)
-	for _, receipt in ipairs({ "nil", "false", "true" }) do
-		helpers.it("keeps recommendation force-dialog and exact native " .. receipt .. " receipt", function()
-			local options = {}
-			if receipt == "true" then options.recommendation_result = true
-			elseif receipt == "false" then options.recommendation_result = false end
-			with_frame(options, function(f)
-				local row = assert(at(f.rows(), f.i18n.get(oracle.labels.auto_detect)))
-				helpers.assert_nil(row.checked, "native recommendation is a command, never a checkbox")
-				local accepted = row.fn()
-				if receipt == "nil" then helpers.assert_nil(accepted)
-				else helpers.assert_eq(accepted, receipt == "true") end
-				helpers.assert_eq(#f.fixture.recommendations, 1)
-				helpers.assert_eq(f.fixture.recommendations[1], { dialog_title = "menu.profiles.recommended_profile", force_dialog = true })
-			end)
-		end)
-	end
-	helpers.it("retains the native captured-pause recommendation lifetime without imposing a live pause gate", function()
+	-- llm.profiles.auto_profile_for_model, as on Windows and Linux: a check, not a
+	-- one-shot recommendation; switched on, the profile follows the model at once.
+	helpers.it("switches the automatic profile and applies the recommendation when it goes on", function()
 		with_frame({ recommendation_result = true }, function(f)
 			local row = assert(at(f.rows(), f.i18n.get(oracle.labels.auto_detect)))
-			f.fixture.native_dependencies.script_control.is_paused = function() return true end
-			helpers.assert_true(row.fn())
-			helpers.assert_eq(#f.fixture.recommendations, 1)
+			helpers.assert_eq(row.checked, true, "the automatic profile is on by default")
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(f.fixture.state.llm_auto_profile_for_model, false)
+			helpers.assert_eq(f.fixture.direct_saves(), 1)
+			helpers.assert_eq(#f.fixture.recommendations, 0, "switching off applies nothing")
+			row = assert(at(f.rows(), f.i18n.get(oracle.labels.auto_detect)))
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(f.fixture.state.llm_auto_profile_for_model, true)
+			helpers.assert_eq(f.fixture.direct_saves(), 2)
+			helpers.assert_eq(f.fixture.recommendations, { {} }, "switching on follows the current model")
 		end)
 	end)
-	helpers.it("held recommendation refuses a withdrawn canonical command before native effects", function()
+	helpers.it("keeps the automatic profile unchanged when its save is refused", function()
+		with_frame({ save_mode = "false" }, function(f)
+			local row = assert(at(f.rows(), f.i18n.get(oracle.labels.auto_detect)))
+			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(f.fixture.state.llm_auto_profile_for_model, true)
+			helpers.assert_eq(#f.fixture.recommendations, 0)
+		end)
+	end)
+	helpers.it("refuses a withdrawn automatic-profile declaration before native effects", function()
 		with_frame({ recommendation_result = true }, function(f)
 			local row = assert(at(f.rows(), f.i18n.get(oracle.labels.auto_detect)))
-			f.document.llm_profile_recommendation = nil
+			f.document.llm_profile_auto_detect_control = nil
 			helpers.assert_eq(row.fn(), false)
+			helpers.assert_eq(f.fixture.direct_saves(), 0)
 			helpers.assert_eq(#f.fixture.recommendations, 0)
 		end)
 	end)
 	helpers.it("actual frame consumption follows changed full source order", function()
 		with_frame({ custom = true }, function(f)
 			local frame = f.document.llm_profile_lua_frame
-			frame[1], frame[10] = frame[10], frame[1]
+			frame[1], frame[8] = frame[8], frame[1]
 			local rows = f.rows()
 			helpers.assert_eq(rows[1].title, f.i18n.get(oracle.labels.create))
 			-- The per-application overrides end the submenu after the frame, behind
@@ -152,9 +153,9 @@ helpers.describe("complete ordered profile frame: actual macOS owner", function(
 		helpers.it("refuses " .. fault .. " instead of inventing a native fixed frame", function()
 			with_frame({ custom = true }, function(f)
 				if fault == "missing frame" then f.document.llm_profile_lua_frame = nil
-				elseif fault == "wrong native list binding" then f.document.llm_profile_lua_frame[6].id = "unregistered_data"
-				elseif fault == "missing presence getter" then f.document.llm_profile_lua_frame[7].present_when = "unregistered_presence"
-				else f.document.llm_profile_lua_frame[10].row_id = "unregistered_command" end
+				elseif fault == "wrong native list binding" then f.document.llm_profile_lua_frame[4].id = "unregistered_data"
+				elseif fault == "missing presence getter" then f.document.llm_profile_lua_frame[5].present_when = "unregistered_presence"
+				else f.document.llm_profile_lua_frame[8].row_id = "unregistered_command" end
 				helpers.assert_eq(#f.rows(), 0)
 				helpers.assert_eq(#f.fixture.selections, 0)
 				helpers.assert_eq(#f.fixture.recommendations, 0)

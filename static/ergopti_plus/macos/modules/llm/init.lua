@@ -141,6 +141,14 @@ local function load_shared_defaults()
 		error("ergopti_plus: _shared/modules/llm/defaults.json is missing required key(s): " .. table.concat(missing, ", "))
 	end
 
+	-- Whether the prompt profile follows the selected model: the manifest's
+	-- default, as on Windows and Linux (llm.profiles.auto_profile_for_model).
+	merged.llm_auto_profile_for_model = require("infra.manifest_reader").default_for(
+		ConfigKeys.KEY.LLM_PROFILES_AUTO_PROFILE_FOR_MODEL)
+	if type(merged.llm_auto_profile_for_model) ~= "boolean" then
+		error("ergopti_plus: the manifest declares no boolean default for llm.profiles.auto_profile_for_model")
+	end
+
 	Logger.done(LOG, "Shared LLM defaults loaded from defaults.json (%s).", tostring(used))
 	return merged
 end

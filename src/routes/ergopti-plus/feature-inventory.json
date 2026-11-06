@@ -1769,14 +1769,11 @@
 		},
 		"platforms": {
 			"windows": true,
-			"macos": false,
+			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.llm_profile_follows_model_is_not_on_macos",
-		"reason": {
-			"fr": "Windows et Linux peuvent suivre le modèle choisi en changeant automatiquement de profil de prompt. Sous macOS, le profil recommandé s’applique à la demande, depuis le menu Profils.",
-			"en": "Windows and Linux can follow the selected model by switching the prompt profile automatically. On macOS the recommended profile is applied on request, from the Profiles menu."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "llm.trigger.disabled_apps",
