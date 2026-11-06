@@ -46,6 +46,10 @@ local CONFIG_DIR_STORAGE_KEY = "paths.config_dir"
 -- Bootstrap storage key of the LogsDirPath override, from the shared registry.
 local LOGS_DIR_STORAGE_KEY = AppDirs.linux_storage_key
 
+--- The bootstrap storage keys that hold a folder the user chose; the legacy
+--- folder migration follows them when it moves the folder.
+M.LOCATOR_STORAGE_KEYS = { CONFIG_DIR_STORAGE_KEY, LOGS_DIR_STORAGE_KEY }
+
 --- Admits native absolute bases; XDG requires relative values to be ignored.
 --- @param value any Environment-provided directory.
 --- @return string|nil normalized

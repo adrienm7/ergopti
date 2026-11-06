@@ -116,14 +116,49 @@ function M.plan(config_paths)
 	return plan
 end
 
+--- Points the bootstrap folder settings at where their folder moved.
+---
+--- A configuration or logs folder the user chose inside an old folder moved
+--- with it, while storage.json still named the old path. When the setting
+--- cannot be stored, the folder moves back to the path it names.
+--- @param report table Core report; receives relocated and restored rows.
+--- @param storage table|nil adapters.storage (get, set); loaded only after a move.
+--- @param ports table Native effects.
+local function follow_locators(report, storage, ports)
+	report.relocated, report.restored = {}, report.restored or {}
+	if #report.moved + #report.backed_up == 0 then return end
+	-- Loaded after the moves: its path is the default folder that now holds
+	-- the moved storage.json.
+	local store = storage or require("adapters.storage")
+	for _, key in ipairs(require("infra.config_paths").LOCATOR_STORAGE_KEYS) do
+		local value = store.get(key, nil)
+		local target, entry = nil, nil
+		if type(value) == "string" and value:sub(1, 1) == "/" then target, entry = Core.relocated(report, value) end
+		if target then
+			if store.set(key, target) then
+				report.relocated[#report.relocated + 1] = { key = key, from = value, to = target }
+			else
+				local back, why = ports.rename(entry.to, entry.from)
+				if back then
+					report.restored[#report.restored + 1] = { from = entry.to, to = entry.from }
+				else
+					report.kept[#report.kept + 1] = { from = entry.to, to = entry.from, reason = "restore_failed",
+						detail = why }
+				end
+			end
+		end
+	end
+end
+
 --- Runs the migration and prepares the cache folder.
---- @param options table|nil { config_paths, ports } test seams; defaults are the real ones.
+--- @param options table|nil { config_paths, ports, storage } test seams; defaults are the real ones.
 --- @return table report The shared core report, logged later by log().
 function M.run(options)
 	options = options or {}
 	local config_paths = options.config_paths or require("infra.config_paths")
 	local ports = options.ports or M.native_ports()
 	local report = Core.apply(M.plan(config_paths), ports)
+	follow_locators(report, options.storage, ports)
 	-- The updater sends a conditional request only when its cache folder exists
 	-- and never creates it from the event loop, so boot creates it here.
 	report.cache_ready = ports.make_dir(config_paths.cache())
@@ -135,6 +170,9 @@ end
 --- @param report table Report returned by run().
 function M.log(logger, report)
 	Core.log_report(logger, LOG, report)
+	for _, entry in ipairs(report.relocated or {}) do
+		logger.info(LOG, "The bootstrap setting %s now names %s, where %s moved.", entry.key, entry.to, entry.from)
+	end
 	if report.cache_ready == false then
 		logger.warn(LOG, "The cache folder could not be created; update checks will not be conditional.")
 	end

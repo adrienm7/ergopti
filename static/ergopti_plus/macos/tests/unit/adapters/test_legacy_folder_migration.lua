@@ -177,6 +177,20 @@ helpers.describe("macOS legacy folder migration", function()
 			.. "/hammerspoon/config.toml", 1, true) ~= nil, "and the configuration follows")
 	end)
 
+	helpers.it("follows a configuration folder chosen below the old default one (legacy-folder-migration-macos-descendant)",
+		function()
+		local files = { [OLD .. "/paths.toml"] = 'ConfigDirPath = "' .. OLD_CONFIG .. '/custom/"\n' }
+		local ports, snapshot = ports_with_files({ OLD .. "/paths.toml", OLD_CONFIG .. "/custom/config.toml" }, files)
+		local logger = { info = function() end, warn = function() end }
+		local report = Migration.run(logger, { home = HOME, ports = ports })
+		local new_custom = HOME .. "/" .. AppDirs.config.macos_relative .. "/custom"
+		helpers.assert_true(table.concat(snapshot(), " "):find(new_custom .. "/config.toml", 1, true) ~= nil,
+			"the chosen folder moved with its ancestor")
+		helpers.assert_eq(files[NEW .. "/paths.toml"], 'ConfigDirPath = "' .. new_custom .. '/"\n',
+			"paths.toml names it where it went")
+		helpers.assert_eq(report.paths_file, "rewritten")
+	end)
+
 	helpers.it("merges the old logs, cache and control folders, backing up what clashes (legacy-folder-migration-macos-merge)",
 		function()
 		local LOGS = HOME .. "/" .. AppDirs.macos.relative

@@ -252,13 +252,43 @@ local function same_folder(a, b)
 	return NativePath.without_trailing_separators(a) == NativePath.without_trailing_separators(b)
 end
 
+--- The part of `path` below `folder`, separator first, or nil when `path` is
+--- not inside it.
+--- @param path string
+--- @param folder string
+--- @return string|nil rest
+local function below(path, folder)
+	local base = NativePath.without_trailing_separators(folder)
+	if base == "" or #path <= #base + 1 or path:sub(1, #base) ~= base then return nil end
+	local separator = path:sub(#base + 1, #base + 1)
+	if not NativePath.separators():find(separator, 1, true) then return nil end
+	return NativePath.without_trailing_separators(path:sub(#base + 1))
+end
+
+--- The new value of one locator, or nil when the rule does not name it.
+--- @param value string Current value.
+--- @param rule table { old, new, under }.
+--- @return string|nil new
+local function rebased(value, rule)
+	if value == "" then return nil end
+	local trailing = value:sub(#NativePath.without_trailing_separators(value) + 1)
+	for _, old in ipairs(rule.old) do
+		if same_folder(value, old) then return NativePath.without_trailing_separators(rule.new) .. trailing end
+		local rest = below(value, old)
+		if rest then return NativePath.without_trailing_separators(rule.under or rule.new) .. rest .. trailing end
+	end
+	return nil
+end
+
 --- Rewrites the paths.toml keys that name an old default folder.
 ---
---- Only a `Key = "value"` line whose value is one of the key's old spellings is
---- changed, to the new value with the same trailing separator. Every other line
---- is kept byte for byte, comments included.
+--- Only a `Key = "value"` line whose value is one of the key's old spellings,
+--- or a folder below one, is changed: the old folder itself becomes `new`, a
+--- folder below it the same folder below `under` (where the old folder went;
+--- `new` by default), with the same trailing separator. Every other line is
+--- kept byte for byte, comments included.
 --- @param text string paths.toml content.
---- @param rewrites table Array of { key, old = {spellings}, new }.
+--- @param rewrites table Array of { key, old = {spellings}, new, under }.
 --- @return string|nil rewritten New text, or nil when nothing changed.
 function M.rewrite_paths_text(text, rewrites)
 	assert(type(text) == "string", "paths.toml text must be a string")
@@ -268,21 +298,36 @@ function M.rewrite_paths_text(text, rewrites)
 		if not key then return line end
 		for _, rule in ipairs(rewrites) do
 			if rule.key == key then
-				for _, old in ipairs(rule.old) do
-					if value ~= "" and same_folder(value, old) then
-						local trailing = value:sub(#NativePath.without_trailing_separators(value) + 1)
-						local new = NativePath.without_trailing_separators(rule.new) .. trailing
-						if new ~= value then
-							changed = true
-							return indent .. key .. spacing .. '"' .. new .. '"' .. rest
-						end
-					end
+				local new = rebased(value, rule)
+				if new and new ~= value then
+					changed = true
+					return indent .. key .. spacing .. '"' .. new .. '"' .. rest
 				end
+				if new then return line end
 			end
 		end
 		return line
 	end)
 	return changed and out or nil
+end
+
+--- Where a path went, from the moves of a report.
+---
+--- A path that is a moved or backed-up entry, or lies below one, is the same
+--- path below where that entry went.
+--- @param report table Report from apply.
+--- @param path string Absolute path.
+--- @return string|nil relocated Nil when no entry holding it moved.
+--- @return table|nil entry The report row of the entry that moved.
+function M.relocated(report, path)
+	for _, kind in ipairs({ "moved", "backed_up" }) do
+		for _, entry in ipairs(report[kind]) do
+			if same_folder(path, entry.from) then return NativePath.without_trailing_separators(entry.to), entry end
+			local rest = below(path, entry.from)
+			if rest then return NativePath.without_trailing_separators(entry.to) .. rest, entry end
+		end
+	end
+	return nil
 end
 
 --- The suffix of the private stage files the publication writes and renames.
@@ -347,14 +392,23 @@ end
 ---
 --- A rule without a `source` is kept as it is. A rule whose source was kept
 --- (its move was refused, or a backup slot was taken) is dropped: the old
---- folder still holds the data the file names.
+--- folder still holds the data the file names. A rule whose source moved
+--- rebases a folder chosen below it to where the source went.
 --- @param rules table Array of { key, old, new, source }.
 --- @param report table Report from apply.
 --- @return table rewrites For rewrite_paths_text.
 function M.settle_rewrites(rules, report)
 	local settled = {}
 	for _, rule in ipairs(rules) do
-		if not (rule.source and outcome_of(report, rule.source) == "kept") then settled[#settled + 1] = rule end
+		local kind, entry = nil, nil
+		if rule.source then kind, entry = outcome_of(report, rule.source) end
+		if kind == "moved" or kind == "backed_up" then
+			-- A folder chosen below the old one is where its ancestor went, the
+			-- backup included; the old folder itself becomes the new default.
+			settled[#settled + 1] = { key = rule.key, old = rule.old, new = rule.new, under = entry.to }
+		elseif kind ~= "kept" then
+			settled[#settled + 1] = rule
+		end
 	end
 	return settled
 end
