@@ -265,7 +265,11 @@ local function assert_guards(source, helper_source, native_source, programmable_
 	-- refused save before it notifies: one call more.
 	-- The number-row rows in menu_keyboard_layout restore the previous choice
 	-- when the save is refused, before the layout is rebuilt: one call more.
-	helpers.assert_eq(calls, 59 + 3 - 1 + 1 + 1 + 1 + 1,
+	-- The automatic profile (llm.profiles.auto_profile_for_model) in
+	-- menu_llm/profiles_manager restores the previous value on a refused save,
+	-- both from its check row and when a manual profile choice turns it off:
+	-- two calls more.
+	helpers.assert_eq(calls, 59 + 3 - 1 + 1 + 1 + 1 + 1 + 2,
 		"the reviewed post-retirement census must enumerate every remaining save call")
 	helpers.assert_eq(guarded, calls,
 		"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "
