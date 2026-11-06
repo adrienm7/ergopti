@@ -4,8 +4,9 @@
 
 Windows installs Ergopti as a system layout from a keyboard DLL generated from the
 same `.keylayout` macOS and Linux install (`static/layouts/registry/ergopti/`). The
-approach is kalamine's (`kalamine`, MIT): the layout becomes the C tables of a
-keyboard DLL, compiled with MSVC and the Windows SDK's `kbd.h`; MSKLC is not used.
+layout becomes the C tables of a keyboard DLL, written from the Windows SDK's
+`kbd.h` structures and compiled with MSVC; MSKLC is not used. Kalamine showed the
+idea (maintainer rule: read it for ideas, never copy its code or templates).
 
 ## Sources: generated, tracked
 

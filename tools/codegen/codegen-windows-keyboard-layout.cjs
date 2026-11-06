@@ -33,6 +33,7 @@ const { generate, encodeKlc } = require('./lib/windows-keyboard-layout.cjs');
 
 const SPEC_PATH = shared('modules', 'layouts', 'windows_system_layout.json');
 const KEYCODES_PATH = shared('modules', 'layouts', 'mac_keycodes.json');
+const PHYSICAL_KEYS_PATH = shared('data', 'keycodes', 'physical_keys.json');
 const REGISTRY_DIR = path.join(REPO_ROOT, 'static', 'layouts', 'registry');
 const OUT_DIR = path.join(
 	REPO_ROOT,
@@ -84,7 +85,14 @@ function buildSources() {
 	const keylayoutPath = path.join(layoutDir, `${spec.registry_id}.keylayout`);
 	const keycodes = JSON.parse(fs.readFileSync(KEYCODES_PATH, 'utf8'));
 	const sourceRel = path.relative(REPO_ROOT, keylayoutPath).split(path.sep).join('/');
-	const generated = generate(readCanonical(keylayoutPath), { meta, spec, keycodes, sourceRel });
+	const physicalKeys = JSON.parse(fs.readFileSync(PHYSICAL_KEYS_PATH, 'utf8'));
+	const generated = generate(readCanonical(keylayoutPath), {
+		meta,
+		spec,
+		keycodes,
+		physicalKeys,
+		sourceRel
+	});
 	return { spec, ...generated };
 }
 

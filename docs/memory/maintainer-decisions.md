@@ -55,7 +55,8 @@ Layout > « Install the Ergopti system layout » (`layout_system_install`,
 UNSIGNED by decision (2026-11-06): the driver starts it through UAC only after a
 dialog that says so, and the row's label says it too. Its keyboard DLL is
 generated from the registry `.keylayout` (`codegen-windows-keyboard-layout.cjs`,
-kalamine's approach, no MSKLC) and built in CI
+written from kbd.h, no MSKLC; kalamine may be read for ideas, never copied)
+and built in CI
 (`docs/tooling/windows-keyboard-layout.md`). Action: a new layout feature lands
 on the three drivers or names its blocker in the row's reason; change the
 Windows layout through the `.keylayout` and its generator, never the DLL.

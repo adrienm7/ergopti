@@ -8,8 +8,8 @@ Compiles the Ergopti keyboard layout DLL from the generated sources
 tools/codegen/codegen-windows-keyboard-layout.cjs) for every architecture
 _shared/modules/layouts/windows_system_layout.json names, into
 static/ergopti_plus/windows/vendor/keyboard_layout/<build>/, where the driver's
-installer and the release package take them. Kalamine's approach without
-MSKLC: kbd.h comes from the Windows SDK and MSVC compiles and links.
+installer and the release package take them. No MSKLC: kbd.h comes from the
+Windows SDK and MSVC compiles and links.
 
 FEATURES & RATIONALE:
 1. One build per directory the installer copies from: amd64, arm64 and x86 go
