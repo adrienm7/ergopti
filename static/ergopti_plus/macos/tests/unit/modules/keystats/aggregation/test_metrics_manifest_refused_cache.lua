@@ -72,6 +72,7 @@ local function fixture()
 		return db
 	end
 	local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", { sqlite3 = sqlite })
+	reader.history_fingerprint_exact = true -- The fixture owns every row and mutation, so its fingerprint is exact.
 	local original_read = reader.read_manifest
 	reader.read_manifest = function(path, first, last, pacer)
 		local manifest, complete = original_read(path, first, last, pacer)
