@@ -1024,8 +1024,10 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 
 ; Derive only changed modeled leaves; untouched physical records stay owned
 ; by the captured document, including values unknown to this driver version.
-_TH_MutationRows(Before, After) {
-	Rows := []
+; A key that leaves the model goes as one table in Drops: deleting its leaves
+; one by one would keep its header as an empty table in the file.
+_TH_MutationRows(Before, After, &Drops := unset) {
+	Rows := [], Drops := []
 	AddFields(Old, New, Section) {
 		for Key, Value in New {
 			if !Old.Has(Key) || !TOML_SameValue(Old[Key], Value) {
@@ -1049,9 +1051,9 @@ _TH_MutationRows(Before, After) {
 	OldKeys := Before.Get("keys", Map()), NewKeys := After.Get("keys", Map())
 	for KeyId, Fields in NewKeys
 		AddFields(OldKeys.Get(KeyId, Map()), Fields, "tap_hold.keys." . TOML_RenderKey(KeyId))
-	for KeyId, Fields in OldKeys
+	for KeyId in OldKeys
 		if !NewKeys.Has(KeyId)
-			AddFields(Fields, Map(), "tap_hold.keys." . TOML_RenderKey(KeyId))
+			Drops.Push("tap_hold.keys." . TOML_RenderKey(KeyId))
 	return Rows
 }
 
@@ -1059,8 +1061,8 @@ _TH_BuildMutationContent(Source, Before, Defaults, Path, Data) {
 	if !_TH_DurationSourceMatches(Source, Path)
 		return false
 	if Source["source_present"] {
-		Image := _TH_BuildSemanticImage(Path, Source["source_content"], 1,
-			_TH_MutationRows(Before, Data), Defaults)
+		Rows := _TH_MutationRows(Before, Data, &Drops)
+		Image := _TH_BuildSemanticImage(Path, Source["source_content"], 1, Rows, Defaults, Drops)
 		Source["content"] := Image["content"]
 		; Publish the projection of these exact future bytes, with defaults, rather
 		; than the stale input RAM or the sparse user-only mutation model.
@@ -1606,11 +1608,11 @@ _TH_OwnedDocumentKeys(Document) {
 ; from the source at the current version, without config.toml first-use stamping
 ; or publication of a runtime cache. An edit that changes nothing in an absent
 ; file creates nothing.
-_TH_BuildSemanticImage(Path, Source, Present, Rows, Defaults) {
+_TH_BuildSemanticImage(Path, Source, Present, Rows, Defaults, Drops := unset) {
 	if TOML_WriteRefusal(Path) != ""
 		throw Error("The tap-hold source is read-only for this session.")
 	Migrated := TapHoldMigrateSource(Source, Defaults)
-	Admitted := TOML_BuildConfigDocumentCandidate(Migrated, Rows, [])
+	Admitted := TOML_BuildConfigDocumentCandidate(Migrated, Rows, IsSet(Drops) ? Drops : [])
 	if !Present && Admitted["content"] == Migrated
 		Admitted := Map("content", Source, "preserve_source", true)
 	else if !(Migrated == Source)
