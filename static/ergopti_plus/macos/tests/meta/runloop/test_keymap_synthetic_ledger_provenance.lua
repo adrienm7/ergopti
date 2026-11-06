@@ -184,8 +184,14 @@ end
 --- @param keymap string Comment-stripped keymap source.
 --- @return boolean valid
 local function selftest_sites_fail_closed(production, keymap)
-	local reads = count_literal(production, "provenance.selftest == true")
-	if reads ~= 3 or count_literal(keymap, "provenance.selftest == true") ~= reads then return false end
+	-- A retired keyDown callback (a refused native stop left the tap installed)
+	-- consumes every selftest key without consulting the gate.
+	local retired_site = "local consume = (provenance and (provenance.loopback or provenance.stale_loopback"
+		.. " or provenance.selftest == true))"
+	local retired = count_literal(keymap, retired_site)
+	if retired ~= 1 or count_literal(keymap, "return consume == true, fence_events") ~= 1 then return false end
+	local reads = count_literal(production, "provenance.selftest == true") - retired
+	if reads ~= 3 or count_literal(keymap, "provenance.selftest == true") - retired ~= reads then return false end
 	if count_literal(keymap, "SelftestGate.admits(provenance)") ~= reads then return false end
 	local consumed = count_literal(keymap, "if not SelftestGate.admits(provenance) then return true, fence_events end")
 		+ count_literal(keymap, "if not SelftestGate.admits(provenance) then\n\t\t\tHotPath.log_if_slow(\"keydown\", t0_hot)\n\t\t\treturn true\n")
