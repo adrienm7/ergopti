@@ -925,6 +925,11 @@ slot_conflict_notice_delay_ms = 300
 # HS: ui/healthcheck/probes.lua. Linux: ui/healthcheck/probes.lua.
 healthcheck_probe_yield_ms = 1
 
+# macOS: the run-loop yield between two hotstring categories whose metadata is
+# read after the boot, so the first preview of a category reads memory rather
+# than its TOML on the keystroke. HS: modules/hotstrings/hotstrings_config.lua.
+hotstring_meta_prewarm_step_ms = 1
+
 # Page scripts cannot read the registry; their copies are pinned to these keys by
 # tools/test/test-keystats-timings-single-source.cjs.
 # Delay before a field of the hotstring editor takes the focus after its dialog

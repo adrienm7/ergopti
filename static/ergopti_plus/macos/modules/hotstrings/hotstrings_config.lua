@@ -971,6 +971,63 @@ function M.resolve(category, section)
 	return resolved
 end
 
+--- Reads the TOML metadata of each category into the memo resolve() reads,
+--- one category per run-loop turn. Filled on first use, the memo cost the
+--- first preview of each category its TOML read on the keystroke: four of the
+--- seven preview.rebuild lines over budget in the 2026-11-06 field report.
+--- The memo keeps its contract: it lives in _state, and a reload re-inits it.
+--- @param categories table Array of category names, as the registry names them.
+--- @return boolean committed True when the first turn was scheduled.
+function M.prewarm_meta(categories)
+	if not require_state("prewarm_meta") then return false end
+	if type(categories) ~= "table" then
+		Logger.error(LOG, "prewarm_meta(): categories must be an array.")
+		return false
+	end
+	local queue = {}
+	for _, category in ipairs(categories) do
+		if type(category) == "string" and category ~= "" then queue[#queue + 1] = category end
+	end
+	local state, index, read = _state, 0, 0
+	local DeferredWork = require("infra.deferred_work")
+	local delay = require("infra.timings").sec("ui", "hotstring_meta_prewarm_step_ms")
+	local step
+	step = function()
+		-- A re-init owns a new memo: this queue warms nothing of it
+		if _state ~= state then return end
+		index = index + 1
+		local category = queue[index]
+		if category == nil then
+			Logger.success(LOG, "Category metadata prewarmed: %d file(s) read for %d category(ies).", read, #queue)
+			return
+		end
+		local extension_id = Extensions.parse_category_key(category)
+		if extension_id then
+			local ok_path, pack_path = pcall(state.toml_resolver, category)
+			if ok_path and type(pack_path) == "string" and pack_path ~= "" and not state.toml_cache["ext:" .. pack_path] then
+				M.resolve_ext(extension_id, pack_path, nil)
+				read = read + 1
+			end
+		else
+			local canonical = PersonalFiles.components(category) and category or ConfigSchema.normalize_category(category)
+			if canonical and not state.toml_cache[canonical] then
+				get_toml_meta(canonical)
+				read = read + 1
+			end
+		end
+		if DeferredWork.after(delay, step, "hotstrings_config.prewarm_meta") ~= true then
+			Logger.error(LOG, "Category metadata prewarm stopped after %d of %d category(ies): the next turn was refused.",
+				index, #queue)
+		end
+	end
+	Logger.start(LOG, "Prewarming the metadata of %d hotstring category(ies)…", #queue)
+	if DeferredWork.after(delay, step, "hotstrings_config.prewarm_meta") ~= true then
+		Logger.error(LOG, "Category metadata prewarm refused: its first turn could not be scheduled.")
+		return false
+	end
+	return true
+end
+
 --- Resolves the effective delay and color for an extension hotstring file.
 --- Mirrors HotstringsResolveExt() on the AHK side.
 --- @param ext_id string Extension identifier (e.g. "ergopti-demo").
