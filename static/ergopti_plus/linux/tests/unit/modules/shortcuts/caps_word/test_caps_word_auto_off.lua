@@ -691,6 +691,21 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 		end)
 	end)
 
+	helpers.it("caps word auto-off, a changed absolute coordinate is a motion; the metrics ignore it (CWL-001)", function()
+		with_caps_word('[shortcuts.caps_word.pointer]\npointer_motion = false\n', function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_eq(c.manager.caps_word_observe_pointer_event("absolute_motion", 0x00), false,
+				"an unchecked motion keeps CapsWord on")
+			helpers.assert_true(c.manager.is_caps_word_active())
+		end)
+		with_caps_word('[shortcuts.caps_word.pointer]\npointer_motion = true\ngesture = false\n', function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_eq(c.manager.caps_word_observe_pointer_event("absolute_motion", 0x00), true)
+			helpers.assert_eq(c.manager.is_caps_word_active(), false)
+		end)
+		helpers.assert_contains(source("ergopti_hotstrings.lua"), 'if kind_of_event ~= "absolute_motion" then keystats.record_pointer')
+	end)
+
 	helpers.it("caps word auto-off, the daemon's main() stays within LuaJIT's 60 upvalues", function()
 		-- The pointer-kind table once captured by main() pushed it to 61: CI's
 		-- LuaJIT refused to compile the daemon at all. test_parse_coverage owns

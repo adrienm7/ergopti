@@ -282,6 +282,7 @@ return {
 	"tests.unit.infra.lifecycle.test_installation",
 	"tests.unit.infra.i18n.test_locale_path_layouts",
 	"tests.unit.infra.lifecycle.test_input_event_codec",
+	"tests.unit.infra.lifecycle.test_absolute_motion",
 	"tests.unit.infra.config.test_logs_dir",
 	"tests.unit.infra.config.test_legacy_folder_migration",
 	"tests.unit.infra.config.test_script_config_authority",

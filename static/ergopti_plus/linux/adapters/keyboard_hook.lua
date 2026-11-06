@@ -288,7 +288,11 @@ local _on_click = nil
 -- Called with ("press", code) for every press of an observed pointer and with
 -- ("motion", axis) for every EV_REL report (a movement or a wheel turn), if
 -- the caller asked for it: CapsWord ends on the pointer kinds it names.
+-- Also called with ("absolute_motion", axis) when a touchpad or tablet reports a
+-- coordinate that changed from the previous one of its contact.
 local _on_pointer_event = nil
+-- Previous coordinates of the absolute pointers, per reader slot.
+local _absolute_motion = require("infra.absolute_motion").new()
 
 -- Set while XKB cannot tell the keys' roles or capture them, so that is
 -- logged once and not at every key event; the next press XKB answers in full
@@ -2793,10 +2797,18 @@ local function _dispatch_pointer(ev, slot)
 		LayerPointer.sync()
 	end
 	if not _running or _capture_session ~= session then return end
+	if ev.type == EVDEV_TYPE_KEY and ev.code == InputEvent.BTN_TOUCH and ev.value == InputEvent.VALUE_UP
+		and slot ~= nil then
+		_absolute_motion.lift(slot)
+	end
 	if _on_pointer_event then
 		-- The value and the frame's SYN_REPORT let the metrics measure a movement.
 		if ev.type == InputEvent.EV_REL then
 			_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code, ev.value, slot)
+		elseif ev.type == InputEvent.EV_ABS then
+			if slot ~= nil and _absolute_motion.observe(slot, ev.code, ev.value) then
+				_call_callback("pointer event callback", _on_pointer_event, "absolute_motion", ev.code, ev.value, slot)
+			end
 		elseif pointer_key and ev.value == InputEvent.VALUE_DOWN then
 			_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)
 		elseif ev.type == InputEvent.EV_SYN then
@@ -3609,6 +3621,7 @@ local function _retire_source_transaction(tx, reason)
 		if _capture_session == tx.session then
 			_running, _reacquiring, _capture_session = false, false, nil
 			_devices, _pointer_devices, _device = {}, {}, nil
+			_absolute_motion.reset()
 			_armed_input, _live_input_context = nil, nil
 			_origin_ready = false
 		end
