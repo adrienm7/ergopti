@@ -361,6 +361,7 @@ M.COMMAND = strict("COMMAND", {
 	ABOUT_CHANGELOG = "about_changelog",
 	ABOUT_RELEASES_PAGE = "about_releases_page",
 	ABOUT_SOURCE_CHECK = "about_source_check",
+	ACCENTED_LETTER_OFF = "accented_letter_off",
 	AGENT_DISABLED_APPS = "agent_disabled_apps",
 	AGENT_DISABLED_APP_ADD = "agent_disabled_app_add",
 	AGENT_DISABLED_APP_CURRENT = "agent_disabled_app_current",

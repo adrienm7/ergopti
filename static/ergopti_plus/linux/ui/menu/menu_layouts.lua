@@ -324,17 +324,21 @@ local function _build_layouts(ctx)
 		local items = {}
 		for _, id in ipairs(Accented.IDS) do
 			local entry = settings[id]
-			local letters = { { label = i18n_safe("common.disabled"), checked = not entry.enabled,
-				action = function() choose(id, nil) end }, { separator = true } }
+			local choices = {}
 			for code = string.byte("a"), string.byte("z") do
 				local letter = string.char(code)
-				letters[#letters + 1] = { label = letter:upper(), checked = entry.enabled and entry.letter == letter,
+				choices[#choices + 1] = { label = letter:upper(), checked = entry.enabled and entry.letter == letter,
 					action = function() choose(id, letter) end }
 			end
+			local letters = ManifestMenu.template_rows("accented_letter_picker_frame", {
+				[require("config_keys").COMMAND.ACCENTED_LETTER_OFF] = function() choose(id, nil) end,
+			}, {
+				["accented_letter_off_checked"] = function() return not entry.enabled end,
+			}, { ["accented_letter_choices"] = function() return choices end }) or {}
 			-- The Windows title: « Tous les raccourcis sur la touche É correspondent
 			-- à ceux de » and the current letter (GetMenuTitleByPath).
-			local title = i18n_safe("shortcuts." .. id:gsub("_", "")) .. entry.letter:upper()
-			items[#items + 1] = { label = title, checked = entry.enabled, items = letters }
+			local caption = i18n_safe("shortcuts." .. id:gsub("_", "")) .. entry.letter:upper()
+			items[#items + 1] = { label = caption, checked = entry.enabled, items = letters }
 		end
 		return { items = items }
 	end

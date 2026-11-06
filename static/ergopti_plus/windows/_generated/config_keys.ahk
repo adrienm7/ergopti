@@ -345,6 +345,7 @@ class MenuCommand {
 	static ABOUT_CHANGELOG := "about_changelog"
 	static ABOUT_RELEASES_PAGE := "about_releases_page"
 	static ABOUT_SOURCE_CHECK := "about_source_check"
+	static ACCENTED_LETTER_OFF := "accented_letter_off"
 	static AGENT_DISABLED_APPS := "agent_disabled_apps"
 	static AGENT_DISABLED_APP_ADD := "agent_disabled_app_add"
 	static AGENT_DISABLED_APP_CURRENT := "agent_disabled_app_current"

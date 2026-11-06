@@ -5092,6 +5092,50 @@
 									]
 								},
 								{
+									"path": "shortcuts.a_grave.enabled",
+									"value": true,
+									"default": false,
+									"recommended": true,
+									"label": [
+										{
+											"key": "shortcuts.agrave"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.e_acute.enabled",
+									"value": true,
+									"default": false,
+									"recommended": true,
+									"label": [
+										{
+											"key": "shortcuts.eacute"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.e_circ.enabled",
+									"value": true,
+									"default": false,
+									"recommended": true,
+									"label": [
+										{
+											"key": "shortcuts.ecirc"
+										}
+									]
+								},
+								{
+									"path": "shortcuts.e_grave.enabled",
+									"value": true,
+									"default": false,
+									"recommended": true,
+									"label": [
+										{
+											"key": "shortcuts.egrave"
+										}
+									]
+								},
+								{
 									"path": "shortcuts.key_combination_taps.alt_gr_then_left_alt",
 									"value": "ctrl_backspace",
 									"default": "none",

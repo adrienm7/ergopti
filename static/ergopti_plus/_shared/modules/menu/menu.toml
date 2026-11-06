@@ -4876,6 +4876,21 @@ type = "---"
 type = "list"
 id = "layout_picker_choices"
 
+# One accented-letter shortcut's picker (Linux; Windows draws its own letter
+# picker): off, then the 26 target letters the driver lists.
+[[menu.accented_letter_picker_frame]]
+type = "check"
+id = "accented_letter_off"
+i18n = "common.disabled"
+checked_when = ["accented_letter_off_checked"]
+
+[[menu.accented_letter_picker_frame]]
+type = "---"
+
+[[menu.accented_letter_picker_frame]]
+type = "list"
+id = "accented_letter_choices"
+
 # Complete macOS Layout frames; native providers supply exact records and callbacks.
 # Native record captions are literal data, never placeholder translation identities.
 
