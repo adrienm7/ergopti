@@ -93,6 +93,10 @@ local _copy_recovery_only = false
 local _copy_capture_timer = nil
 local _copy_restore_retry_timer = nil
 local _copy_dispatch = nil
+-- Native clipboard generation observed when the copied selection was read.
+-- From then on the snapshot may only be restored over that same generation: a
+-- later user or application copy owns the clipboard and revokes the snapshot.
+local _copy_result_receipt = nil
 
 -- App navigation owns two kinds of asynchronous native capabilities: deferred
 -- timers and ShellRunner processes.  Each parent scope has one admission
@@ -464,6 +468,7 @@ local function release_copy_capture(generation)
 	_copy_capture_scope = nil
 	_copy_capture_apps_generation = nil
 	_copy_recovery_only = false
+	_copy_result_receipt = nil
 	_copy_capture_generation = _copy_capture_generation + 1
 	return true
 end
@@ -481,7 +486,37 @@ local function restore_copy_capture(prior, generation)
 		if generation ~= _copy_capture_generation then return true, nil end
 	end
 	local ok_restore, restore_result
-	if type(prior) == "table" and next(prior) ~= nil then
+	local receipt = _copy_result_receipt
+	if receipt ~= nil then
+		-- A missing observation cannot be replaced by a later count: that would
+		-- adopt an unrelated writer's clipboard generation.
+		if receipt.expected_count == nil then
+			_copy_recovery_only = true
+			return false, "copy result ownership count is unavailable"
+		end
+		local expected = receipt.expected_count
+		local function revoke_snapshot()
+			Logger.info(LOG, "copy_or_open_path clipboard ownership changed; revoking the old snapshot without restoration.")
+			release_copy_capture(generation)
+			return true, nil
+		end
+		local current_count, count_error = Clipboard._change_count()
+		if current_count == nil then
+			_copy_recovery_only = true
+			return false, count_error
+		end
+		if current_count ~= expected then return revoke_snapshot() end
+		-- The adapter rechecks immediately before mutation and captures the
+		-- resulting count before any logger callback can change the clipboard.
+		ok_restore = Clipboard.restore(next(prior or {}) ~= nil and prior or nil, receipt)
+		if receipt.count_ok == true and receipt.attempted == false and receipt.count ~= expected then
+			return revoke_snapshot()
+		end
+		if receipt.attempted == true and receipt.count_ok == true then receipt.expected_count = receipt.count end
+		restore_result = receipt.detail or "copy clipboard restoration refused"
+	elseif type(prior) == "table" and next(prior) ~= nil then
+		-- Before the selection is read, the writer of the asynchronous Cmd+C is
+		-- unknown, so the native generation cannot identify the owner yet.
 		ok_restore, restore_result = pcall(pasteboard.writeAllData, prior)
 		ok_restore = ok_restore and restore_result == true
 	else
@@ -564,6 +599,21 @@ abort_copy_capture = function(prior, generation, reason, detail)
 	end
 	Logger.error(LOG, "copy_or_open_path %s — %s (restore=%s).",
 		reason, tostring(detail), tostring(restore_error))
+end
+
+--- Reads the copied selection and records the native generation it was read
+--- at, so the snapshot is only ever restored over that same generation.
+--- @return boolean ok
+--- @return string|nil selection
+local function read_copied_selection()
+	local count_before = Clipboard._change_count()
+	local ok_sel, sel = pcall(pasteboard.getContents)
+	local count_after = Clipboard._change_count()
+	_copy_result_receipt = { expected_count = count_after ~= nil and count_before or nil }
+	if count_before == nil or count_after == nil then
+		Logger.error(LOG, "copy_or_open_path clipboard generation is unavailable; the snapshot is retained.")
+	end
+	return ok_sel, sel
 end
 
 --- Retains admission before Cmd+C, then measures its settle interval from native handoff.
@@ -919,7 +969,7 @@ function M.copy_or_open_path(parent)
 				if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
 					return
 				end
-				local ok_sel, sel = pcall(pasteboard.getContents)
+				local ok_sel, sel = read_copied_selection()
 				if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
 					return
 				end
@@ -967,7 +1017,7 @@ function M.copy_or_open_path(parent)
 		if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
 			return
 		end
-		local ok_sel, sel = pcall(pasteboard.getContents)
+		local ok_sel, sel = read_copied_selection()
 		if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
 			return
 		end

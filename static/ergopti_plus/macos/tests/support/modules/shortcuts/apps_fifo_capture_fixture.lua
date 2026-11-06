@@ -53,7 +53,16 @@ function M.with_world(options, callback)
 				return board
 			end,
 			clearContents = function() board = {}; generation = generation + 1 end,
-			getContents = function() reads = reads + 1; return board['public.utf8-plain-text'] end,
+			getContents = function()
+				reads = reads + 1
+				local text = board['public.utf8-plain-text']
+				if options.copy_during_read then
+					-- Another application copies while the selection is being read
+					board = { ['public.utf8-plain-text'] = 'COPY DURING READ' }
+					generation = generation + 1
+				end
+				return text
+			end,
 			writeAllData = function(saved)
 				restores = restores + 1
 				if restores <= refusal_count then return false end
@@ -111,6 +120,8 @@ function M.with_world(options, callback)
 		end
 		local world = { apps=apps, synthetic=syn, original=original, events=events, fixture=f,
 			advance=advance, clipboard=function() return board end,
+			-- An independent user or application copy, outside the Apps owner
+			user_copy=function(data) board = data; generation = generation + 1 end,
 			counts=function() return copies, restores, #urls, reads end }
 		local outcome=table.pack(xpcall(function() return callback(world) end, debug.traceback))
 		apps.stop_apps_actions()
