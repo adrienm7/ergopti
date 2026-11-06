@@ -32,7 +32,8 @@ helpers.describe("onboarding locale persistence is a required commit boundary", 
 	helpers.it("stops every success-only side effect on false, nil, and throw", function()
 		for _, mode in ipairs({ "false", "nil", "throw" }) do
 			with_finish({ answers = ANSWERS, locale = mode }, function(state)
-				helpers.assert_eq(state.locale_switches, 1)
+				-- The refused language is taken back in memory too.
+				helpers.assert_eq(table.concat(state.switched_locales, ","), "de,en")
 				helpers.assert_eq(state.locale_persists, 1)
 				helpers.assert_eq(#state.writes, 0,
 					mode .. " persistence must stop config publication")

@@ -121,13 +121,14 @@ helpers.describe("the wizard's Tap-Holds answer imports the checked keys", funct
 	end)
 
 	helpers.it("does not write to the old folder when resolving the selected folder fails", function()
-		local persisted = 0
+		local persisted = {}
 		local menu_paths = {
-			persist_config_dir_for_wizard = function() persisted = persisted + 1; return true end,
+			persist_config_dir_for_wizard = function(dir) persisted[#persisted + 1] = dir; return true end,
 			get = function() error("path unavailable") end,
 		}
 		with_finish({ answers = answers({ tab = true }, "/virtual/moved"), menu_paths = menu_paths }, function(state)
-			helpers.assert_eq(persisted, 1)
+			helpers.assert_eq(table.concat(persisted, ","), "/virtual/moved," .. Fixture.CONFIG_DIR,
+				"the refused Finish puts the previous folder back")
 			helpers.assert_eq(#state.writes, 0, "an unknown destination cannot reuse the old config path")
 			helpers.assert_eq(#state.saves, 0)
 			helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 0)
@@ -136,8 +137,13 @@ helpers.describe("the wizard's Tap-Holds answer imports the checked keys", funct
 
 	helpers.it("refuses an empty-folder retry until the destination is selected again", function()
 		local calls = 0
+		local persists = 0
 		local menu_paths = {
-			persist_config_dir_for_wizard = function() return true end,
+			-- The previous folder cannot be put back: the selection stays unresolved.
+			persist_config_dir_for_wizard = function()
+				persists = persists + 1
+				return persists ~= 2
+			end,
 			get = function()
 				calls = calls + 1
 				if calls == 1 then error("temporarily unavailable") end

@@ -29,6 +29,7 @@ local function with_window(module_name, callback)
 			package.loaded["infra.paths"] = { shared = function(relative) return "/virtual/" .. relative end }
 			package.loaded["infra.i18n"] = {
 				get = function(key) return key end,
+				get_locale = function() return "en" end,
 				set_locale_no_reload = function() return true end,
 				persist_locale = function() return false end,
 			}

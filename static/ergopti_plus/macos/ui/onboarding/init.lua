@@ -718,18 +718,61 @@ local function commit_owned(answers, publication)
 	-- empty / unchanged path is a no-op (menu_paths handles the
 	-- "drop the override" case internally).
 	local previous_config_path = _config_path
+	local previous_unresolved = _config_path_unresolved
+	local previous_locale = i18n.get_locale()
+	-- The folder and the language are published before the destination is
+	-- versioned and the answers written. A refused Finish takes both back, so
+	-- later saves never target a folder whose answers were not written.
+	local published_dir, previous_dir, menu_paths = nil, nil, nil
+	local locale_switched, locale_published = false, false
+	local function restore_previous_choices()
+		local restored = true
+		if locale_switched and i18n.get_locale() == answers.locale then
+			if locale_published then
+				local ok, persisted = pcall(i18n.persist_locale, previous_locale)
+				if not ok or persisted ~= true then
+					restored = false
+					Logger.error(LOG, "The previous language could not be saved again: %s.", tostring(persisted))
+				end
+			end
+			i18n.set_locale_no_reload(previous_locale)
+		end
+		if published_dir ~= nil then
+			local ConfigPaths = require("infra.config_paths")
+			if ConfigPaths.get_config_dir() ~= published_dir then
+				-- Something else chose a folder since: that newer choice stands.
+				Logger.warn(LOG, "The configuration folder changed during Finish; it is kept.")
+			else
+				local persisted, persist_err = M._persist_config_dir(menu_paths, previous_dir)
+				if not persisted then
+					restored = false
+					Logger.error(LOG, "The previous configuration folder could not be restored: %s.",
+						tostring(persist_err))
+				end
+			end
+		end
+		if restored then
+			_config_path = previous_config_path
+			_config_path_unresolved = previous_unresolved
+			Logger.info(LOG, "The refused Finish left the previous folder and language in force.")
+		end
+	end
+	local function fail_published(title_key, body)
+		restore_previous_choices()
+		fail_commit(title_key, body)
+	end
 	if answers.config_dir ~= "" then
 		_config_path_unresolved = true
-		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
-		local persisted, persist_err = M._persist_config_dir(
-			ok_mp and menu_paths or nil,
-			answers.config_dir
-		)
+		local ok_mp, loaded_menu_paths = pcall(require, "ui.menu.menu_paths")
+		menu_paths = ok_mp and loaded_menu_paths or nil
+		previous_dir = require("infra.config_paths").get_config_dir()
+		local persisted, persist_err = M._persist_config_dir(menu_paths, answers.config_dir)
 		if not persisted then
 			Logger.error(LOG, "Failed to persist config dir override: %s.", tostring(persist_err))
 			fail_commit("paths_editor.save_failed_title", i18n.get("paths_editor.save_failed"))
 			return
 		end
+		published_dir = require("infra.config_paths").get_config_dir()
 		-- _config_path was captured in M.run() from the config dir as it stood
 		-- BEFORE the wizard ran; persistence above moved the resolver. Writing
 		-- through the stale path would leave the NEW directory without config.toml,
@@ -737,7 +780,7 @@ local function commit_owned(answers, publication)
 		local resolved_path = M._resolve_commit_path(menu_paths, _config_path)
 		if not resolved_path then
 			Logger.error(LOG, "The selected configuration path could not be resolved; onboarding answers were not written.")
-			fail_commit("paths_editor.save_failed_title", i18n.get("paths_editor.save_failed"))
+			fail_published("paths_editor.save_failed_title", i18n.get("paths_editor.save_failed"))
 			return
 		end
 		_config_path = resolved_path
@@ -752,15 +795,18 @@ local function commit_owned(answers, publication)
 	-- AND persist it to hs.settings so it survives the reload below (the in-memory
 	-- set_locale_no_reload alone is wiped by the reload — that lost the language too).
 	i18n.set_locale_no_reload(answers.locale)
+	locale_switched = answers.locale ~= previous_locale
 	local locale_ok, locale_persisted = xpcall(function()
 		return i18n.persist_locale(answers.locale)
 	end, debug.traceback)
 	if not locale_ok or locale_persisted ~= true then
 		Logger.error(LOG, "commit: locale persistence failed — %s.",
 			tostring(locale_persisted))
-		fail_commit("onboarding.error.title", i18n.get("onboarding.error.locale_persist_failed"))
+		-- The refused language transaction rolled its own storage back.
+		fail_published("onboarding.error.title", i18n.get("onboarding.error.locale_persist_failed"))
 		return
 	end
+	locale_published = locale_switched
 
 	local committed, err = Answers.commit({
 		index      = index,
@@ -772,7 +818,7 @@ local function commit_owned(answers, publication)
 	})
 	if not committed then
 		Logger.error(LOG, "commit: the configuration batch failed — %s.", tostring(err))
-		fail_commit("onboarding.error.title", i18n.get("onboarding.error.write_failed") .. "\n\n" .. tostring(err))
+		fail_published("onboarding.error.title", i18n.get("onboarding.error.write_failed") .. "\n\n" .. tostring(err))
 		return
 	end
 
