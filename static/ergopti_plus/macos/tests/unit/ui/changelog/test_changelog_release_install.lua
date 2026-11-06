@@ -26,7 +26,8 @@ local function releases()
 end
 
 --- Stubbed owners recording every effect in order.
---- @param opts table { source, asset = false, stage = { path, stage }, armed = false, restore }
+--- @param opts table { source, asset = false, stage = { path, stage }, armed = false, restore,
+---   reload = false | "throw" }
 --- @return table deps, table events
 local function owners(opts)
 	opts = opts or {}
@@ -78,7 +79,12 @@ local function owners(opts)
 		},
 		coordinator = {
 			request_user_exit = function(reason) event("exit:" .. reason); return true end,
-			request_reload = function(reason) event("reload:" .. reason); return true end,
+			request_reload_owned = function(reason, on_aborted)
+				event("reload:" .. reason)
+				opts.reload_aborted = on_aborted
+				if opts.reload == "throw" then error("reload raised") end
+				return opts.reload ~= false
+			end,
 		},
 	}
 	return deps, events
@@ -277,6 +283,45 @@ helpers.describe("Changelog one-click release install (macOS)", function()
 			open_listed(changelog, state, post, deps)
 			post({ action = "restore_backup", id = "pre-install-x" })
 			helpers.assert_eq(table.concat(events, ","), "restore:pre-install-x")
+		end)
+	end)
+	--- The restore phases the page received, in order.
+	local function restore_phases(state)
+		local phases = {}
+		for _, code in ipairs(state.evaluations) do
+			if code:find("setRestoreProgress(", 1, true) then
+				phases[#phases + 1] = code:match('"phase":"([%a_]+)"')
+			end
+		end
+		return table.concat(phases, ",")
+	end
+
+	-- (restore-reload-refused) The disk was restored but the handoff failed: the
+	-- page must not keep promising a restart (macOS MC-002).
+	for _, mode in ipairs({ false, "throw" }) do
+		helpers.it("reports a refused restore reload as failed (" .. tostring(mode) .. ")", function()
+			with_changelog(function(changelog, state, post)
+				local deps = owners({ reload = mode })
+				open_listed(changelog, state, post, deps)
+				post({ action = "restore_backup", id = "pre-install-x" })
+				helpers.assert_eq(restore_phases(state), "restoring,failed")
+				local last = state.evaluations[#state.evaluations]
+				helpers.assert_true(last:find("restore_error_unexpected", 1, true) ~= nil, last)
+				helpers.assert_true(last:find("pre-restore-y", 1, true) ~= nil, "names the pre-restore copy")
+			end)
+		end)
+	end
+
+	helpers.it("reports a restore reload aborted after acceptance (restore-reload-refused)", function()
+		with_changelog(function(changelog, state, post)
+			local opts = {}
+			local deps = owners(opts)
+			open_listed(changelog, state, post, deps)
+			post({ action = "restore_backup", id = "pre-install-x" })
+			helpers.assert_eq(restore_phases(state), "restoring,restored")
+			helpers.assert_eq(type(opts.reload_aborted), "function", "the reload is owned")
+			opts.reload_aborted("fence refused")
+			helpers.assert_eq(restore_phases(state), "restoring,restored,failed")
 		end)
 	end)
 end)

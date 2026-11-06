@@ -610,11 +610,21 @@ local function restore_from_page(id)
 				or "changelog_window.restore_error_unexpected" })
 		return
 	end
-	answer({ phase = "restored", backup_path = pre and pre.path or nil })
-	local ok, accepted = pcall(deps().coordinator.request_reload, "config_restore")
-	if not ok or accepted ~= true then
-		Logger.error(LOG, "The configuration is restored but the reload was refused: %s.", tostring(accepted))
+	local backup_path = pre and pre.path or nil
+	-- The disk is restored either way; only an accepted, still-live handoff may
+	-- promise a restart. A refusal or a later abort leaves the old runtime up, so
+	-- the page reports the failure with the pre-restore copy, as on Windows.
+	local function reload_refused(detail)
+		Logger.error(LOG, "The configuration is restored but the reload was refused: %s.", tostring(detail))
+		answer({ phase = "failed", backup_path = backup_path,
+			reason_key = "changelog_window.restore_error_unexpected" })
 	end
+	local ok, accepted = pcall(deps().coordinator.request_reload_owned, "config_restore", reload_refused)
+	if not ok or accepted ~= true then
+		reload_refused(accepted)
+		return
+	end
+	answer({ phase = "restored", backup_path = backup_path })
 end
 
 -- The page's reason when the launcher did not take the hand-off.
