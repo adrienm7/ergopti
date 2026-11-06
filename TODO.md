@@ -213,15 +213,15 @@ Evidence: [six-scope recovery/lifecycle audit](docs/audits/platform-parity/2026-
 
 ### Windows
 
-- [ ] **[CODE] WFM-001:** Independent migration moves and locator publication can select an empty configuration after a refusal. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/windows-migration/report.md).
+- [x] **[CODE] WFM-001:** Independent migration moves and locator publication can select an empty configuration after a refusal. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/windows-migration/report.md). A refused move keeps its key; paths.toml is staged and replaced atomically, a same-text backup is reused, and the configuration moves back when the file cannot follow.
 - [ ] **[CODE] WFM-002:** Moving a legacy ancestor leaves a selected custom descendant pointing to its removed path. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/windows-migration/report.md).
 - [ ] **[CODE] WFM-003:** Valid quoted TOML locator keys are missed by the migration rewriter after data moves. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/windows-migration/report.md).
 - [ ] **[CODE] WFM-004:** Migrating only the locator hides the old configuration-transition recovery journal. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/windows-migration/report.md).
 
 ### macOS
 
-- [ ] **[CODE] MFM-001:** Refused bootstrap rewrite leaves a backup that blocks automatic restart recovery. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md).
-- [ ] **[CODE] MFM-002:** Refused configuration move still publishes a locator to the absent new folder. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md).
+- [x] **[CODE] MFM-001:** Refused bootstrap rewrite leaves a backup that blocks automatic restart recovery. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md). paths.toml is staged and replaced atomically, a same-text backup is reused on retry, and the configuration moves back when the file cannot follow.
+- [x] **[CODE] MFM-002:** Refused configuration move still publishes a locator to the absent new folder. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md). A key is rewritten only when the report shows its old folder left.
 - [ ] **[CODE] MFM-003:** Valid explicit configuration locators become dangling after their containing folder migrates. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md).
 - [x] **[CODE] MFM-004:** Destination check followed by POSIX rename can overwrite a newer concurrently published file. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md). Native rename never replaces (mkdir reservation or hard link); a late arrival sends the old entry to its backup.
 - [x] **[CODE] MFM-005:** Native directory listing refusal escapes migration and aborts driver initialization. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md). The native list catches fs.dir's raise; the core reports an unlistable folder as kept (list_failed).

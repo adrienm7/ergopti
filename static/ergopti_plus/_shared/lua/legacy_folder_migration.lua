@@ -25,12 +25,19 @@
 --- 3. Backup Before Rewrite: paths.toml is the one file whose TEXT changes (a
 ---    ConfigDirPath or LogsDirPath that named an old default folder). Its
 ---    previous text is written beside it under the backup suffix first, and an
----    existing backup is never replaced.
---- 4. Minimal by Decision: no build was ever published to users with the old
+---    existing backup is never replaced (one holding the same text, left by an
+---    interrupted boot, is reused). The new text is staged and renamed over the
+---    file, so a refused write never truncates it.
+--- 4. Locator Follows Receipts: a key is rewritten only when its old folder
+---    actually left (a refused move keeps the old folder, which the file still
+---    names). When the new text cannot be published, the configuration folder
+---    moves back to the folder the file still names, so boot never selects an
+---    empty folder while the user's one sits elsewhere.
+--- 5. Minimal by Decision: no build was ever published to users with the old
 ---    folders (project memory, 2026-09-23), so only the maintainer's machines
 ---    have them. The migration covers the folders those machines hold and is
 ---    meant to be deleted once they are moved; it is not a compatibility layer.
---- 5. Deferred Logging: the drivers run it before their logger opens its folder
+--- 6. Deferred Logging: the drivers run it before their logger opens its folder
 ---    (the logs folder is one of the moved entries), so the result is a report
 ---    the driver logs once its logger is ready.
 ---
@@ -278,22 +285,107 @@ function M.rewrite_paths_text(text, rewrites)
 	return changed and out or nil
 end
 
---- Rewrites paths.toml in place, keeping its previous text as a backup first.
+--- The suffix of the private stage files the publication writes and renames.
+local STAGE_SUFFIX = ".migration-stage"
+
+--- Rewrites paths.toml, keeping its previous text as a backup first.
+---
+--- Both files are written to a stage beside them and renamed into place: the
+--- backup with the no-replace rename, the file itself with an atomic replace,
+--- so a refused or partial write leaves paths.toml exactly as it was. An
+--- existing backup holding the current text (an earlier boot stopped after
+--- writing it) is reused; one holding other text is never replaced.
 --- @param path string paths.toml.
 --- @param rewrites table See rewrite_paths_text.
 --- @param backup_suffix string Suffix of the backup file.
---- @param ports table read(path) -> text|nil, exists(path), write(path, text) -> bool.
---- @return string outcome "absent", "unchanged", "rewritten" or "backup_refused".
+--- @param ports table exists, read(path) -> text|nil, write(path, text) -> bool,
+---   rename (never replacing), replace(from, to) -> bool (atomic), remove(path).
+--- @return string outcome "absent", "unchanged", "rewritten", or the refusal
+---   "read_failed", "backup_taken", "backup_refused" or "write_refused".
 function M.rewrite_paths_file(path, rewrites, backup_suffix, ports)
 	if not ports.exists(path) then return "absent" end
 	local text = ports.read(path)
-	if type(text) ~= "string" then return "backup_refused" end
+	if type(text) ~= "string" then return "read_failed" end
 	local rewritten = M.rewrite_paths_text(text, rewrites)
 	if not rewritten then return "unchanged" end
 	local backup = path .. backup_suffix
-	if ports.exists(backup) or not ports.write(backup, text) then return "backup_refused" end
-	if not ports.write(path, rewritten) then return "backup_refused" end
+	if ports.exists(backup) then
+		if ports.read(backup) ~= text then return "backup_taken" end
+	else
+		-- The stage names are written by this migration alone.
+		local stage = backup .. STAGE_SUFFIX
+		ports.remove(stage)
+		if not (ports.write(stage, text) and ports.rename(stage, backup)) then
+			ports.remove(stage)
+			return "backup_refused"
+		end
+	end
+	local stage = path .. STAGE_SUFFIX
+	ports.remove(stage)
+	if not (ports.write(stage, rewritten) and ports.replace(stage, path)) then
+		ports.remove(stage)
+		return "write_refused"
+	end
 	return "rewritten"
+end
+
+--- The outcome a report records for one old folder.
+--- @param report table Report from apply.
+--- @param source string Absolute old folder.
+--- @return string|nil kind "moved", "backed_up" or "kept".
+--- @return table|nil entry The report row.
+local function outcome_of(report, source)
+	for _, kind in ipairs({ "moved", "backed_up", "kept" }) do
+		for _, entry in ipairs(report[kind]) do
+			if same_folder(entry.from, source) then return kind, entry end
+		end
+	end
+	return nil
+end
+
+--- Keeps the rewrites whose old folder did not stay where it was.
+---
+--- A rule without a `source` is kept as it is. A rule whose source was kept
+--- (its move was refused, or a backup slot was taken) is dropped: the old
+--- folder still holds the data the file names.
+--- @param rules table Array of { key, old, new, source }.
+--- @param report table Report from apply.
+--- @return table rewrites For rewrite_paths_text.
+function M.settle_rewrites(rules, report)
+	local settled = {}
+	for _, rule in ipairs(rules) do
+		if not (rule.source and outcome_of(report, rule.source) == "kept") then settled[#settled + 1] = rule end
+	end
+	return settled
+end
+
+--- Outcomes of rewrite_paths_file after which paths.toml still names old folders.
+local REFUSED = { read_failed = true, backup_taken = true, backup_refused = true, write_refused = true }
+
+--- Rewrites paths.toml from what moved, and when it cannot, moves each
+--- `restorable` folder back to the old path the file still names.
+--- @param path string paths.toml.
+--- @param rules table Array of { key, old, new, source, restorable }.
+--- @param backup_suffix string Suffix of the backup file.
+--- @param report table Report from apply; receives paths_file and restored rows.
+--- @param ports table The ports of apply and rewrite_paths_file.
+function M.publish_paths_file(path, rules, backup_suffix, report, ports)
+	report.restored = report.restored or {}
+	report.paths_file = M.rewrite_paths_file(path, M.settle_rewrites(rules, report), backup_suffix, ports)
+	if not REFUSED[report.paths_file] then return end
+	for _, rule in ipairs(rules) do
+		local kind, entry = nil, nil
+		if rule.restorable and rule.source then kind, entry = outcome_of(report, rule.source) end
+		if kind == "moved" or kind == "backed_up" then
+			local back, why = ports.rename(entry.to, entry.from)
+			if back then
+				report.restored[#report.restored + 1] = { from = entry.to, to = entry.from }
+			else
+				report.kept[#report.kept + 1] = { from = entry.to, to = entry.from, reason = "restore_failed",
+					detail = why }
+			end
+		end
+	end
 end
 
 
@@ -310,6 +402,15 @@ local KEPT_REASONS = {
 	backup_exists = "a backup already exists",
 	list_failed = "its folder could not be listed",
 	remove_failed = "its emptied folder could not be removed",
+	restore_failed = "it could not be moved back to the folder paths.toml names",
+}
+
+--- Why paths.toml still names an old folder, for its warning.
+local PATHS_FILE_REFUSALS = {
+	read_failed = "it could not be read",
+	backup_taken = "its backup name already holds other text",
+	backup_refused = "its backup could not be written",
+	write_refused = "its new text could not be written (the backup beside it holds the previous text)",
 }
 
 --- Logs a migration report through the driver's logger.
@@ -336,8 +437,11 @@ function M.log_report(logger, log, report)
 	end
 	if report.paths_file == "rewritten" then
 		logger.info(log, "paths.toml now names the new default folders; its previous text is kept beside it.")
-	elseif report.paths_file == "backup_refused" then
-		logger.warn(log, "paths.toml still names an old default folder: its backup could not be written.")
+	elseif PATHS_FILE_REFUSALS[report.paths_file] then
+		logger.warn(log, "paths.toml still names an old default folder: %s.", PATHS_FILE_REFUSALS[report.paths_file])
+	end
+	for _, entry in ipairs(report.restored or {}) do
+		logger.warn(log, "Moved %s back to %s, the folder paths.toml still names.", entry.from, entry.to)
 	end
 end
 

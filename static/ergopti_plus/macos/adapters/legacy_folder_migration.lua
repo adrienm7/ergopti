@@ -117,12 +117,16 @@ function M.native_ports()
 			file:close()
 			return text
 		end,
+		-- Only the core's private stage files are written; they reach their
+		-- final name through rename or replace.
 		write = function(path, text)
 			local file = io.open(path, "wb")
 			if not file then return false end
 			local written = file:write(text) ~= nil
 			return file:close() and written
 		end,
+		replace = function(from, to) return os.rename(from, to) == true end,
+		remove = function(path) return os.remove(path) == true end,
 	}
 end
 
@@ -165,13 +169,18 @@ end
 --- @return table rewrites
 function M.rewrites(home)
 	local legacy = AppDirs.migration.macos
+	-- The configuration folder moves in one rename, so a locator that cannot
+	-- follow it gets it back; the logs folder merges entry by entry and only
+	-- follows.
 	return {
 		{ key = AppDirs.config.override_key,
 			old = { home .. "/" .. legacy.legacy_config_relative, "~/" .. legacy.legacy_config_relative },
-			new = home .. "/" .. AppDirs.config.macos_relative },
+			new = home .. "/" .. AppDirs.config.macos_relative,
+			source = home .. "/" .. legacy.legacy_config_relative, restorable = true },
 		{ key = AppDirs.override_key,
 			old = { home .. "/" .. legacy.legacy_logs_relative, "~/" .. legacy.legacy_logs_relative },
-			new = home .. "/" .. AppDirs.macos.relative },
+			new = home .. "/" .. AppDirs.macos.relative,
+			source = home .. "/" .. legacy.legacy_logs_relative },
 	}
 end
 
@@ -187,8 +196,8 @@ function M.run(logger, options)
 	local ports = options.ports or M.native_ports()
 	local plan = M.plan(home)
 	local report = Core.apply(plan, ports)
-	report.paths_file = Core.rewrite_paths_file(home .. "/" .. AppDirs.config.macos_paths_file, M.rewrites(home),
-		AppDirs.migration.backup_suffix, ports)
+	Core.publish_paths_file(home .. "/" .. AppDirs.config.macos_paths_file, M.rewrites(home),
+		AppDirs.migration.backup_suffix, report, ports)
 	Core.log_report(logger, LOG, report)
 	return report
 end

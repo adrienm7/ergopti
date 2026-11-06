@@ -134,19 +134,50 @@ function M.run(helpers, shared_root)
 
 		helpers.it("keeps the previous paths.toml text before rewriting it (legacy-folder-migration-backup)", function()
 			local files = { ["/r/paths.toml"] = 'ConfigDirPath = "/h/old/"\n' }
+			local refuse = {}
 			local ports = {
 				exists = function(path) return files[path] ~= nil end,
 				read = function(path) return files[path] end,
-				write = function(path, text) files[path] = text; return true end,
+				write = function(path, text)
+					if refuse[path] then
+						-- A refused write may already have truncated its own file.
+						files[path] = text:sub(1, 3)
+						return false
+					end
+					files[path] = text
+					return true
+				end,
+				rename = function(from, to)
+					if files[to] ~= nil or files[from] == nil then return nil, "refused" end
+					files[to], files[from] = files[from], nil
+					return true
+				end,
+				replace = function(from, to)
+					if files[from] == nil then return false end
+					files[to], files[from] = files[from], nil
+					return true
+				end,
+				remove = function(path) local had = files[path] ~= nil; files[path] = nil; return had end,
 			}
+			local old_text = 'ConfigDirPath = "/h/old/"\n'
 			local rewrites = { { key = "ConfigDirPath", old = { "/h/old" }, new = "/r/config" } }
 			helpers.assert_eq(Migration.rewrite_paths_file("/r/paths.toml", rewrites, ".bak", ports), "rewritten")
-			helpers.assert_eq(files["/r/paths.toml.bak"], 'ConfigDirPath = "/h/old/"\n', "backup holds the old text")
+			helpers.assert_eq(files["/r/paths.toml.bak"], old_text, "backup holds the old text")
 			helpers.assert_eq(files["/r/paths.toml"], 'ConfigDirPath = "/r/config/"\n', "file names the new folder")
-			files["/r/paths.toml"] = 'ConfigDirPath = "/h/old/"\n'
-			helpers.assert_eq(Migration.rewrite_paths_file("/r/paths.toml", rewrites, ".bak", ports), "backup_refused",
-				"an existing backup is never replaced")
-			helpers.assert_eq(files["/r/paths.toml"], 'ConfigDirPath = "/h/old/"\n', "nothing rewritten without a backup")
+			files["/r/paths.toml"] = 'ConfigDirPath = "/h/old/" # other\n'
+			helpers.assert_eq(Migration.rewrite_paths_file("/r/paths.toml", rewrites, ".bak", ports), "backup_taken",
+				"a backup holding other text is never replaced")
+			helpers.assert_eq(files["/r/paths.toml"], 'ConfigDirPath = "/h/old/" # other\n',
+				"nothing rewritten without a backup")
+			files["/r/paths.toml"] = old_text
+			refuse["/r/paths.toml.migration-stage"] = true
+			helpers.assert_eq(Migration.rewrite_paths_file("/r/paths.toml", rewrites, ".bak", ports), "write_refused",
+				"a refused write is reported as such, not as a backup refusal")
+			helpers.assert_eq(files["/r/paths.toml"], old_text, "a refused write never truncates the file")
+			helpers.assert_eq(files["/r/paths.toml.migration-stage"], nil, "its stage is removed")
+			refuse["/r/paths.toml.migration-stage"] = nil
+			helpers.assert_eq(Migration.rewrite_paths_file("/r/paths.toml", rewrites, ".bak", ports), "rewritten",
+				"the next boot reuses the backup an interrupted one left with the same text")
 			helpers.assert_eq(Migration.rewrite_paths_file("/r/none.toml", rewrites, ".bak", ports), "absent")
 		end)
 
