@@ -34,6 +34,19 @@
 const METRICS_MAINTENANCE_WATCHDOG_MS = 120_000;
 
 const METRICS_MAINTENANCE_KINDS = Object.freeze(['export', 'purge']);
+// Each kind's texts, spelled in full so the translation audit sees every key.
+const METRICS_MAINTENANCE_TEXT = {
+	export: {
+		confirm: 'ui_typing.maintenance_confirm_export',
+		done: 'ui_typing.maintenance_export_done',
+		failed: 'ui_typing.maintenance_export_failed'
+	},
+	purge: {
+		confirm: 'ui_typing.maintenance_confirm_purge',
+		done: 'ui_typing.maintenance_purge_done',
+		failed: 'ui_typing.maintenance_purge_failed'
+	}
+};
 
 const metrics_maintenance_state = {
 	pending_kind: null,
@@ -110,7 +123,7 @@ function ask_metrics_maintenance(kind) {
 	if (!METRICS_MAINTENANCE_KINDS.includes(kind) || metrics_maintenance_state.active_id)
 		return false;
 	metrics_maintenance_state.pending_kind = kind;
-	show_metrics_maintenance(_t('ui_typing.maintenance_confirm_' + kind), true);
+	show_metrics_maintenance(_t(METRICS_MAINTENANCE_TEXT[kind].confirm), true);
 	return true;
 }
 
@@ -163,10 +176,7 @@ function complete_metrics_maintenance(id, ok, path) {
 	metrics_maintenance_state.active_kind = null;
 	set_metrics_maintenance_busy(false);
 	const outcome = ok ? 'done' : 'failed';
-	const text = _t('ui_typing.maintenance_' + kind + '_' + outcome).replace(
-		'{path}',
-		String(path ?? '')
-	);
+	const text = _t(METRICS_MAINTENANCE_TEXT[kind][outcome]).replace('{path}', String(path ?? ''));
 	show_metrics_maintenance(text, false);
 	if (ok && kind === 'purge' && typeof request_cache_reset === 'function') request_cache_reset();
 	return true;

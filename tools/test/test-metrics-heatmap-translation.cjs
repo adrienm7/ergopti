@@ -219,6 +219,7 @@ function mediaFixture() {
 		'metrics_typing/charts.js',
 		'metrics_typing/table.js',
 		'metrics_typing/heatmap_win.js',
+		'metrics_typing/maintenance.js',
 		'metrics_typing/main.js'
 	]) {
 		vmMedia.runInContext(fs.readFileSync(p.join(mediaUi, file), 'utf8'), context, {

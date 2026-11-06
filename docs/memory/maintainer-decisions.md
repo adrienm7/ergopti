@@ -689,7 +689,7 @@ editor is written; the navigation layer becomes one layer of the Ergopti TOML so
 
 When the owned Ollama serve process has exited and never published its port (no READY
 frame), the pause treats it as stopped and proceeds, logging why through the central
-logger. A process exit without the RETIRED frame still never retires a *published*
+logger. A process exit without the RETIRED frame still never retires a _published_
 daemon: only the unpublished, physically exited case is released. The rule lives in the
 shared lifecycle (`managed_ollama_daemon_receipt.release_unpublished`, called by
 `managed_ollama_daemon_lifecycle` `terminate`), so every driver using it behaves the same.
