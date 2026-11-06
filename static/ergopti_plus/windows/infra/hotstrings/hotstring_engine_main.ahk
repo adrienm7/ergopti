@@ -141,6 +141,11 @@ _HSE_SourcePriority(CategoryName) {
 ; HSE_FeedBackspace (chop one char), HSE_FeedReset (clear), and
 ; HSE_ApplyExpansion (replace trigger suffix by replacement).
 global HSE_Buffer := ""
+; The buffer text as of the last nonfinal PRIVATE expansion the matcher kept
+; (a programmable user-code output is one). A later repeat that derives its
+; scalar from a prefix of it inherits the private classification; every buffer
+; reset drops it. Never logged, never persisted.
+global HSE_PrivateAncestry := ""
 global HSE_FinalNoOpPending := false
 global HSE_FinalNoOpFound := false
 
@@ -968,12 +973,13 @@ HSE_FeedBackspace(IsPhysical := false, ErasesTypedText := false) {
 ; input line (HSE_StartIsLineStart); it holds only with a known boundary.
 HSE_FeedReset(KnownTerminatorBefore := false, IsPhysical := false, AtLineStart := false) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_Suppressed
-		global HSE_FinalNoOpPending
+		global HSE_FinalNoOpPending, HSE_PrivateAncestry
 		if HSE_Suppressed and !IsPhysical {
 				return
 		}
 		HSE_FinalNoOpPending := false
 		HSE_Buffer := ""
+		HSE_PrivateAncestry := ""
 		HSE_StartIsWordBoundary := !!KnownTerminatorBefore
 		HSE_StartIsLineStart := HSE_StartIsWordBoundary and !!AtLineStart
 }
@@ -1003,7 +1009,9 @@ HSE_Suppress(YesNo) {
 ; word terminator has been observed.
 HSE_HardReset() {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_FinalNoOpPending
+		global HSE_PrivateAncestry
 		HSE_Buffer := ""
+		HSE_PrivateAncestry := ""
 		HSE_StartIsWordBoundary := false
 		HSE_StartIsLineStart := false
 		HSE_FinalNoOpPending := false
@@ -1016,7 +1024,9 @@ HSE_HardReset() {
 ; @param Effect {Object} The committed effect, for KnownBoundaryAfter.
 _HSE_ForgetFinalOutput(Effect) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart, HSE_FinalNoOpPending
+		global HSE_PrivateAncestry
 		HSE_Buffer := ""
+		HSE_PrivateAncestry := ""
 		HSE_StartIsWordBoundary := Effect.KnownBoundaryAfter
 		HSE_StartIsLineStart := false
 		HSE_FinalNoOpPending := false
@@ -1109,6 +1119,7 @@ HSE_WordResetFlagCurrent(Key) {
 ; is the end of it: its output leaves the matcher (_HSE_ForgetFinalOutput).
 HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := false, ExtraStrip := 0, ChainIsFinal := false) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN, HSE_TypoNbspStripped
+		global HSE_PrivateAncestry
 
 		StripLen := _HSE_ExpansionStripUnits(Spec.Length + ExtraStrip, EndChar, HSE_TypoNbspStripped)
 		EmittedEndChar := HSE_PlanTail(_HSE_ExpansionPath(EndChar),
@@ -1134,6 +1145,7 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 		; parser. Clear the model rather than publishing a confidently false buffer.
 		if Effect.ClearAll {
 				HSE_Buffer := ""
+				HSE_PrivateAncestry := ""
 				HSE_StartIsWordBoundary := false
 				return Effect
 		}
@@ -1156,6 +1168,7 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 		HSE_Buffer .= Effect.InsertedText
 
 		_HSE_TrimBufferToCapacity()
+		HSE_PrivateAncestry := Effect.IsPrivate ? HSE_Buffer : ""
 		if (ChainIsFinal or (Spec.HasOwnProp("FinalResult") and Spec.FinalResult))
 				_HSE_ForgetFinalOutput(Effect)
 		return Effect
@@ -1196,7 +1209,7 @@ _HSE_RepeatWordChar(Ch) {
 ; trigger, no end char) or "" when the repeat condition is not met.
 HSE_TryRepeatKey(MagicKey) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS, HSE_RepeatEnabled, HSE_Suppressed
-		global HSE_RebuildInProgress, HSE_RegistryTransitionDepth
+		global HSE_RebuildInProgress, HSE_RegistryTransitionDepth, HSE_PrivateAncestry
 		; The live-rebuild fence belongs here as much as in HSE_FindMatchAtEnd. While
 		; the registry is being rewritten the matcher answers "" for EVERY sequence —
 		; that means "the registry cannot answer right now", not "no trigger claims
@@ -1253,6 +1266,13 @@ HSE_TryRepeatKey(MagicKey) {
 		}
 		; All checks passed — build a transient Spec and fire.
 		TriggerStr := RepeatChar . MagicKey
+		; The scalar is derived from a secret while the text before the magic key is
+		; still a prefix of the private expansion the matcher kept: the repeat keeps
+		; the classification (metrics, AI context, queued events), and its own
+		; application re-marks the ancestry so a further repeat stays private.
+		Before := SubStr(HSE_Buffer, 1, BufLen - MkLen)
+		DerivedPrivate := HSE_PrivateAncestry != ""
+				and SubStr(HSE_PrivateAncestry, 1, StrLen(Before)) == Before
 		return {
 				Trigger:     TriggerStr,
 				Length:      StrLen(TriggerStr),
@@ -1263,6 +1283,7 @@ HSE_TryRepeatKey(MagicKey) {
 				Replacement: RepeatChar . RepeatChar,
 				OnlyText:    true,
 				FinalResult: false,
+				IsPrivate:   DerivedPrivate,
 				Category:    "magickey",
 				Section:     "repeat_corrections"
 		}
