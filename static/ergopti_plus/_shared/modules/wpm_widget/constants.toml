@@ -170,9 +170,13 @@ fallback_accent = "#007aff"
 
 # Where the user left the pill is not a preference: every driver keeps it in its
 # Storage port (registry on Windows, settings on macOS, a file on Linux) under
-# these two keys, never in config.toml.
+# these keys, never in config.toml. macOS and Linux keep the two coordinates
+# (Linux writes both in one set_many replacement). The Windows registry writes
+# one value atomically but has no transaction over two, so Windows publishes the
+# pair as one value, [x, y]: a refused write can never leave a mixed pair.
 storage_x = "wpm_widget.pos_x"
 storage_y = "wpm_widget.pos_y"
+storage_pair = "wpm_widget.pos"
 
 
 # ==================================

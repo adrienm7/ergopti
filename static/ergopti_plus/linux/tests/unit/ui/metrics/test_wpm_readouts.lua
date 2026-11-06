@@ -74,7 +74,8 @@ helpers.describe("wpm readouts: the shared canon", function()
 		local loaded = canon()
 		helpers.assert_eq(loaded.position.storage_x, "wpm_widget.pos_x")
 		helpers.assert_eq(loaded.position.storage_y, "wpm_widget.pos_y")
-		for _, key in ipairs({ "storage_x", "storage_y" }) do
+		helpers.assert_eq(loaded.position.storage_pair, "wpm_widget.pos")
+		for _, key in ipairs({ "storage_x", "storage_y", "storage_pair" }) do
 			local broken = canon()
 			broken.position[key] = nil
 			local refused, err = Model.validate(broken)

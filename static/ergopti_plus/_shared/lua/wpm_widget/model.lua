@@ -62,7 +62,7 @@ local REQUIRED = {
 
 -- Strings that are names, not colours: the Storage keys of the saved position.
 local REQUIRED_NAMES = {
-	position = { storage_x = true, storage_y = true },
+	position = { storage_x = true, storage_y = true, storage_pair = true },
 }
 
 --- Checks a decoded canon.

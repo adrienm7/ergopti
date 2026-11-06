@@ -59,7 +59,7 @@ _WPMG_Main() {
 			"the real boot must admit complete configuration state")
 		if !IsSet(STORAGE_REG_BASE)
 			STORAGE_REG_BASE := "fixture-not-used"
-		WPMWidgetConst.STORE_X := "fixture-x", WPMWidgetConst.STORE_Y := "fixture-y"
+		WPMWidgetConst.STORE_PAIR := "fixture-pair"
 		WPMWidget.show_graph := false, WPMWidget.visible := false, WPMWidget.pos_x := 200, WPMWidget.pos_y := 300
 		State.Old := WPMWidget_BuildCompact(), State.OldHwnd := State.Old.Hwnd
 		_WPMWidget_ApplySurfaceGeometry(State.Old)

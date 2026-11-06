@@ -11,8 +11,14 @@ _TWCT_Areas := [{ Left: 0, Top: 0, Right: 1920, Bottom: 1080 }]
 ; The Storage port holds no position: the anchor stays at its default.
 _TWCT_NoStoredPosition(Key) => "_"
 
-; A Storage port double holding one saved anchor.
-_TWCT_StoredPosition(X, Y, Key) => Key == WPMWidgetConst.STORE_X ? X : Y
+; A Storage port double holding one saved anchor: one [x, y] value.
+_TWCT_StoredPosition(X, Y, Key) => Key == WPMWidgetConst.STORE_PAIR ? [X, Y] : "_"
+
+; One coordinate of the pair the real Storage port holds, or "missing".
+_TWCT_StoredCoordinate(Index) {
+	Pair := ST_Get(WPMWidgetConst.STORE_PAIR, "missing")
+	return (Pair is Array && Pair.Length == 2) ? Pair[Index] : "missing"
+}
 
 TestWPMConfigRejectsStringEncodedBooleans() {
 	SavedVisible := WPMWidget.visible
@@ -93,11 +99,9 @@ TestWPMConfigValidatesSavedPositionAgainstEveryMonitor() {
 
 	SavedX := WPMWidget.pos_x
 	SavedY := WPMWidget.pos_y
-	SavedStoreX := WPMWidgetConst.STORE_X
-	SavedStoreY := WPMWidgetConst.STORE_Y
+	SavedStore := WPMWidgetConst.STORE_PAIR
 	try {
-		WPMWidgetConst.STORE_X := "test.pos_x"
-		WPMWidgetConst.STORE_Y := "test.pos_y"
+		WPMWidgetConst.STORE_PAIR := "test.pos"
 		WPMWidget.pos_x := -1
 		WPMWidget.pos_y := -1
 		WPMWidget_LoadConfig(Map("metrics", Map(
@@ -121,8 +125,7 @@ TestWPMConfigValidatesSavedPositionAgainstEveryMonitor() {
 	} finally {
 		WPMWidget.pos_x := SavedX
 		WPMWidget.pos_y := SavedY
-		WPMWidgetConst.STORE_X := SavedStoreX
-		WPMWidgetConst.STORE_Y := SavedStoreY
+		WPMWidgetConst.STORE_PAIR := SavedStore
 	}
 }
 Test("WPM config: saved surfaces remain reachable after monitor changes (AHK-104)",
@@ -136,9 +139,9 @@ TestWPMAutoPositionRequiresBothCoordinates() {
 	AssertFalse(_WPMWidget_IsAutoPosition(100, 100), "a saved position must survive")
 	SavedX := WPMWidget.pos_x, SavedY := WPMWidget.pos_y
 	SavedVisible := WPMWidget.visible, SavedColors := WPMWidget.use_colors, SavedGraph := WPMWidget.show_graph
-	SavedStoreX := WPMWidgetConst.STORE_X, SavedStoreY := WPMWidgetConst.STORE_Y
+	SavedStore := WPMWidgetConst.STORE_PAIR
 	try {
-		WPMWidgetConst.STORE_X := "test.pos_x", WPMWidgetConst.STORE_Y := "test.pos_y"
+		WPMWidgetConst.STORE_PAIR := "test.pos"
 		for Pair in [[-1, 100], [100, -1]] {
 			WPMWidget_LoadConfig(Map("metrics", Map(WPMWidgetConst.CFG_GRAPH, false)),
 				_TWCT_Areas, _TWCT_StoredPosition.Bind(Pair[1], Pair[2]))
@@ -149,7 +152,7 @@ TestWPMAutoPositionRequiresBothCoordinates() {
 	} finally {
 		WPMWidget.pos_x := SavedX, WPMWidget.pos_y := SavedY
 		WPMWidget.visible := SavedVisible, WPMWidget.use_colors := SavedColors, WPMWidget.show_graph := SavedGraph
-		WPMWidgetConst.STORE_X := SavedStoreX, WPMWidgetConst.STORE_Y := SavedStoreY
+		WPMWidgetConst.STORE_PAIR := SavedStore
 	}
 }
 Test("WPM config: one negative-one coordinate is a position (wpm-anchor-sentinel)",
@@ -160,7 +163,7 @@ _WPMCO_RefusedConfig(Kind, Successor, SamePosition := false) {
 	SavedAuthority := _WPMWidget_PositionAuthority()
 	Saved := {path: ConfigurationFile, store: STORAGE_REG_BASE, x: WPMWidget.pos_x,
 		y: WPMWidget.pos_y, graph: WPMWidget.show_graph, colors: WPMWidget.use_colors,
-		keyX: WPMWidgetConst.STORE_X, keyY: WPMWidgetConst.STORE_Y}
+		key: WPMWidgetConst.STORE_PAIR}
 	Nonce := A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
 	Subkey := "Software\Ergopti_WpmCompensationAudit_" . Nonce
 	RegistryPath := "HKCU\" . Subkey
@@ -175,8 +178,8 @@ _WPMCO_RefusedConfig(Kind, Successor, SamePosition := false) {
 		if Successor {
 			State.bCalls += 1
 			State.bAck := WPMWidget_SavePosition(SuccessorX, SuccessorY, 0, (*) => 0)
-			State.bX := ST_Get(WPMWidgetConst.STORE_X, "missing")
-			State.bY := ST_Get(WPMWidgetConst.STORE_Y, "missing")
+			State.bX := _TWCT_StoredCoordinate(1)
+			State.bY := _TWCT_StoredCoordinate(2)
 		}
 	}
 	try {
@@ -198,13 +201,12 @@ _WPMCO_RefusedConfig(Kind, Successor, SamePosition := false) {
 		AssertEqual("current", Boot["status"])
 		STORAGE_REG_BASE := RegistryPath
 		Canon := ParseTomlFile(_SharedDir . "\modules\wpm_widget\constants.toml")
-		WPMWidgetConst.STORE_X := Canon["position"]["storage_x"]
-		WPMWidgetConst.STORE_Y := Canon["position"]["storage_y"]
-		AssertTrue(WPMWidgetConst.STORE_X != WPMWidgetConst.STORE_Y)
+		WPMWidgetConst.STORE_PAIR := Canon["position"]["storage_pair"]
+		AssertTrue(WPMWidgetConst.STORE_PAIR != "")
 		WPMWidget.show_graph := false, WPMWidget.use_colors := false
 		AssertTrue(WPMWidget_SavePosition(10, 20, 0, (*) => 0))
-		AssertEqual(10, ST_Get(WPMWidgetConst.STORE_X, "missing"))
-		AssertEqual(20, ST_Get(WPMWidgetConst.STORE_Y, "missing"))
+		AssertEqual(10, _TWCT_StoredCoordinate(1))
+		AssertEqual(20, _TWCT_StoredCoordinate(2))
 		; A genuine unrelated Windows reader allows ordinary source reads but
 		; withholds delete sharing, so the actual default replacement refuses.
 		FileHold := DllCall("Kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
@@ -223,8 +225,8 @@ _WPMCO_RefusedConfig(Kind, Successor, SamePosition := false) {
 			Result := WPMWidget_ToggleGraphConfig(0, Notify)
 		else
 			Result := WPMWidget_SaveConfig(false, true, 30, 40, 0, Notify)
-		ActualX := ST_Get(WPMWidgetConst.STORE_X, "missing")
-		ActualY := ST_Get(WPMWidgetConst.STORE_Y, "missing")
+		ActualX := _TWCT_StoredCoordinate(1)
+		ActualY := _TWCT_StoredCoordinate(2)
 		_TestPrint("# wpm-compensation kind=" . Kind . " successor=" . Successor
 			. " notices=" . State.notices . " b_calls=" . State.bCalls . " b_ack=" . State.bAck
 			. " b_stored_x=" . State.bX . " b_stored_y=" . State.bY
@@ -272,7 +274,7 @@ _WPMCO_RefusedConfig(Kind, Successor, SamePosition := false) {
 				ConfigurationFile := Saved.path, STORAGE_REG_BASE := Saved.store
 				WPMWidget.pos_x := Saved.x, WPMWidget.pos_y := Saved.y
 				WPMWidget.show_graph := Saved.graph, WPMWidget.use_colors := Saved.colors
-				WPMWidgetConst.STORE_X := Saved.keyX, WPMWidgetConst.STORE_Y := Saved.keyY
+				WPMWidgetConst.STORE_PAIR := Saved.key
 				if CreatedRoot {
 					try _TOML_InvalidateParseCache(Path)
 					finally DirDelete(Root, true)
@@ -297,12 +299,14 @@ for _WPMCO_ABAKind in ["save-config", "graph-toggle"]
 		_WPMCO_RefusedConfig.Bind(_WPMCO_ABAKind, true, true))
 
 ; Native private Storage values, with a callout-only Store adapter to enter B at
-; individual acknowledged write/compensation boundaries that the native API does
-; not expose itself. No native/user-owned key or handle is retired.
+; the acknowledged write boundary that the native API does not expose itself.
+; No native/user-owned key or handle is retired. The pair is one value, so every
+; mode makes exactly one store call: a refusal leaves the previous pair whole and
+; needs no compensation write (WCF-001).
 _WPMA_LocalStore(Mode) {
 	global STORAGE_REG_BASE, _SharedDir
 	Saved := {storagePath: STORAGE_REG_BASE, x: WPMWidget.pos_x, y: WPMWidget.pos_y,
-		keyX: WPMWidgetConst.STORE_X, keyY: WPMWidgetConst.STORE_Y,
+		key: WPMWidgetConst.STORE_PAIR,
 		authority: _WPMWidget_PositionAuthority(), critical: A_IsCritical}
 	Subkey := "Software\Ergopti_WpmLocalAuthorityAudit_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
 	Handle := 0, Owned := false
@@ -316,14 +320,13 @@ _WPMA_LocalStore(Mode) {
 	Store(Key, Value) {
 		State.calls += 1
 		State.critical.Push(A_IsCritical)
-		if State.calls == 2 && (Mode == "rollback-contender" || Mode == "ordinary-refusal-control" || Mode == "failure-notifier-successor")
-			return false ; the adapter's existing refusal protocol, before any Y write
-		Ack := ST_Set(Key, Value)
-		if State.calls == 1 && (Mode == "first-write-refusal-contender" || Mode == "first-write-success-contender") {
-			Successor()
-			return Mode == "first-write-refusal-contender" ? false : Ack
-		}
-		if State.calls == 3 && Mode == "rollback-contender"
+		; later-writes-refused acknowledges its first write and refuses every
+		; later one: the split X/Y writer stored X, lost Y and its compensation,
+		; and left a mixed pair that no caller asked for.
+		Refused := Mode == "first-write-refusal-contender" || Mode == "ordinary-refusal-control"
+			|| Mode == "failure-notifier-successor" || (Mode == "later-writes-refused" && State.calls > 1)
+		Ack := Refused ? false : ST_Set(Key, Value)
+		if Mode == "first-write-refusal-contender" || Mode == "first-write-success-contender"
 			Successor()
 		return Ack
 	}
@@ -341,8 +344,7 @@ _WPMA_LocalStore(Mode) {
 		AssertTrue(Owned, "the test must affirmatively own the newly created private key")
 		STORAGE_REG_BASE := "HKCU\" . Subkey
 		Canon := ParseTomlFile(_SharedDir . "\modules\wpm_widget\constants.toml")
-		WPMWidgetConst.STORE_X := Canon["position"]["storage_x"]
-		WPMWidgetConst.STORE_Y := Canon["position"]["storage_y"]
+		WPMWidgetConst.STORE_PAIR := Canon["position"]["storage_pair"]
 		_WPMWidget_PositionAuthority({active: 0, published: 0})
 		AssertTrue(WPMWidget_SavePosition(10, 20, 0, (*) => 0))
 		if Mode == "inherited-critical-control"
@@ -350,31 +352,33 @@ _WPMA_LocalStore(Mode) {
 		Result := WPMWidget_SavePosition(30, 40, Store, Notice)
 		AfterCritical := A_IsCritical
 		Critical("Off")
-		ActualX := ST_Get(WPMWidgetConst.STORE_X, "missing")
-		ActualY := ST_Get(WPMWidgetConst.STORE_Y, "missing")
+		ActualX := _TWCT_StoredCoordinate(1)
+		ActualY := _TWCT_StoredCoordinate(2)
 		_TestPrint("# wpm-local-authority mode=" . Mode . " a_ack=" . Result . " calls=" . State.calls
 			. " b_calls=" . State.bCalls . " b_ack=" . State.bAck . " stored=" . ActualX . "," . ActualY
 			. " ram=" . WPMWidget.pos_x . "," . WPMWidget.pos_y . " restored-critical=" . AfterCritical)
-		if Mode == "inherited-critical-control" || Mode == "first-write-success-contender" {
+		AssertEqual(1, State.calls, "the pair is published by one store write, with no compensation write")
+		for CriticalState in State.critical
+			AssertFalse(CriticalState, "native Storage must never execute inside the publication Critical span")
+		if Mode == "inherited-critical-control" || Mode == "first-write-success-contender"
+				|| Mode == "later-writes-refused" {
 			AssertTrue(Result)
 			if Mode == "inherited-critical-control"
 				AssertTrue(AfterCritical, "the caller's original critical posture is restored")
-			AssertEqual(2, State.calls)
-			for CriticalState in State.critical
-				AssertFalse(CriticalState, "native Storage must never execute inside the publication Critical span")
 			ExpectedX := 30, ExpectedY := 40
 		} else {
 			AssertFalse(Result, "a superseded or refused pair must never receive A's publication ACK")
 			ExpectedX := Mode == "failure-notifier-successor" ? 700 : 10, ExpectedY := Mode == "failure-notifier-successor" ? 800 : 20
 		}
-		ContenderExpected := Mode != "ordinary-refusal-control" && Mode != "inherited-critical-control"
+		ContenderExpected := Mode == "first-write-refusal-contender" || Mode == "first-write-success-contender"
+			|| Mode == "failure-notifier-successor"
 		AssertEqual(ContenderExpected ? 1 : 0, State.bCalls)
 		if Mode == "failure-notifier-successor"
 			AssertTrue(State.bAck, "a completed local refusal must release authority before notifying its successor")
 		else if ContenderExpected
-			AssertFalse(State.bAck, "a pair already being written or restored must refuse a reentrant native contender")
-		AssertEqual(ExpectedX, ActualX)
-		AssertEqual(ExpectedY, ActualY)
+			AssertFalse(State.bAck, "a pair already being written must refuse a reentrant native contender")
+		AssertEqual(ExpectedX, ActualX, "the stored pair is the one a caller asked for, never a mixed pair")
+		AssertEqual(ExpectedY, ActualY, "the stored pair is the one a caller asked for, never a mixed pair")
 		AssertEqual(ExpectedX, WPMWidget.pos_x)
 		AssertEqual(ExpectedY, WPMWidget.pos_y)
 	} finally {
@@ -382,7 +386,7 @@ _WPMA_LocalStore(Mode) {
 		_WPMWidget_PositionAuthority(Saved.authority)
 		STORAGE_REG_BASE := Saved.storagePath
 		WPMWidget.pos_x := Saved.x, WPMWidget.pos_y := Saved.y
-		WPMWidgetConst.STORE_X := Saved.keyX, WPMWidgetConst.STORE_Y := Saved.keyY
+		WPMWidgetConst.STORE_PAIR := Saved.key
 		try {
 			if Handle
 				DllCall("Advapi32\RegCloseKey", "Ptr", Handle, "UInt")
@@ -392,6 +396,6 @@ _WPMA_LocalStore(Mode) {
 		} finally Critical(Saved.critical)
 	}
 }
-for _WPMA_Mode in ["first-write-refusal-contender", "first-write-success-contender", "rollback-contender",
+for _WPMA_Mode in ["first-write-refusal-contender", "first-write-success-contender", "later-writes-refused",
 	"ordinary-refusal-control", "inherited-critical-control", "failure-notifier-successor"]
-	Test("WPM position opaque authority: " . _WPMA_Mode . " (wpm-compensation-authority)", _WPMA_LocalStore.Bind(_WPMA_Mode))
+	Test("WPM position opaque authority: " . _WPMA_Mode . " (wpm-compensation-authority, WCF-001)", _WPMA_LocalStore.Bind(_WPMA_Mode))
