@@ -59,14 +59,17 @@ _WTRW_LifecycleOwners() {
 	AssertContains(Start, "OnMessage(", "and handled")
 	AssertContains(_WTRW_Body("_WPMTrayReadout_OnTaskbarCreated"), "WPMTrayReadout._added := false",
 		"TaskbarCreated re-adds the icon on the next frame")
-	AssertContains(_WTRW_Body("WPMTrayReadout_Stop"), "NotifyIcon_Delete(", "stopping removes the icon")
+	; Stop delegates the native removal to the one owner that also frees the icon.
+	AssertContains(_WTRW_Body("WPMTrayReadout_Stop"), "_WPMTrayReadout_Remove()", "stopping removes the icon")
+	AssertContains(_WTRW_Body("_WPMTrayReadout_Remove"), "NotifyIcon_Delete(", "stopping removes the icon")
 }
 Test("wpm tray readout: pause, exit and Explorer restart owners (wpm-tray-readout)", _WTRW_LifecycleOwners)
 
 _WTRW_MenuRowsAndManifest() {
 	Build := _WTRW_Body("BuildMetricsMenu")
-	AssertContains(Build, "MenuCommand.WPM_MENUBAR,", "the readout row has a Windows handler")
-	AssertContains(Build, "MenuCommand.MENUBAR_COLORS,", "its colour row has a Windows handler")
+	; The source scan reads generated constants as the literal they stand for.
+	AssertContains(Build, _DriverResolveConstants("MenuCommand.WPM_MENUBAR") . ",", "the readout row has a Windows handler")
+	AssertContains(Build, _DriverResolveConstants("MenuCommand.MENUBAR_COLORS") . ",", "its colour row has a Windows handler")
 	Source := FileRead(_DriverProductionFileForSymbol("BuildMetricsMenu", _DriverDir), "UTF-8")
 	for Getter in ['"metrics_menubar_wpm",', '"metrics_menubar_colors",', "ConfigLeaf.WPM_MENUBAR_VISIBLE,"]
 		AssertContains(Source, Getter, "the declared tick and greying read the readout state: " . Getter)
