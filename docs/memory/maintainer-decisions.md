@@ -15,6 +15,23 @@ and `user.email` to that identity before the first commit, pass the rule to
 every child session, and keep tool attribution out of messages (the strict
 convention lint already rejects attribution trailers).
 
+## Dead keys: one lifecycle contract, macOS output for the magic key (2026-11-06)
+
+Every OS follows the native macOS dead-key behaviour. A continuation with no
+composition types the dead key's terminator, then that key: Windows already
+did, Linux gets it from explicit fallback lines both XKB converters write. An
+expiry (the legacy Windows two-second wait) or Ergopti's pause cancels the
+pending dead key: nothing is typed and nothing composes later; the Windows
+registry engine resets its pending state from `Ergopti_OnSuspendEnter`. A
+named control that completes a dead key is replayed with the modifiers the
+capture recorded (OSW-001, extended to the legacy `DeadKey` path), never
+stripped. On macOS and Linux the pending state belongs to the OS or the
+receiving application, which Ergopti's pause does not reach; cancelling it
+would mean injecting a key, which is not done. The Ergopti+ magic key inside a
+dead key types what macOS types (j, ξ, ʲ, ⱼ in the circumflex, Greek,
+superscript and subscript states) on Windows and Linux too, pinned by shared
+keystroke vectors.
+
 ## The layout menu keeps layers and rows apart (2026-11-03)
 
 The Windows Keyboard layout menu read as a duplicate: the Base/Shift and AltGr
