@@ -1180,7 +1180,10 @@ local function process(self, code, value, now_ms, scoped, receipt, skip_layer, s
 		if input_arms[self] and input_arms[self].code == code then input_arms[self] = nil end
 		return out
 	end
-	if wrapped and value == REPEAT and input_arms[self] then
+	-- The repeat belongs to the engine that pressed the key, whichever way the
+	-- one-shot was armed: a physical tap sets only the deadline, no input arm,
+	-- and its repeat used to fall through as a physical row the broker refuses.
+	if wrapped and value == REPEAT then
 		hold_row(self, out, code, REPEAT)
 		return out
 	end
