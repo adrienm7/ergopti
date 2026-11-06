@@ -25,6 +25,8 @@ MIT notice has to ship and the design can go further (one `.keylayout` source, g
       default export is a `.bundle` holding both physical variants, ISO and ANSI (as
       `Ergopti_v2.2.0.bundle` does today). The export dialog has a drop-down: « Bundle ISO + ANSI » (default),
       « ISO only » or « ANSI only », the last two giving a single `.keylayout`.
+      Decided 2026-11-06: the user edits one ISO `.keylayout`; the ANSI variant is derived from it by a fixed rule that
+      moves the extra ISO key, and the editor can change where that key goes.
 - [ ] **Layout editor on the Svelte site.** A new tab where a user configures their own layout and edits it as a
       `.keylayout`, then downloads every generated target.
 - [ ] **The same UI inside ErgoptiPlus.** The editor page runs locally in the app's webview on Windows, macOS and
