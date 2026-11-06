@@ -174,6 +174,28 @@ local function _build_layouts(ctx)
 		})
 	end
 
+	-- The scope's restore and clear: the layout rows of config.toml (number-row
+	-- ordering and edges), loaded by the session before they settle.
+	local function apply_layout_scope(mode)
+		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
+		local settled, committed = false, nil
+		require("infra.keyboard_layout_scope").request(mode, ctx.is_paused, function(ok, detail)
+			settled, committed = true, ok
+			if not ok then
+				Logger.error(LOG, "Keyboard layout scope '%s' was not applied: %s.", mode, tostring(detail))
+				show_error(i18n_safe("layouts.linux_rows_not_applied"))
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end)
+		-- The session may answer later: a dispatched request is accepted now and
+		-- its refusal is told when it settles.
+		return not settled or committed == true
+	end
+	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
+		return apply_layout_scope("recommended")
+	end
+	render_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_layout_scope("clear") end
+
 	-- Native-only status never acquires a preference or forced-input writer.
 	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_MODE] = function() return false end
 	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_EDGES] = function() return false end

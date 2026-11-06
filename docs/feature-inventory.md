@@ -813,8 +813,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `wrap_symbols_custom_controls.wrap_symbols_delete_custom` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `wrap_symbols_add_controls.wrap_symbols_add_custom` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `layout_menu.layout_toggle` (hide): Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.
-- [ ] `layout_menu.scope_restore` (hide): Review the platform-specific presentation and equivalent.
-- [ ] `layout_menu.scope_clear` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `layout_menu.layout_bundle` (hide): macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.
 - [ ] `layout_menu.layout_features_base` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.
 - [ ] `layout_menu.layout_features_altgr` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.

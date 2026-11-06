@@ -189,6 +189,31 @@ helpers.describe("Linux keyboard layout scope", function()
 		end)
 	end)
 
+	helpers.it("runs alone from the layout menu and releases once the session loads (layout-only-scope)", function()
+		with_scope(function(_, _, path, _, Scope)
+			local before = Sandbox.read_bytes(path)
+			local live, state = fake_live()
+			local settled
+			Scope.request("clear", function() return false end, function(ok, detail) settled = { ok, detail } end,
+				{ live = live })
+			helpers.assert_nil(settled, "settled only once the session answers")
+			state.answer(true)
+			helpers.assert_eq(settled, { true, nil })
+			helpers.assert_true(Sandbox.read_bytes(path) ~= before, "the rows are cleared")
+		end)
+		-- A refused load reverts the file and reports the refusal.
+		with_scope(function(_, _, path, _, Scope)
+			local before = Sandbox.read_bytes(path)
+			local live, state = fake_live()
+			local settled
+			Scope.request("recommended", function() return false end, function(ok, detail) settled = { ok, detail } end,
+				{ live = live })
+			state.answer(false, "stale_keymap")
+			helpers.assert_eq(settled[1], false)
+			helpers.assert_eq(Sandbox.read_bytes(path), before, "the file does not claim rows the keyboard lacks")
+		end)
+	end)
+
 	helpers.it("asks nothing of the session when the rows do not change (layout-scope-ack)", function()
 		with_scope(function(owner, _, _, _, Scope)
 			helpers.assert_eq(owner.apply("recommended"), true)
