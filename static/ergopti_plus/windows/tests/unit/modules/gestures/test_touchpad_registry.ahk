@@ -341,11 +341,8 @@ Test("touchpad registry: an unprovable or failed restore keeps the backup (touch
 ; must not authorize the destructive apply.
 _TPR_UnrestorableExistingBackupBlocksApply() {
 	global _TPR_Files
-	Header := TouchpadRegistryBackupHeader() . "`
-key " . TouchpadRegistryData()["key"] . "`
-"
-	for _, Text in ["garbage", Header, Header . "UnknownValue dword 1`
-"] {
+	Header := TouchpadRegistryBackupHeader() . "`nkey " . TouchpadRegistryData()["key"] . "`n"
+	for _, Text in ["garbage", Header, Header . "UnknownValue dword 1`n"] {
 		_TPR_Reset(Map("kept", 1))
 		_TPR_Files[_TPR_Path()] := Text
 		AssertFalse(_TPR_Apply(), "an unrestorable existing backup refuses the apply")
