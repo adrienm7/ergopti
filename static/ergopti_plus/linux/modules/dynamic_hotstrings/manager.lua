@@ -120,6 +120,46 @@ end
 -- =========================================
 -- =========================================
 
+--- Serialises the shared first-boot placeholders as a personal_info.toml source.
+--- @return string content
+local function _first_boot_source()
+	local Defaults = require("personal_info.defaults")
+	local function quoted(value) return '"' .. value:gsub('[\\"]', "\\%0") .. '"' end
+	local function section(name, values)
+		local keys = TableUtil.sorted_keys(values)
+		local lines = { "[" .. name .. "]" }
+		for _, key in ipairs(keys) do lines[#lines + 1] = key .. " = " .. quoted(values[key]) end
+		return table.concat(lines, "\n")
+	end
+	return table.concat({
+		"# personal_info.toml — Personal information",
+		"# Auto-managed by the personal information editor.",
+		"# Do not edit manually unless you know what you are doing.",
+		"",
+		section("info", Defaults.info),
+		"",
+		section("letters", Defaults.letters),
+		"",
+	}, "\n")
+end
+
+--- Materialises a missing personal_info.toml with the shared placeholders, as
+--- macOS does at start, so the editor has a source to open and save into. An
+--- existing file (including one a concurrent writer just created) is never
+--- touched.
+--- @param path string Absolute path to personal_info.toml.
+--- @return boolean ok False when the file is absent and could not be created.
+local function _seed_missing_source(path)
+	local _, status = TomlWriter.read_classified(path)
+	if status ~= "absent" then return true end
+	Logger.info(LOG, "Writing default personal_info.toml at '%s'…", path)
+	local written, reason = require("adapters.file_system").write_new(path, _first_boot_source())
+	if written or reason == "EEXIST" then return true end
+	Logger.error(LOG, "Could not create the default personal_info.toml (%s) — the editor has no source.",
+		tostring(reason))
+	return false
+end
+
 --- Decodes personal_info.toml via the shared toml_codec and returns the [info]
 --- and [letters] tables. All TOML parsing is delegated to the shared codec —
 --- this module owns no bespoke parser.
@@ -203,6 +243,7 @@ function M.init(opts)
 	-- Stage parsed state and the count locally. Re-initialisation is synchronous,
 	-- but readers must never observe a cumulative count left over from the
 	-- previous rule set while the engine itself has already been reset.
+	_seed_missing_source(info_path)
 	local staged_info, staged_letters = _parse_personal_info_toml(info_path)
 
 	-- Register @-tag letter shortcuts (e.g. "@p" → first_name).

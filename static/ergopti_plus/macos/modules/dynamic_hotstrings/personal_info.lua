@@ -118,42 +118,14 @@ local function rollback_start(token, reason)
 	return false
 end
 
+local SharedDefaults = require("personal_info.defaults")
+
 local DEFAULT_CONFIG = {
 	-- Read from the shared manifest rather than restated: a second copy of the
 	-- magic key is a second thing to change when the user picks another one.
 	trigger_char = ManifestReader.default_for(ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR),
-	info = {
-		first_name            = "Prénom",
-		last_name             = "Nom",
-		date_of_birth         = "01/01/1990",
-		email_address         = "prenom.nom@exemple.fr",
-		work_email_address    = "prenom.nom@entreprise.fr",
-		phone_number          = "0600000000",
-		phone_number_clean    = "06 00 00 00 00",
-		street_address        = "1 Rue de la Paix",
-		city                  = "Paris",
-		country               = "France",
-		postal_code           = "75001",
-		iban                  = "FR00 0000 0000 0000 0000 0000 000",
-		bic                   = "ABCDFRPP",
-		credit_card           = "0000 0000 0000 0000",
-		social_security_number = "0 00 00 00 000 000 00",
-	},
-	letters = {
-		a = "street_address",
-		b = "bic",
-		c = "credit_card",
-		d = "date_of_birth",
-		e = "email_address",
-		f = "phone_number_clean",
-		i = "iban",
-		m = "email_address",
-		n = "last_name",
-		p = "first_name",
-		s = "social_security_number",
-		t = "phone_number",
-		w = "work_email_address",
-	},
+	info = SharedDefaults.info,
+	letters = SharedDefaults.letters,
 }
 
 --- Returns the deterministic key order for one immutable schema map.
