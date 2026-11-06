@@ -20,13 +20,6 @@
 	"reasons": ["malformed", "unknown_step", "bad_deadline", "busy", "duplicate_request", "failed"],
 	"steps": [
 		{
-			"id": "field_lease",
-			"kind": "field_check",
-			"check": "lease",
-			"deadline_seconds": 45,
-			"proves": "The Karabiner lease is healthy: CLI present, lease phase, guardian ready, no lease failure, key loss or swallowed key this session; the lease answers that timed out, the free memory and the last karabiner.json write (size, time) are named."
-		},
-		{
 			"id": "field_owned_install",
 			"kind": "field_check",
 			"check": "owned_install",
@@ -38,6 +31,13 @@
 			"kind": "reload",
 			"deadline_seconds": 180,
 			"proves": "The driver reloads after the install, so the owner admits the installed runtime before the owned checks run."
+		},
+		{
+			"id": "field_lease",
+			"kind": "field_check",
+			"check": "lease",
+			"deadline_seconds": 45,
+			"proves": "The Karabiner lease is healthy: CLI present, lease phase, guardian ready, no lease failure, key loss or swallowed key this session; the lease answers that timed out, the free memory and the last karabiner.json write (size, time) are named."
 		},
 		{
 			"id": "field_owned_runtime",

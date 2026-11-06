@@ -139,7 +139,15 @@ local function remap_facts()
 	local phase = "unknown"
 	local ok, current = pcall(function() return (require("platform.remap.lease_controller").status()) end)
 	if ok and type(current) == "string" then phase = current end
-	return { enabled = Remap.get_enabled(), phase = phase, guardian = Remap.guardian_state() }
+	local KePaths = require("platform.remap.ke_paths")
+	-- Nil for the shared runtime; for the owned one, whether its owner admitted it
+	local owned_admitted = nil
+	if KePaths.selected_runtime() == KePaths.RUNTIME_OWNED then
+		local status = type(Remap.owned_runtime_status) == "function" and Remap.owned_runtime_status() or nil
+		owned_admitted = type(status) == "table" and status.state == "ready"
+	end
+	return { enabled = Remap.get_enabled(), phase = phase, guardian = Remap.guardian_state(),
+		owned_admitted = owned_admitted }
 end
 
 --- The deployed Karabiner configuration and the tap-hold delays the shared
