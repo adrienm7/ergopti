@@ -158,7 +158,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 - [ ] **[PARITY] WPM:** decide pointer-hide and overlapping colour-source precedence explicitly across OSes; current code differs. Preserve the distinction between an unknown-intent discrepancy and a confirmed bug.
 - [ ] **[PARITY] Linux WPM:** clarify whether no-tray means headless or floating-widget-capable; qualify GTK pumping accordingly. Review an explicit recovery surface for guarded rollback debt without bypassing its fail-closed admission.
 - [ ] **[PARITY] Wrap management:** decide Windows supplementary Unicode scalar support; its UTF-16-length validator currently rejects scalar pairs accepted by macOS. Linux custom pair management is already tracked above; parameter-specific custom delimiters are available.
-- [ ] **[CODE] Wrap documentation:** correct the shared catalogue README claiming two drivers and obsolete open/close/label_key shape; retain trigger normalization separately from spaced output delimiters.
+- [x] **[CODE] Wrap documentation:** correct the shared catalogue README claiming two drivers and obsolete open/close/label_key shape; retain trigger normalization separately from spaced output delimiters. Done: the shared catalogue README now names the three drivers, the real {left, right} group shape, and keeps trigger normalization separate from spaced output delimiters.
 - [ ] **[CI] macOS wrap fixtures:** remove combined-run module-cache/i18n contamination: the combined selection reports 255 passes and four failures while the affected delivery fixture alone passes 12/0. Do not replace actual production owners with more forgiving stubs.
 
 ## Native runtime, editor and diagnostics parity follow-up
