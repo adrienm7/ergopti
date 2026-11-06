@@ -217,7 +217,7 @@ local function formats_lost_by_text_restore(selected_backend)
 	if not ok then return false, {} end
 	local lost = {}
 	for line in listing:gmatch("[^\r\n]+") do
-		local target = line:match("^%s*(.-)%s*$")
+		local target = require("text_utils").trim(line)
 		if target ~= "" and not is_text_equivalent_target(target) then lost[#lost + 1] = target end
 	end
 	return true, lost

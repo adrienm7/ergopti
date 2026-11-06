@@ -189,6 +189,13 @@ const ALLOWED = {
 			reason: 'arg[0] has its backslashes rewritten to "/" first, which native_path never does'
 		}
 	},
+	'linux/adapters/input_source_group_worker.lua': {
+		basename: {
+			count: 1,
+			reason:
+				'ffi-only child whose arg[0] has its backslashes rewritten to "/" first, which native_path never does'
+		}
+	},
 	'linux/ui/webview_manager.lua': {
 		percent_encode: {
 			count: 1,
