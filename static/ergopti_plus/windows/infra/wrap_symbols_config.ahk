@@ -288,6 +288,21 @@ WrapSymbols_IsEnabled(OpenChar) {
 }
 
 ; Build an unpublished active-pairs projection from detached candidates.
+; The saved custom pair a typed symbol belongs to, as its opening or closing
+; character, or 0. The last saved pair wins, as in _WS_BuildActivePairs, so a
+; layout route that carries its own delimiters can still honour a user's pair.
+; @param Symbol {String} The character the key types.
+WrapSymbols_CustomPairFor(Symbol) {
+	global _WS_Custom
+	Found := 0
+	for Pair in _WS_Custom {
+		if (Pair is Map) && Pair.Has("left") && Pair.Has("right")
+				&& (Pair["left"] == Symbol || Pair["right"] == Symbol)
+			Found := Pair
+	}
+	return Found
+}
+
 _WS_BuildActivePairs(Disabled, Custom) {
 	global _WS_BUILTIN_PAIRS
 	if !(Disabled is Map) || !(Custom is Array)
