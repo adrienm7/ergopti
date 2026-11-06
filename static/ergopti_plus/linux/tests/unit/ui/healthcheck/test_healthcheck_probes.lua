@@ -245,9 +245,39 @@ helpers.describe("diagnostics probes (linux)", function()
 		end)
 	end)
 
+	helpers.it("never probes the local Ollama for a selected API backend (ldg-001)", function()
+		with_probes(true, function(Probes, world)
+			local _, answers = start(Probes, { llm = { is_enabled = function() return true end,
+				get_backend = function() return "api" end,
+				get_base_url = function() return "http://127.0.0.1:11435" end } })
+			helpers.assert_eq(answers.ai_health.result.state, "unsupported")
+			for _, request in ipairs(world.requests) do
+				helpers.assert_true(not request.url:find("11435", 1, true), "no request reaches the local Ollama")
+			end
+		end)
+	end)
+
+	helpers.it("probes the selected local Ollama and names it (ldg-001)", function()
+		with_probes(true, function(Probes, world)
+			local _, answers = start(Probes, { llm = { is_enabled = function() return true end,
+				get_backend = function() return "ollama" end,
+				get_base_url = function() return "http://127.0.0.1:11435" end } })
+			local request
+			for _, candidate in ipairs(world.requests) do
+				if candidate.url:find("11435", 1, true) then request = candidate end
+			end
+			helpers.assert_not_nil(request, "the selected Ollama is probed")
+			helpers.assert_eq(request.url, "http://127.0.0.1:11435/api/version")
+			request.callback({ status = 200, body = '{"version":"0.9.1"}' })
+			helpers.assert_eq(answers.ai_health.result.state, "ok")
+			helpers.assert_eq(answers.ai_health.sections.ai.ai_health, "ollama 0.9.1")
+		end)
+	end)
+
 	helpers.it("answers unsupported without libuv rather than blocking the loop", function()
 		with_probes(false, function(Probes, world)
 			local _, answers = start(Probes, { llm = { is_enabled = function() return true end,
+				get_backend = function() return "ollama" end,
 				get_base_url = function() return "http://localhost:11434" end } })
 			helpers.assert_eq(answers.github_api.result.state, "unsupported")
 			helpers.assert_eq(answers.ai_health.result.state, "unsupported")
