@@ -65,9 +65,8 @@ helpers.describe("prediction inline auto-type (llm-inline-autotype-macos)", func
 	end)
 
 	helpers.it("(llm-inline-autotype-macos) the final paint hands its predictions to the inline owner", function()
-		local handle = assert(io.open(helpers.driver_root() .. "/modules/llm/streaming_handler.lua", "rb"))
-		local source = handle:read("*a")
-		handle:close()
+		local source = assert(helpers.read_driver_unit(
+			"if ctx.on_final_predictions then ctx.on_final_predictions(valid_preds) end"))
 		local final = source:find("if ctx.on_final_predictions then ctx.on_final_predictions(valid_preds) end", 1, true)
 		local terminal = source:find("if ctx.on_request_terminal then ctx.on_request_terminal() end\n\t\t\tLogger.success", 1, true)
 		helpers.assert_true(final ~= nil and terminal ~= nil and final > terminal,
