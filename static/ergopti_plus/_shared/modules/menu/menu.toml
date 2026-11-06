@@ -305,8 +305,8 @@ reason_key = "menu.agent.not_ready"
 [[menu.top_level]]
 id = "---"
 
-# macOS only: it lists the applications bundled with the macOS app. Linux had
-# one too, holding a single config-folder row, and that row now lives under
+# The bundled App Cloner and Encryptor: macOS bundles and linux/apps/*.lua,
+# each run as a process of its own (Windows follows, decided 2026-11-06). Linux once held a config-folder row here; it lives under
 # Configuration with the other two drivers' copy of it.
 [[menu.top_level]]
 type = "group"
@@ -314,14 +314,13 @@ id = "apps"
 i18n = "menu.apps.title"
 rows = []
 greyed_when_paused = true
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
-# The separator that closes the group of that row belongs to it: declared for
-# every driver, it stood right after the one above wherever the row is absent.
+# The separator that closes the group of that row belongs to it.
 [[menu.top_level]]
 id = "---"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
 # Versions, Configuration, then Language (the maintainer's order of
@@ -895,15 +894,14 @@ caption_getter = "agent_system_model_caption"
 caption_format = "numbered"
 disabled_when = ["agent_system_model_ready"]
 
-# The Applications submenu, macOS only: it lists the bundled applications
-# found on disk and launches them. Linux's copy held only the config-folder row,
-# which moved to configuration_menu; a row promising per-app settings must not
-# return there until it can carry an application identity through persistence
-# and focus changes.
+# The Applications submenu: one row per bundled app, each launching it. macOS
+# lists the bundles found on disk; Linux lists its two apps. A row
+# promising per-app settings must not return here until it can carry an
+# application identity through persistence and focus changes.
 [[menu.apps_menu]]
 type = "list"
 id = "apps_installed"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
 # The language selector. It had no declaration of any kind: three drivers each

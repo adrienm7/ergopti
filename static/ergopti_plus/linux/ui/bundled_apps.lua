@@ -46,6 +46,7 @@ local DEFAULT_DEPS = {
 	locale = function() return require("infra.i18n").get_locale() end,
 	text = function(key) return require("infra.i18n").get(key) end,
 	getenv = os.getenv,
+	data_home = function() return require("infra.config_paths").data_home() end,
 	spawn = function(executable, args, on_exit)
 		local uv = require("luv")
 		local handle
@@ -121,12 +122,7 @@ end
 --- @return boolean ok
 local function install_desktop_entry(app, executable, words, deps)
 	local Core = require("apps.app_cloner_core")
-	local home = deps.getenv("HOME")
-	local data_home = deps.getenv("XDG_DATA_HOME")
-	if not data_home or data_home:sub(1, 1) ~= "/" then
-		if not home then return false end
-		data_home = home .. "/.local/share"
-	end
+	local data_home = deps.data_home()
 	local launcher = data_home .. "/ergopti/apps/" .. app.desktop_entry .. ".sh"
 	local entry = table.concat({
 		"[Desktop Entry]",

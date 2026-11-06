@@ -1,4 +1,4 @@
---- tests/unit/apps/test_bundled_apps_launcher.lua
+--- tests/unit/ui/bundled_apps/test_bundled_apps_launcher.lua
 
 --- ==============================================================================
 --- MODULE: Linux Bundled Apps Launcher Tests
@@ -21,9 +21,8 @@ local function fake_deps(overrides)
 		locales_dir = function() return "/opt/ergopti/_shared/data/locales" end,
 		locale = function() return "fr" end,
 		text = function(key) return "[" .. key .. "]" end,
-		getenv = function(name)
-			return ({ HOME = "/home/u", ERGOPTI_RUNTIME_PREFIX = "/opt/runtime" })[name]
-		end,
+		getenv = function(name) return ({ ERGOPTI_RUNTIME_PREFIX = "/opt/runtime" })[name] end,
+		data_home = function() return "/home/u/.local/share" end,
 		spawn = function(executable, args) state.spawned[#state.spawned + 1] = { executable, args }; return true end,
 		write_file = function(path, text) state.files[path] = text; return true end,
 	}

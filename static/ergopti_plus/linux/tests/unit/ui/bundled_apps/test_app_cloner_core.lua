@@ -1,4 +1,4 @@
---- tests/unit/apps/test_app_cloner_core.lua
+--- tests/unit/ui/bundled_apps/test_app_cloner_core.lua
 
 --- ==============================================================================
 --- MODULE: Linux App Cloner Tests

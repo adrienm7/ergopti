@@ -24,23 +24,6 @@ local M = {}
 --- The folders the system installs desktop entries into, searched in order.
 M.SYSTEM_APPLICATIONS = "/usr/share/applications/"
 
---- Puts the driver and shared trees on package.path when no launcher did.
-local function ensure_package_path()
-	if package.loaded["infra.literal_module_loader"] then return end
-	local source = debug.getinfo(1, "S").source:gsub("^@", "")
-	local driver = source:match("^(/.*)/apps/[^/]+%.lua$")
-	if not driver then return end
-	for _, shared in ipairs({ driver .. "/../_shared/lua", driver .. "/_shared/lua" }) do
-		local probe = io.open(shared .. "/json.lua", "rb")
-		if probe then
-			probe:close()
-			package.path = table.concat({ driver .. "/?.lua", driver .. "/?/init.lua", shared .. "/?.lua",
-				shared .. "/?/init.lua", package.path }, ";")
-			return
-		end
-	end
-end
-
 --- Whether a command exits 0.
 local function succeeded(command)
 	-- Both os.execute ABIs (a LuaJIT number, or Lua 5.2 true/exit/code) read as one code.
@@ -52,9 +35,11 @@ end
 --- @return table ports
 function M.native_ports()
 	local quote = require("text_utils").shell_quote
-	local home = assert(os.getenv("HOME"), "HOME is not set")
-	local data_home = os.getenv("XDG_DATA_HOME")
-	if not data_home or data_home:sub(1, 1) ~= "/" then data_home = home .. "/.local/share" end
+	local ConfigPaths = require("infra.config_paths")
+	-- The real account home: a clone's profile and the shared VS Code settings
+	-- live there, never in the temporary folder home() falls back to.
+	local home = assert(ConfigPaths.account_home(), "the account has no home folder")
+	local data_home = ConfigPaths.data_home()
 	return {
 		home = home,
 		data_home = data_home,
@@ -142,11 +127,12 @@ function M.run(ports)
 		icon = dialogs.file(t("apps.cloner.prompt_choose_icon"), { filename = ports.home .. "/" })
 	end
 
+	-- Each line is the locale's own label/value pattern (French spaces its colon).
 	local summary = table.concat({
-		t("apps.cloner.summary_source") .. " : " .. source_name,
-		t("apps.cloner.summary_name") .. " : " .. name,
-		t("apps.cloner.summary_url") .. " : " .. (open_item ~= "" and open_item or "—"),
-		t("apps.cloner.summary_icon") .. " : " .. (icon or source.Icon or "—"),
+		t("common.label_value", t("apps.cloner.summary_source"), source_name),
+		t("common.label_value", t("apps.cloner.summary_name"), name),
+		t("common.label_value", t("apps.cloner.summary_url"), open_item ~= "" and open_item or "—"),
+		t("common.label_value", t("apps.cloner.summary_icon"), icon or source.Icon or "—"),
 	}, "\n")
 	if not dialogs.question(t("apps.cloner.title_summary"), summary, t("apps.cloner.btn_clone"), t("button.cancel")) then
 		return "cancelled"
@@ -174,7 +160,6 @@ end
 --- @param argv table
 --- @return number status
 function M.main(argv)
-	ensure_package_path()
 	local options, reason = require("apps.encryptor").parse_arguments(argv)
 	if not options or #options.files > 0 then
 		io.stderr:write("app_cloner.lua: ", reason or "App Cloner takes no file", "\n")

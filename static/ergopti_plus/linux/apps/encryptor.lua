@@ -21,23 +21,6 @@ end
 
 local M = {}
 
---- Puts the driver and shared trees on package.path when no launcher did.
-local function ensure_package_path()
-	if package.loaded["infra.literal_module_loader"] then return end
-	local source = debug.getinfo(1, "S").source:gsub("^@", "")
-	local driver = source:match("^(/.*)/apps/[^/]+%.lua$")
-	if not driver then return end
-	for _, shared in ipairs({ driver .. "/../_shared/lua", driver .. "/_shared/lua" }) do
-		local probe = io.open(shared .. "/json.lua", "rb")
-		if probe then
-			probe:close()
-			package.path = table.concat({ driver .. "/?.lua", driver .. "/?/init.lua", shared .. "/?.lua",
-				shared .. "/?/init.lua", package.path }, ";")
-			return
-		end
-	end
-end
-
 --- Reads the command line.
 --- @param argv table
 --- @return table|nil options { locale, locales_dir, files }
@@ -77,7 +60,6 @@ end
 --- @param argv table
 --- @return number status
 function M.main(argv)
-	ensure_package_path()
 	local options, reason = M.parse_arguments(argv)
 	if not options then
 		io.stderr:write("encryptor.lua: ", reason, "\n")
