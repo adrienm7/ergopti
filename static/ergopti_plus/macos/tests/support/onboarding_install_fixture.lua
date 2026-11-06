@@ -17,6 +17,8 @@ local MODULE_NAMES = {
 	"adapters.timer_scheduler",
 	-- The onboarding names its download cache from the shared folder table.
 	"app_dirs",
+	-- The task lifecycle adapter formats raised errors through the shared owner.
+	"error_description",
 	"hs",
 	"infra.dialog_util",
 	"infra.i18n",
