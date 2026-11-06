@@ -63,6 +63,25 @@ function M.new(...)
 	-- The AI typing context (modules/llm/context.lua), nil on an engine whose
 	-- owner has none: the hotstring matcher itself never depends on it.
 	local ai_context = nil
+	-- The buffer text, as of the last private expansion the matcher kept, that
+	-- descends from a secret. Nothing here is ever logged; nil once the buffer is
+	-- dropped. Typing after it leaves it a prefix of nothing newer.
+	local private_ancestry = nil
+
+	--- Whether text derived from the buffer once `erased` trailing codepoints are
+	--- removed descends from a private expansion the matcher kept: a character
+	--- repeated out of it is a secret-derived scalar and keeps that classification.
+	--- @param erased integer Trailing codepoints the caller is about to erase.
+	--- @return boolean
+	function engine:derives_from_private(erased)
+		if private_ancestry == nil then return false end
+		local cps = {}
+		for cp in self:current_buffer():gmatch("[%z\1-\127\194-\244][\128-\191]*") do cps[#cps + 1] = cp end
+		local keep = #cps - (tonumber(erased) or 0)
+		if keep < 1 then return false end
+		local before = table.concat(cps, "", 1, keep)
+		return private_ancestry:sub(1, #before) == before
+	end
 
 	--- Attaches the observer that mirrors this engine's edits for the AI.
 	--- @param context table typed(), backspaced(), replaced(), reset(), navigated(), text().
@@ -94,6 +113,7 @@ function M.new(...)
 
 	function engine:apply_expansion(result)
 		shared_apply_expansion(self, result)
+		if type(result) == "table" and result.is_private then private_ancestry = self:current_buffer() end
 		if ai_context and type(result) == "table" then
 			-- The text the application now holds in place of the erased trigger,
 			-- the replayed terminator included (the shared engine's own rule).
@@ -113,6 +133,7 @@ function M.new(...)
 	---   treats by `llm.generation.reset_on_nav`; omitted forgets it.
 	function engine:reset(at_boundary, at_line_start, ai_effect)
 		shared_reset(self, at_boundary, at_line_start)
+		private_ancestry = nil
 		if not ai_context then return end
 		if ai_effect == "navigation" then
 			ai_context:navigated()

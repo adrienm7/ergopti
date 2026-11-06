@@ -1516,7 +1516,11 @@ local function main()
 					replacement     = repeated.replacement,
 					backspace_count = repeated.backspace_count,
 					group           = require("config_keys").COMMAND.REPEAT_KEY,
-					final_result    = true,
+					-- The repeated word stays in the matcher (a second repeat, a
+					-- shipped correction), as on Windows and macOS.
+					final_result    = false,
+					-- A character repeated out of a private expansion is derived from it.
+					is_private      = engine:derives_from_private(repeated.backspace_count),
 				}
 			end
 		end
