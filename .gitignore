@@ -178,6 +178,11 @@ static/ergopti_plus/windows/tests/test_config.ini
 # Static asset bundle for the compiled exe
 static/ergopti_plus/windows/build/
 
+# Keyboard layout DLLs built by tools/build/build_windows_keyboard_layout.ps1;
+# the installer script beside them is tracked
+static/ergopti_plus/windows/vendor/keyboard_layout/*/
+static/ergopti_plus/windows/vendor/keyboard_layout/build_receipt.json
+
 
 
 # ======================
