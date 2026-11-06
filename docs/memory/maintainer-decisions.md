@@ -408,3 +408,22 @@ rule and `test_gesture_axis_slots.lua` pins it from evdev frames. The macOS
 engine does not read the axis slots yet (it resolves only direction slots);
 bringing it onto the same rule is a separate TODO item, not a reason to change
 the Linux rule.
+
+## AI predictions run only while the user does nothing (6 November 2026)
+
+A prediction is requested only through the typing pause (the existing debounce)
+and shown only if the user stayed idle until the answer arrived. Any activity
+cancels the debounce, the request in flight (its late answer, retries and
+pacing timer are dropped) and hides the tooltip at once: a non-zero pointer
+move, a click, a wheel or touchpad scroll, a trackpad gesture, an application
+or window switch, or a key the tooltip does not own. The keys that act on a
+shown prediction (accept, select, cycle) and bare modifiers do not count;
+zero-distance motion and Ergopti's own synthetic events do not count. No
+setting, no minimum-display grace window and no pointer travel threshold (the
+Windows 100 px threshold is retired). Activity is not navigation: the AI
+context survives a move or a key, while a click keeps its own reset. Owners:
+macOS `prediction_engine.revoke_for_activity` (O(1) in the keymap mouse and
+keyDown taps) and the keymap utils app/window watchers; Windows
+`LLM_Bridge_OnUserActivity` from the pointer watcher, `_OnPrefixKeyDown` and
+the AltGr foreground WinEvent hook; Linux `prediction_engine.note_user_activity`
+from `on_pointer_event`, `on_consume` and the existing focus poll.
