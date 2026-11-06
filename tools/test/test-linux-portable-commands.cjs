@@ -491,6 +491,7 @@ const PROGRAMS = {
 	hyprctl: optionalTool('Hyprland window identity'),
 	swaymsg: optionalTool('Sway window identity', DRIVER_HOST),
 	niri: optionalTool('Niri window identity'),
+	lswt: optionalTool('wlr-foreign-toplevel window identity (labwc, Wayfire, river)'),
 	'xdg-open': why(
 		`opens links and files; declared dependency: install.sh _check_or_install, ${DEB_RECIPE} Depends and ${RPM_RECIPE} Requires`,
 		DRIVER,
