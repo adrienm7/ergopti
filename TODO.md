@@ -261,7 +261,7 @@ Evidence: [12-scope flow review](docs/audits/platform-parity/2026-11-04-flows/re
 
 ### macOS
 
-- [ ] **[CODE] MCP-001:** Apps selection capture restores an obsolete clipboard over a newer copy. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/report.md).
+- [x] **[CODE] MCP-001:** Apps selection capture restores an obsolete clipboard over a newer copy. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/report.md). Done: once the selection is read, Apps restores only over the generation it read (conditional `Clipboard.restore` receipt, as Search does) and revokes the snapshot after a newer copy.
 - [ ] **[CODE] MCP-002:** Independent macOS clipboard borrowers snapshot another family’s temporary payload. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/report.md).
 - [ ] **[CODE] MCP-003:** Ordinary delayed selection transforms paste captured text into another focused app. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/macos-clipboard/report.md).
 - [x] **[CODE] MCR-001:** Encryptor source conversion can destroy an approved overwrite target on failure. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/macos-crypto/report.md). Approved overwrite is required; improve failure-safe replacement. No unconsented overwrite or explicit atomicity promise is asserted. Done: `encryptor_convert.sh` converts into a stage next to the destination, renames it over the target only on success and removes only that stage on failure.
