@@ -89,6 +89,11 @@ local _pending_mode = "menu"
 local _writer, _reader = nil, nil
 local _opening = nil
 
+-- Whether the last save of the current page was refused. The page's shortcut
+-- auto-close sends `close` right after `save` without reading its answer, so
+-- closing then would destroy the only copy of the draft.
+local _save_refused = false
+
 --- @return table|nil
 local function get_writer()
 	if _writer then return _writer end
@@ -618,6 +623,7 @@ end
 --- @return boolean True when the push reached a live webview.
 function M.push_init(state, context)
 	_opening = nil
+	_save_refused = false
 	local opening = capture_opening(state, context)
 	if not opening then return false end
 	local ok_json, json_mod = pcall(require, "json")
@@ -709,6 +715,7 @@ function M.on_message(payload, state, context)
 		local ok, saved = pcall(save_all, state, data, context)
 		if opening then opening.saving = false end
 		if not ok then error(saved, 0) end
+		_save_refused = saved ~= true
 		if not saved then
 			-- The page flashes its "saved" toast whatever this returns — it does not
 			-- read bridge responses — so a failed write was visible only as a log
@@ -758,8 +765,25 @@ function M.on_message(payload, state, context)
 	end
 
 	if action == "close" then
+		-- Sent only by the shortcut auto-close. It must retire the exact window
+		-- through the manager's epoch-bound capability (audit LVB-001), and never
+		-- after a refused save, which would lose the draft (audit MVB-002).
+		if _save_refused then
+			Logger.warn(LOG, "Hotstring editor kept open: its last save was refused, the draft would be lost.")
+			return { closed = false }
+		end
+		local close = type(context) == "table" and context.close_owned_window or nil
+		if type(close) ~= "function" then
+			Logger.error(LOG, "Hotstring editor close refused — no owned window capability.")
+			return { closed = false }
+		end
+		local ok, closed = pcall(close)
+		if not ok or closed ~= true then
+			Logger.error(LOG, "Hotstring editor window did not close: %s.", tostring(closed))
+			return { closed = false }
+		end
 		Logger.info(LOG, "Hotstring editor closed.")
-		return nil
+		return { closed = true }
 	end
 
 	Logger.debug(LOG, "Unhandled editor action: %s.", tostring(action))
