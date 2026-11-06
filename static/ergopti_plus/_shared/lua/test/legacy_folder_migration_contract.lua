@@ -116,7 +116,7 @@ function M.run(helpers, shared_root)
 		end)
 
 		helpers.it("rewrites only the old default folders of paths.toml (legacy-folder-migration-paths)", function()
-			helpers.assert_eq(#corpus.paths_text, 8, "complete paths.toml vectors")
+			helpers.assert_eq(#corpus.paths_text, 13, "complete paths.toml vectors")
 			-- A Windows row spells backslash separators, a filename byte on POSIX;
 			-- the AutoHotkey replay holds it on Windows.
 			local backslash_separates = NativePath.separators():find("\\", 1, true) ~= nil
@@ -129,7 +129,30 @@ function M.run(helpers, shared_root)
 					helpers.assert_eq(rewritten, expected, row.name)
 				end
 			end
-			helpers.assert_true(replayed >= 6, "the POSIX paths.toml vectors replay")
+			helpers.assert_true(replayed >= 10, "the POSIX paths.toml vectors replay")
+		end)
+
+		helpers.it("rewrites a value the boot TOML reader decodes to the new folder (legacy-folder-migration-toml)", function()
+			-- The boot reader decodes quoted keys, literal strings and escapes: a
+			-- rewrite that matched a narrower spelling left such a locator naming
+			-- the old folder after it moved.
+			local Codec = require("toml_codec.codec")
+			local checked = 0
+			for _, row in ipairs(corpus.paths_text) do
+				if row.os ~= "windows" and type(row.expected) == "string" then
+					local decoded = assert(Codec.decode(row.expected), row.name .. " decodes")
+					for _, rule in ipairs(row.rewrites) do
+						local value = decoded[rule.key]
+						local base = rule.under or rule.new
+						if type(value) == "string" and value ~= "" then
+							helpers.assert_true(value:sub(1, #base) == base or value:sub(1, #rule.new) == rule.new,
+								row.name .. ": " .. rule.key .. " decodes to the new folder, not " .. value)
+							checked = checked + 1
+						end
+					end
+				end
+			end
+			helpers.assert_true(checked >= 7, "every rewritten POSIX vector is read back")
 		end)
 
 		helpers.it("keeps the previous paths.toml text before rewriting it (legacy-folder-migration-backup)", function()

@@ -280,13 +280,115 @@ local function rebased(value, rule)
 	return nil
 end
 
+--- The characters of a TOML basic-string escape, by the letter after `\`.
+local ESCAPES = { b = "\b", t = "\t", n = "\n", f = "\f", r = "\r", ['"'] = '"', ["\\"] = "\\" }
+
+--- Encodes one code point as UTF-8 (LuaJIT has no utf8 library).
+--- @param code integer
+--- @return string|nil bytes Nil for a value TOML does not admit.
+local function utf8_char(code)
+	if code < 0 or code > 0x10FFFF or (code >= 0xD800 and code <= 0xDFFF) then return nil end
+	if code < 0x80 then return string.char(code) end
+	if code < 0x800 then return string.char(0xC0 + math.floor(code / 0x40), 0x80 + code % 0x40) end
+	if code < 0x10000 then
+		return string.char(0xE0 + math.floor(code / 0x1000), 0x80 + math.floor(code / 0x40) % 0x40, 0x80 + code % 0x40)
+	end
+	return string.char(0xF0 + math.floor(code / 0x40000), 0x80 + math.floor(code / 0x1000) % 0x40,
+		0x80 + math.floor(code / 0x40) % 0x40, 0x80 + code % 0x40)
+end
+
+--- Reads one single-line TOML string starting at `at`.
+--- @param line string
+--- @param at integer Index of the opening quote.
+--- @return string|nil value Decoded value; nil when the line holds no valid string there.
+--- @return integer|nil after Index after the closing quote.
+--- @return string|nil kind "basic" or "literal".
+local function read_string(line, at)
+	local quote = line:sub(at, at)
+	if quote == "'" then
+		local close = line:find("'", at + 1, true)
+		if not close then return nil end
+		return line:sub(at + 1, close - 1), close + 1, "literal"
+	end
+	if quote ~= '"' then return nil end
+	local parts, index = {}, at + 1
+	while index <= #line do
+		local char = line:sub(index, index)
+		if char == '"' then return table.concat(parts), index + 1, "basic" end
+		if char == "\\" then
+			local letter = line:sub(index + 1, index + 1)
+			if ESCAPES[letter] then
+				parts[#parts + 1] = ESCAPES[letter]
+				index = index + 2
+			elseif letter == "u" or letter == "U" then
+				local width = letter == "u" and 4 or 8
+				local hex = line:sub(index + 2, index + 1 + width)
+				local char_bytes = #hex == width and hex:match("^%x+$") and utf8_char(tonumber(hex, 16))
+				if not char_bytes then return nil end
+				parts[#parts + 1] = char_bytes
+				index = index + 2 + width
+			else
+				return nil
+			end
+		else
+			parts[#parts + 1] = char
+			index = index + 1
+		end
+	end
+	return nil
+end
+
+--- Spells a value as a TOML string of the same kind as the one it replaces.
+--- A literal string cannot hold a quote or a control character; such a value
+--- becomes a basic string.
+--- @param value string
+--- @param kind string "basic" or "literal".
+--- @return string
+local function spell_string(value, kind)
+	if kind == "literal" and not value:find("[%c']") then return "'" .. value .. "'" end
+	return '"' .. value:gsub('[%c"\\]', function(char)
+		for letter, escaped in pairs(ESCAPES) do
+			if escaped == char then return "\\" .. letter end
+		end
+		return string.format("\\u%04X", char:byte())
+	end) .. '"'
+end
+
+--- Splits one `key = "value"` line of paths.toml, as the boot TOML reader
+--- reads it: a bare or quoted key, and a basic or literal single-line string.
+--- @param line string
+--- @return table|nil parts { indent, key, key_text, spacing, value, kind, rest }.
+local function parse_assignment(line)
+	local indent = line:match("^%s*")
+	local at = #indent + 1
+	local key, key_text, after
+	local bare = line:match("^[%w_%-]+", at)
+	if bare then
+		key, key_text, after = bare, bare, at + #bare
+	else
+		local kind
+		key, after, kind = read_string(line, at)
+		if not key then return nil end
+		key_text = line:sub(at, after - 1)
+		if kind == nil then return nil end
+	end
+	local spacing = line:match("^%s*=%s*", after)
+	if not spacing then return nil end
+	local value, value_after, kind = read_string(line, after + #spacing)
+	if not value then return nil end
+	return { indent = indent, key = key, key_text = key_text, spacing = spacing, value = value, kind = kind,
+		rest = line:sub(value_after) }
+end
+
 --- Rewrites the paths.toml keys that name an old default folder.
 ---
 --- Only a `Key = "value"` line whose value is one of the key's old spellings,
 --- or a folder below one, is changed: the old folder itself becomes `new`, a
 --- folder below it the same folder below `under` (where the old folder went;
---- `new` by default), with the same trailing separator. Every other line is
---- kept byte for byte, comments included.
+--- `new` by default), with the same trailing separator. A quoted key and a
+--- literal string are read as the boot TOML reader reads them, and the new
+--- value keeps the string kind of the old one. Every other line is kept byte
+--- for byte, comments included.
 --- @param text string paths.toml content.
 --- @param rewrites table Array of { key, old = {spellings}, new, under }.
 --- @return string|nil rewritten New text, or nil when nothing changed.
@@ -294,14 +396,14 @@ function M.rewrite_paths_text(text, rewrites)
 	assert(type(text) == "string", "paths.toml text must be a string")
 	local changed = false
 	local out = text:gsub("([^\n]*)", function(line)
-		local indent, key, spacing, value, rest = line:match('^(%s*)([%w_]+)(%s*=%s*)"([^"]*)"(.*)$')
-		if not key then return line end
+		local parts = parse_assignment(line)
+		if not parts then return line end
 		for _, rule in ipairs(rewrites) do
-			if rule.key == key then
-				local new = rebased(value, rule)
-				if new and new ~= value then
+			if rule.key == parts.key then
+				local new = rebased(parts.value, rule)
+				if new and new ~= parts.value then
 					changed = true
-					return indent .. key .. spacing .. '"' .. new .. '"' .. rest
+					return parts.indent .. parts.key_text .. parts.spacing .. spell_string(new, parts.kind) .. parts.rest
 				end
 				if new then return line end
 			end

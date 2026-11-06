@@ -201,12 +201,119 @@ LegacyFolderNormalize(Value) {
 		return RTrim(Value, "\")
 }
 
+; Reads one single-line TOML string at Pos of Line, as the boot TOML reader
+; does: a literal string as written, a basic string with its escapes decoded.
+; Mirrors read_string of _shared/lua/legacy_folder_migration.lua.
+; @param Line {String}
+; @param Pos {Integer} Position of the opening quote.
+; @param Value {VarRef} Receives the decoded value.
+; @param After {VarRef} Receives the position after the closing quote.
+; @param Kind {VarRef} Receives "basic" or "literal".
+; @returns {Boolean} False when no valid string starts there.
+LegacyFolderReadTomlString(Line, Pos, &Value, &After, &Kind) {
+		static Escapes := Map("b", "`b", "t", "`t", "n", "`n", "f", "`f", "r", "`r", '"', '"', "\", "\")
+		Quote := SubStr(Line, Pos, 1)
+		if (Quote == "'") {
+				Close := InStr(Line, "'", true, Pos + 1)
+				if !Close
+						return false
+				Value := SubStr(Line, Pos + 1, Close - Pos - 1), After := Close + 1, Kind := "literal"
+				return true
+		}
+		if (Quote != '"')
+				return false
+		Value := "", Index := Pos + 1
+		while (Index <= StrLen(Line)) {
+				Char := SubStr(Line, Index, 1)
+				if (Char == '"') {
+						After := Index + 1, Kind := "basic"
+						return true
+				}
+				if (Char != "\") {
+						Value .= Char, Index += 1
+						continue
+				}
+				Letter := SubStr(Line, Index + 1, 1)
+				if Escapes.Has(Letter) {
+						Value .= Escapes[Letter], Index += 2
+						continue
+				}
+				if (Letter !== "u" && Letter !== "U")
+						return false
+				Width := (Letter == "u") ? 4 : 8
+				Hex := SubStr(Line, Index + 2, Width)
+				if !RegExMatch(Hex, "^[0-9A-Fa-f]{" . Width . "}$")
+						return false
+				Code := Integer("0x" . Hex)
+				if (Code > 0x10FFFF || (Code >= 0xD800 && Code <= 0xDFFF))
+						return false
+				Value .= Chr(Code), Index += 2 + Width
+		}
+		return false
+}
+
+; Spells a value as a TOML string of the kind it replaces; a literal string
+; cannot hold a quote or a control character, so such a value becomes basic.
+; Mirrors spell_string of _shared/lua/legacy_folder_migration.lua.
+; @param Value {String}
+; @param Kind {String} "basic" or "literal".
+; @returns {String}
+LegacyFolderSpellTomlString(Value, Kind) {
+		if (Kind == "literal" && !RegExMatch(Value, "['\x00-\x1F\x7F]"))
+				return "'" . Value . "'"
+		Out := ""
+		loop parse Value {
+				Code := Ord(A_LoopField)
+				if (A_LoopField == "\" || A_LoopField == '"')
+						Out .= "\" . A_LoopField
+				else if (Code == 8)
+						Out .= "\b"
+				else if (Code == 9)
+						Out .= "\t"
+				else if (Code == 10)
+						Out .= "\n"
+				else if (Code == 12)
+						Out .= "\f"
+				else if (Code == 13)
+						Out .= "\r"
+				else if (Code < 0x20 || Code == 0x7F)
+						Out .= Format("\u{:04X}", Code)
+				else
+						Out .= A_LoopField
+		}
+		return '"' . Out . '"'
+}
+
+; Splits one `key = "value"` line of paths.toml as the boot TOML reader reads
+; it: a bare or quoted key, and a basic or literal single-line string.
+; Mirrors parse_assignment of _shared/lua/legacy_folder_migration.lua.
+; @param Line {String}
+; @returns {Map|String} "indent", "key", "key_text", "spacing", "value", "kind"
+;   and "rest", or "" when the line is not such an assignment.
+LegacyFolderParseAssignment(Line) {
+		RegExMatch(Line, "^\s*", &Indent)
+		Pos := Indent.Len + 1
+		if RegExMatch(Line, "\G[A-Za-z0-9_-]+", &Bare, Pos) {
+				Key := Bare[0], KeyText := Bare[0], After := Pos + Bare.Len
+		} else {
+				if !LegacyFolderReadTomlString(Line, Pos, &Key, &After, &KeyKind)
+						return ""
+				KeyText := SubStr(Line, Pos, After - Pos)
+		}
+		if !RegExMatch(Line, "\G\s*=\s*", &Spacing, After)
+				return ""
+		if !LegacyFolderReadTomlString(Line, After + Spacing.Len, &Value, &ValueAfter, &Kind)
+				return ""
+		return Map("indent", Indent[0], "key", Key, "key_text", KeyText, "spacing", Spacing[0], "value", Value,
+				"kind", Kind, "rest", SubStr(Line, ValueAfter))
+}
+
 ; The new value of one locator, or "" when the rule does not name it. Mirrors
 ; rebased of _shared/lua/legacy_folder_migration.lua: the old folder itself
 ; becomes "new", a folder below it the same folder below "under" (where the old
 ; folder went; "new" by default). The comparison ignores case, as Windows paths
 ; do, and the result keeps the separator style of the value.
-; @param Value {String} Current value, as spelled in the line.
+; @param Value {String} Current value, decoded.
 ; @param Rule {Map} "old" (Array), "new" and an optional "under".
 ; @returns {String}
 LegacyFolderRebased(Value, Rule) {
@@ -232,17 +339,16 @@ LegacyFolderRebased(Value, Rule) {
 		}
 		if (New == "")
 				return ""
-		; Keep the separator style of the line: forward slashes, or the doubled
-		; backslashes of a TOML basic string.
+		; Keep the separator style of the value; the string spelling doubles a
+		; backslash of a basic string.
 		if InStr(Value, "/")
 				New := StrReplace(New, "\", "/")
-		else if InStr(Value, "\\")
-				New := StrReplace(New, "\", "\\")
 		return New
 }
 
 ; Rewrites the paths.toml lines whose value is an old default folder or a
-; folder below one. Mirrors rewrite_paths_text of
+; folder below one, reading quoted keys, literal strings and escapes as the
+; boot TOML reader does. Mirrors rewrite_paths_text of
 ; _shared/lua/legacy_folder_migration.lua.
 ; @param Text {String} paths.toml content.
 ; @param Rewrites {Array} Maps with "key", "old" (Array), "new" and an optional "under".
@@ -254,19 +360,21 @@ LegacyFolderRewritePathsText(Text, Rewrites) {
 		for Index, Line in Lines {
 				if (Index > 1)
 						Out .= "`n"
-				if !RegExMatch(Line, '^(\s*)(\w+)(\s*=\s*)"([^"]*)"(.*)$', &Match) {
+				Parts := LegacyFolderParseAssignment(Line)
+				if !(Parts is Map) {
 						Out .= Line
 						continue
 				}
 				Replacement := Line
 				for Rule in Rewrites {
-						if (Rule["key"] != Match[2])
+						if (Rule["key"] !== Parts["key"])
 								continue
-						New := LegacyFolderRebased(Match[4], Rule)
+						New := LegacyFolderRebased(Parts["value"], Rule)
 						if (New == "")
 								continue
-						if (New != Match[4]) {
-								Replacement := Match[1] . Match[2] . Match[3] . '"' . New . '"' . Match[5]
+						if (New !== Parts["value"]) {
+								Replacement := Parts["indent"] . Parts["key_text"] . Parts["spacing"]
+										. LegacyFolderSpellTomlString(New, Parts["kind"]) . Parts["rest"]
 								Changed := true
 						}
 						break
