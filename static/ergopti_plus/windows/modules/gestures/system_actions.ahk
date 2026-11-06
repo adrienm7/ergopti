@@ -391,13 +391,31 @@ GestureSysQuitFrontmostApp(Sys := 0) {
 			LoggerError("gestures", "The active window of process {1} could not be asked to close.", Active.Pid)
 		return
 	}
+	; PostClose returns the Win32 receipt without throwing: a refused WM_CLOSE
+	; (an elevated target, a dead window) is counted here or it is never seen.
 	Closed := 0
+	Refused := 0
 	for Hwnd in Sys.WindowsOfProcess(Active.Pid) {
 		if A_IsSuspended || Transition != _LifecycleLatestTransition {
 			LoggerInfo("gestures", "quit_frontmost_app was cancelled before a process window close: suspended or original lifecycle transition retired.")
 			return false
 		}
-		Closed += Sys.PostClose(Hwnd) ? 1 : 0
+		if Sys.PostClose(Hwnd)
+			Closed += 1
+		else
+			Refused += 1
+	}
+	if (Closed = 0 && Refused = 0) {
+		LoggerWarn("gestures", "quit_frontmost_app: process {1} has no window to close.", Active.Pid)
+		return false
+	}
+	if (Closed = 0) {
+		LoggerError("gestures", "No window of process {1} could be asked to close ({2} refused).", Active.Pid, Refused)
+		return false
+	}
+	if (Refused > 0) {
+		LoggerWarn("gestures", "Asked process {1} to close {2} window(s); {3} refused.", Active.Pid, Closed, Refused)
+		return false
 	}
 	LoggerInfo("gestures", "Asked process {1} to close its {2} window(s).", Active.Pid, Closed)
 }
