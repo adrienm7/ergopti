@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Kun macOS: disse handlinger skifter det navigationslag, som Karabiner-Elements holder. På Windows og Linux følger laget den nedholdte tast og har ingen kontakt at indstille.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "Dette system lader ingen app lukke notifikationer: ryd dem i notifikationscenteret, som den tilsvarende handling åbner.",
 	"platform_reason.action_office_bold_key_is_windows": "Kun Windows: fransk Microsoft Office gør tekst fed med Ctrl+G, hvor andre apps bruger Ctrl+B, så denne handling vælger tasten efter app. På macOS (Cmd+B) og Linux (Ctrl+B) virker én kombination overalt: tildel den fra »Genveje«.",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Ikke på Linux: Wayland lader ingen app flytte markøren, og denne handling har ingen udgave begrænset til X11-sessioner.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Dette system optager skærmen fra sit eget optageværktøj (Skærmbillede-bjælken på macOS, værktøjet i GNOME eller KDE), som den tilsvarende handling åbner.",
 	"platform_reason.action_same_action_under_another_name": "Dette system tilbyder den samme handling under et andet navn: brug den tilsvarende handling.",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "Ikke på Linux: at tegne over alle vinduer kræver en overlejringsflade, som Wayland-compositorer ikke giver nogen app.",

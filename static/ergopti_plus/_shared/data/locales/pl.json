@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Tylko macOS: te akcje przełączają warstwę nawigacji przechowywaną w Karabiner-Elements. W Windows i Linuksie warstwa podąża za przytrzymanym klawiszem i nie ma przełącznika do ustawienia.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "Ten system nie pozwala żadnej aplikacji zamykać powiadomień: wyczyść je w centrum powiadomień, które otwiera równoważna akcja.",
 	"platform_reason.action_office_bold_key_is_windows": "Tylko Windows: francuski Microsoft Office pogrubia tekst skrótem Ctrl+G, gdzie inne aplikacje używają Ctrl+B, więc ta akcja dobiera klawisz do aplikacji. W macOS (Cmd+B) i Linuksie (Ctrl+B) jedna kombinacja działa wszędzie: przypisz ją z sekcji „Skróty”.",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Nie w Linuksie: Wayland nie pozwala żadnej aplikacji przesuwać wskaźnika, a ta akcja nie ma wersji ograniczonej do sesji X11.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Ten system nagrywa ekran z własnego narzędzia przechwytywania (paska Zrzut ekranu w macOS, narzędzia GNOME lub KDE), które otwiera równoważna akcja.",
 	"platform_reason.action_same_action_under_another_name": "Ten system oferuje tę samą akcję pod inną nazwą: użyj równoważnej akcji.",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "Nie w Linuksie: rysowanie nad wszystkimi oknami wymaga powierzchni nakładki, której kompozytory Wayland nie dają żadnej aplikacji.",

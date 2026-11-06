@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "macOS 전용: 이 동작들은 Karabiner-Elements 안에 보관되는 탐색 레이어를 전환합니다. Windows와 Linux에서는 레이어가 누르고 있는 키를 따르며 설정할 스위치가 없습니다.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "이 시스템은 어떤 앱도 알림을 닫지 못하게 합니다: 대응하는 동작이 여는 알림 센터에서 지우세요.",
 	"platform_reason.action_office_bold_key_is_windows": "Windows 전용: 프랑스어 Microsoft Office는 다른 앱이 Ctrl+B를 쓰는 곳에서 Ctrl+G로 굵게 하므로, 이 동작은 앱에 따라 키를 고릅니다. macOS(Cmd+B)와 Linux(Ctrl+B)에서는 한 조합이 어디서나 통합니다: \"단축키\"에서 지정하세요.",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Linux에는 없음: Wayland는 어떤 앱도 포인터를 움직이지 못하게 하며, 이 동작에는 X11 세션 전용 버전이 없습니다.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "이 시스템은 자체 캡처 도구(macOS 스크린샷 막대, GNOME 또는 KDE 도구)에서 화면을 녹화하며, 대응하는 동작이 그 도구를 엽니다.",
 	"platform_reason.action_same_action_under_another_name": "이 시스템은 같은 동작을 다른 이름으로 제공합니다: 대응하는 동작을 사용하세요.",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "Linux에는 없음: 모든 창 위에 그리려면 오버레이 표면이 필요한데, Wayland 컴포지터는 이를 어떤 앱에도 주지 않습니다.",

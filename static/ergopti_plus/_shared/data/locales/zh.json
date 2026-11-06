@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "仅限 macOS：这些操作切换保存在 Karabiner-Elements 中的导航层。在 Windows 和 Linux 上，该层跟随按住的键，没有可设置的开关。",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "此系统不允许任何应用关闭通知：请在对应操作打开的通知中心里清除它们。",
 	"platform_reason.action_office_bold_key_is_windows": "仅限 Windows：法语版 Microsoft Office 用 Ctrl+G 加粗，而其他应用用 Ctrl+B，因此此操作按应用选择按键。在 macOS（Cmd+B）和 Linux（Ctrl+B）上一个组合到处通用：请在“快捷键”中绑定它。",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Linux 上没有：Wayland 不允许任何应用移动指针，而此操作没有仅限 X11 会话的版本。",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "此系统通过自己的截图工具（macOS 的截屏工具栏、GNOME 或 KDE 的工具）录制屏幕，对应的操作会打开该工具。",
 	"platform_reason.action_same_action_under_another_name": "此系统以另一个名称提供相同的操作：请使用对应的操作。",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "Linux 上没有：在所有窗口之上绘制需要一个覆盖层表面，而 Wayland 合成器不会把它交给任何应用。",

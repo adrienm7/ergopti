@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Solo macOS: queste azioni commutano il livello di navigazione tenuto in Karabiner-Elements. Su Windows e Linux il livello segue il tasto tenuto premuto e non ha un interruttore da impostare.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "Questo sistema non lascia a nessuna app chiudere le notifiche: cancellale nel centro notifiche, che l'azione equivalente apre.",
 	"platform_reason.action_office_bold_key_is_windows": "Solo Windows: Microsoft Office in francese mette in grassetto con Ctrl+G dove le altre app usano Ctrl+B, quindi questa azione sceglie il tasto in base all'app. Su macOS (Cmd+B) e Linux (Ctrl+B) una sola combinazione va bene ovunque: assegnala da «Scorciatoie».",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Non su Linux: Wayland non lascia a nessuna app spostare il puntatore, e questa azione non ha una versione limitata alle sessioni X11.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Questo sistema registra lo schermo dal proprio strumento di cattura (la barra Istantanea schermo di macOS, lo strumento di GNOME o KDE), che l'azione equivalente apre.",
 	"platform_reason.action_same_action_under_another_name": "Questo sistema offre la stessa azione con un altro nome: usa l'azione equivalente.",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "Non su Linux: disegnare sopra tutte le finestre richiede una superficie sovrapposta che i compositori Wayland non concedono a nessuna app.",

@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "macOS only: these switch the navigation layer kept inside Karabiner-Elements. On Windows and Linux the layer follows the key held down and has no switch to set.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "This system lets no application dismiss notifications: clear them in the notification centre, which the equivalent action opens.",
 	"platform_reason.action_office_bold_key_is_windows": "Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”.",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Not on Linux: Wayland lets no application move the pointer, and this action has no version limited to X11 sessions.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "This system records the screen from its own capture tool (the macOS Screenshot toolbar, the GNOME or KDE screenshot tool), which the equivalent action opens.",
 	"platform_reason.action_same_action_under_another_name": "This system offers the same action under another name: use the equivalent action.",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "Not on Linux: drawing over every window needs an overlay surface that Wayland compositors give no application.",

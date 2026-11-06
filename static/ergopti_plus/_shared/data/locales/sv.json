@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Endast macOS: de här åtgärderna växlar navigationslagret som Karabiner-Elements håller. I Windows och Linux följer lagret den nedhållna tangenten och har ingen brytare att ställa in.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "Det här systemet låter ingen app stänga notiser: rensa dem i notiscentret, som motsvarande åtgärd öppnar.",
 	"platform_reason.action_office_bold_key_is_windows": "Endast Windows: franska Microsoft Office gör text fet med Ctrl+G där andra appar använder Ctrl+B, så den här åtgärden väljer tangent efter app. I macOS (Cmd+B) och Linux (Ctrl+B) fungerar en kombination överallt: tilldela den från ”Kortkommandon”.",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Inte i Linux: Wayland låter ingen app flytta pekaren, och den här åtgärden har ingen version begränsad till X11-sessioner.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Det här systemet spelar in skärmen från sitt eget skärmdumpsverktyg (Skärmdump-fältet i macOS, verktyget i GNOME eller KDE), som motsvarande åtgärd öppnar.",
 	"platform_reason.action_same_action_under_another_name": "Det här systemet erbjuder samma åtgärd under ett annat namn: använd motsvarande åtgärd.",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "Inte i Linux: att rita över alla fönster kräver en överlagringsyta som Wayland-kompositörer inte ger någon app.",

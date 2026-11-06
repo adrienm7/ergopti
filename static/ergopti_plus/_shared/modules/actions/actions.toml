@@ -958,10 +958,10 @@ requires_linux = ["tool:pactl"]
 platform = "all"
 
 [sg_actions.center_mouse]
-# The centre of the screen under the pointer. Linux, as for teleport_mouse, has
-# no compositor-independent way to warp the pointer.
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_pointer_cannot_be_moved_on_linux"
+# The centre of the screen under the pointer. Linux moves it on X11 only
+# (modules/gestures/pointer_warp.lua): Wayland lets no client warp the pointer.
+platform = "all"
+requires_linux = ["session:x11", "tool:xdotool", "tool:xrandr"]
 
 [sg_actions.run_program]
 # Versioned absolute executable plus a literal argument vector, owned by the action lifecycle.
@@ -1317,11 +1317,11 @@ requires_linux = ["tool:xclip", "tool:xdg-open"]
 parameter = "search_url"
 
 [sg_actions.teleport_mouse]
-# Implemented on BOTH: Windows in modules/shortcuts, macOS in
-# modules/shortcuts/actions/. Linux has no compositor-independent API for
-# warping the pointer, and Wayland intentionally forbids global pointer moves.
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_pointer_cannot_be_moved_on_linux"
+# Windows in modules/shortcuts, macOS in modules/shortcuts/actions/, Linux on
+# X11 only (modules/gestures/pointer_warp.lua): Wayland intentionally forbids
+# global pointer moves.
+platform = "all"
+requires_linux = ["session:x11", "tool:xdotool", "tool:xrandr"]
 
 # The case actions share one rule on every driver, pinned by the corpus
 # _shared/tests/corpus/text_case/vectors.json that the three suites replay:

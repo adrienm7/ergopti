@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "macOS のみ：これらの操作は Karabiner-Elements 内に保持されるナビゲーションレイヤーを切り替えます。Windows と Linux ではレイヤーは押し続けているキーに従い、設定するスイッチはありません。",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "このシステムはどのアプリにも通知を閉じることを許しません：同等の操作で開く通知センターで消去してください。",
 	"platform_reason.action_office_bold_key_is_windows": "Windows のみ：フランス語版 Microsoft Office は他のアプリが Ctrl+B を使うところで Ctrl+G で太字にするため、この操作はアプリに応じてキーを選びます。macOS（Cmd+B）と Linux（Ctrl+B）では 1 つの組み合わせがどこでも使えます：「ショートカット」から割り当ててください。",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Linux にはありません：Wayland はどのアプリにもポインタの移動を許さず、この操作には X11 セッション限定の版もありません。",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "このシステムは独自のキャプチャツール（macOS のスクリーンショットバー、GNOME や KDE のツール）から画面を収録します。同等の操作がそのツールを開きます。",
 	"platform_reason.action_same_action_under_another_name": "このシステムは同じ操作を別の名前で提供しています：同等の操作を使ってください。",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "Linux にはありません：すべてのウインドウの上に描くにはオーバーレイ面が必要ですが、Wayland のコンポジターはそれをどのアプリにも与えません。",

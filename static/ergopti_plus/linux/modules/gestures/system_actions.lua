@@ -256,6 +256,11 @@ end
 --- receives { run_background = fn(cmd), clipboard = adapter, emit_combo = fn,
 --- sleep_ms = fn } from the executor.
 M.HANDLERS = {
+	-- X11 pointer moves (modules/gestures/pointer_warp.lua); Wayland refuses.
+	center_mouse = function(deps) require("modules.gestures.pointer_warp").center_mouse(deps) end,
+	teleport_mouse = function(deps)
+		require("modules.gestures.pointer_warp").teleport_mouse({ run_background = deps.run_background, notify = notify })
+	end,
 	-- Backgrounded, the command's failure is invisible: with none of the
 	-- clients installed nothing could ever be cleared, which is said here.
 	clear_notifications = function(deps)

@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Alleen macOS: deze acties schakelen de navigatielaag die Karabiner-Elements bijhoudt. Op Windows en Linux volgt de laag de ingedrukte toets en heeft geen schakelaar.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "Dit systeem laat geen enkele app meldingen sluiten: wis ze in het meldingencentrum, dat de gelijkwaardige actie opent.",
 	"platform_reason.action_office_bold_key_is_windows": "Alleen Windows: het Franse Microsoft Office maakt tekst vet met Ctrl+G waar andere apps Ctrl+B gebruiken, dus kiest deze actie de toets per app. Op macOS (Cmd+B) en Linux (Ctrl+B) werkt één combinatie overal: koppel die via ‘Sneltoetsen’.",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Niet op Linux: Wayland laat geen enkele app de aanwijzer verplaatsen, en deze actie heeft geen versie die beperkt is tot X11-sessies.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Dit systeem neemt het scherm op vanuit zijn eigen opnamehulpmiddel (de Schermafbeelding-balk van macOS, het hulpmiddel van GNOME of KDE), dat de gelijkwaardige actie opent.",
 	"platform_reason.action_same_action_under_another_name": "Dit systeem biedt dezelfde actie onder een andere naam: gebruik de gelijkwaardige actie.",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "Niet op Linux: tekenen boven alle vensters vraagt een overlay-oppervlak dat Wayland-compositors aan geen enkele app geven.",

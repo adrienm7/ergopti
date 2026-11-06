@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Pouze macOS: tyto akce přepínají navigační vrstvu uloženou v Karabiner-Elements. Ve Windows a Linuxu vrstva sleduje drženou klávesu a nemá žádný přepínač.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "Tento systém žádné aplikaci nedovolí zavírat oznámení: vymažte je v centru oznámení, které otevře odpovídající akce.",
 	"platform_reason.action_office_bold_key_is_windows": "Pouze Windows: francouzský Microsoft Office dává tučné písmo zkratkou Ctrl+G, kde jiné aplikace používají Ctrl+B, proto tato akce volí klávesu podle aplikace. V macOS (Cmd+B) a Linuxu (Ctrl+B) funguje jedna kombinace všude: přiřaďte ji v části „Klávesové zkratky“.",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Ne v Linuxu: Wayland žádné aplikaci nedovolí pohnout ukazatelem a tato akce nemá verzi omezenou na relace X11.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Tento systém nahrává obrazovku ze svého nástroje pro zachycení (lišta Snímek obrazovky v macOS, nástroj GNOME nebo KDE), který otevře odpovídající akce.",
 	"platform_reason.action_same_action_under_another_name": "Tento systém nabízí stejnou akci pod jiným názvem: použijte odpovídající akci.",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "Ne v Linuxu: kreslení přes všechna okna vyžaduje překryvnou plochu, kterou kompozitory Waylandu žádné aplikaci neposkytnou.",

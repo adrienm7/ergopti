@@ -427,7 +427,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.open_list_vars`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 - [ ] `sg_actions.open_key_history`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 
-## linux — 77 actions not declared
+## linux — 75 actions not declared
 
 - [ ] `sg_actions.lookup`: macOS only: Look Up opens the system dictionary panel on the word under the pointer. Windows and Linux have no system dictionary panel.
 - [ ] `sg_actions.system_app_switcher`: macOS only: macOS switches between applications, each holding its windows. Windows and Linux switch between windows with Alt+Tab: use the equivalent action. Equivalent actions: `app_switcher`.
@@ -445,7 +445,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.desktop_close`: Not on Linux: the number of desktops belongs to each desktop's own settings (GNOME adds and removes them by itself, KDE and Xfce keep a set count), and Wayland gives no application a request to change it.
 - [ ] `sg_actions.task_view`: Each system has its own window overview: Mission Control and App Exposé on macOS, Task View on Windows. Linux desktops each bind their own, so bind your desktop's key as a keystroke there.
 - [ ] `sg_actions.screen_record`: This system records the screen from its own capture tool (the macOS Screenshot toolbar, the GNOME or KDE screenshot tool), which the equivalent action opens. Equivalent actions: `screen_capture`.
-- [ ] `sg_actions.center_mouse`: Not on Linux: Wayland lets no application move the pointer, and this action has no version limited to X11 sessions.
 - [ ] `sg_actions.run_apple_shortcut`: macOS only: Apple Shortcuts exist only on macOS. Elsewhere, run a command or a program instead. Equivalent actions: `run_command`, `run_program`.
 - [ ] `sg_actions.remove_quarantine_selection`: Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file.
 - [ ] `sg_actions.unblock_file_selection`: Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file.
@@ -454,7 +453,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.take_note`: Windows only: this opens the day's notes file in Notepad, the editor every Windows ships. macOS has its own Quick Note (Fn+Q), and Linux has no editor every desktop ships.
 - [ ] `sg_actions.activity_simulation`: Not on Linux: each Linux desktop keeps a session awake through its own idle inhibitor (the presentation mode of KDE and Xfce, a Caffeine extension on GNOME); turn it on there.
 - [ ] `sg_actions.display_mirror_toggle`: No toggle on Linux: GNOME and KDE choose Duplicate in their own Super+P display switcher; bind that key as a keystroke.
-- [ ] `sg_actions.teleport_mouse`: Not on Linux: Wayland lets no application move the pointer, and this action has no version limited to X11 sessions.
 - [ ] `sg_actions.spotlight_mouse`: Not on Linux: drawing over every window needs an overlay surface that Wayland compositors give no application.
 - [ ] `sg_actions.microsoft_bold`: Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”.
 - [ ] `sg_actions.one_shot_shift`: This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.
