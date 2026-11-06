@@ -155,7 +155,11 @@ _CFAS_BothSectionTogglesReport() {
 	Owner := _DriverFuncBody("_ConfigCommitHotstringIntent")
 	Gateway := _DriverFuncBody("ConfigCommitBuilt")
 	Assert(Owner != "" && Gateway != "", "the common reporting path must exist")
-	Assert(InStr(Owner, "if !ConfigCommitBuilt(") > 0 && InStr(Gateway, "ConfigReportPersistenceFailure(") > 0,
+	; The gateway reports through the path-aware wrapper, which adds the session
+	; detail and then reaches the one explicit reporter.
+	PathReporter := _DriverFuncBody("_ConfigReportPathPersistenceFailure")
+	Assert(InStr(Owner, "if !ConfigCommitBuilt(") > 0 && InStr(Gateway, "_ConfigReportPathPersistenceFailure(") > 0
+		&& InStr(PathReporter, "return ConfigReportPersistenceFailure(") > 0,
 		"every construction or durable refusal must reach the explicit failure reporter")
 }
 

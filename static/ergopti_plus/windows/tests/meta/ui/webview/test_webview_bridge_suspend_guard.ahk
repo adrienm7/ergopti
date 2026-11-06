@@ -142,6 +142,27 @@ _A0720WV_MessageHandlers() {
 		}
 		Pos += StrLen(m[0])
 	}
+	; Hosts that register through their own subscription owner forward a
+	; parameter named Handler: the real handler is the one each owner receives
+	; for its "message" kind (or its only kind).
+	if Seen.Has("Handler") {
+		Seen.Delete("Handler")
+		Kept := []
+		for Name in Out
+			if (Name != "Handler")
+				Kept.Push(Name)
+		Out := Kept
+		Pos := 1
+		while (Pos := RegExMatch(Src, '\b\w+_Subscribe\(\s*\w+\s*,\s*(?:"message"\s*,\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:\.Bind\(|\))', &m, Pos)) {
+			Name := m[1]
+			; The owner's own declaration forwards the parameter itself.
+			if (Name != "Handler" && !Seen.Has(Name)) {
+				Seen[Name] := true
+				Out.Push(Name)
+			}
+			Pos += StrLen(m[0])
+		}
+	}
 	return Out
 }
 

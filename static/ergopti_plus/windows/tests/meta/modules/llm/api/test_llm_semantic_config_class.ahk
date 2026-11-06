@@ -152,8 +152,12 @@ _AHK16_EveryRequestPathCarriesSemanticIdentity() {
 	AssertEqual(9, _AHK16_CountOccurrences(FireBody, "request_semantic_signature"),
 		"AHK-16 request signature must also be retained by the native dispatch predicate")
 	MaskedFireBody := _DriverMaskNonCode(&FireBody)
+	; The dispatch predicate also rechecks the source app; it delegates the
+	; request identity to the render-identity owner.
+	SourceBody := _DriverFuncBody("_LLM_Engine_RequestSourceIsCurrent")
 	Assert(RegExMatch(MaskedFireBody,
-		"request_current\s*:=\s*_LLM_Engine_RenderIdentityIsCurrent\.Bind\(\s*this_request_id\s*,\s*request_semantic_signature\s*\)") > 0,
+		"request_current\s*:=\s*_LLM_Engine_RequestSourceIsCurrent\.Bind\(\s*this_request_id\s*,\s*request_semantic_signature\s*,") > 0
+		&& InStr(SourceBody, "_LLM_Engine_RenderIdentityIsCurrent(RequestId, SemanticSignature)") > 0,
 		"AHK-16 native dispatch must bind the original request ID and semantic signature")
 	Assert(InStr(FireBody, "effective_profile_id, profile") > 0,
 		"AHK-16 request identity must bind the resolved prompt profile, not its id alone")

@@ -69,6 +69,15 @@ _SADRD_AltGrModifierBalanced() {
 
 	Downs := _SADRD_Count(Body, "KeyDownFn.Call(ModKey)")
 	Ups := _SADRD_Count(Body, "KeyUpFn.Call(ModKey)")
+	; A press whose owner publication is refused is rolled back at once, then
+	; returns: that Up pairs with the same single Down, never with a second one.
+	RefusalPos := InStr(Body, "if !_TapHoldPublishModifierOwner(KeyId, ModKey, Owner) {")
+	RollbackPos := InStr(Body, "KeyUpFn.Call(ModKey)", false, Max(1, RefusalPos))
+	ReturnPos := InStr(Body, "return Map(", false, Max(1, RollbackPos))
+	NextUpPos := InStr(Body, "KeyUpFn.Call(ModKey)", false, RollbackPos + 1)
+	Assert(RefusalPos > 0 && RollbackPos > RefusalPos && ReturnPos > RollbackPos && NextUpPos > ReturnPos,
+		"the only extra release must be the rollback of a refused publication, followed by its return")
+	Ups -= 1
 
 	AssertEqual(1, Downs,
 		"the shared owner must acquire the resolved modifier exactly once")

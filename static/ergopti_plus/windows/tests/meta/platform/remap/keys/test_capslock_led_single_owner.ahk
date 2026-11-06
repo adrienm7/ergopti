@@ -67,6 +67,7 @@ _CLSO_NativeCaseMatrix() {
 	Root := A_Temp . "\ergopti-nav-case-" . A_ScriptHwnd . "-" . A_TickCount
 	DirCreate(Root)
 	Script := Root . "\case_matrix.ahk"
+	; DisableLayer reads its tap-hold owner; no owner is passed, so a stub suffices.
 	Probe := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n"
 		. 'global CapsWordEnabled := false, LayerEnabled := false, _HardwareCapsLockOn := false' . "`n"
 		. 'LoggerIsDebugEnabled() => false' . "`n"
@@ -80,6 +81,8 @@ _CLSO_NativeCaseMatrix() {
 		. '`tIndicatorRequests.Push(IsActive)' . "`n"
 		. '`treturn false' . "`n}" . "`n"
 		. 'global NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL := ' . NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL . "`n"
+		. 'global _TH_LayerOwner := 0' . "`n"
+		. 'TapHoldOwnerCurrent(*) => true' . "`n"
 		. _DriverFuncBody("DisableLayer") . "`n"
 		. Writer . "`n"
 		. 'Original := GetKeyState("CapsLock", "T")' . "`n"

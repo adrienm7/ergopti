@@ -266,12 +266,16 @@ class _CTHD_World {
 			if TapHoldKeyRolls(Key) {
 				if TapHoldRollUndecided()
 					throw Error("a vector with two undecided typing keys would replay outside the seam")
+				; One owner spans the press, the hold and the roll, as in TapHoldOwnHoldModifier.
+				Owner := TapHoldNewOwner()
+				Owner.KeyId := Key
 				TapFn := () => _CTHD_FireTap(World, Key)
-				PressFn := _TapHoldRollPressModifier.Bind(Key, ModKey)
+				PressFn := _TapHoldRollPressModifier.Bind(Key, ModKey, Owner)
 				OwnFn := (Pressed) => TapHoldOwnImmediateModifier(Key, Info.Wait, ModKey, Seconds,
-					Wait, (Name) => World.Physical.Has(Key), Tick, Pressed ? (*) => true : 0)
+					Wait, (Name) => World.Physical.Has(Key), Tick, Pressed ? (*) => true : 0,
+					0, 0, false, 0, Owner)
 				TapHoldOwnRoll(Key, Info.Wait, Seconds, TapFn, PressFn, OwnFn,
-					Map("wait_release", Wait, "tick", Tick))
+					Map("wait_release", Wait, "tick", Tick), Owner)
 				return
 			}
 			; A native modifier held as itself passes through: its own edge holds it.

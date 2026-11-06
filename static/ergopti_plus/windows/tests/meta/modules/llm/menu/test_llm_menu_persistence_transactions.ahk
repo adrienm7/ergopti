@@ -85,9 +85,13 @@ _LMPT_ApiIdRoundTripsAndPromptEditorRechecksEpoch() {
 	AppendBody := _DriverFuncBody("_LLM_Menu_AppendPersistedUpdates")
 	RestoreBody := _DriverFuncBody("_LLM_Menu_RestoreSavedOptsOnce")
 	BuildBody := _DriverFuncBody("LLM_Menu_BuildSavedOpts")
+	; Restore iterates the shared persisted-field groups, the one key list.
+	GroupsBody := _DriverFuncBody("_LLM_Menu_PersistedFieldGroups")
 	Assert(InStr(AppendBody, 'Key: "api_entry_id"') > 0
 		&& InStr(BuildBody, '"api_entry_id"') > 0
-		&& InStr(RestoreBody, '"api_entry_id"') > 0,
+		&& InStr(RestoreBody, "Groups := _LLM_Menu_PersistedFieldGroups()") > 0
+		&& InStr(RestoreBody, "for key in _str_keys") > 0
+		&& RegExMatch(GroupsBody, 's)static _str_keys := \[[^\]]*"api_entry_id"') > 0,
 		"the active API entry must round-trip through config.toml instead of "
 		. "silently reverting to the first JSON entry after restart")
 	ContextBody := _DriverFuncBody("_PromptEdWeb_ApplyProfileForContext")
