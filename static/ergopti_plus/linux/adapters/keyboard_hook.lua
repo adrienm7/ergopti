@@ -3175,6 +3175,12 @@ function M.held_forwarded_keys()
 	return codes
 end
 
+--- The number-row order the hook types with: "native", "digits" or "symbols".
+--- @return string mode
+function M.number_row_mode()
+	return _number_row.mode
+end
+
 --- Every modifier currently held, keyed by name.
 ---
 --- Distinct from `held_text_modifiers`, which answers a different question and

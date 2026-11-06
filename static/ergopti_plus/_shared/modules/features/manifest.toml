@@ -2052,9 +2052,9 @@ recommended = true
 family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.a_grave"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[features.shortcuts.a_grave]]
 id = "letter"
@@ -2063,9 +2063,9 @@ recommended = "v"
 family = "setting"
 type = "string"
 description_key = "menu.shortcuts.a_grave.letter"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 
 
@@ -2080,9 +2080,9 @@ recommended = true
 family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.e_acute"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[features.shortcuts.e_acute]]
 id = "letter"
@@ -2091,9 +2091,9 @@ recommended = "c"
 family = "setting"
 type = "string"
 description_key = "menu.shortcuts.e_acute.letter"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 
 
@@ -2108,9 +2108,9 @@ recommended = true
 family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.e_circ"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[features.shortcuts.e_circ]]
 id = "letter"
@@ -2119,9 +2119,9 @@ recommended = "x"
 family = "setting"
 type = "string"
 description_key = "menu.shortcuts.e_circ.letter"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 
 
@@ -2136,9 +2136,9 @@ recommended = true
 family = "feature"
 type = "boolean"
 description_key = "menu.shortcuts.e_grave"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[features.shortcuts.e_grave]]
 id = "letter"
@@ -2147,9 +2147,9 @@ recommended = "z"
 family = "setting"
 type = "string"
 description_key = "menu.shortcuts.e_grave.letter"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 
 

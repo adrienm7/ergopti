@@ -2255,12 +2255,14 @@ id = "number_row_policy"
 
 # Works on every layout since 2026-09-21: the chords follow the key that types
 # the accented letter directly in the user's own layout, not Ergopti's positions.
+# Linux follows Windows (modules/shortcuts/accented_shortcuts.lua); a macOS
+# layout file carries its own Command and Control layer.
 [[menu.layout_menu]]
 type = "group"
 id = "accented_letters"
 i18n = "menu.shortcuts.group_accented"
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
+platforms = ["ahk", "linux"]
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 # Which layout to switch to when the driver pauses and when it resumes: the
 # choices are the system's input sources (macOS), the desktop's layouts
@@ -2289,26 +2291,26 @@ reason_key = "platform_reason.lists_windows_only_settings"
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "e_grave"
-platforms = ["ahk"]
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "e_circ"
-platforms = ["ahk"]
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "e_acute"
-platforms = ["ahk"]
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "a_grave"
-platforms = ["ahk"]
-reason_key = "platform_reason.accented_shortcuts_are_windows"
+platforms = ["ahk", "linux"]
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[menu.hotstrings_menu]]
 type = "toggle"

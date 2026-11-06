@@ -177,14 +177,14 @@ two disagree in either direction.
 | `shortcuts.search.search_engine_url_query`                    | n/a             | n/a                                    | —                    |
 | `shortcuts.take_note.dated_notes`                             | n/a             | n/a                                    | —                    |
 | `shortcuts.take_note.destination_folder`                      | n/a             | n/a                                    | —                    |
-| `shortcuts.a_grave.enabled`                                   | n/a             | n/a                                    | —                    |
-| `shortcuts.a_grave.letter`                                    | n/a             | n/a                                    | —                    |
-| `shortcuts.e_acute.enabled`                                   | n/a             | n/a                                    | —                    |
-| `shortcuts.e_acute.letter`                                    | n/a             | n/a                                    | —                    |
-| `shortcuts.e_circ.enabled`                                    | n/a             | n/a                                    | —                    |
-| `shortcuts.e_circ.letter`                                     | n/a             | n/a                                    | —                    |
-| `shortcuts.e_grave.enabled`                                   | n/a             | n/a                                    | —                    |
-| `shortcuts.e_grave.letter`                                    | n/a             | n/a                                    | —                    |
+| `shortcuts.a_grave.enabled`                                   | n/a             | `evdev`, `uinput`                      | —                    |
+| `shortcuts.a_grave.letter`                                    | n/a             | `evdev`, `uinput`                      | —                    |
+| `shortcuts.e_acute.enabled`                                   | n/a             | `evdev`, `uinput`                      | —                    |
+| `shortcuts.e_acute.letter`                                    | n/a             | `evdev`, `uinput`                      | —                    |
+| `shortcuts.e_circ.enabled`                                    | n/a             | `evdev`, `uinput`                      | —                    |
+| `shortcuts.e_circ.letter`                                     | n/a             | `evdev`, `uinput`                      | —                    |
+| `shortcuts.e_grave.enabled`                                   | n/a             | `evdev`, `uinput`                      | —                    |
+| `shortcuts.e_grave.letter`                                    | n/a             | `evdev`, `uinput`                      | —                    |
 | `shortcuts.key_combination_taps.alt_gr_then_left_alt`         | n/a             | `evdev`, `uinput`                      | —                    |
 | `shortcuts.key_combination_taps.alt_gr_then_caps_lock`        | n/a             | `evdev`, `uinput`                      | —                    |
 | `shortcuts.key_combination_taps.left_alt_then_caps_lock`      | n/a             | `evdev`, `uinput`                      | —                    |

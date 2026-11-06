@@ -518,6 +518,30 @@ wrap_text_if_selected = false
 
 
 
+[shortcuts.a_grave]
+enabled = false
+letter = "v"
+
+
+
+[shortcuts.e_acute]
+enabled = false
+letter = "c"
+
+
+
+[shortcuts.e_circ]
+enabled = false
+letter = "x"
+
+
+
+[shortcuts.e_grave]
+enabled = false
+letter = "z"
+
+
+
 [shortcuts.key_combination_taps]
 alt_gr_then_left_alt = "none"
 alt_gr_then_caps_lock = "none"
