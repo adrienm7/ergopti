@@ -4,7 +4,7 @@
 return {
  before_ingest = function(manager, date)
   local db = assert(require("modules.keystats.sqlite_writer").get_db())
-  assert(db:exec("UPDATE meta SET value='4' WHERE key='aggregate_cache_revision'") == 0)
+  assert(db:exec("UPDATE meta SET value='5' WHERE key='aggregate_cache_revision'") == 0)
   assert(manager.append_log({ type = "typing", timestamp = date .. " 23:59:58.000", app = "Editor",
    text = "hi", events = { { "h", 100, {} }, { "i", 100, {} } } }))
  end,

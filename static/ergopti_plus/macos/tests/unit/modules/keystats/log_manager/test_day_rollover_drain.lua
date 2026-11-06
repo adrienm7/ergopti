@@ -199,7 +199,7 @@ end)
 --- @return table db Recording SQLite port with numeric native OK acknowledgements.
 local function recording_reset_db(observed)
 	local meta = { today_log_offset = "0", today_log_date = "2099-06-30",
-		ngram_ctx_json = '{"Editor":{"cur_word":"x","typing_date":"2099-06-30"}}', local_data_sql_outbox = "", aggregate_cache_revision = "4" }
+		ngram_ctx_json = '{"Editor":{"cur_word":"x","typing_date":"2099-06-30"}}', local_data_sql_outbox = "", aggregate_cache_revision = "5" }
 	local pending, step = nil, 0
 	local updates = {
 		{ "UPDATE meta SET value='0' WHERE key='today_log_offset';", "today_log_offset", "0" },

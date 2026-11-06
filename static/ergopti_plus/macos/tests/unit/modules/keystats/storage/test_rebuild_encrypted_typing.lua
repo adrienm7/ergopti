@@ -60,7 +60,7 @@ local function child()
  upvalue(rebuild, '_device_id', 'device')
  local fixture = case == 'empty' and '{}' or (case == 'plaintext' and '[["x",100,{}]]' or envelope)
  assert(db:exec("INSERT INTO events_typing(device_id,id,ts,date,app,is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,text,events_json) VALUES ('device',1,'2026-10-17 12:00:00','2026-10-17','Editor',0,0,0,0,0,'ciphertext','" .. fixture .. "');") == sqlite.OK)
- assert(db:exec("INSERT INTO ngram_chars(device_id,date,app,token,c) VALUES ('device','2026-10-17','Editor','sentinel',9); UPDATE meta SET value='4' WHERE key='aggregate_cache_revision';") == sqlite.OK)
+ assert(db:exec("INSERT INTO ngram_chars(device_id,date,app,token,c) VALUES ('device','2026-10-17','Editor','sentinel',9); UPDATE meta SET value='5' WHERE key='aggregate_cache_revision';") == sqlite.OK)
  if case == 'partial' then
   assert(db:exec("INSERT INTO events_typing(device_id,id,ts,date,app,is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,text,events_json) VALUES ('foreign',1,'2026-10-17 12:00:00','2026-10-17','Editor',0,0,0,0,0,'ciphertext','" .. fixture .. "');") == sqlite.OK)
   local snapshots = upvalue(publish, 'RebuildSnapshot')
@@ -147,10 +147,10 @@ bridge=importlib.util.module_from_spec(spec);spec.loader.exec_module(bridge)
 os.environ['ERGOPTI_REBUILD_CASE']=sys.argv[4]
 with tempfile.TemporaryDirectory(prefix='ergopti-staged-rebuild-') as tmp:
  result=bridge.run_fixture(sys.argv[2],Path(sys.argv[3]).resolve(),root,tmp)
- if sys.argv[4]=='empty': assert result['rebuilt'] is True and result['count']==0 and result['old']==0 and result['revision']=='4',result
- elif sys.argv[4] in ('encrypted','plaintext'): assert result['rebuilt'] is True and result['count']==1 and result['old']==0 and result['revision']=='4',result
+ if sys.argv[4]=='empty': assert result['rebuilt'] is True and result['count']==0 and result['old']==0 and result['revision']=='5',result
+ elif sys.argv[4] in ('encrypted','plaintext'): assert result['rebuilt'] is True and result['count']==1 and result['old']==0 and result['revision']=='5',result
  else:
-  assert result['rebuilt'] is False and result['count']==0 and result['old']==9 and result['revision']==('4' if sys.argv[4]=='fencerollback' else '0'),result
+  assert result['rebuilt'] is False and result['count']==0 and result['old']==9 and result['revision']==('5' if sys.argv[4]=='fencerollback' else '0'),result
   if sys.argv[4] == 'partial': assert result['foreign_count']==1 and result['source_rev']>=1,result
   if sys.argv[4] not in ('rollback','fencerollback'): assert result['retry'] is True and result['retry_count']==1,result
 print('PASS: staged typing rebuild')
