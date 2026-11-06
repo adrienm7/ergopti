@@ -91,6 +91,7 @@ console.log('\x1b[32m[OK] the apps metrics window keeps its state across the Lin
 const actual = vm.createContext({
 	console,
 	document: {
+		addEventListener() {},
 		getElementById() {
 			return null;
 		}

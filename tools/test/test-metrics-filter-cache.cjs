@@ -1424,7 +1424,8 @@ function publishTypingPage(page, host, manifest) {
 			_prefetch_data: initial,
 			app_icons: {},
 			keycode_layout: {},
-			driver_meta: { os: host, heatmap_id: 'sc' }
+			// The recording OS ids of driver_meta: Windows records as 'win'.
+			driver_meta: { os: host === 'windows' ? 'win' : host, heatmap_id: 'sc' }
 		};
 		if (host === 'windows')
 			page.messageListeners

@@ -196,7 +196,7 @@ check(
 
 function loadedPage(host) {
 	const page = loadMetricsAppsPage(host);
-	assert.equal(page.scripts.filter((name) => name !== '#inline').length, 14);
+	assert.equal(page.scripts.filter((name) => name !== '#inline').length, 15);
 	assert.ok(page.scripts.includes('../metrics_calendar.js'));
 	assert.ok(page.scripts.indexOf('../metrics_calendar.js') < page.scripts.indexOf('helpers.js'));
 	assert.equal(

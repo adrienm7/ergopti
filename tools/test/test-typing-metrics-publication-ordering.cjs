@@ -64,10 +64,14 @@ function fixture() {
 		}
 	});
 	context.window = context;
-	vm.runInContext(
-		fs.readFileSync(path.join(root, '_shared/ui/metrics_manifest_keys.js'), 'utf8'),
-		context
-	);
+	// The page's own owners of key names and heatmap layout naming, in its load order.
+	for (const file of [
+		'_shared/ui/_generated/key_names.js',
+		'_shared/ui/key_names.js',
+		'_shared/ui/metrics_manifest_keys.js',
+		'_shared/ui/metrics_typing/heatmap_win.js'
+	])
+		vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), context);
 	vm.runInContext(source, context);
 	vm.runInContext(
 		'compute_manifest_metrics=function(){};update_app_btn_text=function(){};ensure_live_refresh=function(){};render_current_tab=function(){};',
@@ -132,7 +136,13 @@ test('late startup fills assets without rolling back live manifest or prefetch',
 	assert.deepEqual(Array.from(f.state.available_apps), ['Live']);
 	assert.equal(f.context._prefetch_data, null);
 	assert.deepEqual(f.context.app_icons, { Startup: 'icon' });
-	assert.deepEqual(f.context.keycode_layout, { 0: 'Startup' });
+	// The publication keeps the unnamed source and names the special keys on top of it.
+	assert.deepEqual(f.context.keycode_layout_source, { 0: 'Startup' });
+	assert.deepEqual(
+		f.context.keycode_layout,
+		f.context.name_keycode_layout(f.context.keycode_layout_source, f.context.driver_meta)
+	);
+	assert.equal(f.context.keycode_layout[0], 'Startup');
 	assert.equal(f.publish(snapshot('Cache'), revisions(0, 0)), false);
 	assert.equal(queries, 0);
 	assert.equal(renders, 1);
@@ -265,10 +275,10 @@ test('actual Lua cold-empty payload accepts native empty-map arrays', () => {
 	assert.deepEqual(Array.from(f.state.available_apps), []);
 	assert.equal(Array.isArray(f.context.metrics_manifest), true);
 	assert.equal(Array.isArray(f.context.app_icons), true);
-	assert.equal(Array.isArray(f.context.keycode_layout), true);
+	assert.equal(Array.isArray(f.context.keycode_layout_source), true);
 	assert.equal(f.context.metrics_manifest.length, 0);
 	assert.equal(f.context.app_icons.length, 0);
-	assert.equal(f.context.keycode_layout.length, 0);
+	assert.equal(f.context.keycode_layout_source.length, 0);
 });
 
 test('nonempty array maps cannot corrupt a valid publication', () => {

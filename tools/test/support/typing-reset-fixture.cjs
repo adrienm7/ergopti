@@ -69,6 +69,11 @@ function frontend(host = 'macos') {
 		'_generated/keystats_tokens.js',
 		'key_tokens.js',
 		'state.js',
+		// The page's own name and manifest-label owners, loaded in its order.
+		'../_generated/key_names.js',
+		'../key_names.js',
+		'../metrics_calendar.js',
+		'../metrics_manifest_keys.js',
 		'data.js',
 		'filters.js'
 	]) {
@@ -136,7 +141,8 @@ function bootstrapFrontend(host) {
 	}
 	f.elements.pause_threshold.value = '5000';
 	f.context.get_source_mode_flags = f.sourceFlags;
-	for (const file of ['../dom_utils.js', 'format.js', 'modal.js']) {
+	// The page's own heatmap script: the first-paint pipeline names the keycode layout through it.
+	for (const file of ['../dom_utils.js', 'format.js', 'modal.js', 'heatmap_win.js']) {
 		vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), f.context, { filename: file });
 	}
 	f.context.get_local_date_string = () => '2026-09-07';
