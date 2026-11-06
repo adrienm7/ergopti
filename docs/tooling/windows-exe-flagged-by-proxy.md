@@ -207,7 +207,7 @@ SHA-256 and release URL, asking for an allow-list or re-scan).
 - Fix 4 (code signing, item 132): apply to SignPath Foundation and switch it on
   ([steps](signpath-foundation-application.md)). Fix 3 is done (`/Brepro`, verified above).
 - Other hidden PowerShell launchers that AHK could replace, not changed (they were present in the
-  builds that pass): the Recycle Bin action (`GESTURE_SYS_EMPTY_TRASH_COMMAND`, AHK has
+  builds that pass): the Recycle Bin action (`GESTURE_SYS_EMPTY_TRASH_SCRIPT`, AHK has
   `FileRecycleEmpty`), the screen brightness adapter (WMI, reachable through `ComObjGet`), and the elevated touchpad registry
   scripts (`modules/gestures/config.ahk`, `ui/onboarding/gesture_registration.ahk`). The updater,
   crash report, curl, managed network, Ollama and diagnostics workers are vendor scripts: kept.

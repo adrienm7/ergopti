@@ -56,6 +56,8 @@ class _SysActionsFake {
 		this.MonitorList := []
 		this.ClipboardWritable := true
 		this.RefusedCloses := Map()
+		this.SpawnStarts := true
+		this.SpawnObservers := []
 	}
 	_Log(Name, Args*) {
 		Entry := [Name]
@@ -64,6 +66,7 @@ class _SysActionsFake {
 		return true
 	}
 	Launch(Target, WorkingDir := "", Options := "") => (this._Log("Launch", Target, WorkingDir, Options), 1)
+	SpawnObserved(Executable, Args, OnDone) => (this._Log("SpawnObserved", Executable, Args), this.SpawnObservers.Push(OnDone), this.SpawnStarts)
 	PostBroadcast(Msg, WParam, LParam) => this._Log("PostBroadcast", Msg, WParam, LParam)
 	PostClose(Hwnd) => (this._Log("PostClose", Hwnd), !this.RefusedCloses.Has(Hwnd))
 	BroadcastSettingChange(Area) => this._Log("BroadcastSettingChange", Area)
@@ -401,10 +404,13 @@ for _SysActionsQuitCase in ["all-refused", "partial", "no-window", "all-accepted
 _SysActions_EmptyTrashAndEject() {
 	Fake := _SysActionsFake()
 	GestureSysEmptyTrash(Fake)
-	Launches := _SysActions_CallsNamed(Fake, "Launch")
-	AssertEqual('powershell.exe -NoProfile -NonInteractive -Command "Clear-RecycleBin -Force -ErrorAction Stop"',
-		Launches[1][2])
-	AssertEqual("Hide", Launches[1][4])
+	Spawns := _SysActions_CallsNamed(Fake, "SpawnObserved")
+	AssertEqual(1, Spawns.Length)
+	AssertEqual(ShellRunner_WinPsPath(), Spawns[1][2])
+	Args := Spawns[1][3]
+	AssertEqual("-Command", Args[Args.Length - 1])
+	AssertEqual("Clear-RecycleBin -Force -ErrorAction Stop", Args[Args.Length])
+	AssertEqual(0, _SysActions_CallsNamed(Fake, "Launch").Length, "the worker is never an unobserved launch")
 
 	Verbs := []
 	Drive(Letter) => ({ InvokeVerb: (this, Verb) => Verbs.Push(Letter . ">" . Verb) })
@@ -422,6 +428,55 @@ _SysActions_EmptyTrashAndEject() {
 	AssertEqual(1, _SysActions_CallsNamed(Fake, "Notify").Length, "no removable drive is announced")
 }
 Test("system actions: empty_trash and eject_all_disks run their exact commands", _SysActions_EmptyTrashAndEject)
+
+; The Recycle Bin worker was started with a nonwaiting Run whose PID was
+; discarded: a Clear-RecycleBin that failed after a successful launch reached
+; no diagnostic at all (WDS-002). Its exit is now observed and a refusal, a
+; failed start or a nonzero exit is logged as an error, never as success.
+class _SysActionsThrowingSpawnFake extends _SysActionsFake {
+	SpawnObserved(Executable, Args, OnDone) {
+		this._Log("SpawnObserved", Executable, Args)
+		throw OSError(5)
+	}
+}
+_SysActions_EmptyTrashOutcome(Case) {
+	Fake := Case == "start-throws" ? _SysActionsThrowingSpawnFake() : _SysActionsFake()
+	if Case == "start-refused"
+		Fake.SpawnStarts := false
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try {
+		GestureSysEmptyTrash(Fake)
+		if Case == "exit-failure" || Case == "exit-success" {
+			AssertEqual(1, Fake.SpawnObservers.Length, "the started worker has exactly one completion observer")
+			if Case == "exit-failure"
+				Fake.SpawnObservers[1].Call(1, "Clear-RecycleBin : Access is denied.`r`n", "")
+			else
+				Fake.SpawnObservers[1].Call(0, "", "")
+		}
+	} finally LoggerClearTestSink()
+	AssertEqual(1, _SysActions_CallsNamed(Fake, "SpawnObserved").Length)
+	Errors := []
+	Emptied := false
+	for Line in Lines {
+		if InStr(Line, "[ERROR]") && InStr(Line, "Recycle Bin")
+			Errors.Push(Line)
+		if InStr(Line, "Recycle Bin emptied.")
+			Emptied := true
+	}
+	if Case == "exit-success" {
+		AssertEqual(0, Errors.Length, "a zero exit raises no error")
+		AssertTrue(Emptied, "a zero exit reports the completed deletion")
+		return
+	}
+	AssertEqual(1, Errors.Length, "the worker failure is reported once as an error: " . Case)
+	AssertFalse(Emptied, "a failed worker is never reported as an emptied bin")
+	if Case == "exit-failure"
+		AssertTrue(InStr(Errors[1], "Access is denied."), "the worker's own diagnostic reaches the error line")
+}
+for _SysActionsTrashCase in ["start-refused", "start-throws", "exit-failure", "exit-success"]
+	Test("system actions: empty_trash observes its worker: " . _SysActionsTrashCase . " (wds-002)",
+		_SysActions_EmptyTrashOutcome.Bind(_SysActionsTrashCase))
 
 
 
