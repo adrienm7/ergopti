@@ -558,7 +558,7 @@ local KEPT_REASONS = {
 	backup_exists = "a backup already exists",
 	list_failed = "its folder could not be listed",
 	remove_failed = "its emptied folder could not be removed",
-	restore_failed = "it could not be moved back to the folder paths.toml names",
+	restore_failed = "it could not be moved back to the folder its locator names",
 }
 
 --- Why paths.toml still names an old folder, for its warning.
@@ -597,7 +597,7 @@ function M.log_report(logger, log, report)
 		logger.warn(log, "paths.toml still names an old default folder: %s.", PATHS_FILE_REFUSALS[report.paths_file])
 	end
 	for _, entry in ipairs(report.restored or {}) do
-		logger.warn(log, "Moved %s back to %s, the folder paths.toml still names.", entry.from, entry.to)
+		logger.warn(log, "Moved %s back to %s, the folder its locator still names.", entry.from, entry.to)
 	end
 end
 

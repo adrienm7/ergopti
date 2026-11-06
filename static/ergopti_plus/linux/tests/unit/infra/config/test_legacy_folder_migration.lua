@@ -211,6 +211,12 @@ helpers.describe("Linux legacy folder migration", function()
 		helpers.assert_true(table.concat(snapshot(), " "):find(old_custom .. "/config.toml", 1, true) ~= nil,
 			"and the folder moves back to the path it names")
 		helpers.assert_eq(#report.restored, 1, "the move back is reported")
+		local lines = {}
+		Migration.log({ info = function() end, warn = function(_, fmt, ...) lines[#lines + 1] = fmt:format(...) end },
+			report)
+		local logged = table.concat(lines, "\n")
+		helpers.assert_true(logged:find("back to " .. old_custom, 1, true) ~= nil, "the move back is warned")
+		helpers.assert_true(logged:find("paths.toml", 1, true) == nil, "naming the Linux locator, not paths.toml")
 	end)
 
 	helpers.it("logs every move, backup and kept entry", function()
