@@ -201,6 +201,34 @@ helpers.describe("Ollama terminal inference ownership", function()
 		end)
 	end)
 
+	helpers.it("a successor admitted by a cancellation terminal callback is not overwritten (ll-001)", function()
+		isolated(function(api, transport)
+			local successor, posts = nil, 0
+			local post = package.loaded["adapters.http_client"].postStream
+			package.loaded["adapters.http_client"].postStream = function(...)
+				posts = posts + 1
+				return post(...)
+			end
+			local first = { terminals = {} }
+			helpers.assert_true(api.chat("http://127.0.0.1:11434", "fixture-model", {}, {}, nil,
+				function(_, err)
+					first.terminals[#first.terminals + 1] = err
+					successor = begin(api, true)
+				end))
+			local interrupted = api.chat("http://127.0.0.1:11434", "fixture-model", {}, {}, nil,
+				function() error("the refused competitor must not publish") end)
+			helpers.assert_eq(interrupted, false)
+			helpers.assert_eq(posts, 2)
+			helpers.assert_eq(first.terminals[1], "cancelled")
+			helpers.assert_true(api.is_active())
+			transport.chunk('{"message":{"content":"successor"},"done":true}\n')
+			transport.done({ ok = true, status = 200 })
+			helpers.assert_eq(#successor.terminals, 1)
+			helpers.assert_nil(successor.terminals[1].error)
+			helpers.assert_eq(successor.terminals[1].text, "successor")
+		end)
+	end)
+
 	helpers.it("refused cancellation retains the original producer until its completed receipt", function()
 		isolated(function(api, transport)
 			local observed = begin(api, true)

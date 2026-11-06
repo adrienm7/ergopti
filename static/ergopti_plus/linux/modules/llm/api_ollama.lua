@@ -242,6 +242,9 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 		runtime_current = response_current, runtime_receipt = runtime_receipt, origin = base_url }
 	if not runtime_current(response) then return false end
 	if _active_request and M.cancel() ~= true then return false end
+	-- The cancelled request's terminal callback may reenter and admit a
+	-- successor; that successor owns the slot and this interrupted call yields.
+	if _active_request then return false end
 	_request_epoch = _request_epoch + 1
 
 	local stream = options.stream ~= false  -- default: streaming on
