@@ -9,11 +9,15 @@
 --- path. No network calls are ever made.
 ---
 --- FEATURES & RATIONALE:
---- 1. Privacy-first: the report never contains keystrokes, personal data, or file
----    contents. The report mirrors what Debug > Diagnostic shows plus the full log
----    ring buffer, so one file is almost always enough to diagnose the crash.
+--- 1. Privacy-first: the report never contains keystrokes or file contents, and
+---    the whole document goes through the logger's privacy redactor before it is
+---    opened, so a token, account name or path quoted by an error or the log
+---    tail never reaches the disk (the policy Linux already applies; Windows
+---    keeps full local detail by its own documented choice). The report mirrors
+---    what Debug > Diagnostic shows plus the full log ring buffer, so one file
+---    is almost always enough to diagnose the crash.
 --- 2. No confirmation, no modal: the old opt-in prompt added friction with zero
----    privacy benefit — the report is local-only and contains no PII. The outcome
+---    privacy benefit — the report is local-only and redacted. The outcome
 ---    is announced with a non-blocking notification naming the saved file, because
 ---    a modal alert would stall the main thread and every event tap with it.
 --- 3. Rich diagnostics: includes everything from the healthcheck (OS, HS version,
@@ -341,7 +345,17 @@ function M.save(report)
 	end)
 
 	local ts = CrashReport.stem(report.timestamp or os.date("!%Y-%m-%dT%H:%M:%SZ"))
-	local json_str = CrashReport.encode(CrashReport.build(report))
+	-- Redacted before anything is opened, as on Linux: the error text, stack and
+	-- log tail may quote a token, an account name or a path. A redactor that
+	-- cannot answer refuses the report; no raw fallback is written.
+	local admitted, json_str = pcall(function()
+		return Logger.redact_message(CrashReport.encode(CrashReport.build(report)))
+	end)
+	if not admitted or type(json_str) ~= "string" then
+		Logger.error(LOG, "Crash report refused: the privacy redactor is unavailable (%s).",
+			tostring(json_str))
+		return nil
+	end
 	local fname, write_err = _create_unique_report(dir, ts, json_str)
 	if not fname then
 		Logger.error(LOG, "Crash report write failed: %s.", tostring(write_err))
