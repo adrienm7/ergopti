@@ -131,15 +131,20 @@ _TouchpadRegistryNames(Data) {
 ; @param CreateFn {Func|0} Create-only durable writer (FSWriteCreateDurable).
 ; @param ExistsFn {Func|0} Strict existence probe (FSStrictExists).
 ; @param BackupPath {String} Backup file; empty selects TouchpadRegistryBackupPath().
-; @return {Boolean} True when a backup exists afterwards; false blocks every write.
-TouchpadRegistryEnsureBackup(SnapshotFn := 0, CreateFn := 0, ExistsFn := 0, BackupPath := "") {
+; @param ReadFn {Func|0} Strict file reader, fn(Path) (FSReadStrict).
+; @return {Boolean} True when a restorable backup exists afterwards; false blocks every write.
+TouchpadRegistryEnsureBackup(SnapshotFn := 0, CreateFn := 0, ExistsFn := 0, BackupPath := "", ReadFn := 0) {
 	Tag := TouchpadRegistryLogTag()
 	Path := BackupPath != "" ? BackupPath : TouchpadRegistryBackupPath()
 	Snapshot := HasMethod(SnapshotFn, "Call") ? SnapshotFn : TouchpadRegistrySnapshot
 	Create := HasMethod(CreateFn, "Call") ? CreateFn : FSWriteCreateDurable
 	Exists := HasMethod(ExistsFn, "Call") ? ExistsFn : FSStrictExists
+	Read := HasMethod(ReadFn, "Call") ? ReadFn : FSReadStrict
 	try {
 		if Exists.Call(Path) {
+			; A kept backup is immutable but must be restorable: an unreadable or
+			; malformed one would authorize writes that Restore later refuses to undo.
+			_TouchpadRegistryParseBackup(Read.Call(Path), TouchpadRegistryData())
 			LoggerDebug(Tag, "Keeping the touchpad backup of the values from before Ergopti's first write.")
 			return true
 		}
@@ -149,8 +154,10 @@ TouchpadRegistryEnsureBackup(SnapshotFn := 0, CreateFn := 0, ExistsFn := 0, Back
 		FSEnsureDirectoryStrict(Directory)
 		if (Create.Call(Path, Text) != 1) {
 			; A concurrent owner may have created it between the probe and the create
-			if Exists.Call(Path)
+			if Exists.Call(Path) {
+				_TouchpadRegistryParseBackup(Read.Call(Path), TouchpadRegistryData())
 				return true
+			}
 			LoggerError(Tag, "The touchpad backup '{1}' could not be created.", Path)
 			return false
 		}
@@ -179,10 +186,10 @@ TouchpadRegistryEnsureBackup(SnapshotFn := 0, CreateFn := 0, ExistsFn := 0, Back
 ; @param WriteFn {Func|0} DWORD writer, fn(Key, Name, Value) (Reg_WriteDword).
 ; @param SnapshotFn, CreateFn, ExistsFn, BackupPath: forwarded to the backup.
 ; @return {Boolean} True only when the backup exists and every value was written.
-TouchpadRegistryApply(WriteFn := 0, SnapshotFn := 0, CreateFn := 0, ExistsFn := 0, BackupPath := "") {
+TouchpadRegistryApply(WriteFn := 0, SnapshotFn := 0, CreateFn := 0, ExistsFn := 0, BackupPath := "", ReadFn := 0) {
 	Tag := TouchpadRegistryLogTag()
 	LoggerStart(Tag, "Writing the Precision Touchpad gesture values…")
-	if !TouchpadRegistryEnsureBackup(SnapshotFn, CreateFn, ExistsFn, BackupPath) {
+	if !TouchpadRegistryEnsureBackup(SnapshotFn, CreateFn, ExistsFn, BackupPath, ReadFn) {
 		LoggerError(Tag, "No touchpad value was written: the prior values are not backed up.")
 		return false
 	}

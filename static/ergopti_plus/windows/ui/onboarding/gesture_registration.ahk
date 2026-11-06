@@ -230,6 +230,7 @@ _Onboarding_BuildGesturePsScript(ResultPath) {
 	; whole script bails out before any value is written. -Force on New-Item
 	; makes the call idempotent so it's safe when the key already exists.
 	S .= "if (-not (Test-Path $Reg)) { New-Item -Path $Reg -Force | Out-Null }" . CRLF
+	S .= "$disabled = @()" . CRLF
 	S .= "$V = [ordered]@{" . CRLF
 	S .= TouchpadRegistryPowerShellValues()
 	S .= "}" . CRLF
@@ -241,18 +242,25 @@ _Onboarding_BuildGesturePsScript(ResultPath) {
 	; aborts the whole script under $ErrorActionPreference='Stop'.
 	S .= "    New-ItemProperty -Path $Reg -Name $n -Value $V[$n] -PropertyType DWord -Force | Out-Null" . CRLF
 	S .= "  }" . CRLF
-	S .= "  $devs = Get-PnpDevice -PresentOnly | Where-Object {" . CRLF
+	; Same outcome contract as the tray restart worker (config.ahk
+	; _GestureRestartBuildPsScript): no device or any refused PnP operation is a
+	; failure, and a device this script disabled is always re-enabled.
+	S .= "  $devs = @(Get-PnpDevice -PresentOnly | Where-Object {" . CRLF
 	S .= "    $_.Class -eq 'HIDClass' -and $_.FriendlyName -match 'Input Configuration|I2C HID'" . CRLF
-	S .= "  }" . CRLF
+	S .= "  })" . CRLF
+	S .= "  if ($devs.Count -eq 0) { throw 'No Precision Touchpad HID device found.' }" . CRLF
 	S .= "  foreach ($d in $devs) {" . CRLF
-	S .= "    Disable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction SilentlyContinue" . CRLF
+	S .= "    Disable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop" . CRLF
+	S .= "    $disabled += $d" . CRLF
 	S .= "  }" . CRLF
 	S .= "  Start-Sleep -Milliseconds 500" . CRLF
 	S .= "  foreach ($d in $devs) {" . CRLF
-	S .= "    Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction SilentlyContinue" . CRLF
+	S .= "    Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop" . CRLF
 	S .= "  }" . CRLF
 	S .= "  $ErgoptiExitCode = 0" . CRLF
 	S .= "} catch {" . CRLF
+	S .= "} finally {" . CRLF
+	S .= "  foreach ($d in $disabled) { try { Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop } catch {} }" . CRLF
 	S .= "}" . CRLF
 	S .= "try {" . CRLF
 	S .= "  [System.IO.File]::WriteAllText($ResultStage, [string]$ErgoptiExitCode, [System.Text.Encoding]::ASCII)" . CRLF
