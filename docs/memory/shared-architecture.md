@@ -426,7 +426,10 @@ picker shows the raw id. `""` is « no change ». Which event selects which
 target (a quit uses the pause one, only an exact `true` enables) is
 `_shared/lua/layout/pause_switch_policy.lua` and its AHK twin, both pinned by
 `_shared/tests/corpus/layouts/pause_switch_vectors.json`; change the corpus
-first. A reload, a signal or a logoff is not a quit and never switches.
+first. A reload, a signal or a logoff is not a quit and never switches. A start
+applies `startup_event(paused)` once on every driver, unless a pause transition
+already switched since init (Linux `pause_layout_switch.on_start`, Windows
+`PauseLayoutSwitch_ApplyStartup`, macOS the startup timer in `ui/menu/init.lua`).
 
 ### project-quit-refusals-are-one-shared-decision
 
