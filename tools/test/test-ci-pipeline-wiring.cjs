@@ -2524,6 +2524,9 @@ function commonSiteProblems(source) {
 const SITE_PRODUCER_CONDITION =
 	"${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success') }}";
 
+const SITE_NOT_SUPERSEDED_STEP = "steps.admit.outputs.superseded == 'false'";
+const SITE_NOT_SUPERSEDED_JOB = "needs.preflight.outputs.superseded == 'false'";
+
 const SITE_RUN_NAME =
 	"Deploy site (${{ github.event_name == 'workflow_dispatch' && format('manual, run {0}', inputs.run_id) || github.event.workflow_run.head_branch }})";
 
@@ -2579,9 +2582,14 @@ function siteDeploymentProblems(source) {
 		same(
 			pre.outputs,
 			Object.fromEntries(
-				['source_sha', 'target', 'run_id', 'build_artifact_id', 'testbuild_artifact_id'].map(
-					(key) => [key, '${{ steps.admit.outputs.' + key + ' }}']
-				)
+				[
+					'superseded',
+					'source_sha',
+					'target',
+					'run_id',
+					'build_artifact_id',
+					'testbuild_artifact_id'
+				].map((key) => [key, '${{ steps.admit.outputs.' + key + ' }}'])
 			),
 			'forward actual admission'
 		);
@@ -2592,12 +2600,21 @@ function siteDeploymentProblems(source) {
 		for (const job of [pre, deploy]) {
 			same(job['runs-on'], 'ubuntu-latest', 'publication runner');
 			same(job['timeout-minutes'], 20, 'bounded publication');
-			if (job !== pre && job.if !== undefined) errors.push('publication job if');
+			// A superseded source is skipped whole: the receiver steps after admission and
+			// the write job wait for the admission's own explicit 'false', never for a
+			// missing output, so an admission that emitted nothing publishes nothing.
+			if (job !== pre)
+				same(job.if, SITE_NOT_SUPERSEDED_JOB, 'publication job runs only for a current source');
 			for (const key of ['continue-on-error', 'strategy', 'uses'])
 				if (job[key] !== undefined) errors.push('publication job ' + key);
-			for (const step of job.steps)
-				for (const key of ['if', 'continue-on-error'])
-					if (step[key] !== undefined) errors.push('publication step ' + key);
+			job.steps.forEach((step, index) => {
+				if (step['continue-on-error'] !== undefined)
+					errors.push('publication step continue-on-error');
+				const gated = job === pre && index >= 3;
+				if (gated)
+					same(step.if, SITE_NOT_SUPERSEDED_STEP, 'receiver step skips a superseded source');
+				else if (step.if !== undefined) errors.push('publication step if');
+			});
 			same(
 				job.steps[0],
 				{
@@ -2625,8 +2642,9 @@ function siteDeploymentProblems(source) {
 			},
 			'actual metadata admission'
 		);
-		const downloaded = (prefix, key, directory, name) => ({
+		const downloaded = (prefix, key, directory, name, gate) => ({
 			name,
+			...(gate ? { if: gate } : {}),
 			uses: 'actions/download-artifact@v4',
 			with: {
 				'artifact-ids': '${{ ' + prefix + '.' + key + ' }}',
@@ -2640,6 +2658,7 @@ function siteDeploymentProblems(source) {
 			pre.steps[3],
 			{
 				name: 'Checkout exact producer source',
+				if: SITE_NOT_SUPERSEDED_STEP,
 				uses: 'actions/checkout@v4',
 				with: {
 					ref: '${{ steps.admit.outputs.source_sha }}',
@@ -2655,7 +2674,8 @@ function siteDeploymentProblems(source) {
 				'steps.admit.outputs',
 				'build_artifact_id',
 				'received-site',
-				'Receive selected build artifact'
+				'Receive selected build artifact',
+				SITE_NOT_SUPERSEDED_STEP
 			),
 			'preflight exact build ID'
 		);
@@ -2665,7 +2685,8 @@ function siteDeploymentProblems(source) {
 				'steps.admit.outputs',
 				'testbuild_artifact_id',
 				'received-testbuild',
-				'Receive selected browser proof'
+				'Receive selected browser proof',
+				SITE_NOT_SUPERSEDED_STEP
 			),
 			'preflight exact proof ID'
 		);
@@ -2677,6 +2698,7 @@ function siteDeploymentProblems(source) {
 			pre.steps[6],
 			{
 				name: 'Verify tested bytes and source',
+				if: SITE_NOT_SUPERSEDED_STEP,
 				env: { GH_TOKEN: '${{ github.token }}' },
 				run: verify('').replace('$RUNNER_TEMP//', '$RUNNER_TEMP/')
 			},
@@ -2686,6 +2708,7 @@ function siteDeploymentProblems(source) {
 			pre.steps[7],
 			{
 				name: 'Retain admitted producer identity',
+				if: SITE_NOT_SUPERSEDED_STEP,
 				uses: 'actions/upload-artifact@v4',
 				with: {
 					name: 'site-deployment-admission',
@@ -7739,15 +7762,25 @@ function physicalBrowserProblems(files, scripts = PHYSICAL_BROWSER_SCRIPTS) {
 	const at = steps.findIndex((step) => step.name === PHYSICAL_BROWSER_STEP);
 	const layerAt = steps.findIndex((step) => step.name === 'Test shared layer editor rendering');
 	const installAt = steps.findIndex((step) => step.name === 'Install shared UI browsers');
+	// Only other unconditional shared rendering gates may sit between the two.
+	const interposed = at > layerAt && layerAt >= 0 ? steps.slice(layerAt + 1, at) : [];
+	const interposedOwned = interposed.every(
+		(step) =>
+			step.name.startsWith('Test shared ') &&
+			step.name !== PHYSICAL_BROWSER_STEP &&
+			pipeline.stepField(step.body, 'if') === null &&
+			/^npm run test:browser:/.test(pipeline.stepField(step.body, 'run') || '')
+	);
 	if (
 		physical.length !== 1 ||
-		at !== layerAt + 1 ||
+		at <= layerAt ||
+		!interposedOwned ||
 		layerAt < 0 ||
 		installAt < 0 ||
 		installAt >= layerAt
 	) {
 		problems.push(
-			'physical shortcut renderer needs one gate immediately after layer rendering and browser installation'
+			'physical shortcut renderer needs one gate after layer rendering and browser installation, with only shared rendering gates between'
 		);
 	} else if (
 		pipeline.stepField(physical[0].body, 'if') !== null ||
