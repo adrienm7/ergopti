@@ -1052,6 +1052,21 @@
 		},
 		{
 			"os": "linux",
+			"tool": "`flock`",
+			"programs": ["flock"],
+			"used_for": "Queues the read-then-write system toggles (show desktop, dark mode) on one lock so a second toggle reads what the first wrote (`linux/modules/gestures/system_actions.lua`)",
+			"today": "Host util-linux, already a launcher dependency (`install/launch.sh` takes its own lock with it)",
+			"current_class": "SYS",
+			"version_needed": "any",
+			"if_missing": "The launcher already refuses to start without it, so the toggles never run unserialized",
+			"pin_possible": "Not needed: util-linux is part of every base system",
+			"decision": "SYS",
+			"decision_text": "SYS",
+			"alternative": null,
+			"status": "done"
+		},
+		{
+			"os": "linux",
 			"tool": "`udisksctl`",
 			"programs": ["udisksctl"],
 			"used_for": "Unmounting and powering off the removable disks for the eject-all-disks action (`linux/modules/gestures/system_actions.lua`)",

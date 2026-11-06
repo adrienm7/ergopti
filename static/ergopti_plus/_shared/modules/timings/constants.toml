@@ -1305,12 +1305,6 @@ owned_runtime_child_reap_poll_ms = 10
 owned_runtime_core_service_poll_ms = 10
 owned_runtime_console_poll_ms = 25
 
-# The first install's VirtualHIDDevice half: the deadline of pqrs' package
-# signature check and of its install when no driver is installed yet.
-# Swift: OwnedRuntimeCoreLaunchctl.swift.
-owned_runtime_vhid_signature_check_ms = 30000
-owned_runtime_vhid_package_install_ms = 300000
-
 # The VirtualHIDDevice daemon report: the poll of its signed query program,
 # of the Main CLI request's owner, and of the request channel by the worker
 # and its withdrawal watcher. Swift: OwnedVirtualHIDDaemonReportMainOperation.swift,
