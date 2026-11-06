@@ -25,7 +25,7 @@
 				{
 					"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
 					"symbol": "HSE_TryRepeatKey(MagicKey)",
-					"sha256": "4d09b8735fbc38a046f31ca25abef5a7d287bf66ee6d46111d0b0bdba2c75d45"
+					"sha256": "b395f84d6020140500a59c1e8a92e8469f87b591547c50df744ba9a101b6c579"
 				}
 			],
 			"macos": [
@@ -39,12 +39,12 @@
 				{
 					"file": "static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
 					"symbol": "function M.resolve",
-					"sha256": "7ac497766961b3c735c4d8eb1ac9a60117f3011301c61499d6ddccf743b086ea"
+					"sha256": "e632fd03d128ac367693f2737d86a5a6eed5a812a69a4569f4c546171f9765ec"
 				},
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "f4302dbe1a782cc6c2fb38b16d1ae5afc5ee89223b1c5643bc5ac9aad352d65a"
+					"sha256": "55042f0877f60f3036fee7bff1228b6ca70ddfe440fb52efd87e0f4c0a8ee5d4"
 				}
 			]
 		}
@@ -89,7 +89,7 @@
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "f4302dbe1a782cc6c2fb38b16d1ae5afc5ee89223b1c5643bc5ac9aad352d65a"
+					"sha256": "55042f0877f60f3036fee7bff1228b6ca70ddfe440fb52efd87e0f4c0a8ee5d4"
 				}
 			]
 		}
@@ -120,7 +120,7 @@
 				{
 					"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
 					"symbol": "HSE_TryRepeatKey(MagicKey)",
-					"sha256": "4d09b8735fbc38a046f31ca25abef5a7d287bf66ee6d46111d0b0bdba2c75d45"
+					"sha256": "b395f84d6020140500a59c1e8a92e8469f87b591547c50df744ba9a101b6c579"
 				}
 			],
 			"macos": [
@@ -139,12 +139,12 @@
 				{
 					"file": "static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
 					"symbol": "function M.resolve",
-					"sha256": "7ac497766961b3c735c4d8eb1ac9a60117f3011301c61499d6ddccf743b086ea"
+					"sha256": "e632fd03d128ac367693f2737d86a5a6eed5a812a69a4569f4c546171f9765ec"
 				},
 				{
 					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 					"symbol": "local undo = _undoable",
-					"sha256": "f4302dbe1a782cc6c2fb38b16d1ae5afc5ee89223b1c5643bc5ac9aad352d65a"
+					"sha256": "55042f0877f60f3036fee7bff1228b6ca70ddfe440fb52efd87e0f4c0a8ee5d4"
 				}
 			]
 		}

@@ -1207,6 +1207,19 @@ _HSE_RepeatWordChar(Ch) {
 ;
 ; Returns a minimal Spec-like object compatible with HSE_DispatchMatch (star
 ; trigger, no end char) or "" when the repeat condition is not met.
+; The repeat's activation window in seconds: the delay the override cascade
+; resolves for the magic key category, the window macOS applies (STAR_TRIGGER).
+; @returns {Number|String} Seconds (0 = always), or "" when it cannot be resolved.
+HSE_RepeatWindowSeconds() {
+		try Resolved := HotstringsResolve("magickey", "repeat_corrections")
+		catch as Err {
+				LoggerError("HSE", "The repeat window could not be resolved ({1}): the repeat is refused.", Err.Message)
+				return ""
+		}
+		Delay := Resolved.HasOwnProp("Delay") ? Resolved.Delay : ""
+		return Delay == "" ? 0 : Delay
+}
+
 HSE_TryRepeatKey(MagicKey) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS, HSE_RepeatEnabled, HSE_Suppressed
 		global HSE_RebuildInProgress, HSE_RegistryTransitionDepth, HSE_PrivateAncestry
@@ -1273,7 +1286,15 @@ HSE_TryRepeatKey(MagicKey) {
 		Before := SubStr(HSE_Buffer, 1, BufLen - MkLen)
 		DerivedPrivate := HSE_PrivateAncestry != ""
 				and SubStr(HSE_PrivateAncestry, 1, StrLen(Before)) == Before
+		; The repeat answers the magic key within its category's window, as on
+		; macOS (decision of 2026-11-06): the dispatcher's time gate measures it
+		; from the repeated letter, complex-key widening included; 0 is always.
+		WindowSeconds := HSE_RepeatWindowSeconds()
+		if (WindowSeconds == "")
+				return ""
 		return {
+				TimeActivationSeconds: WindowSeconds,
+				PrevCharKey: HSE_TimeGateReferenceChar(TriggerStr, true),
 				Trigger:     TriggerStr,
 				Length:      StrLen(TriggerStr),
 				Star:        true,

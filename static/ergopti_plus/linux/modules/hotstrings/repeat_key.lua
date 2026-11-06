@@ -42,6 +42,10 @@ local ConfigKeys = require("config_keys")
 
 local LOG = "hotstrings.repeat_key"
 
+-- The hotstring category whose delay is the repeat's activation window: the
+-- magic key's, macOS's STAR_TRIGGER (decision of 2026-11-06).
+M.WINDOW_CATEGORY = "magickey"
+
 local FEATURE_PATH = ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED
 local _enabled = nil -- populated once; no preference IO on each keystroke
 
