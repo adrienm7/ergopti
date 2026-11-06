@@ -639,7 +639,12 @@
 		"visibility": "hide",
 		"labels": { "fr": "layout_emulation", "en": "layout_emulation" },
 		"platforms": { "windows": false, "macos": true, "linux": true },
-		"reasons": { "windows": { "en": "", "fr": "" } }
+		"reasons": {
+			"windows": {
+				"en": "The other drivers carry this control as a row of their own: each driver lays out the value, reset or variants of a setting through its own row, because the native menu toolkits differ. This is a presentation difference, not a missing control.",
+				"fr": "The other drivers carry this control as a row of their own: each driver lays out the value, reset or variants of a setting through its own row, because the native menu toolkits differ. This is a presentation difference, not a missing control."
+			}
+		}
 	},
 	{
 		"path": "layout_menu.virtual_keyboard",

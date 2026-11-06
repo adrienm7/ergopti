@@ -312,7 +312,7 @@
 		},
 		{
 			"id": "encryptor-shared-vectors",
-			"ordinal": 595,
+			"ordinal": 596,
 			"name": "Encryptor containers are the shared OpenSSL envelope every driver reads and writes",
 			"cmd": "node",
 			"args": ["tools/test/test-encryptor-shared-vectors.cjs"],
@@ -320,7 +320,7 @@
 		},
 		{
 			"id": "app-cloner-shared-families",
-			"ordinal": 596,
+			"ordinal": 598,
 			"name": "App Cloner families are one catalogue the macOS detection agrees with",
 			"cmd": "node",
 			"args": ["tools/test/test-app-cloner-families.cjs"],
