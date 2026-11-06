@@ -429,6 +429,18 @@ queue_paste_restore_retry = function(reason)
 	return false
 end
 
+--- Whether another family borrows the clipboard right now. Its temporary payload
+--- is not the user's clipboard, so output is typed instead of snapshotting it, as
+--- Windows' SendInstant does when the shared clipboard owner is busy (MCP-002).
+--- @return boolean
+local function clipboard_borrowed_elsewhere()
+	if _paste_owns_clipboard then return false end
+	local holder = ClipboardBorrowers.foreign_holder("keymap_output")
+	if holder == nil then return false end
+	Logger.debug(LOG, "%s borrows the clipboard — typing the output instead of pasting it.", holder)
+	return true
+end
+
 --- Returns true when the text is long enough or unicode-heavy enough that
 --- clipboard-paste should be preferred over simulated keystrokes.
 --- @param text string The text to evaluate.
@@ -807,7 +819,7 @@ function M.emit_tokens(tokens)
 			-- Clipboard text has no per-character OS echo but is still part of
 			-- the logical replacement consumed by synthetic telemetry.
 			logical_text = logical_text .. tok.value
-			if M.should_paste(tok.value) then
+			if M.should_paste(tok.value) and not clipboard_borrowed_elsewhere() then
 				local ok_l, tok_len = pcall(text_utils.utf8_len, tok.value)
 				count              = count + (ok_l and tok_len or 1)
 
@@ -818,6 +830,13 @@ function M.emit_tokens(tokens)
 						ok_l and tok_len or 1, paste_at)
 				end
 				emit_in_order(paste_at, function()
+					-- A family that borrowed the clipboard after this plan still
+					-- owns it when the deferred paste comes due: type the text.
+					if clipboard_borrowed_elsewhere() then
+						assert(SyntheticInput.emit_key_strokes(paste_value),
+							"synthetic token text could not be dispatched")
+						return
+					end
 					local handoff = {}
 					assert(perform_paste(paste_value, handoff) == true,
 						paste_at > 0 and "deferred clipboard token paste could not be dispatched"
@@ -1065,7 +1084,7 @@ function M.emit_text(text)
 	-- (free); a codepoint count would cost a utf8 scan on the hot path
 	Logger.trace(LOG, "Emitting text (%d byte(s))…", #text)
 
-	if M.should_paste(text) then
+	if M.should_paste(text) and not clipboard_borrowed_elsewhere() then
 		assert(perform_paste(text) == true,
 			"clipboard text paste could not be dispatched")
 		Logger.done(LOG, "Text pasted via clipboard.")
