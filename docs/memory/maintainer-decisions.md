@@ -487,3 +487,16 @@ rule and `test_gesture_axis_slots.lua` pins it from evdev frames. macOS applies 
 (`resolveSwipeSlot` in `macos/modules/gestures/engine.lua`, on the commit and
 live paths; `test_gesture_axis_slots.lua`). Windows has no axis slots: the OS
 recognises its gestures. No `swipe_N_vert` slot exists on any OS.
+
+## Crash reports are redacted before persistence on macOS too (2026-11-06)
+
+macOS local crash reports pass the whole encoded document through the logger
+redactor before opening the file, and a redactor that cannot answer refuses the
+report (no raw fallback), as Linux does. Windows keeps its documented full local
+detail.
+
+## An accepted deferred connector honours pause and AI-off (2026-11-06)
+
+Windows runs an accepted agent connector on a fresh timer thread; it is refused
+when the script is paused or the AI is off by the time it starts, like ordinary
+accepted text. macOS and Linux run the connector on the acceptance itself.
