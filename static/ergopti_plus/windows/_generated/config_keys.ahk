@@ -533,6 +533,8 @@ class MenuCommand {
 	static SUGGEST_FEATURE := "suggest_feature"
 	static SUSPEND := "suspend"
 	static SYSTEM_GESTURE_SETTINGS := "system_gesture_settings"
+	static SYSTEM_LAYOUT_INSTALL := "system_layout_install"
+	static SYSTEM_LAYOUT_UPDATE := "system_layout_update"
 	static TAPHOLDS_TOGGLE := "tapholds_toggle"
 	static TAP_HOLD_CLOSE_OTHER_KARABINER := "tap_hold_close_other_karabiner"
 	static TAP_HOLD_KEY_DELAY := "tap_hold_key_delay"

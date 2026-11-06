@@ -1120,6 +1120,9 @@ input_probe_step_ms = 10
 input_probe_settle_ms = 40
 # Windows: an updater completion run off the current thread.
 updater_callback_defer_ms = 50
+# Windows: the poll of the Ergopti system layout installer and of the step that
+# adds the layout to the user's languages (modules/keymap/system_layout_install.ahk).
+system_layout_install_poll_ms = 250
 
 # Windows: minimum age of an abandoned atomic-write stage before it is reaped.
 # AHK: infra/toml/toml_helpers.ahk StaleTempAgeMs (pinned copy).

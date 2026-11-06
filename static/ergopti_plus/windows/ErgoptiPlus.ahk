@@ -1753,6 +1753,7 @@ global _PENDING_KEYBOARD_HKL := 0
 #Include modules/keymap/layout_poll_helper.ahk
 ; Layout on pause / resume: run by the lifecycle owner "keyboard-layout".
 #Include modules/keymap/pause_layout_switch.ahk
+#Include modules/keymap/system_layout_install.ahk
 
 ; The layout poll's seams onto the reload lifecycle (see LayoutPollTick). Its
 ; reload reports a refused stage without the "save failed" notice, and it asks

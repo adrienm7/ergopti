@@ -2367,6 +2367,40 @@
 			"reason_key": "platform_reason.layout_install_is_the_macos_bundle"
 		},
 		{
+			"type": "list",
+			"id": "layout_system_install",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.layout_system_install_is_windows",
+			"status_rows": {
+				"unbuilt": [
+					{
+						"type": "label",
+						"i18n": "menu.layout.system_layout_unbuilt"
+					}
+				],
+				"installed": [
+					{
+						"type": "label",
+						"i18n": "menu.layout.system_layout_installed"
+					}
+				],
+				"installing": [
+					{
+						"type": "label",
+						"i18n": "menu.layout.system_layout_installing"
+					}
+				],
+				"unreadable": [
+					{
+						"type": "label",
+						"i18n": "menu.layout.system_layout_unreadable"
+					}
+				]
+			}
+		},
+		{
 			"type": "section_header",
 			"i18n": "menu.layout.header_layers"
 		},
@@ -3841,6 +3875,28 @@
 			"type": "command",
 			"id": "layout_open_preferences",
 			"i18n": "menu.layout.open_prefs"
+		}
+	],
+	"layout_system_install_commands": [
+		{
+			"type": "command",
+			"id": "system_layout_install",
+			"i18n": "menu.layout.system_layout_install",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.layout_system_install_is_windows"
+		}
+	],
+	"layout_system_update_commands": [
+		{
+			"type": "command",
+			"id": "system_layout_update",
+			"i18n": "menu.layout.system_layout_update",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.layout_system_install_is_windows"
 		}
 	],
 	"llm_custom_profile_controls": [

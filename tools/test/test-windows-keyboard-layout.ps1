@@ -123,6 +123,29 @@ try {
 	[void][ErgoptiProbe.Keyboard]::UnloadKeyboardLayout($hkl)
 }
 
+# The user step the driver runs next, as the runner's own user.
+$addResult = Join-Path $env:RUNNER_TEMP "ergopti-layout-add.json"
+$tip = "{0}:{1}" -f ([string]$spec.language_id).ToUpperInvariant(), $klid.ToUpperInvariant()
+& (Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe") -NoProfile -ExecutionPolicy Bypass `
+	-File (Join-Path $VendorDirectory "add_user_keyboard_layout.ps1") -Klid $klid -LanguageId $spec.language_id `
+	-LocaleName $spec.locale_name -ResultPath $addResult
+$added = Get-Content -Raw -LiteralPath $addResult | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0 -or $added.status -ne "added") {
+	$failures.Add("Adding the layout to the user's languages answered '$($added.status)': $($added.message)")
+} else {
+	$listed = Get-WinUserLanguageList | Where-Object { $_.LanguageTag -ieq $spec.locale_name } | Select-Object -First 1
+	if (-not $listed -or @($listed.InputMethodTips | Where-Object { $_ -ieq $tip }).Count -ne 1) {
+		$failures.Add("The user's languages do not list $tip.")
+	} else {
+		Write-Host "  ok  the user's languages list $tip"
+		$list = Get-WinUserLanguageList
+		$language = $list | Where-Object { $_.LanguageTag -ieq $spec.locale_name } | Select-Object -First 1
+		[void]$language.InputMethodTips.Remove(($language.InputMethodTips | Where-Object { $_ -ieq $tip } | Select-Object -First 1))
+		if ($language.InputMethodTips.Count -eq 0) { [void]$list.Remove($language) }
+		Set-WinUserLanguageList -LanguageList $list -Force
+	}
+}
+
 [void](Invoke-Installer -Action "uninstall")
 if (Test-Path -LiteralPath "HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layouts\$klid") { $failures.Add("The uninstall left $klid in the registry.") }
 

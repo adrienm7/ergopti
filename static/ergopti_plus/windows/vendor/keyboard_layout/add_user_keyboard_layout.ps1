@@ -14,7 +14,8 @@ FEATURES & RATIONALE:
 	does not have it yet, with the Ergopti layout as its only one (Windows would
 	otherwise add the language's default layout too).
 2. Idempotent: a layout already listed is not added twice.
-3. Fail fast: a refused list update exits 1 with the reason on stderr.
+3. Fail fast: the outcome is written to -ResultPath as JSON ({ status,
+	message }: added, already_listed or failed) and a failure exits 1.
 ==============================================================================
 #>
 
@@ -22,11 +23,22 @@ FEATURES & RATIONALE:
 param(
 	[Parameter(Mandatory = $true)][ValidatePattern('^[0-9A-Fa-f]{8}$')][string]$Klid,
 	[Parameter(Mandatory = $true)][ValidatePattern('^[0-9A-Fa-f]{4}$')][string]$LanguageId,
-	[Parameter(Mandatory = $true)][string]$LocaleName
+	[Parameter(Mandatory = $true)][string]$LocaleName,
+	[Parameter(Mandatory = $true)][string]$ResultPath
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+<#
+.SYNOPSIS
+Writes the outcome the driver reads.
+#>
+function Write-Outcome {
+	param([string]$Status, [string]$Message)
+	$json = [ordered]@{ status = $Status; message = $Message } | ConvertTo-Json -Compress
+	[IO.File]::WriteAllText($ResultPath, $json, [Text.UTF8Encoding]::new($false))
+}
 
 try {
 	$tip = "{0}:{1}" -f $LanguageId.ToUpperInvariant(), $Klid.ToUpperInvariant()
@@ -39,14 +51,14 @@ try {
 		$language.InputMethodTips.Clear()
 	}
 	if (@($language.InputMethodTips | Where-Object { $_ -ieq $tip }).Count -gt 0) {
-		Write-Output "already_listed"
+		Write-Outcome -Status "already_listed" -Message ""
 		exit 0
 	}
 	$language.InputMethodTips.Add($tip)
 	Set-WinUserLanguageList -LanguageList $list -Force
-	Write-Output "added"
+	Write-Outcome -Status "added" -Message ""
 	exit 0
 } catch {
-	[Console]::Error.WriteLine($_.Exception.Message)
+	Write-Outcome -Status "failed" -Message $_.Exception.Message
 	exit 1
 }

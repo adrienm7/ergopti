@@ -35,6 +35,11 @@ $outcome = Get-Content -Raw -LiteralPath $result | ConvertFrom-Json
 Remove-Item -LiteralPath $result -Force
 if ($outcome.status -ne "installed") { Write-Host "The installation failed: $($outcome.message)"; exit 1 }
 $layout = Get-Content -Raw -LiteralPath $spec | ConvertFrom-Json
-& (Join-Path $here "add_user_keyboard_layout.ps1") -Klid $outcome.klid -LanguageId $layout.language_id -LocaleName $layout.locale_name
-if ($LASTEXITCODE -ne 0) { Write-Host "The layout is installed but could not be added to your languages: add it in Settings."; exit 1 }
+& (Join-Path $here "add_user_keyboard_layout.ps1") -Klid $outcome.klid -LanguageId $layout.language_id -LocaleName $layout.locale_name -ResultPath $result
+if ($LASTEXITCODE -ne 0) {
+	$added = Get-Content -Raw -LiteralPath $result | ConvertFrom-Json
+	Write-Host "The layout is installed but could not be added to your languages ($($added.message)): add it in Settings."
+	exit 1
+}
+Remove-Item -LiteralPath $result -Force
 Write-Host "The Ergopti layout is installed ($($outcome.klid))."
