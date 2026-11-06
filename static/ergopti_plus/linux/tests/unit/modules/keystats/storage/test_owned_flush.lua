@@ -752,7 +752,11 @@ helpers.describe("linux-open-session-crash-recovery", function()
 		package.loaded[writer_name], package.loaded[keystats_name] = writer, nil
 		local ok, err = xpcall(function()
 			local collector = require(keystats_name)
-			collector.init({ sqlite_path = "/tmp/open-walk-logical.sqlite" })
+			-- A store of its own metrics folder: an identity another test minted
+			-- under the shared test HOME must not rename this device.
+			local uv = require("luv")
+			collector.init({ sqlite_path = "/tmp/open-walk-logical.sqlite",
+				metrics_dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-open-walk-XXXXXX")) .. "/metrics" })
 			require("tests.support.metrics_consent_fixture").enable(collector)
 			body(collector)
 		end, debug.traceback)

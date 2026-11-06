@@ -114,6 +114,8 @@ local TextCipher = require("modules.keystats.text_cipher")
 -- toggle only ever protects the future, which is not what a user with a year of
 -- logs is asking for when they tick it.
 local TextMigration = require("modules.keystats.text_migration")
+-- The per-device data.sql the macOS and Windows drivers import.
+local MetricsLedger = require("modules.keystats.metrics_ledger")
 local MigrationPlan = require("keystats.text_migration")
 -- Battery, network, lock and suspend. Optional: a machine with none of the
 -- tools it reads simply reports nothing, and the typing path must not care.
@@ -266,6 +268,8 @@ local _recovered_walks = nil
 local _persisted_open_walk = nil
 -- Assigned beside the flush capture; declared here so init() binds the local.
 local decode_open_walk
+-- Assigned beside init(); declared here so init() binds the table.
+local LedgerSetup = {}
 -- The monotonic stamp of each application's last manual keystroke. Kept
 -- across flushes: a fresh pending buffer has none, and its first keystroke
 -- then read as zero milliseconds after the previous one, however long ago
@@ -453,8 +457,13 @@ local function sqlite_available()
 	return _sqlite_admitted and SqliteWriter and SqliteWriter.is_available() == true
 end
 
--- Device identifier for SQLite registration (derived from hostname).
+-- Device identifier: the by_device/ folder this host owns (metrics_ledger).
 local _device_id = "linux-unknown"
+
+-- The per-device ledger: `exporter` (nil when refused, with `refusal`),
+-- `saw_migration` (the at-rest migration ran at the previous pump) and
+-- `pending` (committed rows may await export; no query is spawned otherwise).
+local _ledger = { exporter = nil, refusal = nil, saw_migration = false, pending = false }
 
 -- Session start timestamp for export.
 local _session_started_at = nil
@@ -644,8 +653,74 @@ local function migrate_legacy_categories()
 	end
 end
 
+--- Reads one line of a kernel or system identity file.
+--- @param path string
+--- @return string|nil
+local function read_identity_line(path)
+	local handle = io.open(path, "rb")
+	if not handle then return nil end
+	local line = handle:read("*l")
+	handle:close()
+	line = type(line) == "string" and line:gsub("%s+", "") or ""
+	return line ~= "" and line or nil
+end
+
+--- Resolves this host's ledger identity (metrics_ledger.resolve_identity).
+--- @param hostname string Kernel nodename.
+--- @param metrics_dir string|nil Override of <config>/metrics (tests).
+--- @return table|string identity, or the refusal.
+LedgerSetup.resolve = function(hostname, metrics_dir)
+	local ConfigPaths = require("infra.config_paths")
+	local ports = MetricsLedger.native_ports()
+	local identity, reason = MetricsLedger.resolve_identity({
+		metrics_dir = metrics_dir or ConfigPaths.config("metrics"),
+		-- The systemd machine id, the stable per-installation identity the
+		-- dbus copy mirrors on hosts without systemd.
+		host_signature = read_identity_line("/etc/machine-id") or read_identity_line("/var/lib/dbus/machine-id"),
+		hostname = hostname, os_version = read_identity_line("/proc/sys/kernel/osrelease") or "",
+		legacy_registered = function(id)
+			local rows = SqliteWriter.query_rows("SELECT count(*) FROM devices WHERE device_id='"
+				.. require("modules.keystats.sqlite_command").escape_literal(id) .. "';")
+			return rows ~= nil and rows[1] ~= nil and rows[1] ~= "0"
+		end,
+		random_bytes = function(count)
+			local handle = io.open("/dev/urandom", "rb")
+			if not handle then return nil end
+			local bytes = handle:read(count)
+			handle:close()
+			return bytes
+		end,
+		now_ts = os.date("%Y-%m-%d %H:%M:%S") .. ".000",
+		list = ports.list, read = ports.read,
+	})
+	if not identity then return reason end
+	return identity
+end
+
+--- Creates and prepares the exporter of this device's ledger.
+--- @param identity table Resolved identity.
+--- @param metrics_dir string|nil Override of <config>/metrics (tests).
+LedgerSetup.start = function(identity, metrics_dir)
+	local ledger = MetricsLedger.new({
+		metrics_dir = metrics_dir or require("infra.config_paths").config("metrics"),
+		identity = identity,
+		store = { query_rows = SqliteWriter.query_rows, get_meta = SqliteWriter.get_meta, exec_sql = SqliteWriter.exec_sql },
+		fs = MetricsLedger.native_ports(),
+		now_ts = function() return os.date("%Y-%m-%d %H:%M:%S") .. ".000" end,
+		logger = Logger,
+	})
+	local prepared, reason = ledger:prepare()
+	if not prepared then
+		_ledger.refusal = tostring(reason)
+		Logger.error(LOG, "Metrics ledger refused (%s); metrics stay on this device only.", _ledger.refusal)
+		return
+	end
+	_ledger.exporter, _ledger.pending = ledger, true
+	Logger.info(LOG, "Metrics ledger ready: %s.", ledger.path)
+end
+
 --- Initialises the keystats.
---- @param opts table { log_dir?, password_apps? }
+--- @param opts table { log_dir?, password_apps?, sqlite_path?, metrics_dir? }
 function M.init(opts)
 	if _flush_state or _flush_stopping or _reset_request then return false end
 	if not Preferences.admit() then return false end
@@ -678,25 +753,41 @@ function M.init(opts)
 	end
 	hostname = hostname:gsub("%s+", "")
 	_device_id = "linux-" .. hostname
-	_pointer.bind_fractions(_sqlite_path, _device_id)
 
 	-- A usable writer must also acknowledge migration and actual registration.
 	_sqlite_admitted = false
 	local open_called, open_result, open_reason = false, false, "sqlite_unavailable"
 	if SqliteWriter then open_called, open_result, open_reason = pcall(SqliteWriter.open_db, _sqlite_path) end
 	local sqlite_opened = open_called and open_result == true
+	-- The device id is the one of this host's by_device/ folder, which the
+	-- other drivers import; the ledger is refused, never the local store.
+	_ledger.exporter, _ledger.refusal = nil, nil
+	local identity = nil
+	if sqlite_opened then
+		local resolved, identity_or_reason = pcall(LedgerSetup.resolve, hostname, options.metrics_dir)
+		if resolved and type(identity_or_reason) == "table" then
+			identity = identity_or_reason
+			_device_id = identity.device_id
+		else
+			_ledger.refusal = tostring(identity_or_reason)
+			Logger.error(LOG, "Metrics ledger refused (%s); metrics stay on this device only.", _ledger.refusal)
+		end
+	end
+	_pointer.bind_fractions(_sqlite_path, _device_id)
 	-- Verify the real device registration before any n-gram rewrite. A schema
 	-- can contain the word "linux" in an unrelated constraint and still reject
 	-- this OS; a failed transactional registration must leave keys untouched.
 	local registration_ok, registered = false, false
 	if sqlite_opened then
-		registration_ok, registered = pcall(SqliteWriter.register_device, _device_id, hostname, "linux", "", hostname)
+		registration_ok, registered = pcall(SqliteWriter.register_device, _device_id, hostname, "linux",
+			identity and identity.os_version or "", identity and identity.host_signature or hostname)
 	end
 	local migration_ok, migrated = false, false
 	if registration_ok and registered == true then
 		migration_ok, migrated = pcall(SqliteWriter.ensure_token_encoding)
 	end
 	local sqlite_ready = migration_ok and migrated == true
+	if sqlite_ready and identity then LedgerSetup.start(identity, options.metrics_dir) end
 	local sqlite_unavailable = not SqliteWriter or (open_called and open_result == false and open_reason == "sqlite_unavailable")
 	_storage_blocked = not sqlite_ready and not sqlite_unavailable
 	if sqlite_ready then
@@ -2112,6 +2203,40 @@ function M.pump_migration()
 	TextMigration.pump()
 end
 
+--- Exports the next bounded slice of committed rows to this device's ledger.
+--- Driven from the daemon's periodic tick, between flushes: the export reads
+--- only committed rows and must not race the flush owner's transaction. A
+--- finished at-rest migration rewrote stored text, so it regenerates the file.
+function M.pump_ledger()
+	if not _ledger.exporter or M.has_flush_debt() or _flush_stopping or not sqlite_available() then return end
+	local migrating = TextMigration.is_running()
+	if migrating then _ledger.saw_migration = true; return end
+	if _ledger.saw_migration then
+		_ledger.saw_migration = false
+		_ledger.exporter:request_rebuild()
+		_ledger.pending = true
+	end
+	if not _ledger.pending then return end
+	local status, reason = _ledger.exporter:step()
+	if status == "idle" then _ledger.pending = false end
+	if status == "failed" and reason ~= _ledger.refusal then
+		_ledger.refusal = reason
+		Logger.error(LOG, "Metrics ledger export failed: %s.", tostring(reason))
+	elseif status ~= "failed" and _ledger.refusal ~= nil then
+		_ledger.refusal = nil
+	end
+end
+
+--- The ledger's state, for diagnostics.
+--- @return table { available, path?, device_id, refusal? }
+function M.ledger_status()
+	if not _ledger.exporter then return { available = false, device_id = _device_id, refusal = _ledger.refusal } end
+	local status = _ledger.exporter:status()
+	status.available = true
+	status.refusal = _ledger.refusal
+	return status
+end
+
 --- Snapshot of the at-rest migration, for the menu and for diagnostics.
 --- @return table
 function M.get_migration_progress()
@@ -2749,6 +2874,8 @@ function M.pump_flush()
 			if marks.recovered then _recovered_walks = nil end
 			_manifest_cache = { revision = nil, manifest = nil }
 			_last_flush_committed, _flush_state = true, nil
+			-- Committed rows wait for the ledger's next bounded export.
+			_ledger.pending = true
 			prune_calendar(state.snapshot.calendar)
 			if state.snapshot.system then SystemMetrics.acknowledge(state.snapshot.system) end
 			Logger.info(LOG, "Session flush received its SQLite COMMIT and native cleanup acknowledgement.")

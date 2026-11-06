@@ -1,0 +1,30 @@
+-- ergopti metrics — device linux-ledger-host — schema_version 1
+-- This file is APPEND-ONLY. Do not edit by hand.
+-- The keystats replays its content into db.sqlite at startup.
+PRAGMA foreign_keys = OFF;
+
+-- === ingest batch 2026-11-06 10:00:00.000 (offset 0 -> 8, 8 entry(ies)) ===
+BEGIN TRANSACTION;
+INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES ('linux-ledger-host', 1, '2026-11-06 10:00:00.000', '2026-11-05', 'kate', NULL, CAST(X'6C27C3A974C3A90A7365636F6E64206C696E65006166746572206E756C3B20434F4D4D49543B0A2D2D203D3D3D2064617920726F6C6C6F7665722078202D3E20323030302D30312D3031203D3D3D' AS TEXT), '', '', 'ergopti', '', 0, 0, 1, 2, 30, 0, 0, 0.0, 72.5, CAST(X'6C27C3A974C3A90A7365636F6E64206C696E65006166746572206E756C3B20434F4D4D49543B0A2D2D203D3D3D2064617920726F6C6C6F7665722078202D3E20323030302D30312D3031203D3D3D' AS TEXT), '', '[["a",0,{"sk":30}]]');
+INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms) VALUES ('linux-ledger-host', 2, '2026-11-06 10:00:00.000', '2026-11-05', 'kate', 'firefox', 1200);
+INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms) VALUES ('linux-ledger-host', 3, '2026-11-06 10:00:00.000', '2026-11-05', 'kate', 'a', 'b', 5);
+INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key) VALUES ('linux-ledger-host', 4, '2026-11-06 10:00:00.000', '2026-11-05', 'kate', 'ctrl+s');
+INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('linux-ledger-host', 5, '2026-11-06 10:00:00.000', '2026-11-05', 'lock', '{"k":1}');
+INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars) VALUES ('linux-ledger-host', 6, '2026-11-06 10:00:00.000', '2026-11-05', 'kate', 'fired', 'btw', 'by the way', 'user', 7);
+INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms) VALUES ('linux-ledger-host', 7, '2026-11-06 10:00:00.000', '2026-11-05', 'session_start', 0);
+INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd) VALUES ('linux-ledger-host', 8, '2026-11-06 10:00:00.000', '2026-11-05', 'kate', 'suggested', 'ctx', '[]', 'p', '[]', 0, 0, '', 0, 1, 1, 1, 2, 0.0);
+COMMIT;
+
+-- === day rollover 2026-11-05 -> 2026-11-06 ===
+
+-- === ingest batch 2026-11-06 10:00:00.000 (offset 8 -> 16, 8 entry(ies)) ===
+BEGIN TRANSACTION;
+INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES ('linux-ledger-host', 9, '2026-11-06 10:00:00.000', '2026-11-06', 'kate', NULL, CAST(X'6C27C3A974C3A90A7365636F6E64206C696E65006166746572206E756C3B20434F4D4D49543B0A2D2D203D3D3D2064617920726F6C6C6F7665722078202D3E20323030302D30312D3031203D3D3D' AS TEXT), '', '', 'ergopti', '', 0, 0, 1, 2, 30, 0, 0, 0.0, 72.5, CAST(X'6C27C3A974C3A90A7365636F6E64206C696E65006166746572206E756C3B20434F4D4D49543B0A2D2D203D3D3D2064617920726F6C6C6F7665722078202D3E20323030302D30312D3031203D3D3D' AS TEXT), '', '[["a",0,{"sk":30}]]');
+INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms) VALUES ('linux-ledger-host', 10, '2026-11-06 10:00:00.000', '2026-11-06', 'kate', 'firefox', 1200);
+INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms) VALUES ('linux-ledger-host', 11, '2026-11-06 10:00:00.000', '2026-11-06', 'kate', 'a', 'b', 5);
+INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key) VALUES ('linux-ledger-host', 12, '2026-11-06 10:00:00.000', '2026-11-06', 'kate', 'ctrl+s');
+INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('linux-ledger-host', 13, '2026-11-06 10:00:00.000', '2026-11-06', 'lock', '{"k":1}');
+INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars) VALUES ('linux-ledger-host', 14, '2026-11-06 10:00:00.000', '2026-11-06', 'kate', 'fired', 'btw', 'by the way', 'user', 7);
+INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms) VALUES ('linux-ledger-host', 15, '2026-11-06 10:00:00.000', '2026-11-06', 'session_start', 0);
+INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd) VALUES ('linux-ledger-host', 16, '2026-11-06 10:00:00.000', '2026-11-06', 'kate', 'suggested', 'ctx', '[]', 'p', '[]', 0, 0, '', 0, 1, 1, 1, 2, 0.0);
+COMMIT;
