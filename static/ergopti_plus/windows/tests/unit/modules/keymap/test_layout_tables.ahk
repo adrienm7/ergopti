@@ -635,7 +635,9 @@ _WHR_Literal(Text) {
 }
 
 _WHR_Script() {
-	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n"
+	; The admitted async-selection branch needs TapHoldNewOwner, absent here, so
+	; its helpers stay unreferenced at run time; unset load warnings are off.
+	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#Warn VarUnset, Off`n"
 	Code .= '#Include ' . _DriverDir . '\infra\text_utils.ahk' . "`n"
 	for Name in ["WrapTextIfSelected", "UpdateLastSentCharacter", "_LSCPush", "_LSCResetFrom", "GetLastSentCharacterAt"] {
 		Definition := _DriverFuncBody(Name)
@@ -646,6 +648,8 @@ _WHR_Script() {
 	Code .= 'global _LSC_CAP := 16, _LSC_RING := [], _LSC_CURSOR := 0, _LSC_LEN := 0' . "`n"
 	Code .= 'global _WH_Output := "", _WH_Stamped := "", _WH_SendOk := true' . "`n"
 	Code .= 'WrapSymbols_IsEnabled(*) => true`nGetUIASelection() => "selected"`n'
+	; No saved custom pair: the rows below are the layout descriptor delimiters.
+	Code .= 'WrapSymbols_CustomPairFor(*) => ""`nglobal _UIA_SelectionCache := 0`n'
 	Code .= 'AppState_TouchLastSentKey(Text) {`nglobal _WH_Stamped`n_WH_Stamped := Text`n}' . "`n"
 	; This existing logical suffix/ring fixture models one stable input target.
 	; Real target changes are qualified by the separate native renderer probes.
