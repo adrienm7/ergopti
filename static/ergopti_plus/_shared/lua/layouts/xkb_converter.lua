@@ -396,7 +396,9 @@ end
 --- what it types sends its output. Naming only base_keysym left those untypable and
 --- made a plain action and a dead-key action with the same base keysym collide. The
 --- base keysym stays first when a key sends it; a dead key also using the action adds
---- its trigger; an action no key uses keeps its base keysym. Twin of state_keysyms in
+--- its trigger; an action no key uses keeps its base keysym. A base_level_only key
+--- (Ergopti+'s magic key) also adds the keysym its base level sends: inside a dead
+--- state macOS types the action's output for it. Twin of state_keysyms in
 --- keylayout_to_xkb.py.
 function Converter:state_keysyms(action_id)
 	local typed = self:keysyms_typing_action(action_id)
@@ -411,9 +413,19 @@ function Converter:state_keysyms(action_id)
 	end
 	local result = { base }
 	for _, keysym in ipairs(typed) do
-		if keysym ~= base and self.dead_trigger_values[keysym] then result[#result + 1] = keysym end
+		if keysym ~= base and (self.dead_trigger_values[keysym] or self:is_base_level_only_keysym(keysym)) then
+			result[#result + 1] = keysym
+		end
 	end
 	return result
+end
+
+--- True when `keysym` is what a base_level_only text (the magic key) types.
+function Converter:is_base_level_only_keysym(keysym)
+	for text in pairs(self.base_level_only) do
+		if ulen(text) == 1 and self:text_keysym(text) == keysym then return true end
+	end
+	return false
 end
 
 --- Keysym a dead key entering `state` produces.
