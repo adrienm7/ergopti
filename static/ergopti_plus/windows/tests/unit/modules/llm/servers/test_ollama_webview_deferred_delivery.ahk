@@ -24,7 +24,7 @@ _ODLP_ChildSource() {
 	Seen := Map()
 	for Symbol in ["OllamaWV_FlushQueue", "Ergopti_OnSuspendResume", "_TrayRootErrorIsSilent",
 		"ManifestFindEntryByPath", "LLM_DisplayIndentValues", "LLM_Menu_ApplySharedDefaults",
-		"LLM_Deps_Cancel", "LLM_Ollama_SetPort", "LLM_Option_TryNormalizeOllamaPort",
+		"LLM_Deps_Cancel", "OllamaInstallFiles_Spawn", "LLM_Ollama_SetPort", "LLM_Option_TryNormalizeOllamaPort",
 		"WebView_SameCore", "LoggerInfo", "WallClockTimestamp", "TickElapsed", "JsonStringLiteral"] {
 		OwnerRoot := Symbol == "LLM_DisplayIndentValues" ? _DriverDir . "\..\_shared" : _DriverDir
 		Owner := _DriverProductionFileForSymbol(Symbol, OwnerRoot)
