@@ -172,7 +172,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 ### windows-diagnostics
 
-- [ ] **[CODE] WDG-001:** Both crash worker writers retain truncated canonical JSON after partial write refusal. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/windows-diagnostics/report.md).
+- [x] **[CODE] WDG-001:** Both crash worker writers retain truncated canonical JSON after partial write refusal. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/windows-diagnostics/report.md). Done: both workers stage the bytes, delete the owned staging file on refusal and publish with a no-replace move.
 
 ### macos-runtime
 
