@@ -235,19 +235,22 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 			])
 		)
 			return false;
-		const installHandoffs = () =>
-			[
-				['system', '🔐', 'system_best'],
-				['user', '📥', 'user_best']
-			].every(([scope, emoji, best]) =>
-				one(
-					build,
-					`bundle_rows[#bundle_rows + 1] = build_install_item(
-				i18n.get("menu.layout.scope_${scope}"), "${emoji}", ${best}, latest, latest_ver,
-				function() run_install_and_chain(function() return install_${scope}(bundles_dir, latest) end, legacy_active, update_menu) end
-			)`
+		// Exact installation handoffs: the system scope keeps its unavailable-reason
+		// label until the privileged launcher identity can be bound.
+		const installHandoff = (scope) => {
+			const system = scope === 'system';
+			return `bundle_rows[#bundle_rows + 1] = build_install_item(
+			${system ? 'system_scope_label' : 'i18n.get("menu.layout.scope_user")'}, "${system ? '🔐' : '📥'}", ${system ? 'system_best' : 'user_best'}, latest, latest_ver,
+			function()
+				run_install_and_chain(
+					function() return install_${scope}(bundles_dir, latest) end,
+					legacy_active, update_menu
 				)
-			);
+			end
+		)`;
+		};
+		const installHandoffs = () =>
+			['system', 'user'].every((scope) => one(build, installHandoff(scope)));
 		if (section === 'layout_bundle_variant_added' || section === 'layout_bundle_variant_add') {
 			if (
 				positions(build, 'local variant_provider').length ||
@@ -429,22 +432,13 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 					)
 				)
 					return false;
-				for (const [scope, emoji, best] of [
-					['system', '🔐', 'system_best'],
-					['user', '📥', 'user_best']
-				]) {
+				for (const scope of ['system', 'user']) {
 					if (
 						!localPort(
 							'install_' + scope,
 							'local install_' + scope + ' = install.install_' + scope
 						) ||
-						!one(
-							build,
-							`bundle_rows[#bundle_rows + 1] = build_install_item(
-							i18n.get("menu.layout.scope_${scope}"), "${emoji}", ${best}, latest, latest_ver,
-							function() run_install_and_chain(function() return install_${scope}(bundles_dir, latest) end, legacy_active, update_menu) end
-						)`
-						)
+						!one(build, installHandoff(scope))
 					)
 						return false;
 				}
@@ -457,9 +451,15 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 					positions(whole, 'local run_install_and_chain').length ||
 					!exact(
 						chain,
-						`local ok = false
-						pcall(function() ok = install_fn() end)
-						if ok and type(legacy_active) == "table" and #legacy_active > 0 then
+						`local called, ok, reason = pcall(install_fn)
+						if not called or ok ~= true then
+							local key = reason == "launcher_unavailable" and "menu.layout.install_launcher_required"
+								or reason == "system_install_unavailable" and "menu.layout.install_system_unavailable"
+								or reason == "other_scope_occupied" and "menu.layout.install_other_scope"
+								or reason == "other_scope_unverified" and "menu.layout.install_other_scope_unverified" or "menu.layout.install_failed"
+							pcall(notifications.notify, i18n.get(key), nil, "error")
+						end
+						if called and ok == true and type(legacy_active) == "table" and #legacy_active > 0 then
 							Logger.info(LOG, "Install succeeded — auto-upgrading %d legacy entry(ies) in the active list.", #legacy_active)
 							upgrade_active_list_async(legacy_active, function() schedule_menu_refresh(update_menu) end)
 							return

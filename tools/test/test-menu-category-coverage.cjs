@@ -1270,7 +1270,17 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 		['layout_bundle_update', 'layout_install = do_install', 'layout_install = "do_install"'],
 		['layout_bundle_install', 'return install_system(bundles_dir, latest)', 'return true'],
 		['layout_bundle_install', 'return install_user(bundles_dir, latest)', 'return true'],
-		['layout_bundle_install', 'ok = install_fn()', 'ok = true'],
+		[
+			'layout_bundle_install',
+			'local called, ok, reason = pcall(install_fn)',
+			'local called, ok, reason = true, true, nil'
+		],
+		['layout_bundle_install', 'if not called or ok ~= true then', 'if false then'],
+		[
+			'layout_bundle_install',
+			'pcall(notifications.notify, i18n.get(key), nil, "error")',
+			'pcall(notifications.notify, i18n.get(key), nil, "info")'
+		],
 		[
 			'layout_bundle_variant_add',
 			'local function variant_provider() return add_sub end',

@@ -163,7 +163,7 @@ local function wrap_symbol_rows(ctx, sc)
 	local ready = choices ~= nil and not paused
 	local states = choices and choices.states or {}
 	local custom = choices and choices.custom or {}
-	local Keys = require("config_keys").COMMAND
+	local COMMAND = require("config_keys").COMMAND
 	local function mutate(change)
 		if not ready then return false end
 		local committed = sc.commit_wrap_choices(change)
@@ -181,9 +181,9 @@ local function wrap_symbol_rows(ctx, sc)
 	for _, pair in ipairs(sc.get_wrap_pair_list()) do all_lefts[#all_lefts + 1] = pair.left end
 	local getters = { wrap_symbols_ready = function() return ready end }
 	local rows = ManifestMenu.template_rows("wrap_symbols_global_controls", {
-		[Keys.WRAP_SYMBOLS_ENABLE_ALL] = function() return set_all(all_lefts, true) end,
-		[Keys.WRAP_SYMBOLS_DISABLE_ALL] = function() return set_all(all_lefts, false) end,
-		[Keys.WRAP_SYMBOLS_RESTORE] = function()
+		[COMMAND.WRAP_SYMBOLS_ENABLE_ALL] = function() return set_all(all_lefts, true) end,
+		[COMMAND.WRAP_SYMBOLS_DISABLE_ALL] = function() return set_all(all_lefts, false) end,
+		[COMMAND.WRAP_SYMBOLS_RESTORE] = function()
 			return mutate(function(candidate)
 				candidate.wrap_symbol_states, candidate.custom_wrap_symbols = {}, {}
 				return true
@@ -199,8 +199,8 @@ local function wrap_symbol_rows(ctx, sc)
 			if states[pair.left] == false then all_on = false end
 		end
 		local items = ManifestMenu.template_rows("wrap_symbols_group_controls", {
-			[Keys.WRAP_SYMBOLS_ENABLE_GROUP] = function() return set_all(lefts, true) end,
-			[Keys.WRAP_SYMBOLS_DISABLE_GROUP] = function() return set_all(lefts, false) end,
+			[COMMAND.WRAP_SYMBOLS_ENABLE_GROUP] = function() return set_all(lefts, true) end,
+			[COMMAND.WRAP_SYMBOLS_DISABLE_GROUP] = function() return set_all(lefts, false) end,
 		}, getters)
 		if not items then return {} end
 		for _, pair in ipairs(group.pairs) do
@@ -231,7 +231,7 @@ local function wrap_symbol_rows(ctx, sc)
 		for index, pair in ipairs(custom) do
 			local left, right = pair.left, pair.right
 			local controls = ManifestMenu.template_rows("wrap_symbols_custom_controls", {
-				[Keys.WRAP_SYMBOLS_DELETE_CUSTOM] = function()
+				[COMMAND.WRAP_SYMBOLS_DELETE_CUSTOM] = function()
 					return mutate(function(candidate)
 						local current = candidate.custom_wrap_symbols[index]
 						-- The list may have changed since this menu was drawn.
@@ -251,7 +251,7 @@ local function wrap_symbol_rows(ctx, sc)
 	end
 
 	local add = ManifestMenu.template_rows("wrap_symbols_add_controls", {
-		[Keys.WRAP_SYMBOLS_ADD_CUSTOM] = function()
+		[COMMAND.WRAP_SYMBOLS_ADD_CUSTOM] = function()
 			if not ready then return false end
 			local left = ask_symbol("dialog.shortcuts.wrap_symbol_title", "dialog.shortcuts.wrap_symbol_prompt", false)
 			if left == nil then return false end
