@@ -423,3 +423,134 @@ _UA_FirstLineScalarBoundaries() {
 }
 Test("User command first-line byte limits retain complete Unicode scalars (user-command-firstline-scalars)",
 	_UA_FirstLineScalarBoundaries)
+
+
+_UAE_Names() => ["ERGOPTI_USER_COMMAND", "ERGOPTI_USER_COMMAND_OUT", "ERGOPTI_USER_COMMAND_ERR"]
+_UAE_SaveEnvironment() {
+	Saved := Map()
+	Saved.CaseSense := "Off"
+	for Name in _UAE_Names()
+		Saved[Name] := {Name: Name, Present: false, Value: ""}
+	Source := DllCall("Kernel32\GetEnvironmentStringsW", "Ptr")
+	AssertTrue(Source != 0, "The actual parent environment must be acquired before changing any private name")
+	try {
+		Cursor := Source
+		while NumGet(Cursor, 0, "UShort") {
+			Row := StrGet(Cursor, "UTF-16")
+			Cursor += (StrLen(Row) + 1) * 2
+			Separator := InStr(Row, "=", true, 2)
+			if !Separator
+				continue
+			Name := SubStr(Row, 1, Separator - 1)
+			if Saved.Has(Name) {
+				AssertFalse(Saved[Name].Present, "A pre-existing duplicate private parent name cannot be normalized by this fixture")
+				Saved[Name] := {Name: Name, Present: true, Value: SubStr(Row, Separator + 1)}
+			}
+		}
+	} finally AssertTrue(DllCall("Kernel32\FreeEnvironmentStringsW", "Ptr", Source, "Int"), "The exact parent environment buffer must retire")
+	return Saved
+}
+_UAE_RestoreEnvironment(Saved) {
+	Current := _UAE_SaveEnvironment()
+	for Name in _UAE_Names() {
+		if Current[Name].Present
+			AssertTrue(DllCall("Kernel32\SetEnvironmentVariableW", "Str", Name, "Ptr", 0, "Int"), "Only the three owned temporary names may be removed during restoration")
+	}
+	for _, Item in Saved {
+		if Item.Present
+			AssertTrue(DllCall("Kernel32\SetEnvironmentVariableW", "Str", Item.Name, "Ptr", StrPtr(Item.Value), "Int"),
+				"The exact prior spelling, presence and value (including empty) must be restored")
+	}
+	Restored := _UAE_SaveEnvironment()
+	for Name, Item in Saved {
+		AssertEqual(Item.Present, Restored[Name].Present)
+		if Item.Present
+			AssertEqual(Item.Value, Restored[Name].Value)
+	}
+}
+_UAE_Count(Block, Name) {
+	Cursor := 0, Found := 0
+	while Cursor + 2 <= Block.Size && NumGet(Block, Cursor, "UShort") {
+		Start := Cursor
+		while Cursor + 2 <= Block.Size && NumGet(Block, Cursor, "UShort")
+			Cursor += 2
+		AssertTrue(Cursor + 2 <= Block.Size, "The actual native environment block must remain within its counted Buffer")
+		Row := StrGet(Block.Ptr + Start, -((Cursor - Start) // 2), "UTF-16")
+		if StrCompare(SubStr(Row, 1, StrLen(Name) + 1), Name . "=", false) == 0
+			Found += 1
+		Cursor += 2
+	}
+	return Found
+}
+_UAE_Case(Mode) {
+	global _UserCommandEntries
+	AssertEqual(0, _UserCommandEntries.Count, "No existing command may observe this temporary parent environment")
+	Root := A_Temp . "\ergopti_command_environment_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	AssertTrue(Created is Integer && Created == 1, "The witness root must be acquired exclusively before any write or recursive cleanup")
+	State := {Reads: 0, CaptureHex: "", DeliveredUnits: -1, Kind: "", Failure: 0,
+		Binding: "ua_inherited_environment", Entry: 0, Retired: true, Root: Root}
+	Saved := 0
+	try {
+		OutPath := Root . "\inherited.out", ErrPath := Root . "\inherited.err"
+		Sentinel := "owned-inherited-redirection-sentinel"
+		AssertTrue(FSWriteCreateDurable(OutPath, Sentinel) && FSWriteCreateDurable(ErrPath, Sentinel), "Only exclusively acquired private witnesses may receive inherited redirection")
+		Saved := _UAE_SaveEnvironment()
+		for Name in _UAE_Names() {
+			if Saved[Name].Present
+				EnvSet(Name)
+		}
+		; Both possible commands remain alive long enough for the strict helper
+		; to capture its exact actual Entry. Only a local timer process is used.
+		Delay := '"' . A_WinDir . '\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "Start-Sleep -Milliseconds 200" & '
+		Command := Delay . (Mode == "err" ? "echo intended_error_canary 1>&2 & exit /b 3" : "echo intended_output_canary")
+		if Mode == "command" || Mode == "command-lower"
+			EnvSet(Mode == "command-lower" ? "ergopti_user_command" : "ERGOPTI_USER_COMMAND", Delay . "echo inherited_command_canary")
+		else if Mode == "out"
+			EnvSet("ERGOPTI_USER_COMMAND_OUT", OutPath)
+		else if Mode == "err"
+			EnvSet("ERGOPTI_USER_COMMAND_ERR", ErrPath)
+		Overrides := Map("ERGOPTI_USER_COMMAND", Command, "ERGOPTI_USER_COMMAND_OUT", Root . "\preview.out", "ERGOPTI_USER_COMMAND_ERR", Root . "\preview.err")
+		ActualBlock := _UserCommandEnvironment(Overrides)
+		CanonicalBlock := ShellRunner_BuildEnvironment(Overrides)
+		Name := Mode == "out" ? "ERGOPTI_USER_COMMAND_OUT" : (Mode == "err" ? "ERGOPTI_USER_COMMAND_ERR" : "ERGOPTI_USER_COMMAND")
+		ActualCount := _UAE_Count(ActualBlock, Name), CanonicalCount := _UAE_Count(CanonicalBlock, Name)
+		AssertEqual(1, CanonicalCount, "The existing canonical builder independently supplies a unique override")
+		Record := _UAN_Run(Command, "copy", State)
+		OutUnchanged := FSReadUtf8Exact(OutPath) == Sentinel
+		ErrUnchanged := FSReadUtf8Exact(ErrPath) == Sentinel
+		IntendedCopy := Record["copied"].Length == 1 && Record["copied"][1] == "intended_output_canary"
+		InheritedCopy := Record["copied"].Length == 1 && Record["copied"][1] == "inherited_command_canary"
+		IntendedError := Record["notices"].Length == 1 && InStr(Record["notices"][1], "intended_error_canary", true) > 0
+		ModeNumber := Mode == "command" ? 1 : (Mode == "command-lower" ? 2 : (Mode == "out" ? 3 : (Mode == "err" ? 4 : 5)))
+		_TestPrint("# OBSERVATION user-command-inherited-environment mode=" . ModeNumber
+			. " started=" . Record["started"] . " finished=" . Record["finished"] . " retired=" . State.Retired
+			. " actual_rows=" . ActualCount . " canonical_rows=" . CanonicalCount
+			. " copies=" . Record["copied"].Length . " notices=" . Record["notices"].Length
+			. " intended_copy=" . IntendedCopy . " inherited_copy=" . InheritedCopy . " intended_error=" . IntendedError
+			. " out_unchanged=" . OutUnchanged . " err_unchanged=" . ErrUnchanged)
+		AssertTrue(Record["started"] && Record["finished"] && State.Retired, "The public command must complete and its exact tree must acknowledge retirement")
+		if IsObject(State.Failure)
+			throw State.Failure
+		AssertTrue(OutUnchanged && ErrUnchanged, "Inherited private redirections must not replace the public command's own capture destinations")
+		if Mode == "err"
+			AssertTrue(IntendedError && Record["copied"].Length == 0, "A genuine failed command must retain its intended error detail through its own stderr capture")
+		else
+			AssertTrue(IntendedCopy && Record["notices"].Length == 0, "The public stored command must override any earlier inherited spelling, irrespective of native duplicate normalization")
+	} finally {
+		; CreateProcess copied its block: restoring the parent cannot change a
+		; retained child. Its private source/witnesses stay until strict ACK.
+		try {
+			if Saved is Map
+				_UAE_RestoreEnvironment(Saved)
+		} finally {
+			if State.Retired
+				DirDelete(Root, true)
+			else
+				_TestPrint("# command environment witnesses retained with exact unretired process debt")
+		}
+	}
+}
+for _UAE_Mode in ["command", "command-lower", "out", "err", "clean"]
+	Test("Public command inherited environment: " . _UAE_Mode . " keeps its genuine private override (user-command-inherited-environment)",
+		_UAE_Case.Bind(_UAE_Mode))
