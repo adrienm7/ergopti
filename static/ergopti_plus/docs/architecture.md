@@ -77,10 +77,12 @@ graph TD
         LINUX_tray_menu["TrayMenu.lua"]
         LINUX_uinput_writer["UinputWriter.lua"]
         LINUX_user_hotstring_destination["UserHotstringDestination.lua"]
+        LINUX_wayland_selection_counter["WaylandSelectionCounter.lua"]
         LINUX_window_info["WindowInfo.lua"]
         LINUX_window_switch["WindowSwitch.lua"]
         LINUX_wpm_surface["WpmSurface.lua"]
         LINUX_x11_focus["X11Focus.lua"]
+        LINUX_x11_selection_stamp["X11SelectionStamp.lua"]
         LINUX_xkb_capture["XkbCapture.lua"]
         LINUX_xkb_source_probe["XkbSourceProbe.lua"]
     end

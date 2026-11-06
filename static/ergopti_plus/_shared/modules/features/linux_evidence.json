@@ -445,6 +445,31 @@
 				"layout.emulate_home_row",
 				"layout.emulate_bottom_row"
 			]
+		},
+		"accented_shortcuts": {
+			"members": [
+				"shortcuts.e_grave.enabled",
+				"shortcuts.e_grave.letter",
+				"shortcuts.e_circ.enabled",
+				"shortcuts.e_circ.letter",
+				"shortcuts.e_acute.enabled",
+				"shortcuts.e_acute.letter",
+				"shortcuts.a_grave.enabled",
+				"shortcuts.a_grave.letter"
+			],
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/shortcuts/accented_shortcuts.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_layouts.lua",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_accented_shortcuts.lua"
+			]
 		}
 	},
 	"overrides": {

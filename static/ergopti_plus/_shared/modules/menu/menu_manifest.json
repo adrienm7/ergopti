@@ -5903,6 +5903,23 @@
 			"id": "layout_picker_choices"
 		}
 	],
+	"accented_letter_picker_frame": [
+		{
+			"type": "check",
+			"id": "accented_letter_off",
+			"i18n": "common.disabled",
+			"checked_when": [
+				"accented_letter_off_checked"
+			]
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "list",
+			"id": "accented_letter_choices"
+		}
+	],
 	"layout_native_record_choice": [
 		{
 			"type": "check",
