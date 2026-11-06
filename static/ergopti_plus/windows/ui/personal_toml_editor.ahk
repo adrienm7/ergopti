@@ -606,7 +606,7 @@ _AddEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, Ch
 	global _PersonalEditorEntryBusy
 	if _PersonalEditorEntryBusy
 		return false
-	global _PersonalEditorData, _PersonalEditorSection
+	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
 	Data := _PersonalEditorData, SectionName := _PersonalEditorSection
 	TriggerVal := Trim(TriggerEdit.Value)
 	O := Trim(OutputEdit.Value)
@@ -622,9 +622,14 @@ _AddEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, Ch
 	; The persisted default_section pointer can outlive its target (a section
 	; deleted in an earlier session), and AHK v2 THROWS on a missing Map key.
 	; Guarded exactly like the twin read in _FillFormFromSelection.
-	if !_PersonalEditorData["sections"].Has(_PersonalEditorSection) {
-		try LoggerWarn("PersonalEditor", "Section {1} no longer exists — ignoring the action.", _PersonalEditorSection)
+	if !Data["sections"].Has(SectionName) {
+		try LoggerWarn("PersonalEditor", "Section {1} no longer exists — ignoring the action.", SectionName)
 		return
+	}
+	; The same session proof the entry writer applies, before reading the snapshot.
+	if !_PersonalEditorSectionActionCurrent(W, _PersonalEditorOpeningSource, Data, SectionName) {
+		StatusText.Value := t("editor.hotstrings.err_write")
+		return false
 	}
 	for E in Data["sections"][SectionName]["entries"] {
 		if (E["trigger"] == TriggerVal) {
@@ -646,7 +651,7 @@ _SaveEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, C
 	global _PersonalEditorEntryBusy
 	if _PersonalEditorEntryBusy
 		return false
-	global _PersonalEditorData, _PersonalEditorSection
+	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
 	Data := _PersonalEditorData, SectionName := _PersonalEditorSection
 	Row := LV.GetNext(0)
 	if !Row {
@@ -662,9 +667,14 @@ _SaveEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, C
 	; The persisted default_section pointer can outlive its target (a section
 	; deleted in an earlier session), and AHK v2 THROWS on a missing Map key.
 	; Guarded exactly like the twin read in _FillFormFromSelection.
-	if !_PersonalEditorData["sections"].Has(_PersonalEditorSection) {
-		try LoggerWarn("PersonalEditor", "Section {1} no longer exists — ignoring the action.", _PersonalEditorSection)
+	if !Data["sections"].Has(SectionName) {
+		try LoggerWarn("PersonalEditor", "Section {1} no longer exists — ignoring the action.", SectionName)
 		return
+	}
+	; The same session proof the entry writer applies, before reading the snapshot.
+	if !_PersonalEditorSectionActionCurrent(W, _PersonalEditorOpeningSource, Data, SectionName) {
+		StatusText.Value := t("editor.hotstrings.err_write")
+		return false
 	}
 	Entries := Data["sections"][SectionName]["entries"]
 	if Row > Entries.Length {
