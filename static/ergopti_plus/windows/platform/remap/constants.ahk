@@ -1584,7 +1584,28 @@ _TapHoldTapEndsCapsWord(KeyId) {
 	; shortcuts/capsword.ahk is not loaded (standalone tests, tools).
 	if !IsSet(CapsWordEnabled) or !CapsWordEnabled or !IsSet(DisableCapsWord)
 		return false
-	return CapsWordAutoOffIsTerminatorKey(KeyId) and CapsWordAutoOffEndsOnNativeKey(KeyId)
+	Emitted := _TapHoldTapEmittedKey(KeyId)
+	return CapsWordAutoOffIsTerminatorKey(Emitted) and CapsWordAutoOffEndsOnNativeKey(Emitted)
+}
+
+; The key a tap actually types, which is what CapsWord's delimiters judge: the
+; physical carrier is only where the tap came from (Tab remapped to Backspace
+; types no Tab, CapsLock remapped to Enter types one). A tap without a
+; configured action passes the physical key through; a command, or a keystroke
+; under held modifiers, is no delimiter keystroke.
+; @param KeyId {String} Canonical tap-hold key id.
+; @returns {String} The emitted key's id, "" when the tap types no plain key.
+_TapHoldTapEmittedKey(KeyId) {
+	global GESTURE_ACTIONS, TapHold
+	ActionId := TapHoldTapAction(TapHold, KeyId)
+	if (ActionId == "")
+		return KeyId
+	if !GESTURE_ACTIONS.Has(ActionId)
+		return ""
+	Action := GESTURE_ACTIONS[ActionId]
+	if !Action.HasOwnProp("Key") || (Action.HasOwnProp("Mods") && Action.Mods.Length > 0)
+		return ""
+	return ActionId
 }
 
 ; Invoke the configured GESTURE_ACTIONS callback without applying guards. This
