@@ -81,6 +81,7 @@ local function with_widget(callback, position)
 				return self.current_frame
 			end
 			function canvas:mouseCallback(fn) self.mouse_callback = fn; return self end
+			function canvas:canvasMouseEvents() return self end
 			state.canvases[#state.canvases + 1] = canvas
 			phase("create")
 			return canvas

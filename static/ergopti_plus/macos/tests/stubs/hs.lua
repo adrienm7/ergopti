@@ -1043,6 +1043,20 @@ local function make_canvas(initial_frame)
 		return self
 	end
 
+	--- Mirrors hs.canvas: every tracking class starts disabled and native
+	--- delivery requires an explicit opt-in (down, up, enter/exit, move).
+	function canvas:canvasMouseEvents(down, up, enter_exit, move)
+		if down == nil and up == nil and enter_exit == nil and move == nil then
+			local flags = self._mouse_events or {}
+			return flags.down == true, flags.up == true, flags.enter_exit == true, flags.move == true
+		end
+		self._mouse_events = {
+			down = down == true, up = up == true,
+			enter_exit = enter_exit == true, move = move == true,
+		}
+		return self
+	end
+
 	function canvas:show()
 		if self._deleted then return nil end
 		self._showing = true

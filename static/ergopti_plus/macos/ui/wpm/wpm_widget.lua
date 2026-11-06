@@ -358,6 +358,11 @@ update_widget_body = function(generation)
 				end
 			end)
 			if not is_current(generation) or _canvas ~= candidate then return false end
+			-- hs.canvas initializes every tracking flag to false and its native
+			-- dispatcher delivers a callback only for an enabled class, so the
+			-- callback above would never run without this explicit opt-in.
+			_canvas:canvasMouseEvents(true, true, false, true)
+			if not is_current(generation) or _canvas ~= candidate then return false end
 		else
 			-- Only reposition when not dragging.
 			if not _drag_start_mouse then

@@ -160,6 +160,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 						self.mouse_callback = callback
 						return self
 					end
+					function canvas:canvasMouseEvents() return self end
 					canvases[#canvases + 1] = canvas
 					return canvas
 				end,
