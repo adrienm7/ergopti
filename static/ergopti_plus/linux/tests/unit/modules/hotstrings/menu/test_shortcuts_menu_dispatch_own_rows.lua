@@ -64,6 +64,35 @@ helpers.describe("shortcuts menu: this driver's own rows", function()
 		end
 	end)
 
+	helpers.it("lists every catalogue pair once even when two pairs share an endpoint (WSL-002)", function()
+		local shortcuts = fake_shortcuts()
+		-- The alias map keeps one owner per key: the lower pair's closing quote
+		-- overwrote the standard pair's opener, so the standard pair vanished.
+		local standard = { left = "\226\128\156", right = "\226\128\157" }
+		local lower = { left = "\226\128\158", right = "\226\128\156" }
+		shortcuts.get_wrap_pair_list = function() return { standard, lower } end
+		shortcuts.get_wrap_pairs = function()
+			return {
+				[standard.right] = standard,
+				[lower.left] = lower,
+				[lower.right] = lower,
+			}
+		end
+		local rows = shortcuts_menu({ shortcuts = shortcuts })
+		local wanted = require("infra.i18n").get("menu.shortcuts.wrap_symbols")
+		local titles = {}
+		for _, row in ipairs(rows) do
+			if row.title == wanted and type(row.menu) == "table" then
+				for _, entry in ipairs(row.menu) do titles[#titles + 1] = entry.title end
+			end
+		end
+		helpers.assert_eq(#titles, 2, "both quotation pairs are menu choices")
+		local seen = {}
+		for _, title in ipairs(titles) do seen[title] = true end
+		helpers.assert_true(seen[standard.left .. " \226\128\166 " .. standard.right],
+			"the standard curly pair is listed")
+	end)
+
 	helpers.it("orders the wrapping pairs, so a rebuild does not shuffle them", function()
 		local rows = shortcuts_menu()
 		-- By its label, not by "the last submenu with more than one row". That

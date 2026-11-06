@@ -31,7 +31,7 @@ local function every_category_on()
 		config = { any_enabled = on, get_groups = function() return {} end, is_group_enabled = on,
 			is_section_enabled = on, get_category = function() return nil end, get_categories = function() return {} end },
 		shortcuts = { is_enabled = on, toggle = noop, is_caps_word_active = function() return false end,
-			get_wrap_pairs = function() return {} end },
+			get_wrap_pairs = function() return {} end, get_wrap_pair_list = function() return {} end },
 		keystats = { is_enabled = on, toggle = noop,
 			get_session_stats = function() return { keystrokes = 0, words = 0, duration_ms = 0 } end },
 		dyn_hotstrings = { is_enabled = on, set_enabled = noop, get_rules_count = function() return 0 end,
