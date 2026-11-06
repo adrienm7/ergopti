@@ -3,7 +3,12 @@
 --- only LuaJIT's built-in ffi, so its literal script path is sufficient even
 --- when the application directory contains Lua template delimiters.
 local ffi = require("ffi")
-ffi.cdef[[
+
+local M = {}
+
+-- Declared only when the child runs: requiring this file (the adapter
+-- presence check does) must neither touch ffi.C nor exit the caller.
+local DECLARATIONS = [[
 struct _XDisplay;
 struct _XDisplay *XOpenDisplay(const char *);
 int XCloseDisplay(struct _XDisplay *);
@@ -21,10 +26,14 @@ int getppid(void);
 int prctl(int, ...);
 ]]
 
-local function run()
-	local parent = tonumber(arg[1])
-	local soname = arg[2]
-	assert(parent and parent > 0 and parent % 1 == 0 and arg[3] == nil, "invalid parent")
+--- Locks the core keyboard on its first group for the parent process.
+--- @param argv table { parent_pid, x11_soname }
+--- @return boolean accepted
+function M.run(argv)
+	local parent = tonumber(argv[1])
+	local soname = argv[2]
+	assert(parent and parent > 0 and parent % 1 == 0 and argv[3] == nil, "invalid parent")
+	ffi.cdef(DECLARATIONS)
 	assert(type(soname) == "string" and soname:match("^[%w_+%.%-]+$"), "invalid X11 soname")
 	assert(ffi.C.prctl(1, ffi.cast("unsigned long", 9), 0, 0, 0) == 0, "parent binding failed")
 	assert(tonumber(ffi.C.getppid()) == parent, "parent already exited")
@@ -42,5 +51,10 @@ local function run()
 	return ok and accepted == true
 end
 
-local ok, accepted = pcall(run)
-os.exit(ok and accepted == true and 0 or 1)
+if type(arg) == "table" and type(arg[0]) == "string"
+	and arg[0]:gsub("\\", "/"):match("([^/]+)$") == "input_source_group_worker.lua" then
+	local ok, accepted = pcall(M.run, arg)
+	os.exit(ok and accepted == true and 0 or 1)
+end
+
+return M
