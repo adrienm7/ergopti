@@ -15,7 +15,9 @@
 ---    so the executor can list what it runs and the suite pins each command.
 --- 2. Backgrounded: every command is handed to the executor's background
 ---    runner. The daemon holds the grabbed keyboard, so a command that waits
----    for a window manager or a dialog must never be waited for here.
+---    for a window manager or a dialog must never be waited for here; the
+---    runner (modules/gestures/background_commands.lua) still logs a command
+---    that fails, with its exit status.
 --- 3. A catalogue action with `confirm = true` gets its question from
 ---    confirmed_command(): Ergopti's own dialog (ui/native_dialog.lua) in the
 ---    same background shell, chained to the command with &&, so Cancel (or a

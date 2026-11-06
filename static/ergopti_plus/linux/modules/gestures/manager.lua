@@ -63,6 +63,7 @@ local AiActions = require("modules.shortcuts.ai_actions")
 local ShellRunner = require("adapters.shell_runner")
 local DesktopNavigation = require("desktop_navigation")
 local SystemActions = require("modules.gestures.system_actions")
+local BackgroundCommands = require("modules.gestures.background_commands")
 local TableUtil = require("table_util")
 local TextUtils = require("text_utils")
 local ConfigKeys = require("config_keys")
@@ -386,9 +387,12 @@ end
 
 register_modifier_chords(load_modifier_chords())
 
---- Runs a shell command in the background, discarding its output. The shell
---- that forks it answers at once, and its refusal is logged, never dropped;
---- the command itself is not logged, as it can carry a selected path or URL.
+--- Launches an application for the user (xdg-open, gtk-launch, a settings
+--- app) in the background, discarding its output. The shell that forks it
+--- answers at once, and its refusal is logged, never dropped; the command
+--- itself is not logged, as it can carry a selected path or URL. The child is
+--- the application, which outlives the action, so it has no completion to
+--- report: one-shot commands go through BackgroundCommands instead.
 --- @param cmd string A fully composed command.
 --- @return boolean started
 local function run_background(cmd)
@@ -871,13 +875,16 @@ local function _execute_action(action_name, go_next, binding)
 				.. [=[trap 'rm -f "$f"' 0; trap 'exit 1' HUP INT TERM; { ]=] .. shot
 				.. '; } && [ -s "$f" ] && trap - 0 )'
 		end
-		run_background(shot)
+		-- One-shot commands report their own failure (LDS-001); the
+		-- application launches above keep run_background, whose child is the
+		-- application itself.
+		BackgroundCommands.run(shot, action_name)
 		return
 	end
 
 	local direct = DIRECT_COMMANDS[action_name]
 	if direct then
-		run_background(direct)
+		BackgroundCommands.run(direct, action_name)
 		return
 	end
 
@@ -885,13 +892,14 @@ local function _execute_action(action_name, go_next, binding)
 		local meta = Catalogue.actions[action_name]
 		local command = SystemActions.command_for(action_name, M.get_action_label(action_name),
 			meta ~= nil and meta.confirm == true)
-		if command then run_background(command) end
+		if command then BackgroundCommands.run(command, action_name) end
 		return
 	end
 	local system_handler = SystemActions.HANDLERS[action_name]
 	if system_handler then
 		local ok, err = pcall(system_handler, {
-			run_background = run_background,
+			-- Handler commands can name the user's files: their stderr stays out of the log.
+			run_background = function(command) return BackgroundCommands.run(command, action_name, true) end,
 			clipboard = require("adapters.clipboard"),
 			emit_combo = require("modules.gestures.combo_emitter").press,
 			sleep_ms = require("adapters.event_loop").sleep_ms,
