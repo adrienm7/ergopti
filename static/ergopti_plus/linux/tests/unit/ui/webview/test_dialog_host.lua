@@ -175,9 +175,16 @@ h.describe("owned dialog resolver (owned-dialog-host)", function()
 
 	h.it("(owned-dialog-host) os.execute results read as the host's exit code on every interpreter", function()
 		if jit then
-			local status = os.execute("kill -HUP $$")
-			h.assert_eq(status, 1, "the child really terminated by SIGHUP")
-			h.assert_nil(NativeDialog.exit_code(status), "a killed dialog is not a user cancellation")
+			local status, how, code = os.execute("kill -HUP $$")
+			if how == nil then
+				h.assert_eq(status, 1, "the child really terminated by SIGHUP")
+			else
+				-- A LuaJIT built with LUA52COMPAT (Fedora, Alpine) reports the
+				-- signal as Lua 5.2 does instead of a raw wait status.
+				h.assert_eq({ status = status, how = how, code = code }, { how = "signal", code = 1 },
+					"the child really terminated by SIGHUP")
+			end
+			h.assert_nil(NativeDialog.exit_code(status, how, code), "a killed dialog is not a user cancellation")
 		end
 		h.assert_eq(NativeDialog.exit_code(0), 0)
 		h.assert_eq(NativeDialog.exit_code(true), 0)
