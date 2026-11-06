@@ -269,6 +269,19 @@ function M.bump_app_day(agg_batch, date_str, app, field, value)
 	row[field] = (row[field] or 0) + value
 end
 
+--- Whether a wake stamped at this local timestamp is a night wake: earlier
+--- than `end_ms` after local midnight ([keystats] night_wake_end_ms).
+--- @param timestamp string|nil "YYYY-MM-DD HH:MM:SS[.mmm]" in local time.
+--- @param end_ms number Milliseconds after midnight the night ends at.
+--- @return boolean
+function M.is_night_wake(timestamp, end_ms)
+	assert(type(end_ms) == "number" and end_ms > 0, "the night end is a positive duration")
+	if type(timestamp) ~= "string" then return false end
+	local hour, minute, second = timestamp:match("^%d%d%d%d%-%d%d%-%d%d[ T](%d%d):(%d%d):(%d%d)")
+	if not hour then return false end
+	return ((tonumber(hour) * 60 + tonumber(minute)) * 60 + tonumber(second)) * 1000 < end_ms
+end
+
 -- ============================================================================
 -- 9. Per-app context
 -- ============================================================================

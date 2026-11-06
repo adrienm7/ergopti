@@ -50,7 +50,7 @@ local function walk(entries)
 	aggregator.init({ device_id = "passive-period-probe" })
 	for index, entry in ipairs(entries) do
 		entry.type = "system_event"
-		entry.timestamp = string.format("2026-11-04 10:%02d:00.000", index)
+		entry.timestamp = entry.timestamp or string.format("2026-11-04 10:%02d:00.000", index)
 		aggregator.walk_system_event(entry)
 	end
 	return state.agg_batch.system_day["2026-11-04"]
@@ -88,6 +88,19 @@ helpers.describe("keystats aggregator: measured passive intervals (HS-005)", fun
 		helpers.assert_eq(row.sleep_ms, 1200)
 		helpers.assert_eq(row.locked_ms, 3400)
 		helpers.assert_eq(row.passive_count, 0)
+	end)
+end)
+
+helpers.describe("keystats aggregator: night wakes", function()
+	helpers.it("counts a wake before the night's end and not a daytime one", function()
+		local row = walk({
+			{ action = "wake", timestamp = "2026-11-04 03:12:00.000" },
+			{ action = "wake", timestamp = "2026-11-04 05:59:59.000" },
+			{ action = "wake", timestamp = "2026-11-04 06:00:00.000" },
+			{ action = "wake", timestamp = "2026-11-04 14:00:00.000" },
+		})
+		helpers.assert_eq(row.night_wake_count, 2,
+			"the dashboard reads night_wake_count as the wakes between 0 h and 6 h")
 	end)
 end)
 

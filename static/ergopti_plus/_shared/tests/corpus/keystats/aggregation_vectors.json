@@ -371,6 +371,35 @@
 			}
 		},
 		{
+			"id": "system_event_night_wake",
+			"description": "A wake earlier than [keystats] night_wake_end_ms after local midnight counts as a night wake; a 06:00 or daytime wake does not",
+			"events": [
+				{
+					"type": "system_event",
+					"action": "wake",
+					"timestamp": "2024-06-01 03:12:00.000"
+				},
+				{
+					"type": "system_event",
+					"action": "wake",
+					"timestamp": "2024-06-01 05:59:59.000"
+				},
+				{
+					"type": "system_event",
+					"action": "wake",
+					"timestamp": "2024-06-01 06:00:00.000"
+				},
+				{
+					"type": "system_event",
+					"action": "wake",
+					"timestamp": "2024-06-01 14:00:00.000"
+				}
+			],
+			"expected": {
+				"system_day_night_wake_count": 2
+			}
+		},
+		{
 			"id": "system_event_modifier_hold",
 			"description": "A modifier_hold event accumulates kc_hold stats",
 			"events": [

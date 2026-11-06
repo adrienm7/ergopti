@@ -20,8 +20,8 @@
 --- A completed suspension or screen lock is one passive period, as on macOS;
 --- CPU and memory are sampled from /proc as the Windows system_load event; the
 --- X server's current desktop feeds space_switches, and without that source the
---- KPI is unavailable with its reason. night_wake_count has no producer on any
---- driver and stays zero.
+--- KPI is unavailable with its reason. A resume before [keystats]
+--- night_wake_end_ms after local midnight is a night wake, as on macOS and Windows.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -286,6 +286,25 @@ helpers.describe("system metrics: awake, locked, asleep", function()
 			helpers.assert_eq(day.awake_ms, 0,
 				"a locked screen is not the user working, and the panel this feeds "
 					.. "exists to tell the two apart")
+		end)
+	end)
+
+	helpers.it("linux-night-wake: a resume before the night's end counts once, a daytime one does not", function()
+		with_shell({}, function(metrics, sample, set_clock)
+			local step = metrics._sample_interval_ms()
+			local hour = 3
+			set_clock(function(now, date)
+				local clock = sample_clock(now, date)
+				-- The suspension ends at hour:00 local, the noon of sample_clock moved.
+				clock.wall_ms = clock.wall_ms + (hour - 12) * 3600 * 1000
+				clock.boot_ms = now; clock.mono_ms = now == 0 and 0 or step
+				return clock
+			end)
+			sample(0, "2026-08-06"); sample(step * 8, "2026-08-06")
+			helpers.assert_eq(metrics.current().night_wake_count, 1)
+			hour = 12
+			sample(step * 16, "2026-08-06")
+			helpers.assert_eq(metrics.current().night_wake_count, 1, "a noon resume is no night wake")
 		end)
 	end)
 

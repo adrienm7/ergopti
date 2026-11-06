@@ -676,5 +676,19 @@ KLW_WalkSystemEvent(entry) {
 				s["locked_ms"] += KLW_GetMap(entry, "duration_ms", 0)
 		} else if (action = "wake") {
 				s["sleep_ms"] += KLW_GetMap(entry, "duration_ms", 0)
+				if KLW_IsNightWake(ts)
+						s["night_wake_count"] += 1
 		}
+}
+
+/**
+ * Whether a wake stamped at this local timestamp is a night wake: earlier than
+ * KLWConst.NIGHT_WAKE_END_MS after local midnight, as macOS and Linux count it.
+ * @param ts "YYYY-MM-DD HH:MM:SS[.mmm]" in local time.
+ * @returns {Integer} True for a night wake.
+ */
+KLW_IsNightWake(ts) {
+		if !RegExMatch(ts, "^\d{4}-\d{2}-\d{2}[ T](\d{2}):(\d{2}):(\d{2})", &m)
+				return false
+		return ((Integer(m[1]) * 60 + Integer(m[2])) * 60 + Integer(m[3])) * 1000 < KLWConst.NIGHT_WAKE_END_MS
 }

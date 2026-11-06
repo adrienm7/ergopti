@@ -181,7 +181,9 @@ helpers.describe("Linux foreign metrics ledger import", function()
 			"INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms) VALUES ('"
 				.. FOREIGN .. "', 2, '2026-11-05 09:20:00.000', '2026-11-05', 'Safari', 'Mail', 60000);",
 			"INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('"
-				.. FOREIGN .. "', 3, '2026-11-05 12:00:00.000', '2026-11-05', 'passive_period', '{\"kind\":\"sleep\",\"duration_ms\":5000}');"))
+				.. FOREIGN .. "', 3, '2026-11-05 12:00:00.000', '2026-11-05', 'passive_period', '{\"kind\":\"sleep\",\"duration_ms\":5000}');",
+			"INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('"
+				.. FOREIGN .. "', 4, '2026-11-05 03:10:00.000', '2026-11-05', 'wake', '{}');"))
 		drain(f)
 		helpers.assert_eq(scalar(f.db, "SELECT count(*) FROM events_typing WHERE device_id='" .. FOREIGN .. "';"), "1")
 		helpers.assert_eq(scalar(f.db, "SELECT text FROM events_typing WHERE device_id='" .. FOREIGN .. "';"), "it's")
@@ -189,6 +191,7 @@ helpers.describe("Linux foreign metrics ledger import", function()
 		helpers.assert_eq(scalar(f.db, "SELECT chars FROM agg_app_day WHERE device_id='" .. FOREIGN .. "' AND app='Safari';"), "6")
 		helpers.assert_eq(scalar(f.db, "SELECT app_time_ms FROM agg_app_day WHERE device_id='" .. FOREIGN .. "' AND app='Safari';"), "60000")
 		helpers.assert_eq(scalar(f.db, "SELECT sleep_ms || ' ' || passive_count FROM agg_system_day WHERE device_id='" .. FOREIGN .. "';"), "5000 1")
+		helpers.assert_eq(scalar(f.db, "SELECT night_wake_count FROM agg_system_day WHERE device_id='" .. FOREIGN .. "';"), "1")
 		helpers.assert_eq(scalar(f.db, "SELECT count(*) FROM agg_app_day_hourly WHERE device_id='" .. FOREIGN .. "' AND hour='09';") ~= "0", true)
 		local digest, size = sha_of(f.ledger)
 		helpers.assert_eq(scalar(f.db, "SELECT imported_data_sql_size || ' ' || imported_data_sql_sha256 FROM devices WHERE device_id='"

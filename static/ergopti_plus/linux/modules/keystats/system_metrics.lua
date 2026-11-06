@@ -33,7 +33,10 @@
 --- publishes, observed on the daemon's focus tick; Wayland exposes no current
 --- desktop to a client, so there the KPI is unavailable with its reason
 --- (space_change_availability) rather than a zero that looks measured.
---- `night_wake_count` has no producer on any driver and stays zero.
+--- `night_wake_count` counts the suspensions that end earlier than
+--- [keystats] night_wake_end_ms after local midnight, the rule macOS and
+--- Windows apply to their wake events; the wake is seen at the first sample
+--- after resume, so it is placed within one sample interval of the real one.
 ---
 --- SAMPLING, NOT WATCHING:
 --- Every reading is a poll. Watching would mean a D-Bus subscription this driver
@@ -50,6 +53,9 @@ local TableUtil = require("table_util")
 local StorageOwned = require("storage_owned")
 
 local LOG = "modules.keystats.system_metrics"
+
+-- A wake earlier than this after local midnight is a night wake.
+local NIGHT_WAKE_END_MS = require("infra.timings").ms("keystats", "night_wake_end_ms")
 
 -- How often the machine's state is read, in milliseconds. Battery and lock
 -- state move on a scale of minutes; sampling faster spends subprocesses to
@@ -474,7 +480,13 @@ function M.sample()
 		if not capture_events then return end
 		_events[#_events + 1] = { action = action, metadata = metadata, date = clock.date, ts = clock.ts }
 	end
-	if asleep then transition("wake", { asleep_ms = sleep_total }) end
+	if asleep then
+		transition("wake", { asleep_ms = sleep_total })
+		local local_ts = os.date("%Y-%m-%d %H:%M:%S", math.floor(clock.wall_ms / 1000))
+		if require("keystats.aggregator_helpers").is_night_wake(local_ts, NIGHT_WAKE_END_MS) then
+			_day.night_wake_count = _day.night_wake_count + 1
+		end
+	end
 	-- A suspension inside a screen lock belongs to the lock's passive period, as
 	-- on macOS, where a lock owns any later sleep until unlock.
 	if asleep and _last.locked ~= true then

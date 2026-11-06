@@ -82,6 +82,7 @@ local SKIP = {
 	app_switch_accumulates_duration = OUTSIDE_THE_WALK,
 	window_switch_credits_title_ms = OUTSIDE_THE_WALK,
 	system_event_wifi_change = OUTSIDE_THE_WALK,
+	system_event_night_wake = OUTSIDE_THE_WALK,
 	system_event_modifier_hold = OUTSIDE_THE_WALK,
 	system_event_manifest_increment_hs = OUTSIDE_THE_WALK,
 	mixed_batch_typing_and_system = OUTSIDE_THE_WALK,

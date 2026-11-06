@@ -444,6 +444,11 @@ max_keystroke_delay_ms = 5000
 # AHK: keystats.ahk MIDNIGHT_CHECK_TICK_MS.
 midnight_check_tick_ms = 60000
 
+# A wake from sleep earlier than this, counted from local midnight, is a night
+# wake (the dashboard's « reprises entre 0 h et 6 h »). Read by each driver's
+# system-day aggregation. AHK: keystats_walker_core.ahk KLWConst.NIGHT_WAKE_END_MS.
+night_wake_end_ms = 21600000
+
 # Gap between keystrokes that marks a burst boundary.
 # AHK: keystats_walker.ahk BURST_GAP_MS. HS: aggregator.lua BURST_GAP_MS.
 burst_gap_ms = 1000

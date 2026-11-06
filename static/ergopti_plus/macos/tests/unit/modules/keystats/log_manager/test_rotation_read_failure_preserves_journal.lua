@@ -119,7 +119,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 	end
 	-- The cache already holds the current aggregate revision and no settled
 	-- receipt, so the checked reset settles the retained context once.
-	local meta = { local_data_sql_outbox = "", aggregate_cache_revision = "5", ngram_ctx_json = "{}" }
+	local meta = { local_data_sql_outbox = "", aggregate_cache_revision = "6", ngram_ctx_json = "{}" }
 	local reads = {
 		["SELECT value FROM meta WHERE key='local_data_sql_outbox'"] = "local_data_sql_outbox",
 		["SELECT value FROM meta WHERE key='rollover_settlement_receipt';"] = "rollover_settlement_receipt",
