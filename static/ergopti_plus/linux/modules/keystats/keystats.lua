@@ -271,6 +271,13 @@ local decode_open_walk
 -- then read as zero milliseconds after the previous one, however long ago
 -- that was, and every expansion typed first in a flush had no stamp at all.
 local _typing_last_key_at = {}
+-- Counts the capture exclusions entered (pause, private window, secure field,
+-- suppression, metrics off). Each application remembers the count its last
+-- typed key and its last per-app key saw; a different count means keys were
+-- hidden in between, so neither a sequence nor an interval may span them.
+local _capture_boundary = 0
+local _typing_boundary = {}
+local _app_key_boundary = {}
 
 -- Persisted manifest cache keyed by SQLite's monotonic revision. The live
 -- delta is layered on a shallow copy, so an open dashboard avoids a CLI query
@@ -819,10 +826,12 @@ local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
 	local resolved_app = (type(app_id) == "string" and app_id ~= "") and app_id or "Unknown"
 	if type(ch) == "string" and ch ~= "" then
 		record_app_key(resolved_app, ch, timestamp_ms, clock)
-		local pending = ensure_pending(resolved_app, clock)
+		local crossed = _typing_boundary[resolved_app] ~= nil and _typing_boundary[resolved_app] ~= _capture_boundary
+		_typing_boundary[resolved_app] = _capture_boundary
+		local pending = ensure_pending(resolved_app, clock, crossed)
 		local delay = 0
 		local previous_at = _typing_last_key_at[resolved_app]
-		if type(previous_at) == "number" and type(timestamp_ms) == "number" then
+		if not crossed and type(previous_at) == "number" and type(timestamp_ms) == "number" then
 			delay = math.max(0, math.min(timestamp_ms - previous_at, MAX_TYPING_INTERVAL_MS))
 		end
 		_typing_last_key_at[resolved_app] = timestamp_ms
@@ -883,7 +892,9 @@ record_app_key = function(app_id, ch, timestamp_ms, clock)
 	if not may_record() then return end
 	local live, dated = app_pair(app_id, timestamp_ms, clock)
 	local interval = 0
-	if type(live.last_key_at) == "number" then
+	local crossed = _app_key_boundary[app_id] ~= nil and _app_key_boundary[app_id] ~= _capture_boundary
+	_app_key_boundary[app_id] = _capture_boundary
+	if not crossed and type(live.last_key_at) == "number" then
 		local elapsed = timestamp_ms - live.last_key_at
 		if elapsed > 0 then interval = math.min(elapsed, MAX_TYPING_INTERVAL_MS) end
 	end
@@ -1010,13 +1021,15 @@ function M.record_physical_key(app_id, scancode, timestamp_ms)
 	end
 end
 
-ensure_pending = function(app_id, clock)
+ensure_pending = function(app_id, clock, after_exclusion)
 	assert(type(clock) == "table" and type(clock.layout) == "string", "Raw metrics require captured physical context")
 	local pending = _pending_typing_events[app_id]
 	if not pending then pending = { runs = {} }; _pending_typing_events[app_id] = pending end
 	local run = pending.runs[#pending.runs]
-	if not run or run.date ~= clock.date or run.layout ~= clock.layout then
-		run = { date = clock.date, ts = clock.ts, layout = clock.layout,
+	if after_exclusion or not run or run.date ~= clock.date or run.layout ~= clock.layout then
+		-- A run that follows an exclusion settles the walk before it, so its
+		-- first key continues no sequence typed before the hidden span.
+		run = { date = clock.date, ts = clock.ts, layout = clock.layout, after_exclusion = after_exclusion == true,
 			text = {}, events = {}, times = {}, wall_times = {} }
 		pending.runs[#pending.runs + 1] = run
 	end
@@ -1725,6 +1738,7 @@ end
 
 local hold_password_app = M.is_unrecorded_app
 settle_capture_policy = function()
+	if not may_record() then _capture_boundary = _capture_boundary + 1 end
 	if not may_record() or hold_password_app(_hold_focus_app) then
 		_pointer.discard_frames()
 		retire_focus_prefix()
@@ -2376,6 +2390,13 @@ local function capture_flush(close_session)
 			end
 			if #pending.events > 0 then
 				walker_contexts[app_id] = walker_contexts[app_id] or {}
+				if pending.after_exclusion then
+					local ok_settle, settled = pcall(AggregateWalker.settle, walker_contexts[app_id], nil, ngram_batch, true)
+					if not ok_settle then
+						return nil, "Typing aggregate settlement failed; pending source remains unacknowledged"
+					end
+					ngram_batch = settled
+				end
 				local ok_walk, walked = pcall(AggregateWalker.walk,
 					pending.events, date, dashboard_app_name(app_id), ngram_batch,
 					{ times = pending.times, wall_times = pending.wall_times,
@@ -2753,7 +2774,7 @@ local function restore_flush_buffers(buffers)
 		local newer = _pending_typing_events[app]
 		if newer then
 			local tail, head = older.runs[#older.runs], newer.runs[1]
-			if tail and head and tail.date == head.date and tail.layout == head.layout then
+			if tail and head and tail.date == head.date and tail.layout == head.layout and not head.after_exclusion then
 				for _, field in ipairs({ "text", "events", "times", "wall_times" }) do
 					tail[field] = prepend(tail[field], head[field])
 				end
@@ -3084,6 +3105,7 @@ reset_session_step = function()
 		app.last_key_at, app.wpm_ring, app.char_window = nil, {}, {}
 	end
 	_typing_last_key_at = {}
+	_typing_boundary, _app_key_boundary = {}, {}
 	_live = new_live_tracker()
 	_session = new_session_tracker()
 	_session_started_at = os.time() * 1000
