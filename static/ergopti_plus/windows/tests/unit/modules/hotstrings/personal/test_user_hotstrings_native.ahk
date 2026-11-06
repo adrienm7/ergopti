@@ -256,6 +256,55 @@ _UCHActualSourceAdmission() {
 }
 Test("programmable hotstrings: actual absent repaired empty disappeared and unreadable sources acknowledge honest admission", _UCHActualSourceAdmission)
 
+; Regression (AHK-001 / WH-001): the menu's Reload command is bound straight to
+; UserHotstringsReload. A refused source closes callback admission, so a
+; successful reload must restore the configured posture, never leave it closed
+; while the problem indicator disappears.
+_UCHReloadRestoresConfiguredAdmission() {
+	global _ConfigDir, _UserHotstringsOwner, _UserHotstringsLoader, _UserHotstringsJobs, _UserHotstringsLoadEpoch
+	global _UserHotstringsLastRepair, _UserHotstringsProblem, _DriverMenuReady, CategoryEnabled
+	AssertEqual(0, _UserHotstringsJobs.Count)
+	Saved := [_ConfigDir, _UserHotstringsOwner, _UserHotstringsLoader, _UserHotstringsLoadEpoch,
+		_UserHotstringsLastRepair, _UserHotstringsProblem, CategoryEnabled]
+	SavedMenuReady := IsSet(_DriverMenuReady) ? _DriverMenuReady : unset
+	Node := Features["hotstrings"]["dynamic"]["user_code"], SavedEnabled := Node["enabled"]
+	PackageRoots := _UCHPackageRoots(), Fixture := _ScopeOwnerFixture()
+	try {
+		_ConfigDir := Fixture.directory . "\", _DriverMenuReady := false, _UserHotstringsProblem := ""
+		CategoryEnabled := Map("Hotstrings", true)
+		_UserHotstringsOwner := UserHotstringOwner(Map("capture", _UserHotstringsCaptureRule,
+			"current", _UserHotstringsCurrent, "invoke", _UserHotstringsInvoke,
+			"commit", _UserHotstringsCommit, "report", _UserHotstringsReport))
+		Path := UserHotstringsSourcePath()
+		Valid := 'ErgoptiDynamicHotstrings(api) {`n`treturn []`n}`n'
+		for Desired in [true, false] {
+			Node["enabled"] := Desired
+			if FSStrictExists(Path)
+				Assert(FSDelete(Path))
+			AssertFalse(UserHotstringsSetEnabled(Desired ? 1 : 0) && Desired, "an absent source never admits callbacks")
+			Assert(FSWriteCreateDurable(Path, Valid))
+			Assert(UserHotstringsReload(), "the repaired source reload starts")
+			Started := A_TickCount
+			while _UserHotstringsJobs.Count && TickElapsed(Started) < 10000
+				Sleep(10)
+			AssertEqual(0, _UserHotstringsJobs.Count)
+			AssertTrue(_UserHotstringsOwner.ready, "the repaired source is published")
+			AssertEqual(Desired ? true : false, _UserHotstringsOwner.enabled ? true : false,
+				"a successful reload restores the configured admission, not the refusal posture")
+		}
+	} finally {
+		Node["enabled"] := SavedEnabled
+		Assert(UserHotstringsInvalidate("reload-admission-fixture-cleanup"))
+		_ConfigDir := Saved[1], _UserHotstringsOwner := Saved[2], _UserHotstringsLoader := Saved[3]
+		_UserHotstringsLoadEpoch := Saved[4], _UserHotstringsLastRepair := Saved[5], _UserHotstringsProblem := Saved[6]
+		CategoryEnabled := Saved[7]
+		_DriverMenuReady := IsSet(SavedMenuReady) ? SavedMenuReady : unset
+		_UCHRestorePackageRoots(PackageRoots)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("programmable hotstrings: a repaired source reload restores the configured callback admission", _UCHReloadRestoresConfiguredAdmission)
+
 /**
  * A missing programmable source used to open a modal Yes/No offer, first over
  * the boot thread, then once boot was ready, at every start with the option on

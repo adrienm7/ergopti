@@ -130,9 +130,15 @@ UserHotstringsInit() {
 			"current", _UserHotstringsCurrent, "invoke", _UserHotstringsInvoke,
 			"commit", _UserHotstringsCommit, "report", _UserHotstringsReport))
 	}
-	Enabled := Features["hotstrings"]["dynamic"].Has(ConfigLeaf.USER_CODE)
-		&& Features["hotstrings"]["dynamic"][ConfigLeaf.USER_CODE]["enabled"] && IsCategoryGated("Hotstrings")
-	return UserHotstringsSetEnabled(Enabled)
+	return UserHotstringsSetEnabled(_UserHotstringsDesiredEnabled())
+}
+
+; Effective configured posture; a successful Reload restores it because a
+; refused source leaves callback admission closed.
+_UserHotstringsDesiredEnabled() {
+	global Features
+	return Features["hotstrings"]["dynamic"].Has(ConfigLeaf.USER_CODE)
+		&& Features["hotstrings"]["dynamic"][ConfigLeaf.USER_CODE]["enabled"] && IsCategoryGated("Hotstrings") ? 1 : 0
 }
 
 UserHotstringsSetEnabled(Enabled) {
@@ -283,8 +289,10 @@ UserHotstringsReload(*) {
 				throw Error("Source publication refused.")
 			Rules := _UserHotstringsParseMetadata(Stdout)
 			Published := _UserHotstringsOwner.Reload(Rules, Source)
-			if Published
+			if Published {
 				_UserHotstringsProblem := ""
+				_UserHotstringsOwner.SetEnabled(_UserHotstringsDesiredEnabled())
+			}
 			_UserHotstringsRefreshMenu()
 			return Published
 		} catch {
