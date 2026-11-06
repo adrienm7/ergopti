@@ -26,6 +26,9 @@ local M = {}
 
 local json = require("hs.json")
 local LedgerAppend = require("adapters.ledger_append")
+local JournalSeal = require("keystats.journal_seal")
+local TextCrypto = require("keystats.text_crypto")
+local TextCipher = require("modules.keystats.text_cipher")
 
 local Logger = require("infra.logger")
 local LOG    = "keystats.rotation"
@@ -293,6 +296,27 @@ local function _resume_append()
 	return true
 end
 
+--- Distinguishes the IV input of every sealed field. Journal rows carry no
+--- event id yet (ids are allocated at SQL time), so the timestamp, the
+--- monotonic clock and a process counter make each one unique instead.
+local _seal_sequence = 0
+local function _seal_ports(entry)
+	_seal_sequence = _seal_sequence + 1
+	local token = string.format("journal:%s:%.0f:%d", tostring(entry.timestamp),
+		hs.timer.absoluteTime(), _seal_sequence)
+	return {
+		cipher = TextCipher,
+		encode = json.encode,
+		iv_id = function(field) return token .. ":" .. field end,
+	}
+end
+
+local _UNSEAL_PORTS = {
+	cipher = TextCipher,
+	decode = json.decode,
+	is_envelope = function(value) return TextCrypto.unwrap(value) ~= nil end,
+}
+
 --- Append one event, retaining its exact serialized receipt after any refusal.
 --- Hot-path success performs one write and no position query or body read.
 --- @param entry table The exact event retained by the deferred FIFO operation.
@@ -311,7 +335,15 @@ function M.append_log(entry)
 	local attempted, accepted = pcall(function()
 		if not _pending_append then
 			entry.timestamp = entry.timestamp or _now_ts()
-			local encoded, str = pcall(json.encode, entry)
+			-- Under at-rest encryption the journal must not keep the readable
+			-- copy of what the SQL columns seal; a failed seal writes nothing.
+			local journal_entry, unsealed_field = JournalSeal.seal(entry, _seal_ports(entry))
+			if journal_entry == nil then
+				Logger.error(LOG, "At-rest encryption could not seal journal field '%s'; entry kept for retry.",
+					tostring(unsealed_field))
+				return false
+			end
+			local encoded, str = pcall(json.encode, journal_entry)
 			if not encoded or type(str) ~= "string" then
 				Logger.error(LOG, "JSON encode failed for journal entry type '%s'.", tostring(entry.type))
 				return false
@@ -406,6 +438,12 @@ function M.read_new_entries()
 		end
 		if type(line) ~= "string" then return fail_read("line type validation") end
 		local ok, entry = pcall(json.decode, line)
+		if ok and type(entry) == "table" then
+			-- An unopenable sealed row is complete but unreadable: skipping it as
+			-- malformed would acknowledge typed text that never reached SQLite.
+			local opened, sealed_field = JournalSeal.unseal(entry, _UNSEAL_PORTS)
+			if opened == nil then return fail_read("sealed field " .. tostring(sealed_field)) end
+		end
 		if ok and type(entry) == "table" and type(entry.type) == "string"
 		   and type(entry.timestamp) == "string" then
 			table.insert(out, { entry = entry, raw = line })

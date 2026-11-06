@@ -253,7 +253,8 @@ KL_IngestOnce(force := false, rollover_owned := false, Token := 0) {
 				append_failed := false
 				for _, e in pending_snapshot {
 					try {
-						line := KL_JsonEncode(e)
+						; The same sealing encoder as the durable handoff: one journal form.
+						line := _KL_JournalEncodeDefault(e)
 						line := StrReplace(line, "`n", "\n")
 						line := StrReplace(line, "`r", "")
 						if !_KL_JournalAppendDefault(fh, line)
