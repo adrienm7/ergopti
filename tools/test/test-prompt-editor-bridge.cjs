@@ -197,7 +197,7 @@ check(
 );
 check(
 	'frontend rejects an init older than the displayed epoch',
-	/nextContext\.epoch\s*<\s*activePromptContext\.epoch/.test(script),
+	/nextContext\.epoch\s*<=\s*activePromptContext\.epoch/.test(script),
 	'An older fire-and-forget init may otherwise repaint a newer singleton context.'
 );
 check(

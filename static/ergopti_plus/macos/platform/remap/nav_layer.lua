@@ -706,6 +706,43 @@ function M.reconcile_wheel(label)
 	end
 end
 
+-- A refused publication or undo can retain the exact writer capability. Keep
+-- it until cleanup settles before allowing another hold mutation to proceed.
+local pending_hold_cleanups = {}
+local hold_cleanup_running = false
+
+local function settle_hold_cleanup()
+	if #pending_hold_cleanups == 0 then return true end
+	if hold_cleanup_running then return false end
+	hold_cleanup_running = true
+	while #pending_hold_cleanups > 0 do
+		local record = pending_hold_cleanups[1]
+		local called, settled = pcall(M.undo_import, record)
+		if not called or settled ~= true then
+			hold_cleanup_running = false
+			Logger.error(LOG, "Navigation layer cleanup remains pending; hold change refused.")
+			return false
+		end
+		table.remove(pending_hold_cleanups, 1)
+	end
+	hold_cleanup_running = false
+	return true
+end
+
+--- Retains the exact cleanup owner until its undo succeeds.
+function M.undo_owned(record)
+	if record ~= nil then pending_hold_cleanups[#pending_hold_cleanups + 1] = record end
+	return settle_hold_cleanup()
+end
+
+--- Imports a wizard layer while retaining failed publication cleanup.
+function M.import_owned(opts)
+	if not settle_hold_cleanup() then return nil, "navigation layer cleanup remains pending" end
+	local imported, err, failed = M.import_recommended(opts)
+	if not imported and failed then M.undo_owned(failed) end
+	return imported, err
+end
+
 --- Runs a hold setter with the layer its action enters. A hold on the
 --- navigation layer creates the folder's layers.toml from Ergopti's
 --- recommended layer when there is none, before the setter saves: a key set
@@ -717,10 +754,14 @@ end
 --- @param commit function Saves the hold; returns true once it is committed.
 --- @return boolean committed
 function M.commit_hold(label, action_id, commit)
+	if not settle_hold_cleanup() then return false end
 	local layer = nil
 	if action_id == M.HOLD_ACTION_ID then
-		local import, layer_err = M.import_recommended()
+		local import, layer_err, failed = M.import_recommended()
 		if not import then
+			if failed then
+				M.undo_owned(failed)
+			end
 			Logger.error(LOG, "%s refused: the recommended navigation layer cannot be imported (%s).",
 				tostring(label), tostring(layer_err))
 			return false
@@ -729,7 +770,9 @@ function M.commit_hold(label, action_id, commit)
 	end
 	local committed = commit()
 	if committed ~= true then
-		M.undo_import(layer)
+		if layer then
+			M.undo_owned(layer)
+		end
 		return committed
 	end
 	if layer and layer.status == require("keymap.layer_preset").IMPORTED then

@@ -105,6 +105,68 @@ local function with_runner(callback)
 end
 
 helpers.describe("ShellRunner exact start-refusal rollback ownership", function()
+	helpers.it("settles native children when the diagnostic clock fails (shell-diagnostic-clock)", function()
+		for _, mode in ipairs({ "throw", "nil", "text", "nan", "infinity" }) do
+			with_runner(function(runner, native)
+				_G.hs.timer.absoluteTime = function()
+					if mode == "throw" then error("clock unavailable") end
+					if mode == "nil" then return nil end
+					if mode == "text" then return "invalid" end
+					if mode == "nan" then return 0 / 0 end
+					return math.huge
+				end
+				local completions = 0
+				local handle = runner.spawn("/fixture/live", {}, function() completions = completions + 1 end)
+				helpers.assert_true(handle.start(), "diagnostic clock must not prevent native start")
+				native.tasks[1]:complete(0, "", "")
+				helpers.assert_eq(completions, 1)
+				helpers.assert_true(handle.isSettled(), "diagnostic clock must not strand task ownership")
+			end)
+		end
+	end)
+
+	helpers.it("returns native failures without invoking opaque formatters (shell-native-error-object)", function()
+		with_runner(function(runner, native)
+			local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
+			_G.hs.execute = function() error(hostile) end
+			helpers.assert_eq(runner.exec("/fixture/command"), "")
+
+			local rejected = runner.spawn("/fixture/start", {}, function() end)
+			native.tasks[1].start = function() error(hostile) end
+			helpers.assert_eq(rejected.start(), false)
+
+			local handle = runner.spawn("/fixture/live", {}, function() end)
+			local task = native.tasks[2]
+			helpers.assert_true(handle.start())
+			task.setInput = function() error(hostile) end
+			task.closeInput = function() error(hostile) end
+			task.terminate = function() error(hostile) end
+			helpers.assert_eq(handle.set_input("x"), false)
+			helpers.assert_eq(handle.close_input(), false)
+			local accepted, state = handle.terminate()
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(state, "refused")
+			helpers.assert_eq(runner._active_tasks[task], true, "failed termination retains the child")
+			task:complete(0, "", "")
+		end)
+	end)
+
+	helpers.it("delivers all settlement observers after opaque callback errors (shell-opaque-settlement)", function()
+		with_runner(function(runner, native)
+			local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
+			local handle = runner.spawn("/fixture/live", {}, function() error(hostile) end)
+			helpers.assert_true(handle.start())
+			local notified = 0
+			helpers.assert_true(handle.onSettled(function() error(hostile) end))
+			helpers.assert_true(handle.onSettled(function() notified = notified + 1 end))
+			helpers.assert_true(pcall(function() native.tasks[1]:complete(0, "", "") end))
+			helpers.assert_true(handle.isSettled())
+			helpers.assert_eq(notified, 1, "one failing observer must not strand another owner")
+			helpers.assert_true(handle.onSettled(function() error(hostile) end),
+				"an immediate observer failure must remain contained")
+		end)
+	end)
+
 	for _, start_mode in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("fences synchronous and late chunks after " .. start_mode
 			.. " start refusal", function()

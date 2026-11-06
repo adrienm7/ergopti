@@ -35,6 +35,33 @@ local function load_adapter()
 end
 
 helpers.describe("task_lifecycle: only a real native start commits", function()
+	helpers.it("contains errors whose formatter itself raises (task-lifecycle-error-object)", function()
+		local adapter, errors = load_adapter()
+		local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
+		local function fail() error(hostile) end
+		local callback = adapter.guard_callback(fail, "callback")
+		helpers.assert_eq(callback(), false)
+		helpers.assert_nil(adapter.create(fail, "factory"))
+		helpers.assert_eq(adapter.start({ start = fail }, "start"), false)
+		helpers.assert_eq(adapter.terminate({ terminate = fail }, "terminate"), false)
+		helpers.assert_eq(#errors, 4)
+		for _, line in ipairs(errors) do helpers.assert_contains(line, "error object (table)") end
+	end)
+
+	helpers.it("refuses an invalid completion callback before constructing a task (task-invalid-completion)", function()
+		local original_new = hs.task.new
+		local constructed = 0
+		hs.task.new = function() constructed = constructed + 1; return nil end
+		local ok, err = xpcall(function()
+			local adapter, errors = load_adapter()
+			helpers.assert_nil(adapter.native("invalid callback", "/bin/echo", "not a function", {}))
+			helpers.assert_eq(constructed, 0, "a task without its completion owner must never be created")
+			helpers.assert_eq(#errors, 1)
+		end, debug.traceback)
+		hs.task.new = original_new
+		if not ok then error(err) end
+	end)
+
 	helpers.it("rejects nil and throwing construction (task-lifecycle-create-contract)", function()
 		local adapter, errors = load_adapter()
 		helpers.assert_nil(adapter.create(function() return nil end, "nil probe"))

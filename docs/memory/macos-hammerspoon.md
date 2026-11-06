@@ -1407,13 +1407,19 @@ returns `false, ROLLOVER_WAITS_FOR_RECOVERY` without draining, the watcher says
 so once at INFO and completes the rotation on the first tick after the recovery;
 a real stall stays a WARNING. `_recovery_pause_sec` now scales the pause to
 0.5 % of a core on battery (`adapters/power_source.lua`) and keeps full speed on
-the mains. `aggregate_recovery_progress` in meta commits in the same
-transaction as the rows it counts, so a start resumes after the last flushed
-(ts, id) and skips the scan, the clear and the foreign import, which ingest then
-rebuilds by partition. Action: a new walker stage needs a rank, a `reached` call
-and an `after_resume_point` clause; a walker state outside the n-gram context is
-lost on resume. A lock-free reader takes `hold_recovery`: commits raced both
-scans of `field_storage` into 101 false issues on a sound cache.
+the mains. Reconstruction now uses a backup of the exact admitted writer handle
+and builds derived tables privately. Only a complete partition replaces its old
+rows, in the same transaction as its publication metadata; the global cache
+certificate returns only with the final compatible partition. A reload starts
+the private reconstruction again: a durable cursor cannot acknowledge progress
+whose temporary tables disappeared. Keep old aggregates until publication and
+reject unreadable typing ciphertext instead of certifying an empty result.
+Never reopen a pathname to infer the source connection's identity. The native
+backup lease prevents close while backup steps yield; finish must consume that
+owner before any destination SQLite API runs. The final temporary-table transfer
+has a synchronous time budget and refuses publication when exceeded. A lock-free
+reader takes `hold_recovery`: commits raced both scans of `field_storage` into
+101 false issues on a sound cache.
 
 ### project-macos-absence-needs-lstat-proof
 

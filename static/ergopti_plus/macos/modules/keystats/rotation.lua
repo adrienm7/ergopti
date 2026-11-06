@@ -50,8 +50,8 @@ M.READ_STATUS_BATCH  = "batch"
 M.READ_STATUS_EOF    = "eof"
 M.READ_STATUS_FAILED = "failed"
 
---- POSIX errno returned by io.open() when today.log does not exist. In the
---- single-threaded Hammerspoon callback this is a committed empty-journal state.
+--- POSIX errno returned by io.open() when today.log does not exist. It is an
+--- empty-journal state only when no writer or committed watermark contradicts it.
 local ENOENT_ERROR_CODE = 2
 
 --- Shared state injected by M.init().
@@ -87,6 +87,7 @@ local _pending_append = nil
 
 --- Diagnostic callbacks cannot reenter and settle one append twice.
 local _append_active = false
+local _missing_path = false
 
 --- Fences the exact old stream until durable rollover and native cleanup settle.
 local _pending_rollover = nil
@@ -297,7 +298,7 @@ end
 --- @param entry table The exact event retained by the deferred FIFO operation.
 --- @return boolean True only after the complete row is acknowledged.
 function M.append_log(entry)
-	if not _require_init("append_log") or _pending_rollover or _append_active then return false end
+	if not _require_init("append_log") or _pending_rollover or _append_active or _missing_path then return false end
 	if type(entry) ~= "table" or type(entry.type) ~= "string" then
 		Logger.warn(LOG, "append_log: invalid entry — skipping")
 		return false
@@ -348,7 +349,7 @@ end
 --- @return integer offset New byte offset, or the previous committed offset on failure.
 --- @return string status One of READ_STATUS_BATCH, READ_STATUS_EOF, READ_STATUS_FAILED.
 function M.read_new_entries()
-	if not _require_init("read_new_entries") or _pending_rollover or _pending_append or _append_active then
+	if not _require_init("read_new_entries") or _pending_rollover or _pending_append or _append_active or _missing_path then
 		return {}, _today_log_offset, M.READ_STATUS_FAILED
 	end
 
@@ -360,9 +361,10 @@ function M.read_new_entries()
 
 	local open_ok, fh, open_detail, open_code = pcall(io.open, _paths.today_log_path, "r")
 	if not open_ok or not fh then
-		if open_ok and open_code == ENOENT_ERROR_CODE then
+		if open_ok and open_code == ENOENT_ERROR_CODE and _today_log_offset == 0 and not _log_handle then
 			return {}, _today_log_offset, M.READ_STATUS_EOF
 		end
+		if open_ok and open_code == ENOENT_ERROR_CODE then _missing_path = true end
 		Logger.warn(LOG, "Cannot open today.log; committed offset %d preserved "
 			.. "(failure content withheld; terminal type: %s).",
 			_today_log_offset, type(open_detail))
@@ -470,7 +472,7 @@ function M.rollover(data_sql_path, read_status, reset, origin)
 	if not _close_rollover_stream() then return false end
 	local pending = _pending_rollover
 	local function checked_reset(next_date, completion)
-		if next_date ~= pending.date or reset(next_date) ~= true then return false end
+		if next_date ~= pending.date or reset(next_date, completion) ~= true then return false end
 		pending.reset_committed, pending.completion = true, completion
 		return true
 	end
@@ -486,6 +488,7 @@ function M.rollover(data_sql_path, read_status, reset, origin)
 	if committed ~= true then return false end
 	_today_log_offset, _today_log_date = 0, pending.date
 	_append_boundary_required = false
+	_missing_path = false
 	_pending_rollover = nil
 	return true
 end

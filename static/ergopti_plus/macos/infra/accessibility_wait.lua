@@ -94,12 +94,14 @@ local function reset_then_prompt(permission, state, opts)
 	end
 	local bundle_id, bundle_err = permission.bundle_id()
 	if bundle_id == nil then
+		state.reset_pending = false
 		Logger.warn(LOG, "Stale Accessibility grant not reset: %s.", tostring(bundle_err))
 		prompt_user(permission)
 		return
 	end
 	Logger.start(LOG, "Resetting the Accessibility entry of %s…", bundle_id)
 	local started = permission.reset_grant(bundle_id, function(ok, detail)
+		state.reset_pending = false
 		if state.finished then return end
 		if ok then
 			Logger.success(LOG, "Accessibility entry of %s reset.", bundle_id)
@@ -113,6 +115,7 @@ local function reset_then_prompt(permission, state, opts)
 		prompt_user(permission)
 	end)
 	if started ~= true then
+		state.reset_pending = false
 		Logger.warn(LOG, "tccutil could not be started; prompting without resetting %s.", bundle_id)
 		prompt_user(permission)
 	end
@@ -154,13 +157,15 @@ function M.start(opts)
 	if _active ~= nil then return false, "an Accessibility wait is already running" end
 	local poll_seconds = opts.poll_seconds or M.POLL_SECONDS
 	local deadline_seconds = opts.deadline_seconds or M.DEADLINE_SECONDS
-	local state = { finished = false, elapsed = 0, query_failed = false }
+	local state = { finished = false, elapsed = 0, query_failed = false, reset_pending = true }
 
 	local timer, committed = opts.every(poll_seconds, function()
 		if state.finished then return end
 		state.elapsed = state.elapsed + poll_seconds
 		local trusted, detail = opts.permission.is_trusted()
-		if trusted == true then
+		-- A still-running tccutil can revoke trust after an apparently successful
+		-- poll. Boot must not arm input taps until that reset has settled.
+		if trusted == true and not state.reset_pending then
 			Logger.success(LOG, "Accessibility granted after %d s; resuming boot.", state.elapsed)
 			finish(state, opts, opts.on_trusted)
 			return

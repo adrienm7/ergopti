@@ -24,6 +24,7 @@ local function with_editor(callback)
 				local bridge = {}
 				function bridge:setCallback(fn)
 					if fn ~= nil and state.bind_throws then error("native bridge bind refused") end
+					if fn ~= nil and state.bind_refuses then return false end
 					self.callback = fn
 					return self
 				end
@@ -79,6 +80,17 @@ local function with_editor(callback)
 end
 
 helpers.describe("prompt editor native boundaries", function()
+	helpers.it("refuses a bridge that does not acknowledge callback registration", function()
+		with_editor(function(editor, state)
+			state.bind_refuses = true
+			helpers.assert_eq(editor.open({ id = "A" }, function() end), false)
+			helpers.assert_eq(#state.views, 0)
+			helpers.assert_eq(#state.errors, 1)
+			state.bind_refuses = false
+			helpers.assert_true(editor.open({ id = "B" }, function() end))
+			helpers.assert_eq(#state.views, 1)
+		end)
+	end)
 	helpers.it("(prompt-editor-construction-owner) revokes deferred native focus when cleanup begins", function()
 		with_editor(function(editor, state)
 			local pending = {}

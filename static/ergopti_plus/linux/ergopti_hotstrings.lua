@@ -1640,6 +1640,7 @@ local function main()
 	local capture_owned_scancodes = {}
 	local function handle_physical(scancode, _key_name, _char, value, source)
 		if value ~= InputEvent.VALUE_DOWN then return end
+		TapHold.observe_copy_activity()
 		capture_owned_scancodes[scancode] = nil
 		local allowed = not secure_focus_guard.blocks_text()
 		physical_privacy_admission = { code = scancode, allowed = allowed }
@@ -2100,6 +2101,7 @@ local function main()
 	})
 
 	local function on_click()
+		TapHold.observe_copy_activity()
 		-- PRIMARY's baseline belongs to the pre-navigation selection. Its reader
 		-- checks fresh privacy first; actual wrapping remains gated after settle.
 		wrap_on_type.on_pointer_down()

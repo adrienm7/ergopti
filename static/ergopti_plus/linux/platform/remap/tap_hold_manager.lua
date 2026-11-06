@@ -235,6 +235,8 @@ local function build_tap_copy(execute)
 	return require("platform.remap.tap_copy").new({
 		verify_ms = Timings.ms("tap_hold", "copy_verify_ms"),
 		read_counter = function() return require("adapters.clipboard").change_counter() end,
+		capture_destination = function() return require("adapters.user_hotstring_destination").capture() end,
+		destination_current = function(receipt) return require("adapters.user_hotstring_destination").current(receipt) end,
 		-- The retry runs on a timer: only while this initialisation still owns the
 		-- executor and the daemon is not paused.
 		send_copy = function()
@@ -256,6 +258,11 @@ local function build_tap_copy(execute)
 			end
 		end,
 	})
+end
+
+--- Revokes a pending copy retry after physical input or pointer navigation.
+function M.observe_copy_activity()
+	if _tap_copy then _tap_copy:activity() end
 end
 
 --- Reads what the one-shot Shift types for a character, from the table the

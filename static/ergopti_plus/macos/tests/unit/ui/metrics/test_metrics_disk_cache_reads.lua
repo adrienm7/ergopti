@@ -58,7 +58,7 @@ helpers.describe("metrics disk cache reads", function()
 					end
 					adapter.read_with_status = function(path, report)
 						reads = reads + 1
-						helpers.assert_true(path:find("ergopti_metrics_apps_cache.json", 1, true) ~= nil)
+						helpers.assert_true(path:find("ergopti_metrics_apps_cache_v3.json", 1, true) ~= nil)
 						helpers.assert_type(report, "function")
 						if mode == "absent" then return nil, "absent" end
 						if mode == "dependency" then error("PRIVATE_CACHE_PATH") end

@@ -99,6 +99,14 @@ _RunTooltipTintContractTests() {
 	_TOOLTIP_SATURATION := UI_TINT_SATURATION
 	_TOOLTIP_DEFAULT_BG_HEX := UI_BG_HEX
 
+	_CssHexTint() {
+		Expected := _TooltipMixTintHex("#ff8800")
+		for Color in ["#f80", "#f80a", "#ff880080"] {
+			Assert(_TooltipMixTintHex(Color) == Expected, "CSS color must retain the same hue: " . Color)
+		}
+	}
+	Test("tooltip tint: CSS hexadecimal forms", _CssHexTint)
+
 	Vectors := _GetTintVectors()
 
 	for Vec in Vectors {

@@ -16,6 +16,7 @@
 --- Actions: boot (boot and idle), restore_recommended (boot, then the menu's
 --- « Restore recommended values » answered Yes), python_helper (boot, then the
 --- display-mirror shortcut, a helper that runs Python).
+--- gesture_conflict records the real engine's system-conflict state.
 --- type_for_wpm boots Metrics, types physical keys and observes its floating canvas.
 --- Output: the driver's log lines, E2E_* observation lines from the world,
 --- E2E_FACT key=value lines (the lease workers started, the final lease phase
@@ -185,6 +186,9 @@ elseif ACTION == "python_helper" then
 		World.record("SCENARIO_FAILED", "display_mirror_toggle did not run: " .. tostring(result))
 	end
 	idle(5)
+elseif ACTION == "gesture_conflict" then
+	local gestures = require("modules.gestures")
+	World.record("FACT", "system_tap_3_state=" .. tostring(gestures.system_slot_state("tap_3")))
 elseif ACTION == "type_for_wpm" then
 	-- A user types after the configured application's real menu started Metrics
 	-- and the floating widget. No keystats, model or widget method is stubbed.

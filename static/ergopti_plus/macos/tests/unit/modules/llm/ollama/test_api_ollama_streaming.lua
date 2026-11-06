@@ -514,3 +514,28 @@ helpers.describe("Ollama pending observation currency", function()
 		end)
 	end)
 end)
+
+helpers.describe("Ollama inference error privacy", function()
+	helpers.it("does not log a provider error body that echoes private text", function()
+		local request = assert(get_upvalue(ApiOllama.fetch_batch, "post_and_parse"))
+		local client = assert(get_upvalue(request, "_infer_client"))
+		local codec = assert(get_upvalue(request, "JsonCodec"))
+		local logger = assert(get_upvalue(request, "Logger"))
+		local old_post, old_encode, old_error = client.post, codec.encode, logger.error
+		local messages, failed = {}, 0
+		client.post = function(_, _, _, done) done({ status = 500, body = "private-provider-echo" }) end
+		codec.encode = function() return "{}", nil end
+		logger.error = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
+		local ok, err = xpcall(function()
+			request("fixture", "", "sensitive", "", 0.2, 8, 1, false,
+				function() error("unexpected success") end, function() failed = failed + 1 end, {})
+			helpers.assert_eq(failed, 1)
+			helpers.assert_true(#messages > 0)
+			for _, message in ipairs(messages) do
+				helpers.assert_true(not message:find("private-provider-echo", 1, true))
+			end
+		end, debug.traceback)
+		client.post, codec.encode, logger.error = old_post, old_encode, old_error
+		if not ok then error(err, 0) end
+	end)
+end)

@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local function with_apps(callback)
 	local previous_hs = _G.hs
 	local ok, err = xpcall(function()
-		helpers.with_stub_scope({ "ui.menu.menu_apps", "infra.logger", "infra.paths",
+		helpers.with_stub_scope({ "ui.menu.menu_apps", "infra.logger", "infra.paths", "infra.fs_dir",
 			"infra.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils",
 			"adapters.json_codec", "menu.renderer", "logger.shim" }, function()
 			local state = { calls = {}, warnings = {}, images = {}, app_scans = 0,
@@ -21,31 +21,57 @@ local function with_apps(callback)
 				state.warnings[#state.warnings + 1] = string.format(message, ...)
 			end
 			package.loaded["infra.logger"] = logger
-			package.loaded["infra.paths"] = {}
+			package.loaded["infra.paths"] = { shared = function() return "/virtual/locales" end }
 			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["infra.fs_dir"] = { try_entries_quiet = function(directory)
+				state.calls[#state.calls + 1] = directory
+				if directory:find("/Contents/Resources", 1, true) then
+					if state.icon_failure then return {}, false end
+					return {}, true
+				end
+				state.app_scans = state.app_scans + 1
+				if state.throw or state.status ~= true or state.kind ~= "exit" or state.code ~= 0
+					or type(state.output) ~= "string" then return {}, false end
+				local names = {}
+				for path in state.output:gmatch("([^%z]+)%z") do names[#names + 1] = path:match("([^/]+)$") end
+				return names, true
+			end }
 			package.loaded["infra.manifest_menu"] = { build = function(key, title, dynamic, on_click, ctx, providers)
 				if state.render_native then
 					return state.binding.build(key, title, dynamic, on_click, ctx, providers)
 				end
 				return providers.apps_installed()
 			end }
-			package.loaded["adapters.task_lifecycle"] = {}
+			package.loaded["adapters.task_lifecycle"] = {
+				native = function(_, _, callback)
+					local task = { isRunning = function()
+						if state.running == "throw" then error("probe failed") end
+						return state.running
+					end }
+					state.task, state.complete = task, callback
+					return task
+				end,
+				start = function() return state.start ~= false end,
+				terminate = function() state.terminations = (state.terminations or 0) + 1; return true end,
+			}
 			local module = helpers.load_with_stubs("ui.menu.menu_apps", {
 				fs = { attributes = function() return { mode = "directory" } end },
-				execute = function(command)
-					state.calls[#state.calls + 1] = command
-					if command:find("*.icns", 1, true) then
-						if state.icon_failure then return "/private/Partial.icns\0", nil, "exit", 1 end
-						return "", true, "exit", 0
-					end
-					state.app_scans = state.app_scans + 1
-					if state.throw then error("PRIVATE_FAILURE") end
-					return state.output, state.status, state.kind, state.code
-				end,
-				application = { infoForBundlePath = function() return {} end },
+				application = { infoForBundlePath = function() return state.metadata or {} end },
 				image = { imageFromPath = function(path)
 					state.images[#state.images + 1] = path
+					if state.have_icon then return {} end
 					return nil
+				end },
+				canvas = { new = function()
+					state.created = (state.created or 0) + 1
+					return {
+						appendElements = function() if state.fail_render then error("render failed") end end,
+						imageFromCanvas = function() return {} end,
+						delete = function()
+							if state.fail_delete then error("delete failed") end
+							state.deleted = (state.deleted or 0) + 1
+						end,
+					}
 				end },
 			})
 			-- Keep the discovery fixture's direct provider view, while forwarding its
@@ -65,6 +91,66 @@ local function with_apps(callback)
 end
 
 helpers.describe("Bundled app discovery outcome", function()
+	helpers.it("ignores malformed bundle display and icon metadata", function()
+		with_apps(function(module, state, ctx)
+			state.output = "/virtual/First.app\0"
+			state.metadata = { CFBundleDisplayName = {}, CFBundleName = "Valid Name", CFBundleIconFile = {} }
+			local ok, menu = pcall(module.build, ctx)
+			helpers.assert_true(ok, "invalid optional metadata must not break the Applications menu")
+			helpers.assert_eq(menu.submenu[1].label, "Valid Name")
+		end)
+		with_apps(function(module, state, ctx)
+			state.output = "/virtual/First.app\0"
+			state.metadata = { CFBundleDisplayName = false, CFBundleName = {} }
+			helpers.assert_eq(module.build(ctx).submenu[1].label, "First")
+		end)
+	end)
+	for _, probe in ipairs({ "running", "unknown", "throw" }) do
+		helpers.it("retains a refused launch until settlement when the probe is " .. probe, function()
+			with_apps(function(module, state, ctx)
+				state.output, state.start = "/virtual/First.app\0", false
+				state.running = probe == "running" and true or probe == "throw" and "throw" or nil
+				local rows = module.build(ctx).submenu
+				helpers.assert_eq(rows[1].action(), false)
+				helpers.assert_eq(module._active_tasks[state.task], true)
+				helpers.assert_eq(state.terminations, 1)
+				state.complete(1, "", "failed")
+				helpers.assert_nil(module._active_tasks[state.task])
+			end)
+		end)
+	end
+	helpers.it("releases a refused launch proved not running", function()
+		with_apps(function(module, state, ctx)
+			state.output, state.start, state.running = "/virtual/First.app\0", false, false
+			local rows = module.build(ctx).submenu
+			helpers.assert_eq(rows[1].action(), false)
+			helpers.assert_nil(module._active_tasks[state.task])
+			helpers.assert_nil(state.terminations)
+		end)
+	end)
+	helpers.it("cleans up the icon canvas after rendering failure", function()
+		with_apps(function(module, state, ctx)
+			state.output, state.have_icon, state.fail_render = "/virtual/First.app\0", true, true
+			local rows = module.build(ctx).submenu
+			helpers.assert_eq(#rows, 1)
+			helpers.assert_eq(state.created, 1)
+			helpers.assert_eq(state.deleted, 1)
+		end)
+	end)
+	helpers.it("retains a refused icon canvas until cleanup succeeds", function()
+		with_apps(function(module, state, ctx)
+			state.output, state.have_icon, state.fail_delete = "/virtual/First.app\0/virtual/Second.app\0", true, true
+			module.build(ctx)
+			helpers.assert_eq(state.created, 1, "a retained canvas blocks another allocation")
+			state.fail_delete = false
+			module.build(ctx)
+			helpers.assert_eq(state.deleted, 1, "a cached menu retries the retained cleanup")
+			module._invalidate_apps_cache()
+			module.build(ctx)
+			helpers.assert_eq(state.created, 3)
+			helpers.assert_eq(state.deleted, 3)
+		end)
+	end)
 	for _, mode in ipairs({ "exit", "signal", "throw", "invalid" }) do
 		helpers.it("(apps-discovery-outcome) retries after " .. mode .. " without caching partial output", function()
 			with_apps(function(module, state, ctx)
@@ -191,7 +277,7 @@ local function with_native_apps_parent(language, body)
 	local result, detail = xpcall(function()
 		for _, name in ipairs({ "ui.menu.menu_apps", "infra.i18n", "infra.locale", "locale.core",
 			"infra.manifest_menu", "infra.config_paths", "infra.paths", "adapters.json_codec", "menu.renderer",
-			"adapters.task_lifecycle", "infra.text_utils" }) do
+			"adapters.task_lifecycle", "infra.text_utils", "infra.fs_dir" }) do
 			package.loaded[name] = nil
 		end
 		helpers.load_with_stubs("infra.logger")
@@ -218,12 +304,14 @@ local function with_native_apps_parent(language, body)
 			if path == "/virtual/Apps/apps" then return { mode = "directory" } end
 			return old_attributes(path)
 		end
-		hs.execute = function(command)
+		package.loaded["infra.fs_dir"] = { try_entries_quiet = function(directory)
 			state.scans = state.scans + 1
 			if state.on_scan then state.on_scan() end
-			if command:find("*.icns", 1, true) then return "", true, "exit", 0 end
-			return state.output, true, "exit", 0
-		end
+			if directory:find("/Contents/Resources", 1, true) then return {}, true end
+			local names = {}
+			for path in state.output:gmatch("([^%z]+)%z") do names[#names + 1] = path:match("([^/]+)$") end
+			return names, true
+		end }
 		hs.application.infoForBundlePath = function() return nil end
 		local icon = {}
 		hs.image.imageFromPath = function() return icon end

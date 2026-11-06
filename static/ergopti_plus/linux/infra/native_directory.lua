@@ -102,6 +102,18 @@ function M.stat(path)
 	return { kind = KINDS[stat.type] or "other", modified = modified }
 end
 
+--- Reads one physical directory's device and inode without following a link.
+--- @return table|nil identity
+--- @return string|nil detail
+function M.directory_identity(path)
+	local stat, message = native().lstat(path)
+	if type(stat) ~= "table" or stat.type ~= "directory"
+		or type(stat.dev) ~= "number" or type(stat.ino) ~= "number" then
+		return nil, message or "directory identity unavailable"
+	end
+	return { dev = stat.dev, ino = stat.ino }
+end
+
 --- Kind of a path itself, without following a final symbolic link.
 --- @param path string
 --- @return string|nil kind "file", "directory", "link" or "other".

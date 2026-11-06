@@ -284,8 +284,8 @@ function M.open(existing, on_save)
 			if _active_context == active then close_window(window) end
 		end
 	end
-	local bound = pcall(uc.setCallback, uc, receive_message)
-	if not bound then
+	local bound, result = pcall(uc.setCallback, uc, receive_message)
+	if not bound or result ~= uc then
 		window.opening = false
 		close_window(window)
 		Logger.error(LOG, "Prompt editor bridge binding failed.")

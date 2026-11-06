@@ -88,6 +88,7 @@ function M.describe_path(path)
 	local fs = type(hs) == "table" and hs.fs or nil
 	if type(path) ~= "string" or path == "" or type(fs) ~= "table" then return "unknown" end
 	local trimmed = path:gsub("/+$", "")
+	if trimmed == "" then trimmed = "/" end
 	local link_ok, link = pcall(fs.symlinkAttributes, trimmed)
 	if not link_ok or type(link) ~= "table" then return "absent" end
 	if link.mode ~= "link" then return tostring(link.mode) end

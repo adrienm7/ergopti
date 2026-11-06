@@ -4,17 +4,17 @@
 --- MODULE: Typing Metrics Incremental Projection
 --- DESCRIPTION:
 --- Builds the JSON the typing dashboard publishes, reusing the part of the
---- previous projection that covers past days. Only days after the cached
---- watermark are read again; a changed past-data fingerprint discards the
---- cache and rebuilds from scratch. All reads go through
+--- previous projection that covers past days only when the reader can prove
+--- its fingerprint identifies the historical data exactly. The current SQLite
+--- reader cannot do so, so it rebuilds the projection on each request. All reads go through
 --- `modules.keystats.sqlite_reader`, the single owner of the aggregation.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Exact increments: manifest cells belong to one day, and every n-gram
 ---    field is a sum, so cached past days plus freshly read later days equal a
 ---    full read (`sqlite_reader.merge_ngrams` owns the addition).
---- 2. Proved invalidation: a cache is reused only while
----    `sqlite_reader.fingerprint` of its watermark is unchanged. The new
+--- 2. Proved invalidation: a cache is reused only when the reader explicitly
+---    certifies an exact fingerprint and its watermark is unchanged. The new
 ---    watermark's fingerprint is taken before any read, so a write racing the
 ---    job is detected by the next job instead of being cached as current.
 --- 3. Encoded once: past days keep their encoded JSON, so a live update
@@ -152,6 +152,10 @@ function M.session(reader, sqlite_path, today, pacer)
 	local fingerprints = {}
 
 	local function fingerprint(through)
+		-- Aggregate totals are not an identity: compensated changes can leave
+		-- them unchanged. A reader must explicitly certify an exact witness
+		-- before any projection can be reused or advertised by serial.
+		if reader.history_fingerprint_exact ~= true then return nil end
 		if fingerprints[through] == nil then
 			local value, err = reader.fingerprint(sqlite_path, through, pacer)
 			if not value then

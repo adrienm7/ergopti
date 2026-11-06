@@ -36,7 +36,11 @@ local function load_probe(options)
 					task.inputs[#task.inputs + 1] = data
 					return true
 				end,
-				close_input = function() task.closed = true; return true end,
+				close_input = function()
+					task.closed = true
+					if options.close_raises then error("close failed") end
+					return options.close_result ~= false
+				end,
 				terminate = function() task.terminated = true; return true end,
 			}
 		end,
@@ -52,6 +56,34 @@ local function with_probe(callback)
 end
 
 helpers.describe("task output turn probe", function()
+	helpers.it("closes the child when callback error formatting fails (output-turn-error-object)", function()
+		with_probe(function()
+			local Probe, spawns = load_probe()
+			local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
+			local calls = 0
+			helpers.assert_not_nil(Probe.request("test", function() calls = calls + 1; error(hostile) end))
+			helpers.assert_true(pcall(spawns[1].on_chunk, nil, "turn\n", ""))
+			helpers.assert_true(spawns[1].closed, "callback diagnostics must not strand the echo child")
+			spawns[1].on_done(0, "", "")
+			helpers.assert_eq(calls, 1)
+		end)
+	end)
+
+	helpers.it("terminates the echo child if closing its input fails (output-turn-close-refusal)", function()
+		for _, options in ipairs({ { close_result = false }, { close_raises = true } }) do
+			with_probe(function()
+				local Probe, spawns = load_probe(options)
+				local delivered = 0
+				helpers.assert_not_nil(Probe.request("test", function() delivered = delivered + 1 end))
+				spawns[1].on_chunk(nil, "turn\n", "")
+				helpers.assert_eq(delivered, 1)
+				helpers.assert_true(spawns[1].terminated, "a refused close must not leave cat running")
+				spawns[1].on_done(0, "", "")
+				helpers.assert_eq(delivered, 1)
+			end)
+		end
+	end)
+
 	helpers.it("(task-output-turn) reports a turn only once its echo is read", function()
 		with_probe(function()
 			local Probe, spawns = load_probe()
@@ -70,6 +102,24 @@ helpers.describe("task output turn probe", function()
 			helpers.assert_true(spawns[1].closed, "the echo child is released once it answered")
 			spawns[1].on_done(0, "", "")
 			helpers.assert_eq(#outcomes, 1, "the probe settles exactly once")
+		end)
+	end)
+
+	helpers.it("waits for the newline when the echo arrives in separate chunks", function()
+		with_probe(function()
+			local Probe, spawns = load_probe()
+			local outcomes = {}
+			local probe = Probe.request("fragmented", function(delivered) outcomes[#outcomes + 1] = delivered end)
+			helpers.assert_not_nil(probe)
+			spawns[1].on_chunk(nil, "tu", "")
+			spawns[1].on_chunk(nil, "rn", "unrelated\n")
+			helpers.assert_eq(#outcomes, 0)
+			helpers.assert_true(not spawns[1].closed)
+			spawns[1].on_chunk(nil, "\n", "")
+			helpers.assert_eq(outcomes, { true })
+			helpers.assert_true(spawns[1].closed)
+			spawns[1].on_done(0, "", "")
+			helpers.assert_eq(#outcomes, 1)
 		end)
 	end)
 

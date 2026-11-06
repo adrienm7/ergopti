@@ -207,3 +207,61 @@ helpers.describe("keystats-export-log-privacy", function()
 		end)
 	end
 end)
+
+helpers.describe("foreign sync database ownership", function()
+	for _, outcome in ipairs({ "refuse", "accept", "raise" }) do
+		helpers.it("stops before the next device when the callback retires its database: " .. outcome, function()
+			helpers.with_stub_scope({ "infra.fs_dir", "adapters.foreign_ledger_snapshot", "modules.keystats.export" }, function()
+				package.loaded["infra.fs_dir"] = { try_entries = function() return { "first", "second" }, true end }
+				local closes = 0
+				local snapshot_stub = {
+					open = function() return { handle = {} } end,
+					start = function() return true end,
+					poll = function() return "done", { chunk = BATCH, offset = 0, applied_to = #BATCH, digest = "digest" } end,
+					close = function() closes = closes + 1; return true end,
+				}
+				local current, retired, after_retirement = nil, false, 0
+				local function checked() if retired then after_retirement = after_retirement + 1 end end
+				local db = {}
+				function db:prepare() checked(); return { bind_values = function() end, step = function() end, finalize = function() end } end
+				function db:nrows() checked(); local served = false; return function()
+					if not served then served = true; return { imported_data_sql_size = 0 } end
+				end end
+				function db:exec() checked(); return 0 end
+				current = db
+				local export = helpers.load_with_stubs("modules.keystats.export", { fs = { attributes = function() return { size = #BATCH } end } })
+				local function replace_upvalue(fn, name, replacement)
+					for index = 1, math.huge do
+						local found, value = debug.getupvalue(fn, index)
+						assert(found, "missing upvalue: " .. name)
+						if found == name then
+							if replacement then debug.setupvalue(fn, index, replacement) end
+							return value
+						end
+					end
+				end
+				local read_tail = replace_upvalue(export.sync_foreign_data_sql, "_read_foreign_sql_tail")
+				replace_upvalue(read_tail, "ForeignLedgerSnapshot", snapshot_stub)
+				export.init({ paths = { metrics_dir = "/owned/" }, device_id = "local", get_db = function() return current end })
+				local original = io.open
+				io.open = function(path)
+					local id = path:match("/by_device/([^/]+)/device%.json$")
+					return id and { read = function() return '{"device_id":"' .. id .. '"}' end, close = function() end } or nil
+				end
+				local ok, result, detail = pcall(export.sync_foreign_data_sql, function(id)
+					helpers.assert_eq(id, "first")
+					retired, current = true, nil
+					if outcome == "raise" then error("callback failure") end
+					return outcome == "accept"
+				end)
+				io.open = original
+				helpers.assert_true(ok)
+				helpers.assert_true(retired, "the first device must reach the callback")
+				helpers.assert_nil(result)
+				helpers.assert_contains(detail, "database")
+				helpers.assert_eq(after_retirement, 0, "no SQLite operation may use the retired handle")
+				helpers.assert_eq(closes, 1, "the retained foreign reader is closed")
+			end)
+		end)
+	end
+end)

@@ -104,6 +104,11 @@ local function new_fixture()
 	}
 	package.loaded["adapters.secure_field_detector"] = {
 		isSecureApp = function() return state.secure_app == true end,
+		inspectFocusedElementWithReceipt = function()
+			state.secure_reads = state.secure_reads + 1
+			if state.secure_read_fail then return nil, "secure read refused" end
+			return state.secure, nil, {}
+		end,
 		inspectFocusedElement = function()
 			state.secure_reads = state.secure_reads + 1
 			if state.secure_read_fail then return nil, "secure read refused" end
@@ -157,6 +162,9 @@ local function new_fixture()
 		return make_ui_watcher("app", callback)
 	end
 
+	hs_stub.axuielement = { applicationElementForPID = function()
+		return { attributeValue = function() return {} end }
+	end }
 	hs_stub.timer.secondsSinceEpoch = function() return state.now end
 	hs_stub.window.focusedWindow = function()
 		state.ax_reads = state.ax_reads + 1
@@ -274,6 +282,23 @@ helpers.describe("ignored-window cache lifecycle: eventtap-safe transitions", fu
 			"the deferred refresh must publish the new ignored-window classification")
 		helpers.assert_eq(f.state.ax_reads, ax_before + 1,
 			"the deferred refresh must execute exactly one AX probe")
+	end)
+
+	helpers.it("cache lifecycle: a backward clock change invalidates both privacy reads (cache-clock-regression)", function()
+		for _, secure in ipairs({ false, true }) do
+			local f = new_fixture()
+			f.Utils.start_ignored_win_tracking(f.titles, f.patterns)
+			f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns)
+			local normal, generation = f.Utils.is_ignored_window(f.titles, f.patterns, f.state.now)
+			helpers.assert_eq(normal, false)
+			f.state.now = f.state.now - 60
+			local answer, next_generation
+			if secure then answer, next_generation = f.Utils.is_secure_field(f.state.now)
+			else answer, next_generation = f.Utils.is_ignored_window(f.titles, f.patterns, f.state.now) end
+			helpers.assert_nil(answer, "a negative cache age is not evidence of freshness")
+			helpers.assert_true(next_generation > generation)
+			helpers.assert_true(f.scheduler.running_count(0) > 0)
+		end
 	end)
 
 	helpers.it("cache lifecycle: a title change bumps identity even when window id is unchanged", function()

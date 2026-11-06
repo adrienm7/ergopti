@@ -17,6 +17,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const { shared } = require('../lib/paths.cjs');
 
 /** The launcher Info.plist key a developer source build carries. */
@@ -41,7 +42,21 @@ function refuseDeveloperSource(application) {
 	if (bytes.subarray(0, 6).toString('latin1') === 'bplist' || !/<plist[\s>]/.test(text))
 		throw new Error(`${application}: Info.plist is not an XML property list.`);
 	const key = developerSourceKey();
-	if (text.includes(`<key>${key}</key>`))
+	// XML key spelling is not canonical: character references and attributes
+	// on the key tag decode to the same plist key. Parse the actual value rather
+	// than looking for one literal serialization.
+	const probe = spawnSync(
+		'python3',
+		[
+			'-c',
+			'import plistlib, sys\ntry:\n value = plistlib.loads(sys.stdin.buffer.read())\n if not isinstance(value, dict): raise TypeError()\n print("present" if sys.argv[1] in value else "absent")\nexcept Exception:\n sys.exit(2)',
+			key
+		],
+		{ input: bytes, encoding: 'utf8' }
+	);
+	if (probe.error || probe.status !== 0 || !['present\n', 'absent\n'].includes(probe.stdout))
+		throw new Error(`${application}: Info.plist is not a readable XML property list.`);
+	if (probe.stdout === 'present\n')
 		throw new Error(
 			`${application} is a developer source build (${key}); it is never archived, installed or published.`
 		);

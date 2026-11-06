@@ -40,6 +40,15 @@ local function with_editor(callback)
 end
 
 helpers.describe("paths editor: logs folder field (paths-editor-logs-dir)", function()
+	helpers.it("refuses malformed save fields without resetting either folder", function()
+		for _, body in ipairs({ { action = "save" }, { action = "save", configDir = false },
+			{ action = "save", configDir = "/Users/test/cfg/", logsDir = false } }) do
+			with_editor(function(calls)
+				calls.bridge_callback({ body = body })
+				helpers.assert_nil(calls.saved, "invalid fields cannot publish a default or partial folder choice")
+			end)
+		end
+	end)
 	helpers.it("sends the current and the default logs folder", function()
 		with_editor(function(calls, evaluations)
 			calls.bridge_callback({ body = { action = "ready" } })
@@ -68,6 +77,13 @@ helpers.describe("paths editor: logs folder field (paths-editor-logs-dir)", func
 				action = "save", configDir = "/Users/test/cfg/", logsDir = "/Users/test/Sync/",
 			} })
 			helpers.assert_eq(calls.saved, { config = "/Users/test/cfg/", logs = "/Users/test/Sync/" })
+		end)
+	end)
+
+	helpers.it("retains an explicit request to restore the default folder", function()
+		with_editor(function(calls)
+			calls.bridge_callback({ body = { action = "save", configDir = "" } })
+			helpers.assert_eq(calls.saved, { config = "" })
 		end)
 	end)
 

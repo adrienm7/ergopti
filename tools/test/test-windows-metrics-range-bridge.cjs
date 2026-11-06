@@ -181,6 +181,7 @@ const context = {
 	console
 };
 vm.createContext(context);
+vm.runInContext(read('static/ergopti_plus/_shared/ui/metrics_manifest_keys.js'), context);
 vm.runInContext(`const RANGE_REQUEST_WATCHDOG_MS = ${watchdogMs};\n` + data, context, {
 	filename: 'metrics-range-latch.js'
 });
@@ -355,6 +356,7 @@ const manifestContext = {
 	console
 };
 vm.createContext(manifestContext);
+vm.runInContext(read('static/ergopti_plus/_shared/ui/metrics_manifest_keys.js'), manifestContext);
 vm.runInContext(data, manifestContext, { filename: 'metrics-app-selection-refresh.js' });
 manifestContext.compute_manifest_metrics = () => {};
 manifestContext.request_range_data = () => {

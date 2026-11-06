@@ -115,6 +115,17 @@ helpers.describe("updater (linux): the release-list copy survives a restart", fu
 		helpers.assert_nil(options.etag_compare, "an object is not a release list")
 	end)
 
+	helpers.it("list-copy: truncated JSON sends a full request after restart", function()
+		local storage = Fakes.storage({ initial = {} })
+		local probe = boot(storage, VALIDATOR .. "\n")
+		storage.set(probe.LIST_CACHE_KEY, {
+			["main-page-1-size-20"] = { url = PAGE_ONE, etag = VALIDATOR, body = '[{"tag_name":"v1"' },
+		})
+		local restarted = boot(storage, VALIDATOR .. "\n")
+		local _, _, options = restarted._build_fetch_request("main", 1)
+		helpers.assert_nil(options.etag_compare, "a truncated copy cannot answer a 304")
+	end)
+
 	helpers.it("list-copy: a failed page removes its stored copy", function()
 		local storage = Fakes.storage({ initial = {} })
 		local manager = boot(storage, VALIDATOR .. "\n")

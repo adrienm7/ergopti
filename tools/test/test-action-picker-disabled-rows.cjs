@@ -157,6 +157,7 @@ vm.runInContext(
 		items: [
 			{ type: 'heading', level: 1, text: 'Mouse' },
 			{ type: 'action', id: 'left_click_toggle', label: 'Hold left click', disabled: true, hint: 'X11 session only' },
+			{ type: 'action', id: 'run_program', label: 'Run a program [configurable]', parameter: 'program', disabled: true, hint: 'Unavailable: Native runner' },
 			{ type: 'action', id: 'enter', label: 'Enter' }
 		]
 	})`,
@@ -171,7 +172,7 @@ const check = (cond, message) => {
 const rows = byId.list.children.filter((r) => r.classList.contains('row'));
 const greyed = rows.find((r) => r.dataset.id === 'left_click_toggle');
 const live = rows.find((r) => r.dataset.id === 'enter');
-check(rows.length === 3, `expected the none row plus two actions, rendered ${rows.length}`);
+check(rows.length === 4, `expected the none row plus three actions, rendered ${rows.length}`);
 check(greyed !== undefined, 'a disabled action must stay visible — a vanished row reads as a bug');
 check(
 	greyed && greyed.classList.contains('disabled'),
@@ -201,12 +202,6 @@ check(
 
 // Native-unavailable programs retain the same visible/inert DATA contract.
 posted.length = 0;
-vm.runInContext(
-	`init({ title: 'T', cancelLabel: 'Cancel', current: 'none', noneLabel: 'Nothing', items: [
- {type:'action', id:'run_program', label:'Run a program [configurable]', parameter:'program', disabled:true, hint:'Unavailable: Native runner'}
-] })`,
-	context
-);
 const program = byId.list.children.find((row) => row.dataset.id === 'run_program');
 check(
 	program && program.classList.contains('disabled'),

@@ -138,7 +138,10 @@ function M.toggle(page)
 	local UiBuilder = _ui_builder()
 	if not UiBuilder.is_window_focused(view) then
 		Logger.debug(LOG, "Toggle '%s': open but not focused, bringing to front.", page)
-		return UiBuilder.force_focus(view, false) ~= false
+		return UiBuilder.force_focus(view, false, { is_current = function()
+			local valid, current = call_hook(page, mod, spec.window or "window")
+			return valid and rawequal(current, view)
+		end }) ~= false
 	end
 	Logger.debug(LOG, "Toggle '%s': focused, closing.", page)
 	local closed, result = call_hook(page, mod, spec.close or "close")

@@ -44,10 +44,39 @@ package.loaded["modules.keystats.export"] = {
 	get_sqlite_path = function() return nil end, get_db_rev = function() return 0 end,
 }
 
+local fixture_fs = { attributes = function() return nil end, dir = function() return function() return nil end end }
 local LM = helpers.load_with_stubs("modules.keystats.log_manager", {
-	fs = { attributes = function() return nil end, dir = function() return function() return nil end end },
+	fs = fixture_fs,
 	execute = function() return "" end,
 })
+
+helpers.describe("keystats/log_manager: ledger size admission", function()
+	helpers.it("refuses an unreadable ledger without reporting an empty replay", function()
+		local writes = 0
+		local ok = LM._replay_local_data_sql({exec = function() writes = writes + 1 end},
+			{version = 1, offset = 0})
+		helpers.assert_eq(ok, false)
+		helpers.assert_eq(writes, 0)
+	end)
+
+	helpers.it("rejects invalid sizes and a resumed offset beyond an empty ledger", function()
+		local original = fixture_fs.attributes
+		local writes = 0
+		local db = {exec = function() writes = writes + 1 end}
+		local success, err = xpcall(function()
+			for _, size in ipairs({-1, 0/0, math.huge}) do
+				fixture_fs.attributes = function() return {size = size} end
+				helpers.assert_eq(LM._replay_local_data_sql(db, {version = 1, offset = 0}), false)
+			end
+			fixture_fs.attributes = function() return {size = 0} end
+			helpers.assert_eq(LM._replay_local_data_sql(db, {version = 1, offset = 1}), false)
+			helpers.assert_eq(LM._replay_local_data_sql(db, {version = 1, offset = 0}), true)
+			helpers.assert_eq(writes, 0)
+		end, debug.traceback)
+		fixture_fs.attributes = original
+		if not success then error(err) end
+	end)
+end)
 
 helpers.describe("keystats/log_manager: fresh cache recovery cursor", function()
 	helpers.it("uses the last complete batch offset and ignores a torn suffix", function()
@@ -108,7 +137,7 @@ helpers.describe("keystats/log_manager: fresh cache id ownership", function()
 		helpers.assert_true(recovery ~= nil, "the recovery coroutine body must be locatable")
 		local replay = assert(recovery:find("_replay_local_data_sql(db, replay_state)", 1, true))
 		local persist = recovery:find("_persist_recovery_state(db, cursor)", 1, true)
-		local rebuild = assert(recovery:find("_rebuild_aggregates_from_raw(db)", 1, true))
+		local rebuild = assert(recovery:find("_publish_rebuilt_partitions(db)", 1, true))
 		helpers.assert_true(persist ~= nil and replay < persist and persist < rebuild,
 			"the replay cursor and id counter must be published before the aggregate rebuild can fail")
 	end)

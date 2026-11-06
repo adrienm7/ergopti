@@ -172,7 +172,7 @@ local function extension_fixture(outcome)
 		return true
 	end
 	local ctx = {
-		paused = false, state = state, hotfiles = { "magickey" },
+		paused = false, is_paused = function() return false end, state = state, hotfiles = { "magickey" },
 		get_group_name = function(name) return name end,
 		applyTriggerChar = function(text) return text end,
 		extension_packs = { { id = "ergopti", bound_files = {

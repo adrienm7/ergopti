@@ -32,6 +32,7 @@ local Logger     = require("infra.logger")
 local HotPath    = require("infra.hotpath_profiler")
 local Timings    = require("infra.timings")
 local CoreStateM = require("modules.keymap.state")
+local LlmContext = require("modules.keymap.llm_context")
 local TextSender = require("adapters.text_sender")
 local SyntheticInput = require("adapters.synthetic_input")
 local TooltipRenderer  = require("adapters.tooltip_renderer")
@@ -288,9 +289,26 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		end
 	end
 
+	-- Output is still reversible here. Preserve both logical buffers so a
+	-- rejected context edit or privacy mark cannot leave unpublished text live.
+	local prior = {
+		buffer = _state.buffer, llm_buffer = _state.llm_buffer,
+		llm_context_text = _state.llm_context_text, llm_context_mark = _state.llm_context_mark,
+		llm_private_mark = _state.llm_private_mark,
+		start_is_word_boundary = _state.start_is_word_boundary,
+		start_is_line_start = _state.start_is_line_start,
+	}
+	local function restore_before_output()
+		_state.buffer, _state.llm_buffer = prior.buffer, prior.llm_buffer
+		_state.llm_context_text, _state.llm_context_mark = prior.llm_context_text, prior.llm_context_mark
+		_state.llm_private_mark = prior.llm_private_mark
+		_state.start_is_word_boundary, _state.start_is_line_start = prior.start_is_word_boundary, prior.start_is_line_start
+		_state.llm_context_generation = (_state.llm_context_generation or 0) + 1
+	end
 	if type(buffer_action) == "function" then
 		local ok_buf, buf_err = pcall(buffer_action)
 		if not ok_buf then
+			restore_before_output()
 			-- Buffer commit and synthetic output are one transaction. Since the batch
 			-- is still only being built, roll it back instead of displaying output the
 			-- engine cannot describe afterwards.
@@ -307,6 +325,7 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		-- be displayed that a prompt could later repeat.
 		local ok_mark, mark_err = pcall(_llm.mark_private_context, _state.buffer)
 		if not ok_mark then
+			restore_before_output()
 			if replay_owner then pcall(TerminatorReplay.cancel_prepared, replay_owner) end
 			pcall(SyntheticInput.cancel, transaction)
 			Logger.error(LOG, "private AI context mark failed: %s.", tostring(mark_err))
@@ -470,15 +489,16 @@ end
 function M.would_fire(m, buffer)
 	if type(buffer) ~= "string" or type(m) ~= "table" then return nil end
 
-	local tb = m.trigger_bytes
-	if not tb or #buffer < tb then return nil end
-	local typed = buffer:sub(-tb)
+	if type(m.tlen) ~= "number" or m.tlen < 1 then return nil end
+	local ok, start = pcall(utf8.offset, buffer, -m.tlen)
+	if not ok or not start then return nil end
+	local typed = buffer:sub(start)
 
 	local eff_plain, is_noop = HotstringCore.decide(
 		m,
 		m.plain_repl,
 		typed,
-		prev_char_before(buffer, #buffer - tb + 1),
+		prev_char_before(buffer, start),
 		_state and _state.start_is_word_boundary
 	)
 
@@ -559,24 +579,30 @@ local function resolve_terminator_match(mapping, buffer, chars, explicit_magic)
 	local chars_bytes = #chars
 	local extra_bs_bytes = 0
 	local is_typo_endchar = (chars == ":" or chars == ";")
-	if is_typo_endchar and not explicit_magic then
+	if is_typo_endchar then
 		local nnbsp_pos = #buffer - chars_bytes - #NNBSP + 1
 		local nbsp_pos  = #buffer - chars_bytes - #NBSP + 1
 		if nnbsp_pos >= 1 and buffer:sub(nnbsp_pos, nnbsp_pos + #NNBSP - 1) == NNBSP then
 			extra_bs_bytes = #NNBSP
 		elseif nbsp_pos >= 1 and buffer:sub(nbsp_pos, nbsp_pos + #NBSP - 1) == NBSP then
 			extra_bs_bytes = #NBSP
-		else
-			return nil
+		end
+		-- Explicit magic also permits a literal trigger ending in the space.
+		-- Preserve that direct match before treating the space as punctuation.
+		if explicit_magic and extra_bs_bytes > 0 then
+			if #buffer > chars_bytes then
+				local direct, _, _, noop = M.would_fire(mapping, buffer:sub(1, #buffer - chars_bytes))
+				if direct or noop then extra_bs_bytes = 0 end
+			end
 		end
 	end
 
 	local effective_chars_bytes = chars_bytes + extra_bs_bytes
-	if #buffer < tb + effective_chars_bytes then return nil end
-	local buf_start = #buffer - effective_chars_bytes - tb + 1
-	local body = buffer:sub(1, buf_start + tb - 1)
+	if #buffer <= effective_chars_bytes then return nil end
+	local body = buffer:sub(1, #buffer - effective_chars_bytes)
 	local eff_plain, typed_trigger, eff_repl, is_noop = M.would_fire(mapping, body)
 	if not eff_plain and not is_noop then return nil end
+	local buf_start = #body - #typed_trigger + 1
 
 	return {
 		buf_start       = buf_start,
@@ -691,10 +717,22 @@ function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
 		end
 
 		if buffer ~= "" and _registry.is_terminator(magic) then
+			local end_buckets = {}
 			local end_bucket = tail_char and _registry.mappings_for_tail(tail_char) or nil
-			if end_bucket then
-				local end_buffer = buffer .. physical_magic
-				for _, mapping in ipairs(end_bucket) do
+			if end_bucket then end_buckets[#end_buckets + 1] = end_bucket end
+			-- A separately typed typographic space can precede the magic colon or
+			-- semicolon; also consider the trigger ending immediately before it.
+			if physical_magic == magic and (magic == ":" or magic == ";")
+				and (tail_char == NBSP or tail_char == NNBSP) then
+				local before_space = buffer:sub(1, #buffer - #tail_char)
+				local ok, offset = pcall(utf8.offset, before_space, -1)
+				local preceding = ok and offset and before_space:sub(offset) or nil
+				local spaced_bucket = preceding and _registry.mappings_for_tail(preceding) or nil
+				if spaced_bucket and spaced_bucket ~= end_bucket then end_buckets[#end_buckets + 1] = spaced_bucket end
+			end
+			local end_buffer = buffer .. physical_magic
+			for _, bucket in ipairs(end_buckets) do
+				for _, mapping in ipairs(bucket) do
 					if not mapping.auto and mapping_group_active(mapping) then
 						local match = resolve_terminator_match(mapping, end_buffer, physical_magic, true)
 						if match then
@@ -710,6 +748,11 @@ function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
 						end
 					end
 				end
+			end
+			if #end_buckets > 1 then
+				table.sort(end_attempts, function(a, b)
+					return (a.mapping.registry_rank or math.huge) < (b.mapping.registry_rank or math.huge)
+				end)
 			end
 		end
 	end
@@ -882,9 +925,9 @@ local function pick_cascade_step(vbuf, tail, stable_bytes)
 		local bucket = _registry.mappings_for_tail(vbuf:sub(last))
 		for _, m in ipairs(bucket or {}) do
 			if m.auto and is_cascade_link(m) and cascade_step_allowed(m, reference, stable_bytes) then
-				local eff_plain = M.would_fire(m, vbuf)
+				local eff_plain, typed = M.would_fire(m, vbuf)
 				if eff_plain then
-					auto_step = { mapping = m, start = #vbuf - m.trigger_bytes + 1, text = eff_plain }
+					auto_step = { mapping = m, start = #vbuf - #typed + 1, text = eff_plain }
 					break
 				end
 			end
@@ -1060,9 +1103,8 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 
 	local repl_text = eff_plain
 	-- 1-based byte index where the matched trigger starts, used below to splice the
-	-- replacement into the buffer. Derived from the same trigger_bytes would_fire
-	-- matched on, so the two can never disagree about where the trigger began.
-	local tstart_byte = #active_buffer - m.trigger_bytes + 1
+	-- replacement into the buffer, using the actual matched spelling.
+	local tstart_byte = #active_buffer - #typed + 1
 
 	-- The cascade: the replacement may complete further hotstrings. The chain is
 	-- one net edit, so everything below types ONE replacement whose trigger is the
@@ -1084,12 +1126,13 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	-- trigger is erased and the whole replacement typed, the net edit every
 	-- driver applies (no shared prefix is kept on screen). The typed event is on
 	-- screen only in an ignored window, where it is erased with the trigger.
-	-- A trigger shorter than the typed event (a multi-codepoint composed
-	-- character arriving as one event) cannot require a negative number of
-	-- on-screen deletions; the plan clamps it at zero.
+	-- When a consumed event contains text before the trigger, that text was
+	-- never delivered to the app. Re-emit it literally in the same transaction.
+	local event_prefix = ""
 	if not is_ignored and trig_len < char_len then
-		Logger.warn(LOG, "Trigger shorter than the typed event (%d < %d) — clamping deletes to 0.",
-			trig_len, char_len)
+		local ok, event_start = pcall(utf8.offset, active_buffer, -char_len)
+		if not ok or event_start == nil or event_start > tstart_byte then return false end
+		event_prefix = active_buffer:sub(event_start, tstart_byte - 1)
 	end
 	local injection = InjectionPlan.build({
 		path = InjectionPlan.PATH_AUTO, trigger_len = trig_len, event_len = char_len,
@@ -1098,9 +1141,18 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 
 	local replaced = M.perform_text_replacement(
 		injection.erase,
-		function() return emit_dispatch(m, injection.text) end,
+		function()
+			if event_prefix == "" then return emit_dispatch(m, injection.text) end
+			assert(SyntheticInput.emit_key_strokes(event_prefix), "composite event prefix could not be dispatched")
+			local count, echo, logical, delay = emit_dispatch(m, injection.text)
+			return text_utils.utf8_len(event_prefix) + count, event_prefix .. echo, event_prefix .. logical, delay
+		end,
 		function()
 			_state.buffer = active_buffer:sub(1, tstart_byte - 1) .. injection.buffer_suffix
+			if _state.llm_context_text ~= nil then
+				if m.plain_repl == m.repl then LlmContext.replace_tail(_state, trig_len, repl_text)
+				else LlmContext.reset(_state) end
+			end
 			forget_buffer_after_keys(m)
 		end,
 		is_final,
@@ -1242,6 +1294,11 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 				-- buf_start is a valid byte index into _state.buffer: the buffer
 				-- is only mutated by this very closure, which runs after emit.
 				_state.buffer = _state.buffer:sub(1, start_byte - 1) .. injection.buffer_suffix
+				if _state.llm_context_text ~= nil and m.plain_repl == m.repl then
+					local extra_count = extra_bs_bytes > 0 and 1 or 0
+					LlmContext.replace_tail(_state, trig_len + char_len + extra_count,
+						to_type .. (replay_tail and chars or ""))
+				elseif _state.llm_context_text ~= nil then LlmContext.reset(_state) end
 				forget_buffer_after_keys(m)
 			end,
 			is_final,
@@ -1339,7 +1396,10 @@ function M.try_repeat_feature(chars, is_ignored)
 	local replaced = M.perform_text_replacement(
 		is_ignored and char_len or 0,
 		function() return km_utils.emit_text(last_char) end,
-		function() _state.buffer = next_buffer end,
+		function()
+			_state.buffer = next_buffer
+			if _state.llm_context_text ~= nil then LlmContext.replace_tail(_state, char_len, last_char) end
+		end,
 		false, is_ignored, "hotstring", ConfigKeys.COMMAND.REPEAT_KEY, false)
 	if replaced ~= true then return false end
 

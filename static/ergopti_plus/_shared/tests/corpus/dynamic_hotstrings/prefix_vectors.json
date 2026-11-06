@@ -13,6 +13,24 @@
 			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 0 }
 		},
 		{
+			"id": "phone_unicode_short",
+			"description": "Three characters including a narrow nonbreaking space do not meet the five-character threshold.",
+			"phone": "",
+			"fphone": "06 ",
+			"ssn_raw": "",
+			"iban_raw": "",
+			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 0 }
+		},
+		{
+			"id": "phone_unicode_complete",
+			"description": "Five formatted characters with a narrow nonbreaking space meet the threshold.",
+			"phone": "",
+			"fphone": "06 12",
+			"ssn_raw": "",
+			"iban_raw": "",
+			"expected": { "phoneprefixes": 1, "ssnprefixes": 0, "ibanprefixes": 0 }
+		},
+		{
 			"id": "phone_1_digit",
 			"description": "Phone below the 2-digit threshold — no phone prefixes yet.",
 			"phone": "1",

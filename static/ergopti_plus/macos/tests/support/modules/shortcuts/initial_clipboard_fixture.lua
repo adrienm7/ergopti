@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Destination = require("tests.support.text_destination_receipt")
 local with_sender = require("tests.support.text_sender_fixture")
 local M = {}
 
@@ -20,9 +21,10 @@ function M.run(kind, options, callback)
 	helpers.with_stub_scope({
 		"modules.shortcuts.actions.text", "modules.shortcuts.actions.text_continuation",
 		"modules.shortcuts.actions.text_dispatch", "modules.shortcuts.actions.text_transform_grace",
-		"unicode_case", "unicode_case.data", "infra.capsword_output",
+		"unicode_case", "unicode_case.data", "infra.capsword_output", "modules.keymap.utils",
 	}, function()
 		with_sender(function(f)
+			Destination.install()
 			local board = f.hs_overrides.pasteboard
 			local native_read, native_write = board.readAllData, board.setContents
 			local native_clear, native_count = board.clearContents, board.changeCount

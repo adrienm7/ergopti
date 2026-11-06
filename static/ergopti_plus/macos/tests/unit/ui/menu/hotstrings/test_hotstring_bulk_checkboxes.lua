@@ -269,6 +269,24 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 			helpers.assert_eq(file.menu[1].title, "menu.hotstrings.scope_enable_all")
 			helpers.assert_eq(file.menu[2].title, "menu.hotstrings.scope_disable_all")
 			helpers.assert_eq(file.menu[3].title, "menu.hotstrings.open_file")
+			local deferred = require("infra.deferred_work")
+			local shell = require("adapters.shell_runner")
+			local original = deferred.after
+			local original_open = shell.open
+			local callback, opened
+			deferred.after = function() return false end
+			local called, receipt = pcall(file.menu[3].fn)
+			deferred.after = function(_, fn) callback = fn; return true end
+			shell.open = function(path) opened = path; return true end
+			local accepted, success = pcall(file.menu[3].fn)
+			if callback then callback() end
+			deferred.after = original
+			shell.open = original_open
+			helpers.assert_true(called)
+			helpers.assert_eq(receipt, false, "the personal file row reports scheduling refusal")
+			helpers.assert_true(accepted)
+			helpers.assert_eq(success, true, "the personal file row reports accepted scheduling")
+			helpers.assert_eq(opened, "/user/work.toml", "the personal file uses the asynchronous opener")
 			helpers.assert_eq(file.menu[4].title, "-")
 			helpers.assert_eq(file.menu[5].title, "one")
 			helpers.assert_eq(file.menu[1].fn(), true)
@@ -286,18 +304,18 @@ end)
 --- @param body function Real category callback observations.
 local function with_category_file(committed, body, change_label)
 	helpers.with_stub_scope({ "infra.manifest_menu", "infra.deferred_work",
-		"adapters.timer_scheduler", "modules.keymap", "modules.dynamic_hotstrings",
-		"ui.menu.menu_hotstrings" }, function()
+		"adapters.timer_scheduler", "adapters.shell_runner", "modules.keymap", "modules.dynamic_hotstrings",
+		"ui.menu.menu_hotstrings", "ui.menu.menu_hotstrings_custom" }, function()
 		-- Category file opening neither starts nor inspects these unrelated engines.
 		package.loaded["modules.keymap"] = { DEFAULT_STATE = {} }
 		package.loaded["modules.dynamic_hotstrings"] = { DEFAULT_STATE = {} }
 		local callbacks, launches = {}, {}
+		package.loaded["adapters.shell_runner"] = { open = function(path) launches[#launches + 1] = path; return true end }
 		package.loaded["adapters.timer_scheduler"] = { after = function(_, callback)
 			callbacks[#callbacks + 1] = callback
 			return {}, committed
 		end }
 		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
-		hs.execute = function(command) launches[#launches + 1] = command; return "", true end
 		package.loaded["infra.manifest_menu"] = assert(require("menu.renderer").new({
 			platform = "hs", manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
 			json_decode = function(bytes)
@@ -341,18 +359,18 @@ helpers.describe("shared category file command", function()
 				if committed then callbacks[1]() end
 				helpers.assert_eq(#launches, committed and 1 or 0)
 				if committed then
-					helpers.assert_eq(launches[1], "open " .. require("infra.text_utils").shell_quote("/user/category file.toml"))
+					helpers.assert_eq(launches[1], "/user/category file.toml", "the asynchronous opener receives the exact path")
 				end
 				helpers.assert_eq(saves, 0)
 			end)
 		end)
 	end
-	helpers.it("shared category file: refuses a held callback after the native execute port is withdrawn", function()
+	helpers.it("shared category file: refuses a held callback after the native open port is withdrawn", function()
 		with_category_file(true, function(hotstrings, callbacks, launches)
 			local ctx = context(true, true)
 			ctx.hotfile_paths = { alpha = "/user/a.toml" }
 			local command = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu[3]
-			hs.execute = nil
+			package.loaded["adapters.shell_runner"].open = nil
 			helpers.assert_eq(command.fn(), false)
 			helpers.assert_eq(#callbacks, 0)
 			helpers.assert_eq(#launches, 0)

@@ -89,6 +89,19 @@ helpers.describe("VirtualHIDDevice driver update offer", function()
 		restore()
 	end)
 
+	helpers.it("reloads after a successful install even if its result dialog fails", function()
+		local Offer, world = load("karabiner.vhid_update.confirm")
+		local dialog = package.loaded["infra.dialog_util"]
+		local original = dialog.block_alert
+		dialog.block_alert = function(...)
+			if #world.alerts > 0 then error("result dialog unavailable") end
+			return original(...)
+		end
+		helpers.assert_true(Offer.open(remap(true), function() world.reloads = world.reloads + 1 end))
+		helpers.assert_eq(world.reloads, 1, "the installed driver still requires a reload")
+		restore()
+	end)
+
 	helpers.it("shows nothing after a cancelled administrator prompt and never reloads on a refusal", function()
 		local Offer, world = load("karabiner.vhid_update.confirm")
 		local facade = remap(false, "vhid_update_cancelled")

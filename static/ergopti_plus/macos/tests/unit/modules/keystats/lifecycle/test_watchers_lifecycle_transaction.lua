@@ -126,10 +126,19 @@ local function with_fixture(options, scenario)
 	end
 	function audio.isRunning() return audio.running end
 	fixture.audio = audio
+	local device = { running = false, callback = nil, stop_calls = 0 }
+	function device:uid() return "output-1" end
+	function device:volume() return 40 end
+	function device:muted() return false end
+	function device:watcherCallback(cb) self.callback = cb; return self end
+	function device:watcherStart() self.running = true; return self end
+	function device:watcherStop() self.stop_calls = self.stop_calls + 1; self.running = false; return self end
+	function device:watcherIsRunning() return self.running end
+	fixture.audio_device = device
 
 	local hs_stub = {
 		timer = { absoluteTime = function() return fixture.now_ms * 1000000 end },
-		mouse = { absolutePosition = function() return { x = 0, y = 0 } end },
+		mouse = { absolutePosition = function() return fixture.mouse_position or { x = 0, y = 0 } end },
 		caffeinate = {
 			watcher = {
 				systemWillSleep = 1,
@@ -167,12 +176,7 @@ local function with_fixture(options, scenario)
 		},
 		audiodevice = {
 			watcher = audio,
-			defaultOutputDevice = function()
-				return {
-					volume = function() return 40 end,
-					muted = function() return false end,
-				}
-			end,
+			defaultOutputDevice = function() return fixture.audio_device end,
 		},
 	}
 	_G.hs = hs_stub
@@ -193,6 +197,7 @@ local function with_fixture(options, scenario)
 		start = function() return false end,
 	}
 	local scheduler = {}
+	function scheduler.hotstring_time() return (fixture.elapsed_ms or fixture.now_ms) / 1000 end
 	function scheduler.after(_, callback)
 		local mode = options.after_mode or "commit"
 		if mode == "throw" then error("context timer constructor exploded") end
@@ -222,7 +227,7 @@ local function with_fixture(options, scenario)
 		end,
 		day_rollover = function() return true end,
 		log_app_switch = noop,
-		log_passive_period = noop,
+		log_passive_period = function(kind, duration) fixture.passive_period = { kind = kind, duration = duration } end,
 		log_system_event = function(kind, payload)
 			fixture.system_events[#fixture.system_events + 1] = {
 				kind = kind,
@@ -273,6 +278,265 @@ end
 -- =================================================
 
 helpers.describe("keystats hardware watchers form one exact transaction", function()
+	helpers.it("does not count pointer travel while watchers are stopped", function()
+		with_fixture({}, function(watchers, fixture, state)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			fixture.mouse_position = { x = 0, y = 0 }
+			watchers.perform_maintenance()
+			helpers.assert_eq(watchers.stop_hardware_watchers(), true)
+			fixture.mouse_position = { x = 300, y = 400 }
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			watchers.perform_maintenance()
+			helpers.assert_eq(state.mouse_distance_px, 0)
+			fixture.mouse_position = { x = 303, y = 404 }
+			watchers.perform_maintenance()
+			helpers.assert_eq(state.mouse_distance_px, 5)
+		end)
+	end)
+
+	helpers.it("forgets an open lock across watcher shutdown and restart", function()
+		with_fixture({}, function(watchers, fixture, state)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			fixture.now_ms = 1000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.screensDidLock)
+			helpers.assert_eq(watchers.stop_hardware_watchers(), true)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			fixture.now_ms = 5000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.systemDidWake)
+			helpers.assert_eq(state.passive_kind, nil)
+			helpers.assert_eq(fixture.passive_period, nil)
+			helpers.assert_eq(#fixture.timers, 1)
+		end)
+	end)
+
+	helpers.it("includes suspended time in a sleep interval", function()
+		with_fixture({}, function(watchers, fixture)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			fixture.now_ms, fixture.elapsed_ms = 1000, 1000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.systemWillSleep)
+			fixture.now_ms, fixture.elapsed_ms = 1100, 61000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.systemDidWake)
+			helpers.assert_eq(fixture.passive_period.duration, 60000)
+		end)
+	end)
+
+	helpers.it("keeps a lock interval open when the system wakes before screen unlock", function()
+		with_fixture({}, function(watchers, fixture, state)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			fixture.now_ms = 1000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.screensDidLock)
+			fixture.now_ms = 2000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.systemWillSleep)
+			fixture.now_ms = 3000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.systemDidWake)
+			helpers.assert_eq(fixture.passive_period, nil)
+			helpers.assert_eq(state.passive_kind, "lock")
+			fixture.now_ms = 4000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.screensDidUnlock)
+			helpers.assert_eq(fixture.passive_period.kind, "lock")
+			helpers.assert_eq(fixture.passive_period.duration, 3000)
+		end)
+	end)
+
+	helpers.it("keeps the original sleep start across screen and system sleep events", function()
+		with_fixture({}, function(watchers, fixture)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			fixture.now_ms = 1000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.screensDidSleep)
+			fixture.now_ms = 4000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.systemWillSleep)
+			fixture.now_ms = 9000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.systemDidWake)
+			helpers.assert_eq(fixture.passive_period.kind, "sleep")
+			helpers.assert_eq(fixture.passive_period.duration, 8000)
+		end)
+	end)
+
+	helpers.it("supports a default output device without a UID", function()
+		with_fixture({}, function(watchers, fixture)
+			local device = fixture.audio_device
+			device.uid = function() return nil end
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			device.callback(nil, "vmvc", "outp", 0)
+			helpers.assert_eq(#fixture.system_events, 1)
+			helpers.assert_eq(watchers.stop_hardware_watchers(), true)
+		end)
+	end)
+
+	helpers.it("rebinds the device watcher on default-output change", function()
+		with_fixture({}, function(watchers, fixture)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			local first = fixture.audio_device
+			local stale = first.callback
+			local second = { running = false }
+			function second:uid() return "output-2" end
+			function second:volume() return 65 end
+			function second:muted() return true end
+			function second:watcherCallback(cb) self.callback = cb; return self end
+			function second:watcherStart() self.running = true; return self end
+			function second:watcherStop() self.running = false; return self end
+			function second:watcherIsRunning() return self.running end
+			fixture.audio_device = second
+			fixture.audio.callback("dOut")
+			helpers.assert_eq(first.running, false)
+			helpers.assert_eq(second.running, true)
+			local count = #fixture.system_events
+			stale("output-1", "vmvc", "outp", 0)
+			helpers.assert_eq(#fixture.system_events, count)
+			second.callback("output-2", "mute", "outp", 0)
+			helpers.assert_eq(#fixture.system_events, count + 1)
+			helpers.assert_eq(fixture.system_events[#fixture.system_events].payload.volume, 65)
+			helpers.assert_eq(watchers.stop_hardware_watchers(), true)
+		end)
+	end)
+
+	helpers.it("retries a refused device stop before rebinding the new output", function()
+		with_fixture({}, function(watchers, fixture)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			local first, stop = fixture.audio_device, fixture.audio_device.watcherStop
+			local refused = true
+			first.watcherStop = function(self) if refused then return nil end; return stop(self) end
+			local second = { running = false }
+			function second:uid() return "output-2" end
+			function second:volume() return 65 end
+			function second:muted() return false end
+			function second:watcherCallback(cb) self.callback = cb; return self end
+			function second:watcherStart() self.running = true; return self end
+			function second:watcherStop() self.running = false; return self end
+			function second:watcherIsRunning() return self.running end
+			fixture.audio_device = second
+			fixture.audio.callback("dOut")
+			helpers.assert_eq(first.running, true)
+			helpers.assert_eq(second.running, false)
+			refused = false
+			watchers.check_idle()
+			helpers.assert_eq(first.running, false)
+			helpers.assert_eq(second.running, true)
+			helpers.assert_eq(watchers.stop_hardware_watchers(), true)
+		end)
+	end)
+
+	helpers.it("retains an output watcher when stop refuses and retries the exact owner", function()
+		with_fixture({}, function(watchers, fixture)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			local device, stop = fixture.audio_device, fixture.audio_device.watcherStop
+			local refused = true
+			device.watcherStop = function(self) if refused then return nil end; return stop(self) end
+			local stale = device.callback
+			helpers.assert_eq(watchers.stop_hardware_watchers(), false)
+			stale("output-1", "vmvc", "outp", 0)
+			helpers.assert_eq(#fixture.system_events, 0)
+			refused = false
+			helpers.assert_eq(watchers.stop_hardware_watchers(), true)
+			helpers.assert_eq(device.stop_calls, 1)
+			helpers.assert_eq(device.running, false)
+		end)
+	end)
+
+	helpers.it("rolls back if the default output changes during watcher acquisition", function()
+		with_fixture({}, function(watchers, fixture)
+			local device, start = fixture.audio_device, fixture.audio_device.watcherStart
+			device.watcherStart = function(self)
+				local result = start(self)
+				fixture.audio_device = { uid = function() return "successor" end }
+				return result
+			end
+			helpers.assert_eq(watchers.init_hardware_watchers(), false)
+			helpers.assert_eq(device.running, false)
+			helpers.assert_eq(device.callback, nil)
+			helpers.assert_eq(fixture.audio.running, false)
+		end)
+	end)
+
+	helpers.it("removes a callback installed before device setup raises", function()
+		with_fixture({}, function(watchers, fixture)
+			local device = fixture.audio_device
+			device.watcherCallback = function(self, callback)
+				self.callback = callback
+				if callback then error("callback installed before failure") end
+				return self
+			end
+			helpers.assert_eq(watchers.init_hardware_watchers(), false)
+			helpers.assert_eq(device.callback, nil)
+			helpers.assert_eq(fixture.audio.running, false)
+		end)
+	end)
+
+	helpers.it("rejects an equal but nonidentical device start receipt", function()
+		with_fixture({}, function(watchers, fixture)
+			local device = fixture.audio_device
+			local identity = { __eq = function() return true end }
+			setmetatable(device, identity)
+			local other = setmetatable({}, identity)
+			device.watcherStart = function(self) self.running = true; return other end
+			helpers.assert_eq(device == other, true)
+			helpers.assert_eq(watchers.init_hardware_watchers(), false)
+			helpers.assert_eq(device.running, false)
+			helpers.assert_eq(device.stop_calls, 1)
+		end)
+	end)
+
+	helpers.it("retains the owner when stop returns an equal but nonidentical device", function()
+		with_fixture({}, function(watchers, fixture)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			local device, stop = fixture.audio_device, fixture.audio_device.watcherStop
+			local identity = { __eq = function() return true end }
+			setmetatable(device, identity)
+			local other = setmetatable({}, identity)
+			device.watcherStop = function(self) stop(self); return other end
+			helpers.assert_eq(watchers.stop_hardware_watchers(), false)
+			device.watcherStop = stop
+			helpers.assert_eq(watchers.stop_hardware_watchers(), true)
+			helpers.assert_eq(device.stop_calls, 2)
+		end)
+	end)
+
+	helpers.it("rolls back the exact device after watcher start refuses", function()
+		with_fixture({}, function(watchers, fixture)
+			local device = fixture.audio_device
+			device.watcherStart = function(self) self.running = true; return nil end
+			helpers.assert_eq(watchers.init_hardware_watchers(), false)
+			helpers.assert_eq(device.stop_calls, 1)
+			helpers.assert_eq(device.running, false)
+			helpers.assert_eq(device.callback, nil)
+			helpers.assert_eq(fixture.audio.running, false)
+		end)
+	end)
+
+	helpers.it("observes output device volume and mute while fencing stale callbacks", function()
+		with_fixture({}, function(watchers, fixture, state)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			local device = fixture.audio_device
+			helpers.assert_eq(device.running, true)
+			local callback = device.callback
+			state.current_audio_volume = nil
+			callback("output-1", "vmvc", "inpt", 0)
+			callback("other-device", "mute", "outp", 0)
+			helpers.assert_eq(#fixture.system_events, 0)
+			callback("output-1", "vmvc", "outp", 0)
+			callback("output-1", "mute", "outp", 0)
+			helpers.assert_eq(state.current_audio_volume, 40)
+			helpers.assert_eq(#fixture.system_events, 2)
+			helpers.assert_eq(watchers.stop_hardware_watchers(), true)
+			helpers.assert_eq(device.running, false)
+			callback("output-1", "vmvc", "outp", 0)
+			helpers.assert_eq(#fixture.system_events, 2)
+		end)
+	end)
+
+	helpers.it("observes the documented default output device change event", function()
+		with_fixture({}, function(watchers, fixture, state)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			state.current_audio_volume = nil
+			fixture.audio.callback("dOut")
+			helpers.assert_eq(state.current_audio_volume, 40)
+			helpers.assert_eq(#fixture.system_events, 1)
+			helpers.assert_eq(fixture.system_events[1].kind, "audio_change")
+			helpers.assert_eq(fixture.system_events[1].payload.event_code, "dOut")
+			helpers.assert_eq(watchers.stop_hardware_watchers(), true)
+		end)
+	end)
+
 	helpers.it("rolls back earlier siblings when a later watcher refuses startup", function()
 		with_fixture({ start_results = { battery = false } }, function(watchers, fixture)
 			helpers.assert_eq(watchers.init_hardware_watchers(), false)

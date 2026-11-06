@@ -64,9 +64,10 @@ local OUTDATED_ARRAY_REASON = "a remap dictionary is not an array; the neutral s
 local function timing_leaf(section, key, default, path, section_name)
 	if section[key] == nil then return default, false end
 	local called, value = pcall(tonumber, section[key])
-	if called and value ~= nil then return value, false end
+	if called and require("number_policy").within_timer_ceiling(value)
+		and value > 0 and value % 1 == 0 then return value, false end
 	Outdated.report_in_file(path, { section_name, key },
-		"a timing is numeric; the canonical default is used", Logger)
+		"a timing is a finite positive whole number of milliseconds; the canonical default is used", Logger)
 	return default, true
 end
 
@@ -292,6 +293,10 @@ local function name_modifier_holds(actions)
 			end
 			action.label = KeyNames.modifiers_heading(action.modifiers, "macos", i18n.get)
 			action.short_label = KeyNames.modifiers_label(action.modifiers, "macos", i18n.get)
+			if action.id == "hyper" then
+				action.label = "Hyper — " .. action.label
+				action.short_label = "Hyper"
+			end
 		end
 	end
 end

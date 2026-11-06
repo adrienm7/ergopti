@@ -854,6 +854,10 @@ function M.set_override(category, section, field, value)
 		Logger.error(LOG, "set_override(): '%s' is not an overridable field.", tostring(field))
 		return false
 	end
+	if field == "color" and value ~= nil and require("color.hex").parse(value) == nil then
+		Logger.error(LOG, "set_override(): color must contain 3, 4, 6 or 8 hexadecimal digits.")
+		return false
+	end
 
 	local candidate = copy_overrides(_overrides)
 	local entry = candidate[category] or { sections = {} }
@@ -2087,6 +2091,10 @@ end
 --- Source metadata reaches the real engine before conditional source replacement.
 --- A recognized legacy override may be removed only within this held cohort.
 function M.set_personal_metadata(id, section, field, value)
+	if field == "color" and value ~= nil and require("color.hex").parse(value) == nil then
+		Logger.error(LOG, "set_personal_metadata(): color must contain 3, 4, 6 or 8 hexadecimal digits.")
+		return false
+	end
 	if M.retry_personal_cleanup() ~= true then return false end
 	local binding, record = M.personal_file_scope_binding(id), personal_adoption(id)
 	if not binding or binding.current() ~= true or _override_source.status == "error" then return false end

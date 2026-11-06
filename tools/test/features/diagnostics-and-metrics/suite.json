@@ -417,6 +417,22 @@
 			"cmd": "node",
 			"args": ["tools/test/test-legacy-folder-names.cjs"],
 			"repro": "npm run test:legacy-folder-names"
+		},
+		{
+			"id": "js-metrics-app-unicode-search",
+			"ordinal": 577,
+			"name": "application filter matches canonically equivalent Unicode names",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-app-unicode-search.cjs"],
+			"repro": "node tools/test/test-metrics-app-unicode-search.cjs"
+		},
+		{
+			"id": "js-metrics-app-fallback-icon-unicode",
+			"ordinal": 584,
+			"name": "typing metrics fallback badges preserve Unicode initials",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-app-fallback-icon-unicode.cjs"],
+			"repro": "node tools/test/test-metrics-app-fallback-icon-unicode.cjs"
 		}
 	]
 }

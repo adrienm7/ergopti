@@ -44,18 +44,27 @@ def frame(tag,value):
  sys.stdout.buffer.write(struct.pack('>I',len(data))+data);sys.stdout.buffer.flush()
 if mode=='wait':time.sleep(60)
 if request.get('method'):
- frame(b'H',{'version':1,'status':200,'headers':[['Content-Type','application/json']]})
+ headers=[['Content-Type','application/json']]
+ if mode=='bad_header':headers=[['Content-Type','application/json\r\nX-Injected: yes']]
+ if mode=='bad_header_name':headers=[['bad name','value']]
+ if mode=='encoded_body':headers=[['Content-Encoding','gzip']]
+ if mode=='length_short':headers=[['Content-Length','100']]
+ if mode=='length_extra':headers=[['Content-Length','1']]
+ if mode=='length_bad_terminal':headers=[['Content-Length',str(len(b'{"status":"success"}\n'))]]
+ if mode=='length_exact':headers=[['Content-Length',str(len(b'{"status":"success"}\n'))]]
+ frame(b'H',{'version':1,'status':200,'headers':headers})
  frame(b'D',b'{"status":"success"}\n')
  if mode=='body_wait':time.sleep(60)
 if mode=='pid_change':identity['pid']=43
 if mode=='boolean_pid':identity['pid']=True
 if mode=='noncanonical_start':identity['start_seconds']='01234'
+if mode=='oversized_start':identity['start_seconds']='9'*5000
 receipt={'version':1,'success':mode!='admission','reason':'admission' if mode=='admission' else 'complete',
  'listener':None if mode=='admission' else identity}
 if mode=='duplicate':
  frame(b'C',b'{"version":1,"version":1,"success":true,"reason":"complete","listener":null}')
 else:frame(b'C',receipt)
-if mode=='trailing':sys.stdout.buffer.write(b'x');sys.stdout.buffer.flush()
+if mode in ('trailing','length_bad_terminal'):sys.stdout.buffer.write(b'x');sys.stdout.buffer.flush()
 if mode=='exit':sys.exit(74)
 """
 
@@ -128,7 +137,46 @@ class WireReceiving(unittest.TestCase):
     def discover(self):
         return self.api.discover("/private/verified/ollama", "123", "456", 11434, 2, 1)
 
-    def request(self):
+    def test_oversized_listener_number_is_a_closed_protocol_error(self):
+        os.environ["ERGOPTI_PEER_MODE"] = "oversized_start"
+        with self.assertRaises(self.api.ENGINE.NativeHTTPError) as caught:
+            self.discover()
+        self.assertEqual(caught.exception.reason, "protocol")
+
+    def test_huge_timeouts_are_rejected_before_spawning(self):
+        for role in ("http", "ollama"):
+            for field in ("timeout", "idle_timeout"):
+                with self.subTest(role=role, field=field):
+                    options = {"timeout": 2, "idle_timeout": 1}
+                    options[field] = 10**1000
+                    with self.assertRaises(self.api.ENGINE.NativeHTTPError) as caught:
+                        if role == "http":
+                            self.api.ENGINE.NativeHTTPResponse(
+                                "https://example.test", (), **options
+                            )
+                        else:
+                            self.api.discover(
+                                "/private/verified/ollama", "123", "456", 11434, **options
+                            )
+                    self.assertEqual(caught.exception.reason, "protocol")
+                    self.assertEqual(self.children, [])
+        for field in ("timeout", "idle_timeout"):
+            options = {"timeout": 2, "idle_timeout": 1}
+            options[field] = 1e308
+            with self.assertRaises(self.api.ENGINE.NativeHTTPError) as caught:
+                self.api.discover("/private/verified/ollama", "123", "456", 11434, **options)
+            self.assertEqual(caught.exception.reason, "protocol")
+        self.assertEqual(self.children, [])
+
+    def test_http_huge_idle_timeout_is_a_closed_error(self):
+        with self.assertRaises(self.api.ENGINE.NativeHTTPError) as caught:
+            self.api.ENGINE.NativeHTTPResponse(
+                "https://example.test", (), timeout=None, idle_timeout=1e308
+            )
+        self.assertEqual(caught.exception.reason, "protocol")
+        self.assertEqual(self.children, [])
+
+    def request(self, progress=None):
         body = '{"model":"fixture"}'
         headers = [
             ["Accept-Encoding", "identity"],
@@ -150,6 +198,7 @@ class WireReceiving(unittest.TestCase):
             body,
             2,
             1,
+            progress=progress,
         )
 
     def test_discovery_line_and_public_argv_publish_only_reaped_identity(self):
@@ -220,6 +269,40 @@ class WireReceiving(unittest.TestCase):
             self.discover()
         self.assertEqual(raised.exception.reason, "admission")
 
+    def test_invalid_http_headers_are_rejected_before_response_publication(self):
+        for mode in ("bad_header", "bad_header_name", "encoded_body"):
+            with self.subTest(mode=mode):
+                self.receipt.unlink(missing_ok=True)
+                os.environ["ERGOPTI_PEER_MODE"] = mode
+                response = None
+                try:
+                    with self.assertRaises(self.api.ENGINE.NativeHTTPError):
+                        response = self.request()
+                finally:
+                    if response is not None:
+                        response.close()
+
+    def test_content_length_requires_exact_body_and_verified_terminal(self):
+        for mode in ("length_short", "length_extra", "length_bad_terminal"):
+            with self.subTest(mode=mode):
+                self.receipt.unlink(missing_ok=True)
+                os.environ["ERGOPTI_PEER_MODE"] = mode
+                with self.request() as response:
+                    delivered = []
+                    with self.assertRaises(self.api.ENGINE.NativeHTTPError):
+                        while chunk := response.read():
+                            delivered.append(chunk)
+                    if mode != "length_short":
+                        self.assertEqual(delivered, [])
+                        self.assertFalse(response._complete)
+
+    def test_content_length_exact_verifies_terminal_before_last_bytes(self):
+        os.environ["ERGOPTI_PEER_MODE"] = "length_exact"
+        with self.request() as response:
+            self.assertEqual(response.read(), b'{"status":"success"}\n')
+            self.assertTrue(response._complete)
+            self.assertEqual(response.read(), b"")
+
     def test_invalid_identity_duplicate_trailing_and_exit_never_publish(self):
         for mode in ("boolean_pid", "noncanonical_start", "duplicate", "trailing", "exit"):
             with self.subTest(mode=mode):
@@ -240,6 +323,60 @@ class WireReceiving(unittest.TestCase):
             self.assertEqual(response.read(), b'{"status":"success"}\n')
         self.assertIsNotNone(self.children[0].returncode)
         self.assertFalse(response._complete)
+
+    def test_progress_close_does_not_deliver_buffered_response(self):
+        os.environ["ERGOPTI_PEER_MODE"] = "body_wait"
+        response = None
+        cancel = False
+
+        def progress():
+            if cancel:
+                response.close()
+
+        response = self.request(progress=progress)
+        self.assertEqual(response.read(1), b"{")
+        cancel = True
+        with self.assertRaises(self.api.ENGINE.NativeHTTPError):
+            response.read(1)
+        self.assertTrue(response._closed)
+        self.assertIsNotNone(self.children[0].returncode)
+
+    def test_read_progress_failure_retires_child_before_propagating(self):
+        os.environ["ERGOPTI_PEER_MODE"] = "body_wait"
+        primary = RuntimeError("cancel during response")
+        cancelled = False
+
+        def progress():
+            if cancelled:
+                raise primary
+
+        body = "{}"
+        headers = [
+            ["X-Ergopti-Native-Session", "f" * 64],
+            ["X-Ergopti-Native-Challenge", "e" * 64],
+            ["X-Ergopti-Native-Body-SHA256", hashlib.sha256(body.encode()).hexdigest()],
+            ["X-Ergopti-Native-Operation", "d" * 32],
+        ]
+        response = self.api.open_request(
+            "/private/verified/ollama",
+            "123",
+            "456",
+            11434,
+            dict(IDENTITY),
+            "POST",
+            "/api/pull",
+            headers,
+            body,
+            None,
+            1,
+            progress=progress,
+        )
+        cancelled = True
+        with self.assertRaises(RuntimeError) as raised:
+            response.read()
+        self.assertIs(raised.exception, primary)
+        self.assertTrue(response._closed)
+        self.assertIsNotNone(self.children[0].returncode)
 
     def test_role_registers_before_selector_and_physically_closes_original_child(self):
         retained = []

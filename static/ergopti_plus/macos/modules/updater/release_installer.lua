@@ -38,10 +38,13 @@ local FileSystem  = require("adapters.file_system")
 local JsonCodec   = require("adapters.json_codec")
 local ShellRunner = require("adapters.shell_runner")
 local Archives    = require("updater.release_assets")
+local ProxyPolicy = require("network.proxy_policy")
 
 local LOG = "updater.release_installer"
 local ARMING_RECEIPT = "ARMED"
 local RENAME_FLAG = "--release-rename"
+-- Distinguish attempts started within one wall-clock second in this process.
+local stage_sequence = 0
 
 -- The executable inside the app bundle the launcher runs from.
 local EXECUTABLE_SUFFIX = "/Contents/MacOS/ErgoptiPlus"
@@ -86,6 +89,7 @@ M.SWAP_SCRIPT = table.concat({
 	'	case "$device" in ""|*[!0-9]*) echo "The replacement filesystem identity is invalid."; exit 1 ;; esac',
 	'done',
 	'[ "$staged_device" = "$parent_device" ] || { echo "The verified app is not on the installation filesystem: nothing was replaced."; exit 1; }',
+	'if [ -e "$previous" ] || [ -L "$previous" ]; then echo "Move the existing backup at $previous before retrying."; exit 1; fi',
 	'# Stage/destination filesystem admission ends',
 	'rename_flag=' .. RENAME_FLAG,
 	'launcher="$app' .. EXECUTABLE_SUFFIX .. '"',
@@ -99,7 +103,6 @@ M.SWAP_SCRIPT = table.concat({
 	'	if [ "$waited" -gt 1200 ]; then echo "ErgoptiPlus did not quit: nothing was replaced."; exit 3; fi',
 	"	/bin/sleep 0.1",
 	"done",
-	'/bin/rm -rf -- "$previous" || { echo "The previous backup app could not be removed."; /usr/bin/open -- "$app"; exit 4; }',
 	'"$launcher" "$rename_flag" move "$app" "$previous" || { echo "The installed app could not be moved aside."; /usr/bin/open -- "$app"; exit 5; }',
 	'launcher="$previous' .. EXECUTABLE_SUFFIX .. '"',
 	'# Occupied destinations are retained rather than overwritten or nested into',
@@ -231,7 +234,9 @@ function M.stage(asset, done)
 	end
 	-- Publication must remain a rename: a failed cross-device mv can leave a
 	-- partial destination that makes rollback nest the original app inside it.
-	local stage_dir = (parent:gsub("/+$", "")) .. "/.ergopti-release-install-" .. os.date("!%Y%m%d-%H%M%S")
+	stage_sequence = stage_sequence + 1
+	local stage_dir = (parent:gsub("/+$", "")) .. "/.ergopti-release-install-"
+		.. os.date("!%Y%m%d-%H%M%S") .. "-" .. tostring(stage_sequence)
 	-- Keep JSON release data out of shell source and bind the native request to
 	-- this exact stage, using the existing per-child environment override.
 	local request, request_err = JsonCodec.encode({ version = 1, url = asset.url, sha256 = asset.digest,
@@ -240,24 +245,36 @@ function M.stage(asset, done)
 		Logger.error(LOG, "Cannot encode the chosen release download request.")
 		return false
 	end
-	-- The stage script downloads with the system curl, checked at this use.
-	if not require("adapters.system_curl").check("the release download") then return false end
+	-- Read the shared proxy policy instead of maintaining another precedence.
+	-- Only the staging script's explicit-environment branch invokes curl.
+	local policy_path = Paths.shared("modules/network/proxy_policy.json")
+	local raw = type(policy_path) == "string" and FileSystem.read(policy_path) or nil
+	local decoded = type(raw) == "string" and JsonCodec.decode(raw) or nil
+	local policy = ProxyPolicy.new(decoded)
+	if not policy then Logger.error(LOG, "The release proxy policy is unavailable."); return false end
+	local environment = {}
+	for _, name in ipairs(policy.environment_names()) do environment[name] = M._getenv(name) or "" end
+	local route = policy.route(asset.url, environment)
+	if not route then Logger.error(LOG, "The release proxy route is invalid."); return false end
+	if route.mode == "environment" and not require("adapters.system_curl").check("the release download") then return false end
+	environment.ERGOPTI_RELEASE_STAGE_REQUEST = request
 	Logger.start(LOG, "Downloading and verifying %s into %s…", asset.tag, stage_dir)
 	local handle = M._spawn("/bin/sh", { "-c", M.STAGE_SCRIPT, "stage", asset.url, asset.digest,
 		stage_dir, asset.version, app, asset.format, APP_NAME }, function(exit_code, stdout, stderr)
+		local expected = stage_dir .. "/app/" .. APP_NAME
 		local staged = exit_code == 0 and type(stdout) == "string"
-			and stdout:gsub("%s+$", ""):match("^READY (/.+)$") or nil
+			and stdout == "READY " .. expected .. "\n" and expected or nil
 		if staged then
 			Logger.success(LOG, "Release %s downloaded and verified.", asset.tag)
 			done(staged, nil, nil)
 			return
 		end
 		local code = tonumber(exit_code)
-		local stage = (code and code >= M.EXIT_VERIFY_FIRST) and "verify" or "download"
+		local stage = (code == 0 or (code and code >= M.EXIT_VERIFY_FIRST)) and "verify" or "download"
 		local detail = string.format("exit %s: %s", tostring(exit_code), (tostring(stderr or ""):gsub("%s+$", "")))
 		Logger.error(LOG, "Release %s refused at the %s; stage path: %s (%s).", asset.tag, stage, stage_dir, detail)
 		done(nil, stage, detail)
-	end, nil, { ERGOPTI_RELEASE_STAGE_REQUEST = request })
+	end, nil, environment)
 	return type(handle) == "table" and handle.start() == true
 end
 
@@ -289,7 +306,15 @@ function M.arm_swap(staged_app, done)
 				staged_app, app, log)
 			done(true)
 		else
-			Logger.error(LOG, "The detached installer refused its arming receipt (completion=%s).", tostring(ok))
+			Logger.error(LOG, "The detached installer refused its arming receipt (completion=%s; log: %s). If %s exists, move it aside before retrying.",
+				tostring(ok), log, app .. ".previous")
+			if type(FileSystem.classify_no_follow) == "function" then
+				local checked, _, status = pcall(FileSystem.classify_no_follow, app .. ".previous")
+				if checked and status == "ok" then
+					done(false, "previous_backup_occupied")
+					return
+				end
+			end
 			done(false, "the detached installer did not acknowledge arming")
 		end
 	end

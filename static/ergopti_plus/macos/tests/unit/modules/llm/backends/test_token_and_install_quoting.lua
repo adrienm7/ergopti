@@ -55,38 +55,27 @@ end)
 -- =========================================================================
 -- =========================================================================
 
-helpers.describe("layout_install: the privileged install is POSIX-quoted", function()
-	helpers.it("install_system quotes every interpolated path", function()
-		local dispatched_script = nil
-		local install = helpers.load_with_stubs("modules.keymap.layout_install", {
-			execute = function()
-				return "", false, "exit", 1
-			end,
-			osascript = {
-				applescript = function(script)
-					dispatched_script = script
-					return false, nil, "cancelled"
-				end,
-			},
-		})
-		local text_utils = require("infra.text_utils")
-		local source_dir = "/tmp/O'Brien/$cache/`layout`/"
-		local bundle_name = "Ergopti_v2.0.0.bundle"
-
-		install.install_system(source_dir, bundle_name)
-		helpers.assert_true(type(dispatched_script) == "string" and dispatched_script ~= "",
-			"install_system must dispatch the production AppleScript transaction")
-
-		local source_assignment = "source="
-			.. text_utils.shell_quote(source_dir .. bundle_name) .. ";"
-		local target_assignment = "target="
-			.. text_utils.shell_quote(install.SYSTEM_LAYOUTS_DIR:gsub("/+$", "")) .. ";"
-		helpers.assert_true(
-			dispatched_script:find(text_utils.applescript_escape(source_assignment), 1, true) ~= nil,
-			"the privileged source path must survive both POSIX and AppleScript quoting")
-		helpers.assert_true(
-			dispatched_script:find(text_utils.applescript_escape(target_assignment), 1, true) ~= nil,
-			"the privileged destination path must survive both quoting layers")
+helpers.describe("layout_install: user installation is POSIX-quoted", function()
+	helpers.it("install_user quotes every interpolated path", function()
+		local saved_helper, saved_dir, saved_fs = package.loaded["platform.remap.lease_helper"],
+			package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"]
+		package.loaded["platform.remap.lease_helper"] = { resolve = function() return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus" end }
+		package.loaded["infra.fs_dir"] = { try_entries = function() return {}, true end }
+		package.loaded["adapters.file_system"] = { classify_no_follow = function() return { mode = "directory" }, "ok" end }
+		local ok, err = xpcall(function()
+			local dispatched
+			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+				execute = function(command) dispatched = command; return "", false end,
+			})
+			local text_utils = require("infra.text_utils")
+			local source_dir, bundle_name = "/tmp/O'Brien/$cache/`layout`/", "Ergopti_v2.0.0.bundle"
+			install.install_user(source_dir, bundle_name)
+			helpers.assert_type(dispatched, "string")
+			helpers.assert_true(dispatched:find("source=" .. text_utils.shell_quote(source_dir .. bundle_name) .. ";", 1, true) ~= nil)
+			helpers.assert_true(dispatched:find("target=" .. text_utils.shell_quote(install.USER_LAYOUTS_DIR:gsub("/+$", "")) .. ";", 1, true) ~= nil)
+		end, debug.traceback)
+		package.loaded["platform.remap.lease_helper"], package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"] = saved_helper, saved_dir, saved_fs
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("path_exists does not shell out with %q", function()

@@ -109,7 +109,6 @@ local highest_installed    = install.highest_installed
 local install_user         = install.install_user
 local install_system       = install.install_system
 local pick_latest_bundle   = install.pick_latest_bundle
-local invalidate_bundle_caches = install.invalidate_bundle_caches
 local USER_LAYOUTS_DIR     = install.USER_LAYOUTS_DIR
 local SYSTEM_LAYOUTS_DIR   = install.SYSTEM_LAYOUTS_DIR
 
@@ -181,9 +180,15 @@ end
 --- @param legacy_active table Legacy entries in the active input-source list.
 --- @param update_menu function|nil Menu rebuild callback.
 local function run_install_and_chain(install_fn, legacy_active, update_menu)
-	local ok = false
-	pcall(function() ok = install_fn() end)
-	if ok and type(legacy_active) == "table" and #legacy_active > 0 then
+	local called, ok, reason = pcall(install_fn)
+	if not called or ok ~= true then
+		local key = reason == "launcher_unavailable" and "menu.layout.install_launcher_required"
+			or reason == "system_install_unavailable" and "menu.layout.install_system_unavailable"
+			or reason == "other_scope_occupied" and "menu.layout.install_other_scope"
+			or reason == "other_scope_unverified" and "menu.layout.install_other_scope_unverified" or "menu.layout.install_failed"
+		pcall(notifications.notify, i18n.get(key), nil, "error")
+	end
+	if called and ok == true and type(legacy_active) == "table" and #legacy_active > 0 then
 		Logger.info(LOG, "Install succeeded — auto-upgrading %d legacy entry(ies) in the active list.", #legacy_active)
 		upgrade_active_list_async(legacy_active, function()
 			schedule_menu_refresh(update_menu)
@@ -378,8 +383,8 @@ function M.build(ctx)
 	local legacy_active     = {}
 	for _, r in ipairs(records) do
 		local kl_name = r.id or ""
-		if kl_name:lower():find("ergopti", 1, true) then
-			local stable_id = kl_name_to_tis[kl_name]
+		local stable_id = kl_name_to_tis[kl_name]
+		if stable_id or is_legacy_ergopti_id(kl_name) then
 			if stable_id then
 				-- Matches an installed variant → genuinely active
 				active_id_set_pre[stable_id] = true
@@ -412,12 +417,14 @@ function M.build(ctx)
 			system_best and system_best.name or "none",
 			tostring(latest_installed_anywhere))
 
-		-- System scope is listed first: it is the preferred install target
-		-- because it makes the layout available for all users and avoids
-		-- duplication between ~/Library and /Library. A system install also
-		-- removes the user copy automatically, keeping a single canonical bundle.
+		-- Keep an existing system copy visible. Installation and updates in that
+		-- scope are unavailable until privileged launcher identity can be bound.
+		local system_scope_label = i18n.get("menu.layout.scope_system")
+		if not system_best or version_gt(latest_ver, system_best.version) then
+			system_scope_label = system_scope_label .. " — " .. i18n.get("menu.layout.install_system_reason")
+		end
 		bundle_rows[#bundle_rows + 1] = build_install_item(
-			i18n.get("menu.layout.scope_system"), "🔐", system_best, latest, latest_ver,
+			system_scope_label, "🔐", system_best, latest, latest_ver,
 			function()
 				run_install_and_chain(
 					function() return install_system(bundles_dir, latest) end,
@@ -614,7 +621,16 @@ function M.build(ctx)
 	if #records == 0 then
 		local ManifestMenu = require("infra.manifest_menu")
 		return ManifestMenu.template_rows("layout_active_source_empty_commands", {
-			[require("config_keys").COMMAND.LAYOUT_OPEN_PREFERENCES] = function() pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'") end,
+			[require("config_keys").COMMAND.LAYOUT_OPEN_PREFERENCES] = function()
+				local ok, started = pcall(function()
+					return require("adapters.shell_runner").open(KEYBOARD_PREFS_URL)
+				end)
+				if not ok or started ~= true then
+					Logger.error(LOG, "Keyboard settings could not be opened.")
+					return false
+				end
+				return true
+			end,
 		}, {}, {}) or {}
 	else
 		for _, r in ipairs(records) do
@@ -875,18 +891,10 @@ M._parse_active_layouts         = parse_active_layouts
 M._compute_active_layouts_fast  = compute_active_layouts_fast
 M._list_active_keyboard_layouts = list_active_keyboard_layouts
 M._refresh_active_layouts_async = refresh_active_layouts_async
-M._invalidate_bundle_caches     = invalidate_bundle_caches
 M._set_active_layouts_cache     = input_sources.set_active_layouts_cache
 
---- Warms the discovery caches off the menu-open path so the first user click
---- renders instantly. Safe to call repeatedly. Invoked from ui.menu.init once
---- boot settles. See the discovery-cache notes near the top of this module.
---- @param ctx table|nil Menu context; ctx.base_dir locates the bundles directory.
-function M.prime(ctx)
-	local base_dir = (type(ctx) == "table" and type(ctx.base_dir) == "string") and ctx.base_dir or ""
-	pcall(function() M.pick_latest_bundle(base_dir .. BUNDLES_RELDIR) end)
-	pcall(highest_installed, USER_LAYOUTS_DIR)
-	pcall(highest_installed, SYSTEM_LAYOUTS_DIR)
+--- Starts the asynchronous active-layout refresh after boot settles.
+function M.prime()
 	refresh_active_layouts_async(nil)
 end
 

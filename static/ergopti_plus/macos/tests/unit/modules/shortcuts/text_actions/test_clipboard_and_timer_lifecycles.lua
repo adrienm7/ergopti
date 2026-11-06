@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Destination = require("tests.support.text_destination_receipt")
 
 
 --- Clones an all-type clipboard snapshot.
@@ -39,6 +40,7 @@ end
 local function load_wrap_fixture(restore_outcomes)
 	local saved = {
 		hs_global = _G.hs,
+		destination = package.loaded["modules.keymap.utils"],
 		hs_module = package.loaded["hs"],
 		logger = package.loaded["infra.logger"],
 		synthetic = package.loaded["adapters.synthetic_input"],
@@ -83,6 +85,7 @@ local function load_wrap_fixture(restore_outcomes)
 
 	local pasteboard = {
 		changeCount = function() return change_count end,
+		allContentTypes = function() return { {} } end,
 		readAllData = function()
 			snapshots = snapshots + 1
 			return clone(clipboard)
@@ -126,6 +129,7 @@ local function load_wrap_fixture(restore_outcomes)
 	}
 
 	package.loaded["adapters.timer_scheduler"] = nil
+	Destination.install()
 	local text = helpers.load_with_stubs("modules.shortcuts.actions.text", {
 		pasteboard = pasteboard,
 		timer = timer,
@@ -142,6 +146,7 @@ local function load_wrap_fixture(restore_outcomes)
 			handle.callback()
 		end,
 		restore = function()
+			package.loaded["modules.keymap.utils"] = saved.destination
 			package.loaded["modules.shortcuts.actions.text"] = saved.text
 			package.loaded["infra.logger"] = saved.logger
 			package.loaded["adapters.synthetic_input"] = saved.synthetic

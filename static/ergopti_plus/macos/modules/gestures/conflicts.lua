@@ -52,7 +52,11 @@ local cached_preferences = {}
 -- False until one complete read is published: before it nothing is known, so
 -- no slot is reported taken (the boot read follows within a second).
 local snapshot_ready = false
+local snapshot_incomplete = false
+local snapshot_all_absent = false
 local pending_probe = nil
+local probe_cleanup_debt = {}
+local recheck_pending = false
 -- The recheck timer and whoever wants to hear that a slot changed state.
 local watch_handle = nil
 local state_listener = nil
@@ -255,6 +259,35 @@ local function parse_output(values, output)
 	end
 end
 
+--- Retires one exact process, retaining it until its native exit is observed.
+local function retire_probe_handle(handle)
+	local ok, settled = pcall(handle.isSettled)
+	if ok and settled == true then probe_cleanup_debt[handle] = nil; return true end
+	local debt = probe_cleanup_debt[handle] or { observing = false }
+	probe_cleanup_debt[handle] = debt
+	pcall(handle.terminate)
+	ok, settled = pcall(handle.isSettled)
+	if ok and settled == true then probe_cleanup_debt[handle] = nil; return true end
+	if not debt.observing and type(handle.onSettled) == "function" then
+		debt.observing = true
+		local registered, accepted = pcall(handle.onSettled, function()
+			if probe_cleanup_debt[handle] == debt then probe_cleanup_debt[handle] = nil end
+		end)
+		if not registered or accepted ~= true then debt.observing = false end
+	end
+	return false
+end
+
+local function retry_probe_cleanup()
+	local snapshot = {}
+	for handle in pairs(probe_cleanup_debt) do snapshot[#snapshot + 1] = handle end
+	local settled = true
+	for _, handle in ipairs(snapshot) do
+		if not retire_probe_handle(handle) then settled = false end
+	end
+	return settled
+end
+
 --- Refreshes the cache asynchronously; simultaneous requests share one probe.
 --- @param on_done function|nil Called after the complete snapshot is published.
 --- @return boolean accepted
@@ -263,22 +296,51 @@ function M.refresh(on_done)
 		if on_done then pending_probe.waiters[#pending_probe.waiters + 1] = on_done end
 		return true
 	end
-	local probe = { values = {}, remaining = #MACOS_PREFERENCE_COMMANDS, waiters = {}, handles = {} }
+	if not retry_probe_cleanup() then
+		Logger.error(LOG, "Previous system gesture preference processes are still retiring.")
+		return false
+	end
+	local probe = { values = {}, remaining = #MACOS_PREFERENCE_COMMANDS, waiters = {}, handles = {},
+		incomplete = false, absent = 0 }
 	if on_done then probe.waiters[1] = on_done end
 	pending_probe = probe
 	Logger.start(LOG, "Reading system gesture settings asynchronously…")
 	for _, args in ipairs(MACOS_PREFERENCE_COMMANDS) do
+		if pending_probe ~= probe then break end
 		local settled = false
-		local function complete(code, output)
+		local start_refused = false
+		local function complete(code, output, stderr)
 			if settled or pending_probe ~= probe then return end
 			settled = true
-			if code == 0 and type(output) == "string" then parse_output(probe.values, output) end
+			if start_refused then code, output = -1, "" end
+			if code == 0 and type(output) == "string" then
+				parse_output(probe.values, output)
+			else
+				-- A domain the user never configured is a normal defaults result.
+				-- Only that exact diagnostic proves absence; permission, process,
+				-- and localized or otherwise unfamiliar failures remain unverified.
+				local domain = args[#args]
+				local expected = "Domain " .. domain .. " does not exist"
+				local absent = false
+				if code == 1 and type(stderr) == "string" then
+					for line in stderr:gmatch("[^\r\n]+") do
+						if TextUtils.trim(line) == expected then absent = true end
+					end
+				end
+				if not absent then
+					probe.incomplete = true
+				else
+					probe.absent = probe.absent + 1
+				end
+			end
 			probe.remaining = probe.remaining - 1
 			if probe.remaining ~= 0 then return end
 			cached_preferences = probe.values
+			snapshot_incomplete = probe.incomplete
+			snapshot_all_absent = probe.absent == #MACOS_PREFERENCE_COMMANDS
 			snapshot_ready = true
 			pending_probe = nil
-			if next(cached_preferences) == nil then
+			if snapshot_incomplete or (next(cached_preferences) == nil and not snapshot_all_absent) then
 				Logger.warn(LOG, "System gesture preferences are unavailable; conflicts remain unverified.")
 			else
 				Logger.success(LOG, "System gesture settings cached.")
@@ -290,13 +352,32 @@ function M.refresh(on_done)
 		end
 		local ok, handle = pcall(ShellRunner.spawn, "/usr/bin/defaults", args, complete)
 		if ok and type(handle) == "table" then probe.handles[#probe.handles + 1] = handle end
-		if not ok or type(handle) ~= "table" or handle.isSettled() then
+		if not ok or type(handle) ~= "table" then
 			complete(-1, "")
-		-- spawn only prepares the task: unstarted, no read ever completed, so no
-		-- gesture macOS claims was greyed or held back (field report 2026-11-05)
-		elseif handle.start() ~= true then
-			Logger.warn(LOG, "System gesture settings read '%s' could not start.", tostring(args[2]))
+		elseif pending_probe ~= probe then
+			retire_probe_handle(handle)
+		elseif type(handle.isSettled) ~= "function" or type(handle.start) ~= "function"
+			or type(handle.terminate) ~= "function" then
 			complete(-1, "")
+		else
+			local probed, already_settled = pcall(handle.isSettled)
+			if not probed then
+				start_refused = true
+				retire_probe_handle(handle)
+				complete(-1, "")
+			elseif already_settled == true then
+				complete(-1, "")
+			else
+				-- spawn only prepares the task: unstarted, no read ever completed, so no
+				-- gesture macOS claims was greyed or held back (field report 2026-11-05)
+				local started, admitted = pcall(handle.start)
+				if not started or admitted ~= true then
+					Logger.warn(LOG, "System gesture settings read '%s' could not start.", tostring(args[2]))
+					start_refused = true
+					retire_probe_handle(handle)
+					complete(-1, "")
+				end
+			end
 		end
 	end
 	return true
@@ -315,6 +396,14 @@ local function preference_is_disabled(keys, preferences)
 		end
 	end
 	return found
+end
+
+--- Tells whether at least one alias was actually present in the snapshot.
+local function preference_is_observed(keys, preferences)
+	for _, key in ipairs(keys) do
+		if type(preferences[key]) == "table" and #preferences[key] > 0 then return true end
+	end
+	return false
 end
 
 --- Whether one macOS policy is on: any observed non-zero value, all observed
@@ -382,7 +471,7 @@ function M.on_action_changed(slot, new_action)
 	if not action_is_active(new_action) then return nil end
 	local grp = SLOT_TO_GROUP[slot]
 	if not grp then return nil end
-	if macos_gesture_is_disabled(grp, cached_preferences) then
+	if not snapshot_incomplete and macos_gesture_is_disabled(grp, cached_preferences) then
 		if logged_posture[grp.key] ~= "disabled" then
 			logged_posture[grp.key] = "disabled"
 			Logger.debug(LOG, "Native macOS gesture '%s' is disabled — conflict warning suppressed.", grp.key)
@@ -468,8 +557,17 @@ function M.slot_system_state(slot)
 	if not snapshot_ready then return "free" end
 	local grp = SLOT_TO_GROUP[slot]
 	if not grp or grp.blocks ~= true then return "free" end
-	if next(cached_preferences) == nil then return "unverified" end
-	return system_gesture_on(grp, cached_preferences) and "taken" or "free"
+	if next(cached_preferences) == nil and not snapshot_all_absent then return "unverified" end
+	if system_gesture_on(grp, cached_preferences) then return "taken" end
+	if grp.drag_preferences then
+		local swipe_known = preference_is_observed(grp.preferences, cached_preferences)
+		local drag_known = preference_is_observed(grp.drag_preferences, cached_preferences)
+		-- The warning policy requires both independent settings before it calls
+		-- either explicitly disabled setting conflict-free. Keep the engine held
+		-- under the same uncertainty; when both are absent their defaults apply.
+		if swipe_known ~= drag_known then return "unverified" end
+	end
+	return snapshot_incomplete and "unverified" or "free"
 end
 
 --- Whether the engine must hold a slot back; a cheap table read, safe on the
@@ -504,8 +602,11 @@ end
 --- state, so the menu greys or restores it without a reload.
 --- @return boolean accepted
 function M.recheck()
+	if recheck_pending then return true end
+	recheck_pending = true
 	local before = state_digest()
-	return M.refresh(function()
+	local accepted = M.refresh(function()
+		recheck_pending = false
 		if state_digest() == before then return end
 		Logger.info(LOG, "System gesture settings changed: %s.", state_digest())
 		if type(state_listener) == "function" then
@@ -513,6 +614,8 @@ function M.recheck()
 			if not ok then Logger.error(LOG, "Gesture state listener failed: %s.", tostring(err)) end
 		end
 	end)
+	if not accepted then recheck_pending = false end
+	return accepted
 end
 
 --- Names who hears a slot change state (the menu's rebuild request).
@@ -526,15 +629,29 @@ end
 --- @param scheduler table|nil TimerScheduler-like { every, cancel } (tests).
 --- @return boolean started
 function M.start_watch(scheduler)
-	if watch_handle then return true end
+	if watch_handle and watch_handle.active then return true end
+	if watch_handle and M.stop_watch() ~= true then return false end
 	local timers = scheduler or require("adapters.timer_scheduler")
-	local handle, committed = timers.every(Timings.sec("gestures", "system_prefs_recheck_ms"),
-		function() M.recheck() end)
-	if not handle or committed ~= true then
+	local watch = { timers = timers, active = false, starting = true }
+	watch_handle = watch
+	local ok, handle, committed = pcall(timers.every, Timings.sec("gestures", "system_prefs_recheck_ms"),
+		function() if watch_handle == watch and watch.active then M.recheck() end end)
+	watch.starting = false
+	if not ok or not handle or committed ~= true then
+		if type(handle) == "table" and handle.timer ~= nil then
+			watch.handle = handle
+		elseif watch_handle == watch then
+			watch_handle = nil
+		end
 		Logger.error(LOG, "The system gesture settings recheck could not be scheduled.")
 		return false
 	end
-	watch_handle = { handle = handle, timers = timers }
+	if watch.cancelled then
+		watch.handle = handle
+		M.stop_watch()
+		return false
+	end
+	watch.handle, watch.active = handle, true
 	Logger.debug(LOG, "System gesture settings recheck armed.")
 	return true
 end
@@ -542,8 +659,17 @@ end
 --- Stops the recheck timer.
 function M.stop_watch()
 	local watch = watch_handle
-	watch_handle = nil
-	if watch then watch.timers.cancel(watch.handle) end
+	if not watch then return true end
+	watch.active = false
+	watch.cancelled = true
+	if watch.starting then return false end
+	local ok, cancelled = pcall(watch.timers.cancel, watch.handle)
+	if not ok or cancelled ~= true then
+		Logger.error(LOG, "The system gesture settings recheck remains pending cleanup.")
+		return false
+	end
+	if watch_handle == watch then watch_handle = nil end
+	return true
 end
 
 --- Reports native pinch configuration without inventing an Ergopti pinch slot.
@@ -563,7 +689,8 @@ end
 
 --- Cancels owned probes during shutdown; system preferences are never modified.
 function M.restore_all_overrides()
-	M.stop_watch()
+	local timer_settled = M.stop_watch()
+	recheck_pending = false
 	local probe = pending_probe
 	pending_probe = nil
 	if probe then
@@ -571,9 +698,12 @@ function M.restore_all_overrides()
 		-- start reads the settings again, so no warning (#99 logged three)
 		Logger.info(LOG, "System gesture settings read cancelled during shutdown.")
 		for _, handle in ipairs(probe.handles) do
-			if not handle.isSettled() then handle.terminate() end
+			if type(handle.isSettled) == "function" and type(handle.terminate) == "function" then
+				retire_probe_handle(handle)
+			end
 		end
 	end
+	return retry_probe_cleanup() and timer_settled == true
 end
 
 return M

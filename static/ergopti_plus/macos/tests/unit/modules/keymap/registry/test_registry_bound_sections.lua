@@ -114,6 +114,24 @@ helpers.describe("Registry: sections a layout extension binds", function()
 		end)
 	end)
 
+	helpers.it("(layout-extension-sparse) refuses a source list with a missing entry before loading mappings", function()
+		with_registry(fixture_files(), function(state, Registry)
+			local sources = { [1] = SOURCES[1], [3] = { path = GEOMETRY, sections = { "other" } } }
+			helpers.assert_eq(Registry.load_toml("group_a", BUNDLED, sources), false)
+			helpers.assert_eq(#state.mappings, 0)
+			helpers.assert_nil(state.groups.group_a)
+		end)
+	end)
+
+	helpers.it("(layout-extension-sparse) refuses a source with a missing bound section", function()
+		with_registry(fixture_files(), function(state, Registry)
+			local sources = { { path = GEOMETRY, sections = { [1] = "repeat_corrections", [3] = "other" } } }
+			helpers.assert_eq(Registry.load_toml("group_a", BUNDLED, sources), false)
+			helpers.assert_eq(#state.mappings, 0)
+			helpers.assert_nil(state.groups.group_a)
+		end)
+	end)
+
 	helpers.it("(layout-extension-binding) refuses a bound file without its section and malformed sources", function()
 		local files = fixture_files()
 		files[GEOMETRY].sections.repeat_corrections = nil

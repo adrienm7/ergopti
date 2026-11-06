@@ -48,16 +48,16 @@ function M.resolve(defaults)
 		or type(assets) ~= "table" or not dense(bindings) or #bindings == 0 then
 		return nil, "invalid-archive-declaration"
 	end
-	local archives, names = {}, {}
+	local archives, names, formats = {}, {}, {}
 	for _, binding in ipairs(bindings) do
 		local key = type(binding) == "table" and binding.asset_key or nil
 		local format = type(binding) == "table" and binding.format or nil
 		local name = type(key) == "string" and assets[key] or nil
 		if not M.supports(format) or type(name) ~= "string" or not name:match(NAME_PATTERN)
-			or name:sub(-#FORMATS[format]) ~= FORMATS[format] or names[name] then
+			or name:sub(-#FORMATS[format]) ~= FORMATS[format] or names[name] or formats[format] then
 			return nil, "invalid-archive-binding"
 		end
-		names[name] = true
+		names[name], formats[format] = true, true
 		archives[#archives + 1] = { name = name, format = format }
 	end
 	return { owner = github.owner, repo = github.repo, archives = archives }

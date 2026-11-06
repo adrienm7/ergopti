@@ -69,6 +69,7 @@ class ManagedHTTPTransport(httpx.BaseTransport):
         self.active = set()
         self.explicit = {}
         self.closed = False
+        self.acquiring = 0
 
     def _retired(self, stream):
         with self.lock:
@@ -130,20 +131,61 @@ class ManagedHTTPTransport(httpx.BaseTransport):
                             "Managed network relay limit is exhausted", request=request
                         )
                     try:
-                        transport = httpx.HTTPTransport(proxy=relay, trust_env=False)
+                        self.acquiring += 1
+                        try:
+                            transport = httpx.HTTPTransport(proxy=relay, trust_env=False)
+                        finally:
+                            self.acquiring -= 1
                     except (ValueError, ImportError, httpx.InvalidURL):
                         raise httpx.ProxyError(
                             "Managed network relay is unavailable", request=request
                         ) from None
                     self.explicit[relay] = transport
+                    if self.closed:
+                        transport.close()
+                        raise httpx.ConnectError(
+                            "Managed network transport is closed", request=request
+                        )
                 # Serialize relay acquisition with shutdown, just as for the
                 # native child: a closed pool can acquire a new connection.
-                return transport.handle_request(request)
+                self.acquiring += 1
+                try:
+                    response = transport.handle_request(request)
+                finally:
+                    self.acquiring -= 1
+                if self.closed:
+                    # Retain the exact late stream if its cleanup refuses.
+                    stream = response.stream
+                    self.active.add(stream)
+                    stream.close()
+                    self.active.discard(stream)
+                    raise httpx.ConnectError("Managed network transport is closed", request=request)
+                return response
         # GET and HEAD are the actual locked HF snapshot operations. Uploads
         # and non-replayable bodies never silently acquire another transport.
         if request.method not in ("GET", "HEAD"):
             raise httpx.UnsupportedProtocol(
                 "Managed network method is unavailable", request=request
+            )
+        try:
+            body = request.content
+        except httpx.RequestNotRead:
+            # HTTPX rebuilds redirect requests with a fresh, unread ByteStream
+            # even when the original GET had no body. Only this replayable
+            # in-memory stream has a known single bounded chunk.
+            if not isinstance(request.stream, httpx.ByteStream):
+                raise httpx.UnsupportedProtocol(
+                    "Managed network request body is unavailable", request=request
+                ) from None
+            body = next(iter(request.stream), b"")
+        declared_lengths = request.headers.get_list("content-length")
+        if (
+            body
+            or request.headers.get("transfer-encoding") is not None
+            or any(value != "0" for value in declared_lengths)
+        ):
+            raise httpx.UnsupportedProtocol(
+                "Managed network request body is unavailable", request=request
             )
         deadline = request.extensions.get("ergopti_native_deadline")
         if deadline is not None and not Native._positive_timeout(deadline):
@@ -152,13 +194,22 @@ class ManagedHTTPTransport(httpx.BaseTransport):
         idle = timeouts.get("read") if isinstance(timeouts, dict) else None
         if idle is None:
             idle = self.idle_timeout
+        combined = {}
+        for raw_name, raw_value in request.headers.raw:
+            name, value = raw_name.decode("ascii"), raw_value.decode("latin-1")
+            key = name.lower()
+            if key == "accept-encoding":
+                continue
+            if key not in combined:
+                combined[key] = [name, []]
+            combined[key][1].append(value)
         headers = [
-            (name.decode("ascii"), value.decode("latin-1")) for name, value in request.headers.raw
+            (name, ("; " if key == "cookie" else ", ").join(values))
+            for key, (name, values) in combined.items()
         ]
         # Foundation owns content decoding. Identity keeps HTTPX's raw stream
         # and HF's range/integrity contract byte-exact; a violating origin is
         # refused by the native receiver before body delivery.
-        headers = [(name, value) for name, value in headers if name.lower() != "accept-encoding"]
         headers.append(("Accept-Encoding", "identity"))
         with self.lock:
             if self.closed:
@@ -169,27 +220,34 @@ class ManagedHTTPTransport(httpx.BaseTransport):
             if timeout is not None and timeout <= 0:
                 raise httpx.ReadTimeout("Managed network deadline is exhausted", request=request)
             try:
-                response = Native.open_request(
-                    str(request.url), headers, request.method, timeout, idle, mode == "direct"
-                )
+                self.acquiring += 1
+                try:
+                    response = Native.open_request(
+                        str(request.url), headers, request.method, timeout, idle, mode == "direct"
+                    )
+                finally:
+                    self.acquiring -= 1
             except Native.NativeHTTPError as error:
                 raise _failure(error, request) from None
-            if response.status in (301, 302, 303, 307, 308):
-                # HTTPX otherwise drains the redirect body before dispatching
-                # its successor. Retire the exact native child at headers so a
-                # stalled/error body cannot hold the next full-URL PAC lookup.
-                response.close()
-                return httpx.Response(
-                    response.status,
-                    headers=response.headers,
-                    stream=httpx.ByteStream(b""),
-                    extensions={"ergopti_native": True},
-                )
+            # Publish the exact owner before any fallible redirect cleanup so
+            # transport shutdown can retry a refused close.
             stream = _NativeStream(response, request, self._retired)
             self.active.add(stream)
+            if self.closed:
+                stream.close()
+                raise httpx.ConnectError("Managed network transport is closed", request=request)
+            try:
+                headers = httpx.Headers(response.headers, encoding="latin-1")
+            except UnicodeEncodeError:
+                stream.close()
+                raise httpx.RemoteProtocolError(
+                    "Managed network response contains an invalid header", request=request
+                ) from None
+            # HTTPX decides whether a redirect is followed. Keep its original
+            # stream available for callers that inspect a final 3xx response.
         return httpx.Response(
             response.status,
-            headers=response.headers,
+            headers=headers,
             stream=stream,
             extensions={"ergopti_native": True},
         )
@@ -199,10 +257,13 @@ class ManagedHTTPTransport(httpx.BaseTransport):
             self.closed = True
             streams = tuple(self.active)
             transports = tuple(self.explicit.values())
-        failure = None
+            acquiring = self.acquiring
+        failure = RuntimeError("Managed network acquisition remains active") if acquiring else None
         for owned in streams + transports:
             try:
                 owned.close()
+                if any(owned is stream for stream in streams):
+                    self._retired(owned)
             except BaseException as error:
                 # Keep uncertain owners reachable and allow a subsequent close
                 # to retry. Retire other children before propagating cancellation.

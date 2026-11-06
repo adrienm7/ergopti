@@ -17,16 +17,101 @@ local MODULES = {
 }
 local ORIGINS = { "https://registry.ollama.ai", "https://blob.ollama.example" }
 
+helpers.describe("field check command deadlines", function()
+	helpers.it("retains a partially started child when launch refuses (field-command-start-owner)", function()
+		helpers.with_stub_scope(MODULES, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			local observer, done, terminations = nil, nil, 0
+			package.loaded["adapters.timer_scheduler"] = { after = function() error("no timer after refused start") end,
+				cancel = function() return true end }
+			package.loaded["adapters.shell_runner"] = { spawn = function()
+				return { isSettled = function() return false end, start = function() return false end,
+					onSettled = function(fn) observer = fn; return true end,
+					terminate = function() terminations = terminations + 1; return true, "pending" end }
+			end }
+			package.loaded["adapters.field_check_ports"] = nil
+			require("adapters.field_check_ports").exec("/bin/echo", {}, 5, function(code) done = { code = code } end)
+			helpers.assert_eq(terminations, 1)
+			helpers.assert_nil(done, "a refused start can still own a live native child")
+			observer()
+			helpers.assert_true(type(done) == "table")
+			helpers.assert_nil(done.code)
+		end)
+	end)
+	helpers.it("waits for process retirement after a timeout signal (field-command-timeout-owner)", function()
+		helpers.with_stub_scope(MODULES, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			local observer, deadline, done = nil, nil, nil
+			package.loaded["adapters.timer_scheduler"] = {
+				after = function(_, callback) deadline = callback; return {}, true end, cancel = function() return true end,
+			}
+			package.loaded["adapters.shell_runner"] = { spawn = function()
+				return { isSettled = function() return false end, start = function() return true end,
+					onSettled = function(fn) observer = fn; return true end,
+					terminate = function() return true, "pending" end }
+			end }
+			package.loaded["adapters.field_check_ports"] = nil
+			require("adapters.field_check_ports").exec("/bin/echo", {}, 5, function(code) done = { code = code } end)
+			deadline()
+			helpers.assert_nil(done, "a signalled process can still perform effects")
+			observer()
+			helpers.assert_true(type(done) == "table")
+			helpers.assert_nil(done.code)
+		end)
+	end)
+	helpers.it("cancels a deadline if the child completes while it is being armed (field-command-timer-race)", function()
+		helpers.with_stub_scope(MODULES, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			local completion, cancelled, result = nil, 0, nil
+			local handle = {}
+			package.loaded["adapters.timer_scheduler"] = {
+				after = function() completion(0, "ok", ""); return handle, true end,
+				cancel = function(value) helpers.assert_eq(value, handle); cancelled = cancelled + 1; return true end,
+			}
+			package.loaded["adapters.shell_runner"] = { spawn = function(_, _, done)
+				completion = done
+				return { isSettled = function() return false end, start = function() return true end }
+			end }
+			package.loaded["adapters.field_check_ports"] = nil
+			require("adapters.field_check_ports").exec("/bin/echo", {}, 5, function(code) result = code end)
+			helpers.assert_eq(result, 0)
+			helpers.assert_eq(cancelled, 1, "no orphan deadline may survive the completed child")
+		end)
+	end)
+	helpers.it("retires the exact child after deadline allocation refusal (field-command-timer-refusal)", function()
+		helpers.with_stub_scope(MODULES, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			local observer, done, terminations = nil, nil, 0
+			package.loaded["adapters.timer_scheduler"] = { after = function() return {}, false end, cancel = function() return true end }
+			package.loaded["adapters.shell_runner"] = { spawn = function()
+				return { isSettled = function() return false end, start = function() return true end,
+					onSettled = function(fn) observer = fn; return true end,
+					terminate = function() terminations = terminations + 1; return true, "pending" end }
+			end }
+			package.loaded["adapters.field_check_ports"] = nil
+			local port = require("adapters.field_check_ports")
+			port.exec("/bin/echo", {}, 5, function(code) done = { code = code } end)
+			helpers.assert_eq(terminations, 1)
+			helpers.assert_nil(done, "an accepted signal is not process retirement")
+			helpers.assert_true(type(observer) == "function")
+			observer()
+			helpers.assert_true(type(done) == "table", "the caller settles only after exact retirement")
+			helpers.assert_nil(done.code)
+		end)
+	end)
+end)
+
 --- Runs the port over a scripted launcher.
 --- @param script function fn(origin) -> exit code, stdout, stderr
 --- @param launcher string|nil The resolved launcher (nil: none).
 --- @return table answer, table calls
 local function run(script, launcher)
-	local calls, answer = {}, nil
+	local calls, answer, timers = {}, nil, {}
 	helpers.with_stub_scope(MODULES, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["adapters.timer_scheduler"] = {
-			after = function() return { stopped = false } end, cancel = function() return true end,
+			after = function() local handle = { stopped = false }; timers[#timers + 1] = handle; return handle end,
+			cancel = function() return true end,
 		}
 		package.loaded["adapters.shell_runner"] = {
 			spawn = function(executable, args, callback)
@@ -48,7 +133,7 @@ local function run(script, launcher)
 		package.loaded["adapters.field_check_ports"] = nil
 		require("adapters.field_check_ports").new().route_plan(function(value) answer = value end)
 	end)
-	return answer, calls
+	return answer, calls, timers
 end
 
 helpers.describe("network check route plan port", function()
@@ -64,6 +149,12 @@ helpers.describe("network check route plan port", function()
 			{ origin = ORIGINS[1], route = "http://relay.corp.example:3128" },
 			{ origin = ORIGINS[2], route = "direct" },
 		})
+	end)
+
+	helpers.it("does not arm a deadline after an inline launcher completion", function()
+		local answer, _, timers = run(function() return 0, "ROUTE direct\n" end, "/launcher")
+		helpers.assert_eq(#answer.entries, 2)
+		helpers.assert_eq(#timers, 0, "completed route lookups must not leave live deadline timers")
 	end)
 
 	-- Field run 2026-10-27 19:47 read "lookup_failed" for an unreachable PAC:

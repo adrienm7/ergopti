@@ -21,6 +21,8 @@ helpers.describe("clipboard.save counts UTI types via pairs(), not #", function(
 
 		local Clipboard = helpers.load_with_stubs("adapters.clipboard", {
 			pasteboard = {
+				allContentTypes = function() return { {} } end,
+			changeCount = function() return 0 end,
 				readAllData  = function() return { ["public.utf8-plain-text"] = "x", ["public.html"] = "<b>" } end,
 				writeAllData = function() return true end,
 			},

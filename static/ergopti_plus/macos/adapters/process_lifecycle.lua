@@ -21,6 +21,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local ErrorDescription = require("error_description")
 
 local LOG = "adapters.process_lifecycle"
 
@@ -60,7 +61,7 @@ local function invoke_callback(callback, callback_class, ...)
 		return callback(table.unpack(args, 1, args.n))
 	end, debug.traceback)
 	if not ok then
-		Logger.error(LOG, "%s subscriber raised: %s.", callback_class, tostring(err))
+		Logger.error(LOG, "%s subscriber raised: %s.", callback_class, ErrorDescription.describe(err))
 	end
 	return ok
 end
@@ -74,10 +75,10 @@ local function cleanup_app_watcher()
 	end
 	local watcher = _app_watcher
 	local ok, result = xpcall(function() return watcher:stop() end, debug.traceback)
-	if not ok or not result then
+	if not ok or result ~= watcher then
 		_app_cleanup_pending = true
 		Logger.error(LOG, "Application watcher stop failed; retaining the exact handle for retry: %s.",
-			tostring(result))
+			ErrorDescription.describe(result))
 		return false
 	end
 	if _app_watcher == watcher then _app_watcher = nil end
@@ -94,10 +95,10 @@ local function cleanup_window_filter()
 	end
 	local filter = _window_filter
 	local ok, result = xpcall(function() return filter:unsubscribeAll() end, debug.traceback)
-	if not ok or not result then
+	if not ok or result ~= filter then
 		_window_cleanup_pending = true
 		Logger.error(LOG, "Window filter stop failed; retaining the exact handle for retry: %s.",
-			tostring(result))
+			ErrorDescription.describe(result))
 		return false
 	end
 	if _window_filter == filter then _window_filter = nil end
@@ -200,7 +201,7 @@ function M.getForegroundApp()
 		return { appId = app_name, windowTitle = win_title }
 	end)
 	if not ok then
-		Logger.error(LOG, "getForegroundApp(): unexpected error — %s", tostring(result))
+		Logger.error(LOG, "getForegroundApp(): unexpected error — %s", ErrorDescription.describe(result))
 		return empty
 	end
 	return result or empty
@@ -231,22 +232,25 @@ function M.start()
 			return hs.application.watcher.new(function(app_name, event_type, app_obj)
 				if watcher_generation ~= _app_generation or not _app_watcher_active then return end
 				if event_type == hs.application.watcher.launched then
-					for _, callback in ipairs(_launch_callbacks) do
-						invoke_callback(callback, "Application launch", app_name)
+					for index = 1, #_launch_callbacks do
+						if watcher_generation ~= _app_generation or not _app_watcher_active then break end
+						invoke_callback(_launch_callbacks[index], "Application launch", app_name)
 					end
 				elseif event_type == hs.application.watcher.terminated then
-					for _, callback in ipairs(_quit_callbacks) do
-						invoke_callback(callback, "Application quit", app_name)
+					for index = 1, #_quit_callbacks do
+						if watcher_generation ~= _app_generation or not _app_watcher_active then break end
+						invoke_callback(_quit_callbacks[index], "Application quit", app_name)
 					end
 				elseif event_type == hs.application.watcher.activated then
-					for _, callback in ipairs(_activate_callbacks) do
-						invoke_callback(callback, "Application activation", app_name, app_obj)
+					for index = 1, #_activate_callbacks do
+						if watcher_generation ~= _app_generation or not _app_watcher_active then break end
+						invoke_callback(_activate_callbacks[index], "Application activation", app_name, app_obj)
 					end
 				end
 			end)
 		end, debug.traceback)
 		if not ok_new or not candidate then
-			Logger.error(LOG, "Application watcher creation failed: %s.", tostring(candidate))
+			Logger.error(LOG, "Application watcher creation failed: %s.", ErrorDescription.describe(candidate))
 			return false
 		end
 
@@ -254,9 +258,9 @@ function M.start()
 		app_acquired = true
 		local ok_start, start_result = xpcall(function() return candidate:start() end,
 			debug.traceback)
-		if not ok_start or not start_result then
+		if not ok_start or start_result ~= candidate then
 			rollback_start(true, false)
-			Logger.error(LOG, "Application watcher start failed: %s.", tostring(start_result))
+			Logger.error(LOG, "Application watcher start failed: %s.", ErrorDescription.describe(start_result))
 			return false
 		end
 		_app_watcher_active = true
@@ -269,7 +273,7 @@ function M.start()
 			debug.traceback)
 		if not ok_new or not candidate then
 			rollback_start(app_acquired, false)
-			Logger.error(LOG, "Window filter creation failed: %s.", tostring(candidate))
+			Logger.error(LOG, "Window filter creation failed: %s.", ErrorDescription.describe(candidate))
 			return false
 		end
 
@@ -290,14 +294,15 @@ function M.start()
 				end
 				local ok_title, title = pcall(function() return win:title() end)
 				if ok_title and type(title) == "string" then win_title = title end
-				for _, callback in ipairs(_focus_callbacks) do
-					invoke_callback(callback, "Window focus", app_name, win_title)
+				for index = 1, #_focus_callbacks do
+					if filter_generation ~= _window_generation or not _window_filter_active then break end
+					invoke_callback(_focus_callbacks[index], "Window focus", app_name, win_title)
 				end
 			end)
 		end, debug.traceback)
-		if not ok_subscribe or not subscribed then
+		if not ok_subscribe or subscribed ~= candidate then
 			rollback_start(app_acquired, true)
-			Logger.error(LOG, "Window filter subscription failed: %s.", tostring(subscribed))
+			Logger.error(LOG, "Window filter subscription failed: %s.", ErrorDescription.describe(subscribed))
 			return false
 		end
 		_window_cleanup_pending = false

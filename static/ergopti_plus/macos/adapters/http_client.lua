@@ -56,6 +56,7 @@ local hs             = hs
 local Logger         = require("infra.logger")
 local TimerScheduler = require("adapters.timer_scheduler")
 local TextUtils = require("text_utils")
+local ErrorDescription = require("error_description")
 
 local LOG = "adapters.http_client"
 local CACHE_POLICIES = {
@@ -85,7 +86,7 @@ local function invoke_callback(callback, result)
 	local ok, err = xpcall(function() return callback(result) end, debug.traceback)
 	if not ok then
 		Logger.error(LOG, "Completion callback raised: %s. This request is abandoned — nothing "
-			.. "downstream retries it.", tostring(err))
+			.. "downstream retries it.", ErrorDescription.describe(err))
 	end
 end
 
@@ -146,13 +147,14 @@ local ENTITY_HEADERS = {
 --- @return string|nil value
 local function header_value(headers, wanted)
 	if type(headers) ~= "table" then return nil end
+	local found, result = false, nil
 	for key, value in pairs(headers) do
-		if type(key) == "string" and key:lower() == wanted
-			and type(value) == "string" then
-			return value
+		if type(key) == "string" and key:lower() == wanted then
+			if found or type(value) ~= "string" then return nil end
+			found, result = true, value
 		end
 	end
-	return nil
+	return result
 end
 
 --- Returns whether a caller supplied any credential-bearing header.
@@ -244,9 +246,23 @@ local function request_refusal(url, headers, body)
 	local scheme = url:match("^([%a][%w+%.%-]*)://")
 	scheme = scheme and scheme:lower()
 	if scheme ~= "http" and scheme ~= "https" then return "the URL must be absolute HTTP or HTTPS" end
+	if not parse_http_url(url) then return "the URL must have a valid HTTP authority and path" end
 	if headers ~= nil and type(headers) ~= "table" then return "headers must be a table" end
+	local captured = nil
+	if headers ~= nil then
+		local ok, result = pcall(function()
+			local policy = require("infra.http_header_policy")
+			for name, value in pairs(headers) do
+				if type(name) ~= "string" or type(value) ~= "string" then error("header is not a string") end
+			end
+			local _, view = require("network.http_headers").capture(headers, policy.validate)
+			return view
+		end)
+		if not ok then return "headers cannot be represented by the native HTTP bridge" end
+		captured = result
+	end
 	if body ~= nil and type(body) ~= "string" then return "the body must be a string" end
-	return nil
+	return nil, captured
 end
 
 --- Longest native failure reason kept in a result; the system text is one sentence.
@@ -314,6 +330,10 @@ local function resolve_redirect(current_url, location)
 	if type(location) ~= "string" or location == ""
 		or location:find("[%c%s\\]") then
 		return nil, nil, "redirect Location is malformed"
+	end
+	if location:match("^[%a][%w+%.%-]*:")
+		and not location:match("^[%a][%w+%.%-]*://") then
+		return nil, nil, "redirect Location uses an unsupported scheme"
 	end
 
 	local resolved
@@ -468,7 +488,7 @@ local function new(options)
 		end, debug.traceback)
 		if not ok or settled_or_err ~= true then
 			Logger.error(LOG, "%s could not release timeout timer; exact handle retained: %s.",
-				tostring(reason), tostring(settled_or_err))
+				tostring(reason), ErrorDescription.describe(settled_or_err))
 			return false
 		end
 		return true
@@ -522,7 +542,7 @@ local function new(options)
 		if not _native_requests[receipt] then return true end
 		if not ok or result_or_err ~= true then
 			Logger.error(LOG, "HTTP task cancellation failed after logical revocation: %s.",
-				tostring(result_or_err))
+				ErrorDescription.describe(result_or_err))
 			return false
 		end
 		_native_requests[receipt] = nil
@@ -599,6 +619,10 @@ local function new(options)
 				_cancelled = true
 				_request_active = false
 				_cancel_native_tasks()
+				if my_generation ~= _generation then
+					_notify_settlement_observers()
+					return
+				end
 				Logger.warn(LOG, "Request timed out after %dms.", timeout_ms)
 				invoke_callback(callback, {
 					ok = false,
@@ -617,7 +641,7 @@ local function new(options)
 			-- returns the fenced candidate even when its immediate rollback refused
 			_retain_timeout_cleanup(timeout_handle)
 			Logger.error(LOG, "Timeout timer acquisition failed; HTTP dispatch refused: %s.",
-				tostring(schedule_ok and "timer unavailable" or handle_or_err))
+				ErrorDescription.describe(schedule_ok and "timer unavailable" or handle_or_err))
 			return false
 		end
 
@@ -650,6 +674,10 @@ local function new(options)
 			_cancelled = true
 			_request_active = false
 			_stop_timeout()
+			if my_generation ~= _generation then
+				_notify_settlement_observers()
+				return
+			end
 			local native_status = type(status) == "number" and status or 0
 			local public_status = native_status >= 0 and native_status or 0
 			local is_ok  = public_status >= 200 and public_status < 300
@@ -773,19 +801,19 @@ local function new(options)
 			if my_generation ~= _generation or not _request_active then
 				Logger.error(LOG,
 					"%s(): native HTTP dispatch failed after terminal completion — %s. "
-						.. "Duplicate result suppressed.", method, tostring(task_or_err))
+						.. "Duplicate result suppressed.", method, ErrorDescription.describe(task_or_err))
 				_notify_settlement_observers()
 				return false
 			end
 			_cancelled = true
 			_request_active = false
 			_stop_timeout()
-			Logger.error(LOG, "%s(): native HTTP dispatch failed — %s.", method, tostring(task_or_err))
+			Logger.error(LOG, "%s(): native HTTP dispatch failed — %s.", method, ErrorDescription.describe(task_or_err))
 			invoke_callback(callback, {
 				ok = false,
 				status = 0,
 				body = "",
-				error = tostring(task_or_err),
+				error = ErrorDescription.describe(task_or_err),
 				error_kind = "native_dispatch",
 			})
 			_notify_settlement_observers()
@@ -883,7 +911,7 @@ local function new(options)
 				_native_requests[receipt] = nil
 				if my_generation == _generation and _request_active then
 					Logger.error(LOG, "%s(): redirect-aware HTTP dispatch failed: %s.",
-						hop_method, tostring(result_or_err))
+						hop_method, ErrorDescription.describe(result_or_err))
 				end
 				_notify_settlement_observers()
 				return false
@@ -912,7 +940,7 @@ local function new(options)
 	--- @param callback function Completion callback.
 	--- @return boolean accepted
 	local function _request(method, url, headers, body, callback)
-		local refusal = request_refusal(url, headers, body)
+		local refusal, captured_headers = request_refusal(url, headers, body)
 		if refusal then
 			Logger.error(LOG, "%s(): request refused before dispatch: %s.", method, refusal)
 			invoke_callback(callback, {
@@ -924,6 +952,7 @@ local function new(options)
 			})
 			return false
 		end
+		headers = captured_headers
 		if follow_redirects == true and (has_sensitive_headers(headers) or is_https(url)) then
 			return _dispatch_with_redirect_policy(method, url, headers, body, callback)
 		end

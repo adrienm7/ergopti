@@ -99,6 +99,8 @@ var state = {
 	numpad: false,
 	doc: { layers: {} },
 	dirty: false,
+	revision: 0,
+	saveRevision: 0,
 	saving: false,
 	closeArmed: false,
 	selected: null,
@@ -210,11 +212,17 @@ function saveResult(result) {
 		var reasons = errorList(result.errors).map(describeError);
 		state.status = _t('layer_editor.save_refused', reasons.join(' · ') || '?');
 	} else {
-		state.dirty = false;
+		state.dirty = state.revision !== state.saveRevision;
 		state.closeArmed = false;
 		state.fileProblem = null;
 		state.fileErrors = [];
 		state.status = result.applied === false ? _t('layer_editor.apply_failed') : _t('common.saved');
+		if (state.dirty) {
+			state.status =
+				result.applied === false
+					? state.status + ' · ' + _t('layer_editor.unsaved')
+					: _t('layer_editor.unsaved');
+		}
 	}
 	render();
 }
@@ -239,6 +247,7 @@ function describeError(e) {
 // ================================
 
 function markDirty() {
+	state.revision += 1;
 	state.dirty = true;
 	state.closeArmed = false;
 	state.status = _t('layer_editor.unsaved');
@@ -246,7 +255,7 @@ function markDirty() {
 
 /** Binds the selected input to a value, or gives it its normal behaviour back (null). */
 function pick(value) {
-	if (!state.selected || state.os === null) return;
+	if (!state.selected || state.os === null || state.saving) return;
 	if (value === null)
 		LayerModel.makeNative(state.doc, DATA.layer, state.os, state.selected, DATA.platforms);
 	else {
@@ -258,12 +267,14 @@ function pick(value) {
 }
 
 function restoreRecommended() {
+	if (state.saving) return;
 	LayerModel.restoreRecommended(state.doc, DATA.layer, DATA.recommended);
 	markDirty();
 	render();
 }
 
 function clearAll() {
+	if (state.saving) return;
 	LayerModel.clearLayer(state.doc, DATA.layer);
 	markDirty();
 	render();
@@ -272,11 +283,13 @@ function clearAll() {
 function save() {
 	if (state.os === null || state.saving) return;
 	state.saving = true;
+	state.saveRevision = state.revision;
 	post({ action: 'save', text: LayerModel.serialize(state.doc, DATA) });
 	render();
 }
 
 function closeEditor() {
+	if (state.saving) return;
 	if (state.dirty && !state.closeArmed) {
 		state.closeArmed = true;
 		state.status = _t('layer_editor.unsaved_close');
@@ -537,10 +550,13 @@ function renderMouse(current, recommended) {
 }
 
 function pickerRow(label, value, current, available, reason) {
-	var row = make('div', 'row' + (current ? ' current' : '') + (available ? '' : ' disabled'));
+	var row = make(
+		'div',
+		'row' + (current ? ' current' : '') + (available && !state.saving ? '' : ' disabled')
+	);
 	row.appendChild(make('span', 'row-tick', '✓'));
 	row.appendChild(make('span', 'row-label', label));
-	if (!available) {
+	if (!available || state.saving) {
 		row.title = reason || '';
 		return row;
 	}
@@ -618,6 +634,7 @@ function renderRepeat(panel, info) {
 	var apply = make('button', '', _t('layer_editor.repeat.apply'));
 	apply.type = 'button';
 	apply.id = 'repeat-apply';
+	apply.disabled = state.saving;
 	if (!available) {
 		input.disabled = true;
 		apply.disabled = true;
@@ -676,6 +693,7 @@ function renderKeystroke(panel, info) {
 	var apply = make('button', '', _t('layer_editor.keystroke.apply'));
 	apply.type = 'button';
 	apply.id = 'keystroke-apply';
+	apply.disabled = state.saving;
 	apply.addEventListener('click', function () {
 		var chosen = [];
 		if (primaryBox.checked) chosen.push('primary');
@@ -727,7 +745,7 @@ function renderPanel(current, recommended) {
 	var useRec = make('button', '', _t('layer_editor.use_recommended'));
 	useRec.type = 'button';
 	useRec.id = 'use-recommended';
-	useRec.disabled = info.value === info.recommended;
+	useRec.disabled = state.saving || info.value === info.recommended;
 	useRec.addEventListener('click', function () {
 		pick(info.recommended === undefined ? null : info.recommended);
 	});
@@ -754,7 +772,9 @@ function render() {
 	renderMouse(current, recommended);
 	renderPanel(current, recommended);
 	el('status').textContent = state.status;
-	el('btn-save').disabled = state.saving;
+	['btn-save', 'btn-clear', 'btn-restore', 'btn-close'].forEach(function (id) {
+		el(id).disabled = state.saving;
+	});
 }
 
 // ================================

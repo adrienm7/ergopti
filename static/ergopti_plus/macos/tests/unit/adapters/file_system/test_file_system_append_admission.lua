@@ -27,6 +27,9 @@ local function append_to(mode, on_error)
 			hs.fs.attributes = function(path)
 				if path ~= "/virtual/destination" then return nil end
 				if mode == nil then return nil, "No such file or directory" end
+				if mode == "metadata_denied" then return nil, "Permission denied" end
+				if mode == "metadata_unknown" then return nil end
+				if mode == "metadata_false" then return false end
 				return { mode = mode, size = 0 }
 			end
 			io.open = function()
@@ -48,6 +51,14 @@ end
 
 
 helpers.describe("FileSystem append admits only regular files (append-regular-file-2026-10-21)", function()
+	helpers.it("does not open when destination metadata cannot prove its type (append-unknown-metadata)", function()
+		for _, mode in ipairs({ "metadata_denied", "metadata_unknown", "metadata_false" }) do
+			local result, opens = append_to(mode)
+			helpers.assert_eq(result, false, mode .. " must be a refusal")
+			helpers.assert_eq(opens, 0, "an unknown type could be a blocking FIFO")
+		end
+	end)
+
 	for _, mode in ipairs({ "named pipe", "directory", "socket", "char device" }) do
 		helpers.it("refuses a " .. mode .. " destination without opening it", function()
 			local result, opens, errors = append_to(mode)

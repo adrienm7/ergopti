@@ -1,0 +1,1138 @@
+{
+	"scope": "Earlier fixes from this same macOS audit, reviewed after the explicit 100-defect request. Native macOS execution is not established.",
+	"count": 86,
+	"entries": [
+		{
+			"commit": "e0eeb4c",
+			"scenario": "An ambiguous selected input source was overridden by matching a previous build name when applying number-row options.",
+			"module": "static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_number_row_live.lua",
+			"case": "number-row-ambiguous",
+			"passed": 4,
+			"source_inventory": "core",
+			"verification": "Focused current module passed; prior failing scenario reviewed in fix.",
+			"id": 14
+		},
+		{
+			"commit": "8c40540",
+			"scenario": "A delayed tap-hold copy retry could target another field after focus or observed physical activity changed.",
+			"module": "static/ergopti_plus/macos/tests/unit/modules/keymap/test_tap_copy_watch.lua",
+			"case": "tap-copy-context",
+			"passed": 11,
+			"source_inventory": "core",
+			"verification": "Focused current module passed; prior failing scenario reviewed in fix.",
+			"id": 15
+		},
+		{
+			"commit": "99d2bc1",
+			"scenario": "A pending tap-hold copy retry survived pause and could run after resume.",
+			"module": "static/ergopti_plus/macos/tests/unit/modules/keymap/lifecycle/test_start_commit_transaction.lua",
+			"case": "tap-copy-pause",
+			"passed": 51,
+			"source_inventory": "core",
+			"verification": "Focused current module passed; prior failing scenario reviewed in fix.",
+			"id": 16
+		},
+		{
+			"commit": "ff410b1",
+			"scenario": "A failed read of pending keyboard-layout requests was treated as an empty record, allowing existing requests to be overwritten.",
+			"module": "static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_pending_layout_activation.lua",
+			"case": "pending-layout-read-failure",
+			"passed": 16,
+			"source_inventory": "core",
+			"verification": "Focused current module passed; prior failing scenario reviewed in fix.",
+			"id": 17
+		},
+		{
+			"commit": "f4ef16d",
+			"scenario": "A pending-layout write or delete that had not taken effect was acknowledged as successful without readback.",
+			"module": "static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_pending_layout_activation.lua",
+			"case": "pending-layout-write-receipt",
+			"passed": 16,
+			"source_inventory": "core",
+			"verification": "Focused current module passed; prior failing scenario reviewed in fix.",
+			"id": 18
+		},
+		{
+			"commit": "7bbcf6f",
+			"scenario": "Malformed pending-layout entries could be admitted or created, leaving an invalid durable record.",
+			"module": "static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_pending_layout_activation.lua",
+			"case": "pending-layout-malformed",
+			"passed": 16,
+			"source_inventory": "core",
+			"verification": "Focused current module passed; prior failing scenario reviewed in fix.",
+			"id": 19
+		},
+		{
+			"commit": "f347e37",
+			"scenario": "A refused terminator replay cancellation lost its exact cleanup owner.",
+			"module": "static/ergopti_plus/macos/tests/unit/modules/keymap/terminators/test_terminator_replay_gate.lua",
+			"case": "terminator-cancel-refusal",
+			"passed": 33,
+			"source_inventory": "core",
+			"verification": "Focused current module passed; prior failing scenario reviewed in fix.",
+			"id": 20
+		},
+		{
+			"commit": "9094a74",
+			"scenario": "Keyboard-layout installation accepted an existing system copy without verifying the user scope for another copy.",
+			"module": "static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_layout_install_transaction.lua",
+			"case": "checks the user scope before accepting an existing system copy",
+			"passed": 15,
+			"source_inventory": "core",
+			"verification": "Focused current module passed; prior failing scenario reviewed in fix.",
+			"id": 21
+		},
+		{
+			"commit": "adbbb72",
+			"scenario": "A script-control shortcut action could remain changed at runtime when preferences publication refused.",
+			"module": "static/ergopti_plus/macos/tests/unit/modules/shortcuts/script_control/test_script_control_action_registry.lua",
+			"case": "restores a plain action when preference publication refuses",
+			"passed": 26,
+			"source_inventory": "core",
+			"verification": "Focused current module passed; prior failing scenario reviewed in fix.",
+			"id": 22
+		},
+		{
+			"commit": "22bcddc",
+			"scenario": "An invalid gesture tab sensitivity restored another slot's default instead of its own default.",
+			"module": "static/ergopti_plus/macos/tests/unit/modules/gestures/config/test_sensitivity_wrongtype_failclosed.lua",
+			"case": "restores the slot-specific default for an invalid tab sensitivity",
+			"passed": 7,
+			"source_inventory": "core",
+			"verification": "Focused current module passed; prior failing scenario reviewed in fix.",
+			"id": 23
+		},
+		{
+			"commit": "7858088",
+			"scenario": "An empty selection delivered after cancellation could still start the Apple Shortcut action.",
+			"module": "static/ergopti_plus/macos/tests/unit/modules/gestures/actions/test_user_actions.lua",
+			"case": "ignores an empty selection delivered after the run was cancelled",
+			"passed": 88,
+			"source_inventory": "core",
+			"verification": "Focused current module passed; prior failing scenario reviewed in fix.",
+			"id": 24
+		},
+		{
+			"commit": "5faa4dc",
+			"scenario": "Pausing during a bounded shortcut read allowed shortcut output to be published after pause.",
+			"module": "static/ergopti_plus/macos/tests/unit/modules/gestures/actions/test_user_actions.lua",
+			"case": "does not publish shortcut output after pause during the bounded read",
+			"passed": 88,
+			"source_inventory": "core",
+			"verification": "Focused current module passed; prior failing scenario reviewed in fix.",
+			"id": 25
+		},
+		{
+			"commit": "c02d3f9",
+			"scenario": "A three-finger gesture slot was called free when only one of its two independent settings had been observed.",
+			"module": "static/ergopti_plus/macos/tests/unit/modules/gestures/config/test_system_gesture_conflicts.lua",
+			"case": "partially observed three-finger preference aliases",
+			"passed": 12,
+			"source_inventory": "core",
+			"verification": "Focused current module passed; prior failing scenario reviewed in fix.",
+			"id": 26
+		},
+		{
+			"commit": "dc65cbc",
+			"scenario": "A failed system gesture preference source could leave a slot classified free instead of unverified.",
+			"module": "static/ergopti_plus/macos/tests/unit/modules/gestures/config/test_conflict_probe_start.lua",
+			"case": "holds an apparently free slot when a preference source failed",
+			"passed": 7,
+			"source_inventory": "core",
+			"verification": "Focused current module passed; prior failing scenario reviewed in fix.",
+			"id": 27
+		},
+		{
+			"commit": "4856ec9",
+			"scenario": "A malformed stored modifier array could make LLM keyboard modifier menus fail to render.",
+			"module": "static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/settings/test_settings_transaction_fixed_controls.lua",
+			"case": "llm-modifier-array-invalid",
+			"passed": 17,
+			"source_inventory": "core",
+			"verification": "Focused current module passed; prior failing scenario reviewed in fix.",
+			"id": 28
+		},
+		{
+			"fix_commit": "52835c3",
+			"scenario": "Synchronous lease output probe receipt is discarded before publication.",
+			"source_path": "static/ergopti_plus/macos/platform/remap/lease_controller.lua",
+			"test_module": "tests.unit.platform.remap.lease_controller.test_acknowledged_commands",
+			"test_path": "static/ergopti_plus/macos/tests/unit/platform/remap/lease_controller/test_acknowledged_commands.lua",
+			"regression_slug": "lease-output-turn-inline",
+			"baseline_result": "52835c3 reproduced exit=1   FAIL (lease-output-turn-inline) settles an output turn delivered during probe start \u2014 test_acknowledged_commands.lua:308: the synchronous echo proves the worker silent:",
+			"integrated_result": "tests.unit.platform.remap.lease_controller.test_acknowledged_commands exit=0 Passed tests:  54, Failed tests:  0",
+			"commit": "52835c3",
+			"source_inventory": "runtime",
+			"id": 29
+		},
+		{
+			"fix_commit": "7c3fae2",
+			"scenario": "Partially activated wake watcher loses rollback ownership after start failure.",
+			"source_path": "static/ergopti_plus/macos/adapters/wake_watcher.lua",
+			"test_module": "tests.unit.adapters.runtime.test_wake_watcher_lifecycle",
+			"test_path": "static/ergopti_plus/macos/tests/unit/adapters/runtime/test_wake_watcher_lifecycle.lua",
+			"regression_slug": "wake-start-rollback",
+			"baseline_result": "7c3fae2 reproduced exit=1   FAIL retains partial activation until its exact rollback succeeds (wake-start-rollback) \u2014 test_wake_watcher_lifecycle.lua:72: a failed start must roll back the exact watcher:",
+			"integrated_result": "tests.unit.adapters.runtime.test_wake_watcher_lifecycle exit=0 Passed tests:  3, Failed tests:  0",
+			"commit": "7c3fae2",
+			"source_inventory": "runtime",
+			"id": 30
+		},
+		{
+			"fix_commit": "f85166a",
+			"scenario": "Sparse teardown list can skip an owner and commit finalization.",
+			"source_path": "static/ergopti_plus/macos/infra/teardown_transaction.lua",
+			"test_module": "tests.unit.infra.lifecycle.test_teardown_transaction",
+			"test_path": "static/ergopti_plus/macos/tests/unit/infra/lifecycle/test_teardown_transaction.lua",
+			"regression_slug": "teardown-sparse-steps",
+			"baseline_result": "f85166a reproduced exit=1   FAIL rejects sparse step lists before cleanup or finalization (teardown-sparse-steps) \u2014 test_teardown_transaction.lua:76: assert_eq:",
+			"integrated_result": "tests.unit.infra.lifecycle.test_teardown_transaction exit=0 Passed tests:  7, Failed tests:  0",
+			"commit": "f85166a",
+			"source_inventory": "runtime",
+			"id": 31
+		},
+		{
+			"fix_commit": "f051760",
+			"scenario": "Reentrant mutation replaces or removes already validated teardown capabilities.",
+			"source_path": "static/ergopti_plus/macos/infra/teardown_transaction.lua",
+			"test_module": "tests.unit.infra.lifecycle.test_teardown_transaction",
+			"test_path": "static/ergopti_plus/macos/tests/unit/infra/lifecycle/test_teardown_transaction.lua",
+			"regression_slug": "teardown-step-mutation",
+			"baseline_result": "f051760 reproduced exit=1   FAIL retains validated steps and finalizer across reentrant mutation (teardown-step-mutation) \u2014 test_teardown_transaction.lua:61: validation must retain the actual capabilities until their execution:",
+			"integrated_result": "tests.unit.infra.lifecycle.test_teardown_transaction exit=0 Passed tests:  7, Failed tests:  0",
+			"commit": "f051760",
+			"source_inventory": "runtime",
+			"id": 32
+		},
+		{
+			"fix_commit": "0d6195a",
+			"scenario": "Retired process watcher continues dispatch after reentrant restart.",
+			"source_path": "static/ergopti_plus/macos/adapters/process_lifecycle.lua",
+			"test_module": "tests.unit.adapters.processes.test_process_lifecycle_running_guard",
+			"test_path": "static/ergopti_plus/macos/tests/unit/adapters/processes/test_process_lifecycle_running_guard.lua",
+			"regression_slug": "process-event-reentry",
+			"baseline_result": "0d6195a reproduced exit=1   FAIL stops dispatching a retired event after subscriber restart (process-event-reentry) \u2014 test_process_lifecycle_running_guard.lua:215: onAppLaunch delivered a retired event:",
+			"integrated_result": "tests.unit.adapters.processes.test_process_lifecycle_running_guard exit=0 Passed tests:  11, Failed tests:  0",
+			"commit": "0d6195a",
+			"source_inventory": "runtime",
+			"id": 33
+		},
+		{
+			"fix_commit": "ada6c6c",
+			"scenario": "Subscriber registered during event receives the earlier event.",
+			"source_path": "static/ergopti_plus/macos/adapters/process_lifecycle.lua",
+			"test_module": "tests.unit.adapters.processes.test_process_lifecycle_running_guard",
+			"test_path": "static/ergopti_plus/macos/tests/unit/adapters/processes/test_process_lifecycle_running_guard.lua",
+			"regression_slug": "process-event-subscription",
+			"baseline_result": "ada6c6c reproduced exit=1   FAIL defers subscribers registered during dispatch to the next event (process-event-subscription) \u2014 test_process_lifecycle_running_guard.lua:182: onAppLaunch delivered an event predating subscription:",
+			"integrated_result": "tests.unit.adapters.processes.test_process_lifecycle_running_guard exit=0 Passed tests:  11, Failed tests:  0",
+			"commit": "ada6c6c",
+			"source_inventory": "runtime",
+			"id": 34
+		},
+		{
+			"fix_commit": "c076f59",
+			"scenario": "Invalid completion callback still permits task construction.",
+			"source_path": "static/ergopti_plus/macos/adapters/task_lifecycle.lua",
+			"test_module": "tests.unit.adapters.processes.test_task_lifecycle",
+			"test_path": "static/ergopti_plus/macos/tests/unit/adapters/processes/test_task_lifecycle.lua",
+			"regression_slug": "task-invalid-completion",
+			"baseline_result": "c076f59 reproduced exit=1   FAIL refuses an invalid completion callback before constructing a task (task-invalid-completion) \u2014 ...os/tests/unit/adapters/processes/test_task_lifecycle.lua:62: test_task_lifecycle.lua:58: a task without its completi",
+			"integrated_result": "tests.unit.adapters.processes.test_task_lifecycle exit=0 Passed tests:  8, Failed tests:  0",
+			"commit": "c076f59",
+			"source_inventory": "runtime",
+			"id": 35
+		},
+		{
+			"fix_commit": "5a62e30",
+			"scenario": "Echo probe child survives a refused stdin close after its echo.",
+			"source_path": "static/ergopti_plus/macos/adapters/task_output_turn.lua",
+			"test_module": "tests.unit.adapters.processes.test_task_output_turn",
+			"test_path": "static/ergopti_plus/macos/tests/unit/adapters/processes/test_task_output_turn.lua",
+			"regression_slug": "output-turn-close-refusal",
+			"baseline_result": "5a62e30 reproduced exit=1   FAIL terminates the echo child if closing its input fails (output-turn-close-refusal) \u2014 test_task_output_turn.lua:80: a refused close must not leave cat running \u2014 actual: false",
+			"integrated_result": "tests.unit.adapters.processes.test_task_output_turn exit=0 Passed tests:  6, Failed tests:  0",
+			"commit": "5a62e30",
+			"source_inventory": "runtime",
+			"id": 36
+		},
+		{
+			"fix_commit": "437b7dc",
+			"scenario": "Inline reload deadline starts another lease fence after native reload.",
+			"source_path": "static/ergopti_plus/macos/infra/termination_coordinator.lua",
+			"test_module": "tests.unit.infra.lifecycle.test_termination_coordinator",
+			"test_path": "static/ergopti_plus/macos/tests/unit/infra/lifecycle/test_termination_coordinator.lua",
+			"regression_slug": "reload-deadline-inline",
+			"baseline_result": "437b7dc reproduced exit=1   FAIL does not fence after an inline reload deadline has already fired (reload-deadline-inline) \u2014 test_termination_coordinator.lua:977: the expired transaction cannot request a lease:",
+			"integrated_result": "tests.unit.infra.lifecycle.test_termination_coordinator exit=0 Passed tests:  48, Failed tests:  0",
+			"commit": "437b7dc",
+			"source_inventory": "runtime",
+			"id": 37
+		},
+		{
+			"fix_commit": "c4edc07",
+			"scenario": "Refused reload deadline stop loses the exact cleanup handle.",
+			"source_path": "static/ergopti_plus/macos/infra/termination_coordinator.lua",
+			"test_module": "tests.unit.infra.lifecycle.test_termination_coordinator",
+			"test_path": "static/ergopti_plus/macos/tests/unit/infra/lifecycle/test_termination_coordinator.lua",
+			"regression_slug": "reload-deadline-cleanup",
+			"baseline_result": "c4edc07 reproduced exit=1   FAIL retains an inline deadline whose native stop refuses until retry (reload-deadline-cleanup) \u2014 test_termination_coordinator.lua:1002: assert_eq:",
+			"integrated_result": "tests.unit.infra.lifecycle.test_termination_coordinator exit=0 Passed tests:  48, Failed tests:  0",
+			"commit": "c4edc07",
+			"source_inventory": "runtime",
+			"id": 38
+		},
+		{
+			"fix_commit": "2ad2c88",
+			"scenario": "Invalid native wall-clock samples propagate and can crash monotonic fallback.",
+			"source_path": "static/ergopti_plus/macos/adapters/timer_scheduler.lua",
+			"test_module": "tests.unit.adapters.runtime.test_timer_scheduler_every",
+			"test_path": "static/ergopti_plus/macos/tests/unit/adapters/runtime/test_timer_scheduler_every.lua",
+			"regression_slug": "timer-invalid-wall-clock",
+			"baseline_result": "2ad2c88 reproduced exit=1   FAIL uses the fallback when a native wall-clock sample is invalid (timer-invalid-wall-clock) \u2014 /tmp/history-2ad2c88.lua:436: attempt to mul a 'string' with a 'number'",
+			"integrated_result": "tests.unit.adapters.runtime.test_timer_scheduler_every exit=0 Passed tests:  10, Failed tests:  0",
+			"commit": "2ad2c88",
+			"source_inventory": "runtime",
+			"id": 39
+		},
+		{
+			"fix_commit": "785de95",
+			"scenario": "Root directory is treated as double slash in watcher coverage and exclusions.",
+			"source_path": "static/ergopti_plus/macos/infra/file_watchers.lua",
+			"test_module": "tests.unit.infra.file_watchers.test_file_watchers",
+			"test_path": "static/ergopti_plus/macos/tests/unit/infra/file_watchers/test_file_watchers.lua",
+			"regression_slug": "file-watchers-root",
+			"baseline_result": "785de95 reproduced exit=1   FAIL covers personal_info.toml exactly once in the bundle-fallback topology (file-watchers-root) \u2014 test_file_watchers.lua:152: a root watcher already covers personal info:",
+			"integrated_result": "tests.unit.infra.file_watchers.test_file_watchers exit=0 Passed tests:  5, Failed tests:  0",
+			"commit": "785de95",
+			"source_inventory": "runtime",
+			"id": 40
+		},
+		{
+			"fix_commit": "a7c3eba",
+			"scenario": "Truthy non-watcher receipts incorrectly prove watcher activation or cleanup.",
+			"source_path": "static/ergopti_plus/macos/adapters/process_lifecycle.lua",
+			"test_module": "tests.unit.adapters.processes.test_process_lifecycle_running_guard",
+			"test_path": "static/ergopti_plus/macos/tests/unit/adapters/processes/test_process_lifecycle_running_guard.lua",
+			"regression_slug": "process-lifecycle-exact-receipt",
+			"baseline_result": "a7c3eba reproduced exit=1   FAIL requires the exact watcher and filter receipts (process-lifecycle-exact-receipt) \u2014 test_process_lifecycle_running_guard.lua:147: start_returns_true_once cannot prove activation:",
+			"integrated_result": "tests.unit.adapters.processes.test_process_lifecycle_running_guard exit=0 Passed tests:  11, Failed tests:  0",
+			"commit": "a7c3eba",
+			"source_inventory": "runtime",
+			"id": 41
+		},
+		{
+			"fix_commit": "5b30e07",
+			"scenario": "Accessibility boot resumes while an in-flight reset may still revoke trust.",
+			"source_path": "static/ergopti_plus/macos/infra/accessibility_wait.lua",
+			"test_module": "tests.unit.infra.lifecycle.test_accessibility_wait",
+			"test_path": "static/ergopti_plus/macos/tests/unit/infra/lifecycle/test_accessibility_wait.lua",
+			"regression_slug": "accessibility-reset-race",
+			"baseline_result": "5b30e07 reproduced exit=1   FAIL waits for the grant reset before resuming a trusted boot (accessibility-reset-race) \u2014 test_accessibility_wait.lua:106: an in-flight reset can still revoke this grant: expected nil, got 5",
+			"integrated_result": "tests.unit.infra.lifecycle.test_accessibility_wait exit=0 Passed tests:  9, Failed tests:  0",
+			"commit": "5b30e07",
+			"source_inventory": "runtime",
+			"id": 42
+		},
+		{
+			"fix_commit": "28a025a",
+			"scenario": "A refused but unsettled TCC process is reported as already stopped.",
+			"source_path": "static/ergopti_plus/macos/adapters/tcc_grant.lua",
+			"test_module": "tests.unit.adapters.system.test_screen_capture_adapter",
+			"test_path": "static/ergopti_plus/macos/tests/unit/adapters/system/test_screen_capture_adapter.lua",
+			"regression_slug": "tcc-reset-start-race",
+			"baseline_result": "28a025a reproduced exit=1   FAIL retains a refused but unsettled TCC launch until its exact exit (tcc-reset-start-race) \u2014 test_screen_capture_adapter.lua:151: assert_eq:",
+			"integrated_result": "tests.unit.adapters.system.test_screen_capture_adapter exit=0 Passed tests:  15, Failed tests:  0",
+			"commit": "28a025a",
+			"source_inventory": "runtime",
+			"id": 43
+		},
+		{
+			"commit": "3b191b1",
+			"scenario": "Apple Shortcut output was read without a memory bound.",
+			"modules": ["test_bounded_read.lua", "test_user_actions.lua"],
+			"verification": "5/5 et 88/88",
+			"source_inventory": "features",
+			"id": 44
+		},
+		{
+			"commit": "a730c96",
+			"scenario": "An Apple Shortcut process was admitted without a deadline after timer refusal.",
+			"modules": ["test_user_actions.lua"],
+			"verification": "88/88",
+			"source_inventory": "features",
+			"id": 45
+		},
+		{
+			"commit": "f5fccf1",
+			"scenario": "A synchronous Shortcut discovery refusal was notified twice.",
+			"modules": ["test_user_actions.lua"],
+			"verification": "88/88",
+			"source_inventory": "features",
+			"id": 46
+		},
+		{
+			"commit": "af1510b",
+			"scenario": "A copy timestamp preceding key release was incorrectly attributed to the action.",
+			"modules": ["test_tap_copy_watch.lua"],
+			"verification": "11/11",
+			"source_inventory": "features",
+			"id": 47
+		},
+		{
+			"commit": "2e2e4bd",
+			"scenario": "A picker closed despite refusal of the following parameter form.",
+			"modules": ["test_gesture_picker_parameter_transaction.lua"],
+			"verification": "23/23",
+			"source_inventory": "features",
+			"id": 48
+		},
+		{
+			"commit": "c64daa4",
+			"scenario": "A refused picker or parameter-form scheduling request was hidden.",
+			"modules": ["test_gesture_picker_parameter_transaction.lua"],
+			"verification": "23/23",
+			"source_inventory": "features",
+			"id": 49
+		},
+		{
+			"commit": "32432ac",
+			"scenario": "An exception while displaying a dialog interrupted App Cloner.",
+			"module": "tests/unit/ui/dialogs/test_app_cloner_python_offer.lua",
+			"result": {
+				"status": "passed",
+				"exit_code": 0,
+				"passed_tests": 6,
+				"failed_tests": 0,
+				"output_tail": null
+			},
+			"source_inventory": "ui",
+			"id": 50
+		},
+		{
+			"commit": "d609b63",
+			"scenario": "Script-action rollback overwrote a concurrent action.",
+			"module": "tests/unit/ui/menu/shortcuts/test_script_action_rollback_owner.lua",
+			"result": {
+				"status": "passed",
+				"exit_code": 0,
+				"passed_tests": 3,
+				"failed_tests": 0,
+				"output_tail": null
+			},
+			"source_inventory": "ui",
+			"id": 51
+		},
+		{
+			"commit": "1c5c561",
+			"scenario": "An invalid MLX repository identifier was admitted.",
+			"module": "tests/unit/ui/menu/menu_llm/download/test_repository_identifier_validation.lua",
+			"result": {
+				"status": "passed",
+				"exit_code": 0,
+				"passed_tests": 15,
+				"failed_tests": 0,
+				"output_tail": null
+			},
+			"source_inventory": "ui",
+			"id": 52
+		},
+		{
+			"commit": "51c67c5",
+			"scenario": "A failed canvas deletion lost its cleanup owner.",
+			"module": "tests/unit/ui/menu/gestures_and_apps/test_menu_apps_discovery_outcome.lua",
+			"result": {
+				"status": "passed",
+				"exit_code": 0,
+				"passed_tests": 53,
+				"failed_tests": 0,
+				"output_tail": null
+			},
+			"source_inventory": "ui",
+			"id": 53
+		},
+		{
+			"commit": "7342e1a",
+			"scenario": "Opening configuration files blocked menu execution.",
+			"module": "tests/unit/ui/menu/watchers/test_menu_watchers_awake_suppression.lua",
+			"result": {
+				"status": "passed",
+				"exit_code": 0,
+				"passed_tests": 16,
+				"failed_tests": 0,
+				"output_tail": null
+			},
+			"source_inventory": "ui",
+			"id": 54
+		},
+		{
+			"commit": "c6ad4be",
+			"scenario": "Opening keyboard settings blocked and hid refusal.",
+			"module": "tests/unit/ui/menu/keyboard_layout/test_menu_keyboard_layout_reaches_tray_submenu.lua",
+			"result": {
+				"status": "passed",
+				"exit_code": 0,
+				"passed_tests": 65,
+				"failed_tests": 0,
+				"output_tail": null
+			},
+			"source_inventory": "ui",
+			"id": 55
+		},
+		{
+			"commit": "128869e",
+			"scenario": "A refused model-browser scheduling request was hidden.",
+			"module": "tests/unit/ui/menu/menu_llm/activation/test_llm_menu_regressions.lua",
+			"result": {
+				"status": "passed",
+				"exit_code": 0,
+				"passed_tests": 13,
+				"failed_tests": 0,
+				"output_tail": null
+			},
+			"source_inventory": "ui",
+			"id": 56
+		},
+		{
+			"commit": "d5dfad2",
+			"scenario": "Failed start-at-login worker startup prevented retry.",
+			"module": "tests/unit/ui/menu/about/test_start_at_login.lua",
+			"result": {
+				"status": "passed",
+				"exit_code": 0,
+				"passed_tests": 9,
+				"failed_tests": 0,
+				"output_tail": null
+			},
+			"source_inventory": "ui",
+			"id": 57
+		},
+		{
+			"commit": "575715d",
+			"scenario": "A pending start-at-login click was lost when refresh or dialog failed.",
+			"module": "tests/unit/ui/menu/about/test_start_at_login.lua",
+			"result": {
+				"status": "passed",
+				"exit_code": 0,
+				"passed_tests": 9,
+				"failed_tests": 0,
+				"output_tail": null
+			},
+			"source_inventory": "ui",
+			"id": 58
+		},
+		{
+			"scenario": "Unknown or malformed shortcut modifiers were silently discarded, changing the resulting shortcut.",
+			"commits": ["08aa6f1", "2021304"],
+			"modules": [
+				"tests.unit.ui.menu.menu_llm.shortcuts.test_shortcut_prompt_settlement",
+				"tests.unit.ui.menu.menu_llm.shortcuts.test_shortcut_owner_transactions"
+			],
+			"count": 1,
+			"commit": "08aa6f1",
+			"source_inventory": "configuration",
+			"verification": "Current focused modules passed; details in module_results.",
+			"id": 59
+		},
+		{
+			"scenario": "A scalar shortcut snapshot was interpreted as an empty collection, removing all active bindings.",
+			"commits": ["01f3d33"],
+			"modules": ["tests.unit.ui.menu.menu_llm.shortcuts.test_shortcut_owner_transactions"],
+			"count": 1,
+			"commit": "01f3d33",
+			"source_inventory": "configuration",
+			"verification": "Current focused modules passed; details in module_results.",
+			"id": 60
+		},
+		{
+			"scenario": "A false configuration directory cleared the saved path instead of being refused.",
+			"commits": ["1b1d9e6"],
+			"modules": ["tests.unit.infra.config.test_config_paths_logs_dir"],
+			"count": 1,
+			"commit": "1b1d9e6",
+			"source_inventory": "configuration",
+			"verification": "Current focused modules passed; details in module_results.",
+			"id": 61
+		},
+		{
+			"scenario": "Configuration and log paths containing NUL were admitted.",
+			"commits": ["53e3269"],
+			"modules": ["tests.unit.infra.config.test_config_paths_logs_dir"],
+			"count": 1,
+			"commit": "53e3269",
+			"source_inventory": "configuration",
+			"verification": "Current focused modules passed; details in module_results.",
+			"id": 62
+		},
+		{
+			"scenario": "Pending keyboard layout intent was cleared before asynchronous selection completed.",
+			"commits": ["f56423e"],
+			"modules": ["tests.unit.modules.keymap.layout.test_pending_layout_activation"],
+			"count": 1,
+			"commit": "f56423e",
+			"source_inventory": "configuration",
+			"verification": "Current focused modules passed; details in module_results.",
+			"id": 63
+		},
+		{
+			"scenario": "A storage read failure could overwrite pending menu click handoff; a write failure omitted the lost-click notification.",
+			"commits": ["38b4e13"],
+			"modules": ["tests.unit.ui.menu.tray.test_menu_click_gate"],
+			"count": 1,
+			"commit": "38b4e13",
+			"source_inventory": "configuration",
+			"verification": "Current focused modules passed; details in module_results.",
+			"id": 64
+		},
+		{
+			"scenario": "Stale bundle discovery after nested plist/resources edits or same-second name replacement",
+			"fix_commits": ["6c93748", "631ee5e", "c859b88"],
+			"tests": [
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/ui/menu/keyboard_layout/test_layout_bundle_external_refresh.lua",
+					"case": "reflects an install, delete, and bundled-version addition on rebuild",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				},
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_layout_install_transaction.lua",
+					"case": "sees added and removed layouts without launching a directory scan",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				}
+			],
+			"source_inventory": "installation",
+			"inventory_id": "I01",
+			"id": 65
+		},
+		{
+			"scenario": "A failed Resources enumeration published a partial index",
+			"fix_commits": ["fcdd568", "1a184ff"],
+			"tests": [
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_layout_install_transaction.lua",
+					"case": "does not publish a partial native resource enumeration",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				}
+			],
+			"source_inventory": "installation",
+			"inventory_id": "I02",
+			"id": 66
+		},
+		{
+			"scenario": "A concurrent destination could consume a keyboard bundle backup during rollback",
+			"fix_commits": ["6b09c7f"],
+			"tests": [
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_layout_install_transaction.lua",
+					"case": "retains the backup when a concurrent bundle occupies rollback (layout-rollback-exclusive)",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				}
+			],
+			"source_inventory": "installation",
+			"inventory_id": "I03",
+			"id": 67
+		},
+		{
+			"scenario": "A failed install from the actual menu action was not reported",
+			"fix_commits": ["3f462f5"],
+			"tests": [
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/ui/menu/keyboard_layout/test_menu_keyboard_layout_reaches_tray_install_state.lua",
+					"case": "reports failed installs from the actual menu action (layout-install-visible-failure)",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				}
+			],
+			"source_inventory": "installation",
+			"inventory_id": "I04",
+			"id": 68
+		},
+		{
+			"scenario": "A failed ls with partial output was cached as a complete listing",
+			"fix_commits": ["2c0944e"],
+			"tests": [
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_layout_install_transaction.lua",
+					"case": "retries an incomplete listing without reusing its partial result",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				}
+			],
+			"source_inventory": "installation",
+			"inventory_id": "I05",
+			"id": 69
+		},
+		{
+			"scenario": "Installing a bundle deleted existing bundles in the other scope",
+			"fix_commits": ["0a015d9"],
+			"tests": [
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_layout_install_transaction.lua",
+					"case": "does not remove the other scope after the new user bundle commits",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				}
+			],
+			"source_inventory": "installation",
+			"inventory_id": "I06",
+			"id": 70
+		},
+		{
+			"scenario": "An unreadable other scope was treated as empty and allowed installation",
+			"fix_commits": ["b9227b7"],
+			"tests": [
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_layout_install_transaction.lua",
+					"case": "refuses an unreadable other scope before mutation (layout-other-scope-unverified)",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				}
+			],
+			"source_inventory": "installation",
+			"inventory_id": "I07",
+			"id": 71
+		},
+		{
+			"scenario": "An other-scope bundle created during installation did not revoke successful activation",
+			"fix_commits": ["ddf4a64"],
+			"tests": [
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_layout_install_transaction.lua",
+					"case": "preserves and reports an other-scope bundle that appears during installation",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				}
+			],
+			"source_inventory": "installation",
+			"inventory_id": "I08",
+			"id": 72
+		},
+		{
+			"scenario": "A manual release install deleted an existing .previous object",
+			"fix_commits": ["44483ad"],
+			"tests": [
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/modules/updater/test_release_installer.lua",
+					"case": "preserves a pre-existing backup and refuses before arming",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				}
+			],
+			"source_inventory": "installation",
+			"inventory_id": "I09",
+			"id": 73
+		},
+		{
+			"scenario": "Release staging attempts started in the same second reused the same directory",
+			"fix_commits": ["c792e21"],
+			"tests": [
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/modules/updater/test_release_installer.lua",
+					"case": "uses distinct stages for retries started in the same second",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				}
+			],
+			"source_inventory": "installation",
+			"inventory_id": "I10",
+			"id": 74
+		},
+		{
+			"scenario": "The Lua consumer accepted duplicate archive formats rejected by the producer",
+			"fix_commits": ["d36516a"],
+			"tests": [
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/modules/updater/test_release_installer.lua",
+					"case": "preserves other platform assets and requires declared format-key bindings",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				}
+			],
+			"source_inventory": "installation",
+			"inventory_id": "I11",
+			"id": 75
+		},
+		{
+			"scenario": "An infinite update interval raised rather than using the default",
+			"fix_commits": ["41b0fb8"],
+			"tests": [
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/modules/updater/test_update_auto_check.lua",
+					"case": "uses the default for an infinite saved interval",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				}
+			],
+			"source_inventory": "installation",
+			"inventory_id": "I12",
+			"id": 76
+		},
+		{
+			"scenario": "Malformed prerelease suffixes were ordered instead of refused",
+			"fix_commits": ["7795fc0", "d729577"],
+			"tests": [
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/modules/updater/test_release_installer.lua",
+					"case": "replays the shared version vectors, including malformed suffixes",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				}
+			],
+			"source_inventory": "installation",
+			"inventory_id": "I13",
+			"id": 77
+		},
+		{
+			"scenario": "A numeric prerelease identifier was compared lexically against a nonnumeric one",
+			"fix_commits": ["ab0e65f"],
+			"tests": [
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/modules/updater/test_release_installer.lua",
+					"case": "replays the shared version vectors, including malformed suffixes",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				}
+			],
+			"source_inventory": "installation",
+			"inventory_id": "I14",
+			"id": 78
+		},
+		{
+			"scenario": "Large numeric version components lost precision or overflowed",
+			"fix_commits": ["b498d8f", "5637992"],
+			"tests": [
+				{
+					"module": "static/ergopti_plus/macos/tests/unit/modules/updater/test_release_installer.lua",
+					"case": "replays the shared version vectors, including malformed suffixes",
+					"result": "passed with Lua 5.4 + luv on Linux at edf4888"
+				}
+			],
+			"source_inventory": "installation",
+			"inventory_id": "I15",
+			"id": 79
+		},
+		{
+			"commit": "2051852",
+			"scenario": "CoreGraphics mirroring configuration failure was reported as success.",
+			"module": "test_system_mouse_pause_ownership.lua",
+			"verification": "43/43",
+			"source_inventory": "features-extra",
+			"id": 80
+		},
+		{
+			"commit": "9e156b6",
+			"scenario": "Partial application-switcher initialization prevented a subsequent retry.",
+			"module": "test_switcher_initialization_retry.lua",
+			"verification": "1/1",
+			"source_inventory": "features-extra",
+			"id": 81
+		},
+		{
+			"commit": "d2ed664",
+			"scenario": "A refused bundled-app start lost a process whose state was still unknown.",
+			"module": "test_menu_apps_discovery_outcome.lua",
+			"verification": "53/53",
+			"source_inventory": "features-extra",
+			"id": 82
+		},
+		{
+			"commit": "c6c665d",
+			"scenario": "Rapid editor shortcut changes misclassified normal deferred cancellation as cleanup failure.",
+			"module": "test_magic_editor_refresh_during_proof.lua",
+			"verification": "2/2",
+			"source_inventory": "features-extra",
+			"id": 83
+		},
+		{
+			"commit": "c1d417f",
+			"scenario": "Window cycling could target the driver itself.",
+			"module": "test_app_switch_direct.lua",
+			"verification": "11/11",
+			"source_inventory": "features-extra",
+			"id": 84
+		},
+		{
+			"fix_commit": "c6f7196",
+			"scenario": "A truthy malformed emergency timer let exit proceed with no proven deadline.",
+			"source_path": "static/ergopti_plus/macos/infra/emergency_exit.lua",
+			"test_module": "tests.unit.infra.lifecycle.test_emergency_exit",
+			"test_path": "static/ergopti_plus/macos/tests/unit/infra/lifecycle/test_emergency_exit.lua",
+			"regression_test": "rejects a malformed deadline handle before starting the fence",
+			"baseline_exit_code": 1,
+			"baseline_failure": "FAIL rejects a malformed deadline handle before starting the fence (emergency-deadline-handle) \u2014 test_emergency_exit.lua:140: assert_eq:",
+			"current_exit_code": 0,
+			"current_summary": ["Passed tests:  8", "Failed tests:  0"],
+			"commit": "c6f7196",
+			"source_inventory": "runtime-extra",
+			"id": 85
+		},
+		{
+			"fix_commit": "af7e6f3",
+			"scenario": "Overlapping microphone toggles raced on stale input state.",
+			"source_path": "static/ergopti_plus/macos/modules/gestures/system_actions.lua",
+			"test_module": "tests.unit.modules.gestures.actions.test_system_actions",
+			"test_path": "static/ergopti_plus/macos/tests/unit/modules/gestures/actions/test_system_actions.lua",
+			"regression_test": "serializes microphone toggles until the previous result is known",
+			"baseline_exit_code": 1,
+			"baseline_failure": "FAIL serializes microphone toggles until the previous result is known \u2014 test_system_actions.lua:291: assert_eq:",
+			"current_exit_code": 0,
+			"current_summary": ["Passed tests:  23", "Failed tests:  0"],
+			"commit": "af7e6f3",
+			"source_inventory": "runtime-extra",
+			"id": 86
+		},
+		{
+			"commit": "512bff0",
+			"scenario": "A failed driver-update result dialog prevented the required reload.",
+			"module": "static/ergopti_plus/macos/tests/unit/ui/dialogs/test_virtual_hid_update.lua",
+			"production_file": "static/ergopti_plus/macos/ui/virtual_hid_update.lua",
+			"current": {
+				"exit_code": 0,
+				"passed": 4,
+				"failed": 0,
+				"failures": []
+			},
+			"baseline_overlay": {
+				"exit_code": 1,
+				"passed": 3,
+				"failed": 1,
+				"failures": [
+					"FAIL reloads after a successful install even if its result dialog fails \u2014 .../macos/tests/unit/ui/dialogs/test_virtual_hid_update.lua:97: result dialog unavailable",
+					"--- DETAILED FAILURES ---"
+				]
+			},
+			"source_inventory": "ui-extra",
+			"id": 87
+		},
+		{
+			"commit": "1a9d728",
+			"scenario": "Concurrent gesture-conflict notices opened duplicate dialogs for one group.",
+			"module": "static/ergopti_plus/macos/tests/unit/ui/editors/test_gesture_conflict_notice.lua",
+			"production_file": "static/ergopti_plus/macos/ui/gesture_conflict_notice.lua",
+			"current": {
+				"exit_code": 0,
+				"passed": 4,
+				"failed": 0,
+				"failures": []
+			},
+			"baseline_overlay": {
+				"exit_code": 1,
+				"passed": 0,
+				"failed": 4,
+				"failures": [
+					"FAIL honours the menu.gestures.open_settings button \u2014 test_gesture_conflict_notice.lua:49: duplicate requests share the pending dialog:",
+					"FAIL honours the gestures.system.dismiss button \u2014 test_gesture_conflict_notice.lua:49: duplicate requests share the pending dialog:",
+					"FAIL honours the close button \u2014 test_gesture_conflict_notice.lua:49: duplicate requests share the pending dialog:",
+					"FAIL honours the refused button \u2014 test_gesture_conflict_notice.lua:49: duplicate requests share the pending dialog:",
+					"--- DETAILED FAILURES ---"
+				]
+			},
+			"source_inventory": "ui-extra",
+			"id": 88
+		},
+		{
+			"commit": "941e53a",
+			"scenario": "A stale WPM icon was created after its owner stopped.",
+			"module": "static/ergopti_plus/macos/tests/unit/ui/wpm/test_wpm_menubar_reentrant_start.lua",
+			"production_file": "static/ergopti_plus/macos/ui/wpm/wpm_menubar.lua",
+			"current": {
+				"exit_code": 0,
+				"passed": 8,
+				"failed": 0,
+				"failures": []
+			},
+			"baseline_overlay": {
+				"exit_code": 1,
+				"passed": 6,
+				"failed": 2,
+				"failures": [
+					"FAIL retires a constructor that returns after stop and successor start \u2014 test_wpm_menubar_reentrant_start.lua:21: retired constructor's item is released \u2014 actual: false",
+					"FAIL retains a refused retired constructor cleanup for retry \u2014 test_wpm_menubar_reentrant_start.lua:36: cleanup refusal blocks a new item:",
+					"--- DETAILED FAILURES ---"
+				]
+			},
+			"source_inventory": "ui-extra",
+			"id": 89
+		},
+		{
+			"commit": "e52a1b3",
+			"scenario": "WPM metrics could start while pause state was unknown.",
+			"module": "static/ergopti_plus/macos/tests/unit/ui/menu/metrics_and_about/test_menu_metrics_wpm_lifecycle_transaction.lua",
+			"production_file": "static/ergopti_plus/macos/ui/menu/menu_metrics.lua",
+			"current": {
+				"exit_code": 0,
+				"passed": 13,
+				"failed": 0,
+				"failures": []
+			},
+			"baseline_overlay": {
+				"exit_code": 1,
+				"passed": 10,
+				"failed": 3,
+				"failures": [
+					"FAIL keeps WPM stopped when pause state is unavailable: nil \u2014 test_menu_metrics_wpm_lifecycle_transaction.lua:138: unknown pause state must not arm the widget:",
+					"FAIL keeps WPM stopped when pause state is unavailable: throw \u2014 ...nd_about/test_menu_metrics_wpm_lifecycle_transaction.lua:132: pause read failed",
+					"FAIL does not start saved WPM widgets during a failed pause read on menu build \u2014 ...nd_about/test_menu_metrics_wpm_lifecycle_transaction.lua:144: pause read failed",
+					"--- DETAILED FAILURES ---"
+				]
+			},
+			"source_inventory": "ui-extra",
+			"id": 90
+		},
+		{
+			"commit": "a52960c",
+			"scenario": "A concatenated hotstring group/section identity collided for different pairs, causing saved section choices to alias; migration now distinguishes ambiguous legacy entries.",
+			"module": "tests.unit.modules.keymap.registry.test_registry_mutation_transactions_exact_commitment",
+			"cases": [
+				"projects distinct canonical choices over one ambiguous legacy key (section-cache-identity)",
+				"migrates only unique historical identities from the complete inventory (section-cache-identity)"
+			],
+			"passed": 41,
+			"failed": 0,
+			"count": 1,
+			"source_inventory": "configuration-extra",
+			"id": 91
+		},
+		{
+			"commit": "5a52680",
+			"scenario": "An integral floating-point replay offset outside the host integer range passed validation and reached ledger replay.",
+			"module": "tests.unit.modules.keystats.storage.test_ledger_replay_state_bounds",
+			"cases": ["rejects an integral float outside the host integer range before replay"],
+			"passed": 1,
+			"failed": 0,
+			"count": 1,
+			"source_inventory": "configuration-extra",
+			"id": 92
+		},
+		{
+			"commit": "5a52680",
+			"scenario": "A stale or malformed prior menu-click handoff could be renewed or contaminate later clicks when writing a new handoff.",
+			"module": "tests.unit.ui.menu.tray.test_menu_click_gate",
+			"cases": [
+				"does not renew an expired hand-off when a later reload hands off a click",
+				"does not let a malformed earlier hand-off poison a new click"
+			],
+			"passed": 18,
+			"failed": 0,
+			"count": 1,
+			"deduplication": "Distinct from 38b4e13: this is validation of successfully read old records; 38b4e13 handles storage read/write failure.",
+			"source_inventory": "configuration-extra",
+			"id": 93
+		},
+		{
+			"commits": ["28bab06", "a8be18a"],
+			"scenario": "Configured CSS hexadecimal tooltip colors were inconsistently validated or interpreted, including shorthand colors.",
+			"modules": [
+				"tests.unit.modules.hotstrings.test_hotstrings_config_transaction",
+				"tests.unit.ui.tooltip.test_tooltip_tint_contract"
+			],
+			"passed": [17, 9],
+			"failed": 0,
+			"count": 1,
+			"deduplication": "Validation and rendering of CSS color forms grouped as one defect.",
+			"source_inventory": "configuration-extra",
+			"id": 94
+		},
+		{
+			"scenario": "The validated user-controlled launcher path could be replaced before a privileged system keyboard-layout install executed it. The fix refuses system installation until execution can be bound safely.",
+			"fix_commits": ["be4989b", "fc48089"],
+			"test_module": "static/ergopti_plus/macos/tests/unit/modules/keymap/layout/test_layout_install_transaction.lua",
+			"test_case": "refuses system installation before authorization (layout-system-unavailable)",
+			"result": "Focused module passed on Linux with Lua 5.4 and luv at edf4888; this verifies refusal, not native macOS privilege-boundary behavior.",
+			"inventory_id": "X01",
+			"id": 95,
+			"source_inventory": "installation-extra"
+		},
+		{
+			"fix_commit": "2c641b0",
+			"scenario": "Unknown power state enabled aggressive mains recovery pacing.",
+			"source_path": "static/ergopti_plus/macos/adapters/power_source.lua",
+			"test_module": "tests.unit.adapters.runtime.test_power_source",
+			"test_path": "static/ergopti_plus/macos/tests/unit/adapters/runtime/test_power_source.lua",
+			"regression_test": "paces for the battery unless native power is known to be mains",
+			"baseline_exit_code": 1,
+			"baseline_failure": "FAIL paces for the battery unless native power is known to be mains \u2014 test_power_source.lua:19: UPS Power:",
+			"current_exit_code": 0,
+			"current_summary": ["Passed tests:  1", "Failed tests:  0"],
+			"id": 96,
+			"source_inventory": "runtime-extra2"
+		},
+		{
+			"fix_commit": "aed2818",
+			"scenario": "A restarted editor bridge reused a caret from its previous session.",
+			"source_path": "static/ergopti_plus/macos/infra/vscode_bridge.lua",
+			"test_module": "tests.unit.infra.vscode_bridge.test_vscode_bridge_caret_ingest",
+			"test_path": "static/ergopti_plus/macos/tests/unit/infra/vscode_bridge/test_vscode_bridge_caret_ingest.lua",
+			"regression_test": "discards the last caret when the server is stopped and restarted",
+			"baseline_exit_code": 1,
+			"baseline_failure": "FAIL discards the last caret when the server is stopped and restarted \u2014 test_vscode_bridge_caret_ingest.lua:74: stopped sessions must not expose stale caret data: expected nil, got {line=7 _ts=1793803504 active=true character=4 visibleStartLine=2}",
+			"current_exit_code": 0,
+			"current_summary": ["Passed tests:  3", "Failed tests:  0"],
+			"id": 97,
+			"source_inventory": "runtime-extra2"
+		},
+		{
+			"fix_commit": "dce5e16",
+			"scenario": "Repeated conflict-probe cleanup retries accumulated duplicate settlement observers.",
+			"source_path": "static/ergopti_plus/macos/modules/gestures/conflicts.lua",
+			"test_module": "tests.unit.modules.gestures.config.test_conflict_probe_start",
+			"test_path": "static/ergopti_plus/macos/tests/unit/modules/gestures/config/test_conflict_probe_start.lua",
+			"regression_test": "retains a failed start until its exact process settles",
+			"baseline_exit_code": 1,
+			"baseline_failure": "FAIL retains a failed start until its exact process settles \u2014 test_conflict_probe_start.lua:80: retries must not accumulate settlement observers:",
+			"current_exit_code": 0,
+			"current_summary": ["Passed tests:  7", "Failed tests:  0"],
+			"id": 98,
+			"source_inventory": "runtime-extra2"
+		},
+		{
+			"commit": "4d8944e",
+			"scenario": "Menu badges are clipped or miscentered for different label lengths.",
+			"module": "static/ergopti_plus/macos/tests/unit/ui/menu/tray/test_canvas_badge_no_leak.lua",
+			"production_file": "static/ergopti_plus/macos/ui/menu/canvas_badge.lua",
+			"current": {
+				"exit_code": 0,
+				"passed": 52,
+				"failed": 0,
+				"failures": []
+			},
+			"baseline_overlay": {
+				"exit_code": 1,
+				"passed": 49,
+				"failed": 3,
+				"failures": [
+					"FAIL cleans up a canvas when native rendering raises \u2014 ...os/tests/unit/ui/menu/tray/test_canvas_badge_no_leak.lua:61: render failed",
+					"FAIL retries refused canvas cleanup before allocating another \u2014 ...os/tests/unit/ui/menu/tray/test_canvas_badge_no_leak.lua:72: delete failed",
+					"FAIL centers the whole badge for both short and long menu rows \u2014 test_canvas_badge_no_leak.lua:148: badge must not start outside its canvas \u2014 actual: false"
+				]
+			},
+			"id": 100,
+			"source_inventory": "ui-extra2"
+		}
+	],
+	"configuration_module_results": [
+		{
+			"module": "tests.unit.ui.menu.menu_llm.shortcuts.test_shortcut_owner_transactions",
+			"passed": 46,
+			"failed": 0
+		},
+		{
+			"module": "tests.unit.ui.menu.menu_llm.shortcuts.test_shortcut_prompt_settlement",
+			"passed": 16,
+			"failed": 0
+		},
+		{
+			"module": "tests.unit.infra.config.test_config_paths_logs_dir",
+			"passed": 11,
+			"failed": 0
+		},
+		{
+			"module": "tests.unit.modules.keymap.layout.test_pending_layout_activation",
+			"passed": 16,
+			"failed": 0
+		},
+		{
+			"module": "tests.unit.ui.menu.tray.test_menu_click_gate",
+			"passed": 18,
+			"failed": 0
+		},
+		{
+			"module": "tests.unit.infra.toml.test_toml_record_editor",
+			"passed": 8,
+			"failed": 0
+		}
+	],
+	"deduplication": "Repeated commit references, malformed modifier variants, copy context variants, temporary-allocation variants, and menu reason improvements are excluded from additional counts.",
+	"installation_validation": "Five focused macOS Lua modules were rerun on Linux at baseline and passed. Filesystem rename tests use a portable test port; native Swift/macOS and Windows executions were not established by this run.",
+	"pending_revalidation": [
+		"d609b63: protected callback can swallow regression assertions; external observation requested."
+	]
+}

@@ -436,7 +436,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local preference_checkpoint = nil
 	local llm_handler = nil
 	local base_delay_owner = nil
+	local chatgpt_url_owner = nil
 	local script_chords_owner = nil
+	local script_action_owner = nil
 	local apply_preference_scope
 	local apply_global_scope
 	-- Features whose runtime refused the saved value this session: their state
@@ -645,7 +647,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if type(secs) == "table" then
 				for _, sec in ipairs(secs) do
 					if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-						Storage.delete("hotstrings_section_" .. name .. "_" .. sec.name)
+						local keys = require("modules.keymap.section_keys")
+						keys.clear(Storage, name, sec.name)
 					end
 				end
 			end
@@ -753,6 +756,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		snapshot_view       = session_demotions.persisted_view,
 		read_only_reason    = function() return read_only_reason end,
 		restore_runtime     = function(snapshot)
+			if chatgpt_url_owner and chatgpt_url_owner.pending()
+				and chatgpt_url_owner.restore_runtime() ~= true then return false end
 			if base_delay_owner and base_delay_owner.pending()
 				and base_delay_owner.restore_runtime() ~= true then return false end
 			local rollback_modules = core_mods
@@ -761,9 +766,22 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				rollback_modules = script_chords_owner.rollback_modules(core_mods)
 				if type(rollback_modules) ~= "table" then return false end
 			end
+			if script_action_owner and script_action_owner.pending() then
+				if script_action_owner.restore_runtime() ~= true then return false end
+				rollback_modules = script_action_owner.rollback_modules(rollback_modules)
+				if type(rollback_modules) ~= "table" then return false end
+			end
+			if chatgpt_url_owner and chatgpt_url_owner.pending() then
+				rollback_modules = chatgpt_url_owner.rollback_modules(rollback_modules)
+				if type(rollback_modules) ~= "table" then return false end
+			end
 			if sync_state_to_modules(snapshot, false, true, rollback_modules) ~= true then return false end
+			if chatgpt_url_owner and chatgpt_url_owner.pending()
+				and chatgpt_url_owner.restore_runtime() ~= true then return false end
 			if script_chords_owner and script_chords_owner.pending()
 				and script_chords_owner.restore_runtime() ~= true then return false end
+			if script_action_owner and script_action_owner.pending()
+				and script_action_owner.restore_runtime() ~= true then return false end
 			if type(llm_handler) == "table"
 				and type(llm_handler.restore_preference_runtime) == "function" then
 				return llm_handler.restore_preference_runtime(snapshot) == true
@@ -822,8 +840,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				channel = channel_owner.get,
 				is_paused = function()
 					local shortcuts_mod = core_mods.shortcuts_mod
-					return type(shortcuts_mod) == "table" and type(shortcuts_mod.is_paused) == "function"
-						and shortcuts_mod.is_paused() == true
+					if type(shortcuts_mod) ~= "table" or type(shortcuts_mod.is_paused) ~= "function" then return nil end
+					return shortcuts_mod.is_paused()
 				end,
 				on_available = function(release)
 					local accepted = AutoCheck.announce(release)
@@ -847,6 +865,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				return type(apply_preference_scope) == "function" and apply_preference_scope(scope, mode) == true
 			end,
 			state          = state,
+			demotions      = session_demotions,
 			active_tasks   = M._active_tasks,
 			update_icon    = update_icon,
 			reset_menubar  = reset_menubar,
@@ -938,13 +957,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			open_init = function()
 				return DeferredWork.after(0, function()
 					_suppress_watcher_until_awake = TimerScheduler.awake_time() + 8
-					pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua"))
+					ShellRunner.open(base_dir .. "init.lua")
 				end, "menu.open_init")
 			end,
 			open_personal_toml = function()
 				return DeferredWork.after(0, function()
 					local personal_path = MenuPaths.get("PersonalTomlPath")
-					pcall(hs.execute, "open " .. text_utils.shell_quote(personal_path))
+					ShellRunner.open(personal_path)
 				end, "menu.open_personal_toml")
 			end,
 			add_hotstring = function()
@@ -978,7 +997,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			open_config = function()
 				return DeferredWork.after(0, function()
 					_suppress_watcher_until_awake = TimerScheduler.awake_time() + 8
-					pcall(hs.execute, "open " .. text_utils.shell_quote(MenuPaths.get("ConfigTomlPath")))
+					ShellRunner.open(MenuPaths.get("ConfigTomlPath"))
 				end, "menu.open_config")
 			end,
 			open_logs = function()
@@ -1021,13 +1040,18 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- The Debug log rows open through one owner, shared with the gesture
 	-- actions, with the asynchronous Launch Services opener: never a blocking
 	-- hs.execute on the run loop that also services the typing event tap.
-	local function open_async(target) return (ShellRunner.open(target)) end
+	local function open_async(target)
+		local ok, started = pcall(ShellRunner.open, target)
+		if not ok then Logger.error(LOG, "File opener raised: %s.", tostring(started)) end
+		return ok and started == true
+	end
 
 	local function open_path_via_menu(key)
 		local p = MenuPaths.get(key)
 		if type(p) == "string" and p ~= "" then
-			pcall(hs.execute, "open " .. text_utils.shell_quote(p))
+			return open_async(p)
 		end
+		return false
 	end
 
 	local actions = {
@@ -1139,14 +1163,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			local ok, m = pcall(require, "ui.metrics_apps")
 			if ok and type(m.show) == "function" then pcall(m.show) end
 		end,
-		open_script_source        = function() pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua")) end,
+		open_script_source        = function() return open_async(base_dir .. "init.lua") end,
 		open_personal_shortcuts   = function()
 			local ok, ps = pcall(require, "infra.personal_shortcuts")
 			if ok and type(ps.open) == "function" then pcall(ps.open) end
 		end,
-		open_personal_hotstrings  = function() open_path_via_menu("PersonalTomlPath") end,
-		open_personal_info        = function() open_path_via_menu("PersonalInfoTomlPath") end,
-		open_config               = function() open_path_via_menu("ConfigTomlPath") end,
+		open_personal_hotstrings  = function() return open_path_via_menu("PersonalTomlPath") end,
+		open_personal_info        = function() return open_path_via_menu("PersonalInfoTomlPath") end,
+		open_config               = function() return open_path_via_menu("ConfigTomlPath") end,
 		open_logs_folder          = function() return LogOpeners.open_logs_folder(open_async) end,
 		open_today_log            = function() return LogOpeners.open_today_log(open_async) end,
 		open_error_log            = function() return LogOpeners.open_today_errors(open_async) end,
@@ -1558,7 +1582,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		state = state, keymap = keymap, admission = run_global_exclusive,
 		paused = live_pause, save_prefs = transactional_save_prefs,
 	})
+	chatgpt_url_owner = require("ui.menu.chatgpt_url_transaction").new({
+		state = state, shortcuts = core_mods.shortcuts_mod, admission = run_global_exclusive,
+		paused = live_pause, save_prefs = transactional_save_prefs,
+	})
 	script_chords_owner = require("ui.menu.script_chords_transaction").new({
+		state = state, script_control = core_mods.shortcuts_mod, admission = run_global_exclusive,
+		paused = live_pause, save_prefs = transactional_save_prefs,
+	})
+	script_action_owner = require("ui.menu.script_action_transaction").new({
 		state = state, script_control = core_mods.shortcuts_mod, admission = run_global_exclusive,
 		paused = live_pause, save_prefs = transactional_save_prefs,
 	})
@@ -1573,6 +1605,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 	})
 	local ctx = {
+		is_paused = live_pause,
 		physical_shortcuts_scope = function() return preference_scope_owner("shortcuts") end,
 		physical_shortcuts_paused = live_pause,
 		commit_program_parameter = program_parameter_owner.apply,
@@ -1585,7 +1618,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		save_prefs               = save_prefs,
 		commit_preview           = preview_owner.toggle,
 		commit_base_delay        = base_delay_owner.set,
+		commit_chatgpt_url       = chatgpt_url_owner.set,
 		commit_script_chords     = script_chords_owner.toggle,
+		commit_script_action     = script_action_owner.assign,
 		notify_feature           = notify_feature,
 		do_reload                = do_reload,
 		applyTriggerChar         = applyTriggerChar,

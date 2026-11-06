@@ -68,7 +68,12 @@ function M.new()
 	--- @return boolean anchored False when the stamp was unusable or re-anchored.
 	function clock.capture(stamp, delivered)
 		if not is_finite(delivered) then error("frame clock: the delivery time must be a finite number") end
-		if not is_finite(stamp) then return delivered, false end
+		if not is_finite(stamp) then
+			-- A delivery-timed frame breaks the capture timeline. Re-anchor the
+			-- next stamped frame rather than letting it precede this one.
+			offset, last_stamp, last_time = nil, nil, delivered
+			return delivered, false
+		end
 		local anchored = true
 		local delay = delivered - stamp
 		if offset == nil or (last_stamp ~= nil and stamp < last_stamp) then

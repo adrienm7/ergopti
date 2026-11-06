@@ -41,6 +41,7 @@ local ShellRunner   = require("adapters.shell_runner")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
 local FileSystem    = require("adapters.file_system")
+local Clipboard     = require("adapters.clipboard")
 local OpenTarget    = require("open_target")
 
 local LOG = "shortcuts.actions.apps"
@@ -432,22 +433,21 @@ local function begin_copy_capture(scope)
 	-- clipboard snapshot to restore until readAllData returns.
 	local acquisition_generation = scope.generation
 	scope.acquisitions = scope.acquisitions + 1
-	local ok_read, prior_or_error = pcall(pasteboard.readAllData)
+	local ok_read, prior, captured, count = pcall(Clipboard.save)
 	scope.acquisitions = scope.acquisitions - 1
-	if not ok_read or type(prior_or_error) ~= "table" then
-		Logger.error(LOG, "copy_or_open_path: clipboard snapshot failed — %s.",
-			tostring(prior_or_error))
+	if not ok_read or captured ~= true then
+		Logger.error(LOG, "copy_or_open_path: clipboard snapshot failed.")
 		return nil, nil
 	end
 	if not apps_generation_authorized(scope, acquisition_generation) then
 		return nil, nil
 	end
-	_copy_saved_prior = prior_or_error
+	_copy_saved_prior = prior or {}
 	_copy_capture_in_flight = true
 	_copy_capture_scope = scope
 	_copy_capture_generation = _copy_capture_generation + 1
 	_copy_capture_apps_generation = acquisition_generation
-	return _copy_saved_prior, _copy_capture_generation, acquisition_generation
+	return _copy_saved_prior, _copy_capture_generation, acquisition_generation, count
 end
 
 local function stop_copy_timer(handle)
@@ -833,7 +833,7 @@ end
 --- @param parent string|nil Stable action parent.
 function M.open_chatgpt(url, parent)
 	if not apps_admission_open(apps_scope(parent)) then return false end
-	Logger.debug(LOG, "Opening ChatGPT URL: %s.", url)
+	Logger.debug(LOG, "Opening configured ChatGPT URL.")
 	local ok, opened = pcall(urlevent.openURL, url)
 	return ok and opened ~= false
 end
@@ -869,8 +869,13 @@ function M.copy_or_open_path(parent)
 		-- path", reported in the success notification, and the selection fallback
 		-- below became unreachable. The sibling branch already clears for exactly
 		-- this reason; this one did not.
-		local prior, capture_generation, capture_apps_generation = begin_copy_capture(scope)
+		local prior, capture_generation, capture_apps_generation, captured_count = begin_copy_capture(scope)
 		if capture_generation == nil then return false end
+		if Clipboard._change_count() ~= captured_count
+			or not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
+			release_copy_capture(capture_generation)
+			return false
+		end
 		local ok_clear, clear_error = pcall(pasteboard.clearContents)
 		if not ok_clear then
 			abort_copy_capture(prior, capture_generation, "clipboard clear failed", clear_error)
@@ -935,8 +940,13 @@ function M.copy_or_open_path(parent)
 	end
 
 	-- Outside a file manager: copy selection and open or search
-	local prior, capture_generation, capture_apps_generation = begin_copy_capture(scope)
+	local prior, capture_generation, capture_apps_generation, captured_count = begin_copy_capture(scope)
 	if capture_generation == nil then return false end
+	if Clipboard._change_count() ~= captured_count
+		or not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
+		release_copy_capture(capture_generation)
+		return false
+	end
 	local ok_clear, clear_error = pcall(pasteboard.clearContents)
 	if not ok_clear then
 		abort_copy_capture(prior, capture_generation, "clipboard clear failed", clear_error)

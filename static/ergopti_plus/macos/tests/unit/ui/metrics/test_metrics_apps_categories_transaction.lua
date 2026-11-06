@@ -46,6 +46,7 @@ local function with_category_store_owned(spec, callback)
 	local original_open = io.open
 	local state = {
 		target = spec.initial or INITIAL_JSON,
+		config_dir = CONFIG_DIR,
 		exists = spec.initial_status ~= "absent",
 		read_calls = 0,
 		writes = 0,
@@ -117,6 +118,7 @@ local function with_category_store_owned(spec, callback)
 	}
 	package.loaded["infra.dialog_util"] = {
 		text_prompt = function(_title, _prompt, _prior, confirm, _cancel)
+			if spec.during_prompt then spec.during_prompt(state) end
 			return confirm, spec.score_input or "1"
 		end,
 		alert = noop,
@@ -127,7 +129,7 @@ local function with_category_store_owned(spec, callback)
 			"infra.config_paths" }) do
 		previous_modules[name] = { value = package.loaded[name] }
 	end
-	package.loaded["infra.config_paths"] = { get_config_dir = function() return CONFIG_DIR end }
+	package.loaded["infra.config_paths"] = { get_config_dir = function() return state.config_dir end }
 	package.loaded["hs.fs"] = { dir = function() return function() end, {} end }
 	package.loaded["adapters.timer_scheduler"] = {
 		after = function() return { timer = {} }, true end,
@@ -217,6 +219,35 @@ end
 -- ======= 1/ Read Ownership Is Fail-Closed =======
 -- ================================================
 -- ================================================
+
+helpers.describe("metrics_apps categories: concurrent edit", function()
+	helpers.it("preserves a category changed while the score prompt is open", function()
+		local changed = '{"Example":{"score":2,"type":"Concurrent"}}'
+		with_category_store({ during_prompt = function(state) state.target = changed end }, function(metrics, state, callbacks)
+			attempt_edit(metrics, callbacks)
+			helpers.assert_eq(state.target, changed)
+		end)
+	end)
+	helpers.it("refuses a configuration folder change during confirmation", function()
+		with_category_store({ during_prompt = function(state) state.config_dir = "/virtual/other/" end },
+			function(metrics, state, callbacks)
+				attempt_edit(metrics, callbacks)
+				helpers.assert_eq(state.target, INITIAL_JSON)
+				helpers.assert_eq(state.writes, 0)
+			end)
+	end)
+
+	helpers.it("preserves a category changed while the rename prompt is open", function()
+		local changed = '{"Example":{"score":2,"type":"Concurrent"}}'
+		with_category_store({ during_prompt = function(state) state.target = changed end }, function(metrics, state, callbacks)
+			metrics.prompt_category("Example", "Old", 0)
+			callbacks[1]({ _kind = "rename" })
+			callbacks[2]({ text = "Old" })
+			helpers.assert_eq(state.target, changed)
+		end)
+	end)
+
+end)
 
 helpers.describe("metrics_apps categories: unsafe input is never treated as empty", function()
 	for _, case in ipairs({

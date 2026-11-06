@@ -113,6 +113,13 @@
 			"detail": "HTTP 429: the GitHub API rate limit is exhausted"
 		},
 		{
+			"id": "out-of-range-reset-is-no-time",
+			"status": 403,
+			"remaining": "0",
+			"reset": "999999999999999999999999999999999999",
+			"detail": "HTTP 403: the GitHub API rate limit is exhausted"
+		},
+		{
 			"id": "malformed-reset-is-no-time",
 			"status": 403,
 			"remaining": "0",

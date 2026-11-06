@@ -28,6 +28,22 @@ local function read_all(path)
 end
 
 helpers.describe("boot journal (boot-stage-trail)", function()
+	helpers.it("describes the root path without erasing it (boot-journal-root)", function()
+		local original_fs = hs.fs
+		local seen = {}
+		hs.fs = { symlinkAttributes = function(path)
+			seen[#seen + 1] = path
+			return path == "/" and { mode = "directory" } or nil
+		end }
+		local ok, err = pcall(function()
+			helpers.assert_eq(BootJournal.describe_path("/"), "directory")
+			helpers.assert_eq(BootJournal.describe_path("///"), "directory")
+			helpers.assert_eq(seen, { "/", "/" })
+		end)
+		hs.fs = original_fs
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("writes early stages to the fallback log and launcher.log as closed files", function()
 		local stamp = tostring(os.time()) .. "_" .. tostring(math.random(1, 1e9))
 		local fallback = SCRATCH .. "_boot_" .. stamp .. ".log"

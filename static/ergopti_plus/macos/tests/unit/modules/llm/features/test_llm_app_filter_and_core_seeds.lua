@@ -84,6 +84,49 @@ helpers.describe("llm.app_filter — is_blocked empty-name guard", function()
 			"is_blocked must still return true for an app whose name matches the exclusion")
 	end)
 
+	helpers.it("blocks a Unicode case variant of a name-only excluded application", function()
+		local AF = load_filter(false)
+		set_front(make_named_front("Éditeur"))
+		local result = AF.is_blocked({ is_url_bar_focused = false }, { { name = "éditeur" } }, false, false)
+		helpers.assert_eq(result, true, "the excluded application must not receive predictions")
+	end)
+
+	helpers.it("blocks a plain string application exclusion", function()
+		local AF = load_filter(false)
+		set_front(make_named_front("SecretEditor"))
+		local result = AF.is_blocked({ is_url_bar_focused = false }, { "SecretEditor" }, false, false)
+		helpers.assert_eq(result, true, "the stored application name must suppress predictions")
+	end)
+
+	helpers.it("uses exact string bundle and path identities without substring aliases", function()
+		local AF = load_filter(false)
+		set_front(make_named_front("SecretEditor"))
+		local state = { is_url_bar_focused = false }
+		helpers.assert_eq(AF.is_blocked(state, { "COM.TEST.SECRETEDITOR" }, false, false), true)
+		helpers.assert_eq(AF.is_blocked(state, { "/Applications/SecretEditor.app" }, false, false), true)
+		helpers.assert_eq(AF.is_blocked(state, { "other.vendor.SecretEditor" }, false, false), false)
+	end)
+
+	helpers.it("fails closed when a stored path cannot be compared", function()
+		local AF = load_filter(false)
+		local app = make_named_front("SecretEditor")
+		app.path = function() return nil end
+		set_front(app)
+		local result = AF.is_blocked({ is_url_bar_focused = false }, {
+			"/Applications/Other.app",
+		}, false, false)
+		helpers.assert_eq(result, true)
+	end)
+
+	helpers.it("preserves a structured entry's path priority over matching names", function()
+		local AF = load_filter(false)
+		set_front(make_named_front("SecretEditor"))
+		local result = AF.is_blocked({ is_url_bar_focused = false }, {
+			{ name = "SecretEditor", appPath = "/Applications/Other.app", bundleID = "com.test.SecretEditor" },
+		}, false, false)
+		helpers.assert_eq(result, false)
+	end)
+
 	helpers.it("does NOT block a non-matching named app", function()
 		local AF = load_filter(false)
 		set_front(make_named_front("Terminal"))

@@ -75,4 +75,44 @@ helpers.describe("number row live on macOS: the layout the options apply to (num
 		helpers.assert_eq(answer[2], Live.REASON_NO_SOURCE)
 		helpers.assert_eq(#mac.calls, 0, "a choice with no source must not touch the input sources")
 	end)
+
+	helpers.it("does not guess the active source when the registry reports ambiguity (number-row-ambiguous)", function()
+		local replacements = 0
+		local deps = {
+			registry = {
+				snapshot = function() return { active = "", active_error = "ambiguous_input_source",
+					installed = { ergol = { keyboard_name = "Ergo-L" } } } end,
+				read_local_copy = function() return ERGOL end,
+			},
+			build = { current = function() return { name = "Ergo-L 1", source_id = "ergol" } end,
+				replace = function() replacements = replacements + 1 end },
+			build_deps = {},
+			active_sources = function() return { { name = "Ergo-L 1", selected = true } } end,
+		}
+		local answer
+		helpers.assert_eq(Live.apply({ order = "symbols", edges = false }, function(...) answer = { ... } end, deps), false)
+		helpers.assert_eq(answer[1], false)
+		helpers.assert_eq(answer[2], "source_unreadable")
+		helpers.assert_eq(answer[3], "ambiguous_input_source")
+		helpers.assert_eq(replacements, 0, "ambiguous source must not be replaced")
+	end)
+
+	helpers.it("reports an unreadable selected layout without starting a replacement (number-row-unreadable)", function()
+		local replacements = 0
+		local deps = {
+			registry = {
+				snapshot = function() return { active = "ergol", installed = { ergol = { keyboard_name = "Ergo-L" } } } end,
+				read_local_copy = function() return nil, "read refused" end,
+			},
+			build = { replace = function() replacements = replacements + 1 end },
+			build_deps = {},
+			active_sources = function() return {} end,
+		}
+		local answer
+		helpers.assert_eq(Live.apply({ order = "symbols", edges = false }, function(...) answer = { ... } end, deps), false)
+		helpers.assert_eq(answer[1], false)
+		helpers.assert_eq(answer[2], "source_unreadable")
+		helpers.assert_eq(answer[3], "read refused")
+		helpers.assert_eq(replacements, 0)
+	end)
 end)

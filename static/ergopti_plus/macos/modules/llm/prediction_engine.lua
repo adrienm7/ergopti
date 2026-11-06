@@ -268,6 +268,7 @@ local llm_display_name        = core_llm.get_current_model()  -- Human-readable 
 local llm_backend_label       = nil                           -- "Ollama 🦙", "MLX 🚀", or a custom label
 local _model_transition_generation = 0
 local temperature             = LLM_DEFAULTS.llm_temperature
+local LlmContextLimit = require("infra.llm_context_limit")
 local context_window_chars    = LLM_DEFAULTS.llm_context_length
 local min_words               = tonumber(Storage.get("llm_min_words")) or LLM_DEFAULTS.llm_min_words
 local max_words               = tonumber(Storage.get("llm_max_words")) or LLM_DEFAULTS.llm_max_words
@@ -853,12 +854,14 @@ function M.set_llm_backend_name(label)
 end
 
 function M.set_llm_context_length(l)
-	-- Same coercion contract as set_llm_min_words below: this value reaches
-	-- `context_window_chars > 0` in the shared prompt_builder, which throws on a
-	-- string. config.toml / a half-written plist can deliver one, and neither
-	-- preferences.lua nor menu_state.lua coerces on the way in.
-	context_window_chars = tonumber(l) or LLM_DEFAULTS.llm_context_length
+	if not LlmContextLimit.valid(l) then
+		Logger.error(LOG, "LLM context length refused: expected a finite value no greater than %d.",
+			LlmContextLimit.MAX_CHARS)
+		return false
+	end
+	context_window_chars = tonumber(l)
 	Logger.debug(LOG, "Context window: %s chars.", tostring(context_window_chars))
+	return true
 end
 
 function M.set_llm_temperature(t)

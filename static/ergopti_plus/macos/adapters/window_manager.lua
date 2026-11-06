@@ -41,6 +41,8 @@ end
 --- The native Lua focus method returns self even when application() is nil.
 local function focus_attached_window(win, minimized)
 	if win:application() == nil then return false end
+	-- Inventory can be stale by the time the user selects a window.
+	if type(win.isMinimized) == "function" then minimized = win:isMinimized() == true end
 	if minimized then win:unminimize() end
 	local focused = win:focus()
 	return focused ~= nil and focused ~= false and win:application() ~= nil
@@ -87,7 +89,7 @@ end
 --- @return boolean
 function M.exists(spec)
 	local ok, result = pcall(function()
-		if type(spec) ~= "string" then return false end
+		if type(spec) ~= "string" or spec == "" then return false end
 		local app = running_app(spec)
 		if app then return true end
 		local wins = hs.window and hs.window.allWindows and hs.window.allWindows() or {}
@@ -114,7 +116,8 @@ function M.kill(spec)
 		if type(spec) ~= "string" then return false end
 		local app = running_app(spec)
 		if not app then return false end
-		app:kill()
+		-- The port promises forceful termination; kill() only asks the app to quit.
+		app:kill9()
 		return true
 	end)
 	if not ok then
@@ -128,7 +131,7 @@ end
 --- @return table Array of window ID integers (may be empty).
 function M.getList()
 	local ok, result = pcall(function()
-		local wins = hs.window and hs.window.allWindows and hs.window.allWindows() or {}
+		local wins = hs.window and hs.window.visibleWindows and hs.window.visibleWindows() or {}
 		local ids = {}
 		for _, w in ipairs(wins) do
 			local ok_id, id = pcall(function() return w:id() end)

@@ -170,6 +170,11 @@ helpers.describe("real script-action catalogue projection", function()
 			local context = { gestures = gesture_exports, shortcuts = {}, script_control = control, state = state,
 				save_prefs = function() saves = saves + 1; return true end,
 				updateMenu = function() updates = updates + 1 end }
+			context.commit_script_action = function(slot, action)
+				control.set_shortcut_action(slot, action)
+				state.script_control_shortcuts[slot] = action
+				return context.save_prefs()
+			end
 			package.loaded["ui.menu.menu_shortcuts"] = nil
 			local owner = require("ui.menu.menu_shortcuts")
 			for _, paused in ipairs({ false, true }) do

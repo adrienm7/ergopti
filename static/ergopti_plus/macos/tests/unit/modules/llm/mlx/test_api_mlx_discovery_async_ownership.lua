@@ -216,6 +216,24 @@ end
 
 
 helpers.describe("MLX discovery async ownership", function()
+	helpers.it("does not deliver old queued callbacks after a model reset during fan-out", function()
+		with_env({ start_outcomes = { "false" } }, function(env)
+			local first, stale, fresh = 0, 0, 0
+			assert(env.discovery.discover(function()
+				first = first + 1
+				env.discovery.reset()
+				env.discovery.discover(function() fresh = fresh + 1 end)
+			end))
+			assert(env.discovery.discover(function() stale = stale + 1 end))
+			local fired, err = env.fire_next_timer()
+			helpers.assert_true(fired, tostring(err))
+			helpers.assert_eq(first, 1)
+			helpers.assert_eq(stale, 0, "a reset must fence old-model waiters")
+			helpers.assert_true(env.fire_next_timer())
+			helpers.assert_true(env.complete_task(#env.tasks, 0, "{}"))
+			helpers.assert_eq(fresh, 1, "the replacement model's waiter must still run")
+		end)
+	end)
 	-- issue #104: disabling the AI after a failed MLX bootstrap logged three
 	-- ERRORs because a SIGTERM awaiting its native exit read as a refused stop.
 	helpers.it("reports a pending poll exit apart from a refusal (mlx-discovery-pending-stop)", function()

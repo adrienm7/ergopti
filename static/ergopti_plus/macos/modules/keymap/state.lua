@@ -21,7 +21,7 @@
 ---    change, but the invariant lives here with the state definition.
 --- ==============================================================================
 
-local hs = hs
+local TimerScheduler = require("adapters.timer_scheduler")
 local M  = {}
 
 
@@ -180,8 +180,7 @@ function M.new(defaults, delays_default)
 	-- buffer (used after an expansion) while suppress_rescan_keep_buffer
 	-- leaves it intact (used for sequential hotstring chains).
 	s.prepare_suppress_rescan = function(duration)
-		local epoch_fn = hs and hs.timer and hs.timer.secondsSinceEpoch or os.time
-		return epoch_fn() + (tonumber(duration) or DEFAULT_SUPPRESS_SEC)
+		return TimerScheduler.hotstring_time() + (tonumber(duration) or DEFAULT_SUPPRESS_SEC)
 	end
 
 	-- Memory-only commit half used after replacement buffer mutation. Keeping the
@@ -191,7 +190,7 @@ function M.new(defaults, delays_default)
 		s.no_rescan_until = deadline
 		s.no_rescan_keeps_buffer = false
 		s.buffer = ""
-		s.llm_buffer = ""
+		if s.llm_context_text == nil then s.llm_buffer = "" end
 		s.llm_private_mark = ""
 		-- Post-expansion: the replacement just landed on screen. Treat the
 		-- new cursor position as abutting a word boundary so the next typed
@@ -275,8 +274,7 @@ function M.new(defaults, delays_default)
 	-- Returns true once committed: the LLM chain arms its fallback only after
 	-- this commit (prediction_engine), and a missing value read as a refusal.
 	s.suppress_rescan_keep_buffer = function(duration)
-		local epoch_fn = hs and hs.timer and hs.timer.secondsSinceEpoch or os.time
-		s.no_rescan_until = epoch_fn() + (tonumber(duration) or DEFAULT_SUPPRESS_KEEP_SEC)
+		s.no_rescan_until = TimerScheduler.hotstring_time() + (tonumber(duration) or DEFAULT_SUPPRESS_KEEP_SEC)
 		s.no_rescan_keeps_buffer = true
 		return true
 	end

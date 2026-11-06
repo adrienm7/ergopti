@@ -231,16 +231,31 @@ end
 --- @param text string
 --- @return boolean
 local function valid_ipv6(text)
+	if text == "::" then return true end
+	-- A dotted IPv4 tail occupies exactly two of the eight IPv6 groups.
+	if text:find(".", 1, true) then
+		local prefix, a, b, c, d = text:match("^(.*:)(%d+)%.(%d+)%.(%d+)%.(%d+)$")
+		if not prefix then return false end
+		for _, octet in ipairs({ a, b, c, d }) do
+			if #octet > 3 or (#octet > 1 and octet:sub(1, 1) == "0")
+				or tonumber(octet) > 255 then return false end
+		end
+		text = prefix .. "0:0"
+	end
 	if not text:find("^[%x:]+$") or not text:find("%x") then return false end
 	local colons = count(text, ":")
 	local compressed = count(text, "::")
-	if colons < 2 or colons > 7 or compressed > 1 or text:find(":::", 1, true) then return false end
+	if colons < 2 or colons > 8 or compressed > 1 or text:find(":::", 1, true) then return false end
 	if compressed == 0 and colons ~= 7 then return false end
 	if (starts_with(text, ":") and not starts_with(text, "::"))
 		or (ends_with(text, ":") and not ends_with(text, "::")) then return false end
+	local groups = 0
 	for group in text:gmatch("[^:]+") do
 		if #group > 4 then return false end
+		groups = groups + 1
 	end
+	-- A compressed address must replace at least one of the eight groups.
+	if compressed == 1 and groups >= 8 then return false end
 	return true
 end
 
@@ -391,7 +406,7 @@ local function address(text)
 	if text:find("%s") then return nil end
 	local mailbox, mail_domain = text:match("^([%w._%%+-]+)@([%w.-]+)$")
 	if mailbox and domain_tld(mail_domain) then return result("url", "mailto:" .. text) end
-	local inner, bracket_tail = text:match("^%[([%x:]+)%](.*)$")
+	local inner, bracket_tail = text:match("^%[([%x:.]+)%](.*)$")
 	if inner and valid_ipv6(inner) and valid_tail(bracket_tail) then
 		return result("url", "http://" .. text)
 	end

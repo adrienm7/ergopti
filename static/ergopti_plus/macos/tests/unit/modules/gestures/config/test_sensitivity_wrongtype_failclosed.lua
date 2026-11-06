@@ -44,6 +44,31 @@ helpers.describe("gesture sensitivity fails closed to DEFAULT_SENSITIVITY on a w
 		helpers.assert_eq(Gestures.get_sensitivity("swipe_2_left"), Gestures.DEFAULT_SENSITIVITY)
 	end)
 
+	helpers.it("rejects non-finite and extreme values before the gesture tap uses them", function()
+		local geometry = require("modules.gestures.geometry")
+		for _, value in ipairs({ 0 / 0, math.huge, -math.huge, 1e-300, 1e300, 0.99, 60.01 }) do
+			helpers.assert_eq(Gestures.set_sensitivity("swipe_2_left", value), true)
+			local sensitivity = Gestures.get_sensitivity("swipe_2_left")
+			helpers.assert_eq(sensitivity, Gestures.DEFAULT_SENSITIVITY)
+			helpers.assert_true(geometry.incrementalSteps(45, sensitivity) <= 45,
+				"a normal swipe must not request an unbounded action loop")
+		end
+		for _, value in ipairs({ 1, 1.25, 60 }) do
+			Gestures.set_sensitivity("swipe_2_left", value)
+			helpers.assert_eq(Gestures.get_sensitivity("swipe_2_left"), value)
+		end
+	end)
+
+	helpers.it("restores the slot-specific default for an invalid tab sensitivity", function()
+		local Manifest = require("infra.manifest_reader")
+		for _, slot in ipairs({ "swipe_3_up", "swipe_3_down" }) do
+			local expected = Manifest.default_for("gestures.sensitivities." .. slot)
+			helpers.assert_eq(expected, 25, "the slower tab default must remain distinct")
+			helpers.assert_eq(Gestures.set_sensitivity(slot, 1e-300), true)
+			helpers.assert_eq(Gestures.get_sensitivity(slot), expected)
+		end
+	end)
+
 	helpers.it("a genuine positive number is stored verbatim", function()
 		helpers.assert_eq(Gestures.set_sensitivity("swipe_2_left", 5), true)
 		helpers.assert_eq(Gestures.get_sensitivity("swipe_2_left"), 5)

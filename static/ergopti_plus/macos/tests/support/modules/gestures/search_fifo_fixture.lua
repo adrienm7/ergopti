@@ -25,6 +25,7 @@ function M.with_world(options, callback)
 			end
 			f.key_observer = copy
 			hs.pasteboard = {
+				allContentTypes = function() return { {} } end,
 				readAllData = function() return board end,
 				changeCount = function() if w.count_unavailable then return nil end; return generation end,
 				clearContents = function() board = {}; generation = generation + 1 end,

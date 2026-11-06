@@ -21,6 +21,7 @@
 local M = {}
 
 local Logger = require("infra.logger")
+local ErrorDescription = require("error_description")
 
 local LOG = "infra.teardown_transaction"
 
@@ -40,6 +41,20 @@ local function validate_steps(steps)
 	if type(steps) ~= "table" then
 		Logger.error(LOG, "Teardown steps must be a table.")
 		return false
+	end
+	local count = 0
+	for key in pairs(steps) do
+		if type(key) ~= "number" or key < 1 or key % 1 ~= 0 then
+			Logger.error(LOG, "Teardown steps must be a dense array.")
+			return false
+		end
+		count = count + 1
+	end
+	for index = 1, count do
+		if rawget(steps, index) == nil then
+			Logger.error(LOG, "Teardown steps must be a dense array.")
+			return false
+		end
 	end
 	local names = {}
 	for index, step in ipairs(steps) do
@@ -72,10 +87,16 @@ function M.run(state, steps)
 		return false
 	end
 	if not validate_steps(steps) then return false end
+	-- A cleanup can re-enter other owners and mutate its caller's list. Freeze
+	-- both the order and the validated capabilities before crossing that boundary.
+	local snapshot = {}
+	for index, step in ipairs(steps) do
+		snapshot[index] = { name = step.name, run = step.run }
+	end
 
 	state.running = true
 	local all_complete = true
-	for _, step in ipairs(steps) do
+	for _, step in ipairs(snapshot) do
 		if state.completed[step.name] ~= true then
 			local ok, result_or_err = xpcall(step.run, debug.traceback)
 			if ok and result_or_err ~= false then
@@ -83,14 +104,14 @@ function M.run(state, steps)
 			else
 				all_complete = false
 				Logger.error(LOG, "Local teardown step '%s' failed: %s",
-					step.name, tostring(result_or_err))
+					step.name, ErrorDescription.describe(result_or_err))
 			end
 		end
 	end
 	state.running = false
 
 	if all_complete then
-		for _, step in ipairs(steps) do
+		for _, step in ipairs(snapshot) do
 			if state.completed[step.name] ~= true then
 				all_complete = false
 				break
@@ -116,6 +137,7 @@ function M.run_with_finalizer(state, steps, finalizer)
 		Logger.error(LOG, "Teardown finalizer must be a descriptor table.")
 		return false
 	end
+	if not validate_steps(steps) then return false end
 	local complete_transaction = {}
 	for index, step in ipairs(steps) do
 		complete_transaction[index] = step
@@ -123,8 +145,9 @@ function M.run_with_finalizer(state, steps, finalizer)
 	complete_transaction[#complete_transaction + 1] = finalizer
 	if not validate_steps(complete_transaction) then return false end
 
+	local finalizer_snapshot = { name = finalizer.name, run = finalizer.run }
 	if M.run(state, steps) ~= true then return false end
-	return M.run(state, { finalizer })
+	return M.run(state, { finalizer_snapshot })
 end
 
 return M

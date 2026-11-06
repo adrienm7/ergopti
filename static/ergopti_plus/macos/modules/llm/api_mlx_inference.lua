@@ -30,6 +30,7 @@ local ApiCommon      = require("modules.llm.api_common")
 local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
 local Rewrite        = require("llm.rewrite")
 local JsonCodec      = require("adapters.json_codec")
+local LosslessJson   = require("json")
 local FileSystem     = require("adapters.file_system")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
@@ -71,6 +72,24 @@ local STREAM_TMPFILE_CLEANUP_SEC = STREAM_HARD_TIMEOUT_SEC + 10
 -- table (mutated here and by api_mlx's cancel_streaming). nil until init().
 local _ctx = nil
 local _payload_cleanup = nil
+
+-- Native decoding removes JSON null members. An absent or null error means
+-- success is still possible; a non-null error prevents publication.
+local function response_has_error(decoded)
+	if type(decoded) ~= "table" then return false end
+	local value = rawget(decoded, "error")
+	return value ~= nil and not LosslessJson.is_null(value)
+end
+
+-- Native JSON decoding loses the distinction between empty objects and
+-- arrays, and can erase a null array item. Only inspect the source when the
+-- native choices table appears empty; ordinary token events decode once.
+local function has_empty_choices_array(body)
+	local source = type(body) == "string" and LosslessJson.decode_lossless(body) or nil
+	local choices = type(source) == "table" and rawget(source, "choices") or nil
+	return type(choices) == "table" and LosslessJson.is_array(choices)
+		and next(choices) == nil
+end
 
 -- Exact native timer capabilities whose cancellation was refused. The scheduler
 -- also keeps a strong registry, but this request layer must retain its own debt so
@@ -360,14 +379,15 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
 			cancel_non_stream_timer(timeout_handle)
 
 			if status ~= 200 then
-				Logger.error(LOG, "MLX HTTP %s :: %s", tostring(status), tostring((body or ""):sub(1, 260)))
+				Logger.error(LOG, "MLX HTTP %s (response body withheld).", tostring(status))
 				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 				return
 			end
 
 			local resp, _ = JsonCodec.decode(body)
-			if type(resp) ~= "table" or type(resp.choices) ~= "table" or not resp.choices[1] then
-                Logger.debug(LOG, "[%s] #%d Unusable response (decode/choices), body='%s'", model_name, req_id, tostring((body or ""):sub(1, 220)))
+			if type(resp) ~= "table" or response_has_error(resp)
+				or type(resp.choices) ~= "table" or type(resp.choices[1]) ~= "table" then
+				Logger.debug(LOG, "[%s] #%d Unusable response (error/decode/choices).", model_name, req_id)
 				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 				return
 			end
@@ -588,8 +608,10 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	-- Retain the private file created by the allocator. Removing it and opening
 	-- a suffixed pathname would lose its owner-only mode under a normal umask.
 	-- Declare the path before callbacks so they capture this exact request file.
-	local tmp_path, allocation_error = FileSystem.create_secure_temp_file()
-	if type(tmp_path) ~= "string" or tmp_path == "" then
+	local tmp_path, allocation_error, allocation_identity = FileSystem.create_secure_temp_file()
+	if type(tmp_path) ~= "string" or tmp_path == "" or type(allocation_identity) ~= "table"
+		or type(allocation_identity.dev) ~= "number" or math.tointeger(allocation_identity.dev) == nil
+		or type(allocation_identity.ino) ~= "number" or math.tointeger(allocation_identity.ino) == nil then
 		Logger.error(LOG, "Failed to allocate a private MLX streaming payload: %s.", tostring(allocation_error))
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
@@ -602,12 +624,13 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	end
 
 	local task = nil
-	local retire_payload = _payload_cleanup.capture(tmp_path, function() return task end)
+	local retire_payload = _payload_cleanup.capture(tmp_path, function() return task end, allocation_identity, encoded)
 
 	local accumulated   = ""
 	local line_buf      = ""
 	local event_data_lines = {}
 	local stream_complete = false
+	local provider_failed = false
 	local in_reasoning  = false  -- Currently accumulating delta.reasoning(_content) tokens — close </think> on transition or end
 	local t0_req        = TimerScheduler.now()
 	local task_completed = false
@@ -642,10 +665,25 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		if json_str == "" then return end
 		local ok_json, obj, decode_err = pcall(JsonCodec.decode, json_str)
 		if not ok_json or decode_err ~= nil then
-			Logger.debug(LOG, "process_sse_payload: JSON parse failed — skipping event.")
+			provider_failed = true
+			Logger.debug(LOG, "process_sse_payload: JSON parse failed — rejecting stream.")
 			return
 		end
-		if type(obj) ~= "table" or type(obj.choices) ~= "table" or not obj.choices[1] then
+		if type(obj) ~= "table" then
+			provider_failed = true
+			Logger.debug(LOG, "[%s] #%d SSE decode fail: type_obj=%s", model_name, req_id, type(obj))
+			return
+		end
+		if response_has_error(obj) then
+			provider_failed = true
+			return
+		end
+		if provider_failed then return end
+		if type(obj.choices) ~= "table" or type(obj.choices[1]) ~= "table" then
+			-- Only a true empty array is a usage-only event. A null entry,
+			-- empty object or scalar cannot certify an earlier prediction.
+			if type(obj.choices) ~= "table" or obj.choices[1] ~= nil
+				or not has_empty_choices_array(json_str) then provider_failed = true end
 			Logger.debug(LOG, "[%s] #%d SSE decode fail: type_obj=%s",
 				model_name, req_id, type(obj))
 			return
@@ -819,10 +857,13 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 
 	-- Streaming callback: fired each time curl writes a chunk to stdout
 	local function on_chunk(_, chunk, stderr_chunk)
-		if not chunk or chunk == "" then return true end
 		if failure_requested then return false end
 		-- Generation check: if a newer request superseded us, discard chunks silently
 		if my_generation ~= _ctx.stream.generation then return false end
+		-- hs.task reports nil after its native per-chunk UTF-8 decode fails. The
+		-- bytes cannot be recovered, so a later DONE must not publish a partial.
+		if chunk == nil then provider_failed = true; return true end
+		if chunk == "" then return true end
 		-- First chunk received — server is alive (logged once for diagnostics).
 		if not _ctx.stream.has_chunks then
 			_ctx.stream.has_chunks = true
@@ -909,12 +950,21 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 			return
 		end
 
+		-- Native termination decodes unread stdout as one UTF-8 string; nil
+		-- means that terminal bytes were lost before Lua could inspect them.
+		if remaining == nil then provider_failed = true end
 		if remaining and remaining ~= "" then
 			line_buf = line_buf .. remaining
 			flush_lines()
 		end
 		-- HTTP/1.0 closes a streamed body at EOF even when the model generator
 		-- raised. curl exit zero proves transport closure, not provider completion.
+		if provider_failed then
+			Logger.warn(LOG, "[%s] #%d STREAM provider or protocol failure — discarding partial output.",
+				tostring(model_name), req_id)
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+			return
+		end
 		if not stream_complete then
 			Logger.warn(LOG, "[%s] #%d STREAM ended without its completion marker — discarding partial output.",
 				tostring(model_name), req_id)

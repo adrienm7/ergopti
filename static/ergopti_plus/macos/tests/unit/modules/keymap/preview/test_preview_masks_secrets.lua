@@ -255,6 +255,7 @@ local function capture_rows(register, buf)
 		-- Everything the bridge pulls in is loaded FIRST, then the bridge: it captures
 		-- its dependencies as upvalues at require time.
 		local State = helpers.load_with_stubs("modules.keymap.state")
+		local scheduler_hs = hs
 
 		-- Dropped so it is re-required under the fresh stub the bridge load installs;
 		-- see trap 2 above. Registry and Expander are stateful singletons too: leaving
@@ -283,6 +284,8 @@ local function capture_rows(register, buf)
 		register(Registry)
 		Registry.sort_mappings()
 
+		require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
+
 		helpers.assert_eq(Bridge.init(state,
 			{ preview_star_enabled = true, preview_autocorrect_enabled = true }), true)
 		helpers.assert_eq(Expander.init(state, Registry, Bridge), true)
@@ -293,6 +296,7 @@ local function capture_rows(register, buf)
 		-- re-raised afterward so the row assertions cannot become vacuous.
 		local render_ok, render_err = xpcall(function()
 			Bridge.update_preview(buf)
+			scheduler_hs.timer.__fire_all()
 			hs.timer.__fire_all()
 		end, debug.traceback)
 		tooltip.show_stacked = real_show_stacked

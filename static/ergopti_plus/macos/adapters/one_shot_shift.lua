@@ -109,7 +109,7 @@ function M.new(deps)
 		local raw_flags = event:rawFlags()
 		local kind, result = owner:take(code, control, text, now(), deps.magic(), function(title)
 			return translated(code, raw_flags) == text
-				and translated(code, event_api.rawFlagMasks.shift) == title
+				and translated(code, raw_flags | event_api.rawFlagMasks.shift) == title
 		end)
 		if kind == "text" then
 			assert(emit(result), "one-shot Shift text emission was refused")

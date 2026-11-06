@@ -31,6 +31,7 @@
 --- ==============================================================================
 
 local M = {}
+local ManifestKeys = require("keystats.manifest_keys")
 
 local hs      = hs
 local json    = require("hs.json")
@@ -84,7 +85,9 @@ local function _q(s) return "'" .. Literal.escape(tostring(s)) .. "'" end
 local function _safe_query(label, fn, pacer)
 	local ok, err = pcall(fn)
 	if not ok then
-		Logger.error(LOG, "Query failed (%s): %s.", label, tostring(err))
+		local formatted, detail = pcall(tostring, err)
+		Logger.error(LOG, "Query failed (%s): %s.", label,
+			formatted and detail or "unprintable query error")
 	end
 	if pacer then pacer.pause() end
 	return ok
@@ -112,14 +115,37 @@ local function _rows(db, sql, pacer)
 	end
 end
 
---- Returns the calendar day after `date_str` (YYYY-MM-DD). Noon avoids DST
---- transitions shifting the result by a day.
+--- Shifts an ISO calendar date without using the current machine's timezone.
+--- Device data can include dates skipped by a local timezone transition.
+local function shift_day(date_str, direction)
+	local y, m, d = tostring(date_str):match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+	if not y then error("sqlite_reader: invalid date " .. tostring(date_str), 3) end
+	y, m, d = tonumber(y), tonumber(m), tonumber(d)
+	local function month_days(year, month)
+		local leap = year % 4 == 0 and (year % 100 ~= 0 or year % 400 == 0)
+		local days = {31, leap and 29 or 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+		return days[month]
+	end
+	local limit = month_days(y, m)
+	if not limit or d < 1 or d > limit then error("sqlite_reader: invalid date " .. date_str, 3) end
+	d = d + direction
+	if d > limit then
+		d, m = 1, m + 1
+		if m > 12 then y, m = y + 1, 1 end
+	elseif d < 1 then
+		m = m - 1
+		if m < 1 then y, m = y - 1, 12 end
+		d = month_days(y, m)
+	end
+	if y < 0 or y > 9999 then error("sqlite_reader: date outside supported range", 3) end
+	return string.format("%04d-%02d-%02d", y, m, d)
+end
+
+--- Returns the calendar day after `date_str` (YYYY-MM-DD).
 --- @param date_str string Day.
 --- @return string next_day
 function M.next_day(date_str)
-	local y, m, d = tostring(date_str):match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
-	if not y then error("sqlite_reader: invalid date " .. tostring(date_str), 2) end
-	return os.date("%Y-%m-%d", os.time({ year = tonumber(y), month = tonumber(m), day = tonumber(d) + 1, hour = 12 }))
+	return shift_day(date_str, 1)
 end
 
 --- Reset a per-app manifest entry with all numeric counters at 0.
@@ -171,6 +197,7 @@ end
 
 --- Get-or-create a (date, app) cell in `manifest`.
 local function _get(manifest, date_str, app)
+	app = ManifestKeys.encode(app)
 	local d = manifest[date_str]
 	if not d then d = {}; manifest[date_str] = d end
 	local a = d[app]
@@ -483,19 +510,30 @@ local function _manifest_windows(db, start_date, end_date)
 		end)
 		if accepted ~= true then complete = false end
 	end
+	-- Filters cannot create rows in an empty database. Avoid visiting every
+	-- calendar window when a bounded empty read has no source dates.
+	if not lo and not hi then return {}, complete end
+	if not lo or not hi then return {}, false end
 	if start_date and start_date ~= "" and (not lo or start_date > lo) then lo = start_date end
 	if end_date and end_date ~= "" and (not hi or end_date < hi) then hi = end_date end
 	local windows = {}
 	if not lo or not hi or lo > hi then return windows, complete end
+	-- Validate even a single-day window before the iterator accepts it.
+	if not pcall(shift_day, lo, 0) or not pcall(shift_day, hi, 0) then
+		Logger.error(LOG, "Cannot read manifest history: invalid date bound.")
+		return windows, false
+	end
 	local window_lo = lo
 	while window_lo <= hi do
 		local window_hi = window_lo
 		for _ = 2, MANIFEST_WINDOW_DAYS do
+			if window_hi == hi then break end
 			local following = M.next_day(window_hi)
 			if following > hi then break end
 			window_hi = following
 		end
 		windows[#windows + 1] = { window_lo, window_hi }
+		if window_hi == hi then break end
 		window_lo = M.next_day(window_hi)
 	end
 	return windows, complete
@@ -561,6 +599,22 @@ local function _new_ngram_dict()
 	return { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {} }
 end
 
+--- Refuses non-finite SQL totals rather than certifying an unusable projection.
+local function finite_number(value, fallback)
+	local number = tonumber(value) or fallback
+	assert(number == number and number ~= math.huge and number ~= -math.huge,
+		"non-finite n-gram aggregate")
+	return number
+end
+
+local function finite_sum(left, right)
+	if math.type(left) == "integer" and math.type(right) == "integer" then
+		assert(not (right > 0 and left > math.maxinteger - right)
+			and not (right < 0 and left < math.mininteger - right), "n-gram integer overflow")
+	end
+	return finite_number(left + right, 0)
+end
+
 
 --- Adds one row of the catalogue's n-gram read into a dictionary item. TOTAL
 --- returns floats, and a row whose counters are not numbers comes back raw:
@@ -569,20 +623,20 @@ end
 --- @param item table { c, t, e, hs, llm, o } accumulated in place.
 --- @param r table A ngram.tokens or ngram.tokens_by_app row.
 local function _merge_ngram_row(item, r)
-	item.c = item.c + (tonumber(r.c) or 0)
-	item.t = item.t + (tonumber(r.td) or 0)
-	item.e = item.e + (tonumber(r.e) or 0)
-	local copies = tonumber(r.source_rows) or 1
+	item.c = finite_sum(item.c, finite_number(r.c, 0))
+	item.t = finite_sum(item.t, finite_number(r.td, 0))
+	item.e = finite_sum(item.e, finite_number(r.e, 0))
+	local copies = finite_number(r.source_rows, 1)
 	-- An empty source map contributes nothing; skipping its decode is exact
 	local raw = r.esrc_json or "{}"
 	local ok, src = true, nil
 	if raw ~= "{}" then ok, src = pcall(json.decode, raw) end
 	if ok and type(src) == "table" then
-		item.hs  = item.hs  + (tonumber(src.hotstring) or 0) * copies
-		item.llm = item.llm + (tonumber(src.llm)       or 0) * copies
+		item.hs  = finite_sum(item.hs, finite_number(src.hotstring, 0) * copies)
+		item.llm = finite_sum(item.llm, finite_number(src.llm, 0) * copies)
 		for k, v in pairs(src) do
 			if KUtils.is_other_synthetic_source(k) then
-				item.o = item.o + (tonumber(v) or 0) * copies
+				item.o = finite_sum(item.o, finite_number(v, 0) * copies)
 			end
 		end
 	end
@@ -612,13 +666,26 @@ local function _ngram_days(db, start_date, end_date)
 		end)
 		if accepted ~= true then complete = false end
 	end
+	-- An explicit filter cannot create data in an empty database. Without this
+	-- check, a years-long range schedules every daily query despite no rows.
+	if not lo and not hi then return {}, complete end
+	if not lo or not hi then return {}, false end
 	if start_date and start_date ~= "" and (not lo or start_date > lo) then lo = start_date end
 	if end_date and end_date ~= "" and (not hi or end_date < hi) then hi = end_date end
 	local days = {}
-	if not lo or not hi then return days, complete end
+	if not lo or not hi or lo > hi then return days, complete end
+	-- Stored dates are untrusted: a malformed bound must not escape this read
+	-- before its SQLite handle is closed, or certify a partial projection.
+	local valid_lo = pcall(shift_day, lo, 0)
+	local valid_hi = pcall(shift_day, hi, 0)
+	if not valid_lo or not valid_hi then
+		Logger.error(LOG, "Cannot read n-gram history: invalid date bound.")
+		return days, false
+	end
 	local day = lo
 	while day <= hi do
 		days[#days + 1] = day
+		if day == hi then break end
 		day = M.next_day(day)
 	end
 	return days, complete
@@ -682,20 +749,20 @@ local function _accumulate_ngrams(db, out, start_date, end_date, selected_apps, 
 			item = { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 			bucket[key] = item
 		end
-		item.c = item.c + (count or 0)
+		item.c = finite_sum(item.c, finite_number(count, 0))
 	end
 
 	-- Shortcuts (counts only).
 	query("ngram_shortcuts", function()
 		for r in _rows(db, string.format([[
-			SELECT token, SUM(c) AS c FROM ngram_shortcuts %s GROUP BY token
+			SELECT token, TOTAL(c) AS c FROM ngram_shortcuts %s GROUP BY token
 		]], where), pacer) do
 			add_count(out.sc, r.token, r.c)
 		end
 	end, pacer)
 	query("ngram_shortcut_bigrams", function()
 		for r in _rows(db, string.format([[
-			SELECT token, SUM(c) AS c FROM ngram_shortcut_bigrams %s GROUP BY token
+			SELECT token, TOTAL(c) AS c FROM ngram_shortcut_bigrams %s GROUP BY token
 		]], where), pacer) do
 			add_count(out.sc_bg, r.token, r.c)
 		end
@@ -703,7 +770,7 @@ local function _accumulate_ngrams(db, out, start_date, end_date, selected_apps, 
 	-- Keycodes.
 	query("ngram_keycodes", function()
 		for r in _rows(db, string.format([[
-			SELECT keycode, SUM(c) AS c FROM ngram_keycodes %s GROUP BY keycode
+			SELECT keycode, TOTAL(c) AS c FROM ngram_keycodes %s GROUP BY keycode
 		]], where), pacer) do
 			add_count(out.kc, tostring(r.keycode), r.c)
 		end
@@ -765,12 +832,14 @@ function M.merge_ngrams(into, from, pacer)
 				target = { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 				bucket[token] = target
 			end
-			target.c   = target.c   + item.c
-			target.t   = target.t   + item.t
-			target.e   = target.e   + item.e
-			target.hs  = target.hs  + item.hs
-			target.llm = target.llm + item.llm
-			target.o   = target.o   + item.o
+			local c = finite_sum(target.c, item.c)
+			local t = finite_sum(target.t, item.t)
+			local e = finite_sum(target.e, item.e)
+			local hs_count = finite_sum(target.hs, item.hs)
+			local llm = finite_sum(target.llm, item.llm)
+			local other = finite_sum(target.o, item.o)
+			target.c, target.t, target.e = c, t, e
+			target.hs, target.llm, target.o = hs_count, llm, other
 		end
 	end
 	return into
@@ -791,10 +860,7 @@ function M.split_bounds(start_date, end_date, today_str)
 		and (not end_date or end_date == "" or end_date >= today_str)
 	-- Historical: anything strictly before today. Calendar arithmetic on the
 	-- date string avoids invalid days (2026-01-00) and DST-length days.
-	local y, m, d = tostring(today_str):match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
-	if not y then error("sqlite_reader: invalid today " .. tostring(today_str), 2) end
-	local yesterday_str = os.date("%Y-%m-%d",
-		os.time({ year = tonumber(y), month = tonumber(m), day = tonumber(d) - 1, hour = 12 }))
+	local yesterday_str = shift_day(today_str, -1)
 	local historical_end = yesterday_str
 	if end_date and end_date ~= "" and end_date < today_str then historical_end = end_date end
 	return { includes_today = includes_today, historical_end = historical_end }
@@ -868,31 +934,31 @@ function M.read_today_split(sqlite_path, start_date, end_date, selected_apps, pa
 
 		_safe_query("ngram_keycodes(today)", function()
 			for r in _rows(db, string.format([[
-				SELECT app, keycode, SUM(c) AS c FROM ngram_keycodes
+				SELECT app, keycode, TOTAL(c) AS c FROM ngram_keycodes
 				WHERE date = %s %s GROUP BY app, keycode
 			]], _q(today_str), app_clause), pacer) do
 				_today_bucket(r.app).kc[tostring(r.keycode)] =
-					{ c = r.c or 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+					{ c = finite_number(r.c, 0), t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 			end
 		end, pacer)
 
 		_safe_query("ngram_shortcuts(today)", function()
 			for r in _rows(db, string.format([[
-				SELECT app, token, SUM(c) AS c FROM ngram_shortcuts
+				SELECT app, token, TOTAL(c) AS c FROM ngram_shortcuts
 				WHERE date = %s %s GROUP BY app, token
 			]], _q(today_str), app_clause), pacer) do
 				_today_bucket(r.app).sc[r.token] =
-					{ c = r.c or 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+					{ c = finite_number(r.c, 0), t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 			end
 		end, pacer)
 
 		_safe_query("ngram_shortcut_bigrams(today)", function()
 			for r in _rows(db, string.format([[
-				SELECT app, token, SUM(c) AS c FROM ngram_shortcut_bigrams
+				SELECT app, token, TOTAL(c) AS c FROM ngram_shortcut_bigrams
 				WHERE date = %s %s GROUP BY app, token
 			]], _q(today_str), app_clause), pacer) do
 				_today_bucket(r.app).sc_bg[r.token] =
-					{ c = r.c or 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+					{ c = finite_number(r.c, 0), t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 			end
 		end, pacer)
 
@@ -948,7 +1014,9 @@ local FINGERPRINT_SOURCES = {
 	{ "ngram_media_keys",        "c" },
 	{ "ngram_shortcuts",         "c" },
 	{ "ngram_shortcut_bigrams",  "c" },
-	{ "agg_app_day",             "chars", "time_ms", "think_time_ms", "app_time_ms", "hs_triggers", "llm_triggers" },
+	{ "agg_app_day",             "chars", "pauses", "time_ms", "think_time_ms", "app_time_ms",
+		"hs_chars", "llm_chars", "hs_triggers", "llm_triggers", "hs_suggested", "llm_suggested",
+		"hs_input_chars", "llm_input_chars" },
 	{ "agg_app_day_buckets",     "time_sum", "credited", "hs_input_time_sum", "llm_input_time_sum" },
 	{ "agg_app_day_burst",       "count_total", "inter_delay_sum", "length(length_buckets_json)" },
 	{ "agg_app_day_session",     "count_total", "total_active_ms", "length(durations_json)" },

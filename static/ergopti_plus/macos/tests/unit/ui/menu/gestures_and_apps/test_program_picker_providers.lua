@@ -25,6 +25,7 @@ local function with_provider(kind, options, body)
 	local publish_assignment
 	local function set_action(_, value)
 		fixture.sets = fixture.sets + 1
+		if value == "none" and options.refuse_restore then return false end
 		fixture.action = value
 		if value == selected then
 			local committed = receipt(options.assign)
@@ -88,7 +89,10 @@ local function with_provider(kind, options, body)
 		package.loaded["infra.dialog_util"].block_alert = function(_, reason) fixture.warning = reason end
 		package.loaded["platform.remap.lease_helper"] = { resolve = function() return nil end }
 		package.loaded["adapters.apple_shortcuts_native"] = nil
-		package.loaded["infra.deferred_work"] = { after = function(_, callback) callback(); return true end }
+		package.loaded["infra.deferred_work"] = { after = function(_, callback)
+			if options.reject_schedule then return false end
+			callback(); return true
+		end }
 		package.loaded["ui.action_picker"] = { open = function(settings, callback)
 			helpers.assert_eq(settings.items[1].id, selected)
 			helpers.assert_eq(settings.items[1].disabled, options.unavailable and true or nil, "program selection must follow registration readiness")
@@ -156,8 +160,21 @@ local function with_provider(kind, options, body)
 				set_shortcut_action = set_action,
 				get_shortcut_actions = function() return { script_altgr_enter = fixture.action } end,
 			}
+			local held
+			ctx.commit_script_action = require("ui.menu.script_action_transaction").new({
+				state = state, script_control = ctx.script_control, paused = function() return false end,
+				save_prefs = ctx.save_prefs,
+				admission = function(_, fn, claim)
+					if held and not held.retry_restore() then return false end
+					held = nil
+					local result = fn()
+					if claim.pending() then held = claim end
+					return result
+				end,
+			}).assign
 			require("ui.menu.menu_shortcuts").build(ctx)
-			rows[1].items[1].action()
+			fixture.repeat_action = rows[1].items[1].action
+			fixture.action_receipt = fixture.repeat_action()
 		end
 		if options.scalar and picker_callback then
 			local original = picker_callback
@@ -167,7 +184,7 @@ local function with_provider(kind, options, body)
 			if kind ~= "script" then
 				helpers.assert_type(picker_callback, "function")
 				if options.cancel then return picker_callback(selected) end
-				picker_callback(selected, scalar)
+				return picker_callback(selected, scalar)
 			end
 		end, state)
 	end, debug.traceback)
@@ -180,6 +197,70 @@ end
 for _, kind in ipairs({ "keyboard", "tap", "script" }) do
 	local binding = kind == "keyboard" and "keyboard__primary_1" or kind == "tap" and "tap_key__number_row_left" or "script__script_altgr_enter"
 	helpers.describe("program transaction through actual " .. kind .. " provider", function()
+		if kind == "script" then
+			helpers.it("reports refusal to schedule a script action parameter", function()
+				with_provider(kind, { reject_schedule = true }, function(fixture)
+					helpers.assert_eq(fixture.action_receipt, false)
+					helpers.assert_eq(fixture.action, "none")
+					helpers.assert_eq(fixture.saves, 0)
+				end)
+			end)
+			helpers.it("refuses a plain action when its runtime setter refuses", function()
+				with_provider(kind, { action = "save", assign = "false" }, function(fixture, _, state)
+					helpers.assert_eq(fixture.action_receipt, false)
+					helpers.assert_eq(state.script_control_shortcuts.script_altgr_enter, "none")
+					helpers.assert_eq(fixture.saves, 0)
+				end)
+			end)
+			helpers.it("restores a plain action when preference publication refuses", function()
+				with_provider(kind, { action = "save", save = "false" }, function(fixture, _, state)
+					helpers.assert_eq(fixture.action_receipt, false)
+					helpers.assert_eq(fixture.action, "none")
+					helpers.assert_eq(state.script_control_shortcuts.script_altgr_enter, "none")
+					helpers.assert_eq(fixture.saves, 1)
+				end)
+			end)
+			helpers.it("retains a refused inverse until the next admitted attempt", function()
+				local options = { action = "save", assign = "false", refuse_restore = true }
+				with_provider(kind, options, function(fixture, _, state)
+					helpers.assert_eq(fixture.action_receipt, false)
+					helpers.assert_eq(fixture.repeat_action(), false)
+					helpers.assert_eq(fixture.saves, 0)
+					options.refuse_restore, options.assign = false, nil
+					helpers.assert_true(fixture.repeat_action())
+					helpers.assert_eq(fixture.action, "save")
+					helpers.assert_eq(state.script_control_shortcuts.script_altgr_enter, "save")
+					helpers.assert_eq(fixture.saves, 1)
+				end)
+			end)
+			helpers.it("retains failed compensation after preference refusal", function()
+				local options = { action = "save", save = "false", refuse_restore = true }
+				with_provider(kind, options, function(fixture, _, state)
+					helpers.assert_eq(fixture.action_receipt, false)
+					helpers.assert_eq(fixture.repeat_action(), false)
+					helpers.assert_eq(fixture.saves, 1, "no new write while recovery is pending")
+					options.refuse_restore, options.save = false, nil
+					helpers.assert_true(fixture.repeat_action())
+					helpers.assert_eq(fixture.action, "save")
+					helpers.assert_eq(state.script_control_shortcuts.script_altgr_enter, "save")
+					helpers.assert_eq(fixture.saves, 2)
+				end)
+			end)
+		end
+		if kind ~= "script" then
+			helpers.it("keeps the picker open when its parameter handoff is refused", function()
+				with_provider(kind, {}, function(fixture, pick)
+					local deferred = require("infra.deferred_work")
+					local previous = deferred.after
+					deferred.after = function() return false end
+					local ok, result = pcall(pick)
+					deferred.after = previous
+					helpers.assert_true(ok)
+					helpers.assert_eq(result, false)
+					helpers.assert_eq(fixture.action, "none")
+				end)
+			end)
+		end
 		for _, stage in ipairs({ "parameter", "assign", "save" }) do
 			for _, mode in ipairs({ "false", "nil", "throw" }) do
 				helpers.it("restores both owners after " .. stage .. " " .. mode, function()

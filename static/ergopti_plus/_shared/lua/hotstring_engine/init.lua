@@ -180,7 +180,7 @@ function M.decide(mapping, plain, typed, prev_char, start_is_boundary)
 	if mode == "exact" then
 		if typed == mapping.trigger then eff = plain end
 	elseif mode == "fold" then
-		if text_utils.trig_lower(typed) == mapping.trigger_folded then eff = plain end
+		if text_utils.trig_fold(typed) == mapping.trigger_folded then eff = plain end
 	elseif mode == "conform" then
 		if text_utils.trig_lower(typed) == mapping.trigger then
 			eff = text_utils.conform_replacement(plain, typed, mapping.trigger)
@@ -273,7 +273,7 @@ function M.best_match_at(buf_cps, buckets, body_len, want_auto, start_is_boundar
 	if type(buf_cps) ~= "table" or type(buckets) ~= "table" then return nil end
 	if type(body_len) ~= "number" or body_len < 1 then return nil end
 
-	local bucket = buckets[text_utils.trig_lower(buf_cps[body_len])]
+	local bucket = buckets[text_utils.trig_fold(buf_cps[body_len])]
 	if not bucket then return nil end
 
 	-- The bucket is sorted longest-first, so the first survivor is the longest
@@ -303,7 +303,7 @@ end
 --- @param auto_map table The immediate candidate.
 --- @return boolean
 function M.final_end_outranks(buf_cps, buckets, body_len, start_is_boundary, auto_map)
-	local bucket = buckets[text_utils.trig_lower(buf_cps[body_len])]
+	local bucket = buckets[text_utils.trig_fold(buf_cps[body_len])]
 	if not bucket then return false end
 	for _, mapping in ipairs(bucket) do
 		if not mapping.auto_expand and mapping.final_result
@@ -342,7 +342,7 @@ function M.candidates_at(buf_cps, buckets, body_len, start_is_boundary, limit)
 	if type(buf_cps) ~= "table" or type(buckets) ~= "table" then return out end
 	if type(body_len) ~= "number" or body_len < 1 then return out end
 
-	local bucket = buckets[text_utils.trig_lower(buf_cps[body_len])]
+	local bucket = buckets[text_utils.trig_fold(buf_cps[body_len])]
 	if not bucket then return out end
 
 	-- The first survivor of the auto_expand pass is the one that would actually
@@ -626,10 +626,10 @@ function M.new()
 		local function register(trigger, replacement, mode, source)
 			local cps, n = utf8_codepoints(trigger)
 			if n == 0 then return end
-			-- Bucket key: the tail codepoint, Unicode-folded. trig_lower rather than
+			-- Bucket key: the tail codepoint, Unicode-folded. trig_fold rather than
 			-- string.lower because the latter is ASCII-only, so an accented tail typed
 			-- as "Ê" probed a bucket registered under "ê" and never matched.
-			local key    = text_utils.trig_lower(cps[n])
+			local key    = text_utils.trig_fold(cps[n])
 			local bucket = candidate_buckets[key]
 			if not bucket then bucket = {} ; candidate_buckets[key] = bucket end
 			bucket[#bucket + 1] = {
@@ -637,7 +637,7 @@ function M.new()
 				-- Canonical side of a "fold" compare, precomputed so the hot path folds
 				-- only what the user typed. The trigger itself stays AS WRITTEN, because
 				-- it is what every consumer of a match result sees.
-				trigger_folded = mode == "fold" and text_utils.trig_lower(trigger) or nil,
+				trigger_folded = mode == "fold" and text_utils.trig_fold(trigger) or nil,
 				replacement  = replacement,
 				tlen         = n,
 				match_mode   = mode,

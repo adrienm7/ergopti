@@ -599,11 +599,12 @@ _ErrorDialog_InitJson(Session) {
 	Context := HealthCheck_RedactionContext()
 	Rules := Config["redaction"]
 	Record := Session["record"]
+	Shared := HealthCheck_ShareDocument(Session["snapshot"], Config["schema"])
 	return '{"type":"init","kind":' . JsonStringLiteral(Record["kind"])
 		. ',"module":' . JsonStringLiteral(Redact_Apply(Record["module"], Rules, Context))
 		. ',"message":' . JsonStringLiteral(Redact_Apply(Record["message"], Rules, Context))
 		. ',"log_path":' . JsonStringLiteral(Redact_Apply(Session["log_path"], Rules, Context))
-		. ',"text":' . JsonStringLiteral(Redact_Apply(Session["report"]["text"], Rules, Context))
+		. ',"text":' . JsonStringLiteral(Shared["text"])
 		. ',"more":' . _ED_Folded . '}'
 }
 

@@ -149,7 +149,11 @@ function M.focused_identity()
 		local window_id = win:id()
 		local app = win:application()
 		local pid = app and app:pid()
-		if window_id == nil or pid == nil then return nil end
+		-- Hammerspoon exposes 0 when its AX window-number lookup failed.
+		-- That sentinel cannot distinguish two windows of the same process.
+		window_id = type(window_id) == "number" and math.tointeger(window_id) or nil
+		pid = type(pid) == "number" and math.tointeger(pid) or nil
+		if not window_id or window_id <= 0 or not pid or pid <= 0 then return nil end
 		return tostring(pid) .. ":" .. tostring(window_id)
 	end)
 	if not ok then
@@ -163,7 +167,7 @@ end
 --- @return table Array of WindowInfo objects (may be empty).
 function M.getAll()
 	local ok, result = pcall(function()
-		local windows = hs.window and hs.window.allWindows and hs.window.allWindows()
+		local windows = hs.window and hs.window.visibleWindows and hs.window.visibleWindows()
 		if type(windows) ~= "table" then return {} end
 
 		local infos = {}

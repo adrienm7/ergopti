@@ -1037,6 +1037,22 @@ function M.get(key, default_value)
 	return result
 end
 
+--- Reads a key while distinguishing absence from an unavailable store.
+function M.read_exact(key)
+	local loaded, ready = pcall(_ensure_loaded)
+	if not loaded or ready ~= true then return false, nil end
+	local ok, value = pcall(function()
+		local stored = _cache[tostring(key)]
+		if type(stored) == "table" then return json.decode(json.encode(stored)) end
+		return stored
+	end)
+	if not ok then
+		Logger.error(LOG, "read_exact(): failed to read key '%s'.", tostring(key))
+		return false, nil
+	end
+	return true, value
+end
+
 --- Deletes the entry for the given key from the persistent store.
 --- @param key string
 --- @return boolean True on success, including an already-absent key.

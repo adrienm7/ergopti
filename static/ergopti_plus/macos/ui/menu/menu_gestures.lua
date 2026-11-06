@@ -15,6 +15,7 @@
 local M = {}
 
 local gestures_mod  = require("modules.gestures")
+local Sensitivity = require("modules.gestures.sensitivity")
 local MenuUtils = require("ui.menu.menu_utils")
 local dialog        = require("infra.dialog_util")
 local i18n          = require("infra.i18n")
@@ -270,7 +271,7 @@ function M.build(ctx)
 			end
 			local spec = type(gestures.get_action_parameter_spec) == "function" and gestures.get_action_parameter_spec(a) or nil
 			if spec then
-				DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+				return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 					local committed = shortcut_utils.prompt_action_parameter(gestures, slot, a, spec, picked, {
 						section = "gestures", key = slot,
 						read = function() return gestures.get_action(slot) end,
@@ -283,7 +284,6 @@ function M.build(ctx)
 						show_conflict(conflict)
 					end
 				end, "menu_gestures.action_parameter")
-				return
 			end
 			local conflict = apply_action()
 			if conflict == false then return false end
@@ -347,7 +347,7 @@ function M.build(ctx)
 			sensSubmenu = ManifestMenu.template_rows("gesture_sensitivity_head")
 			if not sensSubmenu then return nil end
 		end
-		local sensitivities = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0, 40.0, 50.0, 60.0 }
+		local sensitivities = Sensitivity.options()
 		for _, s in ipairs(sensitivities) do
 			local label = string.format("%.1f", s)
 			if s == 3.5 then label = label .. " " .. i18n.get("menu.gestures.default_sensitivity") end
@@ -368,7 +368,7 @@ function M.build(ctx)
 
 		local slot_commands = {
 			[require("config_keys").COMMAND.GESTURE_SLOT_CHANGE_ACTION] = function()
-				DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
+				return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
 					function() open_action_chooser(slot, names, current) end,
 					"menu_gestures.action_chooser")
 			end,

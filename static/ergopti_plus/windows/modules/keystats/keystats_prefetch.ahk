@@ -65,7 +65,7 @@ KLPF_PrefetchPath(which, metrics_dir, HashFn := CryptoSha256) {
 		Digest := HashFn.Call(Store)
 		if !(Digest is String) || !RegExMatch(Digest, "^[0-9a-fA-F]{64}$")
 				throw Error("Metrics prefetch store hashing failed.")
-		return A_Temp . "\ergopti_metrics_prefetch_" . Digest . "_" . which . ".json"
+		return A_Temp . "\ergopti_metrics_prefetch_v3_" . Digest . "_" . which . ".json"
 }
 
 ; Background projection protocol.  A projection is CPU/SQLite heavy enough to
@@ -325,7 +325,7 @@ KLPF_ReapOrphanRangeMounts(Directory := A_Temp) {
 ; Only the new PID-bearing names prove liveness ownership. Keep canonical
 ; snapshots, legacy GUID-only stages, and every live process's private files.
 KLPF_ReapOrphanPrefetchStages(Directory := A_Temp) {
-	Pattern := "^ergopti_metrics_prefetch_[0-9A-Fa-f]{64}_(?:typing|apps)\.json\.stage\."
+	Pattern := "^ergopti_metrics_prefetch_(?:v3_)?[0-9A-Fa-f]{64}_(?:typing|apps)\.json\.stage\."
 		. "([1-9]\d{0,9})\.[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
 		. "[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\.[1-9]\d*(?:\.request)?"
 		. "(?:\.[1-9]\d*-[1-9]\d*\.tmp)?$"
@@ -1294,8 +1294,11 @@ KLPF_UniqueAppsFromManifest(manifest) {
 		apps_set  := Map()
 		apps_list := []
 		for _, day_data in manifest {
-				for app_name, _ in day_data {
-						if (app_name = "Unknown" || app_name == "_sys" || app_name == "_system")
+				for app_key, _ in day_data {
+						if (app_key == "_sys" || app_key == "_system")
+								continue
+						app_name := KLR_ManifestAppLabel(app_key)
+						if (app_name = "Unknown")
 								continue
 						if !apps_set.Has(app_name) {
 								apps_set[app_name] := true

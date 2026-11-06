@@ -49,7 +49,7 @@ function M.read()
 		return nil
 	end
 
-	if type(result) ~= "string" or result == "" then
+	if type(result) ~= "string" then
 		return nil
 	end
 
@@ -115,32 +115,75 @@ end
 --- Saves ALL current clipboard data (all pasteboard types: text, images, files, etc.).
 --- Uses readAllData() so non-text content (images, RTF, file URLs) is preserved.
 --- Returns nil when the clipboard is empty; a truthy table otherwise.
+--- @param quiet boolean|nil Suppress synchronous diagnostics in event callbacks.
 --- @return table|nil Pasteboard data table, or nil if empty/error.
 --- @return boolean read_ok True when nil means an empty clipboard, false on error.
-function M.save()
+--- @return integer|nil count Native generation captured with the snapshot.
+function M.save(quiet)
+	local function report(level, ...)
+		if not quiet then Logger[level](LOG, ...) end
+	end
+	-- Hammerspoon's readAllData() snapshots only the first pasteboard item.
+	-- Refuse known multi-item content so a later restore cannot discard items.
+	if not hs or not hs.pasteboard or type(hs.pasteboard.allContentTypes) ~= "function" then
+		report("error", "save(): pasteboard item enumeration is unavailable.")
+		return nil, false
+	end
+	local before = M._change_count()
+	if before == nil then
+		report("error", "save(): pasteboard generation is unavailable.")
+		return nil, false
+	end
+	local checked, items = pcall(hs.pasteboard.allContentTypes)
+	if not checked or type(items) ~= "table" or #items > 1 then
+		report("error", "save(): cannot preserve every pasteboard item.")
+		return nil, false
+	end
 	local ok, result = pcall(function()
 		return hs.pasteboard.readAllData()
 	end)
 
 	if not ok then
-		Logger.error(LOG, "save(): pasteboard error — %s", tostring(result))
+		report("error", "save(): pasteboard error — %s", tostring(result))
 		return nil, false
 	end
 
 	if type(result) ~= "table" then
-		Logger.error(LOG, "save(): pasteboard returned %s instead of a data table", type(result))
+		report("error", "save(): pasteboard returned %s instead of a data table", type(result))
+		return nil, false
+	end
+	local after = M._change_count()
+	if after == nil or after ~= before then
+		report("error", "save(): pasteboard changed or became unavailable during the snapshot.")
+		return nil, false
+	end
+	-- Hammerspoon's readAllData() omits a type when its native data provider
+	-- returns nil. Restoring that partial table would silently lose that type.
+	if #items == 1 then
+		if type(items[1]) ~= "table" then
+			report("error", "save(): pasteboard item types are unavailable.")
+			return nil, false
+		end
+		for _, uti in ipairs(items[1]) do
+			if type(uti) ~= "string" or type(result[uti]) ~= "string" then
+				report("error", "save(): a pasteboard type could not be preserved.")
+				return nil, false
+			end
+		end
+	elseif next(result) ~= nil then
+		report("error", "save(): pasteboard changed during the snapshot.")
 		return nil, false
 	end
 	-- readAllData() returns an empty table when clipboard is empty.
 	if next(result) == nil then
-		return nil, true
+		return nil, true, after
 	end
 
 	-- readAllData() is a UTI-string-keyed HASH table, not an array, so `#result`
 	-- always reports 0. Count with pairs() so the diagnostic is truthful (F-I3).
 	local n = TableUtil.count(result)
-	Logger.debug(LOG, "save(): clipboard snapshot taken (%d type(s)).", n)
-	return result, true
+	report("debug", "save(): clipboard snapshot taken (%d type(s)).", n)
+	return result, true, after
 end
 
 --- Restores the clipboard to a previously saved value.

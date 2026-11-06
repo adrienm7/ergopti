@@ -76,6 +76,8 @@ let activeIndex = 0;
 
 let currentId = 'none';
 let strings = { noResults: 'No matching action' };
+// Ready and navigation completion can both push the same document payload.
+let initialized = false;
 
 function el(id) {
 	return document.getElementById(id);
@@ -86,6 +88,7 @@ function el(id) {
 // ============================================================
 
 function init(data) {
+	if (initialized) return;
 	data = data || {};
 	strings.noResults = data.noResults || 'No matching action';
 
@@ -163,6 +166,7 @@ function init(data) {
 	collapsed.clear();
 	render();
 	updateEditCurrent(data.editCurrentLabel || '');
+	initialized = true;
 	focusSearch();
 }
 
@@ -505,6 +509,8 @@ let defaultCount = null;
 // Host-supplied for llm_vision: the vision backends a binding may use
 // ([{value: id, label, defaultModel}], defaultModel "" when it needs one).
 let visionChoices = null;
+let visionModelDrafts = new Map();
+let visionModelOwner = null;
 
 // Host-supplied for llm_language: the target languages a binding may name
 // ([{value, label}]: "ui" for the interface language, then every locale).
@@ -722,6 +728,14 @@ function fillPromptChoices(value) {
 		appendOption(profile, choice.value, choice.label);
 		if (current && choice.value === current.profileId) selected = choice.value;
 	}
+	// A per-binding translation is valid even though it is not a catalogued profile.
+	if (
+		current?.translationTarget &&
+		!promptChoices.some((choice) => choice.value === current.profileId)
+	) {
+		appendOption(profile, current.profileId, current.profileId + ' — ' + current.translationTarget);
+		selected = current.profileId;
+	}
 	profile.value = selected;
 	const defaultLabel = (paramStrings.countDefault || '{1}').replace('{1}', String(defaultCount));
 	appendOption(count, '', defaultLabel);
@@ -756,7 +770,22 @@ function fillVisionChoices(value) {
 		if (current && choice.value === current.backend) selected = choice.value;
 	}
 	provider.value = selected;
-	el('param-vision-model').value = current && current.model !== null ? current.model : '';
+	visionModelDrafts = new Map();
+	visionModelOwner = selected;
+	const model =
+		current && current.backend === selected && current.model !== null ? current.model : '';
+	visionModelDrafts.set(selected, model);
+	el('param-vision-model').value = model;
+	updateVisionModelHint();
+}
+
+// Models belong to a backend. Keep unsaved drafts when switching back, but
+// never submit one provider's model name to a newly selected provider.
+function changeVisionProvider() {
+	const model = el('param-vision-model');
+	if (visionModelOwner !== null) visionModelDrafts.set(visionModelOwner, model.value);
+	visionModelOwner = el('param-vision-provider').value;
+	model.value = visionModelDrafts.get(visionModelOwner) || '';
 	updateVisionModelHint();
 }
 
@@ -787,7 +816,14 @@ function fillLanguageChoices(value) {
 // The value the prompt choices describe.
 function promptChoiceValue() {
 	const count = el('param-count').value;
-	return count === '' ? el('param-profile').value : el('param-profile').value + '|' + count;
+	const profile = el('param-profile').value;
+	const initial = parseLlmPrompt(editing?.parameterValue || '');
+	if (profile === 'translate' && initial?.profileId === profile && initial.translationTarget) {
+		// A target is representable only alongside an explicit count.
+		if (count === '') return null;
+		return profile + '|' + count + '|' + initial.translationTarget;
+	}
+	return count === '' ? profile : profile + '|' + count;
 }
 
 function openParamEditor(entry) {
@@ -1123,10 +1159,12 @@ document.addEventListener('DOMContentLoaded', function () {
 		editCurrent();
 	});
 	el('param-vision-provider').addEventListener('change', function () {
-		updateVisionModelHint();
+		changeVisionProvider();
 	});
 
 	document.addEventListener('keydown', function (e) {
+		// Let the focused button handle Enter itself, including Back and Cancel.
+		if (e.key === 'Enter' && e.target?.tagName === 'BUTTON') return;
 		// While a value is being edited every key belongs to the editor: Escape
 		// and Enter can be keys to capture there, never a cancel or a pick.
 		if (onParamKeydown(e)) return;

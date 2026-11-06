@@ -49,9 +49,10 @@ end
 
 local function with_rebuild(scenario)
 	with_owner(function(facts, manager, state, export)
-		local rebuild = value(manager.ingest_once, "_rebuild_aggregates_from_raw")
+		local publish = value(manager.ingest_once, "_publish_rebuilt_partitions")
+		local rebuild = value(publish, "_rebuild_aggregates_from_raw")
 		local cutoffs = value(rebuild, "_typing_replay_cutoffs")
-		local mark = value(manager.ingest_once, "_mark_aggregate_cache_rebuilt")
+		local mark = nil
 		value(cutoffs, "_device_id", "device")
 		value(cutoffs, "Export", export)
 		local paths = value(cutoffs, "_paths")
@@ -95,6 +96,32 @@ local function with_rebuild(scenario)
 			return 0
 		end
 		function db:errmsg() return "owned context refusal" end
+		value(manager.ingest_once, "SqliteWriter").get_db = function() return db end
+		local stage = { statements = {}, deletes = 0 }
+		stage.nrows, stage.exec, stage.errmsg = db.nrows, db.exec, db.errmsg
+		local snapshot_port = {
+			witness = function() return {} end,
+			same = function() return true end,
+			open = function(owner) return { db = stage, owner = owner, captured = {} } end,
+			publish = function(snapshot, device, finish)
+				if finish and finish:find("ngram_ctx_json", 1, true) and snapshot.owner.context_refused then return false end
+				if finish then
+					local context = finish:match("UPDATE meta SET value='([^']*)' WHERE key='ngram_ctx_json'")
+					if context then snapshot.owner.context = context end
+					local revision = finish:match("UPDATE meta SET value='([^']*)' WHERE key='aggregate_cache_revision'")
+					if revision then snapshot.owner.revision = revision end
+					snapshot.owner.view_revision = (snapshot.owner.view_revision or 0) + 1
+				end
+				snapshot.owner.statements[#snapshot.owner.statements + 1] = "PUBLISH " .. device
+				if finish then
+					snapshot.owner.statements[#snapshot.owner.statements + 1] = finish
+				end
+				return true, {}
+			end,
+			close = function() return true end,
+		}
+		value(publish, "RebuildSnapshot", snapshot_port)
+		state.stage, state.publish = stage, publish
 		scenario(cutoffs, rebuild, mark, db, state, facts, manager, export)
 	end)
 end
@@ -215,7 +242,7 @@ helpers.describe("historical rebuild ownership", function()
 			local walked = 0
 			value(rebuild, "Aggregator", { get_ngram_ctx = function() return {} end,
 				set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
-				set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+				set_device_id = function() end, reset_batch = function() end, settle_contexts = function() return true end, flush = function() return true end,
 				walk_typing = function() walked = walked + 1 end })
 			helpers.assert_eq(assert(cutoffs(db, "device")), {})
 			helpers.assert_eq(rebuild(db), true, "a legacy restart must not refuse the rebuild forever")
@@ -246,7 +273,7 @@ helpers.describe("historical rebuild ownership", function()
 			local walked = 0
 			value(rebuild, "Aggregator", { get_ngram_ctx = function() return {} end,
 				set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
-				set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+				set_device_id = function() end, reset_batch = function() end, settle_contexts = function() return true end, flush = function() return true end,
 				walk_typing = function() walked = walked + 1 end })
 			local ids, sql = {}, {}
 			for id = 1, 300 do ids[#ids + 1] = id; sql[#sql + 1] = insert(id) end
@@ -273,7 +300,7 @@ helpers.describe("historical rebuild ownership", function()
 			end
 			helpers.assert_eq(walked, 300, "every raw row is replayed across the slices")
 			helpers.assert_true(slices > 2, "the recovery ran in several slices")
-			helpers.assert_true(db.statements[#db.statements] == "COMMIT;", "the revision mark committed")
+			helpers.assert_contains(db.statements[#db.statements], "aggregate_cache_revision", "the final publication carries the revision")
 
 			-- A stop in the middle abandons the walk and its exact timer.
 			walked = 0
@@ -306,7 +333,7 @@ helpers.describe("historical rebuild ownership", function()
 		local walked = {}
 		value(rebuild, "Aggregator", { get_ngram_ctx = function() return { walked = #walked } end,
 			set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
-			set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+			set_device_id = function() end, reset_batch = function() end, settle_contexts = function() return true end, flush = function() return true end,
 			walk_typing = function(row) walked[#walked + 1] = row end })
 		return start, pending, walked
 	end
@@ -338,28 +365,9 @@ helpers.describe("historical rebuild ownership", function()
 
 	-- Field run 2026-11-01: 10315 slices, then a reload threw them away and the
 	-- next start scanned the 300 MB ledger and cleared the rows all over again.
-	helpers.it("resumes an interrupted rebuild after its last committed row (recovery-resume-point)", function()
+	helpers.it("restarts interrupted private reconstruction from the first row (recovery-resume-point)", function()
 		with_rebuild(function(_, rebuild, _, db, state, _, manager)
 			local start, pending, walked = recovery_harness(rebuild, manager, false)
-			local stored = nil
-			local exec, nrows = db.exec, db.nrows
-			function db:exec(sql)
-				local body = sql:match("VALUES%('aggregate_recovery_progress', '(.*)'%);$")
-				if body then stored = body end
-				if sql:find("DELETE FROM meta WHERE key='aggregate_recovery_progress'", 1, true) then stored = nil end
-				return exec(self, sql)
-			end
-			function db:nrows(sql)
-				if sql:find("WHERE key='aggregate_recovery_progress'", 1, true) then
-					local served = stored == nil
-					return function()
-						if served then return nil end
-						served = true
-						return { value = stored }
-					end
-				end
-				return nrows(self, sql)
-			end
 			local ids, sql = {}, {}
 			for id = 1, 1200 do ids[#ids + 1] = id; sql[#sql + 1] = insert(id) end
 			state.raw.device = ids
@@ -367,38 +375,24 @@ helpers.describe("historical rebuild ownership", function()
 			local function step()
 				local handle = table.remove(pending, 1)
 				assert(handle, "a yielded recovery owns its next slice timer")
-				handle.timer = nil
-				handle.fn()
+				handle.timer = nil; handle.fn()
 			end
-
 			start(db)
-			local guard = 0
-			while #walked < 650 do
-				step()
-				guard = guard + 1
-				assert(guard < 10000, "the walk never reached its first flush")
-			end
-			local first_run = #walked
+			while #walked < 650 do step() end
+			helpers.assert_eq(#db.statements, 3, "only the certificate fence may touch the canonical handle")
+			helpers.assert_eq(db.statements[1], "BEGIN IMMEDIATE;")
+			helpers.assert_contains(db.statements[2], "aggregate_cache_revision','0'")
+			helpers.assert_eq(db.statements[3], "COMMIT;")
 			local cancel = value(value(manager.init, "_rollback_failed_init"), "_release_failed_init_resources")
 			helpers.assert_eq(value(cancel, "_cancel_aggregate_recovery")(), true)
-			helpers.assert_true(stored ~= nil, "the first flush committed a resume point")
-			helpers.assert_true(stored:find('"id":500', 1, true) ~= nil, "it names the last flushed row: " .. stored)
-
-			local deletes_before, scans = db.deletes, 0
-			state.ledgers["owned/device/data.sql"] = nil
-			value(value(rebuild, "_typing_replay_cutoffs"), "FileSystem", { read = function() scans = scans + 1 end })
-			for index = 1, first_run do walked[index] = nil end
+			for i = #walked, 1, -1 do walked[i] = nil end
 			start(db)
-			guard = 0
+			local guard = 0
 			while manager.is_recovering() do
-				step()
-				guard = guard + 1
-				assert(guard < 10000, "the resumed recovery never ended")
+				step(); guard = guard + 1; assert(guard < 10000, "recovery never ended")
 			end
-			helpers.assert_eq(#walked, 700, "only the rows after the resume point are walked again")
-			helpers.assert_eq(scans, 0, "a resumed rebuild does not read the ledger again")
-			helpers.assert_eq(db.deletes - deletes_before, 1, "it clears nothing; only the mark retires its row")
-			helpers.assert_eq(stored, nil, "the finished rebuild retires its resume point")
+			helpers.assert_eq(#walked, 1200, "the new snapshot must replay every row")
+			helpers.assert_contains(db.statements[#db.statements], "aggregate_cache_revision")
 		end)
 	end)
 
@@ -450,13 +444,13 @@ helpers.describe("historical rebuild ownership", function()
 			})
 			value(rebuild, "Aggregator", { get_ngram_ctx = function() return {} end,
 				set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
-				set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+				set_device_id = function() end, reset_batch = function() end, settle_contexts = function() return true end, flush = function() return true end,
 				walk_typing = function() end })
 			-- The first derived table holds more than a batch, and still does after
 			-- three batches: one probe finds it large, three find rows left over.
 			local left_over_probes = 4
-			local nrows = db.nrows
-			function db:nrows(sql)
+			local nrows = state.stage.nrows
+			function state.stage:nrows(sql)
 				if sql:find("AS left_over FROM agg_app_day ", 1, true) and left_over_probes > 0 then
 					left_over_probes = left_over_probes - 1
 					local served = false
@@ -478,7 +472,7 @@ helpers.describe("historical rebuild ownership", function()
 				assert(slices < 10000, "recovery never ended")
 			end
 			local bounded, open_deletes = 0, 0
-			for _, sql in ipairs(db.statements) do
+			for _, sql in ipairs(state.stage.statements) do
 				if sql:match("^DELETE FROM agg_app_day WHERE rowid IN") then
 					bounded = bounded + 1
 					open_deletes = open_deletes + 1
@@ -545,27 +539,42 @@ helpers.describe("historical rebuild ownership", function()
 			local current = { Editor = { cur_word = "local" } }
 			local aggregate = { get_ngram_ctx = function() return current end,
 				set_ngram_ctx = function(ctx) current = ctx end, reset_ngram_ctx = function() current = {} end,
-				set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+				set_device_id = function() end, reset_batch = function() end, settle_contexts = function() return true end, flush = function() return true end,
 				walk_typing = function() current = { foreign = true } end }
 			value(rebuild, "Aggregator", aggregate)
 			helpers.assert_eq(rebuild(db, { "foreign" }), true)
 			helpers.assert_eq(current, { Editor = { cur_word = "local" } })
-			helpers.assert_eq(mark(db), true)
-			helpers.assert_eq(require("hs.json").decode(db.context), { Editor = { cur_word = "local" } })
+			helpers.assert_eq(state.publish(db, { "foreign" }), true)
+			helpers.assert_eq(current, { Editor = { cur_word = "local" } })
 		end)
 	end)
 
-	helpers.it("commits rebuilt local context with the revision or rolls both back (historical-rollover-context)", function()
-		with_rebuild(function(_, _, mark, db)
-			value(mark, "Aggregator", { get_ngram_ctx = function() return { Editor = { cur_word = "y" } } end })
-			helpers.assert_eq(mark(db), true)
+	helpers.it("publishes rebuilt context and revision only in the last partition", function()
+		with_rebuild(function(_, rebuild, _, db, state)
+			state.raw.device, state.raw.foreign = { 1 }, { 1 }
+			state.ledgers["owned/device/data.sql"] = batch(insert(1)) .. marker
+			state.ledgers["owned/by_device/foreign/data.sql"] = batch(insert(1, "x", nil, nil, "'foreign'")) .. marker
+			value(rebuild, "Aggregator", { get_ngram_ctx = function() return { Editor = { cur_word = "y" } } end,
+				set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
+				set_device_id = function() end, reset_batch = function() end, settle_contexts = function() return true end, flush = function() return true end,
+				walk_typing = function() end })
+			helpers.assert_eq(state.publish(db), true)
 			helpers.assert_eq(require("hs.json").decode(db.context), { Editor = { cur_word = "y" } })
-			helpers.assert_eq(db.statements[1], "BEGIN TRANSACTION;")
-			helpers.assert_eq(db.statements[#db.statements], "COMMIT;")
-			db.statements, db.context_refused = {}, true
-			helpers.assert_eq(mark(db), false)
-			helpers.assert_eq(db.statements[#db.statements], "ROLLBACK;")
-			helpers.assert_eq(#db.statements, 3, "context refusal must precede any version/revision update")
+			helpers.assert_eq(db.revision, "4")
+			helpers.assert_eq(db.statements[1], "BEGIN IMMEDIATE;")
+			helpers.assert_contains(db.statements[2], "aggregate_cache_revision','0'")
+			helpers.assert_eq(db.statements[3], "COMMIT;")
+			helpers.assert_eq(db.statements[4], "PUBLISH 'foreign'")
+			helpers.assert_contains(db.statements[5], "WHERE key='rev'")
+			helpers.assert_eq(db.statements[6], "PUBLISH 'device'")
+			helpers.assert_contains(db.statements[7], "aggregate_cache_revision")
+			helpers.assert_contains(db.statements[7], "WHERE key='rev'")
+			db.context_refused = true
+			local before = #db.statements
+			helpers.assert_eq(state.publish(db), false)
+			helpers.assert_eq(#db.statements, before + 5, "only the fence and earlier partition may publish before final refusal")
+			helpers.assert_eq(db.statements[#db.statements - 1], "PUBLISH 'foreign'")
+			helpers.assert_contains(db.statements[#db.statements], "WHERE key='rev'")
 		end)
 	end)
 
@@ -579,7 +588,7 @@ helpers.describe("historical rebuild ownership", function()
 				set_ngram_ctx = function(ctx) current = ctx end,
 				reset_ngram_ctx = function() current = {} end,
 				set_device_id = function(device) selected = device end,
-				reset_batch = function() end,
+				reset_batch = function() end, settle_contexts = function() return true end,
 				flush = function() return true end,
 				walk_typing = function()
 					current = { Editor = { cur_word = selected == "device" and "repaired-local" or "foreign" } }
@@ -631,7 +640,7 @@ helpers.describe("historical rebuild ownership", function()
 			manager.ingest_once()
 			helpers.assert_eq(applied, 1)
 			helpers.assert_eq(state.reads, 1, "the actual empty-outbox flush must reach the normal EOF read")
-			helpers.assert_true(db.deletes > 0, "the foreign partition was really rebuilt")
+			helpers.assert_true(state.stage.deletes > 0, "the foreign partition was really rebuilt privately")
 			helpers.assert_eq(db.revision, "1", "a partial refresh cannot certify the global revision")
 			helpers.assert_eq(db.context, old_context, "unvalidated local context cannot be republished")
 			helpers.assert_eq(db.view_revision, 1, "a completed partial refresh still invalidates dashboard snapshots")
@@ -639,18 +648,18 @@ helpers.describe("historical rebuild ownership", function()
 
 			helpers.assert_eq(rebuild(db), true, "the old revision still permits a complete migration retry")
 			helpers.assert_eq(current, { Editor = { cur_word = "repaired-local" } })
-			helpers.assert_eq(mark(db), true)
-			helpers.assert_eq(db.revision, "3")
+			helpers.assert_eq(state.publish(db), true)
+			helpers.assert_eq(db.revision, "4")
 			helpers.assert_eq(json.decode(db.context), current)
-			helpers.assert_eq(db.view_revision, 2)
+			helpers.assert_eq(db.view_revision, 3)
 
 			current = { Editor = { cur_word = "current-live" } }
 			manager.ingest_once()
 			helpers.assert_eq(applied, 2)
 			helpers.assert_eq(state.reads, 2)
-			helpers.assert_eq(db.revision, "3", "current foreign-only refresh keeps its compatibility mark")
+			helpers.assert_eq(db.revision, "4", "current foreign-only refresh keeps its compatibility mark")
 			helpers.assert_eq(json.decode(db.context), current, "current local context keeps normal persistence")
-			helpers.assert_eq(db.view_revision, 3)
+			helpers.assert_eq(db.view_revision, 4)
 		end)
 	end)
 end)

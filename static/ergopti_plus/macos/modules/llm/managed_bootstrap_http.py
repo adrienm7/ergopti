@@ -14,6 +14,7 @@ import math
 import os
 from pathlib import Path
 import re
+import selectors
 import signal
 import subprocess
 import sys
@@ -252,7 +253,7 @@ def download(url, output, digest, size, deadline, idle_timeout, request=_native_
         return output
     finally:
         if not complete:
-            output.unlink()
+            output.unlink(missing_ok=True)
 
 
 def _run_uv(arguments, deadline, environment=None):
@@ -260,10 +261,24 @@ def _run_uv(arguments, deadline, environment=None):
     child = None
     try:
         child = subprocess.Popen(arguments, stdout=subprocess.PIPE, env=environment)
-        stdout, _ = child.communicate(timeout=_remaining(deadline))
-        if child.returncode != 0 or len(stdout) > 16 * 1024 * 1024:
+        chunks = []
+        size = 0
+        limit = 16 * 1024 * 1024
+        with selectors.DefaultSelector() as selector:
+            selector.register(child.stdout, selectors.EVENT_READ)
+            while True:
+                if not selector.select(_remaining(deadline)):
+                    raise BootstrapFailure("deadline")
+                chunk = os.read(child.stdout.fileno(), min(65536, limit + 1 - size))
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > limit:
+                    raise BootstrapFailure("dependency")
+                chunks.append(chunk)
+        if child.wait(timeout=_remaining(deadline)) != 0:
             raise BootstrapFailure("dependency")
-        return stdout
+        return b"".join(chunks)
     except subprocess.TimeoutExpired:
         raise BootstrapFailure("deadline") from None
     finally:

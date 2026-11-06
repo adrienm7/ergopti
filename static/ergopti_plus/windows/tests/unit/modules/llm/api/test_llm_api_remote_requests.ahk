@@ -441,3 +441,12 @@ for Index, Budget in [0, -1, "30000", 0x80000000, "unset"]
 #Include %A_LineFile%/../test_llm_api_remote_abort_retirement.ahk
 
 #Include %A_LineFile%/../test_llm_api_remote_completion_reads.ahk
+
+_RemoteBuildContext_RawProfile() {
+	profile := Map("id", "raw", "system_single", "{context}", "batch", false)
+	system := LLM_ResolveSystemPrompt(profile, 1, 1, 15)
+	req := _LLMRemote_BuildRequestContext(system, "typed context", "context")
+	AssertEqual("", req["system"], "the raw profile has no system instruction")
+	AssertEqual("typed context", req["user"], "the typed context is the user message")
+}
+Test("raw profile puts the context in the user message", _RemoteBuildContext_RawProfile)

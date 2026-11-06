@@ -4911,12 +4911,13 @@ end
 --- @param ms number|nil Per-key override in milliseconds, or nil to clear.
 function M.set_tap_timeout(key_id, ms)
 	if not require_state("set_tap_timeout") then return false end
-	local value = tonumber(ms)
-	if value and value > 0 then
-		value = math.floor(value)
-	else
-		value = nil  -- clear override → inherit the global timeout
+	local value = ms == nil and nil or tonumber(ms)
+	if ms ~= nil and (not require("number_policy").within_timer_ceiling(value)
+		or (value > 0 and value % 1 ~= 0)) then
+		Logger.error(LOG, "set_tap_timeout: invalid value '%s' — ignoring.", tostring(ms))
+		return false
 	end
+	if value ~= nil and value <= 0 then value = nil end -- inherit the global timeout
 	local committed = commit_state_mutation(function(candidate)
 		local cfg = candidate.tap_hold_config[key_id] or {}
 		candidate.tap_hold_config[key_id] = {
@@ -5040,11 +5041,10 @@ end
 function M.set_tap_hold_timeout(ms)
 	if not require_state("set_tap_hold_timeout") then return false end
 	local value = tonumber(ms)
-	if not value or value <= 0 then
+	if not require("number_policy").within_timer_ceiling(value) or value <= 0 or value % 1 ~= 0 then
 		Logger.error(LOG, "set_tap_hold_timeout: invalid value '%s' — ignoring.", tostring(ms))
 		return false
 	end
-	value = math.floor(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.tap_hold_timeout_ms = value
 	end, nil, require("config_keys").KEY.TAP_HOLDS_TIMEOUT_MS)
@@ -5090,11 +5090,10 @@ end
 function M.set_sticky_timeout(ms)
 	if not require_state("set_sticky_timeout") then return false end
 	local value = tonumber(ms)
-	if not value or value <= 0 then
+	if not require("number_policy").within_timer_ceiling(value) or value <= 0 or value % 1 ~= 0 then
 		Logger.error(LOG, "set_sticky_timeout: invalid value '%s' — ignoring.", tostring(ms))
 		return false
 	end
-	value = math.floor(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.sticky_timeout_ms = value
 	end, nil, require("config_keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
@@ -5115,11 +5114,10 @@ end
 function M.set_simultaneous_threshold(ms)
 	if not require_state("set_simultaneous_threshold") then return false end
 	local value = tonumber(ms)
-	if not value or value <= 0 then
+	if not require("number_policy").within_timer_ceiling(value) or value <= 0 or value % 1 ~= 0 then
 		Logger.error(LOG, "set_simultaneous_threshold: invalid value '%s' — ignoring.", tostring(ms))
 		return false
 	end
-	value = math.floor(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.simultaneous_threshold_ms = value
 	end, nil, require("config_keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)

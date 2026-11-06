@@ -71,9 +71,9 @@ local function make_ctx()
 end
 
 
-local function with_switch_frame(callback, labels)
+local function with_switch_frame(callback, labels, configure)
 	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "infra.i18n",
-		"modules.keymap.input_sources", "modules.keymap.layout_install", "modules.keymap.layout_registry"}, function()
+		"infra.notifications", "modules.keymap.input_sources", "modules.keymap.layout_install", "modules.keymap.layout_registry"}, function()
 		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local installer = require("modules.keymap.layout_install")
 		local fixture = {records = {{id = "French", name = "French", selected = false}}, saves = 0, updates = 0, effects = 0}
@@ -90,6 +90,7 @@ local function with_switch_frame(callback, labels)
 		sources.set_input_source_async = forbidden
 		installer.install_system = forbidden
 		installer.install_user = forbidden
+		if configure then configure(fixture, installer) end
 		package.loaded["modules.keymap.layout_registry"] = {picker = function() return fixture.custom or {layouts = {}, active = ""} end, select = forbidden}
 		local translator = require("infra.i18n")
 		local original_get = translator.get

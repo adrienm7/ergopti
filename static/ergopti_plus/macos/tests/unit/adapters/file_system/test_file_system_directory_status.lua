@@ -24,7 +24,7 @@ local function with_adapter(run)
 				attributes = function()
 					state.follows = state.follows + 1
 					if state.throw then error("injected followed stat failure") end
-					return state.followed, state.follow_error
+					return state.followed, state.follow_error, state.follow_errno
 				end,
 			} }
 			run(require("adapters.file_system"), state)
@@ -96,6 +96,20 @@ helpers.describe("FileSystem.directory_status", function()
 end)
 
 helpers.describe("FileSystem.followed_mode (config-backup-special-nodes)", function()
+	helpers.it("does not mistake a filename for an ENOENT reason (followed-mode-enoent-path)", function()
+		with_adapter(function(adapter, state)
+			state.followed = nil
+			state.follow_error = "cannot obtain information from file '/No such file or directory': Permission denied"
+			local status, detail = adapter.followed_mode("/No such file or directory")
+			helpers.assert_eq(status, "error", "the filename is not the native failure reason")
+			helpers.assert_contains(detail, "Permission denied")
+			state.follow_error = "cannot obtain information from file '/fixture/missing': No such file or directory"
+			helpers.assert_eq(adapter.followed_mode("/fixture/missing"), "absent")
+			state.follow_errno = 13
+			helpers.assert_eq(adapter.followed_mode("/fixture/missing"), "error", "a native errno outranks text")
+		end)
+	end)
+
 	helpers.it("(config-backup-special-nodes) reports the followed mode without opening anything", function()
 		with_adapter(function(adapter, state)
 			state.followed = { mode = "named pipe" }

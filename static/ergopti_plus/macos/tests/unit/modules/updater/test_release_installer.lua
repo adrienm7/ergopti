@@ -134,16 +134,73 @@ helpers.describe("release_installer: staging and replacement dispatch", function
 		helpers.assert_eq(call.args[5], DIGEST)
 		helpers.assert_eq(call.args[7], "0.0.0-dev.139")
 		helpers.assert_eq(call.args[8], "/Applications/ErgoptiPlus.app")
-		helpers.assert_true(call.args[6]:match("^/Applications/%.ergopti%-release%-install%-%d%d%d%d%d%d%d%d%-%d%d%d%d%d%d$") ~= nil, "the private stage belongs to the destination parent, regardless of TMPDIR")
-		call.on_done(0, "READY /private/tmp/user/x/app/ErgoptiPlus.app\n", "")
+		helpers.assert_true(call.args[6]:match("^/Applications/%.ergopti%-release%-install%-%d%d%d%d%d%d%d%d%-%d%d%d%d%d%d%-%d+$") ~= nil, "the private stage belongs to the destination parent, regardless of TMPDIR")
+		call.on_done(0, "READY " .. call.args[6] .. "/app/ErgoptiPlus.app\n", "")
 		call.on_done(10, "", "curl: (6) Could not resolve host")
 		call.on_done(21, "", "")
 		call.on_done(27, "", "code object is not signed")
-		helpers.assert_eq(results[1][1], "/private/tmp/user/x/app/ErgoptiPlus.app")
+		helpers.assert_eq(results[1][1], call.args[6] .. "/app/ErgoptiPlus.app")
 		helpers.assert_eq(results[2][2], "download")
 		helpers.assert_eq(results[3][2], "verify")
 		helpers.assert_eq(results[4][2], "verify")
 		helpers.assert_nil(results[4][1])
+	end)
+
+	helpers.it("refuses a stage receipt naming a different application", function()
+		local callback, result
+		Installer._spawn = function(_, _, on_done)
+			callback = on_done
+			return { start = function() return true end }
+		end
+		local asset = { tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST, format = "zip" }
+		helpers.assert_true(Installer.stage(asset, function(...) result = { ... } end))
+		callback(0, "READY /private/tmp/foreign/app/ErgoptiPlus.app\n", "")
+		helpers.assert_nil(result[1], "a foreign receipt must not reach the swap owner")
+		helpers.assert_eq(result[2], "verify")
+	end)
+
+	helpers.it("uses distinct stages for retries started in the same second", function()
+		local paths = {}
+		Installer._spawn = function(_, args)
+			paths[#paths + 1] = args[6]
+			return { start = function() return true end }
+		end
+		local old_date = os.date
+		os.date = function() return "20261104-120000" end
+		local ok, err = xpcall(function()
+			local asset = { tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST, format = "zip" }
+			helpers.assert_true(Installer.stage(asset, function() end))
+			helpers.assert_true(Installer.stage(asset, function() end))
+			helpers.assert_true(paths[1] ~= paths[2], "a retry must not reuse the first stage")
+		end, debug.traceback)
+		os.date = old_date
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("requires system curl only for an explicit proxy route", function()
+		local previous = package.loaded["adapters.system_curl"]
+		local checks, starts, child_environment, curl_available = 0, 0, nil, false
+		package.loaded["adapters.system_curl"] = { check = function() checks = checks + 1; return curl_available end }
+		Installer._spawn = function(_, _, _, _, environment)
+			child_environment = environment
+			return { start = function() starts = starts + 1; return true end }
+		end
+		local asset = { tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST, format = "zip" }
+		local ok, err = pcall(function()
+			helpers.assert_true(Installer.stage(asset, function() end), "native stage does not run curl")
+			helpers.assert_eq(checks, 0)
+			helpers.assert_eq(child_environment.https_proxy, "", "the child receives the admitted proxy snapshot")
+			env.https_proxy = "http://proxy.example:3128"
+			helpers.assert_eq(Installer.stage(asset, function() end), false, "the explicit proxy uses curl")
+			helpers.assert_eq(checks, 1)
+			helpers.assert_eq(starts, 1)
+			curl_available = true
+			helpers.assert_true(Installer.stage(asset, function() end))
+			helpers.assert_eq(child_environment.https_proxy, env.https_proxy)
+		end)
+		env.https_proxy = nil
+		package.loaded["adapters.system_curl"] = previous
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("arms the replacement detached, with the previous app kept aside", function()
@@ -316,7 +373,14 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		assert(sh("mkdir -p " .. quote(app) .. " " .. quote(staged)) == 0)
 		write(app .. "/marker", "installed")
 		write(staged .. "/marker", "chosen")
-		if opts.previous then assert(sh("mkdir -p " .. quote(previous)) == 0) end
+		if opts.previous == "directory" then
+			assert(sh("mkdir -p " .. quote(previous)) == 0)
+			write(previous .. "/marker", "user backup")
+		elseif opts.previous == "file" then
+			write(previous, "user backup")
+		elseif opts.previous == "symlink" then
+			assert(sh("ln -s missing " .. quote(previous)) == 0)
+		end
 
 		local opened = dir .. "/opened"
 		local open = fake(dir, "open", 'echo "$2" >> ' .. quote(opened))
@@ -331,10 +395,12 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		local status, output = sh(require("tests.support.release_swap_ports").command() .. " --release-rename lock " .. quote(app)
 			.. " " .. quote(script) .. " " .. pid .. " " .. quote(staged) .. " " .. quote(previous)
 			.. " 3>" .. quote(acknowledgement))
-		helpers.assert_eq(read(acknowledgement), "ARMED\n", "the actual worker acknowledges before the same swap checks")
+		helpers.assert_eq(read(acknowledgement), opts.previous and "" or "ARMED\n",
+			"an occupied backup must refuse before the driver quits")
 		local result = {
 			status = status, output = output,
 			app = read(app .. "/marker"), previous = read(previous .. "/marker"), opened = read(opened) or "",
+			previous_file = read(previous), previous_link = sh("test -L " .. quote(previous)) == 0,
 			app_path = app,
 		}
 		sh("rm -rf " .. quote(dir))
@@ -347,7 +413,7 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		local completed, result = pcall(function()
 			local sleeper = producer:read("*l")
 			assert(sleeper and sleeper:match("^[1-9]%d*$"), "The retained sleeper must publish its exact PID")
-			return swap({ pid = sleeper, previous = true })
+			return swap({ pid = sleeper })
 		end)
 		-- Close this exact producer even if PID admission or swap failed. All
 		-- original result assertions run only after the parent has been reaped.
@@ -358,6 +424,19 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		helpers.assert_eq(result.app, "chosen")
 		helpers.assert_eq(result.previous, "installed")
 		helpers.assert_eq(result.opened, result.app_path .. "\n")
+	end)
+
+	helpers.it("preserves a pre-existing backup and refuses before arming", function()
+		for _, kind in ipairs({ "directory", "file", "symlink" }) do
+			local result = swap({ previous = kind })
+			helpers.assert_eq(result.status, 1)
+			helpers.assert_eq(result.app, "installed")
+			helpers.assert_eq(result.opened, "")
+			if kind == "directory" then helpers.assert_eq(result.previous, "user backup") end
+			if kind == "file" then helpers.assert_eq(result.previous_file, "user backup") end
+			if kind == "symlink" then helpers.assert_true(result.previous_link) end
+			helpers.assert_true(result.output:find("Move the existing backup", 1, true) ~= nil)
+		end
 	end)
 
 	helpers.it("puts the previous app back and opens it when the chosen one cannot move in", function()
@@ -399,6 +478,10 @@ helpers.describe("release_installer: declared archive preference and historical 
 			function(value) value.release_install.macos_archives[1].asset_key = "missing" end,
 			function(value) value.release_install.macos_archives[1].format = "zip" end,
 			function(value) value.release_install.macos_archives[2] = value.release_install.macos_archives[1] end,
+			function(value)
+				value.release_assets.extra_zip = "Other.app.zip"
+				value.release_install.macos_archives[1] = { asset_key = "extra_zip", format = "zip" }
+			end,
 			function(value) value.release_install.macos_archives.future = {} end,
 			function(value) value.github.owner = "../foreign" end,
 		}) do
@@ -626,5 +709,16 @@ helpers.describe("release_installer: explicit native script observation", functi
 		end, debug.traceback)
 		assert(sh("rm -rf " .. quote(dir)) == 0)
 		if not ok then error(err, 0) end
+	end)
+end)
+
+helpers.describe("updater version comparison parity", function()
+	helpers.it("replays the shared version vectors, including malformed suffixes", function()
+		local raw = assert(read(helpers.shared("modules/updater/version_vectors.json")))
+		local vectors = require("json").decode(raw).vectors
+		local version = require("updater.version")
+		for _, vector in ipairs(vectors) do
+			helpers.assert_eq(version.compare_versions(vector.a, vector.b), vector.expect, vector.id)
+		end
 	end)
 end)

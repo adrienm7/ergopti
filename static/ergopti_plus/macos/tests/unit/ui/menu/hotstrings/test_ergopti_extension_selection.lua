@@ -152,6 +152,19 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 				helpers.assert_type(find(extension.menu, suffix_title .. " (24)"), "table",
 					"all suffixes are visible in the extension's actual category subtree")
 				helpers.assert_true(type(initial.action) == "function")
+				for _, read in ipairs({ function() return nil end, function() return true end,
+					function() error("pause unavailable") end }) do
+					ctx.is_paused = read
+					local called, accepted = pcall(initial.action)
+					helpers.assert_true(called, "pause failures must not escape the menu action")
+					helpers.assert_eq(accepted, false, "unknown or paused state must not change the extension")
+					local bulk = Hotstrings.build_extension_bulk_actions(ctx, {}, Hotstrings.bound_sections(ctx).ergopti)
+					local bulk_called, bulk_accepted = pcall(bulk[1].action)
+					helpers.assert_true(bulk_called)
+					helpers.assert_eq(bulk_accepted, false, "bulk changes must also consult the live pause owner")
+					helpers.assert_eq(saves, 0)
+				end
+				ctx.is_paused = function() return false end
 				helpers.assert_true(initial.action())
 				helpers.assert_eq(Registry.is_section_enabled("magickey", "replace"), true)
 				local saved = Preferences.load(prefs_file)

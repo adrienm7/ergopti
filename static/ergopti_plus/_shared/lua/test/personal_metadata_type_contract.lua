@@ -28,8 +28,20 @@ end
 function M.run(helpers, corpus)
 	local Metadata = require("hotstrings.personal_metadata")
 	local Codec = require("toml_codec")
-	assert(corpus.version == 1 and #corpus.vectors == 24, "personal metadata type corpus must contain twenty-four vectors")
+	assert(corpus.version == 1 and #corpus.vectors == 26, "personal metadata type corpus must contain twenty-six vectors")
 	helpers.describe("personal metadata stored types", function()
+		helpers.it("validates CSS color lengths without rewriting invalid stored data (personal-css-color)", function()
+			for _, value in ipairs({ "#abc", "#abcd", "#abcdef", "#abcdef12", "abcdef" }) do
+				helpers.assert_true(Metadata.valid("color", value))
+			end
+			for _, value in ipairs({ "#abcde", "#abcdef0", "#abcdz" }) do
+				helpers.assert_eq(Metadata.valid("color", value), false)
+				helpers.assert_nil(Metadata.prepare("[_meta]\ncolor = \"#123456\"\n", nil, "color", value))
+				local source = '[_meta]\ncolor = "' .. value .. '"\n'
+				helpers.assert_true(Metadata.readonly_fields(source, nil).color)
+				helpers.assert_nil(Metadata.prepare(source, nil, "color", "#123456"))
+			end
+		end)
 		for _, vector in ipairs(corpus.vectors) do
 			helpers.it("(personal-metadata-source-type) " .. vector.name, function()
 				helpers.assert_not_nil(Codec.decode(vector.source), "the source is genuine admitted TOML")

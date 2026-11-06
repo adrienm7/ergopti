@@ -177,6 +177,68 @@ end
 
 helpers.describe("LLM semantic HTTP ownership", function()
 
+	helpers.it("remote model listing state and waiter retire when the same entry changes", function()
+		local api = fresh_backend("modules.llm.api_remote")
+		configure_remote(api)
+		local state, restore = instrument_client(get_upvalue(api.list_active_models, "_listing_client"))
+		local ok, err = xpcall(function()
+			local plan = require("llm.api_model_listing").plan
+			local view = { model = "new-model", default_model = "fallback", extras = {}, format = "openai" }
+			local calls, reason = 0, nil
+			api.list_active_models(function(_, why)
+				calls, reason = calls + 1, why
+				helpers.assert_eq(api.get_entries()[1].base_url, "https://new.invalid")
+			end)
+			helpers.assert_eq(api.listing_state("entry-a").state, "pending")
+			api.set_entries({ { id = "entry-a", provider = "fixture", base_url = "https://new.invalid",
+				token = "new-token", model = "new-model" } })
+			helpers.assert_nil(api.listing_state("entry-a"))
+			helpers.assert_eq(plan(view, api.listing_state("entry-a")).models[1].model, "new-model")
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(reason, "stale_identity")
+			state.requests[1].deliver({ ok = true, status = 200, body = [[{"data":[{"id":"old"}]}]] }, true)
+			helpers.assert_nil(api.listing_state("entry-a"))
+			helpers.assert_eq(plan(view, api.listing_state("entry-a")).models[1].model, "new-model")
+			api.list_active_models(function() end)
+			state.requests[2].deliver({ ok = true, status = 200, body = [[{"data":[{"id":"new"}]}]] })
+			helpers.assert_eq(api.listed_models("entry-a")[1], "new")
+			api.set_entries({ { id = "entry-a", provider = "fixture", base_url = "https://third.invalid",
+				token = "other-token", model = "third-model" } })
+			helpers.assert_nil(api.listing_state("entry-a"))
+		end, debug.traceback)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("remote model selector does not cancel an in-flight availability check", function()
+		local api = fresh_backend("modules.llm.api_remote")
+		configure_remote(api)
+		local check = get_upvalue(api.check_availability, "_check_client")
+		local listing = get_upvalue(api.list_active_models, "_listing_client") or check
+		local check_state, restore_check = instrument_client(check)
+		local listing_state, restore_listing = check_state, function() end
+		if listing ~= check then listing_state, restore_listing = instrument_client(listing) end
+		local available, listed = 0, 0
+		local ok, err = xpcall(function()
+			api.check_availability("model-a", function() available = available + 1 end, function() end)
+			api.list_active_models(function(success) if success then listed = listed + 1 end end)
+			local first = check_state.requests[1]
+			local second = listing_state.requests[listing == check and 2 or 1]
+			helpers.assert_true(first ~= nil and second ~= nil)
+			second.deliver({ ok = true, status = 200, body = [[{"data":[]}]] })
+			first.deliver({ ok = true, status = 200, body = [[{"data":[]}]] })
+			helpers.assert_eq(available, 1, "the Test API availability must finish")
+			helpers.assert_eq(listed, 1, "the model selector listing must finish")
+			api.list_active_models(function() end)
+			local pending = listing_state.requests[#listing_state.requests]
+			api.set_active_entry_id("entry-b")
+			helpers.assert_true(pending.cancelled, "an identity change retires the listing owner")
+		end, debug.traceback)
+		restore_listing()
+		restore_check()
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("semantic HTTP owner isolation preserves Ollama inference across out-of-order warmup", function()
 		local api = fresh_backend("modules.llm.api_ollama")
 		local post_and_parse = get_upvalue(api.fetch_batch, "post_and_parse")

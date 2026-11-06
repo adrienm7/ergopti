@@ -781,9 +781,8 @@ function _renderMagicKey(page, state) {
 	var input = document.createElement('input');
 	input.type = 'text';
 	input.className = 'magic-input';
-	// A supplementary Unicode symbol occupies two browser UTF-16 units, but
-	// the Linux runtime still validates exactly one scalar before saving.
-	input.maxLength = choice.max_characters * (choice.validation === 'safe_magic_key' ? 2 : 1);
+	// maxlength counts UTF-16 code units; one accepted Unicode scalar may need two.
+	input.maxLength = choice.max_characters * 2;
 	input.value = isPreset
 		? state.custom
 		: state.magic === CUSTOM_MAGIC_VALUE
@@ -1096,9 +1095,16 @@ window.setGestureRegisterStatus = function (ok) {
 // ======================================
 // ======================================
 
+/** Reads an absolute Unix path literally: trailing spaces are valid names. */
+function _configInputValue() {
+	var value = document.getElementById('config-input').value || '';
+	if ((_platform === 'macos' || _platform === 'linux') && value.charAt(0) === '/') return value;
+	return value.trim();
+}
+
 /** Leaves the config step: the folder's configuration and metrics store. */
 function _leaveConfig() {
-	_configDir = (document.getElementById('config-input').value || '').trim();
+	_configDir = _configInputValue();
 	if (_configPending || _configDir !== _loadedDir) {
 		// A requested folder is not an admitted configuration. Retire prior
 		// values and choices now, and allow the config step to retry the same
@@ -1126,7 +1132,17 @@ function _pageComplete(page) {
 		Object.prototype.hasOwnProperty.call(_current, page.magic_key.path)
 	)
 		return true;
-	if (_magicValue(page) !== '') return true;
+	var value = _magicValue(page);
+	var scalars = Array.from(value);
+	if (
+		scalars.length > 0 &&
+		scalars.length <= page.magic_key.max_characters &&
+		scalars.every(function (scalar) {
+			var cp = scalar.codePointAt(0);
+			return cp > 0x1f && !(cp >= 0x7f && cp <= 0x9f) && !(cp >= 0xd800 && cp <= 0xdfff);
+		})
+	)
+		return true;
 	var input = document.getElementById('page-magic-options').querySelector('.magic-input');
 	if (input) {
 		input.classList.add('invalid');
@@ -1157,7 +1173,7 @@ document.getElementById('btn-next').addEventListener('click', function () {
 
 document.getElementById('btn-back').addEventListener('click', function () {
 	if (_steps[_stepIndex] === STEP_CONFIG) {
-		_configDir = (document.getElementById('config-input').value || '').trim();
+		_configDir = _configInputValue();
 	}
 	if (_stepIndex > 0) _go(_stepIndex - 1);
 });

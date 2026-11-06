@@ -816,6 +816,7 @@
 	},
 	{
 		"id": "hyper",
+		"modifiers": ["cmd", "option", "shift", "ctrl"],
 		"short_label": "Hyper",
 		"label": "⌘⌥⇧⌃ — Hyper (tous les modificateurs)",
 		"holdable": true,

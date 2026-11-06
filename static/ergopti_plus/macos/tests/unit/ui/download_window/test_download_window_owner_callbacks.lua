@@ -60,6 +60,29 @@ local function with_window(scenario)
 end
 
 helpers.describe("download window exact native owners", function()
+	helpers.it("rejects non-finite and out-of-range bootstrap progress", function()
+		with_window(function(window, records)
+			local observed = 0
+			window.set_percent_listener(function() observed = observed + 1 end)
+			helpers.assert_true(window.show({ kind = "mlx_install" }))
+			local native = records.windows[1]
+			native.opts.on_navigation("didFinishNavigation")
+			local before = #native.codes
+			for _, value in ipairs({ 0/0, math.huge, -math.huge, -1, 101 }) do
+				helpers.assert_eq(window.set_progress(value), false)
+			end
+			for _, value in ipairs({ 0/0, math.huge, -math.huge, {} }) do
+				helpers.assert_eq(window.update(value), false)
+			end
+			helpers.assert_eq(#native.codes, before)
+			helpers.assert_eq(observed, 0)
+			window.set_progress(50)
+			helpers.assert_eq(observed, 1)
+			helpers.assert_contains(native.codes[#native.codes], "setProgress(50)")
+			window.set_progress(nil)
+			helpers.assert_contains(native.codes[#native.codes], "setProgress(null)")
+		end)
+	end)
 	helpers.it("(download-cleanup-only) focuses only the captured active operation", function()
 		with_window(function(window, records)
 			helpers.assert_true(window.show({ kind = "mlx_install" }))

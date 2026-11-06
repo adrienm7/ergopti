@@ -18,7 +18,7 @@ helpers.describe("menu_apps: descriptions are resolved when the submenu is built
 		local previous_hs = _G.hs
 		local ok, err = xpcall(function()
 			helpers.with_fresh_modules({ "ui.menu.menu_apps", "infra.logger", "infra.paths",
-				"infra.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils" }, function()
+				"infra.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils", "infra.fs_dir" }, function()
 				local locale = "fr"
 				local texts = {
 					fr = { ["menu.apps.clone_desc"] = "Dupliquer une application" },
@@ -31,13 +31,13 @@ helpers.describe("menu_apps: descriptions are resolved when the submenu is built
 				end }
 				package.loaded["adapters.task_lifecycle"] = {}
 				local scans = 0
+				package.loaded["infra.fs_dir"] = { try_entries_quiet = function(directory)
+					if directory:find("/Contents/Resources", 1, true) then return {}, true end
+					scans = scans + 1
+					return { "App Cloner.app" }, true
+				end }
 				local module = helpers.load_with_stubs("ui.menu.menu_apps", {
 					fs = { attributes = function() return { mode = "directory" } end },
-					execute = function(command)
-						if command:find("*.icns", 1, true) then return "", true, "exit", 0 end
-						scans = scans + 1
-						return "/virtual/App Cloner.app\0", true, "exit", 0
-					end,
 					application = { infoForBundlePath = function() return {} end },
 					image = { imageFromPath = function() return nil end },
 				})

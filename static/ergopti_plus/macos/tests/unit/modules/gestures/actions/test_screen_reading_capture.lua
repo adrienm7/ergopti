@@ -203,6 +203,39 @@ helpers.describe("screen reading capture (llm-vision)", function()
 		end)
 	end)
 
+	helpers.it("(screen-reading-original-fallback) keeps captured bytes when failed sips changed its file", function()
+		for _, residue in ipairs({ false, "truncated", png(800, 600, "incomplete conversion") }) do
+			with_subject(function(subject, fixture)
+				local delivered = start(subject, { "-i" })
+				local original = png(4000, 3000, "captured original")
+				fixture.file = original
+				fixture.tasks[1].finish(0, "", "")
+				fixture.file = residue ~= false and residue or nil
+				fixture.tasks[2].finish(1, "", "sips conversion failed")
+				helpers.assert_eq(#delivered, 1)
+				helpers.assert_eq(delivered[1].outcome, "image")
+				helpers.assert_eq(delivered[1].data, "B64(" .. original .. ")",
+					"a failed in-place conversion must not replace the original capture")
+				helpers.assert_eq(#fixture.notifications, 0)
+				helpers.assert_eq(fixture.removed[1], TEMP)
+			end)
+		end
+	end)
+
+	helpers.it("(screen-reading-original-fallback) keeps the original when resized output is unusable", function()
+		with_subject(function(subject, fixture)
+			local delivered = start(subject, { "-i" })
+			local original = png(4000, 3000, "captured original")
+			fixture.file = original
+			fixture.tasks[1].finish(0, "", "")
+			fixture.file = "unusable resized output"
+			fixture.tasks[2].finish(0, "", "")
+			helpers.assert_eq(delivered[1].outcome, "image")
+			helpers.assert_eq(delivered[1].data, "B64(" .. original .. ")")
+			helpers.assert_eq(fixture.removed[1], TEMP)
+		end)
+	end)
+
 	helpers.it("reports a cancelled selection and a failed capture without a notification", function()
 		with_subject(function(subject, fixture)
 			local cancelled = start(subject, { "-i" })

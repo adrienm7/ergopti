@@ -170,6 +170,7 @@ local function build_world(selection, ui_locale, options)
 	hs_stub.application.frontmostApplication = function() return front_app end
 	hs_stub.pasteboard = {
 		changeCount = function() return world.clipboard_generation end,
+		allContentTypes = function() return { {} } end,
 		readAllData = function()
 			if world.clipboard == nil then return {} end
 			return { ["public.utf8-plain-text"] = world.clipboard }

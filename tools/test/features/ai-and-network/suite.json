@@ -532,6 +532,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-model-browser-host-actions.cjs"],
 			"repro": "npm run test:model-browser-host-actions"
+		},
+		{
+			"id": "js-prompt-editor-literal-token",
+			"ordinal": 574,
+			"name": "prompt editor preserves literal brace text through its save bridge",
+			"cmd": "node",
+			"args": ["tools/test/test-prompt-editor-literal-token.cjs"],
+			"repro": "node tools/test/test-prompt-editor-literal-token.cjs"
 		}
 	]
 }

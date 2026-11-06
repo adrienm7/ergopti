@@ -852,3 +852,19 @@ Test("_LLMRemoteExtractUsage: estimated cost is included in result map", _Remote
 
 
 #Include %A_LineFile%/../test_llm_api_remote_retirement.ahk
+
+_RemotePayload_RawHasNoSystem() {
+	for Fmt in ["openai", "anthropic", "gemini"] {
+		body := JsonParse(_LLMRemoteBuildPayload(Fmt, "model", "", "typed context", 0.2, 16))
+		if (Fmt == "gemini") {
+			AssertFalse(body.Has("systemInstruction"), "Gemini has no empty system instruction")
+			AssertEqual("typed context", body["contents"][1]["parts"][1]["text"])
+		} else {
+			AssertFalse(body.Has("system"), "Anthropic has no empty system field")
+			AssertEqual(1, body["messages"].Length, "only the user message remains")
+			AssertEqual("user", body["messages"][1]["role"])
+			AssertEqual("typed context", body["messages"][1]["content"])
+		}
+	}
+}
+Test("remote raw payload omits system instructions across providers", _RemotePayload_RawHasNoSystem)

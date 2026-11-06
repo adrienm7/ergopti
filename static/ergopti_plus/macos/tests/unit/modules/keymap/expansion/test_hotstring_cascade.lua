@@ -150,6 +150,21 @@ local CHAIN = {
 
 helpers.describe("keymap: the hotstring cascade", function()
 
+	helpers.it("splices a different-width folded cascade trigger at its typed boundary", function()
+		local state, expander = fresh_engine({
+			{ "a", "K", { is_case_sensitive = true } },
+			{ "k", "output", { is_case_sensitive = true } },
+		}, 2)
+		state.buffer = "xa"
+		local first
+		for _, mapping in ipairs(state.mappings) do
+			if mapping.trigger == "a" then first = mapping end
+		end
+		helpers.assert_true(first ~= nil)
+		helpers.assert_true(expander.try_auto_expand(first, 1, false))
+		helpers.assert_eq("xoutput", state.buffer)
+	end)
+
 	helpers.it("one arrow is today's behaviour: the output is final", function()
 		local state, expander, log = fresh_engine(CHAIN, 1)
 		state.buffer = ""

@@ -39,16 +39,16 @@ function Owner:arm(now, timeout)
 	self.deadline = now + timeout
 end
 
---- Cancels activation while retaining release debt for already consumed keys.
+--- Cancels activation while retaining release debt for transformed keys.
 function Owner:disarm()
 	self.deadline = nil
-	self.shifted = {}
 end
 
 --- Drops identities after observation stops; a later press is a new owner.
 function Owner:reset()
 	self:disarm()
 	self.absorbed = {}
+	self.shifted = {}
 end
 
 --- Whether the owner can change the next event.

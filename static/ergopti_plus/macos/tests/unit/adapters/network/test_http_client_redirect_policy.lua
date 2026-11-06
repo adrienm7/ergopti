@@ -86,6 +86,20 @@ local function load_fixture(options)
 end
 
 helpers.describe("HttpClient redirect ownership", function()
+	helpers.it("refuses ambiguous Location headers instead of choosing one", function()
+		local client, state = load_fixture()
+		local terminal
+		client.get("https://api.example.test/start", { Authorization = "fixture-token" }, function(result)
+			terminal = result
+		end)
+		state.callbacks[1](302, "", {
+			Location = "https://api.example.test/safe",
+			location = "https://other.example.test/unexpected",
+		})
+		helpers.assert_eq(#state.requests, 1)
+		helpers.assert_eq(terminal and terminal.status, 302)
+		helpers.assert_eq(terminal and terminal.ok, false)
+	end)
 	helpers.it("preserves uncredentialed default native redirect behavior", function()
 		local client, state = load_fixture()
 		local result

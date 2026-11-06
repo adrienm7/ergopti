@@ -62,6 +62,31 @@ helpers.describe("LLM progressive reveal owns every timer transaction", function
 		helpers.assert_eq(#sizes, 1,
 			"a deferred reveal from a stale request must not mutate the current tooltip")
 	end)
+
+	helpers.it("does not publish an old full batch if timer cleanup is refused after revocation", function()
+		local callback
+		local handle = { timer = {} }
+		local attempts = 0
+		package.loaded["adapters.timer_scheduler"] = {
+			after = function(_, fn) callback = fn; return handle, true end,
+			cancel = function(candidate)
+				helpers.assert_eq(candidate, handle)
+				attempts = attempts + 1
+				return false
+			end,
+		}
+		package.loaded["modules.llm.progressive_reveal"] = nil
+		local Reveal = require("modules.llm.progressive_reveal")
+		local current, sizes = true, {}
+		Reveal.deliver({ "one", "two", "three" }, function(values)
+			sizes[#sizes + 1] = #values
+		end, 7, function() return current end)
+		current = false
+		callback()
+		callback()
+		helpers.assert_eq(sizes, { 1 }, "retired requests cannot republish a fallback")
+		helpers.assert_eq(attempts, 2, "each delivery may retry only the retained timer cleanup")
+	end)
 end)
 
 package.loaded["adapters.timer_scheduler"] = saved_scheduler

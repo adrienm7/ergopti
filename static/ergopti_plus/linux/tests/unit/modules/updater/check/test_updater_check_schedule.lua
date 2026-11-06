@@ -55,6 +55,16 @@ local function with_manager(opts, body)
 	ctx.state_key = probe.CHECK_STATE_KEY
 	if opts.record then initial[ctx.state_key] = opts.record end
 	ctx.storage = Fakes.storage({ initial = initial })
+	ctx.record_read_error = opts.record_read_error == true
+	local original_get = ctx.storage.get
+	ctx.storage.get = function(key, default)
+		if key == ctx.state_key and ctx.record_read_error then return default end
+		return original_get(key, default)
+	end
+	ctx.storage.read_exact = function(key)
+		if key == ctx.state_key and ctx.record_read_error then return false, nil end
+		return true, ctx.storage.get(key, nil)
+	end
 	package.loaded["adapters.storage"] = ctx.storage
 	package.loaded["modules.updater.manager"] = nil
 	ctx.M = require("modules.updater.manager")
@@ -112,6 +122,28 @@ local function record(ctx)
 end
 
 helpers.describe("updater (linux): the check schedule follows the persisted record", function()
+	helpers.it("retains the persisted record after an unavailable read", function()
+		local original = { seed = SEED, last_check_at = T0 - 120, last_notified_tag = "v1.2.3" }
+		with_manager({ now = T0, record = original, record_read_error = true }, function(ctx)
+			helpers.assert_eq(ctx.storage.values[ctx.state_key], original)
+			helpers.assert_eq(#ctx.dispatches, 0)
+			ctx.record_read_error = false
+			ctx.clock.now = ctx.clock.now + ctx.M.TIMING.reevaluate_sec
+			fire(ctx)
+			helpers.assert_eq(record(ctx), original)
+			helpers.assert_eq(#ctx.dispatches, 0)
+		end)
+	end)
+	helpers.it("clock rollback behind startup restarts the boot delay", function()
+		with_manager({ now = T0, record = { seed = SEED } }, function(ctx)
+			ctx.clock.now = T0 - 86400
+			fire(ctx)
+			helpers.assert_eq(last_timer(ctx).delay, ctx.M.TIMING.boot_check_delay_sec)
+			ctx.clock.now = ctx.clock.now + ctx.M.TIMING.boot_check_delay_sec
+			fire(ctx)
+			helpers.assert_eq(#ctx.dispatches, 1)
+		end)
+	end)
 	-- A local version run from source has no installation to update. It used
 	-- to check on the schedule all the same, and announce releases it could
 	-- not install; the tray now greys its update rows and nothing is armed.
@@ -250,6 +282,19 @@ helpers.describe("updater (linux): the check schedule follows the persisted reco
 			ctx.dispatches[2](true, { tag = "v1.4.0" }, nil)
 			helpers.assert_eq(ctx.available, { "v1.4.0" }, "a new release is announced once")
 			helpers.assert_eq(record(ctx).last_notified_tag, "v1.4.0", "and persisted")
+		end)
+	end)
+
+	helpers.it("uses the default for an infinite saved interval", function()
+		with_manager({ now = T0, config = "[updater]\ncheck_interval_seconds = inf\n" }, function(ctx)
+			helpers.assert_eq(ctx.M.get_check_interval(), ctx.M.TIMING.default_check_interval_sec)
+		end)
+	end)
+
+	helpers.it("snaps an enormous finite interval without raising", function()
+		with_manager({ now = T0, config = "[updater]\ncheck_interval_seconds = 1e100\n" }, function(ctx)
+			local presets = ctx.M.TIMING.check_interval_presets
+			helpers.assert_eq(ctx.M.get_check_interval(), presets[#presets - 1].seconds)
 		end)
 	end)
 

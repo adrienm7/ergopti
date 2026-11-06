@@ -21,7 +21,7 @@ local OWNED = {
 	"keymap.terminators", "keymap.terminators_catalogue", "keymap.utils",
 	"logger.shim", "modules.keystats", "modules.keymap.expander",
 	"modules.keymap.state", "modules.keymap.terminator_replay", "modules.keymap.terminators",
-	"modules.keymap.utils", "tests.stubs.hs", "text_utils",
+	"modules.keymap.utils", "adapters.clipboard", "tests.stubs.hs", "text_utils",
 }
 
 -- Keep native consumers isolated even when a historical assertion aborts early.
@@ -192,6 +192,7 @@ local function load_fixture(options)
 	}
 
 	local clipboard_writes = {}
+	hs_stub.pasteboard.allContentTypes = function() return { { "original" } } end
 	hs_stub.pasteboard.readAllData = function() return { original = "snapshot" } end
 	local native_set_contents = hs_stub.pasteboard.setContents
 	local native_write_all_data = hs_stub.pasteboard.writeAllData

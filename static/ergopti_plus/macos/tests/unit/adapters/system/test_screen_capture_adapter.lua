@@ -134,6 +134,38 @@ helpers.describe("screen capture adapter: Screen Recording permission", function
 		end)
 	end)
 
+	helpers.it("retains a refused but unsettled TCC launch until its exact exit (tcc-reset-start-race)", function()
+		local saved = package.loaded["adapters.shell_runner"]
+		local observer, result = nil, nil
+		package.loaded["adapters.shell_runner"] = {
+			spawn = function()
+				return {
+					start = function() return false end,
+					isSettled = function() return false end,
+					onSettled = function(fn) observer = fn; return true end,
+				}
+			end,
+		}
+		local ok, err = pcall(function()
+			with_native({ processInfo = { bundleID = "com.ergoptiplus.app.hammerspoon" } }, function(adapter)
+				helpers.assert_eq(adapter.reset_permission("com.ergoptiplus.app.hammerspoon",
+					function(done, detail) result = { done, detail } end), true)
+				helpers.assert_nil(result, "the reset can still revoke the grant")
+				helpers.assert_eq(type(observer), "function")
+				observer()
+				helpers.assert_eq(result[1], false)
+				helpers.assert_contains(result[2], "unsettled launch")
+				package.loaded["adapters.shell_runner"].spawn = function()
+					return { start = function() return false end, isSettled = function() return true end }
+				end
+				helpers.assert_eq(adapter.reset_permission("com.ergoptiplus.app.hammerspoon", function() end), false,
+					"a proven unlaunched task remains an immediate refusal")
+			end)
+		end)
+		package.loaded["adapters.shell_runner"] = saved
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("resets only this app's Screen Recording entry through tccutil (screen-recording-stale-reset)",
 		function()
 			local saved = package.loaded["adapters.shell_runner"]
@@ -163,11 +195,17 @@ helpers.describe("screen capture adapter: Screen Recording permission", function
 					local _, unsupported = pcall(require("adapters.tcc_grant").reset, "All", "com.ergoptiplus.app.hammerspoon",
 						function() end)
 					helpers.assert_contains(tostring(unsupported), "unsupported service")
+					spawned = nil
+					helpers.assert_eq(adapter.reset_permission("com.other.application", function() end), false,
+						"a caller must not reset another application's grant")
+					helpers.assert_nil(spawned)
 				end)
 				with_native({}, function(adapter)
 					local bundle_id, detail = adapter.bundle_id()
 					helpers.assert_nil(bundle_id)
 					helpers.assert_contains(detail, "bundleID")
+					helpers.assert_eq(adapter.reset_permission("com.other.application", function() end), false)
+					helpers.assert_nil(spawned, "an unknown process identity must never invoke tccutil")
 				end)
 			end)
 			package.loaded["adapters.shell_runner"] = saved
@@ -176,6 +214,29 @@ helpers.describe("screen capture adapter: Screen Recording permission", function
 end)
 
 helpers.describe("screen capture adapter: verified clipboard image", function()
+	helpers.it("rejects invalid or regressing pasteboard counts (screen-capture-count-validity)", function()
+		for _, invalid in ipairs({ -1, 1.5, math.huge, 0 / 0 }) do
+			local native, state = pasteboard_native()
+			native.pasteboard.changeCount = function() return invalid end
+			with_native(native, function(adapter)
+				local copied, detail = adapter.copy_image_file_to_clipboard("/tmp/cap.png")
+				helpers.assert_eq(copied, false)
+				helpers.assert_contains(detail, "invalid count")
+				helpers.assert_eq(#state.writes, 0, "invalid ownership must prevent the clipboard write")
+			end)
+		end
+		local native, state = pasteboard_native()
+		native.pasteboard.writeObjects = function(image)
+			state.count, state.image = 6, image
+			return true
+		end
+		with_native(native, function(adapter)
+			local copied, detail = adapter.copy_image_file_to_clipboard("/tmp/cap.png")
+			helpers.assert_eq(copied, false)
+			helpers.assert_contains(detail, "did not advance")
+		end)
+	end)
+
 	helpers.it("copies the capture file and reads the image back", function()
 		local native, state = pasteboard_native()
 		with_native(native, function(adapter)

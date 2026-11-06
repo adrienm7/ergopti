@@ -234,6 +234,57 @@ async function inspect(page) {
 												);
 										}
 									}
+									if (
+										os === 'macos' &&
+										colorScheme === 'light' &&
+										size.width === GEOMETRY.width &&
+										locale === 'en'
+									) {
+										await page.locator('[data-code="MouseLeft"]').click();
+										await page.locator('#btn-clear').click();
+										await page.locator('#btn-save').click();
+										const submitted = await page.evaluate(() => window.__posted.at(-1));
+										assert.equal(submitted.action, 'save');
+										assert.equal(
+											await page.locator('#btn-restore').isDisabled(),
+											true,
+											'restore is unavailable while saving'
+										);
+										assert.equal(
+											await page.locator('#btn-clear').isDisabled(),
+											true,
+											'clear is unavailable while saving'
+										);
+										assert.equal(
+											await page.locator('#btn-close').isDisabled(),
+											true,
+											'close waits for the save result'
+										);
+										await page.keyboard.press('Escape');
+										assert.equal(
+											(await page.evaluate(() => window.__posted.at(-1))).action,
+											'save',
+											'Escape cannot abandon a pending save'
+										);
+										await page.locator('#picker-list .row').last().click();
+										assert.equal(
+											await page.evaluate(() => LayerModel.serialize(state.doc, DATA)),
+											submitted.text,
+											'picker cannot change the pending document'
+										);
+										await page.evaluate(() => window.saveResult({ saved: false, errors: [] }));
+										assert.equal(
+											await page.locator('#btn-restore').isDisabled(),
+											false,
+											'edits resume after refusal'
+										);
+										await page.locator('#btn-restore').click();
+										assert.notEqual(
+											await page.evaluate(() => LayerModel.serialize(state.doc, DATA)),
+											submitted.text,
+											'restored edits remain available after refusal'
+										);
+									}
 									await page.locator('[data-code="MouseLeft"]').click();
 									assert.ok(
 										await page.locator('#panel').textContent(),

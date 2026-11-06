@@ -66,6 +66,19 @@ end
 -- =======================================
 
 helpers.describe("vscode_bridge caret ingest", function()
+	helpers.it("discards the last caret when the server is stopped and restarted", function()
+		local bridge, callback = load_fixture()
+		callback("POST", "/caret", {}, '{"active":true,"line":7,"visibleStartLine":2,"character":4}')
+		helpers.assert_true(bridge.get_caret(5) ~= nil)
+		helpers.assert_true(bridge.stop_server())
+		helpers.assert_nil(bridge.get_caret(5), "stopped sessions must not expose stale caret data")
+		helpers.assert_true(bridge.start_server())
+		helpers.assert_nil(bridge.get_caret(5), "a restarted server must wait for fresh telemetry")
+		callback("POST", "/caret", {}, '{"active":true,"line":8,"visibleStartLine":2,"character":4}')
+		helpers.assert_eq(bridge.get_caret(5).line, 8)
+		helpers.assert_true(bridge.stop_server())
+	end)
+
 	helpers.it("keeps equal caret metadata independent of its sibling and the native graph", function()
 		helpers.with_fresh_modules({ "adapters.json_codec" }, function()
 			local rectangle = { x = 10, y = 20 }

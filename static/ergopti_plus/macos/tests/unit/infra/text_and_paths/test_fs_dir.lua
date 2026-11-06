@@ -13,6 +13,33 @@
 local helpers = require("tests.helpers")
 
 helpers.describe("infra/fs_dir.entries — directory listing", function()
+	helpers.it("rejects embedded NUL before calling the native directory iterator (fs-dir-nul)", function()
+		local fs_dir = require("infra.fs_dir")
+		local previous, calls = hs.fs.dir, 0
+		hs.fs.dir = function(path)
+			calls = calls + 1
+			-- Native opendir receives a C string, whose first NUL terminates it.
+			local actual = path:match("^[^%z]*")
+			local done = false
+			return function()
+				if done then return nil end
+				done = true
+				return "entry from " .. actual
+			end
+		end
+		local ok, err = pcall(function()
+			for _, list in ipairs({ fs_dir.try_entries, fs_dir.try_entries_quiet }) do
+				local names, listed, detail = list("/safe\0/other")
+				helpers.assert_eq(names, {})
+				helpers.assert_eq(listed, false)
+				helpers.assert_contains(detail, "invalid directory path")
+			end
+			helpers.assert_eq(calls, 0, "the truncated prefix must not be enumerated")
+		end)
+		hs.fs.dir = previous
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("exposes entries() and lists registered names in order", function()
 		package.loaded["infra.fs_dir"] = nil
 		local fs_dir = require("infra.fs_dir")
@@ -51,5 +78,19 @@ helpers.describe("infra/fs_dir.entries — directory listing", function()
 		helpers.assert_eq(listed, false, "an unreadable directory is not authoritative evidence of absence")
 		helpers.assert_true(type(list_err) == "string" and list_err:find("permission denied", 1, true) ~= nil,
 			"try_entries must preserve the enumeration failure for its caller")
+	end)
+
+	helpers.it("quiet listing preserves refusal without logging private details", function()
+		local fs_dir = require("infra.fs_dir")
+		local logger, previous_dir = require("infra.logger"), hs.fs.dir
+		local previous_error, calls = logger.error, 0
+		logger.error = function() calls = calls + 1 end
+		hs.fs.dir = function() error("private path") end
+		local names, listed, detail = fs_dir.try_entries_quiet("/private")
+		hs.fs.dir, logger.error = previous_dir, previous_error
+		helpers.assert_eq(names, {})
+		helpers.assert_eq(listed, false)
+		helpers.assert_type(detail, "string")
+		helpers.assert_eq(calls, 0)
 	end)
 end)

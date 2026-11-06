@@ -53,6 +53,7 @@ M.FAILURE_BUSY = "busy"
 M.FAILURE_UNKNOWN_LAYOUT = "unknown_layout"
 M.FAILURE_NOT_INSTALLED = "not_installed"
 M.FAILURE_PROVIDED_BY_BUNDLE = "provided_by_bundle"
+M.FAILURE_BUNDLE_SCAN = "bundle_scan_failed"
 M.FAILURE_FOREIGN_FILE = "foreign_file"
 M.FAILURE_UNSUPPORTED = "unsupported_platform"
 M.FAILURE_DOWNLOAD = "download_failed"
@@ -81,6 +82,20 @@ local PLATFORM = "macos"
 -- The one operation in flight ({ id, action }), nil when idle: an installation
 -- and an uninstallation of the same layout must never interleave their writes.
 local _busy = nil
+local _file_cleanup = {}
+
+local function settle_file_cleanup()
+	while #_file_cleanup > 0 do
+		local called, settled = pcall(_file_cleanup[1])
+		if not called or settled ~= true then return false end
+		table.remove(_file_cleanup, 1)
+	end
+	return true
+end
+
+local function retain_file_cleanup(retry)
+	if type(retry) == "function" then _file_cleanup[#_file_cleanup + 1] = retry end
+end
 
 -- Catalogue, shipped index, installed record and refresh, shared with Linux.
 local Store = RegistryStore.new({
@@ -190,6 +205,12 @@ local function default_deps(settings)
 		encode_json = Json.encode,
 		read = FileSystem.read,
 		write = FileSystem.write,
+		create = FileSystem.create_if_absent,
+		inspect_file = FileSystem.classify_no_follow,
+		read_status = FileSystem.read_with_status,
+		digest = Crypto.sha256_bytes,
+		replace_exact = FileSystem.write_if_unchanged,
+		remove_exact = FileSystem.remove_if_unchanged,
 		delete = FileSystem.delete,
 		exists = FileSystem.exists,
 		prepare_parent = FileSystem.prepare_parent_for_create,
@@ -229,12 +250,12 @@ end
 
 --- Keyboard names the installed Ergopti bundles already provide.
 --- @param deps table
---- @return table Set { [name] = true }.
+--- @return table|nil Set { [name] = true }, or nil on listing failure.
 local function bundle_names(deps)
 	local ok, names = pcall(deps.bundle_names)
 	if not ok or type(names) ~= "table" then
 		Logger.warn(LOG, "The installed Ergopti bundles could not be listed: %s.", tostring(names))
-		return {}
+		return nil
 	end
 	return names
 end
@@ -359,7 +380,7 @@ function M.snapshot(deps)
 			snapshot.installed[entry.id] = entry
 		end
 	end
-	local provided = bundle_names(deps)
+	local provided = bundle_names(deps) or {}
 	local names, aliases = {}, {}
 	local InputSources = require("modules.keymap.input_sources")
 	--- Registers metadata aliases before the nonblocking TIS cache is populated.
@@ -408,8 +429,44 @@ local function acquire_slot(id, action, on_done)
 		on_done(false, M.FAILURE_BUSY, "another layout operation is still running")
 		return false
 	end
-	_busy = { id = id, action = action }
+	local owner = { id = id, action = action }
+	_busy = owner
+	if not settle_file_cleanup() then
+		if _busy == owner then _busy = nil end
+		on_done(false, M.FAILURE_WRITE, "a previous layout file cleanup remains pending")
+		return false
+	end
 	return true
+end
+
+--- Capture both registered copies before a mutation. The digest proves only
+--- their bytes, not who owns the inode; the native conditional operations
+--- recheck those bytes under the cooperative writer lock.
+local function capture_registered_files(deps, entry, verified_candidate)
+	if type(deps.inspect_file) ~= "function" or type(deps.read_status) ~= "function"
+		or type(deps.digest) ~= "function" then
+		return nil, "classified layout verification is unavailable"
+	end
+	local checksum_valid = type(entry.sha256) == "string" and entry.sha256:match("^%x+$") ~= nil and #entry.sha256 == 64
+	local copies = {}
+	for _, path in ipairs({ deps.local_dir .. entry.id .. ".keylayout", deps.layouts_dir .. entry.id .. ".keylayout" }) do
+		local attrs, status = deps.inspect_file(path)
+		if status == "absent" then
+			copies[path] = { status = "absent" }
+		elseif status == "ok" and type(attrs) == "table" and attrs.mode == "file" then
+			local content, read_status = deps.read_status(path)
+			local is_candidate = type(verified_candidate) == "string" and content == verified_candidate
+			if not checksum_valid and not is_candidate then return nil, "the installed layout has no usable checksum" end
+			local digest = not is_candidate and type(content) == "string" and deps.digest(content) or nil
+			if read_status ~= "ok" or (not is_candidate and (type(digest) ~= "string" or digest:lower() ~= entry.sha256:lower())) then
+				return nil, "the installed layout was changed or cannot be read: " .. path
+			end
+			copies[path] = { status = "ok", content = content }
+		else
+			return nil, "the installed layout is not an inspectable regular file: " .. path
+		end
+	end
+	return copies
 end
 
 --- What an installed layout's enable came to, read from a fresh process. The
@@ -450,9 +507,13 @@ local function settle_enable(deps, id, entry, path, listed, reason, update, call
 				callback({ enabled = true, pending_activation = false, consent = not update })
 				return
 			end
+			if deps.pending.record(id, entry.keyboard_name) ~= true then
+				Logger.error(LOG, "The '%s' layout is installed but its pending activation could not be confirmed.", id)
+				callback({ enabled = false, pending_activation = false, consent = false, reason = "pending_record_failed" })
+				return
+			end
 			Logger.warn(LOG, "The '%s' layout is installed and listed in the enabled sources, but a fresh process does not see it on (listed=%s); macOS turns it on at the next login (reason=not_enabled:%s).",
 				id, tostring(state.listed), M.REASON_REQUIRES_LOGOUT)
-			deps.pending.record(id, entry.keyboard_name)
 			callback({ enabled = false, pending_activation = true, consent = false, reason = M.REASON_REQUIRES_LOGOUT })
 		end)
 	if dispatched ~= true then
@@ -464,22 +525,161 @@ end
 --- @param deps table
 --- @param entry table
 --- @param text string
+--- @param previous table|nil Previously registered entry for this id.
 --- @return string|nil installed_path
 --- @return string|nil failure_code
 --- @return string|nil detail
-local function publish(deps, entry, text)
+local function publish_update(deps, entry, text, previous)
+	if type(deps.replace_exact) ~= "function" or type(deps.remove_exact) ~= "function"
+		or type(deps.inspect_file) ~= "function" or type(deps.read_status) ~= "function" then
+		return nil, M.FAILURE_WRITE, "conditional layout publication is unavailable"
+	end
+	local record_path = deps.local_dir .. deps.settings.installed_file
+	local attrs, record_status = deps.inspect_file(record_path)
+	if record_status ~= "ok" or type(attrs) ~= "table" or attrs.mode ~= "file" then
+		return nil, M.FAILURE_RECORD, "the installed layout record is not a regular file"
+	end
+	local raw, read_status = deps.read_status(record_path)
+	if read_status ~= "ok" or type(raw) ~= "string" then
+		return nil, M.FAILURE_RECORD, "the installed layout record cannot be read"
+	end
+	local current, record_err = Catalogue.decode_installed(raw, deps.decode_installed_json or Json.decode_lossless)
+	local registered = current and current.layouts[entry.id]
+	if not registered or registered.sha256 ~= previous.sha256 or registered.version ~= previous.version then
+		return nil, M.FAILURE_RECORD, record_err or "the installed layout record changed"
+	end
+	local copies, capture_err = capture_registered_files(deps, registered, text)
+	if not copies then return nil, M.FAILURE_FOREIGN_FILE, capture_err end
+	local local_path = deps.local_dir .. entry.id .. ".keylayout"
 	local installed_path = deps.layouts_dir .. entry.id .. ".keylayout"
+	local encoded_ok, encoded = pcall(function() return deps.encode_json(Catalogue.with_installed(current, entry)) end)
+	if not encoded_ok or type(encoded) ~= "string" then return nil, M.FAILURE_RECORD, "cannot encode the installed layout record" end
+	local loaded, inverse_module = pcall(require, "config_file_inverse")
+	local factory = loaded and type(inverse_module) == "table" and inverse_module.for_current_writer or nil
+	if type(factory) ~= "function" then return nil, M.FAILURE_WRITE, "layout compensation owner is unavailable" end
+	local built, inverse, writer = pcall(factory)
+	if not built or type(inverse) ~= "table" or type(writer) ~= "table"
+		or type(inverse.restore) ~= "function" or type(inverse.settle_publication) ~= "function"
+		or type(writer.publish_if_unchanged) ~= "function" or type(writer.read_classified) ~= "function"
+		or type(writer.remove_if_unchanged) ~= "function" or type(writer.retry_publication_cleanup) ~= "function" then
+		return nil, M.FAILURE_WRITE, "layout compensation owner is unavailable"
+	end
+	local publish_exact, read_classified = writer.publish_if_unchanged, writer.read_classified
+	local remove_conditional, settle_publication = writer.remove_if_unchanged, writer.retry_publication_cleanup
+	local restore, settle_inverse = inverse.restore, inverse.settle_publication
+	local inspect, read, replace, remove = deps.inspect_file, deps.read_status, deps.replace_exact, deps.remove_exact
+	local files = { read_with_status = read, remove_if_unchanged = remove }
+	files.write_if_unchanged = function(path, content, expected, on_error)
+		local observed, status = inspect(path)
+		if expected.status == "absent" then
+			if status ~= "absent" then return false, "layout path is no longer absent" end
+		elseif status ~= "ok" or type(observed) ~= "table" or observed.mode ~= "file" then
+			return false, "layout path is no longer a regular file"
+		end
+		return replace(path, content, expected, on_error)
+	end
+	local function current_owner()
+		return rawequal(package.loaded["config_file_inverse"], inverse_module)
+			and rawequal(inverse_module.for_current_writer, factory)
+			and rawequal(package.loaded["toml_codec.writer"], writer)
+			and rawequal(writer.publish_if_unchanged, publish_exact)
+			and rawequal(writer.read_classified, read_classified)
+			and rawequal(writer.remove_if_unchanged, remove_conditional)
+			and rawequal(writer.retry_publication_cleanup, settle_publication)
+			and rawequal(inverse.restore, restore)
+			and rawequal(inverse.settle_publication, settle_inverse)
+			and rawequal(deps.inspect_file, inspect) and rawequal(deps.read_status, read)
+			and rawequal(deps.replace_exact, replace) and rawequal(deps.remove_exact, remove)
+	end
+	local effects = {}
+	local function rollback()
+		if not current_owner() then return false end
+		for index = #effects, 1, -1 do
+			if not current_owner() or restore(effects[index], files) ~= true then return false end
+			table.remove(effects, index)
+		end
+		return true
+	end
+	local function retry_rollback()
+		local called, settled = pcall(rollback)
+		return called and settled == true
+	end
+	local function fail(code, detail)
+		if #effects == 0 then return nil, code, detail end
+		if not retry_rollback() then
+			retain_file_cleanup(retry_rollback)
+			return nil, code, tostring(detail) .. "; conditional rollback remains pending"
+		end
+		return nil, code, detail
+	end
+	for _, step in ipairs({ { local_path, text, copies[local_path], M.FAILURE_WRITE },
+		{ installed_path, text, copies[installed_path], M.FAILURE_WRITE },
+		{ record_path, encoded, { status = "ok", content = raw }, M.FAILURE_RECORD } }) do
+		local source = { status = step[3].status, content = step[3].content }
+		local effect = { path = step[1], source = source, candidate = step[2] }
+		if not current_owner() then return fail(step[4], "layout publication owner changed") end
+		local called, written, detail, receipt = pcall(publish_exact, step[1], step[2], files, source)
+		if not called then detail, written, receipt = tostring(written), false, nil end
+		if written ~= true then
+			if type(receipt) == "function" then
+				effect.publication_cleanup = receipt
+				effects[#effects + 1] = effect
+			else
+				-- Without a receipt, only an unchanged source proves this step had
+				-- no visible effect. Preserve earlier candidates when the outcome
+				-- is unknown, so a retry of the same verified candidate can join it.
+				local checked, unchanged = pcall(function()
+					local observed, status = inspect(step[1])
+					if source.status == "absent" then return status == "absent" end
+					if status ~= "ok" or type(observed) ~= "table" or observed.mode ~= "file" then return false end
+					local bytes, read_status = read(step[1])
+					return read_status == "ok" and bytes == source.content
+				end)
+				if not checked or not unchanged then
+					return nil, step[4], tostring(detail) .. "; publication was not confirmed at " .. step[1]
+						.. "; inspect retained layout copies at " .. local_path .. " and " .. installed_path
+				end
+			end
+			return fail(step[4], detail)
+		end
+		effects[#effects + 1] = effect
+	end
+	return installed_path, nil, nil
+end
+
+local function publish(deps, entry, text, previous)
+	if previous ~= nil then return publish_update(deps, entry, text, previous) end
+	local installed_path = deps.layouts_dir .. entry.id .. ".keylayout"
+	local created_paths = {}
+	local function retained(detail)
+		if #created_paths == 0 then return tostring(detail) end
+		return tostring(detail) .. "; created copies retained at " .. table.concat(created_paths, ", ")
+	end
+	if previous == nil and type(deps.create) ~= "function" then
+		return nil, M.FAILURE_WRITE, "exclusive layout creation is unavailable"
+	end
 	for _, step in ipairs({
 		{ deps.local_dir .. entry.id .. ".keylayout", text },
 		{ installed_path, text },
 	}) do
-		local ok, err = write_file(deps, step[1], step[2])
-		if not ok then return nil, M.FAILURE_WRITE, err end
+		if previous == nil then
+			local prepared, prepare_err = deps.prepare_parent(step[1])
+			if not prepared then return nil, M.FAILURE_WRITE, retained(prepare_err) end
+			local created, status, detail = deps.create(step[1], step[2])
+			if created ~= true then
+				local code = status == "exists" and M.FAILURE_FOREIGN_FILE or M.FAILURE_WRITE
+				return nil, code, retained("cannot create " .. step[1] .. ": " .. tostring(detail or status))
+			end
+			created_paths[#created_paths + 1] = step[1]
+		else
+			local ok, err = write_file(deps, step[1], step[2])
+			if not ok then return nil, M.FAILURE_WRITE, err end
+		end
 	end
 	local record, record_err = read_installed(deps)
-	if not record then return nil, M.FAILURE_RECORD, record_err end
+	if not record then return nil, M.FAILURE_RECORD, retained(record_err) end
 	local ok, err = write_installed(deps, Catalogue.with_installed(record, entry))
-	if not ok then return nil, M.FAILURE_RECORD, err end
+	if not ok then return nil, M.FAILURE_RECORD, retained(err) end
 	return installed_path, nil, nil
 end
 
@@ -545,7 +745,12 @@ function M.install(id, on_done, deps)
 			finish(false, M.FAILURE_FOREIGN_FILE, deps.layouts_dir .. id .. ".keylayout was not installed by ErgoptiPlus")
 			return
 		end
-		if type(entry.keyboard_name) == "string" and bundle_names(deps)[entry.keyboard_name] then
+		local provided = bundle_names(deps)
+		if not provided then
+			finish(false, M.FAILURE_BUNDLE_SCAN, "installed keyboard bundles could not be listed")
+			return
+		end
+		if type(entry.keyboard_name) == "string" and provided[entry.keyboard_name] then
 			finish(false, M.FAILURE_PROVIDED_BY_BUNDLE, "an installed Ergopti bundle already provides "
 				.. entry.keyboard_name)
 			return
@@ -561,13 +766,17 @@ function M.install(id, on_done, deps)
 				finish(false, M.FAILURE_DOWNLOAD, detail)
 				return
 			end
+			if record.layouts[id] then
+				local copies, capture_err = capture_registered_files(deps, record.layouts[id], detail.text)
+				if not copies then finish(false, M.FAILURE_FOREIGN_FILE, capture_err); return end
+			end
 			if entry.extension ~= nil then
 				local staged, stage_err = Extension.stage(deps.local_dir, entry, detail.content, {
 					read = deps.read, write = function(path, text) return write_file(deps, path, text) end,
 				})
 				if not staged then finish(false, M.FAILURE_WRITE, stage_err) return end
 			end
-			local path, code, publish_err = publish(deps, entry, detail.text)
+			local path, code, publish_err = publish(deps, entry, detail.text, record.layouts[id])
 			if not path then
 				finish(false, code, publish_err)
 				return
@@ -575,7 +784,7 @@ function M.install(id, on_done, deps)
 			deps.enable_source(path, entry.name, function(listed, _output, reason)
 				settle_enable(deps, id, entry, path, listed == true, reason, record.layouts[id] ~= nil, function(state)
 					finish(true, { entry = entry, path = path, source = detail.source, enabled = state.enabled,
-						pending_activation = state.pending_activation, consent = state.consent })
+						pending_activation = state.pending_activation, consent = state.consent, reason = state.reason })
 				end)
 			end)
 		end)
@@ -598,17 +807,30 @@ function M.uninstall(id, on_done, deps)
 		return false
 	end
 	deps = resolved
+	if not acquire_slot(id, "uninstall", on_done) then return false end
 	local record, record_err = read_installed(deps)
 	if not record then
+		_busy = nil
 		on_done(false, M.FAILURE_RECORD, record_err)
 		return false
 	end
 	local entry = Registry.is_valid_id(id) and record.layouts[id] or nil
 	if not entry then
+		_busy = nil
 		on_done(false, M.FAILURE_NOT_INSTALLED, "the layout '" .. tostring(id) .. "' was not installed here")
 		return false
 	end
-	if not acquire_slot(id, "uninstall", on_done) then return false end
+	local copies, capture_err = capture_registered_files(deps, entry)
+	if not copies then
+		_busy = nil
+		on_done(false, M.FAILURE_FOREIGN_FILE, capture_err)
+		return false
+	end
+	if type(deps.remove_exact) ~= "function" then
+		_busy = nil
+		on_done(false, M.FAILURE_WRITE, "conditional layout removal is unavailable")
+		return false
+	end
 	Logger.start(LOG, "Uninstalling the '%s' layout…", id)
 	deps.disable_source(entry.keyboard_name, entry.name, function(disabled, _output, reason)
 		if not disabled then
@@ -617,11 +839,34 @@ function M.uninstall(id, on_done, deps)
 			Logger.warn(LOG, "The '%s' layout could not be removed from the input sources: %s.", id,
 				tostring(reason))
 		end
+		for path, expected in pairs(copies) do
+			if expected.status == "absent" then
+				local _, status = deps.inspect_file(path)
+				if status ~= "absent" then
+					_busy = nil
+					on_done(false, M.FAILURE_FOREIGN_FILE, "a previously absent layout path is no longer absent: " .. path)
+					return
+				end
+			end
+		end
 		for _, path in ipairs({ deps.layouts_dir .. id .. ".keylayout", deps.local_dir .. id .. ".keylayout" }) do
-			if not deps.delete(path) then
+			local expected = copies[path]
+			local removed, remove_err, _, retry = true, nil, nil, nil
+			if expected.status == "ok" then removed, remove_err, _, retry = deps.remove_exact(path, expected) end
+			if removed ~= true then
+				retain_file_cleanup(retry)
 				_busy = nil
 				Logger.error(LOG, "The '%s' layout was not uninstalled: cannot delete %s.", id, path)
-				on_done(false, M.FAILURE_WRITE, "cannot delete " .. path)
+				on_done(false, M.FAILURE_WRITE, "removal not confirmed for " .. path .. "; the file may have been removed: "
+					.. tostring(remove_err))
+				return
+			end
+		end
+		for path in pairs(copies) do
+			local _, status = deps.inspect_file(path)
+			if status ~= "absent" then
+				_busy = nil
+				on_done(false, M.FAILURE_FOREIGN_FILE, "layout removal could not be confirmed at " .. path)
 				return
 			end
 		end
@@ -725,7 +970,12 @@ function M.install_local(entry, text, on_done, deps)
 		finish(false, M.FAILURE_FOREIGN_FILE, deps.layouts_dir .. id .. ".keylayout was not installed by ErgoptiPlus")
 		return false
 	end
-	if type(entry.keyboard_name) == "string" and bundle_names(deps)[entry.keyboard_name] then
+	local provided = bundle_names(deps)
+	if not provided then
+		finish(false, M.FAILURE_BUNDLE_SCAN, "installed keyboard bundles could not be listed")
+		return false
+	end
+	if type(entry.keyboard_name) == "string" and provided[entry.keyboard_name] then
 		finish(false, M.FAILURE_PROVIDED_BY_BUNDLE, "an installed Ergopti bundle already provides "
 			.. entry.keyboard_name)
 		return false
@@ -736,7 +986,7 @@ function M.install_local(entry, text, on_done, deps)
 			finish(false, M.FAILURE_INVALID, reason or digest_err)
 			return
 		end
-		local path, code, publish_err = publish(deps, entry, text)
+		local path, code, publish_err = publish(deps, entry, text, record.layouts[id])
 		if not path then
 			finish(false, code, publish_err)
 			return
@@ -744,7 +994,7 @@ function M.install_local(entry, text, on_done, deps)
 		deps.enable_source(path, entry.name, function(listed, _output, enable_reason)
 			settle_enable(deps, id, entry, path, listed == true, enable_reason, record.layouts[id] ~= nil, function(state)
 				finish(true, { entry = entry, path = path, source = "composer", enabled = state.enabled,
-					pending_activation = state.pending_activation, consent = state.consent })
+					pending_activation = state.pending_activation, consent = state.consent, reason = state.reason })
 			end)
 		end)
 	end)

@@ -108,6 +108,14 @@ _ConfigBackup_Join(Dir, Relative) {
 	return RTrim(Dir, "\/") . "\" . StrReplace(Relative, "/", "\")
 }
 
+; A bare drive designator (C:) resolves relative to that drive's current
+; directory; retain the separator when the configuration root is C:\.
+_ConfigBackup_Root(Dir) {
+	if RegExMatch(Dir, "i)^[a-z]:[\\/]+$")
+		return SubStr(Dir, 1, 2) . "\"
+	return RTrim(Dir, "\/")
+}
+
 _ConfigBackup_Included(Rules, Name) {
 	Lower := StrLower(Name)
 	for _, Extension in Rules["extensions"] {
@@ -143,7 +151,7 @@ _ConfigBackup_Walk(ConfigDir, Rules) {
 	Pending := [""]
 	while (Pending.Length > 0) {
 		Relative := Pending.RemoveAt(1)
-		Dir := (Relative == "") ? RTrim(ConfigDir, "\/") : _ConfigBackup_Join(ConfigDir, Relative)
+		Dir := (Relative == "") ? _ConfigBackup_Root(ConfigDir) : _ConfigBackup_Join(ConfigDir, Relative)
 		for _, Path in FSListDirectoryStrict(Dir, true) {
 			SplitPath(Path, &Name)
 			if FSIsReparsePoint(Path) {
@@ -243,9 +251,20 @@ ConfigBackup_Create(ConfigDir, Kind, Tag := "", FromVersion := "", Rules := 0, C
 		. ',"files":[' . _ConfigBackup_JoinArray(FilesJson) . "]}"
 	if !FSWriteCreateDurable(BackupPath . "\" . Rules["manifest"], Manifest)
 		throw Error("Configuration backup failed writing its manifest in '" . BackupPath . "'.")
+	_ConfigBackup_RequireManifest(BackupPath . "\" . Rules["manifest"], Manifest)
 	try LoggerSuccess("ConfigBackup", "Configuration backed up to {1} ({2} file(s)).", BackupPath, Files.Length)
 	return Map("id", Id, "path", BackupPath, "kind", Kind, "created_at", Time["iso"], "tag", Tag,
 		"from_version", FromVersion, "files", Files)
+}
+
+; A successful create does not prove that the published manifest still holds
+; the encoded bytes. Refuse the backup on any read failure or mismatch.
+_ConfigBackup_RequireManifest(Path, Expected) {
+	try Matches := FSUtf8ExactMatches(Path, Expected)
+	catch
+		Matches := false
+	if !Matches
+		throw Error("Configuration backup failed verifying its manifest.")
 }
 
 _ConfigBackup_JoinArray(Items) {
@@ -295,11 +314,18 @@ _ConfigBackup_Load(ConfigDir, Id, Rules) {
 		if !Record.Has(Field) || !(Record[Field] is String)
 			return 0
 	}
+	if !RegExMatch(Record["created_at"], "^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+		return 0
 	Files := []
+	Seen := Map()
+	Seen.CaseSense := "Off"
 	for _, BackupFile in Record["files"] {
 		if !(BackupFile is Map) || !BackupFile.Has("root") || BackupFile["root"] != "config" || !BackupFile.Has("path")
 				|| !ConfigBackup_IsContained(BackupFile["path"])
 			return 0
+		if Seen.Has(BackupFile["path"])
+			return 0
+		Seen[BackupFile["path"]] := true
 		Files.Push(BackupFile["path"])
 	}
 	return Map("id", Id, "path", BackupPath, "kind", Record["kind"],
@@ -333,7 +359,7 @@ ConfigBackup_Latest(ConfigDir, Kind, Rules := 0) {
 		Rules := ConfigBackup_Rules()
 	Folder := _ConfigBackup_Join(ConfigDir, Rules["folder"])
 	Prefix := Rules["kinds"][Kind] . "-"
-	Best := 0
+	Candidates := []
 	for _, Path in FSListDirectoryStrict(Folder, true) {
 		SplitPath(Path, &Name)
 		if (SubStr(Name, 1, StrLen(Prefix)) != Prefix)
@@ -341,10 +367,27 @@ ConfigBackup_Latest(ConfigDir, Kind, Rules := 0) {
 		Record := _ConfigBackup_Load(ConfigDir, Name, Rules)
 		if !IsObject(Record) || Record["kind"] != Kind
 			continue
-		if !IsObject(Best) || _ConfigBackup_CompareOrder(Record, Best) > 0
-			Best := Record
+		Candidates.Push(Record)
 	}
-	return Best
+	while Candidates.Length {
+		Best := 1
+		for Index, Record in Candidates {
+			if _ConfigBackup_CompareOrder(Record, Candidates[Best]) > 0
+				Best := Index
+		}
+		Record := Candidates.RemoveAt(Best)
+		Complete := true
+		for _, Relative in Record["files"] {
+			try FSReadBytesStrict(_ConfigBackup_Join(Record["path"], "config/" . Relative))
+			catch {
+				Complete := false
+				break
+			}
+		}
+		if Complete
+			return Record
+	}
+	return 0
 }
 
 ; Puts a backup back: backs the current configuration up first, checks every

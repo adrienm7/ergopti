@@ -372,6 +372,37 @@ helpers.describe("the recommended layer comes with the key that enters it", func
 		end)
 	end)
 
+	helpers.it("refuses a shipped preset read or close failure and closes the stream", function()
+		with_folder(function(dir)
+			for _, failure in ipairs({ "read_throw", "read_nil", "close_nil" }) do
+				local original_open, closes = io.open, 0
+				io.open = function(path, mode)
+					local file, err = original_open(path, mode)
+					if not file or not path:match("layer_actions%.toml$") then return file, err end
+					return {
+						read = function(_, ...)
+							if failure == "read_throw" then error("read refused") end
+							if failure == "read_nil" then return nil, "read refused" end
+							return file:read(...)
+						end,
+						close = function()
+							closes = closes + 1
+							file:close()
+							if failure == "close_nil" then return nil, "close refused" end
+							return true
+						end,
+					}
+				end
+				local called, imported = pcall(NavLayer.import_recommended, { shared_root = helpers.shared(), config_dir = dir })
+				io.open = original_open
+				helpers.assert_true(called)
+				helpers.assert_nil(imported, failure .. " must prevent publishing the preset")
+				helpers.assert_eq(closes, 1)
+				helpers.assert_nil(content(dir .. "/layers.toml"))
+			end
+		end)
+	end)
+
 	helpers.it("(nav-layer-fresh-install-default) an existing layers.toml is never replaced", function()
 		for label, own in pairs({ edited = '[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"KeyJ" = "keystroke:ArrowDown"\n',
 			empty = "" }) do
@@ -386,6 +417,21 @@ helpers.describe("the recommended layer comes with the key that enters it", func
 				helpers.assert_eq(content(dir .. "/layers.toml"), own, label .. ": an undo never removes a kept file")
 			end)
 		end
+	end)
+
+	helpers.it("refuses an unreadable existing navigation layer", function()
+		with_folder(function(dir)
+			local writes = 0
+			local import, err = NavLayer.import_recommended({ shared_root = helpers.shared(), config_dir = dir,
+				file_adapter = {
+					read_with_status = function() return nil, "error", "permission denied" end,
+					write_if_unchanged = function() writes = writes + 1; return true end,
+				},
+			})
+			helpers.assert_nil(import, "an unreadable layer must not be reported as usable")
+			helpers.assert_true(type(err) == "string" and err ~= "")
+			helpers.assert_eq(writes, 0, "the inaccessible file remains untouched")
+		end)
 	end)
 
 	helpers.it("(nav-layer-fresh-install-default) an undo removes only the file the import created, as it created it", function()

@@ -820,12 +820,12 @@ function M.build_request(entry, messages, opts)
 	local payload = nil
 	if provider.format == "anthropic" then
 		payload = {
-			model = model, system = system, max_tokens = max_tokens, temperature = temperature,
+			model = model, system = system ~= "" and system or nil, max_tokens = max_tokens, temperature = temperature,
 			messages = { { role = "user", content = user } },
 		}
 	elseif provider.format == "gemini" then
 		payload = {
-			systemInstruction = { parts = { { text = system } } },
+			systemInstruction = system ~= "" and { parts = { { text = system } } } or nil,
 			contents = { { role = "user", parts = { { text = user } } } },
 			generationConfig = { temperature = temperature, maxOutputTokens = max_tokens },
 		}

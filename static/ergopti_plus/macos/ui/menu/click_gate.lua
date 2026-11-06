@@ -106,7 +106,7 @@ function M.new(deps)
 
 	local function report_lost(labels)
 		if #labels == 0 then return end
-		Logger.warn(LOG, "Menu click(s) on %s not applied: the current menu has no such row.",
+		Logger.warn(LOG, "Menu click(s) on %s could not be applied.",
 			table.concat(labels, ", "))
 		local ok, err = pcall(deps.notify_lost)
 		if not ok then Logger.error(LOG, "Lost menu click notice failed: %s.", tostring(err)) end
@@ -277,12 +277,31 @@ function M.new(deps)
 
 	--- Writes clicks into the hand-off record, after any already written.
 	local function persist(clicks)
-		local record = { schema = REPLAY_SCHEMA, at = deps.now(), clicks = {} }
+		local now = deps.now()
+		local record = { schema = REPLAY_SCHEMA, at = now, clicks = {} }
 		local read, previous = pcall(store.get, M.REPLAY_KEY, nil)
-		if read and type(previous) == "string" then
+		if not read then
+			Logger.error(LOG, "The existing reload hand-off could not be read; it is not overwritten: %s.", tostring(previous))
+			local labels = {}
+			for _, click in ipairs(clicks) do labels[#labels + 1] = ClickIntent.describe(click.path) end
+			report_lost(labels)
+			return
+		end
+		if type(previous) == "string" then
 			local decoded, earlier = pcall(json.decode, previous)
-			if decoded and type(earlier) == "table" and type(earlier.clicks) == "table" then
+			local valid = decoded and type(earlier) == "table" and earlier.schema == REPLAY_SCHEMA
+				and type(earlier.at) == "number" and earlier.at <= now and now - earlier.at <= REPLAY_TTL_SEC
+				and type(earlier.clicks) == "table"
+			if valid then
+				for _, click in ipairs(earlier.clicks) do
+					if type(click) ~= "table" or not ClickIntent.valid_path(click.path)
+						or (click.desired ~= nil and type(click.desired) ~= "boolean") then valid = false; break end
+				end
+			end
+			if valid then
 				for _, click in ipairs(earlier.clicks) do record.clicks[#record.clicks + 1] = click end
+			else
+				Logger.warn(LOG, "The previous reload hand-off is invalid or expired; it is not renewed.")
 			end
 		end
 		for _, click in ipairs(clicks) do
@@ -297,6 +316,9 @@ function M.new(deps)
 		end
 		Logger.error(LOG, "%d held menu click(s) could not be handed to the reloaded menu: %s.",
 			#clicks, tostring(encoded and committed or text))
+		local labels = {}
+		for _, click in ipairs(clicks) do labels[#labels + 1] = ClickIntent.describe(click.path) end
+		report_lost(labels)
 	end
 
 	--- Hands clicks to the successor of a reload, or reports them dropped on a quit.

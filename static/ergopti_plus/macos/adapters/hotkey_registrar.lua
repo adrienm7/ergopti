@@ -195,20 +195,23 @@ local function bind_native(chord, callback, native_key, conditional, admit_capsl
 	local entry = {
 		hotkey = nil,
 		chord = type(hs_key) == "number" and ("native " .. identity) or Chord.format(parsed.mods, parsed.key),
-		enabled = true,
+		enabled = false,
 		native_settled = true,
 		identity = identity,
 		conditional = conditional == true,
 	}
 	local function deliver_if_enabled(...)
 		if entry.enabled ~= true then return nil end
-		local guard_ok, allowed_or_err = xpcall(_delivery_guard, debug.traceback)
+		local generation = entry.claim_generation or 0
+		local guard = _delivery_guard
+		local guard_ok, allowed_or_err = xpcall(guard, debug.traceback)
 		if not guard_ok then
 			Logger.error(LOG, "Delivery guard raised for %s — callback denied: %s.",
 				entry.chord, tostring(allowed_or_err))
 			return nil
 		end
-		if allowed_or_err ~= true then return nil end
+		if allowed_or_err ~= true or guard ~= _delivery_guard or entry.enabled ~= true
+			or (entry.claim_generation or 0) ~= generation then return nil end
 
 		local args = table.pack(...)
 		local callback_ok, result_or_err = xpcall(function()
@@ -232,6 +235,7 @@ local function bind_native(chord, callback, native_key, conditional, admit_capsl
 	local handle = next_handle()
 	entry.hotkey = hotkey
 	_bindings[handle] = entry
+	entry.enabled = true
 	if owns_transaction then _claim_transaction = false end
 	Logger.debug(LOG, "Bound %s → %s.", _bindings[handle].chord, handle)
 	return handle
@@ -268,7 +272,15 @@ function M.replace_physical_claims(owner, rows)
 			mods, key = parsed.mods, parsed.key
 		end
 		local identity = M.physical_identity(mods, key)
-		if identity then claims[identity] = { action = row.action, binding_id = row.binding_id } end
+		if identity then
+			local existing = claims[identity]
+			if existing and (existing.binding_id == nil or row.binding_id == nil
+				or existing.binding_id ~= row.binding_id) then
+				existing.multiple = true
+			elseif not existing then
+				claims[identity] = { action = row.action, binding_id = row.binding_id }
+			end
+		end
 	end
 	local previous = _physical_claims[owner]
 	local suspended_before, touched = {}, {}
@@ -338,7 +350,8 @@ function M.has_physical_conflict(mods, native_code, owner, binding_id)
 	if identity == nil then return true end
 	for claimant, rows in pairs(_physical_claims) do
 		local row = rows[identity]
-		if row and (claimant ~= owner or row.binding_id ~= binding_id) then return true end
+		if row and (row.multiple == true or row.binding_id == nil or claimant ~= owner
+			or row.binding_id ~= binding_id) then return true end
 	end
 	for _, entry in pairs(_bindings) do
 		if entry.identity == identity and not entry.conditional and entry.native_deleted ~= true then return true end
@@ -461,7 +474,8 @@ function M.unbind(handle)
 			-- captured chord with no remaining owner capable of deleting it. Disable is
 			-- a fail-safe best effort so personal bindings are not intercepted while a
 			-- later teardown retries the actual delete.
-			local disabled_ok, disable_err = pcall(function() entry.hotkey:disable() end)
+			local disable_called, disable_err = pcall(function() return entry.hotkey:disable() end)
+			local disabled_ok = disable_called and disable_err ~= nil and disable_err ~= false
 			entry.native_settled = disabled_ok
 			Logger.error(LOG, "unbind(): %s failed to release — %s; retained for retry (disabled=%s%s).",
 				entry.chord,

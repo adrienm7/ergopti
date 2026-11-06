@@ -44,6 +44,7 @@ PAGE_SCRIPTS = (
     "../metrics_freshness.js",
     "../_generated/metrics_general_category_aliases.js",
     "../metrics_calendar.js",
+    "../metrics_manifest_keys.js",
     "helpers.js",
     "state.js",
     "main.js",

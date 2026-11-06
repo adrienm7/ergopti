@@ -177,7 +177,7 @@ function M.new(ctx)
 		if not ok or choice ~= i18n.get("button.remove") then return false end
 		local removed_index, removed_entry, removed_models = remove_user_model(backend, m_name)
 		if removed_index == nil then return false end
-		if state.llm_model == m_name then
+		if state.llm_backend == backend and state.llm_model == m_name then
 			local disable_ok, disable_result = xpcall(disable_model, debug.traceback)
 			if not disable_ok or disable_result ~= true then
 				restore_user_model(removed_index, removed_entry, removed_models)

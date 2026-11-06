@@ -29,6 +29,34 @@ end
 -- ==========================================
 
 helpers.describe("keystats export — foreign directory enumeration", function()
+	helpers.it("distinguishes a missing directory from an uninspectable directory", function()
+		helpers.with_fresh_modules({"infra.logger", "infra.i18n", "infra.fs_dir", "adapters.file_system",
+			"modules.keystats.export"}, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["infra.i18n"] = {get = function(key) return key end}
+			local status, failing_path = "error", "/metrics/"
+			package.loaded["adapters.file_system"] = {classify_no_follow = function(path)
+				helpers.assert_eq(path, failing_path)
+				return nil, status
+			end}
+			local export = helpers.load_with_stubs("modules.keystats.export", {fs = {attributes = function(path)
+				if path == failing_path then return nil end
+				return {mode = "directory"}
+			end}})
+			export.init({paths = {metrics_dir = "/metrics/"}, device_id = "local", get_db = function() return {} end})
+			for _, path in ipairs({"/metrics/", "/metrics/by_device/"}) do
+				failing_path, status = path, "error"
+				local devices, detail = export.sync_foreign_data_sql()
+				helpers.assert_nil(devices, "unverified directory must not be reported as empty")
+				helpers.assert_true(type(detail) == "string")
+				status = "absent"
+				devices, detail = export.sync_foreign_data_sql()
+				helpers.assert_eq(devices, {})
+				helpers.assert_nil(detail)
+			end
+		end)
+	end)
+
 	helpers.it("returns the canonical directory refusal without throwing", function()
 		helpers.with_fresh_modules({
 			"infra.fs_dir",
@@ -176,5 +204,30 @@ helpers.describe("keystats log manager — foreign sync failures", function()
 		helpers.assert_true(recovery ~= nil and recovery:find(
 			"\n\tif _running_recovery_progress() == nil then _sync_foreign_data_sql() end\n", 1, true) ~= nil,
 			"startup aggregate recovery must route through the checked boundary too")
+	end)
+end)
+
+helpers.describe("foreign sync writer quarantine", function()
+	helpers.it("does not touch the previously captured handle after foreign sync retires it", function()
+		helpers.with_fresh_modules({ "infra.logger", "modules.keystats.sqlite_writer",
+			"modules.keystats.aggregator", "modules.keystats.rotation", "modules.keystats.export",
+			"keystats.metrics", "adapters.ledger_append", "modules.keystats.log_manager" }, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			local calls = 0
+			local db = { nrows = function() calls = calls + 1; error("retired handle read") end,
+				exec = function() calls = calls + 1; error("retired handle write") end }
+			local current = db
+			package.loaded["modules.keystats.sqlite_writer"] = { get_db = function() return current end }
+			package.loaded["modules.keystats.aggregator"] = {}
+			package.loaded["modules.keystats.rotation"] = {}
+			package.loaded["modules.keystats.export"] = { sync_foreign_data_sql = function()
+				current = nil
+				return {}
+			end }
+			package.loaded["keystats.metrics"] = {}
+			local manager = helpers.load_with_stubs("modules.keystats.log_manager")
+			helpers.assert_eq(manager.ingest_once(), false)
+			helpers.assert_eq(calls, 0, "foreign sync may retire the original writer")
+		end)
 	end)
 end)

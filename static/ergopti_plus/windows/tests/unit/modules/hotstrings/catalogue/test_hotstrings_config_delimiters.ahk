@@ -250,8 +250,17 @@ TestHotstringsConfig_ColorWriterUsesTomlStringCodec() {
 			"the public color writer must reject non-string values")
 		AssertFalse(FileExist(Path),
 			"a rejected color value must not publish an override file")
-		AssertTrue(HotstringsSetOverride("rolls", "", "color", InjectedColor),
-			"a string color must remain persistable through the shared TOML codec")
+		for Valid in ["#abc", "#abcd", "#abcdef", "#abcdef12", "abcdef"] {
+			AssertTrue(HotstringsIsHexColor(Valid), "valid CSS color must remain accepted")
+		}
+		for Invalid in ["#12345", "#1234567", InjectedColor] {
+			AssertFalse(HotstringsSetOverride("rolls", "", "color", Invalid),
+				"the public writer must reject invalid CSS colors")
+		}
+		AssertFalse(FileExist(Path), "invalid CSS colors must not publish a file")
+		Candidate := Map("rolls", { Delay: "", Color: InjectedColor, ShowTooltip: "", Priority: "", Sections: Map() })
+		AssertTrue(_SaveOverrides(Candidate),
+			"the low-level TOML codec must still escape even hostile internal data")
 		Reparsed := _ParseOverrides(Path)
 		AssertEqual(InjectedColor, Reparsed["rolls"].Color,
 			"quotes and line breaks in a color string must round-trip as data")

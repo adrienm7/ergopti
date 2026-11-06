@@ -489,7 +489,14 @@ function M.followed_mode(path)
 	local ok, followed, follow_err, errno = pcall(hs.fs.attributes, path)
 	if not ok then return "error", tostring(followed) end
 	if type(followed) == "table" then return "present", followed.mode end
-	if errno == 2 or tostring(follow_err):find("No such file", 1, true) then return "absent" end
+	-- hs.fs.attributes includes the filename in its error text. Match only the
+	-- terminal native reason, otherwise a filename containing that phrase can
+	-- turn a permission error into a false proof of absence.
+	local missing = "No such file or directory"
+	if errno == 2 or (errno == nil and type(follow_err) == "string"
+		and (follow_err == missing or follow_err:sub(-(#missing + 2)) == ": " .. missing)) then
+		return "absent"
+	end
 	return "error", tostring(follow_err or "cannot inspect the link target")
 end
 
@@ -751,13 +758,18 @@ end
 --- Reads a regular file without turning lookup or stream failures into absence.
 --- @param path string Absolute path to the file.
 --- @param on_error function|nil Optional diagnostic owner receiving only a fixed failure category.
+--- @param max_bytes integer|nil Maximum bytes admitted; reads at most one byte more to detect overflow.
 --- @return string|nil content
---- @return string status `ok`, `absent`, or `error`.
+--- @return string status `ok`, `absent`, `too_large` (bounded reads), or `error`.
 --- @return string|nil detail
-function M.read_with_status(path, on_error)
+function M.read_with_status(path, on_error, max_bytes)
 	if on_error ~= nil and type(on_error) ~= "function" then
 		Logger.error(LOG, "read_with_status(): diagnostic owner must be a function.")
 		return nil, "error", "diagnostic owner must be a function"
+	end
+	if max_bytes ~= nil and (type(max_bytes) ~= "number" or max_bytes % 1 ~= 0
+		or max_bytes < 0 or max_bytes >= math.maxinteger) then
+		return nil, "error", "max_bytes must be a non-negative integer"
 	end
 	local function report(category, message, ...)
 		if on_error then
@@ -790,8 +802,9 @@ function M.read_with_status(path, on_error)
 		report("open", "read_with_status(): cannot open '%s' — %s", path, detail)
 		return nil, "error", detail
 	end
-	local read_ok, content, read_err = pcall(fh.read, fh, "*a")
+	local read_ok, content, read_err = pcall(fh.read, fh, max_bytes and (max_bytes + 1) or "*a")
 	local close_ok, closed, close_err = pcall(fh.close, fh)
+	if max_bytes ~= nil and read_ok and content == nil and read_err == nil then content = "" end
 	if not read_ok or type(content) ~= "string" then
 		detail = tostring((read_ok and read_err) or content or "read failed")
 		report("read", "read_with_status(): read failed for '%s' — %s", path, detail)
@@ -802,6 +815,7 @@ function M.read_with_status(path, on_error)
 		report("close", "read_with_status(): close failed for '%s' — %s", path, detail)
 		return nil, "error", detail
 	end
+	if max_bytes ~= nil and #content > max_bytes then return nil, "too_large" end
 
 	local unchanged, revalidate_err = revalidate_write_path(requested_path, resolved_path, chain)
 	if not unchanged then
@@ -816,6 +830,17 @@ function M.read_with_status(path, on_error)
 		return nil, "error", revalidate_err
 	end
 	return content, "ok"
+end
+
+--- Reads at most max_bytes from a regular file without trusting an earlier stat.
+--- @param path string Absolute path to the file.
+--- @param max_bytes integer Maximum accepted byte length.
+--- @return string|nil content
+--- @return string status `ok`, `absent`, `too_large`, or `error`.
+--- @return string|nil detail
+function M.read_bounded(path, max_bytes)
+	if max_bytes == nil then return nil, "error", "max_bytes is required" end
+	return M.read_with_status(path, nil, max_bytes)
 end
 
 --- Reads the entire contents of a file as a string.
@@ -1492,6 +1517,7 @@ end
 --- Callers own the returned pathname and must remove it explicitly.
 --- @return string|nil path Owned regular-file pathname.
 --- @return string|nil detail Concrete allocation or classification failure.
+--- @return table|nil identity Device and inode observed without following links.
 function M.create_secure_temp_file()
 	local call_ok, path = pcall(os.tmpname)
 	if not call_ok or type(path) ~= "string" or path == "" then
@@ -1501,7 +1527,7 @@ function M.create_secure_temp_file()
 	if status ~= "ok" or type(attributes) ~= "table" or attributes.mode ~= "file" then
 		return nil, tostring(detail or "os.tmpname did not create a regular file")
 	end
-	return path
+	return path, nil, { dev = attributes.dev, ino = attributes.ino }
 end
 
 --- Acquires the stable adjacent writer locks for several paths in canonical
@@ -2467,17 +2493,13 @@ function M.append_reporting(path, content, on_error)
 	-- Admit only a regular file or an absent path, as write_atomic does: opening
 	-- a FIFO without a reader blocks the main thread, and with a reader the bytes
 	-- leave for another process. The metadata follows a symlink to its target.
-	if not hs or not hs.fs or type(hs.fs.attributes) ~= "function" then
-		report("append", "error", "append(): destination metadata is unavailable; refusing to open it.")
+	local status, mode_or_error = M.followed_mode(path)
+	if status == "error" then
+		report("append", "error", "append(): cannot inspect the destination — %s", tostring(mode_or_error))
 		return false
 	end
-	local probe_ok, attributes = pcall(hs.fs.attributes, path)
-	if not probe_ok then
-		report("append", "error", "append(): cannot inspect the destination — %s", tostring(attributes))
-		return false
-	end
-	if type(attributes) == "table" and attributes.mode ~= "file" then
-		report("append", "error", "append(): destination is not a regular file (%s).", tostring(attributes.mode))
+	if status == "present" and mode_or_error ~= "file" then
+		report("append", "error", "append(): destination is not a regular file (%s).", tostring(mode_or_error))
 		return false
 	end
 

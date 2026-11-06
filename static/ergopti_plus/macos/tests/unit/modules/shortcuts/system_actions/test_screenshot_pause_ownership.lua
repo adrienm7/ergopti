@@ -28,6 +28,7 @@ local function fresh_screenshot()
 		tasks = {},
 		next_options = {},
 		notifications = {},
+		files = {},
 	}
 
 	function fixture.queue(options)
@@ -108,10 +109,20 @@ local function fresh_screenshot()
 		expand_path = function() return "/tmp/hs012-home" end,
 		create_secure_temp_file = function()
 			temp_files = temp_files + 1
-			return "/tmp/hs012-capture-" .. temp_files
+			local path = "/tmp/hs012-capture-" .. temp_files
+			fixture.files[path] = true
+			if fixture.on_allocate then fixture.on_allocate() end
+			return path
 		end,
-		remove_exact = function() return true end,
-		classify_no_follow = function() return { mode = "file", size = 64 }, "ok" end,
+		remove_exact = function(path) fixture.files[path] = nil; return true end,
+		classify_no_follow = function()
+			if fixture.on_classify then fixture.on_classify() end
+			return { mode = "file", size = 64 }, "ok"
+		end,
+		read_with_status = function()
+			if fixture.on_read then fixture.on_read() end
+			return "\137PNG\r\n\26\n" .. string.rep("\0", 4) .. "IHDR" .. string.pack(">I4I4", 10, 10), "ok"
+		end,
 	}
 	package.loaded["adapters.screen_capture"] = {
 		permission_state = function() return true end,
@@ -119,7 +130,11 @@ local function fresh_screenshot()
 		open_permission_settings = function() return true end,
 		clipboard_change_count = function() return 1 end,
 		clipboard_has_image = function() return true end,
-		copy_image_file_to_clipboard = function() return true end,
+		copy_image_file_to_clipboard = function() fixture.clipboard_copies = (fixture.clipboard_copies or 0) + 1; return true end,
+		encode_base64 = function()
+			if fixture.on_encode then fixture.on_encode() end
+			return "encoded"
+		end,
 	}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.notifications"] = {
@@ -158,6 +173,49 @@ end
 
 
 helpers.describe("shared screenshot owner: positive controls", function()
+	for _, boundary in ipairs({ "on_read", "on_encode" }) do
+		helpers.it("does not deliver a screen image after pause during " .. boundary, function()
+			local f = fresh_screenshot()
+			local delivered = 0
+			local pause_result = "not called"
+			f[boundary] = function() pause_result = f.subject.pause_screenshot_actions("gestures") end
+			helpers.assert_eq(f.subject.capture_image({}, "gestures", 100, function() delivered = delivered + 1 end), true)
+			f.tasks[1]:deliver(0, "", "")
+			helpers.assert_eq(pause_result, false, "the running native boundary must remain owned")
+			helpers.assert_eq(delivered, 0)
+			helpers.assert_eq(f.subject.has_pending_screenshot_action("gestures"), false)
+			helpers.assert_eq(next(f.files), nil)
+		end)
+	end
+	helpers.it("does not copy a screenshot after pause during file inspection", function()
+		local f = fresh_screenshot()
+		local pause_result
+		f.on_classify = function()
+			f.on_classify = nil
+			pause_result = f.subject.pause_screenshot_actions("gestures")
+		end
+		helpers.assert_eq(f.subject.capture({}, "gestures"), true)
+		f.tasks[1]:deliver(0, "", "")
+		helpers.assert_eq(pause_result, false)
+		helpers.assert_eq(f.clipboard_copies or 0, 0)
+		helpers.assert_eq(#f.notifications, 0)
+		helpers.assert_eq(next(f.files), nil)
+	end)
+	for _, action in ipairs({ "capture", "capture_image" }) do
+		helpers.it(action .. " retains a file acquired during a reentrant pause", function()
+			local f = fresh_screenshot()
+			f.on_allocate = function()
+				helpers.assert_eq(f.subject.pause_screenshot_actions("gestures"), false)
+			end
+			local result
+			if action == "capture" then result = f.subject.capture({}, "gestures")
+			else result = f.subject.capture_image({}, "gestures", 1024, function() error("cancelled") end) end
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(#f.tasks, 0)
+			helpers.assert_eq(next(f.files), nil)
+			helpers.assert_eq(f.subject.has_pending_screenshot_action("gestures"), false)
+		end)
+	end
 	helpers.it("completes save and direct clipboard capture exactly once", function()
 		local f = fresh_screenshot()
 		helpers.assert_eq(f.subject.save({}, "full"), true)

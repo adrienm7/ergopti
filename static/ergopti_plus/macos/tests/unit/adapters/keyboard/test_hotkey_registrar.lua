@@ -55,6 +55,21 @@ end
 -- ==========================
 
 helpers.describe("hotkey_registrar: bind", function()
+	helpers.it("does not deliver a press before native bind commits", function()
+		local adapter, hs_stub = fresh()
+		local native_bind = hs_stub.hotkey.bind
+		local fired = 0
+		hs_stub.hotkey.bind = function(mods, key, pressed)
+			pressed()
+			return native_bind(mods, key, pressed)
+		end
+		local token = assert(adapter.bind("Ctrl+T", function() fired = fired + 1 end))
+		helpers.assert_eq(fired, 0)
+		hs_stub.hotkey._bound[1].pressed_fn()
+		helpers.assert_eq(fired, 1)
+		helpers.assert_eq(adapter.unbind(token), true)
+	end)
+
 	helpers.it("registers the chord with Hammerspoon and answers a handle", function()
 		local adapter, hs_stub = fresh()
 		local handle = adapter.bind("Ctrl+Shift+S", function() end)
@@ -367,6 +382,30 @@ helpers.describe("hotkey_registrar: delivery guard", function()
 			"the same handle must resume without a fragile native rebind sweep")
 	end)
 
+	helpers.it("denies a press if its guard disables the binding while checking", function()
+		local adapter, hs_stub = fresh()
+		local fired = 0
+		local token = assert(adapter.bind("Ctrl+T", function() fired = fired + 1 end))
+		adapter.set_delivery_guard(function()
+			helpers.assert_eq(adapter.setEnabled(token, false), true)
+			return true
+		end)
+		hs_stub.hotkey._bound[1].pressed_fn()
+		helpers.assert_eq(fired, 0)
+	end)
+
+	helpers.it("denies a press if the live guard is replaced while checking", function()
+		local adapter, hs_stub = fresh()
+		local fired = 0
+		adapter.bind("Ctrl+T", function() fired = fired + 1 end)
+		adapter.set_delivery_guard(function()
+			adapter.set_delivery_guard(function() return false end)
+			return true
+		end)
+		hs_stub.hotkey._bound[1].pressed_fn()
+		helpers.assert_eq(fired, 0)
+	end)
+
 	helpers.it("audit pause fence: a throwing delivery guard fails closed", function()
 		local adapter, hs_stub = fresh()
 		local fired = 0
@@ -382,6 +421,37 @@ helpers.describe("hotkey_registrar: delivery guard", function()
 end)
 
 helpers.describe("hotkey_registrar: native factory claims", function()
+	helpers.it("detects same-owner logical and physical claims on the same chord (hotkey-same-owner-collision)", function()
+		local adapter, native = fresh()
+		local code = native.keycodes.map.a
+		helpers.assert_true(adapter.replace_physical_claims("keyboard", {
+			{ chord = "Ctrl+A", binding_id = "logical", action = "one" },
+			{ mods = { "ctrl" }, native_code = code, binding_id = "physical", action = "two" },
+		}))
+		helpers.assert_true(adapter.has_physical_conflict({ "ctrl" }, code, "keyboard", "logical"))
+		helpers.assert_true(adapter.has_physical_conflict({ "ctrl" }, code, "keyboard", "physical"),
+			"the logical assignment must not disappear behind its physical alias")
+		helpers.assert_true(adapter.replace_physical_claims("keyboard", {
+			{ chord = "Ctrl+A", binding_id = "logical" },
+		}))
+		helpers.assert_eq(adapter.has_physical_conflict({ "ctrl" }, code, "keyboard", "logical"), false,
+			"a single assignment must still exempt itself")
+	end)
+	helpers.it("does not bypass an unacknowledged disable after failed deletion (hotkey-delete-disable-refusal)", function()
+		for _, refusal in ipairs({ "nil", "false" }) do
+			local adapter, native = fresh()
+			local token = assert(adapter.bind_conditional({ "ctrl" }, native.keycodes.map.a, function() end))
+			local hotkey = native.hotkey._bound[1]
+			local delete, disable = hotkey.delete, hotkey.disable
+			hotkey.delete = function() error("injected delete failure") end
+			hotkey.disable = function() if refusal == "false" then return false end; return nil end
+			helpers.assert_eq(adapter.unbind(token), false)
+			helpers.assert_nil(adapter.bind("Ctrl+A", function() end), "a refused native disable must block competing acquisition")
+			helpers.assert_eq(#native.hotkey._bound, 1, "no competing native bind may be attempted")
+			hotkey.delete, hotkey.disable = delete, disable
+			helpers.assert_true(adapter.unbind(token))
+		end
+	end)
 	helpers.it("suspends an existing conditional for late explicit acquisition and restores it after the last claim", function()
 		local adapter, native = fresh()
 		local token = assert(adapter.bind_conditional({"ctrl"}, native.keycodes.map.a, function() end))

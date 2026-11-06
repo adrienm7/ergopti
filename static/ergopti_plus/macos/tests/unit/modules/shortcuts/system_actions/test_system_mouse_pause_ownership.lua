@@ -477,6 +477,22 @@ helpers.describe("SystemMouse mirror owner: positive and synchronous controls", 
 		handle:deliver(0, "single_screen\n", "")
 	end)
 
+	helpers.it("reports CoreGraphics failures instead of a successful mirror toggle", function()
+		local fixture = fresh_mouse_owner()
+		helpers.assert_eq(fixture.subject.toggle_display_mirror(), true)
+		local handle = fixture.shells[1]
+		local quote = require("infra.text_utils").shell_quote
+		local command = "python3 -B " .. quote(helpers.driver_root()
+			.. "tests/support/modules/shortcuts/mirror_configuration_fixture.py")
+			.. " " .. quote(handle.args[2]) .. " 2>&1"
+		local process = assert(io.popen(command, "r"))
+		local output = assert(process:read("a"))
+		local closed, reason, status = process:close()
+		helpers.assert_true(closed == true and reason == "exit" and status == 0,
+			"the dispatched Python must handle each native result: " .. output)
+		handle:deliver(0, "single_screen\n", "")
+	end)
+
 	helpers.it("publishes one terminal only after start commits", function()
 		local fixture = fresh_mouse_owner()
 		helpers.assert_eq(fixture.subject.toggle_display_mirror(), true)
@@ -766,6 +782,31 @@ end)
 
 
 helpers.describe("SystemMouse owner: parent isolation", function()
+	helpers.it("refuses a disconnected screen while resolving a teleport", function()
+		local fixture = fresh_mouse_owner()
+		hs.screen.allScreens = function()
+			return { hs.mouse.getCurrentScreen(), { id = function() return 2 end,
+				frame = function() error("display disconnected") end } }
+		end
+		local ok, result = pcall(fixture.subject.teleport_mouse, "gestures")
+		helpers.assert_eq(ok, true)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(fixture.mouse_moves, 0)
+	end)
+
+	helpers.it("does not teleport after a pause during screen resolution", function()
+		local fixture = fresh_mouse_owner()
+		local current = hs.mouse.getCurrentScreen()
+		hs.screen.allScreens = function()
+			return { current, { id = function() return 2 end, frame = function()
+				fixture.subject.pause_mouse_actions("gestures")
+				fixture.subject.resume_mouse_actions("gestures")
+				return { x = 0, y = 0, w = 100, h = 100 }
+			end, name = function() return "screen" end } }
+		end
+		helpers.assert_eq(fixture.subject.teleport_mouse("gestures"), false)
+		helpers.assert_eq(fixture.mouse_moves, 0)
+	end)
 	helpers.it("keeps gesture spotlight and teleport live while shortcuts pause", function()
 		local fixture = fresh_mouse_owner()
 		helpers.assert_eq(

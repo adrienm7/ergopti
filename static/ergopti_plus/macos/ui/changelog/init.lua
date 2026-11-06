@@ -407,6 +407,7 @@ local function fetch_and_inject(channel)
 	if not session_is_current(owner, view, controller) then return end
 	if not registry_channel(channel, "release fetch") then return end
 	local request_generation = next_fetch_generation()
+	_last_list = nil
 
 	Logger.trace(LOG, "Fetching releases (channel=%s)…", channel)
 	if not session_is_current(owner, view, controller) or request_generation ~= _fetch_generation then return end
@@ -452,7 +453,6 @@ local function fetch_and_inject(channel)
 		end
 
 		local releases = data
-		_last_list = { kind = "json", releases = data }
 		local ok_enc, json = pcall(hs.json.encode, releases)
 		if not ok_enc or not json then
 			Logger.warn(LOG, "Failed to re-encode releases as JSON.")
@@ -460,6 +460,7 @@ local function fetch_and_inject(channel)
 				request_generation)
 			return
 		end
+		_last_list = { kind = "json", releases = data }
 
 		eval(string.format("injectReleases(%s,%s)", json, js_str(channel)),
 			request_generation, #releases)
@@ -563,7 +564,9 @@ local function install_session()
 		end,
 		install_async = function(staged, release, asset, done)
 			return deps().installer.arm_swap(staged, function(armed, detail)
-				done(armed == true, ReleaseInstall.REASON.install, detail)
+				local reason = detail == "previous_backup_occupied" and ReleaseInstall.REASON.previous_backup
+					or ReleaseInstall.REASON.install
+				done(armed == true, reason, detail)
 			end) == true
 		end,
 		restart = function()
@@ -616,6 +619,17 @@ end
 
 -- The page's reason when the launcher did not take the hand-off.
 local HANDOFF_FAILED = "changelog_window.install_error_handoff"
+
+--- Reports a stale action while a replacement list is not yet available.
+local function report_missing_list(tag)
+	local owner = install_owner()
+	local reason = _install_session and _install_session.busy() and ReleaseInstall.REASON.busy
+		or ReleaseInstall.REASON.unknown_release
+	local message = js_value({ tag = tag, phase = "failed", reason_key = reason })
+	if message and install_owner_retained(owner) then
+		eval(string.format("setInstallProgress(%s)", message), owner.generation, nil, owner)
+	end
+end
 
 --- Hands the newest release of a feed-only list to Sparkle. The feed names no
 --- digest, so this host cannot verify a download itself; Sparkle verifies the
@@ -771,10 +785,15 @@ local function ensure_ucc(owner)
 			subscribe_from_page(body.channel)
 		elseif body.action == "install_release" then
 			-- Only this click installs a chosen release: nothing else calls the session.
-			install_session().install(body.tag, body.channel)
+			if _last_list == nil then
+				report_missing_list(body.tag)
+			else
+				install_session().install(body.tag, body.channel)
+			end
 		elseif body.action == "install_through_updater" then
 			-- A feed-only list's newest release: Sparkle verifies and asks the user.
-			hand_off_to_updater(body.tag, body.channel)
+			if _last_list == nil then report_missing_list(body.tag)
+			else hand_off_to_updater(body.tag, body.channel) end
 		elseif body.action == "install_failure_action" then
 			if _install_session then
 				_install_session.failure_action(body.operation, body.epoch, body.id)

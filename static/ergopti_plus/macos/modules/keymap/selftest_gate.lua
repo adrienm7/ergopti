@@ -57,9 +57,12 @@ local function report_refusal(reason)
 	local generation = FieldRunSelftest.generation()
 	if _logged_generation == generation then return end
 	_logged_generation = generation
-	pcall(SyntheticInput.defer_after_callback, "keymap selftest refusal", function()
+	local called, scheduled = pcall(SyntheticInput.defer_after_callback, "keymap selftest refusal", function()
 		Logger.warn(LOG, "A field-run selftest key was consumed (%s); no application received it.", reason)
 	end)
+	if (not called or scheduled ~= true) and _logged_generation == generation then
+		_logged_generation = nil
+	end
 end
 
 --- Decides one selftest key. The caller consumes the key unless this admits it.

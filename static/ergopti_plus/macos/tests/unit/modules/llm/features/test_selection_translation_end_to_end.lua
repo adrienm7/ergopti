@@ -57,6 +57,16 @@ helpers.describe("translation of the selection end to end (llm_translate_selecti
 		end)
 	end)
 
+	helpers.it("retains Markdown formatting in the translation the user accepts", function()
+		with_world("**important**", "fr", function(world)
+			trigger(world, "ui")
+			answer(world.posts[1], "**TRANSLATION:** **important**")
+			helpers.assert_eq(world.renders[#world.renders].texts[1], "**important**")
+			helpers.assert_eq(accept(world, 1), true)
+			helpers.assert_eq(world.document[1], "**important**")
+		end)
+	end)
+
 	helpers.it("names a fixed target language natively, whatever the interface", function()
 		with_world(SELECTION, "fr", function(world)
 			trigger(world, "ja")

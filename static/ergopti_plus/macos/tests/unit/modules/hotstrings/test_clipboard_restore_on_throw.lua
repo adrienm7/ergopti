@@ -56,6 +56,7 @@ helpers.describe("clipboard: a write that throws must not keep the user's clipbo
 			local clipboard, writes, restores, notifications, count = original, 0, 0, 0, 0
 			f.hs_overrides.pasteboard = {
 				changeCount = function() return count end,
+				allContentTypes = function() return { {} } end,
 				readAllData = function() return clipboard end,
 				setContents = function(text)
 					writes = writes + 1

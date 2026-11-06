@@ -9,6 +9,7 @@
 
 local helpers = require("tests.helpers")
 
+local NORMAL_LEVEL = 0
 local FLOATING_LEVEL = 10
 local OVERLAY_LEVEL = 20
 
@@ -17,6 +18,7 @@ local function load_fixture()
 	local canvas_port = {
 		windowBehaviors = { canJoinAllSpaces = 1 },
 		windowLevels = {
+			normal = NORMAL_LEVEL,
 			floating = FLOATING_LEVEL,
 			overlay = OVERLAY_LEVEL,
 		},
@@ -53,13 +55,13 @@ end
 
 helpers.describe("GraphicsRenderer z-order", function()
 	helpers.it("maps alwaysOnTop to the intended native level", function()
-		helpers.assert_true(FLOATING_LEVEL < OVERLAY_LEVEL,
+		helpers.assert_true(NORMAL_LEVEL < FLOATING_LEVEL and FLOATING_LEVEL < OVERLAY_LEVEL,
 			"the fixture must model overlay above floating")
 
 		local cases = {
 			{ label = "omitted", opts = {}, expected = OVERLAY_LEVEL },
 			{ label = "true", opts = { alwaysOnTop = true }, expected = OVERLAY_LEVEL },
-			{ label = "false", opts = { alwaysOnTop = false }, expected = FLOATING_LEVEL },
+			{ label = "false", opts = { alwaysOnTop = false }, expected = NORMAL_LEVEL },
 		}
 
 		for _, case in ipairs(cases) do

@@ -362,13 +362,12 @@ end
 --- Value rules of owners that accept more than the manifest's Lua type. The
 --- gesture owner coerces a sensitivity with tonumber (set_sensitivity: a hand
 --- edit or an AHK migration can persist "4.5"), so a numeric string is a value
---- it applies, not an outdated one. A script-control slot takes an action id
+--- it applies within the supported range, not an outdated one. A script-control slot takes an action id
 --- the catalogue still offers.
 local OWNER_VALUE_RULES = {
 	gesture_sensitivities = function(value)
-		local number = tonumber(value)
-		if type(number) == "number" and number > 0 then return true end
-		return false, "the value is not a positive number"
+		if require("modules.gestures.sensitivity").coerce(value) ~= nil then return true end
+		return false, "the value is outside the supported sensitivity range"
 	end,
 	script_control_shortcuts = function(value)
 		local retired, detail = M.action_is_retired(value)

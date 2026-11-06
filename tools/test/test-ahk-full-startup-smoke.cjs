@@ -207,7 +207,7 @@ const BOOT_OPERATION_CEILINGS = {
 	'toml.document_parse': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
 	'config_migrate.registry_deep_compares': { all: 13, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
 	'toml.document_slow_steps': { all: 11943, [REALISTIC_HOTSTRINGS_FIXTURE]: 13420 },
-	'toml.flat_values': { all: 2179, [REALISTIC_HOTSTRINGS_FIXTURE]: 1198 }
+	'toml.flat_values': { all: 2181, [REALISTIC_HOTSTRINGS_FIXTURE]: 1199 }
 };
 
 /**

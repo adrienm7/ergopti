@@ -128,6 +128,21 @@ local function finish_operation(operation)
 	return _current_operation ~= operation
 end
 
+--- Own the allocation until its pathname has been attached or rejected.
+local function allocate_temp_capture(operation)
+	if not operation_is_authorized(operation) then return nil, nil, true end
+	operation.acquiring = true
+	local ok, path, detail = xpcall(FileSystem.create_secure_temp_file, debug.traceback)
+	if ok and type(path) == "string" and path ~= "" then operation.temp_path = path end
+	operation.acquiring = false
+	if not operation_is_authorized(operation) then
+		finish_operation(operation)
+		return nil, nil, true
+	end
+	if not operation.temp_path then return nil, ok and detail or path, false end
+	return operation.temp_path, nil, false
+end
+
 --- Releases one exact native task identity after its terminal callback.
 --- @param operation table Operation identity.
 --- @param slot table Phase/task identity.
@@ -457,16 +472,15 @@ local function pixel_hex_at(operation, x, y, on_hex)
 		require("ui.python_runtime_offer").offer(python_state)
 		return false
 	end
-	local allocation_ok, tmpfile, allocation_detail = xpcall(
-		FileSystem.create_secure_temp_file, debug.traceback)
-	if allocation_ok ~= true or type(tmpfile) ~= "string" or tmpfile == "" then
+	local tmpfile, allocation_detail, cancelled = allocate_temp_capture(operation)
+	if cancelled then return false end
+	if not tmpfile then
 		operation.authorized = false
 		finish_operation(operation)
 		Logger.error(LOG, "Pixel capture temporary-file allocation failed: %s.",
-			tostring(allocation_ok == true and allocation_detail or tmpfile))
+			tostring(allocation_detail))
 		return false
 	end
-	operation.temp_path = tmpfile
 	local safe_x  = math.floor(tonumber(x) or 0) - 1
 	local safe_y  = math.floor(tonumber(y) or 0) - 1
 
@@ -577,14 +591,23 @@ function M.copy_pixel_color(parent)
 	if not operation then return false end
 	Logger.trace(LOG, "Pixel color read started…")
 	local ok, pos = pcall(hs.mouse.absolutePosition)
-	if not ok or not pos then
+	local function coordinate(value)
+		if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then return nil end
+		local integer = math.tointeger(math.floor(value))
+		-- The capture region subtracts one pixel around the requested point.
+		if integer == nil or integer == math.mininteger then return nil end
+		return integer
+	end
+	local x = ok and type(pos) == "table" and coordinate(pos.x) or nil
+	local y = ok and type(pos) == "table" and coordinate(pos.y) or nil
+	if x == nil or y == nil then
 		operation.authorized = false
 		finish_operation(operation)
 		Logger.error(LOG, "copy_pixel_color: failed to read mouse position.")
 		return false
 	end
 
-	return pixel_hex_at(operation, math.floor(pos.x), math.floor(pos.y), function(hex)
+	return pixel_hex_at(operation, x, y, function(hex)
 		if not hex then
 			notifications.notify(i18n.get("shortcuts.pixel_read_error"), nil, "error")
 			return
@@ -621,17 +644,16 @@ function M.interactive_screenshot(parent)
 	local operation = begin_operation(pixel_scope(parent), "Interactive screenshot")
 	if not operation then return false end
 	Logger.trace(LOG, "Interactive screenshot started…")
-	local allocation_ok, tmpfile, allocation_detail = xpcall(
-		FileSystem.create_secure_temp_file, debug.traceback)
-	if allocation_ok ~= true or type(tmpfile) ~= "string" or tmpfile == "" then
+	local tmpfile, allocation_detail, cancelled = allocate_temp_capture(operation)
+	if cancelled then return false end
+	if not tmpfile then
 		operation.authorized = false
 		finish_operation(operation)
 		Logger.error(LOG, "Interactive screenshot temporary-file allocation failed: %s.",
-			tostring(allocation_ok == true and allocation_detail or tmpfile))
+			tostring(allocation_detail))
 		notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
 		return false
 	end
-	operation.temp_path = tmpfile
 	local mark = CaptureFlow.clipboard_mark()
 	return start_task_phase(operation, "Interactive screenshot", SCREENCAPTURE_BIN,
 		-- -t png: the temp file has no extension and the user's screenshot
@@ -645,7 +667,9 @@ function M.interactive_screenshot(parent)
 				stderr = stderr,
 				interactive = true,
 				destination = "clipboard",
+				authorized = function() return operation_is_authorized(operation) end,
 			})
+			if not operation_is_authorized(operation) then return false end
 			if outcome == CaptureFlow.OUTCOME_COPIED then
 				notifications.notify(i18n.get("shortcuts.screenshot_copied"), nil, "success")
 				Logger.done(LOG, "Interactive screenshot copied to the clipboard.")

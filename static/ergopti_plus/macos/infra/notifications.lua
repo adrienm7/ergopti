@@ -148,7 +148,8 @@ function M.notify(title_or_msg, body, kind, on_click)
 	local owner_id = nil
 	local created, notification_or_err = xpcall(function()
 		return require("adapters.application_notifier").new(function()
-			if owner_id then release_notification(owner_id) end
+			if owner_id == nil or _notification_owners[owner_id] == nil then return end
+			release_notification(owner_id)
 			if type(on_click) == "function" then
 				run_click_step("action", on_click)
 				return
@@ -184,7 +185,8 @@ function M.notify(title_or_msg, body, kind, on_click)
 	end
 
 	local notification = notification_or_err
-	if type(notification.send) ~= "function" then
+	local readable, send = pcall(function() return notification.send end)
+	if not readable or type(send) ~= "function" then
 		local detail = "Notification object has no send capability"
 		Logger.warn(LOG, "%s.", detail)
 		return false, detail

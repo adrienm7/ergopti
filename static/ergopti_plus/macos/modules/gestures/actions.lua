@@ -1966,13 +1966,18 @@ sg("search_web", function(binding)
 	-- the FIRST had just copied — the selection, not the user's clipboard — and
 	-- then dutifully "restored" it, so the real clipboard was gone for good. The
 	-- same stale-snapshot class the text-transform path was hardened against.
-	local ok_snapshot, snapshot_or_error = pcall(hs.pasteboard.readAllData)
-	if not ok_snapshot or type(snapshot_or_error) ~= "table" then
-		Logger.error(LOG, "search_web clipboard snapshot failed: %s.", tostring(snapshot_or_error))
-		return
+	local ok_snapshot, snapshot, captured, snapshot_count = pcall(Clipboard.save)
+	if not ok_snapshot or captured ~= true then
+		Logger.error(LOG, "search_web clipboard snapshot failed.")
+		return false
 	end
 	if not aux_admission_open(parent) then return false end
-	_search_saved_clipboard = snapshot_or_error
+	if Clipboard._change_count() ~= snapshot_count then
+		Logger.error(LOG, "search_web clipboard changed before capture.")
+		return false
+	end
+	if not aux_admission_open(parent) then return false end
+	_search_saved_clipboard = snapshot or {}
 	_search_result_receipt = nil
 	_search_capture_in_flight = true
 	_search_parent = parent

@@ -1532,8 +1532,12 @@ _TooltipMixTintHex(AccentHex) {
 		if (SubStr(H, 1, 1) == "#") {
 				H := SubStr(H, 2)
 		}
-		if !RegExMatch(H, "^[0-9A-Fa-f]{6}$") {
+		if !RegExMatch(H, "^(?:[0-9A-Fa-f]{3,4}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$") {
 				return _TOOLTIP_DEFAULT_BG_HEX
+		}
+		; Tint uses hue only; CSS alpha is validated but does not set the panel opacity.
+		if (StrLen(H) <= 4) {
+				H := SubStr(H, 1, 1) . SubStr(H, 1, 1) . SubStr(H, 2, 1) . SubStr(H, 2, 1) . SubStr(H, 3, 1) . SubStr(H, 3, 1)
 		}
 
 		R := Integer("0x" . SubStr(H, 1, 2)) / 255.0

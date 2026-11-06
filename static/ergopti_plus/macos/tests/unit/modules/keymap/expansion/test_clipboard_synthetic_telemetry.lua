@@ -254,6 +254,7 @@ helpers.describe("clipboard output reaches synthetic telemetry", function()
 		local write_attempts = 0
 		local original = { ["public.utf8-plain-text"] = "ORIGINAL" }
 		local current = original
+		fixture.hs.pasteboard.allContentTypes = function() return { { "public.utf8-plain-text" } } end
 		fixture.hs.pasteboard.readAllData = function() return original end
 		fixture.hs.pasteboard.writeAllData = function(saved)
 			native_write_all_data(saved)

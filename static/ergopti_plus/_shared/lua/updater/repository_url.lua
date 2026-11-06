@@ -35,7 +35,15 @@ function M.is_repository_url(value, owner, repo)
 	local root = "https://" .. Identifiers.hosts.github .. "/" .. owner .. "/" .. repo
 	if value:sub(1, #root) ~= root then return false end
 	local rest = value:sub(#root + 1)
-	return rest == "" or rest:match(REST_PATTERN) ~= nil
+	if rest == "" then return true end
+	if not rest:match(REST_PATTERN) then return false end
+	local path = rest:match("^[^?#]*")
+	path = path:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end)
+	if path:find("\\", 1, true) or path:find("%c") then return false end
+	for segment in (path .. "/"):gmatch("(.-)/") do
+		if segment == ".." then return false end
+	end
+	return true
 end
 
 return M

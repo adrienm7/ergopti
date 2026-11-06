@@ -295,7 +295,7 @@ local function rebuild_tail_indexes()
 	local star_idx = {}
 	local literal_magic_idx = {}
 	local magic = type(_state.magic_key) == "string" and _state.magic_key or ""
-	local magic_tail = magic ~= "" and text_utils.trig_lower(tail_codepoint(magic)) or nil
+	local magic_tail = magic ~= "" and text_utils.trig_fold(tail_codepoint(magic)) or nil
 	-- Mappings bucketed by the FIRST codepoint of their trigger. classify_trigger
 	-- answers "is `str` a prefix of some trigger?", which no existing index could
 	-- serve: the tail buckets answer the other two questions (a trigger that
@@ -308,9 +308,9 @@ local function rebuild_tail_indexes()
 		-- merge candidates coming from two independent O(1) indexes without
 		-- duplicating this module's collision comparator.
 		m.registry_rank = registry_rank
-		-- tail_char is already Unicode-lowercased (trig_lower) at add_raw() time, so
+		-- tail_char is already Unicode-lowercased (trig_fold) at add_raw() time, so
 		-- it is used directly as the bucket key. The expander's hot path queries the
-		-- same lowercase key via mappings_for_tail (also trig_lower), so an accented
+		-- same lowercase key via mappings_for_tail (also trig_fold), so an accented
 		-- uppercase tail typed by the user lands in the same bucket as registration.
 		local tc = m.tail_char
 		local bucket = tail_idx[tc]
@@ -347,7 +347,7 @@ local function rebuild_tail_indexes()
 			-- literals such as stored `litA` with configured magic `a`.
 			local ok_base, base_offset = pcall(utf8.offset, m.trigger, -1)
 			local base = (ok_base and base_offset) and m.trigger:sub(1, base_offset - 1) or ""
-			local base_tail = base == "" and "" or text_utils.trig_lower(tail_codepoint(base))
+			local base_tail = base == "" and "" or text_utils.trig_fold(tail_codepoint(base))
 			local lbucket = literal_magic_idx[base_tail]
 			if not lbucket then
 				lbucket = {}
@@ -414,9 +414,9 @@ function M.mappings_for_tail(tail_char)
 	-- Buckets are keyed by the trigger's last codepoint Unicode-LOWERCASED (see
 	-- add_raw's tail_char). The lookup MUST apply the same fold, otherwise an
 	-- uppercase last char probes an empty bucket and the auto-expansion never fires.
-	-- trig_lower (not ASCII :lower()) covers accented capitals — "Ê" → "ê" — so a
+	-- trig_fold (not ASCII :lower()) covers accented capitals — "Ê" → "ê" — so a
 	-- case-conform entry registered only in lowercase still matches UPPERCASE input.
-	return _state.mappings_by_tail_char[text_utils.trig_lower(tail_char)]
+	return _state.mappings_by_tail_char[text_utils.trig_fold(tail_char)]
 end
 
 --- Returns the bucket of has_magic mappings whose star_base ends with
@@ -429,7 +429,7 @@ function M.mappings_for_star_tail(tail_char)
 	-- registration side stores a folded tail key, so the preview/resolver query
 	-- must fold too; otherwise a fold-mode `abc★` fires for `ABC★` while the
 	-- prospective lookup probes the raw `C` bucket and finds nothing.
-	return _state.mappings_by_star_tail_char[text_utils.trig_lower(tail_char)]
+	return _state.mappings_by_star_tail_char[text_utils.trig_fold(tail_char)]
 end
 
 --- Returns ordinary auto mappings whose literal trigger currently ends with the
@@ -439,7 +439,7 @@ end
 function M.mappings_for_literal_magic_tail(tail_char)
 	if not _state or type(tail_char) ~= "string" then return nil end
 	local index = _state.mappings_by_literal_magic_tail
-	return index and index[text_utils.trig_lower(tail_char)] or nil
+	return index and index[text_utils.trig_fold(tail_char)] or nil
 end
 
 --- Returns all three trigger-membership flags in a single O(N) pass.
@@ -505,9 +505,9 @@ function M.classify_trigger(str)
 	end
 
 	local tail_bucket  = _state.mappings_by_tail_char
-		and _state.mappings_by_tail_char[text_utils.trig_lower(tail_codepoint(str))]
+		and _state.mappings_by_tail_char[text_utils.trig_fold(tail_codepoint(str))]
 	local first_bucket = _state.mappings_by_first_char
-		and _state.mappings_by_first_char[text_utils.trig_lower(first_codepoint(str))]
+		and _state.mappings_by_first_char[text_utils.trig_fold(first_codepoint(str))]
 
 	if tail_bucket then
 		for _, m in ipairs(tail_bucket) do
@@ -694,7 +694,7 @@ function M.add(trigger, replacement, opts)
 		local group_state = current_group and _state.groups[current_group] or nil
 		local group_order = (group_state and group_state.group_order) or 0
 		local match_mode = conform and "conform" or (fold and "fold" or "exact")
-		local trigger_folded = fold and text_utils.trig_lower(t) or nil
+		local trigger_folded = fold and text_utils.trig_fold(t) or nil
 		-- Precompute magic-key membership so the main event loop does not have to
 		-- recompute it on every keystroke; invalidated by update_trigger_char().
 		local mk        = _state.magic_key
@@ -703,7 +703,7 @@ function M.add(trigger, replacement, opts)
 		local star_base = has_magic and t:sub(1, #t - mkl) or nil
 		local star_base_bytes = star_base and #star_base or nil
 		local star_base_tail_char = star_base ~= nil
-			and (star_base == "" and "" or text_utils.trig_lower(tail_codepoint(star_base)))
+			and (star_base == "" and "" or text_utils.trig_fold(tail_codepoint(star_base)))
 			or nil
 
 		local k        = t .. "\0" .. tostring(is_word) .. "\0" .. tostring(a) .. "\0" .. (current_group or "")
@@ -753,14 +753,14 @@ function M.add(trigger, replacement, opts)
 			-- Last UTF-8 codepoint of the trigger, used later to bucket mappings
 			-- by tail character so run_trigger_checks can skip any mapping whose
 			-- last char does not match the just-typed character. Unicode-lowercased
-			-- (trig_lower, not ASCII :lower()) so an accented uppercase tail typed by
+			-- (trig_fold, not ASCII :lower()) so an accented uppercase tail typed by
 			-- the user — "Ê" — resolves to the same bucket as the lowercase "ê"
 			-- registration. This is what lets a case-conform entry (registered in
 			-- lowercase only) match an UPPERCASE-typed trigger whose tail is accented.
-			tail_char    = text_utils.trig_lower(tail_codepoint(t)),
+			tail_char    = text_utils.trig_fold(tail_codepoint(t)),
 			-- First codepoint, folded like tail_char. Buckets the "is this string a
 			-- PREFIX of some trigger?" question, which the tail index cannot answer.
-			first_char   = text_utils.trig_lower(first_codepoint(t)),
+			first_char   = text_utils.trig_fold(first_codepoint(t)),
 			-- The three-way match mode, resolved once at registration. It used to be
 			-- two orthogonal booleans (case_conform, case_fold) — a second vocabulary
 			-- for the same three outcomes the shared matcher core already names, and
@@ -807,7 +807,8 @@ function M.add(trigger, replacement, opts)
 		add_raw(t, r, is_auto, plain_r, conform, fold)
 		-- Only generate space variants for triggers that contain spaces but do not
 		-- *start* with a space (starting-space triggers are word-boundary guards).
-		local starts_with_space = t:match("^[ \194\160\226\128\175]") ~= nil
+		local starts_with_space = t:sub(1, 1) == " " or t:sub(1, 2) == "\194\160"
+			or t:sub(1, 3) == "\226\128\175"
 		if not starts_with_space and t:match(" ") then
 			add_raw((t:gsub(" ", "\194\160")),   r, is_auto, plain_r, conform, fold)  -- regular nbsp
 			add_raw((t:gsub(" ", "\226\128\175")), r, is_auto, plain_r, conform, fold) -- narrow nbsp
@@ -1108,17 +1109,18 @@ function M.update_trigger_char(char)
 			local base   = m.trigger:sub(1, #m.trigger - old_len)
 			local new_tr = base .. char
 			m.trigger             = new_tr
+			m.trigger_folded      = m.match_mode == "fold" and text_utils.trig_fold(new_tr) or nil
 			m.trigger_bytes       = #new_tr
-			-- trig_lower (not ASCII :lower()) is required here so that accented
-			-- capital tails ("Ê") are lowercased to "ê" — matching the trig_lower
+			-- trig_fold (not ASCII :lower()) is required here so that accented
+			-- capital tails ("Ê") are lowercased to "ê" — matching the trig_fold
 			-- used at add_raw() time and in mappings_for_tail bucket lookup.
-			m.tail_char           = text_utils.trig_lower(tail_codepoint(new_tr))
+			m.tail_char           = text_utils.trig_fold(tail_codepoint(new_tr))
 			m.tlen                = text_utils.utf8_len(new_tr)
 			m.has_magic           = true
 			m.star_base           = base
 			m.star_base_bytes     = #base
 			m.star_base_tail_char = base == "" and ""
-				or text_utils.trig_lower(tail_codepoint(base))
+				or text_utils.trig_fold(tail_codepoint(base))
 			renamed = renamed + 1
 		else
 			-- Previously non-magic mappings must not suddenly gain has_magic

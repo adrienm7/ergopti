@@ -41,8 +41,14 @@ local function fixture()
 		refresh = function() f.items = f.tree(); f.stale = false; return f.items end,
 		current_items = function() return f.items end,
 		store = {
-			get = function(key, default) local value = f.store[key]; if value == nil then return default end; return value end,
-			set = function(key, value) f.store[key] = value; return true end,
+			get = function(key, default)
+				if f.read_error then error("store read failed") end
+				local value = f.store[key]; if value == nil then return default end; return value
+			end,
+			set = function(key, value)
+				if f.write_refused then return false end
+				f.store[key] = value; return true
+			end,
 			delete = function(key) f.store[key] = nil; return true end,
 		},
 		schedule = function(_, callback) f.timers[#f.timers + 1] = callback; return true end,
@@ -96,6 +102,46 @@ helpers.describe("menubar click gate", function()
 		click(f)
 		local record = json.decode(f.store[KEY])
 		helpers.assert_eq(#record.clicks, 2, "the logger drain still accepts clicks; they are handed over too")
+	end)
+
+	helpers.it("does not renew an expired hand-off when a later reload hands off a click", function()
+		local f = fixture()
+		f.store[KEY] = json.encode({ schema = 1, at = f.clock - 61,
+			clicks = { { path = { "Features", "Old" }, desired = true } } })
+		f.terminal = true; f.reloading = true
+		click(f); f.gate.handoff()
+		local record = json.decode(f.store[KEY])
+		helpers.assert_eq(#record.clicks, 1)
+		helpers.assert_eq(record.clicks[1].path, { "Features", "Preview" })
+	end)
+
+	helpers.it("does not let a malformed earlier hand-off poison a new click", function()
+		local f = fixture()
+		f.store[KEY] = json.encode({ schema = 1, at = f.clock, clicks = { { path = { 3 } } } })
+		f.terminal = true; f.reloading = true
+		click(f); f.gate.handoff()
+		local record = json.decode(f.store[KEY])
+		helpers.assert_eq(#record.clicks, 1)
+		helpers.assert_eq(record.clicks[1].path, { "Features", "Preview" })
+	end)
+
+	helpers.it("keeps an existing hand-off when reading it fails", function()
+		local f = fixture()
+		local previous = json.encode({ schema = 1, at = f.clock,
+			clicks = { { path = { "Features", "Old" }, desired = true } } })
+		f.store[KEY] = previous
+		f.read_error = true; f.terminal = true; f.reloading = true
+		click(f); f.gate.handoff()
+		helpers.assert_eq(f.store[KEY], previous, "unread earlier clicks must not be overwritten")
+		helpers.assert_eq(f.lost, 1, "the newly dropped click is reported")
+	end)
+
+	helpers.it("reports clicks lost when the hand-off cannot be written", function()
+		local f = fixture()
+		f.write_refused = true; f.terminal = true; f.reloading = true
+		click(f); f.gate.handoff()
+		helpers.assert_eq(f.store[KEY], nil)
+		helpers.assert_eq(f.lost, 1, "the user is told the choice was not handed over")
 	end)
 
 	helpers.it("(menu-click-handoff-once) consumes the hand-off once and refuses a second inherit", function()

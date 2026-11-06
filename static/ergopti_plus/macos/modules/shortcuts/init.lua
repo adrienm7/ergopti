@@ -135,6 +135,7 @@ M.is_enabled             = Bindings.is_enabled
 M.is_bound               = Bindings.is_bound
 M.set_wrap_pairs_getter  = Bindings.set_wrap_pairs_getter
 M.set_chatgpt_url        = Bindings.set_chatgpt_url
+M.get_chatgpt_url        = Bindings.get_chatgpt_url
 
 -- Proxy Script Control Methods
 M.ACTIONS               = ScriptControl.ACTIONS
@@ -147,6 +148,7 @@ M.get_pause_epoch       = ScriptControl.get_pause_epoch
 M.register_pause_owner  = ScriptControl.register_pause_owner
 M.PAUSE_OWNER_IDS       = ScriptControl.PAUSE_OWNER_IDS
 M.set_shortcut_action   = ScriptControl.set_shortcut_action
+M.get_shortcut_actions  = ScriptControl.get_shortcut_actions
 M.set_script_chords_enabled = ScriptControl.set_chords_enabled
 M.script_chords_enabled = ScriptControl.chords_enabled
 M.script_chord_slots    = ScriptControl.slots
