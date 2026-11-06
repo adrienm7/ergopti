@@ -1234,6 +1234,8 @@
 							blob.metrics_manifest_incomplete === true
 						);
 					}
+					// The KPIs this host cannot measure, each with its reason key.
+					window.metricsUnmeasured = (blob.driver_meta && blob.driver_meta.unmeasured) || {};
 					const categories = blob.user_categories || {};
 					const icons = blob.app_icons || {};
 					if (typeof window.bootstrapMetricsAppsData === 'function') {

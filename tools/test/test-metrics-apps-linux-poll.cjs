@@ -55,8 +55,17 @@ installHostCapabilities(sandbox);
 vm.runInContext(script, sandbox);
 
 const answer = (manifest) =>
-	window.__hostBridgeResponse('metrics_apps_bridge', false, { metrics_manifest: manifest });
+	window.__hostBridgeResponse('metrics_apps_bridge', false, {
+		metrics_manifest: manifest,
+		driver_meta: { unmeasured: { space_switches: 'platform_reason.desktop_changes_need_x11' } }
+	});
 answer({ '2026-09-24': { firefox: { chars: 10 } } });
+// The KPIs the host cannot measure travel with the first paint, so the cards
+// read « — » and the reason rather than a zero that looks measured.
+assert.equal(
+	window.metricsUnmeasured && window.metricsUnmeasured.space_switches,
+	'platform_reason.desktop_changes_need_x11'
+);
 answer({ '2026-09-24': { firefox: { chars: 10 } } });
 answer({ '2026-09-24': { firefox: { chars: 10 } } });
 const failures = [];
