@@ -42,8 +42,8 @@
 ;   IMMNotificationClient, GetSystemPowerStatus polling). They are
 ;   listed in KEYSTATS_SPEC §3 but their UI consumers tolerate empty
 ;   tables, so we ship without them and revisit when needed.
-; - space_change is macOS-only (Mission Control); intentionally not
-;   ported.
+; - space_change comes from keystats_virtual_desktop.ahk, polled on the
+;   window-topology tick.
 ; - system_load (periodic CPU/RAM snapshots) is also deferred.
 ; ==============================================================================
 

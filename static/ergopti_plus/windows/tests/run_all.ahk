@@ -1218,6 +1218,7 @@ global _AhkSubDir := ""
 #Include unit/ui/windows/test_focus_handle_release_reentry.ahk
 #Include unit/modules/keystats/test_keystats_mouse_coordinates.ahk
 #Include unit/modules/keystats/test_keystats_window_topology.ahk
+#Include unit/modules/keystats/test_keystats_virtual_desktop.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_fire_log_privacy.ahk
 #Include unit/modules/keystats/ergonomics/test_synthetic_typing_row_privacy.ahk
 ; The near-miss row — the third persisted sink, and the one that had no privacy
