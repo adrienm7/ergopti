@@ -106,16 +106,23 @@ helpers.describe("active layout rows", function()
 		end
 		helpers.assert_eq(type(found), "table", "the list is declared")
 		helpers.assert_eq(found.platforms, nil, "the list is no longer macOS-only")
-		-- The install rows stay macOS-only and say where Windows and Linux install from.
-		local bundle
+		-- The .bundle rows stay macOS-only and the Windows install row Windows-only;
+		-- each reason says where the other systems install from.
+		local bundle, system
 		for _, row in ipairs(manifest.layout_menu) do
 			if row.id == "layout_bundle" then bundle = row end
+			if row.id == "layout_system_install" then system = row end
 		end
 		helpers.assert_eq(bundle.reason_key, "platform_reason.layout_install_is_the_macos_bundle")
+		helpers.assert_eq(type(system), "table", "Windows declares its install row")
+		helpers.assert_eq(system.platforms[1], "ahk")
+		helpers.assert_eq(#system.platforms, 1, "the Windows install row is Windows-only")
 		local english = Json.decode(read(helpers.driver_root() .. "/../_shared/data/locales/en.json"))
 		local reason = english[bundle.reason_key]
-		helpers.assert_true(type(reason) == "string" and reason:find("Ergopti_windows.exe", 1, true) ~= nil
+		helpers.assert_true(type(reason) == "string" and reason:find("Install the Ergopti system layout", 1, true) ~= nil
 			and reason:find(english["menu.layout.manage"], 1, true) ~= nil, "the reason names both install routes")
+		helpers.assert_true(english[system.reason_key]:find(english["menu.layout.manage"], 1, true) ~= nil,
+			"the Windows row tells Linux where to install from")
 		local owner = read(helpers.driver_root() .. "/ui/menu/menu_layouts.lua")
 		helpers.assert_true(owner:find('providers["active_layouts"]', 1, true) ~= nil, "the provider exists")
 		helpers.assert_true(owner:find('require("ui.menu.active_layout_rows").rows(', 1, true) ~= nil)

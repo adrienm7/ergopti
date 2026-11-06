@@ -625,12 +625,28 @@
 		"platforms": { "windows": false, "macos": true, "linux": false },
 		"reasons": {
 			"windows": {
-				"en": "macOS only: this row installs the .bundle layout. On Windows the layout installer is a separate, unsigned download that must run as administrator, which the driver never starts: run Ergopti_windows.exe from the release page. On Linux, install Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
-				"fr": "macOS uniquement : cette ligne installe la disposition .bundle. Sous Windows, l'installateur de la disposition est un téléchargement séparé, non signé, qui doit s'exécuter en administrateur, ce que le pilote ne lance jamais : exécutez Ergopti_windows.exe depuis la page des versions. Sous Linux, installez Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
+				"en": "macOS only: this row installs the .bundle layout. Windows installs Ergopti from « Install the Ergopti system layout » below; on Linux, install it from « Manage layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "macOS uniquement : cette ligne installe la disposition .bundle. Windows installe Ergopti depuis « Installer la disposition système Ergopti » ci-dessous ; sous Linux, installez-la depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
 			},
 			"linux": {
-				"en": "macOS only: this row installs the .bundle layout. On Windows the layout installer is a separate, unsigned download that must run as administrator, which the driver never starts: run Ergopti_windows.exe from the release page. On Linux, install Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
-				"fr": "macOS uniquement : cette ligne installe la disposition .bundle. Sous Windows, l'installateur de la disposition est un téléchargement séparé, non signé, qui doit s'exécuter en administrateur, ce que le pilote ne lance jamais : exécutez Ergopti_windows.exe depuis la page des versions. Sous Linux, installez Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
+				"en": "macOS only: this row installs the .bundle layout. Windows installs Ergopti from « Install the Ergopti system layout » below; on Linux, install it from « Manage layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "macOS uniquement : cette ligne installe la disposition .bundle. Windows installe Ergopti depuis « Installer la disposition système Ergopti » ci-dessous ; sous Linux, installez-la depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
+			}
+		}
+	},
+	{
+		"path": "layout_menu.layout_system_install",
+		"visibility": "hide",
+		"labels": { "fr": "layout_system_install", "en": "layout_system_install" },
+		"platforms": { "windows": true, "macos": false, "linux": false },
+		"reasons": {
+			"macos": {
+				"en": "Windows only: this row installs the Ergopti keyboard layout into Windows, through an unsigned installer that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "Windows uniquement : cette ligne installe la disposition de clavier Ergopti dans Windows, par un installateur non signé qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
+			},
+			"linux": {
+				"en": "Windows only: this row installs the Ergopti keyboard layout into Windows, through an unsigned installer that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "Windows uniquement : cette ligne installe la disposition de clavier Ergopti dans Windows, par un installateur non signé qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
 			}
 		}
 	},
@@ -1265,6 +1281,44 @@
 			"linux": {
 				"en": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.",
 				"fr": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own."
+			}
+		}
+	},
+	{
+		"path": "layout_system_install_commands.system_layout_install",
+		"visibility": "hide",
+		"labels": {
+			"fr": "Installer la disposition système Ergopti (droits administrateur, installateur non signé)…",
+			"en": "Install the Ergopti system layout (administrator rights, unsigned installer)…"
+		},
+		"platforms": { "windows": true, "macos": false, "linux": false },
+		"reasons": {
+			"macos": {
+				"en": "Windows only: this row installs the Ergopti keyboard layout into Windows, through an unsigned installer that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "Windows uniquement : cette ligne installe la disposition de clavier Ergopti dans Windows, par un installateur non signé qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
+			},
+			"linux": {
+				"en": "Windows only: this row installs the Ergopti keyboard layout into Windows, through an unsigned installer that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "Windows uniquement : cette ligne installe la disposition de clavier Ergopti dans Windows, par un installateur non signé qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
+			}
+		}
+	},
+	{
+		"path": "layout_system_update_commands.system_layout_update",
+		"visibility": "hide",
+		"labels": {
+			"fr": "Mettre à jour la disposition système Ergopti (droits administrateur, installateur non signé)…",
+			"en": "Update the Ergopti system layout (administrator rights, unsigned installer)…"
+		},
+		"platforms": { "windows": true, "macos": false, "linux": false },
+		"reasons": {
+			"macos": {
+				"en": "Windows only: this row installs the Ergopti keyboard layout into Windows, through an unsigned installer that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "Windows uniquement : cette ligne installe la disposition de clavier Ergopti dans Windows, par un installateur non signé qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
+			},
+			"linux": {
+				"en": "Windows only: this row installs the Ergopti keyboard layout into Windows, through an unsigned installer that asks for administrator rights. macOS installs its .bundle from the rows above, and Linux installs Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "Windows uniquement : cette ligne installe la disposition de clavier Ergopti dans Windows, par un installateur non signé qui demande les droits administrateur. macOS installe son .bundle depuis les lignes ci-dessus, et Linux installe Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
 			}
 		}
 	},
