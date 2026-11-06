@@ -841,6 +841,7 @@ GetSelectionAsync(OnReady, Ports := 0) {
 				"physical_generation", GenerationFn.Call(),
 				"generation_fn", GenerationFn,
 				"foreground", 0,
+				"foreground_fn", ForegroundFn,
 				"control", 0,
 				"control_fn", ControlFn,
 				"clipboard", "",
@@ -957,6 +958,13 @@ _SelectionCaptureStartCurrent(Job) {
 		; Legacy manually assembled jobs have no control observer. Every job
 		; created by GetSelectionAsync captures one before its first clipboard call.
 		if Job.Has("control") && Job["control_fn"].Call() != Job["control"]
+				return false
+		; Startup is judged by the same window and physical action as the poll:
+		; a newer key press or an external foreground change must refuse before
+		; the clear and the Ctrl+C, not only after them (WCP-001).
+		if Job.Has("foreground_fn") && Job["foreground_fn"].Call() != Job["foreground"]
+				return false
+		if Job.Has("generation_fn") && Job["generation_fn"].Call() != Job["physical_generation"]
 				return false
 		; A supplied observation port may itself cancel or replace the capture.
 		return !A_IsSuspended and _SelectionCaptureJob == Job
