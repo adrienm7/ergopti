@@ -153,7 +153,7 @@ two disagree in either direction.
 | `llm.trigger.instant_on_word_end`                             | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
 | `llm.trigger.after_hotstring`                                 | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
 | `llm.trigger.while_hotstring_tooltip`                         | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
-| `llm.trigger.inline_autotype`                                 | n/a             | n/a                                    | `ollama`, `webview2` |
+| `llm.trigger.inline_autotype`                                 | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
 | `llm.trigger.secure_filter_enabled`                           | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
 | `llm.trigger.url_bar_filter_enabled`                          | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
 | `llm.navigation.nav_modifiers`                                | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |

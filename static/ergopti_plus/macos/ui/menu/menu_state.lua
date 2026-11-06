@@ -455,6 +455,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			{ fn = "set_llm_url_bar_filter_enabled",      val = state.llm_url_bar_filter_enabled },
 			{ fn = "set_llm_secure_field_filter_enabled", val = state.llm_secure_field_filter_enabled },
 			{ fn = "set_llm_instant_on_word_end",         val = state.llm_instant_on_word_end },
+			{ fn = "set_llm_inline_autotype",             val = state.llm_inline_autotype },
 			{ fn = "set_llm_agent_system1",               val = state.llm_agent_system1 },
 			{ fn = "set_llm_agent_system2",               val = state.llm_agent_system2 },
 			{ fn = "set_llm_agent_mode",                  val = state.llm_agent_mode },

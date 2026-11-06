@@ -1379,6 +1379,7 @@ function checkAutomaticTriggerControls() {
 			'llm_trigger_leading',
 			'llm_instant_on_word_end',
 			'llm_after_hotstring',
+			'llm_inline_autotype',
 			'llm_while_hotstring_tooltip',
 			undefined,
 			'llm_url_bar_filter',

@@ -753,6 +753,22 @@
 			]
 		},
 		{
+			"type": "check",
+			"id": "llm_inline_autotype",
+			"i18n": "menu.llm.inline_autotype",
+			"checked_when": [
+				"llm_inline_autotype_enabled"
+			],
+			"disabled_when": [
+				"llm_trigger_ready"
+			],
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
 			"type": "choice",
 			"id": "llm_while_hotstring_tooltip",
 			"path": "llm.trigger.while_hotstring_tooltip",

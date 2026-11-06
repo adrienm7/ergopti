@@ -672,6 +672,7 @@ function M.set_llm_app_profile_overrides(text)   return engine.set_llm_app_profi
 function M.set_llm_url_bar_filter_enabled(v)      return engine.set_llm_url_bar_filter_enabled(v)      end
 function M.set_llm_secure_field_filter_enabled(v) return engine.set_llm_secure_field_filter_enabled(v) end
 function M.set_llm_instant_on_word_end(v)         return engine.set_llm_instant_on_word_end(v)         end
+function M.set_llm_inline_autotype(v)             return engine.set_llm_inline_autotype(v)             end
 function M.set_llm_while_hotstring_tooltip(v)     return engine.set_llm_while_hotstring_tooltip(v)     end
 function M.set_llm_val_modifiers(mods)      return engine.set_llm_val_modifiers(mods)      end
 function M.set_llm_nav_modifiers(mods)      return engine.set_llm_nav_modifiers(mods)      end

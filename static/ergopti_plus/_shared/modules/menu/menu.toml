@@ -689,6 +689,16 @@ i18n = "menu.llm.after_hotstring"
 checked_when = ["llm_after_hotstring_enabled"]
 disabled_when = ["llm_trigger_ready"]
 
+# Windows draws the same switch in its display section (llm_display_inline_control).
+[[menu.llm_trigger_menu]]
+type = "check"
+id = "llm_inline_autotype"
+i18n = "menu.llm.inline_autotype"
+checked_when = ["llm_inline_autotype_enabled"]
+disabled_when = ["llm_trigger_ready"]
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
 # The enum feature owns the two values; the shared choice renderer owns the
 # ticks and the « label : value » caption on every driver.
 [[menu.llm_trigger_menu]]

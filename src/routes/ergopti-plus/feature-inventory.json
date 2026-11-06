@@ -1874,14 +1874,11 @@
 		},
 		"platforms": {
 			"windows": true,
-			"macos": false,
-			"linux": false
+			"macos": true,
+			"linux": true
 		},
-		"reason_key": "platform_reason.inline_autotype_is_windows",
-		"reason": {
-			"fr": "Windows uniquement : dans ce mode, la prédiction est tapée directement dans le document à mesure qu’elle arrive. macOS et Linux affichent la prédiction dans une bulle et ne l’insèrent que lorsque vous l’acceptez.",
-			"en": "Windows only: in this mode the prediction is typed straight into the document as it arrives. macOS and Linux show the prediction in a bubble and insert it when you accept it."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "llm.trigger.secure_filter_enabled",

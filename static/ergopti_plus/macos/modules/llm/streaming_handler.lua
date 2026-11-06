@@ -565,6 +565,8 @@ function M.build_callbacks(ctx)
 			if ctx.on_request_terminal then ctx.on_request_terminal() end
 			Logger.success(LOG, "%d prediction(s) received in %dms from '%s'.",
 				#valid_preds, elapsed_ms or 0, tostring(model_to_use))
+			-- Inline mode types the finished prediction (prediction_engine.lua).
+			if ctx.on_final_predictions then ctx.on_final_predictions(valid_preds) end
 		else
 			Logger.debug(LOG, "Streaming — %d prediction(s) received (partial batch).", #valid_preds)
 		end

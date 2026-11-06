@@ -707,6 +707,7 @@ return {
 	"tests.unit.ui.menu.llm.test_model_selector_api_listing",
 	"tests.unit.modules.llm.settings.test_navigation_settings",
 	"tests.unit.modules.llm.prediction.test_prediction_digit_accept",
+	"tests.unit.modules.llm.prediction.test_prediction_inline_autotype",
 	"tests.unit.modules.llm.prediction.test_llm_tooltip_chords_consumed",
 	"tests.unit.modules.llm.prediction.test_prediction_engine_canonicals",
 	"tests.unit.modules.llm.prediction.test_prediction_trigger_now",

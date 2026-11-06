@@ -141,13 +141,12 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.keys.wrap_text_if_selected` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keys.cmd_star` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 
-## macos — 64 paths not declared
+## macos — 63 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `hotstrings.magic_key_source_char` (setting; declared: windows; reason: `platform_reason.magic_key_detection_is_windows`)
 - [ ] `hotstrings.tap_hold_resets_word` (setting; declared: windows, linux; reason: `platform_reason.tap_hold_word_reset_not_on_macos`)
 - [ ] `llm.onboarding_seen` (setting; declared: windows; reason: `platform_reason.ai_menu_bookkeeping_is_windows`)
-- [ ] `llm.trigger.inline_autotype` (setting; declared: windows; reason: `platform_reason.inline_autotype_is_windows`)
 - [ ] `shortcuts.wrap_text_if_selected` (feature; declared: windows, linux; reason: `platform_reason.wrap_selection_is_a_shortcut_key_on_macos`)
 - [ ] `shortcuts.search.search_engine` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.search.search_engine_url_query` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -208,7 +207,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `category_enabled.rolls` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.magic_key` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 
-## linux — 154 paths not declared
+## linux — 153 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `hotstrings.enabled` (feature; declared: macos; reason: `platform_reason.hotstrings_master_is_macos_engine`)
@@ -216,7 +215,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `llm.onboarding_seen` (setting; declared: windows; reason: `platform_reason.ai_menu_bookkeeping_is_windows`)
 - [ ] `llm.models.user_models` (setting; declared: macos; reason: `platform_reason.llm_saved_user_models_are_macos`)
 - [ ] `llm.models.mlx` (setting; declared: macos; reason: `platform_reason.llm_mlx_is_apple_silicon`)
-- [ ] `llm.trigger.inline_autotype` (setting; declared: windows; reason: `platform_reason.inline_autotype_is_windows`)
 - [ ] `llm.navigation.arrow_nav_enabled` (setting; declared: macos; reason: `platform_reason.arrow_navigation_is_macos`)
 - [ ] `shortcuts.search.search_engine` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.search.search_engine_url_query` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -534,6 +532,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `top_level.reload` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `top_level.quit` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `llm_menu.llm_generation` (hide): Linux only: this driver lists the models and the two generation settings straight in the menu. macOS and Windows put the same choices behind a submenu row, which their own rows above declare.
+- [ ] `llm_trigger_menu.llm_inline_autotype` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `llm_display_menu.llm_token_streaming` (grey): Not on Windows yet: the token-by-token display has not been validated on Windows, so this option stays inactive.
 - [ ] `agent_menu.agent_disabled_apps` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `apps_menu.apps_installed` (hide): Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.

@@ -79,6 +79,16 @@
 		}
 	},
 	{
+		"path": "llm_trigger_menu.llm_inline_autotype",
+		"visibility": "hide",
+		"labels": {
+			"fr": "✍️ Saisie automatique en ligne (style Copilot)",
+			"en": "✍️ Inline auto-type (Copilot-style)"
+		},
+		"platforms": { "windows": false, "macos": true, "linux": true },
+		"reasons": { "windows": { "en": "", "fr": "" } }
+	},
+	{
 		"path": "llm_display_menu.llm_token_streaming",
 		"visibility": "grey",
 		"labels": {

@@ -225,6 +225,11 @@ function M.build(ctx)
 				return apply_setting_transaction(settings_mgr, ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING,
 					not state.llm_after_hotstring, "set_llm_after_hotstring")
 			end,
+			[ConfigKeys.COMMAND.LLM_INLINE_AUTOTYPE] = function()
+				if not ready() then return false end
+				return apply_setting_transaction(settings_mgr, ConfigKeys.COMMAND.LLM_INLINE_AUTOTYPE,
+					not state.llm_inline_autotype, "set_llm_inline_autotype")
+			end,
 			[ConfigKeys.COMMAND.LLM_WHILE_HOTSTRING_TOOLTIP] = function(value)
 				local current = state.llm_while_hotstring_tooltip
 					or Manifest.default_for(ConfigKeys.KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP)
@@ -240,6 +245,7 @@ function M.build(ctx)
 			["llm_secure_field_filter_ready"] = function() return PrivacyPolicy.ready(secure_source) end,
 			["llm_instant_on_word_end_enabled"] = function() return state.llm_instant_on_word_end end,
 			["llm_after_hotstring_enabled"] = function() return state.llm_after_hotstring end,
+			["llm_inline_autotype_enabled"] = function() return state.llm_inline_autotype == true end,
 			-- A state not yet hydrated from the menu defaults reads the manifest's.
 			[ConfigKeys.KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP] = function()
 				if state.llm_while_hotstring_tooltip ~= nil then return state.llm_while_hotstring_tooltip end

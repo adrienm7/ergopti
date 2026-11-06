@@ -916,6 +916,12 @@ function M.predict(context, output_context, override, automatic)
 	local clean_context, trigger_chars = context_without_trigger(context,
 		type(output_context) == "table" and output_context.input_chars or 0)
 	local requested = override and override.num_predictions or ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS) or 1
+	-- Inline mode types the finished prediction instead of offering it, as
+	-- Windows does: one variant, since typing several would be chaos. Live
+	-- mode keeps its offer (it rewrites what is typed).
+	local inline = TriggerSettings.get(require("config_keys").LEAF.INLINE_AUTOTYPE) == true
+		and not (override ~= nil and override.live == true)
+	if inline then requested = 1 end
 	-- A request naming its own prompt keeps it; otherwise the profile the user mapped
 	-- to the application typed in wins over the menu's.
 	local profile = override and override.profile
@@ -1188,7 +1194,21 @@ function M.predict(context, output_context, override, automatic)
 				local observed, observe_err = pcall(_observers.generation, _suggestion_context, reported)
 				if not observed then Logger.warn(LOG, "Prediction generation observer failed: %s", require("modules.llm.error_log").describe(observe_err)) end
 			end
-			if #candidates > 0 then publish() else clear_offer() end
+			if #candidates > 0 then
+				publish()
+				-- Inline mode: the finished prediction goes through the same
+				-- acceptance as Tab, which rechecks the request, the focus, the
+				-- pause and privacy. A rewrite, or a correction that erases what
+				-- the user typed, keeps its offer: it is never applied without
+				-- the user's own accept.
+				local first = candidates[1]
+				if inline and not rewrite and (first.deletes or 0) <= trigger_chars and request_current(false) then
+					Logger.info(LOG, "Inline mode: typing the finished prediction (%d byte(s)).", #first.to_type)
+					M.accept(1)
+				elseif inline then
+					Logger.info(LOG, "Inline mode leaves an erasing prediction to the offer.")
+				end
+			else clear_offer() end
 		end)
 		-- A backend can refuse admission while its earlier native transport is
 		-- still settling. A synchronous completion may already own the next
