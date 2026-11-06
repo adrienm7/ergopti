@@ -209,7 +209,8 @@ _ORT_Proxy() {
 		"RouteOriginsSha256", "0000000000000000000000000000000000000000000000000000000000000000",
 		"ProxyRelayContractPath", "C:\bundled\proxy_auth_relay.json",
 		"ProxyRelayContractSha256", "1111111111111111111111111111111111111111111111111111111111111111",
-		"ProxyRelayDialMs", 10000, "ProxyRelayHandshakeMs", 15000, "ProxyRelayIdleMs", 300000, "ProxyRelayProbeMs", 30000)
+		"ProxyRelayDialMs", 10000, "ProxyRelayHandshakeMs", 15000, "ProxyRelayIdleMs", 300000, "ProxyRelayProbeMs", 30000,
+		"ProxyListProbeMs", 1000)
 }
 
 ; No relay is installed in the fixture: the launcher reads its empty default, and
@@ -242,7 +243,8 @@ _ORT_ProxyCaptures() {
 
 _ORT_ProxyCapturesRequired() {
 	for Name in ["", "VendorDirectory", "VendorSha256", "RouteOriginsPath", "RouteOriginsSha256",
-			"ProxyRelayContractPath", "ProxyRelayContractSha256", "ProxyRelayDialMs", "ProxyRelayProbeMs"] {
+			"ProxyRelayContractPath", "ProxyRelayContractSha256", "ProxyRelayDialMs", "ProxyRelayProbeMs",
+			"ProxyListProbeMs"] {
 		Proxy := _ORT_Proxy()
 		if (Name != "")
 			Proxy.Delete(Name)

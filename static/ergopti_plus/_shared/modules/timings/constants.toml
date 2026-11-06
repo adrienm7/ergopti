@@ -108,6 +108,7 @@ managed_proxy_lookup_timeout_ms = 30000
 # Longest TCP connect to a relay a PAC names before another entry ("PROXY a;
 # DIRECT"): an unreachable relay sends the managed Ollama server to the next
 # entry, as a browser does. LX: modules/llm/managed_ollama_proxy.lua.
+# AHK: modules/llm/ollama_managed_bootstrap.ahk (ProxyListProbeMs).
 managed_proxy_probe_timeout_ms = 1000
 
 # HTTP polling interval when the remote driver polls a streaming response.

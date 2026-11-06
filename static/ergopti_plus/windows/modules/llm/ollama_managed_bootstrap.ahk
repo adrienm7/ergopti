@@ -398,7 +398,8 @@ class OllamaManagedBootstrap {
 			"ProxyRelayDialMs", TimingsGet("adapters", "proxy_relay_dial_timeout_ms"),
 			"ProxyRelayHandshakeMs", TimingsGet("adapters", "proxy_relay_handshake_timeout_ms"),
 			"ProxyRelayIdleMs", TimingsGet("adapters", "proxy_relay_idle_timeout_ms"),
-			"ProxyRelayProbeMs", TimingsGet("adapters", "proxy_relay_probe_timeout_ms"))
+			"ProxyRelayProbeMs", TimingsGet("adapters", "proxy_relay_probe_timeout_ms"),
+			"ProxyListProbeMs", TimingsGet("llm", "managed_proxy_probe_timeout_ms"))
 		; Absent only in a checkout without the binary (docs/design/proxy-auth-relay.md).
 		; The expected digest is the manifest's: hashing the file here would admit
 		; whatever sits at this path. The launcher compares and holds the image.

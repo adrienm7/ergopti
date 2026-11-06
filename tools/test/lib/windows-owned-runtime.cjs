@@ -365,7 +365,9 @@ function launcherArguments(profile, { port, runtimeTicket, relayPath, relaySha25
 		'-ProxyRelayIdleMs',
 		String(timings.idleMs),
 		'-ProxyRelayProbeMs',
-		String(timings.probeMs)
+		String(timings.probeMs),
+		'-ProxyListProbeMs',
+		String(timings.listProbeMs)
 	];
 	if (relayPath) row.push('-ProxyRelayPath', relayPath, '-ProxyRelaySha256', relaySha256);
 	return row;

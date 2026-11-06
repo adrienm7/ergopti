@@ -733,7 +733,8 @@ async function main() {
 					`$Defaults = '${path.join(SHARED, 'modules/updater/defaults.json')}'`,
 					'$Resolve = { param($Origin) Resolve-ErgoptiNativeNetworkRoutes $Origin 30000 $null $null $Policy $Defaults }',
 					"$Read = { param($Name) [Environment]::GetEnvironmentVariable($Name, 'Process') }",
-					"$Plan = Get-ErgoptiOwnedProxyEnvironment -Origins @('https://registry.ollama.ai') -Resolve $Resolve -ReadEnvironment $Read",
+					'$Probe = { param($Relay) Test-ErgoptiRelayReachable -Relay $Relay -TimeoutMs 1000 }',
+					"$Plan = Get-ErgoptiOwnedProxyEnvironment -Origins @('https://registry.ollama.ai') -Resolve $Resolve -ReadEnvironment $Read -Probe $Probe",
 					"[Console]::Out.Write($Plan.Environment['HTTPS_PROXY'])"
 				].join('\n')
 			);
