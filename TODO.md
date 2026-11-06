@@ -197,8 +197,8 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 ### linux-diagnostics
 
-- [ ] **[CODE] LDG-001:** API diagnostics report and probe the Ollama backend instead of the selected backend. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-diagnostics/report.md).
-- [ ] **[CODE] LDG-002:** Disabled AI becomes unknown in diagnostics and disappears from its export. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-diagnostics/report.md).
+- [x] **[CODE] LDG-001:** API diagnostics report and probe the Ollama backend instead of the selected backend. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-diagnostics/report.md). Done: collector and probe read `get_backend()`; a backend without a schema health path answers unsupported, as on macOS.
+- [x] **[CODE] LDG-002:** Disabled AI becomes unknown in diagnostics and disappears from its export. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-diagnostics/report.md). Done: the collector keeps a known `false` and leaves only a missing switch unknown.
 - [ ] **[CODE] LDG-003:** Refused timer admission leaves the configuration diagnostic pending without a completion path. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-diagnostics/report.md).
 
 ### Qualification and policy follow-up

@@ -819,6 +819,7 @@ return {
 	"tests.unit.ui.menu.hotstrings.test_hotstrings_master_tick",
 	"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions",
 	"tests.unit.ui.healthcheck.test_healthcheck_probes",
+	"tests.unit.ui.healthcheck.test_healthcheck_ai_section",
 	"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source",
 	"tests.unit.ui.healthcheck.test_healthcheck_configuration",
 	"tests.unit.ui.healthcheck.test_healthcheck_report_issue",

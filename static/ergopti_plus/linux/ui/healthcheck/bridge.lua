@@ -342,10 +342,23 @@ end
 local function collect_ai(state)
 	local llm = state.llm
 	if not llm then return {} end
+	-- A known false is a fact, not an unknown: `x == true or nil` erased it and
+	-- the page showed "unknown" for a switched-off AI (audit LDG-002).
+	local enabled = nil
+	if type(llm.is_enabled) == "function" then enabled = llm.is_enabled() == true end
+	-- The selected backend, as macOS reads it: an API user is not on Ollama (audit LDG-001).
+	local backend = nil
+	if type(llm.get_backend) == "function" then
+		local ok, value = pcall(llm.get_backend)
+		if ok and type(value) == "string" then
+			backend = value
+		else
+			Logger.warn(LOG, "Diagnostics could not read the AI backend: %s.", tostring(value))
+		end
+	end
 	return {
-		ai_enabled = type(llm.is_enabled) == "function" and llm.is_enabled() == true or nil,
-		-- Ollama is the only backend this driver has
-		ai_backend = "ollama",
+		ai_enabled = enabled,
+		ai_backend = backend,
 		ai_model   = type(llm.get_current_model) == "function" and llm.get_current_model() or nil,
 	}
 end

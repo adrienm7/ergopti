@@ -44,8 +44,8 @@ local GITHUB_OWNER = "diagnostics.github"
 local AI_OWNER = "diagnostics.ai"
 local PAC_OWNER = "diagnostics.pac"
 
--- The Ollama port when the engine names no base URL
-local AI_BACKEND = "ollama"
+-- The only backend whose server answers at the engine's local base URL.
+local AI_LOCAL_BACKEND = "ollama"
 
 
 
@@ -209,7 +209,9 @@ local function proxy_pac(config, run)
 	end
 end
 
---- The local AI backend answers its version endpoint.
+--- The selected local AI backend answers its version endpoint. A backend with
+--- no health path in the schema (the remote API) is unsupported, never probed
+--- through the local Ollama URL (audit LDG-001), as on macOS.
 --- @param config table { paths, timeout_ms }
 --- @param state table Daemon state.
 --- @param run table
@@ -221,13 +223,15 @@ local function ai_health(config, state, run)
 			done({ state = "disabled" })
 			return
 		end
+		local read, backend = pcall(function() return type(llm.get_backend) == "function" and llm.get_backend() end)
+		local path = read and type(backend) == "string" and config.paths[backend] or nil
 		local HttpClient = require("adapters.http_client")
-		if not HttpClient.HAS_ASYNC or type(llm.get_base_url) ~= "function" then
+		if not path or backend ~= AI_LOCAL_BACKEND or not HttpClient.HAS_ASYNC or type(llm.get_base_url) ~= "function" then
 			done({ state = "unsupported" })
 			return
 		end
 		run.cancellers[#run.cancellers + 1] = function() HttpClient.cancel(AI_OWNER) end
-		local started = HttpClient.get(llm.get_base_url() .. config.paths[AI_BACKEND], {},
+		local started = HttpClient.get(llm.get_base_url() .. path, {},
 			{ timeout_ms = config.timeout_ms, owner = AI_OWNER }, function(result)
 				local status = tonumber(result.status) or 0
 				if status < 200 or status >= 300 then
@@ -236,7 +240,7 @@ local function ai_health(config, state, run)
 				end
 				local data = decode(result.body)
 				local version = type(data) == "table" and type(data.version) == "string" and data.version or nil
-				done({ state = "ok" }, { ai = { ai_health = version and (AI_BACKEND .. " " .. version) or ("HTTP " .. status) } })
+				done({ state = "ok" }, { ai = { ai_health = version and (backend .. " " .. version) or ("HTTP " .. status) } })
 			end)
 		if started ~= true then done({ state = "error", detail = "HTTP request refused" }) end
 	end
