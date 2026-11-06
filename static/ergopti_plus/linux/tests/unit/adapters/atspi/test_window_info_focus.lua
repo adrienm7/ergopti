@@ -434,6 +434,33 @@ helpers.describe("window_info: Wayland", function()
 		end)
 	end
 
+	-- lswt -j on a wlr-foreign-toplevel compositor (labwc, Wayfire, river).
+	local LSWT = '{"supported-data":{"title":true,"app-id":true,"identifier":true,"activated":true},'
+		.. '"toplevels":[{"title":"Terminal","app-id":"foot","identifier":"a1","activated":false},'
+		.. '{"title":"Untitled","app-id":"editor","identifier":"b2","activated":true}]}'
+
+	helpers.it("(linux-wayland-wlr-toplevel) reads the activated toplevel through lswt", function()
+		local wi = under("wayland", "labwc", { { "command -v 'lswt'", true }, { "lswt -j", LSWT } })
+		local info = wi.getFocused()
+		helpers.assert_eq(info.appId, "editor")
+		helpers.assert_eq(info.windowTitle, "Untitled")
+		helpers.assert_eq(wi.focused_identity(), "wlr-toplevel::b2")
+		restore()
+	end)
+
+	helpers.it("(linux-wayland-wlr-toplevel) names no focus without activation state or with two activated", function()
+		for _, payload in ipairs({
+			(LSWT:gsub('"activated":true}', '"activated":false}', 1)),
+			(LSWT:gsub('"activated":false', '"activated":true')),
+			'{"supported-data":{"title":true,"app-id":true,"activated":false},'
+				.. '"toplevels":[{"title":"Untitled","app-id":"editor","activated":true}]}',
+		}) do
+			local wi = under("wayland", "labwc", { { "command -v 'lswt'", true }, { "lswt -j", payload } })
+			helpers.assert_eq(wi.getFocused().appId, "", payload)
+			restore()
+		end
+	end)
+
 	helpers.it("(linux-focus-window-identity) refuses unknown compositor window identity", function()
 		local wi = under("wayland", "GNOME", {})
 		local identity = wi.focused_identity()

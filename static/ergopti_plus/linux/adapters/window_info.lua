@@ -14,8 +14,15 @@
 ---   - sway and other wlroots compositors answer `swaymsg -t get_tree`.
 ---   - Hyprland answers `hyprctl activewindow -j`.
 ---   - niri answers `niri msg --json focused-window`.
----   - GNOME removed Shell.Eval in 41, so there is no unprivileged way to ask.
----   - KDE, COSMIC and Weston expose nothing equivalent.
+---   - every compositor with wlr-foreign-toplevel-management (labwc, Wayfire,
+---     river and the other wlroots ones) answers through `lswt -j`, whose
+---     listing marks the activated toplevel.
+---   - GNOME removed Shell.Eval in 41 and admits its Introspect interface to
+---     allow-listed senders only, so only a Shell extension could ask.
+---   - KDE answers only a KWin script, which must call back a D-Bus name the
+---     daemon would own; COSMIC's own toplevel protocol needs a native Wayland
+---     client, and ext-foreign-toplevel-list carries no activation state;
+---     Weston exposes nothing. Those stay unknown.
 --- That is a deliberate security posture, not an oversight to work around, and
 --- it is why per-application rules cannot be promised under Wayland. The failure
 --- is honest: an empty appId, logged once, rather than a wrong one.
@@ -51,7 +58,7 @@ local LOG = "adapters.window_info"
 -- Compositors that answer a focused-window query, and how to ask. Order is
 -- deliberate: the probe tries each in turn, so a session running more than one
 -- IPC socket resolves the same way every time rather than by chance.
-local WAYLAND_BACKENDS = { "sway", "hyprland", "niri" }
+local WAYLAND_BACKENDS = { "sway", "hyprland", "niri", "wlr_toplevel" }
 
 -- Set once when no query interface exists, so the log states the limitation
 -- rather than repeating it on every keystroke's context refresh.
@@ -354,11 +361,37 @@ local function focused_niri()
 	return info, native_identity("niri", win.id, win.pid), tonumber(win.pid)
 end
 
+--- Queries a wlr-foreign-toplevel compositor through lswt (2.0 or later).
+--- The protocol names no process, so the identity carries none. A listing
+--- that cannot report activation (ext-foreign-toplevel-list alone), with no
+--- or with two activated toplevels, names no focus: unknown, not a guess.
+--- @return table|nil
+local function focused_wlr_toplevel()
+	if not Shell.has_command("lswt") then return nil end
+	local listing = checked_json("lswt -j 2>/dev/null")
+	if not listing or type(listing.toplevels) ~= "table" then return nil end
+	local supported = type(listing["supported-data"]) == "table" and listing["supported-data"] or {}
+	if supported.activated ~= true then return nil end
+	local focused = nil
+	for _, toplevel in ipairs(listing.toplevels) do
+		if type(toplevel) == "table" and toplevel.activated == true then
+			if focused then return nil end
+			focused = toplevel
+		end
+	end
+	if not focused then return nil end
+	local info = empty_info()
+	info.windowTitle = text_field(focused.title)
+	info.appId = text_field(focused["app-id"])
+	return info, native_identity("wlr-toplevel", focused.identifier, nil), nil
+end
+
 -- Each query probes its own client binary first and answers nil without it.
 local WAYLAND_QUERIES = {
-	sway     = focused_sway,
-	hyprland = focused_hyprland,
-	niri     = focused_niri,
+	sway         = focused_sway,
+	hyprland     = focused_hyprland,
+	niri         = focused_niri,
+	wlr_toplevel = focused_wlr_toplevel,
 }
 
 --- Tries every Wayland backend this session might speak.
