@@ -1277,6 +1277,8 @@ local function main()
 		Logger.error(LOG, "Startup refused: %s.", tostring(pause_detail))
 		return
 	end
+	-- The layout of the live pause state, as macOS applies once its boot settles.
+	require("modules.keymap.pause_layout_switch").start_safely(script_actions.is_paused())
 
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
