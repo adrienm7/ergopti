@@ -306,18 +306,16 @@ helpers.describe("independent complete fixed wrap declaration coverage", functio
 						helpers.assert_eq(actual.id, expected.id)
 						helpers.assert_eq(actual.i18n, expected.i18n)
 						helpers.assert_eq(actual.disabled_when, expected.disabled_when)
-						helpers.assert_eq(actual.platforms, wrap_expectations.platforms)
-						helpers.assert_eq(actual.unavailable, "hide")
+						-- Declared for every driver: Linux manages its pairs too.
+						helpers.assert_eq(actual.platforms, nil)
+						helpers.assert_eq(actual.unavailable, nil)
 						if expected.id then commands[expected.id] = function() error("projection must not deliver a native effect", 0) end end
 					end
 					local rows = assert(renderer.template_rows(section.section, commands, { wrap_symbols_ready = function() return true end }))
-					if platform == "linux" then helpers.assert_eq(rows, {})
-					else
-						helpers.assert_eq(#rows, #section.rows)
-						for index, expected in ipairs(section.rows) do
-							if expected.separator then helpers.assert_eq(rows[index], { separator = true })
-							else helpers.assert_eq(rows[index].label, expected.i18n) end
-						end
+					helpers.assert_eq(#rows, #section.rows)
+					for index, expected in ipairs(section.rows) do
+						if expected.separator then helpers.assert_eq(rows[index], { separator = true })
+						else helpers.assert_eq(rows[index].label, expected.i18n) end
 					end
 				end
 			end

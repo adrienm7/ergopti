@@ -1752,12 +1752,7 @@
 			"i18n": "menu.shortcuts.wrap_symbols_check_all",
 			"disabled_when": [
 				"wrap_symbols_ready"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
+			]
 		},
 		{
 			"type": "command",
@@ -1765,12 +1760,7 @@
 			"i18n": "menu.shortcuts.wrap_symbols_uncheck_all",
 			"disabled_when": [
 				"wrap_symbols_ready"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
+			]
 		},
 		{
 			"type": "command",
@@ -1778,20 +1768,10 @@
 			"i18n": "common.restore_recommended",
 			"disabled_when": [
 				"wrap_symbols_ready"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
+			]
 		},
 		{
-			"type": "---",
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
+			"type": "---"
 		}
 	],
 	"wrap_symbols_group_controls": [
@@ -1801,12 +1781,7 @@
 			"i18n": "menu.shortcuts.wrap_symbols_check_all",
 			"disabled_when": [
 				"wrap_symbols_ready"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
+			]
 		},
 		{
 			"type": "command",
@@ -1814,52 +1789,27 @@
 			"i18n": "menu.shortcuts.wrap_symbols_uncheck_all",
 			"disabled_when": [
 				"wrap_symbols_ready"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
+			]
 		},
 		{
-			"type": "---",
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
+			"type": "---"
 		}
 	],
 	"wrap_symbols_custom_separator": [
 		{
-			"type": "---",
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
+			"type": "---"
 		}
 	],
 	"wrap_symbols_custom_controls": [
 		{
 			"type": "command",
 			"id": "wrap_symbols_delete_custom",
-			"i18n": "button.delete",
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
+			"i18n": "button.delete"
 		}
 	],
 	"wrap_symbols_add_controls": [
 		{
-			"type": "---",
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
+			"type": "---"
 		},
 		{
 			"type": "command",
@@ -1867,12 +1817,7 @@
 			"i18n": "menu.shortcuts.wrap_symbols_add_custom",
 			"disabled_when": [
 				"wrap_symbols_ready"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
+			]
 		}
 	],
 	"key_combinations_group": [

@@ -4046,7 +4046,7 @@
 	"platform_reason.category_gates_are_windows": "Windows فقط: يحتفظ Windows ببوابة رئيسية لكل فئة أمام مفاتيح الفئة نفسها. يحتفظ macOS بمفتاح hotstrings الرئيسي في hotstrings.enabled، ويفعّل Linux مجموعات hotstrings واحدة تلو الأخرى.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "هذا الاختصار يخص النظام الذي يربطه: يعرض كل برنامج إجراءاته على التركيبات التي يتركها نظامه حرة (تركيبات مفتاح Windows في Windows، وCtrl وCmd في macOS، وخانات لوحة المفاتيح في Linux) ويحفظ الاختيار باسمه الخاص.",
 	"platform_reason.personal_shortcut_switches_are_windows": "Windows فقط: تشير هذه المفاتيح الخمسة إلى إعدادات Windows شخصية (مفتاح حاسوب محمول معطل، وسحب النوافذ وتبديل علامات التبويب بالفأرة، ولوحة مفاتيح قابلة للبرمجة، وبيئة عمل مهنية). لا يوجد ما يقابلها في macOS وLinux.",
-	"platform_reason.wrap_symbols_store_is_macos": "macOS فقط بهذا الاسم: يحتفظ macOS باختياراته لرموز التغليف في هذا القسم. يحتفظ Windows باختياراته في wrap_symbols.toml، ولا يقرأ Linux هذا القسم.",
+	"platform_reason.wrap_symbols_store_is_not_windows": "macOS وLinux فقط بهذا الاسم: يحتفظان باختياراتهما لرموز التغليف في هذا القسم. يحتفظ Windows باختياراته في wrap_symbols.toml.",
 	"platform_reason.ai_menu_bookkeeping_is_windows": "Windows فقط: علامة تتبّع داخلية في قائمة الذكاء الاصطناعي في Windows، وليست إعدادًا تختاره. لا تحتفظ قائمتا الذكاء الاصطناعي في macOS وLinux بسجل كهذا.",
 	"platform_reason.inline_autotype_is_windows": "Windows فقط: في هذا الوضع يُكتب التوقع مباشرة في المستند فور وصوله. يعرض macOS وLinux التوقع في فقاعة ولا يدرجانه إلا عند قبوله.",
 	"platform_reason.arrow_navigation_is_macos": "macOS فقط: تفضيل في قائمة الذكاء الاصطناعي في macOS للتنقل بين التوقعات بمفاتيح الأسهم. يختار Windows وLinux مفاتيح التنقل عبر إعداد معدّلات التنقل.",

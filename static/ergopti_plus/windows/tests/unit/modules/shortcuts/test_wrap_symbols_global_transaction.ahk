@@ -609,18 +609,28 @@ Test("wrap symbols: actual provider consumes complete declared controls and nati
 _WSGT20260813_ControlMetadataMutations(Path) {
 	Definition := _MR_GetMenuDef("wrap_symbols_global_controls")
 	First := Definition[1], Second := Definition[2]
-	OriginalKey := First["i18n"], OriginalPlatforms := First["platforms"]
+	; The controls are declared for every driver; the test hides one for Windows.
+	OriginalKey := First["i18n"], HadPlatforms := First.Has("platforms"), HadUnavailable := First.Has("unavailable")
+	OriginalPlatforms := HadPlatforms ? First["platforms"] : "", OriginalUnavailable := HadUnavailable ? First["unavailable"] : ""
 	try {
 		First["i18n"] := "button.delete"
 		Definition[1] := Second, Definition[2] := First
 		Rows := _WS_BuildSymbolRows()
 		AssertEqual(t("menu.shortcuts.wrap_symbols_uncheck_all"), Rows[1]["label"])
 		AssertEqual(t("button.delete"), Rows[2]["label"], "actual provider reads caption and shared source order")
-		First["platforms"] := ["hs"]
+		First["platforms"] := ["hs"], First["unavailable"] := "hide"
 		Rows := _WS_BuildSymbolRows()
 		AssertEqual(t("common.restore_recommended"), Rows[2]["label"], "only the hidden command retires")
 	} finally {
-		First["i18n"] := OriginalKey, First["platforms"] := OriginalPlatforms
+		First["i18n"] := OriginalKey
+		if HadPlatforms
+			First["platforms"] := OriginalPlatforms
+		else if First.Has("platforms")
+			First.Delete("platforms")
+		if HadUnavailable
+			First["unavailable"] := OriginalUnavailable
+		else if First.Has("unavailable")
+			First.Delete("unavailable")
 		Definition[1] := First, Definition[2] := Second
 	}
 }

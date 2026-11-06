@@ -1566,75 +1566,53 @@ type = "command"
 id = "wrap_symbols_enable_all"
 i18n = "menu.shortcuts.wrap_symbols_check_all"
 disabled_when = ["wrap_symbols_ready"]
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_global_controls]]
 type = "command"
 id = "wrap_symbols_disable_all"
 i18n = "menu.shortcuts.wrap_symbols_uncheck_all"
 disabled_when = ["wrap_symbols_ready"]
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_global_controls]]
 type = "command"
 id = "wrap_symbols_restore"
 i18n = "common.restore_recommended"
 disabled_when = ["wrap_symbols_ready"]
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_global_controls]]
 type = "---"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_group_controls]]
 type = "command"
 id = "wrap_symbols_enable_group"
 i18n = "menu.shortcuts.wrap_symbols_check_all"
 disabled_when = ["wrap_symbols_ready"]
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_group_controls]]
 type = "command"
 id = "wrap_symbols_disable_group"
 i18n = "menu.shortcuts.wrap_symbols_uncheck_all"
 disabled_when = ["wrap_symbols_ready"]
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_group_controls]]
 type = "---"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_custom_separator]]
 type = "---"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_custom_controls]]
 type = "command"
 id = "wrap_symbols_delete_custom"
 i18n = "button.delete"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_add_controls]]
 type = "---"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_add_controls]]
 type = "command"
 id = "wrap_symbols_add_custom"
 i18n = "menu.shortcuts.wrap_symbols_add_custom"
 disabled_when = ["wrap_symbols_ready"]
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.key_combinations_group]]
 type = "toggle"

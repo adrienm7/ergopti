@@ -123,6 +123,155 @@ local function _extension_shortcut_rows()
 	return rows
 end
 
+--- Exactly one Unicode scalar, or nil: a wrap symbol is one character.
+--- @param raw any
+--- @return string|nil
+local function single_symbol(raw)
+	if type(raw) ~= "string" or raw == "" then return nil end
+	local ok, length = pcall(require("compat.utf8").len, raw)
+	return ok and length == 1 and raw or nil
+end
+
+--- Asks for one wrap symbol until the user types exactly one character.
+--- @param title_key string
+--- @param prompt_key string
+--- @param allow_empty boolean Whether an empty answer is accepted ("").
+--- @return string|nil symbol, nil when the dialog was cancelled.
+local function ask_symbol(title_key, prompt_key, allow_empty)
+	while true do
+		local raw = prompt_text(i18n_safe(title_key), i18n_safe(prompt_key), "")
+		if raw == nil then return nil end
+		if allow_empty and raw == "" then return "" end
+		local symbol = single_symbol(raw)
+		if symbol then return symbol end
+		show_error(i18n_safe("dialog.shortcuts.wrap_symbol_invalid"), i18n_safe(title_key))
+	end
+end
+
+--- The rows of the wrap-symbol submenu.
+--- @param ctx table Menu context (paused, on_menu_changed).
+--- @param sc table The shortcuts manager.
+--- @return table rows
+local function wrap_symbol_rows(ctx, sc)
+	if not ManifestMenu then return {} end
+	if type(sc.get_wrap_choices) ~= "function" or type(sc.commit_wrap_choices) ~= "function"
+		or type(sc.get_wrap_groups) ~= "function" then
+		-- A shortcuts owner without wrap choices: the controls are drawn greyed.
+		Logger.error(LOG, "The shortcuts owner has no wrap-symbol choices; the wrap controls are unavailable.")
+	end
+	local choices = type(sc.get_wrap_choices) == "function" and sc.get_wrap_choices() or nil
+	local paused = ctx.paused == true
+	local ready = choices ~= nil and not paused
+	local states = choices and choices.states or {}
+	local custom = choices and choices.custom or {}
+	local Keys = require("config_keys").COMMAND
+	local function mutate(change)
+		if not ready then return false end
+		local committed = sc.commit_wrap_choices(change)
+		if committed ~= true then return false end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return true
+	end
+	local function set_all(lefts, enabled)
+		return mutate(function(candidate)
+			for _, left in ipairs(lefts) do candidate.wrap_symbol_states[left] = enabled end
+			return true
+		end)
+	end
+	local all_lefts = {}
+	for _, pair in ipairs(sc.get_wrap_pair_list()) do all_lefts[#all_lefts + 1] = pair.left end
+	local getters = { wrap_symbols_ready = function() return ready end }
+	local rows = ManifestMenu.template_rows("wrap_symbols_global_controls", {
+		[Keys.WRAP_SYMBOLS_ENABLE_ALL] = function() return set_all(all_lefts, true) end,
+		[Keys.WRAP_SYMBOLS_DISABLE_ALL] = function() return set_all(all_lefts, false) end,
+		[Keys.WRAP_SYMBOLS_RESTORE] = function()
+			return mutate(function(candidate)
+				candidate.wrap_symbol_states, candidate.custom_wrap_symbols = {}, {}
+				return true
+			end)
+		end,
+	}, getters)
+	if not rows then return {} end
+
+	for _, group in ipairs(type(sc.get_wrap_groups) == "function" and sc.get_wrap_groups() or {}) do
+		local lefts, all_on = {}, true
+		for _, pair in ipairs(group.pairs) do
+			lefts[#lefts + 1] = pair.left
+			if states[pair.left] == false then all_on = false end
+		end
+		local items = ManifestMenu.template_rows("wrap_symbols_group_controls", {
+			[Keys.WRAP_SYMBOLS_ENABLE_GROUP] = function() return set_all(lefts, true) end,
+			[Keys.WRAP_SYMBOLS_DISABLE_GROUP] = function() return set_all(lefts, false) end,
+		}, getters)
+		if not items then return {} end
+		for _, pair in ipairs(group.pairs) do
+			local left = pair.left
+			items[#items + 1] = {
+				label = pair.left == pair.right and pair.left or (pair.left .. " … " .. pair.right),
+				checked = states[left] ~= false,
+				disabled = not ready or nil,
+				action = ready and function()
+					return mutate(function(candidate)
+						candidate.wrap_symbol_states[left] = candidate.wrap_symbol_states[left] == false
+						return true
+					end)
+				end or nil,
+			}
+		end
+		rows[#rows + 1] = {
+			label = i18n_safe(group.i18n or "menu.shortcuts.wrap_symbols_title"),
+			items = items,
+			checked = all_on,
+		}
+	end
+
+	if #custom > 0 then
+		local separator = ManifestMenu.template_rows("wrap_symbols_custom_separator", {}, getters)
+		if not separator then return {} end
+		for _, row in ipairs(separator) do rows[#rows + 1] = row end
+		for index, pair in ipairs(custom) do
+			local left, right = pair.left, pair.right
+			local controls = ManifestMenu.template_rows("wrap_symbols_custom_controls", {
+				[Keys.WRAP_SYMBOLS_DELETE_CUSTOM] = function()
+					return mutate(function(candidate)
+						local current = candidate.custom_wrap_symbols[index]
+						-- The list may have changed since this menu was drawn.
+						if not current or current.left ~= left or current.right ~= right then return false end
+						table.remove(candidate.custom_wrap_symbols, index)
+						return true
+					end)
+				end,
+			}, getters)
+			if not controls then return {} end
+			local label = left == right and left or (left .. " … " .. right)
+			rows[#rows + 1] = {
+				label = string.format("%s (%s)", label, i18n_safe("menu.shortcuts.wrap_symbols_custom_label")),
+				items = controls,
+			}
+		end
+	end
+
+	local add = ManifestMenu.template_rows("wrap_symbols_add_controls", {
+		[Keys.WRAP_SYMBOLS_ADD_CUSTOM] = function()
+			if not ready then return false end
+			local left = ask_symbol("dialog.shortcuts.wrap_symbol_title", "dialog.shortcuts.wrap_symbol_prompt", false)
+			if left == nil then return false end
+			local right = ask_symbol("dialog.shortcuts.wrap_symbol_close_title",
+				"dialog.shortcuts.wrap_symbol_close_prompt", true)
+			if right == nil then return false end
+			if right == "" then right = left end
+			return mutate(function(candidate)
+				candidate.custom_wrap_symbols[#candidate.custom_wrap_symbols + 1] = { left = left, right = right }
+				return true
+			end)
+		end,
+	}, getters)
+	if not add then return {} end
+	for _, row in ipairs(add) do rows[#rows + 1] = row end
+	return rows
+end
+
+
 --- Builds the shortcuts submenu: this driver's own rows, then the manifest's.
 ---
 --- Hand-rolled until 2026-08-05, which is what kept `extensions_shortcuts`
@@ -232,28 +381,11 @@ local function _build_shortcuts(ctx)
 		if row then selection_rows[#selection_rows + 1] = row end
 	end
 
-	-- Wrap symbols submenu. Ordered, because `get_wrap_pairs` returns a map and
-	-- `pairs` would give the user a different order on every rebuild.
-	local wrap_items = {}
-	local opening = {}
-	-- The ordered catalogue, not the alias map: two pairs can share an endpoint
-	-- (the curly pair's opener is the lower pair's closer), and the map keeps
-	-- only one owner of such a key.
-	for _, pair in ipairs(sc.get_wrap_pair_list()) do
-		opening[#opening + 1] = { ch = pair.left, pair = pair }
-	end
-	table.sort(opening, function(a, b) return a.ch < b.ch end)
-	for _, entry in ipairs(opening) do
-		local pair = entry.pair
-		-- The pair around an ellipsis, and nothing else. This used to append a
-		-- second illustration, "(«texte»)", whose only content was a French word —
-		-- so the row was a translated label followed by an untranslated one, and
-		-- the ellipsis had already said the same thing in every language.
-		wrap_items[#wrap_items + 1] = {
-			label  = string.format("%s … %s", entry.ch, pair.right),
-			action = function() sc.wrap_selection(pair.left, pair.right) end,
-		}
-	end
+	-- Wrap symbols submenu: which catalogue pairs wrap a selection and the pairs
+	-- the user added, managed as on Windows and macOS (one group per catalogue
+	-- family with its own check/uncheck all, restore, add and delete). The
+	-- choices live in config.toml's shortcuts.wrap_symbols, macOS's store.
+	local wrap_items = wrap_symbol_rows(ctx, sc)
 
 	local handlers = {}
 

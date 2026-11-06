@@ -4046,7 +4046,7 @@
 	"platform_reason.category_gates_are_windows": "Windows בלבד: ב-Windows יש שער ראשי אחד לכל קטגוריה, לפני המתגים של הקטגוריה עצמה. ב-macOS המתג הראשי של hotstrings הוא hotstrings.enabled, וב-Linux מפעילים את קבוצות ה-hotstrings אחת אחת.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "קיצור זה שייך למערכת שקושרת אותו: כל מנהל התקן מציע את הפעולות שלו על צירופים שהמערכת שלו משאירה פנויים (צירופי מקש Windows ב-Windows, Ctrl ו-Cmd ב-macOS, משבצות מקלדת ב-Linux) ושומר את הבחירה בשמו שלו.",
 	"platform_reason.personal_shortcut_switches_are_windows": "Windows בלבד: חמשת המתגים האלה מייצגים הגדרות אישיות של Windows (מקש שבור במחשב נייד, גרירת חלונות והחלפת לשוניות בעכבר, מקלדת ניתנת לתכנות, סביבה מקצועית). ל-macOS ול-Linux אין מקבילה.",
-	"platform_reason.wrap_symbols_store_is_macos": "macOS בלבד בשם זה: macOS שומר את בחירות סמלי העטיפה שלו בסעיף זה. Windows שומר את שלו ב-wrap_symbols.toml, ו-Linux אינו קורא סעיף זה.",
+	"platform_reason.wrap_symbols_store_is_not_windows": "macOS ו-Linux בלבד בשם זה: הם שומרים את בחירות סמלי העטיפה שלהם בסעיף זה. Windows שומר את שלו ב-wrap_symbols.toml.",
 	"platform_reason.ai_menu_bookkeeping_is_windows": "Windows בלבד: דגל רישום פנימי של תפריט ה-AI ב-Windows, לא הגדרה שבוחרים. תפריטי ה-AI ב-macOS וב-Linux אינם שומרים רישום כזה.",
 	"platform_reason.inline_autotype_is_windows": "Windows בלבד: במצב זה ההשלמה מוקלדת ישירות למסמך עם הגעתה. macOS ו-Linux מציגים את ההשלמה בבועה ומוסיפים אותה רק כשמאשרים אותה.",
 	"platform_reason.arrow_navigation_is_macos": "macOS בלבד: העדפה בתפריט ה-AI של macOS למעבר בין השלמות באמצעות מקשי החצים. Windows ו-Linux בוחרים את מקשי הניווט בהגדרת משנות הניווט.",

@@ -39,6 +39,7 @@ local Paths  = require("infra.paths")
 local Manifest = require("infra.manifest_reader")
 local TextCase = require("unicode_case")
 local WrapPair = require("wrap_pair")
+local WrapSettings = require("modules.shortcuts.wrap_symbol_settings")
 local SendInput = require("send_input")
 local TomlCodec = require("toml_codec")
 local Clipboard = require("adapters.clipboard")
@@ -180,28 +181,29 @@ end
 local function load_wrap_pairs()
 	local lookup = {}
 	local ordered = {}
+	local groups = {}
 
 	local ok_json, json = pcall(require, "json")
 	if not ok_json or type(json) ~= "table" or type(json.decode) ~= "function" then
 		Logger.error(LOG, "JSON decoder unavailable — wrap-symbol catalogue not loaded.")
-		return lookup, ordered
+		return lookup, ordered, groups
 	end
 
 	local path = resolve_wrap_symbols_path()
 	if path == "" then
 		Logger.error(LOG, "Could not resolve the shared wrap-symbols path — catalogue not loaded.")
-		return lookup, ordered
+		return lookup, ordered, groups
 	end
 
 	if type(collision_read) ~= "function" then
 		Logger.error(LOG, "Shared wrap-symbols reader unavailable — catalogue not loaded.")
-		return lookup, ordered
+		return lookup, ordered, groups
 	end
 	collision_json, collision_json_decode = json, json.decode
 	local content, status = collision_read(path)
 	if status ~= "ok" or type(content) ~= "string" then
 		Logger.error(LOG, "Shared wrap-symbols catalogue unreadable at '%s'.", path)
-		return lookup, ordered
+		return lookup, ordered, groups
 	end
 	local original_content = content
 
@@ -212,15 +214,18 @@ local function load_wrap_pairs()
 	local ok, data = pcall(collision_json_decode, content)
 	if not ok or type(data) ~= "table" or type(data.groups) ~= "table" then
 		Logger.error(LOG, "Shared wrap-symbols catalogue failed to parse — catalogue not loaded.")
-		return lookup, ordered
+		return lookup, ordered, groups
 	end
 
 	for _, group in ipairs(data.groups) do
+		local listed = { i18n = type(group.i18n) == "string" and group.i18n or nil, pairs = {} }
+		groups[#groups + 1] = listed
 		for _, pair in ipairs(group.pairs or {}) do
 			if type(pair) == "table"
 					and type(pair.left) == "string" and pair.left ~= ""
 					and type(pair.right) == "string" and pair.right ~= "" then
 				ordered[#ordered + 1] = { left = pair.left, right = pair.right }
+				listed.pairs[#listed.pairs + 1] = { left = pair.left, right = pair.right }
 				-- Every trigger form of each end, so the bare typed guillemet reaches
 				-- the catalogue's spaced pair; the output keeps its delimiters.
 				WrapPair.register(lookup, pair)
@@ -231,14 +236,20 @@ local function load_wrap_pairs()
 	Logger.info(LOG, "Wrap-symbol catalogue loaded from shared SSoT (%d lookup key(s)).", TableUtil.count(lookup))
 
 	wrap_source = { path = path, content = original_content, pairs = copy_wrap_pairs(lookup) }
-	return lookup, ordered
+	return lookup, ordered, groups
 end
 
 --- Canonical wrap-pair catalogue, derived at require-time from the shared JSON
 --- single source of truth (never hardcoded here). Each entry maps a trigger
 --- character to its { left, right } wrapping symbols; WRAP_PAIR_LIST keeps the
 --- catalogue order.
-local WRAP_PAIRS, WRAP_PAIR_LIST = load_wrap_pairs()
+local WRAP_PAIRS, WRAP_PAIR_LIST, WRAP_GROUPS = load_wrap_pairs()
+
+-- The pairs that wrap now: the catalogue filtered by the user's choices, plus
+-- the pairs the user added (modules/shortcuts/wrap_symbol_settings). Read at
+-- init, at each applied configuration and after each menu change, never on a
+-- keystroke.
+local _active_wrap_pairs = WRAP_PAIRS
 
 --- Checks whether a character is a wrap-pair trigger.
 --- @param ch string Single character.
@@ -247,13 +258,25 @@ function M.get_wrap_pair(ch)
 	-- One CHARACTER, not one byte: « », “ ” and the CJK brackets are pairs of
 	-- the catalogue too, and a byte test made every one of them unmatched.
 	if not TextCase.is_single_character(ch) then return nil end
-	return WRAP_PAIRS[ch]
+	return _active_wrap_pairs[ch]
 end
 
 --- Returns the full wrap-pairs catalogue.
 --- @return table
 function M.get_wrap_pairs()
 	return WRAP_PAIRS
+end
+
+--- The catalogue groups in order, as a copy: each { i18n, pairs }.
+--- @return table
+function M.get_wrap_groups()
+	local groups = {}
+	for index, group in ipairs(WRAP_GROUPS) do
+		local copy = { i18n = group.i18n, pairs = {} }
+		for position, pair in ipairs(group.pairs) do copy.pairs[position] = { left = pair.left, right = pair.right } end
+		groups[index] = copy
+	end
+	return groups
 end
 
 --- The built-in pairs in catalogue order, as a copy.
@@ -883,6 +906,45 @@ function M.mark_config_reads(config, mark)
 	end
 end
 
+--- Rebuilds the active wrap table from config.toml's wrap-symbol choices.
+--- An unreadable choice fails closed: no pair wraps until the file is fixed,
+--- rather than wrapping with pairs the user may have switched off.
+local function refresh_wrap_pairs()
+	if not _persist or not _config_path then
+		_active_wrap_pairs = WRAP_PAIRS
+		return
+	end
+	local ok, view = pcall(function() return (WrapSettings.read(_config_path)) end)
+	if not ok then
+		Logger.error(LOG, "Wrap-symbol choices unreadable — no pair wraps: %s.", tostring(view))
+		_active_wrap_pairs = {}
+		return
+	end
+	_active_wrap_pairs = WrapSettings.active_pairs(WRAP_PAIR_LIST, view)
+end
+
+--- The user's wrap-symbol choices as stored now.
+--- @return table|nil view { states, custom }, nil when unreadable or not persisted.
+function M.get_wrap_choices()
+	if not _persist or not _config_path then return nil end
+	local ok, view = pcall(function() return (WrapSettings.read(_config_path)) end)
+	return ok and view or nil
+end
+
+--- Publishes one change to the wrap-symbol choices, then applies it.
+--- @param mutate function mutate(candidate) -> boolean (wrap_symbol_settings.commit).
+--- @return boolean committed
+--- @return string|nil reason
+function M.commit_wrap_choices(mutate)
+	if _configuration_owner ~= nil or not _persist or not _config_path then return false, "configuration_busy" end
+	local committed, reason = WrapSettings.commit(_config_path, mutate)
+	if committed then
+		refresh_wrap_pairs()
+		collision_generation = collision_generation + 1
+	end
+	return committed, reason
+end
+
 --- Initialises the shortcuts module.
 --- @param opts table|nil { enabled?, persist?, config_path?, capture_text_owner? }
 function M.init(opts)
@@ -943,6 +1005,7 @@ function M.init(opts)
 	_enabled = enabled
 	_wrap_on_type = wrap_on_type
 	collision_generation = collision_generation + 1
+	refresh_wrap_pairs()
 	Logger.info(LOG, "Shortcuts manager initialised (enabled=%s, wrap_on_type=%s).",
 		tostring(_enabled), tostring(_wrap_on_type))
 end
@@ -1009,6 +1072,8 @@ function M.apply_configuration(owner, state)
 	collision_generation = collision_generation + 1
 	_enabled, _wrap_on_type = state.enabled, state.wrap
 	if not state.caps_word_active then end_caps_word("shortcut configuration applied") end
+	-- A restore or a reload may have changed the wrap-symbol choices too.
+	refresh_wrap_pairs()
 	return true
 end
 

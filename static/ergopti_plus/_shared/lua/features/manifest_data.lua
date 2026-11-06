@@ -47,7 +47,7 @@ M.sections = {
 	["shortcuts.keyboard"] = { description_key = "menu.shortcuts.keyboard", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.personal"] = { description_key = "menu.shortcuts.personal", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.script_control"] = { description_key = "menu.shortcuts.script_control", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
-	["shortcuts.wrap_symbols"] = { description_key = "menu.shortcuts.wrap_symbols", platforms = { "hs" }, subsections = {  } },
+	["shortcuts.wrap_symbols"] = { description_key = "menu.shortcuts.wrap_symbols", platforms = { "hs", "linux" }, subsections = {  } },
 	["shortcuts.tap_keys"] = { description_key = "menu.shortcuts.header_tap_keys", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["shortcuts.caps_word"] = { description_key = "menu.caps_word.auto_off", platforms = { "ahk", "hs", "linux" }, subsections = { "pointer" } },
 	["shortcuts.caps_word.pointer"] = { description_key = "menu.caps_word.pointer_header", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
