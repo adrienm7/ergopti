@@ -1246,6 +1246,37 @@ local function _event_clock_now_ms()
 	return _clock_event_ms + math.max(0, since_read)
 end
 
+--- Arms the installed engine's one-shot Shift for an origin that owns no key
+--- frame, a gesture or a pointer button (decision of 2026-11-06: a generic
+--- catalogue action on every OS). A keyboard tap or key combination arms it
+--- through its own frame lease instead. The guard keeps the arm only while the
+--- same engine and remapper generation stay installed under a running,
+--- intercepting hook: a pause uninstalls the engine, so it voids the arm too.
+--- The engine still spends the arm on the next key and drops it at its timeout.
+--- @return boolean armed
+--- @return string|nil refusal Why nothing was armed.
+function M.arm_action_one_shot()
+	local engine, generation, issuer = _remapper, _remapper_generation, _remapper_input_owner
+	if not _running or not _intercept or not engine then return false, "no tap-hold engine is installed" end
+	if _armed_input ~= nil then return false, "a key already holds a one-shot Shift" end
+	local at_ms = _event_clock_now_ms()
+	if not at_ms then return false, "no keyboard event has set the engine clock yet" end
+	local function current()
+		return package.loaded["adapters.keyboard_hook"] == M and _running and _intercept
+			and _remapper == engine and _remapper_generation == generation and _remapper_input_owner == issuer
+	end
+	local called, published
+	if issuer then
+		called, published = pcall(_input_ports.arm_one_shot, issuer, at_ms, current)
+	elseif not engine.has_combinations and type(engine.arm_one_shot) == "function" then
+		called, published = pcall(engine.arm_one_shot, engine, at_ms, current)
+	else
+		return false, "the installed engine has no input owner"
+	end
+	if not called or published ~= true then return false, "the engine refused the arm" end
+	return true
+end
+
 --- Accepts only the explicit native repeat receipt; boolean consumers stay once-only.
 --- @param receipt any Consumer result.
 --- @return function|nil callback Exact callback owned by this physical press.
