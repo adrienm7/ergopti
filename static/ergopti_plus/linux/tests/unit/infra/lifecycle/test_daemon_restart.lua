@@ -330,11 +330,11 @@ helpers.describe("Main early pause restoration", function()
 				if loadstring then chunk = assert(loadstring(text)); setfenv(chunk, environment)
 				else chunk = assert(load(text, "Main early pause", "t", environment)) end
 				-- The desktop layout switch is initialised by an earlier Main span.
-				local layout_switches = {}
+				local layout_switches, starts = {}, {}
 				local previous_switch = package.loaded["modules.keymap.pause_layout_switch"]
 				package.loaded["modules.keymap.pause_layout_switch"] = { on_pause_change = function(paused)
 					layout_switches[#layout_switches + 1] = paused
-				end }
+				end, start_safely = function(paused) starts[#starts + 1] = paused end }
 				local ran, controller = pcall(chunk())
 				package.loaded["modules.keymap.pause_layout_switch"] = previous_switch
 				if not ran then error(controller, 0) end
@@ -342,10 +342,13 @@ helpers.describe("Main early pause restoration", function()
 				helpers.assert_eq(#layout_switches, 1, "the restored pause switches the desktop layout once")
 				helpers.assert_true(layout_switches[1])
 				if acknowledged then
+					helpers.assert_eq(#starts, 1, "the start switch follows the restored pause once")
+					helpers.assert_true(starts[1], "the start reads the restored pause")
 					helpers.assert_true(controller.is_paused())
 					local _, status = f.read(); helpers.assert_eq(status, "absent")
 				else
 					helpers.assert_nil(controller, "refused pause must return before watch and native capture")
+					helpers.assert_eq(#starts, 0, "a refused start never switches the layout")
 					helpers.assert_eq(f.read(), image, "the next startup must retain the requested pause")
 				end
 			end)

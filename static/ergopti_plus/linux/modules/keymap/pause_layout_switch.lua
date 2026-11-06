@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Pause Layout Switch (Linux)
 --- DESCRIPTION:
---- Switches the desktop's keyboard layout when the script pauses, resumes or
---- quits, to the layouts the user chose in Layout > « Layout on pause /
+--- Switches the desktop's keyboard layout when the script starts, pauses,
+--- resumes or quits, to the layouts the user chose in Layout > « Layout on pause /
 --- resume ». The shared policy (_shared/lua/layout/pause_switch_policy.lua)
 --- decides which layout each event selects; the input source adapter switches.
 ---
@@ -16,6 +16,9 @@
 ---    (each one is bounded by the shared input-source deadline).
 --- 3. A reload or a signal is not a quit: only the user's quit actions switch,
 ---    as on macOS.
+--- 4. A start applies the layout of the live pause state once (the shared
+---    startup rule, as macOS does after its boot settles): a pause transition
+---    that already ran since init, such as a restored pause, chose it first.
 --- ==============================================================================
 
 local M = {}
@@ -27,6 +30,8 @@ local LOG = "modules.keymap.pause_layout_switch"
 
 local _switcher = nil
 local _preferences = nil
+-- Whether an event already chose the layout since init: the start then defers to it.
+local _event_applied = false
 
 --- Takes ownership of the switcher and the preferences reader.
 --- @param deps table { switcher, preferences }: an input_source_switch switcher
@@ -39,6 +44,7 @@ function M.init(deps)
 		error("the pause layout switch needs a switcher and a preferences reader", 2)
 	end
 	_switcher, _preferences = deps.switcher, deps.preferences
+	_event_applied = false
 end
 
 local function initialised()
@@ -55,6 +61,7 @@ function M.is_initialised() return _switcher ~= nil end
 --- @return string "none" when nothing switches, "pending" once a switch started.
 local function apply(event)
 	local switcher = initialised()
+	_event_applied = true
 	local called, settings = pcall(_preferences.settings)
 	if not called then
 		Logger.error(LOG, "Layout switch on %s skipped: the settings are unreadable (%s).", event, tostring(settings))
@@ -79,6 +86,30 @@ end
 function M.on_pause_change(paused)
 	if type(paused) ~= "boolean" then error("the pause state must be a boolean", 2) end
 	return apply(paused and "pause" or "resume")
+end
+
+--- Applies the layout of the live pause state once the daemon started.
+--- @param paused boolean Whether the script is paused once its start settled.
+--- @return string "none", "pending", or "superseded" when a pause transition
+---   already chose the layout since init.
+function M.on_start(paused)
+	local event = Policy.startup_event(paused)
+	initialised()
+	if _event_applied then
+		Logger.debug(LOG, "Startup layout switch skipped: a pause transition already chose the layout.")
+		return "superseded"
+	end
+	return apply(event)
+end
+
+--- on_start for the daemon's start: a failure is logged and never stops the start.
+--- @param paused boolean
+--- @return string "none", "pending", "superseded" or "failed"
+function M.start_safely(paused)
+	local called, result = pcall(M.on_start, paused)
+	if called then return result end
+	Logger.error(LOG, "The startup layout switch failed: %s.", tostring(result))
+	return "failed"
 end
 
 --- Switches to the pause layout before a user quit.
@@ -110,6 +141,7 @@ function M.switcher() return initialised() end
 --- Test seam: forgets the owner so a test can initialise a fresh one.
 function M._reset_for_test()
 	_switcher, _preferences = nil, nil
+	_event_applied = false
 end
 
 return M
