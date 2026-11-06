@@ -717,6 +717,7 @@ return {
 	"tests.unit.modules.llm.agent.test_agent_vectors",
 	"tests.unit.modules.llm.remote.test_remote_formats_vectors",
 	"tests.unit.modules.llm.remote.test_remote_usage_vectors",
+	"tests.unit.modules.llm.remote.test_auth_failure_vectors",
 	"tests.unit.modules.llm.context.test_context_buffer_vectors",
 	"tests.unit.modules.llm.context.test_ai_typing_context",
 	"tests.unit.modules.llm.remote.test_api_remote_usage",

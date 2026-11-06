@@ -2376,7 +2376,15 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 					end
 					do_next()
 				end,
-				function()
+				function(failure)
+					-- A refused key is refused again: neither a retry nor another variant.
+					if ApiCommon.is_authentication_failure(failure) then
+						Logger.warn(LOG, "[%s] Variant %d/%d stopped: the credential was refused (no retry).",
+							tostring(model_name), variant_index, max_attempts)
+						attempt_index = max_attempts + 1
+						do_next()
+						return
+					end
 					if attempt < 2 then
 						local retry_tokens = tokens + _RETRY_EXTRA_TOKENS
 						local retry_temp   = math.min(1.30, (tonumber(temp) or ApiCommon.DEFAULT_TEMPERATURE) + _RETRY_TEMP_STEP)

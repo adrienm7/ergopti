@@ -25,6 +25,7 @@ local Paths  = require("infra.paths")
 local FileSystem = require("adapters.file_system")   -- OS-pure file read (port FileSystem)
 local JsonCodec  = require("adapters.json_codec")    -- OS-pure JSON decode (port JsonCodec)
 local Temperature = require("llm.temperature")       -- shared diversity temperature algorithm
+local FailureClass = require("llm.failure_class")     -- shared authentication-failure verdict
 local LOG    = "llm.api_common"
 
 
@@ -176,6 +177,14 @@ function M.get_retry_policy()
 	return cfg("retry", "max_multiplier"),
 		cfg("retry", "retry_temperature_step"),
 		cfg("retry", "retry_extra_tokens")
+end
+
+--- Whether a failed prediction call was refused for its credential: such a call
+--- is never retried, because the same key is refused again.
+--- @param failure any The failure detail a backend callback received.
+--- @return boolean refused
+function M.is_authentication_failure(failure)
+	return FailureClass.is_authentication_failure(failure)
 end
 
 --- Returns the stop-sequence array for the given backend variant.

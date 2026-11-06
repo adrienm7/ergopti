@@ -2848,7 +2848,9 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                                on_success, on_fail, dedup_stats, on_raw, current)
 	M.resolve_active_entry(function(resolved, entry)
 		if resolved ~= true or not entry then
-			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+			if type(on_fail) == "function" then
+				ApiCommon.protected_call(on_fail, "on_fail", { reason = "no_credential", status = 0, message = "" })
+			end
 			return
 		end
 		post_and_parse_resolved(entry, model_name, system_prompt, full_text, tail_text,
@@ -3568,7 +3570,15 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 					end
 					do_next()
 				end,
-				function()
+				function(failure)
+					-- A refused key is refused again: neither a retry nor another variant.
+					if ApiCommon.is_authentication_failure(failure) then
+						Logger.warn(LOG, "[%s] Variant %d/%d stopped: the credential was refused (no retry).",
+							tostring(model_name), variant_index, max_attempts)
+						attempt_index = max_attempts + 1
+						do_next()
+						return
+					end
 					if attempt < 2 then
 						local retry_tokens = tokens + _R_EXTRA_TOKENS
 						local retry_temp   = math.min(1.30, (tonumber(temp) or ApiCommon.DEFAULT_TEMPERATURE) + _R_TEMP_STEP)

@@ -51,6 +51,9 @@ local API_COMMON = {
 		return true
 	end,
 	log_prediction_summary = function() end,
+	is_authentication_failure = function(failure)
+		return require("llm.failure_class").is_authentication_failure(failure)
+	end,
 	protected_call = function(callback, _label, ...)
 		if type(callback) == "function" then return callback(...) end
 	end,
