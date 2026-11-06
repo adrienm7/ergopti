@@ -3995,6 +3995,7 @@
 	"physical_shortcuts.position_unavailable": "Bu tuş konumu burada kullanılamıyor.",
 	"physical_shortcuts.windows_unavailable": "Henüz Windows'ta kullanılamıyor: Fiziksel tuş kısayolu düzenleyicisi Windows üzerinde henüz kullanılamıyor.",
 	"physical_shortcuts.collision": "Bu tuş birleşimi zaten kullanılıyor. Başka bir birleşim seçin.",
+	"physical_shortcuts.delivery_unqualified": "Henüz kullanılamıyor: Ergopti bu sistemde fiziksel bir tuşa bağlı bir eylemi henüz güvenle çalıştıramıyor. Adlandırılmış kısayollar çalışmaya devam eder.",
 	"physical_shortcuts.window_unavailable": "Bu pencere kullanılamıyor: Yeniden açmayı deneyin.",
 	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Bu eski öykünme yardımcıları, Windows tarama kodu kısayollarını kullanır. Diğer sistemler kendi yerel klavye düzeni eşlemelerini kullanır.",
 	"gestures.system.conflicts_caption": "⚠ %s olası çakışma",

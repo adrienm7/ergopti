@@ -1466,7 +1466,13 @@
 			"disabled_when": [
 				"physical_shortcuts_editor_ready"
 			],
-			"disabled_reason_key": "physical_shortcuts.window_unavailable"
+			"disabled_reason_key": "physical_shortcuts.window_unavailable",
+			"disabled_reasons": [
+				{
+					"when": "physical_shortcuts_delivery_unqualified",
+					"reason_key": "physical_shortcuts.delivery_unqualified"
+				}
+			]
 		},
 		{
 			"type": "---"

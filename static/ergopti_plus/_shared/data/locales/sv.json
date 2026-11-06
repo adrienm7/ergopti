@@ -3995,6 +3995,7 @@
 	"physical_shortcuts.position_unavailable": "Denna tangentposition är inte tillgänglig här.",
 	"physical_shortcuts.windows_unavailable": "Ännu inte för Windows: Redigeraren för fysiska kortkommandon är ännu inte tillgänglig i Windows.",
 	"physical_shortcuts.collision": "Denna tangentkombination används redan. Välj en annan.",
+	"physical_shortcuts.delivery_unqualified": "Inte tillgängligt än: Ergopti kan ännu inte säkert köra en åtgärd som är kopplad till en fysisk tangent på det här systemet. De namngivna kortkommandona fungerar fortfarande.",
 	"physical_shortcuts.window_unavailable": "Detta fönster är inte tillgängligt: Försök att öppna det igen.",
 	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Dessa äldre emuleringsfunktioner använder Windows-snabbtangenter baserade på skanningskoder. Andra system använder mappningen i sina inbyggda tangentbordslayouter.",
 	"gestures.system.conflicts_caption": "⚠ %s möjliga konflikter",

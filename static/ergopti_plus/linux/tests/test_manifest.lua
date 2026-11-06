@@ -556,6 +556,7 @@ return {
 	"tests.unit.infra.test_personal_shortcuts",
 	"tests.unit.modules.gestures.actions.test_pointer_warp",
 	"tests.unit.modules.shortcuts.keyboard.test_accented_shortcuts",
+	"tests.unit.ui.editors.physical.test_physical_delivery_unqualified",
 	"tests.unit.infra.test_features_manifest_projection",
 	"tests.unit.modules.updater.vectors.test_update_channels_vectors",
 	"tests.unit.modules.updater.check.test_update_check_feedback",
