@@ -222,6 +222,43 @@
 				}
 			],
 			"expected": "ConfigDirPath = \"C:/Users/u/AppData/Local/Root/config/profiles/p/\"\n"
+		},
+		{
+			"name": "reads a quoted key as the boot TOML reader does",
+			"text": "\"ConfigDirPath\" = \"/h/.config/old/\"\n",
+			"rewrites": [{ "key": "ConfigDirPath", "old": ["/h/.config/old"], "new": "/h/root/config" }],
+			"expected": "\"ConfigDirPath\" = \"/h/root/config/\"\n"
+		},
+		{
+			"name": "reads a literal string and keeps it literal",
+			"text": "ConfigDirPath = '/h/.config/old' # chosen\n",
+			"rewrites": [{ "key": "ConfigDirPath", "old": ["/h/.config/old"], "new": "/h/root/config" }],
+			"expected": "ConfigDirPath = '/h/root/config' # chosen\n"
+		},
+		{
+			"name": "decodes a basic-string escape before comparing",
+			"text": "ConfigDirPath = \"/h/.config/\\u006Fld/\"\n",
+			"rewrites": [{ "key": "ConfigDirPath", "old": ["/h/.config/old"], "new": "/h/root/config" }],
+			"expected": "ConfigDirPath = \"/h/root/config/\"\n"
+		},
+		{
+			"name": "leaves a line the TOML reader would refuse",
+			"text": "ConfigDirPath = \"/h/.config/old\\q\"\n",
+			"rewrites": [{ "key": "ConfigDirPath", "old": ["/h/.config/old"], "new": "/h/root/config" }],
+			"expected": null
+		},
+		{
+			"name": "keeps the backslashes of a Windows literal string",
+			"os": "windows",
+			"text": "ConfigDirPath = 'C:\\Users\\u\\.config\\old\\'\n",
+			"rewrites": [
+				{
+					"key": "ConfigDirPath",
+					"old": ["C:/Users/u/.config/old"],
+					"new": "C:\\\\Users\\\\u\\\\AppData\\\\Local\\\\Root\\\\config"
+				}
+			],
+			"expected": "ConfigDirPath = 'C:\\Users\\u\\AppData\\Local\\Root\\config\\'\n"
 		}
 	]
 }

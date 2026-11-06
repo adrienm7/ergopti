@@ -112,7 +112,7 @@ Test("legacy folder migration: every shared move vector replays on a private tre
 
 _LFM_EveryPathsTextVectorReplays() {
 	Corpus := _LFM_Corpus()
-	AssertEqual(8, Corpus["paths_text"].Length, "complete paths.toml vectors")
+	AssertEqual(13, Corpus["paths_text"].Length, "complete paths.toml vectors")
 	for Row in Corpus["paths_text"] {
 		Rewrites := []
 		for Rule in Row["rewrites"] {
