@@ -452,7 +452,8 @@ LayoutManager_SelectSettled(Id, OnDone, Options := unset) {
  * @returns {Map} Pending or terminal configuration receipt.
  */
 LayoutManager_SelectTransition(Id, Options := unset) {
-	if !LayoutRegistry_IsValidId(Id)
+	; "" is the menu's « none »: the system layout types.
+	if Id != "" && !LayoutRegistry_IsValidId(Id)
 		throw ValueError("The layout selection requires a valid registry identifier.")
 	if !IsSet(Options)
 		Options := Map()
@@ -481,6 +482,12 @@ _LayMgrWeb_SelectionOperations(Id, Path, Expected, SnapshotFn) {
 			|| StrCompare(Expected["content"], Current["content"], true) != 0
 			|| !ManifestValuesEqual(Expected["values"], Current["values"])
 		throw Error("The selected helper source intent changed or could not be admitted.")
+	if Id == ""
+		return [
+			ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, ""),
+			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_BASE, false),
+			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_VARIANT, "none"),
+		]
 	if LayoutManager_BuiltinIds().Has(Id)
 		return [
 			ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, ""),

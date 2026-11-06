@@ -580,6 +580,18 @@ KeylayoutEmulation_PressNative(Sc, Shift, Caps, Hkl) {
 		if Swapped != ""
 			Native := {Count: 1, Text: Swapped}
 	}
+	return KeylayoutEmulation_ComposeNative(Native)
+}
+
+/**
+ * Completes the pending registry dead key with what the OS layout types.
+ * Split from KeylayoutEmulation_PressNative so the shared emulation vectors
+ * can feed the OS character the corpus names instead of reading the machine's.
+ * @param {Object} Native - {Count, Text}: the OS character, Count 0 for none.
+ * @returns {Map} Output and Native (whether the OS must receive the original key).
+ */
+KeylayoutEmulation_ComposeNative(Native) {
+	global KLE_Model, KLE_State, KLE_Compositions, KEYLAYOUT_NEUTRAL_STATE
 	Transitions := KLE_Compositions.Get(KLE_State, Map())
 	if Native.Count > 0 && Transitions.Has(Native.Text) {
 		Step := Transitions[Native.Text]
