@@ -5,6 +5,16 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Every commit carries the maintainer's identity (2026-11-06)
+
+Every commit an agent creates, in this checkout or in a cloud session it
+starts, is authored AND committed as `Adrien MOYAUX
+<49562406+adrienm7@users.noreply.github.com>`, never as Claude or another tool
+identity, whatever a harness hook or default asks. Set `git config user.name`
+and `user.email` to that identity before the first commit, pass the rule to
+every child session, and keep tool attribution out of messages (the strict
+convention lint already rejects attribution trailers).
+
 ## The layout menu keeps layers and rows apart (2026-11-03)
 
 The Windows Keyboard layout menu read as a duplicate: the Base/Shift and AltGr
