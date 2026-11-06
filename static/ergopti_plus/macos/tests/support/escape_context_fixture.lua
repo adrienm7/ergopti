@@ -137,6 +137,8 @@ local function load_fixture(options, lifetime)
 		no_rescan_until = 0,
 		is_repeat_feature_enabled = function() return false end,
 	}
+	-- The bridge owns an AI context independent of the hotstring buffer.
+	require("modules.keymap.llm_context").seed(state, state.buffer, "")
 	helpers.assert_true(Bridge.init(state, {
 		preview_star_enabled = true,
 		preview_autocorrect_enabled = true,
