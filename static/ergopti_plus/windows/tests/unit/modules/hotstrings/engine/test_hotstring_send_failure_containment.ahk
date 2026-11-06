@@ -327,6 +327,39 @@ for Boundary in ["snapshot", "clear", "sequence", "send"] {
 Test("hotstrings: ordinary selection startup retains its native timer (selection-startup-revocation)",
 	_SCSC_Startup.Bind("none", "none"))
 
+; A paste prepared on the clipboard belongs to the window, the pause state and
+; the physical action current when it was asked for (WCP-002).
+_SCSC_AdmittedTarget() {
+	global _KS_PhysicalInputGeneration
+	PreviousSuspended := A_IsSuspended
+	PreviousGeneration := _KS_PhysicalInputGeneration
+	Window := Gui("+AlwaysOnTop", "Private admitted paste target")
+	try {
+		Field := Window.AddEdit("w200")
+		Window.Show()
+		WinActivate("ahk_id " . Window.Hwnd)
+		Field.Focus()
+		AssertTrue(WinWaitActive("ahk_id " . Window.Hwnd, , 1), "the private target must own the foreground")
+		Suspend(false)
+		Target := _SendInstantCaptureAdmittedTarget()
+		AssertTrue(Target is Map, "an active unpaused window yields a target")
+		AssertTrue(_SendInstantTargetCurrent(Target), "nothing changed yet")
+		_KS_PhysicalInputGeneration += 1
+		AssertFalse(_SendInstantTargetCurrent(Target), "a newer physical action revokes the paste")
+		_KS_PhysicalInputGeneration := PreviousGeneration
+		AssertTrue(_SendInstantTargetCurrent(Target), "the same generation admits it again")
+		Suspend(true)
+		AssertFalse(_SendInstantTargetCurrent(Target), "a pause revokes the paste")
+		AssertFalse(_SendInstantCaptureAdmittedTarget(), "a paused driver yields no target")
+	} finally {
+		_KS_PhysicalInputGeneration := PreviousGeneration
+		Suspend(PreviousSuspended)
+		Window.Destroy()
+	}
+}
+Test("hotstrings: a prepared paste refuses a pause or a newer physical action (sendinstant-admitted-target)",
+	_SCSC_AdmittedTarget)
+
 class _SCL_Callback {
 	__New(State) {
 		this.State := State

@@ -585,12 +585,17 @@ _PPH_Script(Entry, Mode) {
 	}
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`nOnError(_PPH_Error)`n" . Registry
 	Code .= '_PPH_Error(Err, *) {`nFileAppend(Err.Message, "**")`nExitApp(1)`n}`n'
-	for Name in ["GesturePastePlain", "_GesturePastePlainRestore"]
+	for Name in ["GesturePastePlain", "_GesturePastePlainRestore", "_GesturePastePlainSend"]
 		Code .= _DriverFuncBody(Name) . "`n"
 	Code .= 'global SEND_INSTANT_PASTE_DELAY_MS := ' . SEND_INSTANT_PASTE_DELAY_MS . "`n"
-	Code .= 'global S := Map("text", "genuine copy", "rich", true, "seq", 42, "reads", 0, "saves", 0, "writes", 0, "restores", 0, "warnings", 0, "errors", 0, "sent", [], "sent_text", [], "active_at_send", 0, "excel", false, "fail_save", false)`n'
+	Code .= 'global S := Map("text", "genuine copy", "rich", true, "seq", 42, "reads", 0, "saves", 0, "writes", 0, "restores", 0, "warnings", 0, "errors", 0, "sent", [], "sent_text", [], "active_at_send", 0, "excel", false, "fail_save", false, "target", 1, "admitted", true, "drift", "")`n'
+	; The window and admission observers are the only passive target ports; the
+	; drift mode changes one of them inside the real snapshot boundary (WCP-002).
+	Code .= '_SendInstantCaptureAdmittedTarget() {`nglobal S`nreturn S["admitted"] ? Map("hwnd", S["target"]) : 0`n}`n'
+	Code .= '_SendInstantTargetCurrent(Target) {`nglobal S`nreturn Target is Map && Target["hwnd"] == S["target"] && S["admitted"]`n}`n'
+	Code .= 'LoggerInfo(*) => 0`n'
 	Code .= 'CB_Read() {`nglobal S`nS["reads"] += 1`nreturn S["text"]`n}`n'
-	Code .= 'CB_SaveAll() {`nglobal S`nS["saves"] += 1`nreturn S["fail_save"] ? "__CB_SAVE_ERROR__" : Map("text", S["text"], "rich", S["rich"])`n}`n'
+	Code .= 'CB_SaveAll() {`nglobal S`nS["saves"] += 1`nif S["drift"] == "target"`nS["target"] := 2`nelse if S["drift"] == "pause"`nS["admitted"] := false`nreturn S["fail_save"] ? "__CB_SAVE_ERROR__" : Map("text", S["text"], "rich", S["rich"])`n}`n'
 	Code .= 'CB_Write(Text) {`nglobal S`nS["writes"] += 1`nS["text"] := Text`nS["rich"] := false`nS["seq"] += 1`nreturn true`n}`n'
 	; This existing logical clipboard models one synchronous owned publication.
 	; Native owner/UTF-16 authentication is exercised by the separate real-CB tests.
@@ -607,8 +612,9 @@ _PPH_Script(Entry, Mode) {
 	Code .= 'Mode := "' . Mode . '"`nBusy := InStr(Mode, "busy-") == 1`nOtherToken := 0`n'
 	Code .= 'if Busy {`nOtherToken := CB_TryBeginOwnedTransaction("other temporary producer")`nCheck(OtherToken > 0, "contender setup")`nOtherRecord := CBClipboardOwner.active[OtherToken]`nS["text"] := Mode == "busy-clear" ? "" : Mode == "busy-external" ? "new external copy" : "temporary payload"`nS["seq"] := Mode == "busy-external" ? 77 : 42`n}`n'
 	Code .= 'S["excel"] := Mode == "excel" or Mode == "busy-excel"`nS["fail_save"] := Mode == "snapshot-failure"`nif Mode == "non-text"`nS["text"] := ""`nBefore := S["text"]`n'
+	Code .= 'Drift := InStr(Mode, "drift-") == 1`nif Drift`nS["drift"] := SubStr(Mode, 7)`nif Mode == "paused"`nS["admitted"] := false`n'
 	Code .= Entry . "()`n"
-	Code .= 'if Busy {`nCheck(S["sent"].Length == 0, "busy plain paste must emit no key, including native fallbacks")`nCheck(S["reads"] == 0 && S["saves"] == 0 && S["writes"] == 0 && S["restores"] == 0, "busy plain paste must not inspect or mutate another owner")`nCheck(S["text"] == Before, "temporary or externally replaced payload must survive")`nCheck(CBClipboardOwner.active.Count == 1 && CBClipboardOwner.active[OtherToken] == OtherRecord, "exact other owner remains live")`nCheck(S["warnings"] == 1, "busy refusal must be explicit")`nCB_EndOwnedTransaction(OtherToken)`n} else {`n'
+	Code .= 'if Drift || Mode == "paused" {`nCheck(S["sent"].Length == 0, "a paste whose target or admission is gone must emit no key")`nCheck(S["writes"] == 0 && S["restores"] == 0, "a refused paste must not replace the clipboard")`nCheck(S["saves"] == (Drift ? 1 : 0), "a paused driver must not even snapshot")`nCheck(S["text"] == Before && S["rich"], "original clipboard formats must survive")`n} else if Busy {`nCheck(S["sent"].Length == 0, "busy plain paste must emit no key, including native fallbacks")`nCheck(S["reads"] == 0 && S["saves"] == 0 && S["writes"] == 0 && S["restores"] == 0, "busy plain paste must not inspect or mutate another owner")`nCheck(S["text"] == Before, "temporary or externally replaced payload must survive")`nCheck(CBClipboardOwner.active.Count == 1 && CBClipboardOwner.active[OtherToken] == OtherRecord, "exact other owner remains live")`nCheck(S["warnings"] == 1, "busy refusal must be explicit")`nCB_EndOwnedTransaction(OtherToken)`n} else {`n'
 	Code .= 'Check(S["sent"].Length == 1, "normal paste must emit once")`nCheck(S["sent"][1] == (Mode == "excel" ? "^+v" : "^v"), "native paste chord")`nCheck(S["sent_text"][1] == Before, "normal paste payload")`nCheck(S["active_at_send"] == 1, "native fallback must retain its exact owner through emission")`n'
 	Code .= 'if Mode == "text" {`nCheck(S["writes"] == 1, "plain text coercion")`nCheck(CBClipboardOwner.active.Count == 1, "deferred restore owns the snapshot")`nStarted := A_TickCount`nwhile CBClipboardOwner.active.Count && A_TickCount - Started < 2000`nSleep(10)`nCheck(S["restores"] == 1, "native timer restores through actual debt coordinator")`n} else {`nCheck(S["writes"] == 0 && S["restores"] == 0, "native bypass must preserve formats")`nCheck(S["saves"] == (Mode == "snapshot-failure" ? 1 : 0), "only failed snapshot fallback attempts a save")`n}`nCheck(S["text"] == Before && S["rich"], "original clipboard formats must survive")`n}`n'
 	Code .= 'Check(CBClipboardOwner.active.Count == 0 && !CBClipboardOwner.restore_debt, "all exact owners retire")`nCheck(S["errors"] == 0, "no hidden failure may be accepted")`nFileAppend("plain-paste-ok", "*")`nExitApp(0)`n'
@@ -663,7 +669,8 @@ _PPH_ActualPlainPaste(Entry, Mode) {
 }
 
 for Entry in ["GesturePastePlain"] {
-	for Mode in ["busy-text", "busy-clear", "busy-external", "busy-excel", "text", "non-text", "excel", "snapshot-failure"] {
+	for Mode in ["busy-text", "busy-clear", "busy-external", "busy-excel", "text", "non-text", "excel", "snapshot-failure",
+			"drift-target", "drift-pause", "paused"] {
 		Test("clipboard: actual " . Entry . " respects " . Mode . " (plain-paste-owner-refusal)",
 			_PPH_ActualPlainPaste.Bind(Entry, Mode))
 	}
