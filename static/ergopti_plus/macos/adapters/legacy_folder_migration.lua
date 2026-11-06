@@ -18,7 +18,8 @@
 ---    finds the moved file and the new configuration folder.
 --- 2. Shared Rules: what moves and what is refused is _shared/lua/
 ---    legacy_folder_migration.lua; this adapter resolves the folders from
----    app_dirs and owns the native effects (hs.fs and os.rename).
+---    app_dirs and owns the native effects (hs.fs and os.rename), none of
+---    which replaces an existing destination.
 --- 3. What Stays: the owned Karabiner runtime's folders keep their compiled name
 ---    (app_dirs owned_runtime), and the runtime state of the old support folder
 ---    (locks, the lease guardian, the PTY sources) stays for a build that may
@@ -58,7 +59,31 @@ function M.native_ports()
 			end
 			return names
 		end,
-		rename = function(from, to) return os.rename(from, to) end,
+		-- os.rename replaces an existing destination file or empty folder, so a
+		-- name published after the core's check would be lost. A folder first
+		-- reserves its destination with mkdir, which fails on any existing name,
+		-- and rename over that empty reservation fails once anything arrives in
+		-- it. Anything else is hard linked, which never replaces, then unlinked.
+		rename = function(from, to)
+			if fs.symlinkAttributes(from, "mode") == "directory" then
+				local reserved, reserve_err = fs.mkdir(to)
+				if not reserved then return nil, tostring(reserve_err or "destination exists") end
+				local moved, move_err = os.rename(from, to)
+				if not moved then
+					fs.rmdir(to)
+					return nil, move_err
+				end
+				return true
+			end
+			local linked, link_err = fs.link(from, to, false)
+			if linked ~= true then return nil, tostring(link_err or "hard link refused") end
+			local removed, remove_err = os.remove(from)
+			if not removed then
+				os.remove(to)
+				return nil, remove_err
+			end
+			return true
+		end,
 		make_dir = function(path)
 			local current = ""
 			for part in path:gmatch("[^/]+") do

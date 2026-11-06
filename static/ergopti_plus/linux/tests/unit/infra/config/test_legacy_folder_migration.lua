@@ -36,6 +36,23 @@ local function read(path)
 	return content
 end
 
+--- A private scratch folder for the native-port cases, removed by `drop`.
+--- @return string dir
+local function scratch()
+	local dir = os.tmpname()
+	os.remove(dir)
+	assert(os.execute("mkdir -p -- '" .. dir .. "'"))
+	return dir
+end
+
+local function drop(dir) os.execute("rm -rf -- '" .. dir .. "'") end
+
+local function write(path, text)
+	local file = assert(io.open(path, "wb"))
+	assert(file:write(text))
+	assert(file:close())
+end
+
 helpers.describe("Linux legacy folder migration", function()
 	helpers.it("merges each XDG base's old folder into its ergopti folder (legacy-folder-migration-linux)", function()
 		local ports, snapshot = Contract.memory_ports({
@@ -68,6 +85,29 @@ helpers.describe("Linux legacy folder migration", function()
 		helpers.assert_eq(#report.backed_up, 1, "one entry backed up")
 		helpers.assert_eq(#report.kept, 0, "nothing left behind")
 		helpers.assert_true(report.cache_ready, "cache folder reported ready")
+	end)
+
+	helpers.it("keeps a file published after the check, on real folders (legacy-folder-migration-linux-race)", function()
+		local dir = scratch()
+		local ok, err = pcall(function()
+			assert(os.execute("mkdir -p -- '" .. dir .. "/old' '" .. dir .. "/new'"))
+			write(dir .. "/old/storage.json", "LEGACY")
+			local ports = Migration.native_ports()
+			local rename = ports.rename
+			ports.rename = function(from, to)
+				-- Another writer publishes the destination between the check and the rename.
+				if to == dir .. "/new/storage.json" then write(to, "CONCURRENT-NEW") end
+				return rename(from, to)
+			end
+			local report = require("legacy_folder_migration").apply({
+				{ from_dir = dir .. "/old", to_dir = dir .. "/new", backup_dir = dir .. "/new/bak/old" } }, ports)
+			helpers.assert_eq(read(dir .. "/new/storage.json"), "CONCURRENT-NEW", "the newer file survives")
+			helpers.assert_eq(read(dir .. "/new/bak/old/storage.json"), "LEGACY", "the old file went to the backup")
+			helpers.assert_eq(#report.moved, 0, "no move reported over the newer file")
+			helpers.assert_eq(#report.backed_up, 1, "the backup is reported")
+		end)
+		drop(dir)
+		assert(ok, err)
 	end)
 
 	helpers.it("logs every move, backup and kept entry", function()

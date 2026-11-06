@@ -70,9 +70,33 @@ LegacyFolderIsEmptyDir(Dir) {
 		return true
 }
 
+; Moves one old entry into its backup slot, its destination being taken.
+; Mirrors back_up_entry of _shared/lua/legacy_folder_migration.lua.
+; @param From {String} Old path.
+; @param To {String} The taken destination.
+; @param Backup {String} Path the old entry takes.
+; @param Report {Map} Receives a "backed_up" or a "kept" row.
+LegacyFolderBackUpEntry(From, To, Backup, Report) {
+		if (FileExist(Backup) != "") {
+				Report["kept"].Push(Map("from", From, "to", Backup, "reason", "backup_exists"))
+				return
+		}
+		Failure := LegacyFolderRenameInto(From, Backup)
+		if (Failure == "")
+				Report["backed_up"].Push(Map("from", From, "to", Backup, "taken", To))
+		else if (FileExist(Backup) != "")
+				; The slot was taken between the check and the move, which never
+				; replaces: what arrived there stays.
+				Report["kept"].Push(Map("from", From, "to", Backup, "reason", "backup_exists"))
+		else
+				Report["kept"].Push(Map("from", From, "to", Backup, "reason", "rename_failed", "detail", Failure))
+}
+
 ; Moves one file or folder to its destination; when the destination holds
 ; something, moves it into the backup slot instead. Mirrors move_entry of
-; _shared/lua/legacy_folder_migration.lua.
+; _shared/lua/legacy_folder_migration.lua. DirMove and FSMove never replace an
+; existing destination, so one that appears after the check fails the move and
+; the old entry goes to its backup like any taken name.
 ; @param From {String} Old path.
 ; @param To {String} New path.
 ; @param Backup {String} Path the old entry takes when To is taken.
@@ -90,21 +114,15 @@ LegacyFolderMoveEntry(From, To, Backup, Report) {
 						}
 				}
 				if !Freed {
-						if (FileExist(Backup) != "") {
-								Report["kept"].Push(Map("from", From, "to", Backup, "reason", "backup_exists"))
-								return
-						}
-						Failure := LegacyFolderRenameInto(From, Backup)
-						if (Failure == "")
-								Report["backed_up"].Push(Map("from", From, "to", Backup, "taken", To))
-						else
-								Report["kept"].Push(Map("from", From, "to", Backup, "reason", "rename_failed", "detail", Failure))
+						LegacyFolderBackUpEntry(From, To, Backup, Report)
 						return
 				}
 		}
 		Failure := LegacyFolderRenameInto(From, To)
 		if (Failure == "")
 				Report["moved"].Push(Map("from", From, "to", To))
+		else if (FileExist(To) != "")
+				LegacyFolderBackUpEntry(From, To, Backup, Report)
 		else
 				Report["kept"].Push(Map("from", From, "to", To, "reason", "rename_failed", "detail", Failure))
 }

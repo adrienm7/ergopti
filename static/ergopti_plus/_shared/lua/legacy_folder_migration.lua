@@ -19,7 +19,9 @@
 ---    entry where it is, with a warning naming both paths.
 --- 2. Rename, Not Copy: a move is one rename inside the same home folder. It
 ---    loses nothing on failure and costs nothing for the multi-gigabyte managed
----    runtimes, so the folders themselves need no copy.
+---    runtimes, so the folders themselves need no copy. The rename port never
+---    replaces what exists at its destination, so a newer file published there
+---    after the check is kept and the old entry goes to the backup instead.
 --- 3. Backup Before Rewrite: paths.toml is the one file whose TEXT changes (a
 ---    ConfigDirPath or LogsDirPath that named an old default folder). Its
 ---    previous text is written beside it under the backup suffix first, and an
@@ -80,8 +82,37 @@ local function rename_into(from, to, ports)
 	return true
 end
 
+--- Moves one old entry into its backup slot, the destination being taken.
+--- @param from string Old path.
+--- @param to string The taken destination.
+--- @param backup string Path the old entry takes.
+--- @param ports table Native effects.
+--- @param report table Report being filled.
+local function back_up_entry(from, to, backup, ports, report)
+	if ports.exists(backup) then
+		report.kept[#report.kept + 1] = { from = from, to = backup, reason = "backup_exists" }
+		return
+	end
+	local saved, reason, detail = rename_into(from, backup, ports)
+	if saved then
+		report.backed_up[#report.backed_up + 1] = { from = from, to = backup, taken = to }
+	elseif reason == "rename_failed" and ports.exists(backup) then
+		-- The backup slot was taken between the check and the rename: the
+		-- no-replace rename kept what arrived there.
+		report.kept[#report.kept + 1] = { from = from, to = backup, reason = "backup_exists" }
+	else
+		report.kept[#report.kept + 1] = { from = from, to = backup, reason = reason, detail = detail }
+	end
+end
+
 --- Moves one entry to its destination, or into the backup folder when the
 --- destination holds something.
+---
+--- The rename port never replaces an existing destination (renameat2
+--- RENAME_NOREPLACE, a hard link, an exclusive mkdir reservation or a Win32
+--- move without MOVEFILE_REPLACE_EXISTING). The existence checks only choose
+--- the slot: a destination that appears between the check and the rename makes
+--- the rename fail, and the entry then goes to its backup like any taken name.
 --- @param from string Old path.
 --- @param to string New path.
 --- @param backup string Path the old entry takes when `to` is taken.
@@ -94,22 +125,15 @@ local function move_entry(from, to, backup, ports, report)
 		-- data: it gives way to the old entry.
 		local left = ports.list(to)
 		if not (left and #left == 0 and ports.remove_empty_dir(to)) then
-			if ports.exists(backup) then
-				report.kept[#report.kept + 1] = { from = from, to = backup, reason = "backup_exists" }
-				return
-			end
-			local saved, reason, detail = rename_into(from, backup, ports)
-			if saved then
-				report.backed_up[#report.backed_up + 1] = { from = from, to = backup, taken = to }
-			else
-				report.kept[#report.kept + 1] = { from = from, to = backup, reason = reason, detail = detail }
-			end
+			back_up_entry(from, to, backup, ports, report)
 			return
 		end
 	end
 	local moved, reason, detail = rename_into(from, to, ports)
 	if moved then
 		report.moved[#report.moved + 1] = { from = from, to = to }
+	elseif reason == "rename_failed" and ports.exists(to) then
+		back_up_entry(from, to, backup, ports, report)
 	else
 		report.kept[#report.kept + 1] = { from = from, to = to, reason = reason, detail = detail }
 	end

@@ -148,6 +148,31 @@ function M.run(helpers, shared_root)
 			helpers.assert_eq(Migration.rewrite_paths_file("/r/none.toml", rewrites, ".bak", ports), "absent")
 		end)
 
+		helpers.it("keeps a destination published after its check (legacy-folder-migration-race)", function()
+			-- Another writer publishes the destination between the core's check and
+			-- its rename: the no-replace rename refuses, and the old entry must go to
+			-- the backup instead of being reported as kept beside a lost slot.
+			local ports, snapshot = M.memory_ports({ "/h/old/storage.json", "/h/new/" })
+			local rename = ports.rename
+			local raced = false
+			ports.rename = function(from, to)
+				if to == "/h/new/storage.json" and not raced then
+					raced = true
+					assert(ports.make_dir("/h/new/storage.json/"))
+				end
+				return rename(from, to)
+			end
+			local report = Migration.apply({ { from_dir = "/h/old", to_dir = "/h/new", backup_dir = "/h/new/bak/old" } },
+				ports)
+			helpers.assert_true(raced, "the destination arrived after the check")
+			helpers.assert_eq(#report.moved, 0, "nothing reported as moved over the new entry")
+			helpers.assert_eq(#report.backed_up, 1, "the old entry went to its backup")
+			helpers.assert_eq(#report.kept, 0, "nothing left behind")
+			local after = table.concat(snapshot(), " ")
+			helpers.assert_true(after:find("/h/new/bak/old/storage.json", 1, true) ~= nil, "the old entry is in the backup")
+			helpers.assert_true(after:find("/h/new/storage.json/", 1, true) ~= nil, "the newer entry is untouched")
+		end)
+
 		helpers.it("refuses a plan without its ports or its backup", function()
 			helpers.assert_true(not pcall(Migration.apply, {}, { exists = function() return false end }),
 				"a missing port stops the migration")

@@ -16,6 +16,7 @@
 local helpers = require("tests.helpers")
 local Contract = require("test.legacy_folder_migration_contract")
 local Migration = require("adapters.legacy_folder_migration")
+local Core = require("legacy_folder_migration")
 local AppDirs = require("app_dirs")
 
 Contract.run(helpers, helpers.shared(""))
@@ -49,6 +50,47 @@ local function ports_with_files(tree, files)
 	local exists = ports.exists
 	ports.exists = function(path) return files[path] ~= nil or exists(path) end
 	return ports, snapshot
+end
+
+--- A private scratch folder for the native-port cases, removed by `drop`.
+--- @return string dir
+local function scratch()
+	local dir = os.tmpname()
+	os.remove(dir)
+	assert(os.execute("mkdir -p -- '" .. dir .. "'"))
+	return dir
+end
+
+local function drop(dir) os.execute("rm -rf -- '" .. dir .. "'") end
+
+--- Runs `body` with hs.fs bound to the real LuaFileSystem, as Hammerspoon's
+--- own hs.fs is, so the native ports act on the scratch folder.
+--- @param body function
+local function with_real_fs(body)
+	local lfs = require("lfs")
+	local saved = {}
+	local real = {
+		attributes = lfs.attributes, symlinkAttributes = lfs.symlinkattributes, mkdir = lfs.mkdir,
+		rmdir = lfs.rmdir, link = lfs.link, dir = lfs.dir,
+	}
+	for name, fn in pairs(real) do saved[name] = hs.fs[name]; hs.fs[name] = fn end
+	local ok, err = pcall(body)
+	for name, fn in pairs(saved) do hs.fs[name] = fn end
+	assert(ok, err)
+end
+
+local function write(path, text)
+	local file = assert(io.open(path, "wb"))
+	assert(file:write(text))
+	assert(file:close())
+end
+
+local function read(path)
+	local file = io.open(path, "rb")
+	if not file then return nil end
+	local text = file:read("a")
+	file:close()
+	return text
 end
 
 helpers.describe("macOS legacy folder migration", function()
@@ -128,6 +170,40 @@ helpers.describe("macOS legacy folder migration", function()
 			if line:find("WARN", 1, true) == 1 and line:find(BACKUP, 1, true) then warned = true end
 		end
 		helpers.assert_true(warned, "the backup is logged as a warning")
+	end)
+
+	helpers.it("keeps a file or folder published after the check, on real folders (legacy-folder-migration-macos-race)",
+		function()
+		local dir = scratch()
+		local ok, err = pcall(with_real_fs, function()
+			assert(os.execute("mkdir -p -- '" .. dir .. "/old/sub' '" .. dir .. "/new'"))
+			write(dir .. "/old/paths.toml", "LEGACY")
+			write(dir .. "/old/sub/a", "OLD-A")
+			local ports = Migration.native_ports()
+			local rename = ports.rename
+			ports.rename = function(from, to)
+				-- Another writer publishes each destination between the check and the rename.
+				if to == dir .. "/new/paths.toml" then write(to, "CONCURRENT-NEW") end
+				if to == dir .. "/new/sub" then
+					assert(os.execute("mkdir -p -- '" .. to .. "'"))
+					write(to .. "/b", "NEW-B")
+				end
+				return rename(from, to)
+			end
+			local report = Core.apply({
+				{ from = dir .. "/old/paths.toml", to = dir .. "/new/paths.toml", backup = dir .. "/bak/paths.toml" },
+				{ from = dir .. "/old/sub", to = dir .. "/new/sub", backup = dir .. "/bak/sub" },
+			}, ports)
+			helpers.assert_eq(read(dir .. "/new/paths.toml"), "CONCURRENT-NEW", "the newer file survives")
+			helpers.assert_eq(read(dir .. "/bak/paths.toml"), "LEGACY", "the old file went to the backup")
+			helpers.assert_eq(read(dir .. "/new/sub/b"), "NEW-B", "the newer folder survives")
+			helpers.assert_eq(read(dir .. "/new/sub/a"), nil, "the old folder did not replace it")
+			helpers.assert_eq(read(dir .. "/bak/sub/a"), "OLD-A", "the old folder went to the backup")
+			helpers.assert_eq(#report.moved, 0, "no move reported over a newer entry")
+			helpers.assert_eq(#report.backed_up, 2, "both backups are reported")
+		end)
+		drop(dir)
+		assert(ok, err)
 	end)
 
 	helpers.it("names the owned runtime folder apart from the Ergopti root", function()
