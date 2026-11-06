@@ -12,8 +12,10 @@
 ; 1. Operating-system mappings: StrUpper / StrLower convert every accented
 ;    letter (é, à, ç) through Windows' own simple case mappings. The macOS and
 ;    Linux drivers read a complete generated Unicode table instead; the corpus
-;    limits the few vectors where the two differ (ß, the Greek final sigma,
-;    title-case digraphs) to those drivers.
+;    limits the few vectors where the two differ (ß uppercased, the Greek final
+;    sigma) to those drivers. The title case of a word's first character takes
+;    the generated title forms StrUpper lacks (ǆ -> ǅ, ß -> Ss), so the selection
+;    title and the one-shot Shift agree with macOS and Linux.
 ; 2. One title-case rule for the three drivers. Format("{:T}") capitalized after
 ;    a digit ("3e" -> "3E") and not after a hyphen ("jean-pierre" ->
 ;    "Jean-pierre"), while the Lua drivers only started a word after whitespace.
@@ -22,6 +24,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\_generated\unicode_title.ahk
 
 
 
@@ -59,6 +62,15 @@ TextCaseHasLowercase(Text) {
 ; a word ends the word start ("3e" stays "3e").
 ; @param {String} Text
 ; @returns {String}
+; The title-case form of one character: its Unicode title form when that is not
+; its uppercase, else StrUpper's.
+; @param {String} Char One character (possibly a surrogate pair).
+; @returns {String}
+TextCaseTitleCharacter(Char) {
+	Exceptions := UnicodeTitleExceptions()
+	return Exceptions.Has(Char) ? Exceptions[Char] : StrUpper(Char)
+}
+
 TextCaseTitle(Text) {
 	Lowered := StrLower(Text)
 	Result := ""
@@ -74,7 +86,7 @@ TextCaseTitle(Text) {
 			Result .= Char
 		} else {
 			AtWordStart := false
-			Result .= StrUpper(Char)
+			Result .= TextCaseTitleCharacter(Char)
 		}
 	}
 	return Result

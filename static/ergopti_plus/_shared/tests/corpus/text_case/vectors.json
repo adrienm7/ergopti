@@ -2,7 +2,7 @@
 	"description": "Golden vectors for the selection case actions (selection_uppercase, selection_lowercase, selection_titlecase and the uppercase_selection / titlecase_selection toggles). Replayed by the macOS, Linux and Windows suites so the three drivers agree on accented letters, apostrophes and hyphens.",
 	"title_rule": "Title case lowercases the text, then gives the first character of each word its Unicode title-case form. A word starts at the beginning of the text and after whitespace or a dash (Unicode Pd, e.g. the hyphen of jean-pierre). Other punctuation placed before a word (quotes, brackets, guillemets) is kept and does not consume the capital. An apostrophe inside a word does not start a new word, so l'ete stays L'ete and don't stays Don't. A digit or symbol that starts a word is kept and ends the word start, so 3e stays 3e.",
 	"toggle_rule": "toggle_upper returns the uppercase text when the text contains a character with an uppercase mapping, the lowercase text otherwise. toggle_title returns the lowercase text when the text is already in title case, the title-case text otherwise.",
-	"drivers_rule": "A vector without a drivers list applies to hs, linux and ahk. The Windows driver uses the operating system's simple case mappings (StrUpper / StrLower), which do not expand ß to SS, do not apply the Greek final sigma and have no title-case digraphs, so those vectors are limited to the two Lua drivers, which read the complete generated Unicode table.",
+	"drivers_rule": "A vector without a drivers list applies to hs, linux and ahk. The Windows driver uses the operating system's simple case mappings (StrUpper / StrLower), which do not expand ß to SS and do not apply the Greek final sigma, so those vectors are limited to the two Lua drivers, which read the complete generated Unicode table. Title case on Windows takes the generated title forms (windows/_generated/unicode_title.ahk), so the title-case digraph applies to every driver.",
 	"vectors": [
 		{
 			"id": "french_accents_lowercase_input",
@@ -193,7 +193,6 @@
 		},
 		{
 			"id": "title_case_digraph",
-			"drivers": ["hs", "linux"],
 			"input": "ǆungla",
 			"upper": "ǄUNGLA",
 			"lower": "ǆungla",

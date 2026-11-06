@@ -118,7 +118,8 @@ OneShotShift() {
 				}
 		} else {
 				if OneShotShiftEnabled {
-						TitleCaseText := Format("{:T}", Scalar)
+						; The shared title rule, as the Lua drivers' UnicodeCase.title.
+						TitleCaseText := TextCaseTitle(Scalar)
 						SendNewResult(TitleCaseText)
 				} else {
 						SendNewResult(Scalar)

@@ -125,7 +125,8 @@ and the next module candidates. The audit is paused at the maintainer's request.
 - [x] **[POLICY] Windows/Linux timeout configuration:** evaluate exposing an editable one-shot timeout equivalent to the macOS user setting. All three share the2000ms default, but the reviewed Windows/Linux paths use the shared registry without the same editable user leaf. Preserve the documented per-driver construction and define any zero/unlimited policy before adding a control.
       Done (decision 2026-11-06, align on macOS): Windows reads `[tap_holds] sticky_timeout_ms` at boot and Linux `[tap_hold] sticky_timeout_ms` in tap_hold.toml; both tray menus gain the sticky delay row (prompt, positive whole milliseconds, reload); zero, negative, fractional and unlimited values are refused as on macOS. AHK test written, not run on the Linux host.
 - [ ] **[TEST] macOS one-shot/CapsWord relay:** combine the original serializer and CapsWord observer for generated punctuation under a space-only exit policy. The direct one-shot emission path lacks an explicit output relay, but the archived emission port does not establish native tap ordering or a confirmed CapsWord failure. Keep this candidate outside the confirmed findings until reproduced.
-- [ ] **[TEST/POLICY] Native one-shot text parity:** qualify Windows Tab/Escape capture representation, Unicode title casing and scalar replay against Lua key-down payloads; qualify macOS modifier-map/dead-key/IME handling and Linux real-device output receiving. The recorded-port probes and genuine isolated XKB component do not establish these cases. Do not list unverified behavior as an absent feature or assume a shared grapheme contract.
+- [x] **[TEST/POLICY] Native one-shot text parity:** qualify Windows Tab/Escape capture representation, Unicode title casing and scalar replay against Lua key-down payloads; qualify macOS modifier-map/dead-key/IME handling and Linux real-device output receiving. The recorded-port probes and genuine isolated XKB component do not establish these cases. Do not list unverified behavior as an absent feature or assume a shared grapheme contract.
+      Code part done: Windows titles the captured character with the shared rule (`TextCaseTitle`, no more `Format("{:T}")`) and its title takes the generated Unicode title forms StrUpper lacks (`windows/_generated/unicode_title.ahk`, from `codegen-unicode-case.cjs`), so the corpus title digraph now applies to Windows. Native qualification moved to « To confirm » on each machine.
 
 ## CapsWord parity follow-up
 
@@ -145,7 +146,8 @@ and the next module candidates. The audit is paused at the maintainer's request.
 - [x] **[POLICY] CapsWord variants:** settle repeated catalogue invocation (toggle on Windows/Linux versus active request on macOS), fixed macOS editing/navigation exits and modifier-only idle activity. Keep explicit Windows next-activation setting lifetime and gesture exclusion distinct from unknown common intent. [Comparison](docs/audits/platform-parity/2026-11-05-caps-word/capabilities.md).
       Done (decision 2026-11-06): the action toggles everywhere (macOS fixed); the macOS fixed exits are one shared list that Linux (`caps_word_observe_control`) and Windows (`CAPSWORD_FIXED_EXIT_VKS`, key-down always subscribed) now apply; a lone modifier no longer restarts the Windows delay. Gesture exclusion stays as documented. AHK tests written, not run on the Linux host.
 - [ ] **[PARITY] Windows CapsWord live settings:** under the decision of 2026-11-06 (CWL-002, macOS and Linux), an acknowledged CapsWord menu change must reach the running Windows session from its next event; `CapsWordAutoOffStore` still publishes for the next activation only (`CapsWordAutoOff.Armed` keeps the old policy). Re-arm the active subscriptions and idle timer on publication, with an AHK regression.
-- [ ] **[NATIVE] CapsWord ownership:** qualify preexisting CapsLock and pause/quit/reload restoration, physical Windows Space HotIf priority, macOS key/control payload receiving, and Linux absolute reader/desktop keyboard grouping. Recorded lock requests and successful Lua cases are not receiving evidence. [Coverage limits](docs/audits/platform-parity/2026-11-05-caps-word/report.md).
+- [x] **[NATIVE] CapsWord ownership:** qualify preexisting CapsLock and pause/quit/reload restoration, physical Windows Space HotIf priority, macOS key/control payload receiving, and Linux absolute reader/desktop keyboard grouping. Recorded lock requests and successful Lua cases are not receiving evidence. [Coverage limits](docs/audits/platform-parity/2026-11-05-caps-word/report.md).
+      Moved 2026-11-06 to « To confirm » on the Mac, the Windows PC and Linux (hardware-only qualification).
 
 ## Repeat and recovery parity follow-up
 
@@ -770,6 +772,10 @@ Hands needed:
       another app and F5 each cancel and hide; Tab, Shift+Tab, the arrows and the validation digits still act on
       it; a resting hand keeps it. Check that mouseMoved now in the keymap mouse tap adds no visible pointer lag
       (Debug log `User activity (mouseMoved)` appears once per cancellation, not per event).
+- [ ] Branch `wave3/input-policies` (2026-11-06): a second CapsWord gesture or shortcut switches CapsWord off and
+      unlocks CapsLock; the CapsWord delimiter menu shows « ★ » after the magic key is renamed. Native one-shot Shift:
+      modifier-map, dead-key and IME handling of the captured key; CapsWord key/control payload receiving
+      (moved from the one-shot and CapsWord parity follow-ups).
 
 ## To confirm on the Windows PC
 
@@ -866,6 +872,7 @@ Account and tester actions (maintainer, from the PC):
       hides when typing stops and on pause; restart Explorer: it comes back; quit: it leaves; at 125 % and 200 % the
       number stays legible.
 - [ ] Branch `layout/system-switch-parity` (2026-11-06, AHK unrun on Linux): run the AHK suite
+- [ ] Branch `wave3/input-policies` (2026-11-06, AHK unrun on Linux): run `test_tap_hold_one_shot_timeout.ahk`,
 
 ## To confirm on Linux
 
@@ -911,6 +918,11 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 - [ ] Predictions stop on activity (feat/predictions-stop-on-activity): with a slow model, during the spinner move
       the mouse, turn the wheel, touch the touchpad (absolute pad and relative pad), switch window (the 250 ms poll),
       press F5: each cancels and hides. The validation digits and the navigation chords keep a shown prediction.
+- [ ] Branch `wave3/input-policies` (2026-11-06): with the Bépo registry layout installed, monnaie then cédille
+      types ₢ at once in a GTK and a Qt application (desktop Compose, DKS-001); Tap-holds > sticky delay row changes
+      the one-shot wait; a CapsWord menu change applies to the running session. Native one-shot Shift real-device
+      output receiving; CapsWord absolute reader and desktop keyboard grouping (moved from the one-shot and
+      CapsWord parity follow-ups).
 
 ## Remaining code work
 

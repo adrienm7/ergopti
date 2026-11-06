@@ -360,7 +360,10 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-unicode-case.cjs',
-		outputs: ['static/ergopti_plus/_shared/lua/unicode_case/data.lua']
+		outputs: [
+			'static/ergopti_plus/_shared/lua/unicode_case/data.lua',
+			'static/ergopti_plus/windows/_generated/unicode_title.ahk'
+		]
 	},
 	{
 		script: 'codegen/codegen-hid-key-identity-hs.cjs',
