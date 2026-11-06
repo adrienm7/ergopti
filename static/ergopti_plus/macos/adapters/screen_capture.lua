@@ -71,15 +71,35 @@ end
 -- =====================================
 -- =====================================
 
+-- The answer of the latest live read, { granted, detail }: nil before the
+-- first capture asked. Diagnostics phase A reads memory only, and the live
+-- query alone overran its 5 ms budget (field report 2026-11-05).
+local _last_read = nil
+
 --- Reports whether this process may record the screen, without prompting.
 --- @return boolean|nil granted Nil when the native query itself failed.
 --- @return string|nil detail Exact failure when granted is nil.
 function M.permission_state()
 	local fn, missing = native(nil, "screenRecordingState")
-	if not fn then return nil, missing end
+	if not fn then
+		_last_read = { granted = nil, detail = missing }
+		return nil, missing
+	end
 	local ok, state = pcall(fn, false)
-	if not ok then return nil, tostring(state) end
+	if not ok then
+		_last_read = { granted = nil, detail = tostring(state) }
+		return nil, _last_read.detail
+	end
+	_last_read = { granted = state == true }
 	return state == true
+end
+
+--- The answer of the latest live read, without asking macOS again.
+--- @return boolean|nil granted Nil when no read answered yet or the last one failed.
+--- @return string|nil detail Why granted is nil.
+function M.last_known_permission()
+	if _last_read == nil then return nil, "not read yet" end
+	return _last_read.granted, _last_read.detail
 end
 
 --- Asks macOS to register this process and show its Screen Recording prompt.
