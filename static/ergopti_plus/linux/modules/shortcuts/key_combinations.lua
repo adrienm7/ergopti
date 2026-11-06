@@ -360,7 +360,8 @@ function M.new(options)
 	function owner.owns_configuration(token) return type(token) == "table" and lease == token end
 	function owner.validate_slot(kind, pair, value)
 		if not known[pair] or type(value) ~= "string" then return false end
-		if kind == "tap" then return value == "none" or catalogue.is_assignable(value) == true end
+		-- The one-shot Shift is pair-native state: a pair keeps refusing it, as a chord does.
+		if kind == "tap" then return value == "none" or value ~= "one_shot_shift" and catalogue.is_assignable(value) == true end
 		if kind == "combo" then
 			local declared=pcall(declared_settings)
 			return declared and next(declarations)~=nil and (value=="none" or value~="one_shot_shift" and value~="run_program" and value~="alt_tab_monitor" and catalogue.is_assignable(value)==true)

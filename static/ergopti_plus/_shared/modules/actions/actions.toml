@@ -1531,10 +1531,9 @@ platform = "all"
 # --- Tap-Hold (actions disponibles uniquement comme valeur au tap d'une touche remappée) ---
 
 [sg_actions.one_shot_shift]
-platform = "ahk"
+platform = "ahk,linux"
 reason_hs = "platform_reason.action_same_action_under_another_name"
 equivalent_hs = ["sticky_shift"]
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
 
 [sg_actions.caps_word]
 # Linux toggles the shortcuts manager's CapsWord, which locks CapsLock as
@@ -1725,7 +1724,8 @@ emit_hs_mods = ["cmd"]
 platform = "hs"
 reason_ahk = "platform_reason.action_same_action_under_another_name"
 equivalent_ahk = ["one_shot_shift"]
-reason_linux = "platform_reason.action_sticky_keys_are_the_systems"
+reason_linux = "platform_reason.action_same_action_under_another_name"
+equivalent_linux = ["one_shot_shift"]
 
 [sg_actions.sticky_ctrl]
 platform = "ahk,hs"

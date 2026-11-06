@@ -740,6 +740,18 @@ function M.paste_plain()
 	return type(result) == "table" and result.ok == true
 end
 
+--- Arms the one-shot Shift from an origin without a key frame, a gesture or a
+--- pointer button, through the hook's installed tap-hold engine (decision of
+--- 2026-11-06, as Windows' and macOS' catalogue action). The next key typed
+--- spends it, as a tapped one-shot Shift.
+--- @return boolean armed
+function M.arm_one_shot_shift()
+	record("one_shot_shift")
+	local armed, refusal = require("adapters.keyboard_hook").arm_action_one_shot()
+	if not armed then Logger.warn(LOG, "One-shot Shift not armed: %s.", tostring(refusal)) end
+	return armed == true
+end
+
 --- The catalogue actions this module performs, by action id, for the gesture
 --- executor. The daemon injects them through modules/shortcuts/action_handlers,
 --- so a gesture or a keyboard slot runs the same code as the tray row instead
@@ -753,6 +765,7 @@ function M.action_handlers()
 		-- A key, a key combination, a tap-hold or a gesture bound to CapsWord
 		-- toggles the session the tray row shows, as Windows' ToggleCapsWord.
 		["caps_word"] = function() return M.toggle_caps_word() end,
+		["one_shot_shift"] = function() return M.arm_one_shot_shift() end,
 		["select_line"] = function() return M.select_line() end,
 		["select_word"] = function() return M.select_word() end,
 		["paste_plain"] = function() return M.paste_plain() end,
