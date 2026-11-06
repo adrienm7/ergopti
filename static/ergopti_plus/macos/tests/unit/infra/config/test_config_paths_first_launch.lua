@@ -82,7 +82,8 @@ helpers.describe("ConfigPaths on the first launch of a packaged app", function()
 			local paths = helpers.load_with_stubs("infra.config_paths", {
 				fs = {
 					attributes = function(path)
-						if path:find("/.config/ergopti_plus", 1, true) and not available then return nil end
+						-- The default folder comes from the shared folder table, never a literal.
+						if path:find("/" .. AppDirs.config.macos_relative, 1, true) and not available then return nil end
 						return { mode = "directory" }
 					end,
 					mkdir = function() return nil, "permission denied" end,
