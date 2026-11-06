@@ -206,6 +206,7 @@ graph TD
         WINDOWS_network_failure_host["NetworkFailureHost.ahk"]
         WINDOWS_network_info["NetworkInfo.ahk"]
         WINDOWS_notifier["Notifier.ahk"]
+        WINDOWS_notify_icon["NotifyIcon.ahk"]
         WINDOWS_ollama_identity["OllamaIdentity.ahk"]
         WINDOWS_process_lifecycle["ProcessLifecycle.ahk"]
         WINDOWS_program_providers["ProgramProviders.ahk"]

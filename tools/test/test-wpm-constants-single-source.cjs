@@ -132,7 +132,8 @@ const pins = [
 	['macos/ui/wpm/wpm_menubar.lua', 'Timings.sec("ui", "wpm_menubar_update_ms")'],
 	['linux/ui/wpm/widget.lua', 'Timings.sec("ui", "wpm_widget_update_ms")'],
 	['linux/ui/wpm/tray_readout.lua', 'Timings.sec("ui", "wpm_menubar_update_ms")'],
-	['windows/ui/wpm/wpm_config.ahk', '_WPMWidget_NeedTiming("ui", "wpm_widget_update_ms"']
+	['windows/ui/wpm/wpm_config.ahk', '_WPMWidget_NeedTiming("ui", "wpm_widget_update_ms"'],
+	['windows/ui/wpm/wpm_config.ahk', '_WPMWidget_NeedTiming("ui", "wpm_menubar_update_ms"']
 ];
 for (const [rel, needle] of pins) {
 	if (!read(rel).includes(needle))

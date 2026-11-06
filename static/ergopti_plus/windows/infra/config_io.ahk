@@ -1654,6 +1654,8 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: WPMWidget.use_colors })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH, Value: WPMWidget.show_graph })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.WPM_MENUBAR_VISIBLE, Value: WPMTrayReadout.running })
+		Updates.Push({ Section: "metrics", Key: ConfigLeaf.WPM_MENUBAR_COLORS, Value: WPMTrayReadout.use_colors })
 		; The flat [llm] keys below round-trip through _LLM_Menu DIRECTLY (not via
 		; Features), so the _LLM_Menu_SyncToFeatures gate above does not cover them. The
 		; boot-armed SaveFullConfig timer fires ~0-100 ms after _DriverReady, while

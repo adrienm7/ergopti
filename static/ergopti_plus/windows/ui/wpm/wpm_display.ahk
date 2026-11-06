@@ -71,10 +71,16 @@ class WPMWidgetConst {
     ; [transparency]
     static ALPHA_ACTIVE       := 0
     static ALPHA_IDLE         := 0
+    ; [menubar] — the notification-area readout (wpm_tray_readout.ahk); hex
+    ; strings without the leading '#'.
+    static MENUBAR_ALPHA      := 0.0
+    static MENUBAR_TEXT       := ""
+    static MENUBAR_NEUTRAL_BG := ""
     ; Timings: [ui] and [keystats].
     static IDLE_HIDE_MS       := 0
     static COLOR_HOLD_MS      := 0
     static TICK_MS            := 0
+    static MENUBAR_TICK_MS    := 0
     static WINDOW_MS          := 0
     static WPM_MIN_DURATION_MS := 0
 
@@ -217,6 +223,36 @@ _WPMWidget_NeutralCategory(category) {
     return WPMWidgetConst.NEUTRAL.Has(category)
 }
 
+; Whether a readout needs the ring: the floating widget or the notification-area
+; readout, which draw from the same keystrokes. Neither costs anything when off.
+_WPMWidget_Collecting() {
+	return WPMWidget.visible || (IsSet(WPMTrayReadout) && WPMTrayReadout.running)
+}
+
+; Which sources still colour the readouts: each held for COLOR_HOLD_MS after
+; its last keystroke, as Model.active_source holds the last one on macOS and
+; Linux. The watermarks are sampled together under Critical, RAM-only.
+; @returns {Map} has_hs, has_ai, has_ac (Booleans).
+WPMWidget_ActiveSources() {
+	StampCritical := Critical("On")
+	try {
+		now := A_TickCount
+		last_hs := WPMWidget._last_hs_tick
+		last_ai := WPMWidget._last_ai_tick
+		last_ac := WPMWidget._last_ac_tick
+	} finally {
+		Critical(StampCritical)
+	}
+	return Map("has_hs", _WPMWidget_SourceHeld(now, last_hs), "has_ai", _WPMWidget_SourceHeld(now, last_ai),
+		"has_ac", _WPMWidget_SourceHeld(now, last_ac))
+}
+
+; Zero means no source event, not an event in a later UInt32 era.
+_WPMWidget_SourceHeld(Now, Last) {
+	return Last is Integer && Last > 0 && Last <= Now
+		&& _WPMWidget_TickDelta(Now, Last) < WPMWidgetConst.COLOR_HOLD_MS
+}
+
 ; Called by the keystats hook after each accepted keystroke.
 ; category: TOML group name of the hotstring ("magickey", "rolls", …).
 ;   Pass "" for manual keystrokes or when the category is unknown.
@@ -227,7 +263,7 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
 	; stale callback cannot repaint pre-pause activity after resume.
 	if A_IsSuspended
 		return
-	if !WPMWidget.visible
+	if !_WPMWidget_Collecting()
 		return
 	; Neutral categories count as keystrokes but must not trigger HS color.
 	if (is_hs and _WPMWidget_NeutralCategory(category))
@@ -240,7 +276,7 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
 	; bounded regardless of replacement length.
 	RingCritical := Critical("On")
 	try {
-		if A_IsSuspended or !WPMWidget.visible
+		if A_IsSuspended or !_WPMWidget_Collecting()
 			return
 		head := WPMWidget._ring_head
 		if (WPMWidget._ring.Length < cap)

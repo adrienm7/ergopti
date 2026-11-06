@@ -603,30 +603,6 @@
 		}
 	},
 	{
-		"path": "metrics_menu.wpm_menubar",
-		"visibility": "hide",
-		"labels": { "fr": "MPM dans la barre des menus", "en": "WPM in menu bar" },
-		"platforms": { "windows": false, "macos": true, "linux": true },
-		"reasons": {
-			"windows": {
-				"en": "Not on Windows: these rows govern the words-per-minute readout in the menu bar (macOS) or the notification area (Linux). Windows has no equivalent; its readout is the floating widget.",
-				"fr": "Pas sous Windows : ces lignes règlent l'affichage des mots par minute dans la barre des menus (macOS) ou la zone de notification (Linux). Windows n'en a pas d'équivalent ; sa jauge est le widget flottant."
-			}
-		}
-	},
-	{
-		"path": "metrics_menu.menubar_colors",
-		"visibility": "hide",
-		"labels": { "fr": "    ↳ Couleur par source de saisie", "en": "    ↳ Colour by input source" },
-		"platforms": { "windows": false, "macos": true, "linux": true },
-		"reasons": {
-			"windows": {
-				"en": "Not on Windows: these rows govern the words-per-minute readout in the menu bar (macOS) or the notification area (Linux). Windows has no equivalent; its readout is the floating widget.",
-				"fr": "Pas sous Windows : ces lignes règlent l'affichage des mots par minute dans la barre des menus (macOS) ou la zone de notification (Linux). Windows n'en a pas d'équivalent ; sa jauge est le widget flottant."
-			}
-		}
-	},
-	{
 		"path": "metrics_menu.metrics_availability",
 		"visibility": "hide",
 		"labels": { "fr": "metrics_availability", "en": "metrics_availability" },

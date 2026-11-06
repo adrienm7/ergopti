@@ -115,6 +115,33 @@ _ToggleWpmWidgetColors(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 	return _MET_RebuildWidgetMenu(RebuildFn)
 }
 
+; The notification-area readout rows: persist, apply, then repaint the ticks.
+_ToggleWpmTrayReadout(ToggleFn := 0, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _ToggleWpmTrayReadout(ToggleFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	Toggled := HasMethod(ToggleFn, "Call") ? ToggleFn.Call() : WPMTrayReadout_Toggle()
+	if !(Toggled is Integer) || Toggled != 1
+		return false
+	return _MET_RebuildWidgetMenu(RebuildFn)
+}
+
+_ToggleWpmTrayReadoutColors(ToggleFn := 0, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _ToggleWpmTrayReadoutColors(ToggleFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	Toggled := HasMethod(ToggleFn, "Call") ? ToggleFn.Call() : WPMTrayReadout_ToggleColors()
+	if !(Toggled is Integer) || Toggled != 1
+		return false
+	return _MET_RebuildWidgetMenu(RebuildFn)
+}
+
 ; Detached native surfaces remain owned until actual destruction is observed.
 class _METWpmRetiredSurfaces {
 	static pending := []

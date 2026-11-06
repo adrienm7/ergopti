@@ -114,10 +114,16 @@ WPMWidget_LoadSharedConst() {
 		WPMWidgetConst.ALPHA_ACTIVE := Integer(_WPMWidget_Need(wpm_c, "transparency", "alpha_active", Missing))
 		WPMWidgetConst.ALPHA_IDLE   := Integer(_WPMWidget_Need(wpm_c, "transparency", "alpha_idle", Missing))
 
+		; [menubar] — the notification-area readout
+		WPMWidgetConst.MENUBAR_ALPHA      := Float(_WPMWidget_Need(wpm_c, "menubar", "background_alpha", Missing))
+		WPMWidgetConst.MENUBAR_TEXT       := _hex(_WPMWidget_Need(wpm_c, "menubar", "text_color", Missing))
+		WPMWidgetConst.MENUBAR_NEUTRAL_BG := _hex(_WPMWidget_Need(wpm_c, "menubar", "neutral_background", Missing))
+
 		; Timings, from the registry every driver reads.
 		WPMWidgetConst.IDLE_HIDE_MS        := _WPMWidget_NeedTiming("ui", "wpm_widget_idle_hide_ms", Missing)
 		WPMWidgetConst.COLOR_HOLD_MS       := _WPMWidget_NeedTiming("ui", "wpm_color_hold_ms", Missing)
 		WPMWidgetConst.TICK_MS             := _WPMWidget_NeedTiming("ui", "wpm_widget_update_ms", Missing)
+		WPMWidgetConst.MENUBAR_TICK_MS     := _WPMWidget_NeedTiming("ui", "wpm_menubar_update_ms", Missing)
 		WPMWidgetConst.WINDOW_MS           := _WPMWidget_NeedTiming("keystats", "wpm_window_ms", Missing)
 		WPMWidgetConst.WPM_MIN_DURATION_MS := _WPMWidget_NeedTiming("keystats", "wpm_min_duration_ms", Missing)
 
