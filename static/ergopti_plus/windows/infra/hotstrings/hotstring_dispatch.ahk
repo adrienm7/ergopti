@@ -184,6 +184,7 @@ _HSE_TerminalOwnerIsCurrent(Owner) {
 
 _HSE_CommitTerminalOwner(Owner, TrailingText) {
 	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN
+	global HSE_PrivateAncestry
 	global _PrefixPrivateResidue
 	if HasMethod(Owner.Get("CommitFn", 0), "Call")
 		return Owner["CommitFn"].Call(Owner, TrailingText)
@@ -208,11 +209,13 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 	}
 	BufferCritical := Critical("On")
 	PreviousBuffer := HSE_Buffer
+	PreviousAncestry := HSE_PrivateAncestry
 	PreviousBoundary := HSE_StartIsWordBoundary
 	try {
 		try {
 			if ClearAll {
 				HSE_Buffer := ""
+				HSE_PrivateAncestry := ""
 				HSE_StartIsWordBoundary := false
 			} else {
 				CurrentLength := StrLen(HSE_Buffer)
@@ -220,12 +223,14 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 					? SubStr(HSE_Buffer, 1, CurrentLength - DeleteCount) : ""
 				HSE_Buffer .= InsertedText
 				_HSE_TrimBufferToCapacity()
+				HSE_PrivateAncestry := Effect.IsPrivate ? HSE_Buffer : ""
 				if Owner.Get("OutputIsFinal", false)
 					_HSE_ForgetFinalOutput(Effect)
 			}
 			_HSE_MirrorCanonicalEffectToLlm(Effect)
 		} catch {
 			HSE_Buffer := PreviousBuffer
+			HSE_PrivateAncestry := PreviousAncestry
 			HSE_StartIsWordBoundary := PreviousBoundary
 			throw
 		}
@@ -677,6 +682,7 @@ _HSE_RetainNotepadPrefixChar(Owner, Char) {
 /** TextSender calls this after its native output verdict, before completion. */
 _HSE_CommitNotepadOwner(Owner) {
 	global _HSE_TerminalOwner, HSE_Buffer, HSE_StartIsWordBoundary
+	global HSE_PrivateAncestry
 	global HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
 	global _PrefixInputContextGeneration, _PrefixDeferredGeneration, _PrefixPrivateResidue
 	global _PrefixContentGeneration
@@ -706,16 +712,19 @@ _HSE_CommitNotepadOwner(Owner) {
 		KnownBoundaryAfter: InsertedText != ""
 			&& _HSE_CharOpensWord(SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1)), _HSE_WordBoundarySet()) }
 	PreviousBuffer := HSE_Buffer
+	PreviousAncestry := HSE_PrivateAncestry
 	PreviousBoundary := HSE_StartIsWordBoundary
 	try {
 		HSE_Buffer := SubStr(HSE_Buffer, 1, StrLen(HSE_Buffer) - Owner["EraseUnits"]) . InsertedText
 		_HSE_TrimBufferToCapacity()
+		HSE_PrivateAncestry := Effect.IsPrivate ? HSE_Buffer : ""
 		if Owner.Get("OutputIsFinal", false)
 			_HSE_ForgetFinalOutput(Effect)
 		_HSE_MirrorCanonicalEffectToLlm(Effect)
 		UpdateLastSentCharacter(SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1)))
 	} catch {
 		HSE_Buffer := PreviousBuffer
+		HSE_PrivateAncestry := PreviousAncestry
 		HSE_StartIsWordBoundary := PreviousBoundary
 		throw
 	}

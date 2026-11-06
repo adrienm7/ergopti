@@ -1553,6 +1553,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/adapters/input/test_input_serialization.ahk
 #Include meta/modules/hotstrings/engine/test_fire_log_defer_after_suppress.ahk
 #Include meta/modules/hotstrings/engine/test_repeat_fire_category_hosts.ahk
+#Include meta/modules/hotstrings/engine/test_repeat_private_ancestry.ahk
 #Include meta/modules/hotstrings/engine/test_hse_suppress_release_bounded.ahk
 #Include meta/modules/hotstrings/engine/test_hse_physical_suppression_provenance.ahk
 #Include meta/modules/hotstrings/engine/test_hse_endchar_index_bound.ahk
