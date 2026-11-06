@@ -10,6 +10,38 @@
 
 local M = {}
 
+--- Builds the backup capability the aggregate rebuild snapshot requires.
+--- Fixtures that model their own connections share it so every bridge maps
+--- backup_init/step/finish onto the parent's real SQLite backup the same way.
+--- Each database passed to it must carry the parent's `_bridge_id`.
+--- @param request function JSON request returning `{ ok, value, error }`.
+--- @param error_code integer|nil Status returned when the parent refuses a step.
+--- @return function backup_init Hammerspoon-shaped `hs.sqlite3.backup_init`.
+function M.backup_init(request, error_code)
+	error_code = error_code or 1
+	local function call(fields)
+		local result = request(fields)
+		return result.ok and result.value or nil, result.error
+	end
+	return function(target, target_name, source, source_name)
+		local id = call({ op = "backup_init", target = target._bridge_id, target_name = target_name,
+			source = source._bridge_id, source_name = source_name })
+		if id == nil then return nil end
+		local backup = { _bridge_id = id }
+		local closed = false
+		function backup:step(pages)
+			if closed then error("attempt to use closed sqlite database backup") end
+			return call({ op = "backup_step", backup = id, pages = pages }) or error_code
+		end
+		function backup:finish()
+			if closed then error("attempt to use closed sqlite database backup") end
+			closed = true
+			return call({ op = "backup_finish", backup = id }) or error_code
+		end
+		return backup
+	end
+end
+
 --- @param request function JSON request/response boundary.
 --- @return table sqlite Simulated lsqlite3 capability over real SQLite.
 function M.new(request)
@@ -48,25 +80,7 @@ function M.new(request)
 		end
 		return db
 	end
-	function sqlite.backup_init(target, target_name, source, source_name)
-		local id = call("backup_init", { target = target._bridge_id, target_name = target_name,
-			source = source._bridge_id, source_name = source_name })
-		if id == nil then return nil end
-		local backup = { _bridge_id = id }
-		local closed = false
-		function backup:step(pages)
-			if closed then error("attempt to use closed sqlite database backup") end
-			local value = call("backup_step", { backup = id, pages = pages })
-			return value or sqlite.ERROR
-		end
-		function backup:finish()
-			if closed then error("attempt to use closed sqlite database backup") end
-			closed = true
-			local value = call("backup_finish", { backup = id })
-			return value or sqlite.ERROR
-		end
-		return backup
-	end
+	sqlite.backup_init = M.backup_init(request, sqlite.ERROR)
 	return sqlite
 end
 
