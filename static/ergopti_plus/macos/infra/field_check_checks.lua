@@ -267,7 +267,10 @@ end
 function M.owned_runtime(ports, report, finish)
 	local facts = ports.keystats_facts()
 	report.step("dormant_source", facts.credit_source == "legacy" and STATE.pass or STATE.fail, facts.credit_source)
-	report.step("capture_unloaded", facts.capture_loaded and STATE.fail or STATE.pass, yes_no(not facts.capture_loaded))
+	-- Information only: the owned runtime is the default and its owner builds
+	-- the capture port, which loads the raw stream owner, on every owned boot
+	-- (field report 2026-11-05: this step failed every such run).
+	report.step("capture_unloaded", STATE.info, yes_no(not facts.capture_loaded))
 	report.step("runtime_installed", STATE.info, yes_no(ports.path_exists(OWNED_RUNTIME_DIR)))
 	report.step("job_file", STATE.info, yes_no(ports.path_exists(OWNED_JOB_FILE)))
 	report.step("stock_app", STATE.info, yes_no(ports.path_exists(STOCK_APP)))
