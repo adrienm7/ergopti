@@ -180,11 +180,12 @@ function M.is_trusted()
 end
 
 --- The answer of the latest live read, without asking macOS again.
---- @return boolean|nil trusted Nil when no read answered yet or the last one failed.
---- @return string|nil detail Why trusted is nil.
+--- @return boolean|nil trusted Nil when no read happened yet or the last one failed.
+--- @return string|nil detail Why the last read failed.
+--- @return boolean read False before the first live read.
 function M.last_known()
-	if _last_read == nil then return nil, "not read yet" end
-	return _last_read.trusted, _last_read.detail
+	if _last_read == nil then return nil, nil, false end
+	return _last_read.trusted, _last_read.detail, true
 end
 
 --- Asks macOS to show its Accessibility prompt for this process.

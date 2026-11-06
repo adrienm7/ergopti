@@ -95,11 +95,12 @@ function M.permission_state()
 end
 
 --- The answer of the latest live read, without asking macOS again.
---- @return boolean|nil granted Nil when no read answered yet or the last one failed.
---- @return string|nil detail Why granted is nil.
+--- @return boolean|nil granted Nil when no read happened yet or the last one failed.
+--- @return string|nil detail Why the last read failed.
+--- @return boolean read False before the first live read.
 function M.last_known_permission()
-	if _last_read == nil then return nil, "not read yet" end
-	return _last_read.granted, _last_read.detail
+	if _last_read == nil then return nil, nil, false end
+	return _last_read.granted, _last_read.detail, true
 end
 
 --- Asks macOS to register this process and show its Screen Recording prompt.
