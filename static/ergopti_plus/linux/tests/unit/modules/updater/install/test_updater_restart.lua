@@ -590,7 +590,8 @@ helpers.describe("Main restart pause wiring", function()
 			local text = source:sub(first, last + 4):gsub("^local function " .. name, "return function", 1)
 			local received, shutdowns
 			local environment = setmetatable({ arg = { "--tray", "space ' apostrophe" },
-				updater = { installed_launcher = function() return "/installed/launcher" end },
+				updater = { installed_launcher = function() return "/installed/launcher" end,
+					installed_root = function() return "/installed" end },
 				shutdown = { request = function() shutdowns = true end },
 				require = function(module)
 					helpers.assert_true(module == "infra.daemon_restart" or module == "modules.updater.restarter")
@@ -604,6 +605,10 @@ helpers.describe("Main restart pause wiring", function()
 			else helpers.assert_true(helper(true)) end
 			helpers.assert_eq(received.paused, true, "the Main helper must forward live pause")
 			helpers.assert_eq(received.args, { "--tray", "space ' apostrophe" })
+			if name == "restart_on_installed_release" then
+				-- The installed tree is watched until its daemon reports ready.
+				helpers.assert_eq(received.successor, { root = "/installed" })
+			end
 			helpers.assert_true(shutdowns)
 		end
 	end)
