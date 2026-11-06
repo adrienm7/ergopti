@@ -85,9 +85,7 @@ helpers.describe("macOS configuration backup: API entries (backup-api-entries)",
 	end)
 
 	helpers.it("(backup-api-entries) uses the hs.settings key the LLM module owns", function()
-		local handle = assert(io.open(helpers.driver_root() .. "/modules/llm/init.lua", "rb"))
-		local source = handle:read("*a")
-		handle:close()
+		local source = assert(helpers.read_driver_unit("local API_STATE_KEY"))
 		local key = source:match('local API_STATE_KEY%s*=%s*"([^"]+)"')
 		helpers.assert_true(key ~= nil, "modules/llm/init.lua declares API_STATE_KEY")
 		with_store({}, function(Backup) helpers.assert_eq(Backup.API_STATE_KEY, key) end)
