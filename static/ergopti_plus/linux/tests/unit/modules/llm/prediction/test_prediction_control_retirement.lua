@@ -570,12 +570,15 @@ helpers.describe("Main retires AI at forwarded standard editing chords", functio
 		{ label = "Ctrl+Meta+V", key = "v", code = 47, mods = { ctrl = true, meta = true } },
 		{ label = "Ctrl+AltGr+V", key = "v", code = 47, mods = { ctrl = true, altgr = true } },
 	}) do
-		helpers.it("editing-chord-owner preserves unclassified " .. vector.label, function()
+		-- An unclassified chord leaves the document alone, but it is still a key
+		-- the tooltip does not own: predictions run only while the user does
+		-- nothing (2026-11-06), so the request in flight and its answer go.
+		helpers.it("editing-chord-owner keeps the document but cancels the offer through unclassified " .. vector.label, function()
 			scenario({}, function(s)
 				s.type("hello"); s.scheduler.test.advance(.5)
 				s.shortcut(vector); s.respond(1, RESPONSE)
-				helpers.assert_true(s.prediction.has_suggestions())
-				helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.text, "hello" .. RESPONSE)
+				helpers.assert_eq(s.prediction.has_suggestions(), false)
+				helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.text, "hello")
 			end)
 		end)
 	end
@@ -993,14 +996,17 @@ do
 		for _, specimen in ipairs({ { "c", "ctrl", "owned-gui-editor" }, { "s", "ctrl", "owned-gui-editor" },
 			{ "u", "ctrl", "owned-gui-editor" }, { "u", "ctrl-alt", "gnome-terminal" },
 			{ "u", "ctrl-meta", "gnome-terminal" }, { "u", "ctrl-altgr", "gnome-terminal" }, { "u", "ctrl-shift", "gnome-terminal" } }) do
+			-- Out of Readline scope the chord leaves the field unchanged, yet it is
+			-- a key the tooltip does not own: the offer goes (2026-11-06).
 			helpers.it("readline-control-scope " .. table.concat(specimen, " "), function()
 				whole_main({ key = specimen[1], modifier = specimen[2], app = specimen[3] }, function(s)
 					s.prepare(); s.control(); finish_old(s, "late")
 					helpers.assert_eq(s.after_control, s.before_control)
 					if specimen[1] == "c" then helpers.assert_true(s.copy_observed) end
 					if specimen[1] == "s" then helpers.assert_eq(s.saved_text, s.before_control.text) end
-					helpers.assert_true(s.prediction.has_suggestions())
-					helpers.assert_true(s.prediction.accept(1))
+					helpers.assert_eq(s.prediction.has_suggestions(), false)
+					helpers.assert_eq(s.prediction.accept(1), false)
+					helpers.assert_eq({ text = s.text, caret = s.caret }, s.before_control)
 				end)
 			end)
 		end
@@ -1074,8 +1080,10 @@ do
 					s.prepare(); s.control(); finish_old(s, "late")
 					helpers.assert_eq(s.after_control, s.before_control)
 					helpers.assert_eq(s.forwarded, 1); helpers.assert_eq(s.controls, 1)
-					helpers.assert_true(s.prediction.has_suggestions())
-					helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.output, 1)
+					-- Unchanged field, yet a key the tooltip does not own: the
+					-- offer goes, as no prediction outlives user activity (2026-11-06).
+					helpers.assert_eq(s.prediction.has_suggestions(), false)
+					helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.output, 0)
 				end)
 			end)
 		end
@@ -1132,8 +1140,10 @@ do
 				whole_main({ key = specimen[1], modifier = specimen[2], app = specimen[3] }, function(s)
 					s.prepare(); s.control(); finish_old(s, "late")
 					helpers.assert_eq(s.after_control, s.before_control)
-					helpers.assert_true(s.prediction.has_suggestions())
-					helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.output, 1)
+					-- Unchanged field, yet a key the tooltip does not own: the
+					-- offer goes, as no prediction outlives user activity (2026-11-06).
+					helpers.assert_eq(s.prediction.has_suggestions(), false)
+					helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.output, 0)
 				end)
 			end)
 		end
@@ -1210,8 +1220,10 @@ do
 					else
 						helpers.assert_eq(s.chars, 0); helpers.assert_eq(s.controls, 1)
 						helpers.assert_eq(s.after_control, s.before_control)
-						helpers.assert_true(s.prediction.has_suggestions()); helpers.assert_true(s.visible)
-						helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.output, 1)
+						-- Unchanged field, yet a key the tooltip does not own: the
+						-- offer goes, as no prediction outlives user activity (2026-11-06).
+						helpers.assert_eq(s.prediction.has_suggestions(), false); helpers.assert_eq(s.visible, false)
+						helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.output, 0)
 					end
 					helpers.assert_eq(s.requests[1], request); helpers.assert_eq(request.done, callback)
 				end)
