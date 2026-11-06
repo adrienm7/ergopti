@@ -953,7 +953,9 @@ console.log(
 			/min = bounds\.min/.test(linux[1]) &&
 			/max = bounds\.max/.test(linux[1]) &&
 			/on_save = save,/.test(linux[1]) &&
-			/local saved, accepted = pcall\(set, name, value, source, current\)/.test(linuxRequest[1]) &&
+			/local saved, accepted, reason = pcall\(classified or retained or set, name, value, source, current, receipt, owner_current\)/.test(
+				linuxRequest[1]
+			) &&
 			/if type\(refresh\) == "function" then refresh\(\) end/.test(linuxRequest[1]) &&
 			/pcall\(dialog\.text_prompt/.test(mac[1]) &&
 			/apply_setting_transaction\(\{/.test(mac[1]) &&
@@ -985,7 +987,10 @@ console.log(
 	for (const driver of Object.keys(numeric))
 		assert.equal(numericCounterparts({ ...numeric, [driver]: '' }), false);
 	for (const [driver, before] of [
-		['linux', 'pcall(set, name, value, source, current)'],
+		[
+			'linux',
+			'pcall(classified or retained or set, name, value, source, current, receipt, owner_current)'
+		],
 		['linux', 'then refresh() end'],
 		['linux', 'numeric_setting_request(ctx.on_menu_changed, Settings,'],
 		['linux', 'on_save = save,'],

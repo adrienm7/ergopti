@@ -39,6 +39,7 @@ const path = require('path');
 const { execFileSync } = require('node:child_process');
 const assert = require('node:assert/strict');
 const { stripComments } = require('../lib/script-source.cjs');
+const { namesCommandConstant } = require('../lib/menu-command-constant.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -297,7 +298,10 @@ for (const row of restoreRows) {
 	for (const driver of DRIVERS) {
 		if (Array.isArray(row.platforms) && !row.platforms.includes(driver.platform)) continue;
 		const registered = driverSources[driver.dir].some(
-			({ text }) => text.includes(`"${row.id}"`) || new RegExp(`[{,]\\s*${row.id}\\s*=`).test(text)
+			({ text }) =>
+				text.includes(`"${row.id}"`) ||
+				new RegExp(`[{,]\\s*${row.id}\\s*=`).test(text) ||
+				namesCommandConstant(text, row.id, driver.ext)
 		);
 		if (!registered)
 			errors.push(`${driver.dir} shows ${row.menu}.${row.id} but registers no command for it.`);
