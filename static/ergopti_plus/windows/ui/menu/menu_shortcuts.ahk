@@ -98,7 +98,7 @@ _SC_KeyCombinationCommands(Options := unset) {
 ; « CapsWord : désactivation automatique », declared by caps_word_auto_off_group:
 ; the delay choice, one checkbox per delimiter of the hotstring catalogue and
 ; one per pointer kind of [shortcuts.caps_word.pointer]. Every row stores
-; through CapsWordAutoOffStore, which the next activation reads; no reload.
+; through CapsWordAutoOffStore, which re-arms an active CapsWord; no reload.
 _SC_CapsWordAutoOffSubmenu() {
 	Commands := Map(MenuCommand.CAPS_WORD_IDLE_TIMEOUT,
 		(Seconds, *) => CapsWordAutoOffStore(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS, Seconds))
