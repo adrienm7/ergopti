@@ -683,8 +683,8 @@ local _action_handlers = {}
 -- The observer told about every key combination the catalogue emitted AND the
 -- virtual keyboard acknowledged, whoever asked for it (a gesture, a keyboard
 -- shortcut, a tap-hold). The emitted keys never reach the hook, so this is the
--- only place their logical effect (an arrow's word and AI-context reset, a
--- CapsWord delimiter) can be published, once, after the output is certain.
+-- only place their logical effect (an arrow word and AI-context reset, a
+-- word-capitalisation delimiter) can be published, once, after the output is certain.
 local _effect_observer = nil
 
 local function _execute_action(action_name, go_next, binding)
