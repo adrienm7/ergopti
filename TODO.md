@@ -189,7 +189,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 ### linux-runtime
 
-- [ ] **[CODE] LRT-001:** First managed install leaves the model browser using stale absence ancestry. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-runtime/report.md).
+- [x] **[CODE] LRT-001:** First managed install leaves the model browser using stale absence ancestry. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-runtime/report.md). Done: the page's read-only observer builds a fresh resolver per observation instead of keeping its first witness.
 
 ### linux-webview
 
