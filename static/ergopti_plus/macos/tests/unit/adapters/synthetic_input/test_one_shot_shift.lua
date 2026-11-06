@@ -47,6 +47,48 @@ local function fixture()
 end
 
 helpers.describe("one-shot native boundary", function()
+	-- The generated punctuation of a one-shot Shift reaches the CapsWord output
+	-- observer once its returned events are handed off, so a space-only CapsWord
+	-- ends on " :" though the physical "." keeps it (one-shot-capsword-relay).
+	helpers.it("relays the serialized result to the CapsWord observer on handoff (one-shot-capsword-relay)", function()
+		local CapsWordOutput = require("infra.capsword_output")
+		local Policy = require("caps_word.auto_off")
+		local reported = {}
+		helpers.assert_true(CapsWordOutput.set_observer(function(text) reported[#reported + 1] = text end))
+		local ok, err = pcall(function()
+			local text = "."
+			local event = {
+				getFlags = function() return {} end,
+				rawFlags = function() return 0 end,
+				getCharacters = function() return text end,
+				setUnicodeString = function(_, value) text = value end,
+			}
+			local emitted = {}
+			package.loaded["adapters.one_shot_shift"] = nil
+			local adapter = require("adapters.one_shot_shift").new({
+				data = data, magic = function() return "★" end, now = function() return 10 end,
+				event = { rawFlagMasks = { shift = 2 } }, is_repeat = function() return false end,
+				translate = function(_, flags) return flags == 0 and "." or ":" end,
+				emit = function(value) emitted[#emitted + 1] = value; return true end,
+			})
+			adapter.arm(2)
+			helpers.assert_true(adapter.key_down(event, 47), "the special result is serialized")
+			helpers.assert_eq(#reported, 0, "nothing is reported before the handoff settles")
+			adapter.finish(true)
+			helpers.assert_eq(emitted, { " :" })
+			helpers.assert_eq(reported, { " :" }, "the CapsWord observer sees the generated text")
+			local space_only = assert(Policy.compile({ idle_timeout_seconds = 0, terminators = { "space" },
+				pointer = { left_click = false } }, { "left_click" }))
+			helpers.assert_true(Policy.ends_on_text(space_only, reported[1]), "the generated \" :\" ends a space-only CapsWord")
+			helpers.assert_eq(Policy.ends_on_text(space_only, "."), false, "control: the physical \".\" does not")
+			adapter.arm(2)
+			helpers.assert_true(adapter.key_down(event, 47))
+			adapter.finish(false)
+			helpers.assert_eq(#reported, 1, "a refused handoff reports nothing")
+		end)
+		CapsWordOutput.set_observer(nil)
+		if not ok then error(err, 0) end
+	end)
 	helpers.it("checks the actual shifted Option combination before native emission (one-shot-option-shift)", function()
 		local emitted, raw, text = {}, 16, "é"
 		local event = {
