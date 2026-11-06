@@ -735,6 +735,12 @@ function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 
 	local snapshot_ok, saved, snapshot_error = read_restorable_snapshot(b)
 	if not snapshot_ok then return false, snapshot_error or "clipboard_snapshot_failed" end
+	-- PRIMARY follows the application's live selection without a keystroke.
+	-- Read before the copy, it tells whether this application publishes the
+	-- range being transformed; only then can it prove the range unchanged
+	-- right before the paste (LCP-003). Windows and macOS replace the
+	-- selection they read; a field identity alone does not pin its range.
+	local primary_ok, primary_before = M.read_primary()
 
 	local owned, previous_owned
 	local function restore()
@@ -757,6 +763,10 @@ function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 		return fail(selected)
 	end
 	owned = selected
+	local range_observable = primary_ok and primary_before == selected
+	if not range_observable then
+		Logger.debug(LOG, "The selected range is not published as PRIMARY; only the field is rechecked.")
+	end
 
 	local transformed_ok, replacement = pcall(transform, selected)
 	if not transformed_ok or type(replacement) ~= "string" then
@@ -771,11 +781,19 @@ function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 	end
 	if not current() then return fail("destination_changed") end
 
+	local range_changed = false
 	local paste_ok, pasted = pcall(function()
 		if not wait_checked(sleep_ms, SETTLE_MS) then return false end
 		if not current() then return false end
 		local read_ok, contents = read_backend_checked(b)
 		if not read_ok or contents ~= replacement then return false end
+		if range_observable then
+			local still_ok, primary_now = M.read_primary()
+			if not still_ok or primary_now ~= selected then
+				range_changed = true
+				return false
+			end
+		end
 		if not current() then return false end
 		if emit_combo("ctrl+v", publication) ~= true then return false end
 		if not current() then return false end
@@ -787,6 +805,10 @@ function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 	if not read_ok then return false, "clipboard_ownership_unknown" end
 	if content == replacement and not restore() then return false, "clipboard_restore_failed" end
 	if not current() then return false, "destination_changed" end
+	if range_changed then
+		Logger.warn(LOG, "The selection changed before the paste; the transformed text was not pasted.")
+		return false, "selection_changed"
+	end
 	if not paste_ok or pasted ~= true then return false, "paste_chord_failed" end
 	Logger.debug(LOG, "Replaced a %d-byte selection via %s.", #selected, b.name)
 	return true
