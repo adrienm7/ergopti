@@ -875,6 +875,45 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		if not ok then error(err, 0) end
 	end)
 
+	-- MCF-001 timer-race subtype: a refused later switch cancelled the reload an
+	-- accepted earlier switch still owed, so the accepted locale never loaded.
+	for _, refusal in ipairs({ "timer", "settings" }) do
+		helpers.it("(locale-superseded-reload) a " .. refusal .. " refusal hands the accepted reload back", function()
+			local path = os.tmpname()
+			local file = assert(io.open(path, "wb")); file:write('[script]\nlocale = "fr"\n'); file:close()
+			local Paths = require("infra.config_paths")
+			local prior_get, prior_reload = Paths.get, hs.reload
+			local prior_scheduler = package.loaded["adapters.timer_scheduler"]
+			local reloads = {}
+			Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
+			hs.reload = function() reloads[#reloads + 1] = hs.settings.get("ergopti.i18n_locale") end
+			local ok, err = xpcall(function()
+				local i18n, scheduler = load_i18n_with_scheduler()
+				helpers.assert_true(i18n.set_locale("de"))
+				local accepted = assert(io.open(path, "rb")); local accepted_bytes = accepted:read("*a"); accepted:close()
+				if refusal == "timer" then
+					scheduler.failure = "settled"
+					helpers.assert_eq(i18n.set_locale("en"), false)
+				else
+					with_settings_refusal("false", function() helpers.assert_eq(i18n.set_locale("en"), false) end)
+				end
+				local read = assert(io.open(path, "rb")); local actual = read:read("*a"); read:close()
+				helpers.assert_eq(actual, accepted_bytes, "the refused locale must not survive in config.toml")
+				helpers.assert_eq(i18n.get_locale(), "de")
+				helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "de")
+				for _, call in ipairs(scheduler.calls) do
+					if call.handle.committed and call.handle.timer ~= nil then
+						call.handle.timer = nil; call.callback()
+					end
+				end
+				helpers.assert_eq(reloads, { "de" }, "the accepted switch keeps exactly its own reload")
+			end, debug.traceback)
+			Paths.get, hs.reload = prior_get, prior_reload
+			package.loaded["adapters.timer_scheduler"] = prior_scheduler; os.remove(path)
+			if not ok then error(err, 0) end
+		end)
+	end
+
 	helpers.it("retains rollback debt when the publisher claims success without restoring bytes", function()
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr"\n'

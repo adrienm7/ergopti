@@ -378,6 +378,23 @@ end
 --- The reload is debounced: rapid successive calls cancel the pending reload
 --- so only the last selected locale is applied, preventing stale reloads from
 --- landing on an intermediate language when the user switches quickly.
+--- Re-arms the reload an accepted earlier switch still owed after a refused
+--- later switch cancelled it: refusing the later locale must not also drop the
+--- reload that applies the accepted one.
+--- @return boolean rearmed
+local function restore_superseded_reload()
+	if _reload_timer ~= nil then
+		Logger.error(LOG, "The accepted locale reload waits behind retained timer cleanup.")
+		return false
+	end
+	_reload_generation = _reload_generation + 1
+	if not arm_locale_reload(_reload_generation, _locale) then
+		Logger.error(LOG, "The accepted locale reload could not be rescheduled.")
+		return false
+	end
+	return true
+end
+
 --- @param code string A known locale code.
 local function set_locale_transaction(code)
 	if not _scope.admit_change() then return false end
@@ -388,8 +405,11 @@ local function set_locale_transaction(code)
 	if code == _locale then return true end
 	if not rewrite_configured(code) then return false end
 	Logger.start(LOG, "Switching locale to '%s'…", code)
-	-- Cancel any pending reload from a previous rapid switch
+	-- Cancel any pending reload from a previous rapid switch. A committed one
+	-- belongs to an accepted switch, so a refusal below hands it back.
+	local superseded = false
 	if _reload_timer then
+		superseded = _reload_timer.committed == true
 		if TimerScheduler.cancel(_reload_timer) ~= true then
 			Logger.error(LOG, "Locale switch blocked by pending reload cleanup debt.")
 			return false
@@ -397,26 +417,34 @@ local function set_locale_transaction(code)
 		_reload_timer = nil
 	end
 
+	local function refuse(message)
+		Logger.error(LOG, message)
+		if superseded then restore_superseded_reload() end
+		return false
+	end
+
 	_reload_generation = _reload_generation + 1
 	local generation = _reload_generation
 	if not arm_locale_reload(generation, code) then
-		Logger.error(LOG, "Locale switch reload timer was refused; locale remains unchanged.")
-		return false
+		return refuse("Locale switch reload timer was refused; locale remains unchanged.")
 	end
 	local reload_timer = _reload_timer
 
+	local function retire_reload()
+		_reload_generation = _reload_generation + 1
+		if TimerScheduler.cancel(reload_timer) == true and _reload_timer == reload_timer then
+			_reload_timer = nil
+		end
+	end
+
 	local persisted = persist_selected_locale(code)
 	if persisted ~= true then
-		_reload_generation = _reload_generation + 1
-		TimerScheduler.cancel(reload_timer)
-		Logger.error(LOG, "Locale persistence failed; locale remains unchanged.")
-		return false
+		retire_reload()
+		return refuse("Locale persistence failed; locale remains unchanged.")
 	end
 	if not verify_configured_locale() then
-		_reload_generation = _reload_generation + 1
-		TimerScheduler.cancel(reload_timer)
-		Logger.error(LOG, "Configured locale changed before publication; locale remains unchanged.")
-		return false
+		retire_reload()
+		return refuse("Configured locale changed before publication; locale remains unchanged.")
 	end
 	_locale = code
 	return true
