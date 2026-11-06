@@ -312,6 +312,23 @@ helpers.describe("owned runtime artifact fetch: then always that one", function(
 		helpers.assert_eq(world.commands[3].name, "curl")
 	end)
 
+	-- MRT-003: the cache accepted any receipt starting with the digest while the
+	-- launcher's helper source requires exactly digest .. "\n", so a damaged
+	-- receipt was "already verified" here and refused at every install.
+	helpers.it("fetches again when the receipt is not exactly the digest line (mrt-003)", function()
+		for _, damaged in ipairs({ DIGEST .. "\nextra", DIGEST .. "\n\n", DIGEST .. " extra\n", DIGEST,
+				DIGEST:upper() .. "\n" }) do
+			local fetcher, world = fake()
+			ensure(fetcher, pin())
+			world.files[HOME .. "/receipt"] = damaged
+			helpers.assert_nil(fetcher.payload_for(pin()), "a damaged receipt is not a kept payload")
+			world.commands = {}
+			helpers.assert_true(ensure(fetcher, pin()).ok)
+			helpers.assert_eq(world.commands[3].name, "curl", "a damaged receipt is repaired by a fetch")
+			helpers.assert_eq(world.files[HOME .. "/receipt"], DIGEST .. "\n")
+		end
+	end)
+
 	helpers.it("lets a caller that asks during a fetch wait for that same fetch", function()
 		package.loaded["platform.remap.ke_paths"] = nil
 		package.loaded["platform.remap.runtime_artifact_fetch"] = nil
