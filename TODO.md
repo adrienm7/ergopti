@@ -451,9 +451,9 @@ three-OS CI is green on the final source. See the handoff above for the current 
       (161 keyboard slots) and lazy dbusmenu children need a desktop check; macOS `menu_keyboard_layout.sources`
       re-reads the bundle variants from disk per rebuild (57-415 ms spikes) and needs a proven cache contract;
       hs.menubar has no per-row update, so a macOS toggle still rebuilds the root.
-- [ ] **AI menu.** "Test a prediction" under the profile row: group model, profile, test, never two separators in a row.
+- [x] **AI menu.** "Test a prediction" under the profile row: group model, profile, test, never two separators in a row.
       The test uses a high temperature, bypasses the cache, never a fixed string, and shows the generation time.
-- [ ] **Generation parameters submenu.** Predictions count, min and max words with no separator; one separator; all the
+- [x] **Generation parameters submenu.** Predictions count, min and max words with no separator; one separator; all the
       context rows at the bottom (two separators become one).
 - [ ] **Prediction indentation default -3**, recommended -3, all drivers.
 - [x] **French punctuation.** Space before `:` in composed `label: value` rows and about 21 strings, with a gate.
@@ -461,7 +461,7 @@ three-OS CI is green on the final source. See the handoff above for the current 
       fr.json clean, gate `test-french-punctuation.cjs` (no glued high punctuation, no hardcoded `" : "` join), and the
       rendered rows walked in French by `test-ahk-tray-rows-read-as-text.cjs` and both Lua tray walks
       (`_shared/lua/test/menu_row_text.lua`). Rechecked green on 6 November.
-- [ ] **Multi-prediction tooltip.** The number is right-aligned in the tooltip, not stuck to the text.
+- [x] **Multi-prediction tooltip.** The number is right-aligned in the tooltip, not stuck to the text.
 - [x] **macOS one-shot Shift is not one-shot.** Tap it then type « abc » quickly: « ABc » or « ABC ». It must be spent
       by the first key; today it seems to end only on its timeout (configurable in the menu, can be infinite). Check
       the F20 one-shot sentinel path (modules/keymap/one_shot_shift.lua, adapters/one_shot_shift.lua) against Windows
@@ -509,11 +509,11 @@ three-OS CI is green on the final source. See the handoff above for the current 
       (e1f0fbca); the macOS remap picker headings come from `remap.category.*` in 21 locales and AltGr from the key
       table (fbf75123). Left, not key names: the metrics sequence chips (`CONTROL_KEY_SYMBOLS`) keep English names
       on purpose, so a typed dead-key glyph is never mistaken for a control key.
-- [ ] **Model selection page.** Install Ollama and Install MLX buttons act or say why, disabled when installed; a whole
+- [x] **Model selection page.** Install Ollama and Install MLX buttons act or say why, disabled when installed; a whole
       section header opens its list; header on two lines (install, port, status; then add a model by hand); Ollama and MLX
       models grouped in collapsible sections per provider, alphabetical; search crosses sections; gate for page actions
       with no host handler.
-- [ ] **Options greyed.** Disable in browser address bars and in password fields can be changed, or say why not.
+- [x] **Options greyed.** Disable in browser address bars and in password fields can be changed, or say why not.
 - [x] **Defaults and recommended.** Each manifest row declares feature or setting, CI gate, empty config boots neutral,
       missing option takes its manifest default, Restore recommended restores adjusted settings too (see
       docs/memory/maintainer-decisions.md).
