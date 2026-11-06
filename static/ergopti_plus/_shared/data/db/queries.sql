@@ -468,6 +468,11 @@ VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s key}});
 INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json)
 VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s action}}, {{s? metadata_json}});
 
+-- name: events.network
+-- doc: A connectivity transition: Internet reachability or a VPN adapter (Windows keystats_network.ahk kinds).
+INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{s app}}, {{s? meta_json}});
+
 -- name: events.hotstring
 -- doc: A hotstring that fired, was suggested, dismissed or nearly typed.
 INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars)

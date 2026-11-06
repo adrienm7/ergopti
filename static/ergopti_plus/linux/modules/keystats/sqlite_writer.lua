@@ -1049,6 +1049,21 @@ _raw_sql.system = function(device_id, events, first_id)
 	return table.concat(statements, "\n")
 end
 
+--- Renders connectivity transitions as the Windows events_network rows.
+--- @param events table Array of { ts, date, kind, app, meta }.
+_raw_sql.network = function(device_id, events, first_id)
+	local statements = {}
+	for i, ev in ipairs(events) do
+		assert(type(ev.kind) == "string" and ev.kind ~= "", "a network event needs its kind")
+		statements[#statements + 1] = Queries.render("events.network", "cli_json", {
+			device_id = device_id, id = first_id + i - 1,
+			ts = _text(ev.ts), date = _text(ev.date), kind = ev.kind, app = _text(ev.app),
+			meta_json = Json.encode(type(ev.meta) == "table" and ev.meta or {}),
+		})
+	end
+	return table.concat(statements, "\n")
+end
+
 --- Plans admitted semantic media entries as raw events_system rows and their
 --- derived press and hold rows, so the flush that owns the raw source commits
 --- its projections in the same transaction (media never reaches the numeric
@@ -1075,6 +1090,16 @@ function M.insert_system_events(device_id, events)
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
 	local sql = _compose_raw("system", device_id, events, first_id)
+	if not sql then return false end
+	return _exec_raw_batch(sql)
+end
+
+--- Commits one canonical raw connectivity batch and returns its native receipt.
+function M.insert_network_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local sql = _compose_raw("network", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -1759,13 +1784,15 @@ function M.start_flush(device_id, payload)
 	payload.raw.sessions = payload.raw.sessions or {}
 	payload.raw.system = payload.raw.system or {}
 	payload.raw.media = payload.raw.media or {}
+	payload.raw.network = payload.raw.network or {}
 	-- Media rows need the admitted policy and the tap threshold their holds are split by.
 	if #payload.raw.media > 0 and (not M.media_available() or type(payload.media_threshold_ms) ~= "number") then
 		return nil
 	end
 	local media_threshold_ms = payload.media_threshold_ms
 	local path, count = _db_path, 0
-	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm", "windows", "sessions", "system", "media" }
+	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm", "windows", "sessions", "system", "media",
+		"network" }
 	for _, name in ipairs(families) do
 		array(payload.raw[name])
 		count = count + #payload.raw[name]

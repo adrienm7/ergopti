@@ -543,11 +543,11 @@ av_state_slow_tick_ms = 30000
 network_wifi_tick_ms = 15000
 
 # Network: internet reachability check interval.
-# AHK: keystats_network.ahk REACH_TICK_MS.
+# AHK: keystats_network.ahk REACH_TICK_MS. Linux: network_metrics.lua.
 network_reach_tick_ms = 30000
 
 # Network: VPN adapter poll interval.
-# AHK: keystats_network.ahk VPN_TICK_MS.
+# AHK: keystats_network.ahk VPN_TICK_MS. Linux: network_metrics.lua.
 network_vpn_tick_ms = 20000
 
 # Sensor (CPU/GPU temp, fan) sampling tick.

@@ -701,7 +701,7 @@
 				"date": "v_date",
 				"app": "Code's",
 				"count_total": 7,
-				"max_cpm": 0.000025,
+				"max_cpm": 2.5e-5,
 				"max_chars": 7,
 				"length_buckets_json": "v_length_buckets_json",
 				"inter_delay_count": 7,
@@ -831,6 +831,33 @@
 				"action": "v_action"
 			},
 			"sql": "INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_action', NULL);"
+		},
+		{
+			"name": "events.network",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"kind": "v_kind",
+				"app": "v_app",
+				"meta_json": "v_meta_json"
+			},
+			"sql": "INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_kind', 'v_app', 'v_meta_json');"
+		},
+		{
+			"name": "events.network",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"kind": "v_kind",
+				"app": "v_app"
+			},
+			"sql": "INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_kind', 'v_app', NULL);"
 		},
 		{
 			"name": "events.hotstring",
