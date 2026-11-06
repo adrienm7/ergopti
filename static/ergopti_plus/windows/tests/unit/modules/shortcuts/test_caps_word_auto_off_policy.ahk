@@ -34,7 +34,7 @@ _CWAOP_Join(List) {
 
 _CWAOP_CompileVectors() {
 	Corpus := _CWAOP_Corpus()
-	AssertEqual(14, Corpus["compile"].Length, "complete compile vectors")
+	AssertEqual(16, Corpus["compile"].Length, "complete compile vectors")
 	for Row in Corpus["compile"] {
 		Policy := _CWAOP_Compile(Corpus, Row["idle"], Row["terminators"], Row["pointer"], &Reason)
 		if Row["valid"] {
