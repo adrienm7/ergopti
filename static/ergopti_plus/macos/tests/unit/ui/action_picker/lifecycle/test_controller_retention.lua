@@ -58,6 +58,44 @@ helpers.describe("action picker bounds retained native controllers", function()
 		end)
 	end)
 
+	-- MVB-001: init() delivery swallowed encoder and native evaluation failures
+	-- inside its own pcall, so the picker stayed open and empty with no ERROR.
+	for _, case in ipairs({
+		{ name = "a raised evaluation", setup = function(h) h.eval_mode = "throw" end },
+		{ name = "a refused evaluation", setup = function(h) h.eval_mode = "refuse" end },
+		{ name = "a raised encoding", setup = function(h) h.encode_throws = true end },
+		{ name = "a page execution error", complete = { code = 4, message = "ReferenceError" } },
+	}) do
+		helpers.it("reports " .. case.name .. " of the initial catalogue once (mvb-001)", function()
+			with_picker(function(_, h)
+				helpers.assert_true(h.open())
+				local view, controller = h.views[1], h.controllers[1]
+				if case.setup then case.setup(h) end
+				for _ = 1, 2 do
+					h.post(controller, view, { action = "ready" })
+					local completion = view.completions[#view.completions]
+					if case.complete and completion then completion(nil, case.complete) end
+				end
+				helpers.assert_eq(#h.errors, 1, "one fixed-metadata ERROR per failure kind, got " .. #h.errors)
+				helpers.assert_true(h.errors[1]:find("ReferenceError", 1, true) == nil,
+					"the report must not echo native error text")
+				helpers.assert_eq(view.deleted, false, "the failed page stays open for cancel")
+			end)
+		end)
+	end
+
+	helpers.it("accepts the native nil-error sentinels of a healthy initialization (mvb-001)", function()
+		with_picker(function(_, h)
+			helpers.assert_true(h.open())
+			local view, controller = h.views[1], h.controllers[1]
+			h.post(controller, view, { action = "ready" })
+			view.completions[#view.completions](nil, nil)
+			h.post(controller, view, { action = "ready" })
+			view.completions[#view.completions](nil, { code = 0 })
+			helpers.assert_eq(#h.errors, 0)
+		end)
+	end)
+
 	helpers.it("rejects an old native page after the controller is rebound to B", function()
 		with_picker(function(picker, h)
 			helpers.assert_true(h.open())

@@ -184,7 +184,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 ### macos-webview
 
-- [ ] **[CODE] MVB-001:** Action picker silently drops failed initial data delivery. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-webview/report.md).
+- [x] **[CODE] MVB-001:** Action picker silently drops failed initial data delivery. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-webview/report.md). Done: init delivery reports encoding, submission and page-execution failures once with fixed metadata.
 - [ ] **[CODE] MVB-002:** Shortcut auto-close destroys the unsaved draft after a refused hotstring save. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-webview/report.md).
 
 ### linux-runtime
