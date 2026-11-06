@@ -46,7 +46,7 @@ local function run(world, keys, options)
 		package.loaded["adapters.own_window"] = { for_webview = function() return { id = function() return SCRATCH_WINDOW end } end }
 		-- The shared chrome is its own owner's concern; the steps are recorded only
 		package.loaded["ui.ui_builder"] = {
-			force_focus = function() end,
+			force_focus = function() world.refocused = (world.refocused or 0) + 1 end,
 			window_chrome_steps = function()
 				world.chrome_applied = true
 				return {}
@@ -175,6 +175,15 @@ helpers.describe("field run scratch typing", function()
 		local world = run({ taps = "enabled", focus = function() return false end }, { "w", "k" })
 		helpers.assert_eq(#world.emitted, 0)
 		helpers.assert_eq(world.outcome.aborted, "window_unfocused")
+	end)
+
+	-- Field reports 2026-11-05 and 2026-11-06: one focus look 0.6 s after show
+	-- failed every typing selftest while the window was still activating.
+	helpers.it("waits for a scratch window that gains the focus late and asks for it again", function()
+		local world = run({ taps = "enabled", focus = function(index) return index >= 15 end }, { "w", "k" })
+		helpers.assert_eq(table.concat(world.emitted, ","), "w,k", tostring(world.outcome.aborted))
+		helpers.assert_nil(world.outcome.aborted)
+		helpers.assert_true((world.refocused or 0) >= 2, "the focus is asked for again while waiting")
 	end)
 
 	-- 2026-10-31 14:13:39: the focused-window read of this process waited out

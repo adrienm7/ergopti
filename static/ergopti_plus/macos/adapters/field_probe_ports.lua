@@ -574,6 +574,13 @@ local SCRATCH_POLL_SECONDS = 0.05
 -- Polls the keymap must classify the published scratch window as typing with
 -- one generation before the first key (its title replaces the placeholder once)
 local SCRATCH_CLASSIFIED_POLLS = 3
+-- Polls the scratch window may take to gain the focus before the run gives
+-- up, asking for it again every SCRATCH_REFOCUS_POLLS: one look 0.6 s after
+-- show failed every typing selftest of five field runs (2026-11-05 and
+-- 2026-11-06), as "window_unfocused" while the window was still activating and
+-- as "not_frontmost" after a stray trackpad touch handed the focus back.
+local SCRATCH_FOCUS_POLLS = 40
+local SCRATCH_REFOCUS_POLLS = 10
 
 -- The scratch page: one text field that takes the focus itself.
 local SCRATCH_HTML = [[<!doctype html><html><body style="margin:12px;font:14px -apple-system">
@@ -804,10 +811,17 @@ local function scratch_typing(keys, callback, options)
 	--- during the first keys lost the leading space and the trigger's word start.
 	--- @param stable_polls integer Consecutive polls with the same classification.
 	--- @param last_generation integer|nil Generation seen at the previous poll.
-	local function await_classification(stable_polls, last_generation)
+	local function await_classification(stable_polls, last_generation, focus_polls)
 		if settled then return end
+		focus_polls = focus_polls or 0
 		local focused, reason = scratch_has_focus()
-		if not focused then return settle(reason) end
+		if not focused then
+			if focus_polls >= SCRATCH_FOCUS_POLLS then return settle(reason) end
+			if focus_polls > 0 and focus_polls % SCRATCH_REFOCUS_POLLS == 0 then
+				pcall(require("ui.ui_builder").force_focus, view, false)
+			end
+			return Timer.after(SCRATCH_POLL_SECONDS, function() await_classification(0, nil, focus_polls + 1) end)
+		end
 		if publication == nil then
 			local published, generation = pcall(Selftest.publish, reason)
 			if not published then
@@ -823,7 +837,7 @@ local function scratch_typing(keys, callback, options)
 		if ignored == true then return settle("scratch_ignored") end
 		stable_polls = (ignored == false and generation == last_generation) and stable_polls + 1 or 0
 		if stable_polls >= SCRATCH_CLASSIFIED_POLLS then return type_key(1) end
-		Timer.after(SCRATCH_POLL_SECONDS, function() await_classification(stable_polls, generation) end)
+		Timer.after(SCRATCH_POLL_SECONDS, function() await_classification(stable_polls, generation, focus_polls) end)
 	end
 	Timer.after(SCRATCH_SETTLE_SECONDS, function() await_classification(0, nil) end)
 end
