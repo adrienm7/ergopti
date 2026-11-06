@@ -684,3 +684,14 @@ append-only ledger, and each device applies it while replaying, so a sibling dev
 The layout generator's editor unifies the navigation layer editor (`_shared/ui/layer_editor`), the layout composer
 (`_shared/ui/layout_composer`) and the layout manager window into one shared model and page. No second layout
 editor is written; the navigation layer becomes one layer of the Ergopti TOML source.
+
+## A dead, unpublished Ollama daemon never blocks the pause (2026-11-06)
+
+When the owned Ollama serve process has exited and never published its port (no READY
+frame), the pause treats it as stopped and proceeds, logging why through the central
+logger. A process exit without the RETIRED frame still never retires a *published*
+daemon: only the unpublished, physically exited case is released. The rule lives in the
+shared lifecycle (`managed_ollama_daemon_receipt.release_unpublished`, called by
+`managed_ollama_daemon_lifecycle` `terminate`), so every driver using it behaves the same.
+
+Pinned by `test_managed_ollama_daemon_protocol.lua` (`daemon-dead-unpublished-release`).

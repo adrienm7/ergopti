@@ -141,6 +141,25 @@ function M.new(task, nonce, ports)
 		return true, "prepared"
 	end
 
+	--- Releases a daemon that exited without ever publishing its port.
+	--- MAINTAINER DECISION 2026-11-06: a physically exited process that never
+	--- reported READY holds no port to retire, so the pause treats it as stopped
+	--- even when no RETIRED frame arrived (field exit 78). A published daemon
+	--- (READY seen) keeps requiring the exact native receipt.
+	--- @param original table Exact original task.
+	--- @return boolean released
+	--- @return string state "dead_unpublished" or a fixed refusal state.
+	function receiver.release_unpublished(original)
+		if not rawequal(original, task) then return false, "identity" end
+		if joined then return true, "dead_unpublished" end
+		if ready then return false, "published" end
+		local ok, physical = pcall(is_settled, task)
+		if not ok or physical ~= true then return false, "pending" end
+		joined = true
+		if nonce_owners[nonce] == receiver then nonce_owners[nonce] = nil end
+		return true, "dead_unpublished"
+	end
+
 	return receiver, nil
 end
 
