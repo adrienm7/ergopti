@@ -158,6 +158,7 @@ local KEY_MAP = {
 	llm_model_ollama                     = { sec = "llm", path = "models", key = "ollama"         },
 	llm_active_profile                   = { sec = "llm", path = "profiles", key = "active"        },
 	llm_num_predictions                  = { sec = "llm", path = "profiles", key = ConfigKeys.LEAF.NUM_PREDICTIONS },
+	llm_auto_profile_for_model           = { sec = "llm", path = "profiles", key = ConfigKeys.LEAF.AUTO_PROFILE_FOR_MODEL },
 	llm_debounce                         = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.DEBOUNCE_MS, units_per_state = 1000, never = true },
 	llm_min_request_interval             = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.MIN_REQUEST_INTERVAL_MS, units_per_state = 1000 },
 	llm_instant_on_word_end              = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.INSTANT_ON_WORD_END },

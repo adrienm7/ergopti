@@ -1020,6 +1020,20 @@ function M.new(ctx)
 			return false, false
 		end
 
+		-- The automatic profile (llm.profiles.auto_profile_for_model), as on
+		-- Windows and Linux: on, the profile follows the model without a question;
+		-- off, a model change leaves the chosen profile alone. Only an explicit
+		-- request (force_dialog) still asks.
+		if opts.force_dialog ~= true then
+			if state.llm_auto_profile_for_model ~= true then
+				Logger.debug(LOG, "Automatic profile is off; the profile stays %s.", tostring(cur_profile))
+				return true
+			end
+			if cur_profile == rec_profile then return true end
+			Logger.info(LOG, string.format("Automatic profile: switching %s → %s.", cur_profile, rec_profile))
+			return commit_recommendation(rec_profile)
+		end
+
 		if cur_profile ~= rec_profile then
 			if is_completion then
 				-- Completion models have exactly one correct profile — switch silently.

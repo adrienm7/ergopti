@@ -100,6 +100,8 @@ local function with_fixture(spec, body)
 			llm_backend = "ollama",
 			llm_enabled = true,
 			llm_active_profile = "basic",
+			-- The automatic profile is on by default (llm.profiles.auto_profile_for_model).
+			llm_auto_profile_for_model = true,
 			llm_model = "A",
 			llm_model_power = 1,
 			llm_model_mlx = "mlx-A",
@@ -448,7 +450,7 @@ helpers.describe("HS-031 recommended profiles share the profile transaction owne
 
 	helpers.it("HS-031 treats recommendation dialog refusal as a successful no-op", function()
 		with_fixture({dialog_choice = "button.cancel", model_params = 3}, function(fixture)
-			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), true)
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b", { force_dialog = true }), true)
 			assert_old_profile(fixture)
 			helpers.assert_eq(fixture.calls.profiles, {})
 			helpers.assert_eq(fixture.calls.save_profiles, {})
@@ -458,7 +460,7 @@ helpers.describe("HS-031 recommended profiles share the profile transaction owne
 
 	helpers.it("HS-031 reports a throwing recommendation dialog as failure", function()
 		with_fixture({dialog_choice = "throw", model_params = 3}, function(fixture)
-			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), false)
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b", { force_dialog = true }), false)
 			assert_old_profile(fixture)
 			helpers.assert_true(#fixture.errors >= 1)
 		end)
@@ -500,16 +502,16 @@ helpers.describe("HS-031 recommended profiles share the profile transaction owne
 			model_params = 3,
 			failures = compensation_failures("runtime", "throw"),
 		}, function(fixture)
-			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), false)
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b", { force_dialog = true }), false)
 			helpers.assert_eq(fixture.runtime.profile, "advanced")
 			helpers.assert_eq(fixture.dialog_calls(), 1)
 
-			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), false)
-			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), false)
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b", { force_dialog = true }), false)
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b", { force_dialog = true }), false)
 			helpers.assert_eq(fixture.dialog_calls(), 1,
 				"unsettled debt must refuse before presenting a new decision")
 
-			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), true)
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b", { force_dialog = true }), true)
 			helpers.assert_eq(fixture.dialog_calls(), 2)
 			assert_old_profile(fixture)
 		end)

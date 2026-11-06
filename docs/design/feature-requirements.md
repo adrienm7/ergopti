@@ -146,7 +146,7 @@ two disagree in either direction.
 | `llm.models.mlx`                                              | `mlx`           | n/a                                    | n/a                  |
 | `llm.profiles.active`                                         | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
 | `llm.profiles.num_predictions`                                | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
-| `llm.profiles.auto_profile_for_model`                         | n/a             | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
+| `llm.profiles.auto_profile_for_model`                         | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
 | `llm.trigger.disabled_apps`                                   | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
 | `llm.trigger.debounce_ms`                                     | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |
 | `llm.trigger.min_request_interval_ms`                         | `mlx`, `ollama` | `evdev`, `ollama`, `uinput`            | `ollama`, `webview2` |

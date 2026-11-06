@@ -3974,16 +3974,6 @@
 	"llm_profile_lua_frame": [
 		{
 			"type": "include",
-			"section": "llm_profile_recommendation",
-			"present_when": "llm_profile_recommendation_present"
-		},
-		{
-			"type": "include",
-			"section": "llm_profile_paused_recommendation",
-			"present_when": "llm_profile_recommendation_paused"
-		},
-		{
-			"type": "include",
 			"section": "llm_profile_auto_detect_control"
 		},
 		{
@@ -4107,28 +4097,6 @@
 			"row_id": "llm_profile_clone"
 		}
 	],
-	"llm_profile_recommendation": [
-		{
-			"type": "command",
-			"id": "llm_profile_recommend",
-			"i18n": "menu.profiles.auto_detect",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
-		}
-	],
-	"llm_profile_paused_recommendation": [
-		{
-			"type": "label",
-			"id": "llm_profile_recommend_paused",
-			"i18n": "menu.profiles.auto_detect",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
-		}
-	],
 	"llm_profile_auto_detect_control": [
 		{
 			"type": "check",
@@ -4136,12 +4104,7 @@
 			"i18n": "menu.profiles.auto_detect",
 			"checked_when": [
 				"llm_profile_auto_detect_checked"
-			],
-			"platforms": [
-				"ahk",
-				"linux"
-			],
-			"unavailable": "hide"
+			]
 		}
 	],
 	"personal_shortcuts_frame": [

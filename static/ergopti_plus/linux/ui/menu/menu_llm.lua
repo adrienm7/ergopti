@@ -619,8 +619,6 @@ local function _build_llm(ctx)
 			[require("config_keys").COMMAND.LLM_PROFILE_CLONE] = function() return open_editor(seed, true, { as_new = true }, true) end,
 			[require("config_keys").COMMAND.LLM_PROFILE_CREATE] = function() return open_editor(nil, true, nil, true) end,
 		}, {
-			["llm_profile_recommendation_present"] = function() return false end,
-			["llm_profile_recommendation_paused"] = function() return false end,
 			["llm_profile_auto_detect_checked"] = function() return ProfileSettings.get(require("config_keys").LEAF.AUTO_PROFILE_FOR_MODEL) == true end,
 			["llm_profile_custom_present"] = custom_present,
 			["llm_profile_clone_present"] = clone_present,

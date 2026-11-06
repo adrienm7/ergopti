@@ -1237,26 +1237,6 @@
 		"reasons": { "macos": { "en": "", "fr": "" }, "linux": { "en": "", "fr": "" } }
 	},
 	{
-		"path": "llm_profile_recommendation.llm_profile_recommend",
-		"visibility": "hide",
-		"labels": {
-			"fr": "✨ Détection automatique du meilleur profil",
-			"en": "✨ Automatically detect the best profile"
-		},
-		"platforms": { "windows": false, "macos": true, "linux": false },
-		"reasons": { "windows": { "en": "", "fr": "" }, "linux": { "en": "", "fr": "" } }
-	},
-	{
-		"path": "llm_profile_auto_detect_control.llm_profile_auto_detect",
-		"visibility": "hide",
-		"labels": {
-			"fr": "✨ Détection automatique du meilleur profil",
-			"en": "✨ Automatically detect the best profile"
-		},
-		"platforms": { "windows": true, "macos": false, "linux": true },
-		"reasons": { "macos": { "en": "", "fr": "" } }
-	},
-	{
 		"path": "personal_shortcuts_frame.personal_shortcuts_registered",
 		"visibility": "hide",
 		"labels": { "fr": "Raccourcis personnels", "en": "Personal shortcuts" },
