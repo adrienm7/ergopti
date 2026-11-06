@@ -5298,7 +5298,10 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	{
 		const [settings] = menu.llm_menu.filter((row) => row.id === 'llm_generation_settings');
 		const inline = menu.llm_menu.filter((row) => row.id === 'llm_generation');
-		assert.deepEqual(inline.map((row) => row.platforms), [['linux']]);
+		assert.deepEqual(
+			inline.map((row) => row.platforms),
+			[['linux']]
+		);
 		assert.equal(
 			settings.reason_key,
 			'platform_reason.llm_generation_settings_are_inline_on_linux'
