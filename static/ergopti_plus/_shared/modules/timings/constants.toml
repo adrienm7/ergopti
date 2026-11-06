@@ -430,6 +430,15 @@ ingest_tick_ms = 5000
 # separate owned phases; no new phase starts before physical cleanup ACK.
 sqlite_operation_timeout_ms = 1000
 
+# How long a dashboard READ waits for the single writer's lock (a COMMIT holds
+# it for milliseconds) before the read is refused. The databases use a rollback
+# journal, so a reader meets SQLite's busy state while the writer commits; with
+# no wait that was an immediate refusal and an empty or partial dashboard. Must
+# stay below sqlite_operation_timeout_ms. A hot rollback journal left by an
+# interrupted write is NOT waited for: only the writer's next open recovers it.
+# Linux: sqlite_reader.lua (.timeout). macOS: sqlite_reader.lua (busy_timeout).
+sqlite_read_busy_timeout_ms = 500
+
 # Keystroke delay above this value is treated as a "thinking pause".
 # AHK: keystats.ahk / keystats_walker.ahk THINK_PAUSE_MS.
 # HS: aggregator.lua THINK_PAUSE_THRESHOLD_MS.

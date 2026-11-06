@@ -105,7 +105,8 @@ end
 --- Composes the `sqlite3` invocation that reads `sql` from standard input.
 --- @param db_path string Filesystem path to the database file.
 --- @param sql     string Complete SQL script; may contain arbitrary user text.
---- @param opts    table|nil { flags = string[]?, capture_stderr?, capture_exit? }.
+--- @param opts    table|nil { flags = string[]?, capture_stderr?, capture_exit?,
+---   busy_timeout_ms = integer? (wait for the writer's lock before refusing) }.
 --- @return string|nil The command, or nil when the arguments are unusable.
 --- @return string|nil The reason, when the command could not be composed.
 function M.build(db_path, sql, opts)
@@ -116,6 +117,15 @@ function M.build(db_path, sql, opts)
 		return nil, "sql must be a non-empty string"
 	end
 	opts = opts or {}
+	if opts.busy_timeout_ms ~= nil then
+		local wait = opts.busy_timeout_ms
+		if type(wait) ~= "number" or wait < 0 or wait % 1 ~= 0 then
+			return nil, "busy_timeout_ms must be a non-negative integer"
+		end
+		-- A dot-command on the script's first line: the CLI has no flag for it, and
+		-- it prints nothing, so JSON output and the exit receipt are unchanged.
+		sql = string.format(".timeout %d\n", opts.busy_timeout_ms) .. sql
+	end
 
 	-- A personal .sqliterc is executable CLI setup: it can replace JSON mode,
 	-- prepend output or run .shell before the owned script/receipt even starts.

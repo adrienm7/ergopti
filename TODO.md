@@ -1118,9 +1118,17 @@ Each closes on a named green hosted or native run, recorded here.
 
 ## Maintainer decisions pending
 
-- [ ] Define "the read-only dashboard with a hot journal" (which dashboard opens which database read-only, and
-      which journal is hot: a rollback `-journal` left by an interrupted keystats write, or a WAL?) so a program can
-      check it.
+- [x] Define "the read-only dashboard with a hot journal". Decided 2026-11-06 (`docs/memory/maintainer-decisions.md`,
+      « The metrics dashboard reads the live store »): the typing and applications dashboards read `db.sqlite` on
+      Linux and macOS read-only, in a rollback-journal store (`journal_mode = DELETE`, no WAL); the hot journal is the
+      `db.sqlite-journal` of an interrupted write, recovered only by the writer, so the reader refuses and keeps its
+      last good projection. Reads wait the writer's COMMIT (`keystats.sqlite_read_busy_timeout_ms`) on both. Windows
+      replays the append-only `data.sql` into a private image and keeps the last good one on an open transaction.
+      Done: the wait, the named refusal, tests on Linux and macOS.
+- [ ] Dashboard export and purge on the three drivers (reset exists as `metrics_reset_session`). Decided 2026-11-06:
+      both go through the single owning writer after its flush settles, with a confirmation, same behaviour on every
+      OS, text through the `i18n` skill in all locales. Not built yet: needs the writer-side request/receipt protocol
+      per driver (Linux `request_session_reset`, macOS `log_manager`, Windows `KL_*` journal owner) and a Windows run.
 
 - **PAC list walk on macOS.** Linux probes a `PROXY a; DIRECT` list before the Ollama start
   (`llm.managed_proxy_probe_timeout_ms`). Decided 2026-11-06 (align on the most complete OS, Linux): Windows walks

@@ -625,3 +625,46 @@ it and types the trigger back, outside the matcher. Anything else first
 (another key, a click, a focus change) voids it, and Ctrl/Cmd/Option+Backspace
 stay the application's. Owners: Linux `_undoable` in `ergopti_hotstrings.lua`,
 macOS `Expander.undo_on_backspace`; Windows is still to build.
+
+## The metrics dashboard reads the live store and offers reset, export, purge (6 November 2026)
+
+The metrics dashboards (typing and applications) are not read-only windows: they
+read the live data correctly while a write may be in progress, and they offer
+explicit user actions. The same behaviour holds on Windows (AHK v2), macOS
+(Hammerspoon Lua) and Linux (LuaJIT).
+
+**Stores and journal.** Linux and macOS keep `db.sqlite` (`_shared/data/db/schema.sql`
+and the writers: `PRAGMA journal_mode = DELETE`, `synchronous = FULL`). It is a
+rollback-journal store; no driver uses a WAL, and none may switch to one without
+a new decision. The "hot journal" is `db.sqlite-journal`, left by a write
+interrupted before its COMMIT. Windows has no database the dashboard opens: the
+single writer appends to the per-device `data.sql` ledger, and the reader replays
+it into a private image (`keystats_reader_db.ahk`). Its hot journal is the
+ledger's trailing open transaction or a NUL hole from an interrupted append.
+
+**Reading rules.**
+
+1. One writer owns each store (the keystats flush); the dashboard never writes
+   to it, never deletes or rolls back a journal, never opens it with create flags.
+2. Linux: `sqlite3 -readonly` with `.timeout`; macOS: `OPEN_READONLY` with
+   `PRAGMA busy_timeout`. The wait is `keystats.sqlite_read_busy_timeout_ms`
+   (500, below the 1000 ms deadline of one SQLite child) and covers only the
+   writer's COMMIT lock. Without it a read during a flush was refused at once.
+3. A hot journal is never waited for: a read-only connection cannot recover it
+   (SQLite answers "attempt to write a readonly database"); the next writer open
+   recovers it. The read is refused, the refusal is logged with its cause, and the
+   dashboard keeps its last good projection. A failed pass never publishes a
+   partial one.
+4. Windows: a ledger ending inside an open transaction or a NUL hole keeps the
+   last-good projection and logs the error; the reader's image is private.
+
+**User actions.** Reset (end the typing session, nothing stored is deleted: the
+existing `metrics_reset_session`), export (a copy of the stored data) and purge
+(delete the stored data) all go through the single owning writer, never through a
+second process opening the store, and each asks for confirmation naming what is
+deleted. Reset exists on all three drivers. Export and purge are decided but not
+built: they follow once the writer-side protocol (flush settled, then act, then
+receipt) is written for each driver (see TODO).
+
+Pinned by `test_keystats_sqlite_read_concurrency.lua` (Linux, real `sqlite3`: held
+lock, hot journal) and `test_sqlite_reader_busy_wait.lua` (macOS).

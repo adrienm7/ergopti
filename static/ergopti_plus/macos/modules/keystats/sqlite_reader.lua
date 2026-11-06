@@ -42,6 +42,7 @@ local Literal = require("sqlite.literal")
 local Queries = require("keystats.queries")
 local KUtils = require("keystats.utils")
 local LOG    = "keystats.sqlite_reader"
+local BUSY_TIMEOUT_MS = require("infra.timings").ms("keystats", "sqlite_read_busy_timeout_ms")
 
 
 
@@ -64,6 +65,10 @@ local function _open(sqlite_path)
 		return nil
 	end
 	db:exec("PRAGMA query_only = 1;")
+	-- Rollback-journal store: the writer's COMMIT locks readers out for
+	-- milliseconds. Wait for it instead of refusing at once (a partial
+	-- projection). A hot journal is not waited for: only the writer recovers it.
+	db:exec(string.format("PRAGMA busy_timeout = %d;", BUSY_TIMEOUT_MS))
 	return db
 end
 

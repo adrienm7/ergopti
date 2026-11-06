@@ -20,6 +20,9 @@ local AppCategoryStore = require("keystats.app_category_store")
 local ok_json, Json = pcall(require, "json")
 local LOG = "modules.keystats.sqlite_reader"
 
+-- How long a read waits for the writer's COMMIT lock (single source: timings).
+local READ_BUSY_TIMEOUT_MS = require("infra.timings").ms("keystats", "sqlite_read_busy_timeout_ms")
+
 -- An ambiguous media pipe close is never retried or replaced by another query.
 local _media_read_debt = nil
 
@@ -85,7 +88,10 @@ local function read_rows(sqlite_path, sql, media_owned)
 	-- a world-writable directory.
 	-- Readonly is an open-time property: SELECT alone still creates a missing
 	-- database (or a dangling alias target) under SQLite's default create mode.
-	local cmd = SqliteCommand.build(sqlite_path, sql, { flags = { "-readonly", "-json" }, capture_exit = true })
+	-- The wait covers the writer's COMMIT only; a hot journal stays the writer's
+	-- to recover (a read-only connection cannot), and surfaces as a refusal.
+	local cmd = SqliteCommand.build(sqlite_path, sql, { flags = { "-readonly", "-json" }, capture_exit = true,
+		capture_stderr = true, busy_timeout_ms = READ_BUSY_TIMEOUT_MS })
 	if not cmd then return {}, false end
 	local pipe = io.popen(cmd, "r")
 	if not pipe then return {}, false end
@@ -102,7 +108,13 @@ local function read_rows(sqlite_path, sql, media_owned)
 	end
 	local accepted, body, reason = SqliteCommand.read_exit_receipt(output)
 	if not accepted then
-		Logger.warn(LOG, "SQLite read refused: %s.", reason)
+		-- Named, never hidden: a hot rollback journal reads as a write attempt to
+		-- a read-only connection, and only the writer's next open recovers it.
+		local cause = SqliteCommand.sanitise_error(body)
+		if cause == "attempt to write a readonly database" then
+			cause = "hot rollback journal awaiting the writer's recovery"
+		end
+		Logger.warn(LOG, "SQLite read refused: %s (%s).", reason, cause)
 		return {}, false
 	end
 	if body == "" then return {}, true end
