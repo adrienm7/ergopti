@@ -5,6 +5,9 @@
 
 const post = makeHostBridge('token_bridge');
 
+const FOCUS_RETRY_FIRST_MS = 50; // [ui] token_prompt_focus_retry_first_ms
+const FOCUS_RETRY_SECOND_MS = 150; // [ui] token_prompt_focus_retry_second_ms
+
 function doOpenLink() {
 	post('open_link');
 }
@@ -31,8 +34,8 @@ window.addEventListener('load', function () {
 			if (document.activeElement === document.body) input.focus();
 		};
 		focusIfUnclaimed();
-		setTimeout(focusIfUnclaimed, 50);
-		setTimeout(focusIfUnclaimed, 150);
+		setTimeout(focusIfUnclaimed, FOCUS_RETRY_FIRST_MS);
+		setTimeout(focusIfUnclaimed, FOCUS_RETRY_SECOND_MS);
 
 		input.addEventListener('keypress', function (e) {
 			if (e.key === 'Enter') {

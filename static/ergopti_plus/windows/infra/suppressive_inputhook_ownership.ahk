@@ -300,7 +300,7 @@ _SIHO_CustomModifierSettle(Receipt, Hook, OwnerToken) {
 				return false
 			Sleep(-1)
 			if !Receipt.ended
-				Sleep(1)
+				Sleep(TimingsGet("ui", "custom_modifier_settle_poll_ms"))
 		}
 		return !A_IsSuspended && SIHO_IsOwned(OwnerToken, Hook)
 	} finally Critical(PreviousCritical)
