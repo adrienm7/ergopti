@@ -514,6 +514,86 @@ helpers.describe("caps word auto-off: the manager session", function()
 			helpers.assert_eq(c.hook.releases, 1)
 		end)
 	end)
+
+	-- CWL-002: the menu promises a change applies to the running CapsWord from its
+	-- next event, as on macOS; the session used to keep the policy of its start.
+	helpers.it("(cwl-002) unchecking Space mid-session keeps CapsWord on at the next space", function()
+		with_caps_word(nil, function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_true(c.AutoOff.set_terminator("space", false))
+			helpers.assert_eq(c.manager.caps_word_observe_text(" "), false, "the acknowledged change applies now")
+			helpers.assert_true(c.manager.is_caps_word_active())
+			helpers.assert_true(c.AutoOff.set_terminator("space", true))
+			helpers.assert_eq(c.manager.caps_word_observe_text(" "), true, "checking it again ends at the next space")
+		end)
+	end)
+
+	helpers.it("(cwl-002) enabling left click mid-session ends CapsWord at the next click", function()
+		with_caps_word('[shortcuts.caps_word.pointer]\nleft_click = false\n', function(c)
+			local Codes = require("infra.evdev_codes")
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_eq(c.manager.caps_word_observe_pointer(c.AutoOff.pointer_kind_of_button(Codes.BTN_LEFT)), false,
+				"control: unchecked, a click keeps it")
+			helpers.assert_true(c.AutoOff.set_pointer("left_click", true))
+			helpers.assert_eq(c.manager.caps_word_observe_pointer(c.AutoOff.pointer_kind_of_button(Codes.BTN_LEFT)), true)
+			helpers.assert_eq(c.manager.is_caps_word_active(), false)
+		end)
+	end)
+
+	helpers.it("(cwl-002) a delay set from 0 mid-session ends a silent CapsWord", function()
+		with_caps_word('[shortcuts.caps_word]\nidle_timeout_seconds = 0\n', function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			c.now = 1500
+			c.manager.caps_word_observe_text("a")
+			helpers.assert_true(c.AutoOff.set_idle_timeout_seconds(1))
+			c.now = 2400
+			c.run_due()
+			helpers.assert_true(c.manager.is_caps_word_active(), "0.9 s after the last key")
+			c.now = 2500
+			c.run_due()
+			helpers.assert_eq(c.manager.is_caps_word_active(), false, "1 s after the last key, the new delay ends it")
+		end)
+	end)
+
+	helpers.it("(cwl-002) a shorter delay mid-session replaces the old idle check", function()
+		with_caps_word('[shortcuts.caps_word]\nidle_timeout_seconds = 10\n', function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_true(c.AutoOff.set_idle_timeout_seconds(1))
+			c.now = 2000
+			c.run_due()
+			helpers.assert_eq(c.manager.is_caps_word_active(), false, "ends 1 s after activation, not 10 s")
+		end)
+	end)
+
+	helpers.it("(cwl-002) a longer delay or 0 mid-session never lets the old check end it early", function()
+		with_caps_word('[shortcuts.caps_word]\nidle_timeout_seconds = 1\n', function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_true(c.AutoOff.set_idle_timeout_seconds(5))
+			c.now = 2000
+			c.run_due()
+			helpers.assert_true(c.manager.is_caps_word_active(), "the 1 s check of the old delay is retired")
+			c.now = 6000
+			c.run_due()
+			helpers.assert_eq(c.manager.is_caps_word_active(), false, "the 5 s delay ends it")
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_true(c.AutoOff.set_idle_timeout_seconds(0))
+			c.now = 60000
+			c.run_due()
+			helpers.assert_eq(c.manager.caps_word_observe_text("a"), false, "0: never times out")
+			helpers.assert_true(c.manager.is_caps_word_active())
+		end)
+	end)
+
+	helpers.it("(cwl-002) a hand edit still waits for the next activation", function()
+		with_caps_word(nil, function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			local file = assert(io.open(c.path, "wb"))
+			file:write('[shortcuts.caps_word]\nterminators = ["comma"]\n')
+			file:close()
+			c.AutoOff.refresh()
+			helpers.assert_eq(c.manager.caps_word_observe_text(" "), true, "the running session keeps its settings")
+		end)
+	end)
 end)
 
 

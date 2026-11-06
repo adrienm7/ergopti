@@ -318,6 +318,11 @@ local function persist(path, value, apply, resolve_value)
 	apply(staged, value)
 	publish(staged)
 	Logger.info(LOG, "%s set to %s.", path, type(value) == "table" and table.concat(value, ", ") or tostring(value))
+	-- The running session follows an acknowledged change from its next event.
+	manager = package.loaded["modules.shortcuts.manager"]
+	if type(manager) == "table" and type(manager.caps_word_policy_published) == "function" then
+		manager.caps_word_policy_published(_policy)
+	end
 	return true
 end
 
