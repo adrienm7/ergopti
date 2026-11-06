@@ -1127,10 +1127,8 @@ Each closes on a named green hosted or native run, recorded here.
       Done: the wait, the named refusal, tests on Linux and macOS.
 - [ ] Dashboard export and purge on the three drivers (reset exists as `metrics_reset_session`). Decided 2026-11-06:
       both go through the single owning writer after its flush settles, with a confirmation, same behaviour on every
-      OS, text through the `i18n` skill in all locales. Open question for the maintainer before any purge code: the stores are append-only
-      per-device ledgers (`data.sql`) that sibling devices replay, so deleting this device's rows is re-imported or
-      contradicted unless purge also covers foreign device folders or writes a tombstone. Choose: this device only
-      with its folder removed from sync, all devices, or a tombstone row. Export has no such question (a copy taken
+      OS, text through the `i18n` skill in all locales. Purge decided 2026-11-06: purge everywhere. The owning writer appends a dated tombstone row to its ledger; every
+      device applies it when replaying, so purged data never comes back from a sibling device. Export has no such question (a copy taken
       after the flush settles). Not built yet: needs the writer-side request/receipt protocol
       per driver (Linux `request_session_reset`, macOS `log_manager`, Windows `KL_*` journal owner) and a Windows run.
 

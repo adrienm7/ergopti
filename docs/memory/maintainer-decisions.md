@@ -668,3 +668,8 @@ receipt) is written for each driver (see TODO).
 
 Pinned by `test_keystats_sqlite_read_concurrency.lua` (Linux, real `sqlite3`: held
 lock, hot journal) and `test_sqlite_reader_busy_wait.lua` (macOS).
+
+## Metrics purge applies to every device (2026-11-06)
+
+The dashboard's « Purger » removes the data on every device. The owning writer appends a dated tombstone row to its
+append-only ledger, and each device applies it while replaying, so a sibling device never re-imports purged rows.
