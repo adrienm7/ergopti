@@ -39,8 +39,6 @@ local _relay_refusal, _refusal_origin = nil, nil
 local _fallback_origin, _fallback_stage = nil, nil
 -- The cause last reported, so the log names each change once.
 local _last_cause = nil
--- The read-only managed-runtime resolver, built on the first capture.
-local _resolver = nil
 
 --- Records the result of one owned runtime repair.
 --- @param result table { ok, error?, origin?, direct_fallback?, relay_refusal? } as the repair controller reports it.
@@ -91,14 +89,15 @@ function M.direct_fallback(origin)
 end
 
 --- The managed runtime's read-only status: installed, missing or unavailable.
+--- Each observation builds its own resolver. A resolver records the absence of
+--- missing ancestors as part of its witness, so one kept from before the first
+--- install refused the parents that install created and reported the new
+--- runtime absent until a restart (audit LRT-001).
 --- @return string status
 local function managed_status()
-	if _resolver == nil then
-		local ok, resolver = pcall(function() return require("modules.llm.ollama_install_resolver").new() end)
-		if not ok or type(resolver) ~= "table" then return "unavailable" end
-		_resolver = resolver
-	end
-	local ok, verdict = pcall(require("modules.llm.ollama_installed_runtime").capture, _resolver)
+	local built, resolver = pcall(function() return require("modules.llm.ollama_install_resolver").new() end)
+	if not built or type(resolver) ~= "table" then return "unavailable" end
+	local ok, verdict = pcall(require("modules.llm.ollama_installed_runtime").capture, resolver)
 	return ok and type(verdict) == "table" and type(verdict.status) == "string" and verdict.status or "unavailable"
 end
 
@@ -139,9 +138,9 @@ function M.capture(llm, ports)
 	return available, reason, cause
 end
 
---- Test seam: forgets the recorded failure and fallback, the resolver and the last cause.
+--- Test seam: forgets the recorded failure and fallback and the last cause.
 function M._reset()
-	_failure, _resolver, _last_cause, _relay_refusal, _refusal_origin = nil, nil, nil, nil, nil
+	_failure, _last_cause, _relay_refusal, _refusal_origin = nil, nil, nil, nil
 	_fallback_origin, _fallback_stage = nil, nil
 end
 
