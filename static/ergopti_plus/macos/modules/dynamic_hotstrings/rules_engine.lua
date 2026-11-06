@@ -373,7 +373,13 @@ local function preview_provider(buf, start_is_boundary)
 	local match = SharedEngine.match_buffer(buf, GROUP_NAME, guard, start_is_boundary)
 	if not ResolutionOwner.current(resolution, _active_start_token, _km, _trigger,
 		match and match.rule.section) then return nil end
-	if not match then return require("modules.dynamic_hotstrings.user_code").preview(buf) end
+	if not match then
+		-- A programmable preview is declared display metadata and its callback
+		-- types literally, so it must not be projected as TOML output tokens.
+		local described = require("modules.dynamic_hotstrings.user_code").preview(buf)
+		if described == nil then return nil end
+		return { text = described, literal = true }
+	end
 	local token = {}
 	_preview_snapshot = {
 		buffer = buf,
