@@ -60,22 +60,22 @@ _NPPA_Exercise() {
 	FilePathsEditor()
 	_NPPA_Require(_NPPA.Windows.Length == 1, "The actual public editor must create exactly one real native window.")
 	Window := _NPPA.Windows[1].Gui
-	Edit := 0, Button := 0
+	PathEdit := 0, Button := 0
 	for Control in Window {
 		if Control.Type == "Edit"
-			Edit := Control
+			PathEdit := Control
 		if Control.Type == "Button" && Control.Text == "button.ok"
 			Button := Control
 	}
-	_NPPA_Require(IsObject(Edit) && IsObject(Button), "The original native edit and OK controls must resolve.")
+	_NPPA_Require(IsObject(PathEdit) && IsObject(Button), "The original native edit and OK controls must resolve.")
 	Candidate := A_Args[2] . "\changed\"
-	Edit.Value := Candidate
+	PathEdit.Value := Candidate
 	_NPPA_Require(Candidate != _ConfigDir, "The candidate must differ from the retained folder.")
 	Suspend(true)
 	try {
 		_NPPA_Click(Button, 1)
 		_NPPA_Require(_NPPA.Writes.Length == 0 && DllCall("IsWindowVisible", "Ptr", _NPPA.Windows[1].Hwnd, "Int")
-			&& Edit.Value == Candidate, "A paused OK callback must not enter the writer or retire its exact native editor.")
+			&& PathEdit.Value == Candidate, "A paused OK callback must not enter the writer or retire its exact native editor.")
 	} finally Suspend(false)
 	_NPPA_Observe()
 	_NPPA_Require(_NPPA.Writes.Length == 0 && _NPPA.Returned == 1, "Resume alone must not replay a refused folder change.")
