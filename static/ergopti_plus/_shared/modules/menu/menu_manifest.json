@@ -2406,12 +2406,7 @@
 		},
 		{
 			"type": "list",
-			"id": "layout_emulation",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			"id": "layout_emulation"
 		},
 		{
 			"type": "list",

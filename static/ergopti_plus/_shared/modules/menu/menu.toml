@@ -2151,12 +2151,11 @@ i18n = "menu.layout.header_layers"
 # ships or the layout manager installed. It writes what the onboarding choice
 # writes. Windows picks it in the shared layout manager and reports it in the
 # custom_layouts status row above, where macOS and Linux list the system's own
-# input sources, so only the Lua drivers draw it here.
+# input sources; the three drivers draw this row (Windows from its registry
+# catalogue, through the layout manager's acknowledged handoff).
 [[menu.layout_menu]]
 type = "list"
 id = "layout_emulation"
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 # `list` rather than `dynamic` since 2026-08-07: the driver answers with row
 # DATA and the renderer materialises it, where a `dynamic` handler was handed the

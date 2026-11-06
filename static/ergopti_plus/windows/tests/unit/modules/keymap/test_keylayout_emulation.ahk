@@ -163,6 +163,135 @@ _KLT_VectorsCase() {
 	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
 }
 
+Test("keylayout emulation: the shared [layout] options vectors decide as the Lua emulation does (layout-registry-emulation)",
+	() => _KLT_WithEmulation(_KLT_OptionsVectorsCase))
+
+; Modifier word of an options-vector press -> the hotkey prefix of its chord.
+_KLT_ChordPrefix(Mods) => Mods.Has("ctrl") ? "^" : (Mods.Has("alt") ? "!" : "#")
+
+; Decides one press of emulation_vectors.json the way the registered hotkeys
+; do, through the production criteria and handlers' own functions: the
+; criterion of the hotkey that would catch the press, then the same output
+; call as its handler (_KLE_OnKey, _KLE_OnAltGr, _KLE_OnShortcut, the reset
+; keys). The vectors name the OS layout's character (native=), where the
+; handler reads the machine's, so the completion goes through
+; KeylayoutEmulation_ComposeNative.
+; @param Press {String} "[mods] SCnnn [native=text]".
+; @returns {Map} "decides" (pass, type, type_pass or shortcut) and "text".
+_KLT_OptionsDecide(Press) {
+	global KLE_KeyCodes, KLE_DEAD_RESET_KEYS, KLE_NATIVE_CHORD_KEYS
+	Mods := Map()
+	Sc := ""
+	NativeText := ""
+	for Word in StrSplit(Press, " ") {
+		if SubStr(Word, 1, 7) == "native="
+			NativeText := SubStr(Word, 8)
+		else if RegExMatch(Word, "^SC[0-9A-F]{3}$")
+			Sc := Word
+		else
+			Mods[Word] := true
+	}
+	Assert(Sc != "", "a vector press names a scan code: " . Press)
+	Pass := Map("decides", "pass", "text", "")
+	for Key in KLE_DEAD_RESET_KEYS {
+		if Key == Sc {
+			KeylayoutEmulation_ResetDeadKey()
+			return Pass
+		}
+	}
+	; No hotkey exists for a key the layout table does not hold.
+	if !KLE_KeyCodes.Has(Sc)
+		return Pass
+	if Mods.Has("ctrl") || Mods.Has("alt") || Mods.Has("win") {
+		Prefix := _KLT_ChordPrefix(Mods)
+		if KLE_NATIVE_CHORD_KEYS.Has(Sc) || !_KLE_ShortcutCriterion(Prefix . Sc)
+			return Pass
+		KeylayoutEmulation_ResetDeadKey()
+		Char := KeylayoutEmulation_ShortcutChar(Sc, Prefix)
+		return Char == "" ? Pass : Map("decides", "shortcut", "text", Char)
+	}
+	Shift := Mods.Has("shift")
+	Caps := Mods.Has("caps")
+	if Mods.Has("altgr") {
+		if !_KLT_AltGrRowOnKanaFamily(_KLE_AltGrCriterion.Bind("SC138 & " . Sc))
+			return Pass
+		return Map("decides", "type", "text", KeylayoutEmulation_Press(Sc, Shift, Caps, true))
+	}
+	if !_KLE_BaseCriterion(Sc, Shift)
+		return Pass
+	if LayoutRowIsEmulated(Sc) && KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) && !_KLE_DigitsOwnKey(Sc, Shift)
+		return Map("decides", "type", "text", KeylayoutEmulation_Press(Sc, Shift, Caps, false))
+	Step := KeylayoutEmulation_ComposeNative({Count: StrLen(NativeText) > 0 ? 1 : 0, Text: NativeText})
+	return Map("decides", Step["Native"] ? "type_pass" : "type", "text", Step["Output"])
+}
+
+; The vectors that order the number row (digits or symbols first) with the row
+; emulated: the ordering in effect is the foreground OS layout's, which a unit
+; test cannot fix, so the Lua drivers replay them and AHK pins them by name
+; (number_row_levels.json and the number-row suites own the AHK side).
+_KLT_OptionsVectorIsOsDependent(Vector) {
+	Settings := Vector.Has("settings") ? Vector["settings"] : Map()
+	return Settings.Get("number_row", "native") != "native" && Settings.Get("emulate_number_row", true) ? true : false
+}
+
+_KLT_OptionsVectorsCase() {
+	global Features, CategoryEnabled, LayerEnabled, ScriptInformation
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone(),
+		ScriptInformation["MagicKeySourceScan"], ScriptInformation["MagicKeySourceOverridesEmulation"]]
+	Vectors := JsonParse(FileRead(_SharedDir . "\tests\corpus\layouts\emulation_vectors.json", "UTF-8"))["vectors"]
+	Assert(Vectors.Length >= 12, "the options corpus holds its vectors")
+	Failures := []
+	Skipped := []
+	Replayed := 0
+	try {
+		for Vector in Vectors {
+			if _KLT_OptionsVectorIsOsDependent(Vector) {
+				Skipped.Push(Vector["id"])
+				continue
+			}
+			Settings := Vector.Has("settings") ? Vector["settings"] : Map()
+			Layout := Map("emulated_layout", Vector["layout"], "ergopti_variant", "none",
+				"ergopti_base", Settings.Get("base", true) ? true : false,
+				"ergopti_alt_gr", Settings.Get("alt_gr", true) ? true : false,
+				"direct_access_digits", "native")
+			for Row in ["number_row", "top_row", "home_row", "bottom_row"]
+				Layout["emulate_" . Row] := Settings.Get("emulate_" . Row, true) ? true : false
+			Features := Map("layout", Layout,
+				"hotstrings", Map("magic_key", Map("replace", Map("enabled", Settings.Has("magic_key")))))
+			CategoryEnabled := Map("Layout", true)
+			LayerEnabled := false
+			State["initialized"] := false
+			MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
+			ScriptInformation["MagicKeySourceScan"] := Settings.Get("magic_key", "")
+			ScriptInformation["MagicKeySourceOverridesEmulation"] := Settings.Has("magic_key")
+			_KLT_Load(Vector["layout"])
+			KeylayoutEmulation_ResetDeadKey()
+			Replayed += 1
+			for Position, Step in Vector["steps"] {
+				Label := Vector["id"] . " #" . Position . " (" . Step["press"] . ")"
+				Got := _KLT_OptionsDecide(Step["press"])
+				if Got["decides"] != Step["decides"]
+					Failures.Push(Label . " decided " . Got["decides"] . " instead of " . Step["decides"])
+				else if Step.Has("text") && Step["text"] !== Got["text"]
+					Failures.Push(Label . " gave [" . Got["text"] . "] instead of [" . Step["text"] . "]")
+			}
+		}
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		State.Clear()
+		for Key, Value in Saved[4]
+			State[Key] := Value
+		ScriptInformation["MagicKeySourceScan"] := Saved[5]
+		ScriptInformation["MagicKeySourceOverridesEmulation"] := Saved[6]
+	}
+	AssertEqual(5, Skipped.Length, "only the OS-dependent number-row orderings stay with the Lua replay: " . _KLT_Join(Skipped))
+	AssertEqual(Vectors.Length - 5, Replayed, "every other options vector is replayed")
+	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
+}
+
 Test("keylayout emulation: captured routes retain layout and modifiers after unload (todo49-captured-kle)",
 	() => _KLT_WithEmulation(_KLT_CapturedReplayVectorsCase))
 

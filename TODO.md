@@ -822,9 +822,14 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
 4. The checks below and the [standing checks](docs/tooling/windows-maintainer-checks.md#standing-checks) 1 to 15
    (`node tools/maintainer/windows-live-checks.cjs` runs the automatable ones).
 
-- [ ] Layout emulation parity (2026-11-06): replay `_shared/tests/corpus/layouts/emulation_vectors.json` in
-      `test_keylayout_emulation.ahk` (the Lua drivers' options oracle; only `keylayout_vectors.json` is replayed by
-      AHK today) and fix any difference in the Windows emulation or the corpus.
+- [ ] Layout emulation parity (2026-11-06): run the Windows suite once on a real machine. The AHK test
+      `test_keylayout_emulation.ahk` now replays `emulation_vectors.json` (written without an AutoHotkey runtime,
+      never run), except five vectors that order the number row (digits or symbols first), whose ordering in effect
+      is the foreground OS layout's: the Lua drivers replay those, the AHK number-row suites own that side. Fix any
+      difference in the Windows emulation or the corpus, and check the vectors skipped by name are still five.
+- [ ] Layout emulation row on Windows (2026-11-06): Tray > Layout > « Disposition à émuler » lists none, Ergopti,
+      Ergopti➕ and the registry layouts; choosing one restarts the driver on it (the tick follows), « none » types
+      the system layout, an uninstalled stored layout stays named.
 - [ ] Tray > Gestures: one « Infos… » row that opens the dialog.
 - [ ] Ollama or oMLX on a non-default port with the process scan failing: still found.
 - [ ] `axa` then Space fast, 20 times: always `AXA`.
