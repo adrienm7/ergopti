@@ -17,6 +17,7 @@
 // =================================
 
 let _strings = {};
+let _initialized = false;
 
 /**
  * Returns the translated string for key, or the key itself as a fallback.
@@ -66,6 +67,7 @@ window.initData = function (data) {
 		applyDomStrings();
 	}
 
+	if (_initialized || !Array.isArray(data.fields)) return;
 	const rows = document.getElementById('rows');
 	rows.innerHTML = '';
 	(data.fields || []).forEach(function (f) {
@@ -91,6 +93,7 @@ window.initData = function (data) {
 		rows.appendChild(row);
 	});
 
+	_initialized = true;
 	const first = document.querySelector('#rows textarea');
 	if (first) first.focus();
 };

@@ -26,15 +26,25 @@ end
 local function opening_current(owner, state, context)
 	if _opening ~= owner or not owner
 		or type(context) ~= "table" or context.app_name ~= APP_NAME or context.epoch ~= owner.epoch
+		or context.document_owner ~= owner.document_owner
+		or type(owner.host.document_owner_current) ~= "function"
+		or owner.host.document_owner_current ~= owner.document_owner_current
+		or type(owner.host.document_owner_retained) ~= "function"
+		or owner.host.document_owner_retained ~= owner.document_owner_retained
 		or dependency(state, "dyn_hotstrings", "modules.dynamic_hotstrings.manager") ~= owner.dynamic
 		or dependency(state, "webview_manager", "ui.webview_manager") ~= owner.host
 		or owner.host.current_epoch ~= owner.current_epoch or owner.host.page_current ~= owner.page_current
 		or type(owner.current_epoch) ~= "function" or type(owner.page_current) ~= "function" then return false end
+	local admitted, document_current = pcall(owner.document_owner_current, owner.document_owner)
+	if not admitted or document_current ~= true or _opening ~= owner then return false end
 	local read, epoch = pcall(owner.current_epoch, APP_NAME)
 	if not read or epoch ~= owner.epoch or _opening ~= owner then return false end
 	local called, current = pcall(owner.page_current, APP_NAME, owner.epoch)
-	return called and current == true and _opening == owner and owner.host.current_epoch == owner.current_epoch
+	local retained, still_owned = pcall(owner.document_owner_retained, owner.document_owner)
+	return called and current == true and retained and still_owned == true and _opening == owner and owner.host.current_epoch == owner.current_epoch
 		and owner.host.page_current == owner.page_current
+		and owner.host.document_owner_current == owner.document_owner_current
+		and owner.host.document_owner_retained == owner.document_owner_retained
 end
 
 local function notify_refused(state)
@@ -51,13 +61,17 @@ local function close_page(state, context)
 		and manager.hide(APP_NAME) == true
 end
 
-local function push_init(state, payload, current)
+local function push_init(state, payload, current, document_owner)
 	local manager = dependency(state, "webview_manager", "ui.webview_manager")
 	if not manager or type(manager.eval_js) ~= "function" or current and not current() then return false end
 	local ok_json, encoded = pcall(Json.encode, payload)
 	if not ok_json or type(encoded) ~= "string" or current and not current() then return false end
-	local ok_push, pushed = pcall(manager.eval_js, APP_NAME,
-		"if(window.initData) window.initData(" .. encoded .. ")")
+	local evaluate = document_owner and manager.eval_owned_js or manager.eval_js
+	if type(evaluate) ~= "function" then return false end
+	local code = "if(window.initData) window.initData(" .. encoded .. ")"
+	local ok_push, pushed
+	if document_owner then ok_push, pushed = pcall(evaluate, APP_NAME, document_owner, code)
+	else ok_push, pushed = pcall(evaluate, APP_NAME, code) end
 	return ok_push and pushed == true and (not current or current())
 end
 
@@ -103,8 +117,8 @@ end
 --- @return any|nil  Response to send back to JS.
 function M.on_message(payload, state, context)
 	state = type(state) == "table" and state or {}
-	if type(payload) ~= "table" then return nil end
-	local action = payload.action
+	local action = type(payload) == "table" and payload.action or payload == "ready" and "ready" or nil
+	if not action then return nil end
 	if action == "ready" then
 		local captured, current, candidate
 		if type(context) == "table" and context.epoch ~= nil then
@@ -114,12 +128,25 @@ function M.on_message(payload, state, context)
 				return { pushed = false }
 			end
 			if context.app_name ~= APP_NAME or type(context.epoch) ~= "number" or context.epoch <= 0
-				or context.epoch % 1 ~= 0 or type(host.current_epoch) ~= "function" then return { pushed = false } end
+				or context.epoch % 1 ~= 0 or type(host.current_epoch) ~= "function"
+				or type(context.document_owner) ~= "table" or type(host.document_owner_current) ~= "function" then return { pushed = false } end
+			if _opening and _opening.document_owner == context.document_owner then
+				local owner = _opening
+				current = function() return opening_current(owner, state, context) end
+				if not current() then return { pushed = false } end
+				if owner.pushed then return { pushed = true } end
+				if not owner.payload or not owner.receipt then return { pushed = false } end
+				local pushed = push_init(state, owner.payload, current, owner.document_owner)
+				if pushed and current() then owner.pushed = true end
+				return { pushed = pushed }
+			end
 			local previous = _opening
 			local checked, epoch = pcall(host.current_epoch, APP_NAME)
 			if not checked or epoch ~= context.epoch or _opening ~= previous then return { pushed = false } end
 			local owner = { dynamic = dynamic, host = host, epoch = context.epoch,
-				current_epoch = host.current_epoch, page_current = host.page_current }
+				current_epoch = host.current_epoch, page_current = host.page_current,
+				document_owner = context.document_owner, document_owner_current = host.document_owner_current,
+				document_owner_retained = host.document_owner_retained }
 			_opening = owner
 			current = function() return opening_current(owner, state, context) end
 			if not current() then return { pushed = false } end
@@ -130,8 +157,11 @@ function M.on_message(payload, state, context)
 			captured = { info = info, letters = letters, trigger = trigger }
 		end
 		local data = _build_initial_payload(state, captured)
-		local pushed = data ~= nil and push_init(state, data, current)
-		if pushed and candidate and current() then candidate.owner.receipt = candidate.receipt end
+		if candidate and current() then
+			candidate.owner.receipt, candidate.owner.payload = candidate.receipt, data
+		end
+		local pushed = data ~= nil and push_init(state, data, current, candidate and candidate.owner.document_owner)
+		if pushed and candidate and current() then candidate.owner.pushed = true end
 		if not pushed then Logger.error(LOG, "Personal-info initial data could not reach the page.") end
 		return { pushed = pushed, data = data }
 	end
@@ -141,7 +171,7 @@ function M.on_message(payload, state, context)
 		if type(context) == "table" and context.epoch ~= nil then
 			owner = _opening
 			current = function() return opening_current(owner, state, context) end
-			if not current() or owner.receipt == nil then
+			if not current() or owner.receipt == nil or not owner.pushed then
 				if current() then notify_refused(state) end
 				return { saved = false, reloaded = false, closed = false }
 			end

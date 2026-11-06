@@ -49,6 +49,14 @@ async function main() {
 			values
 		);
 		await page.locator('[name="city"]').fill('Paris');
+		await page.evaluate(() =>
+			window.initData({ fields: [{ key: 'city', label: 'city', value: 'Puteaux' }] })
+		);
+		assert.equal(
+			await page.locator('[name="city"]').inputValue(),
+			'Paris',
+			'late initialization must preserve edits'
+		);
 		await page.click('#btn-save');
 		let result = await page.evaluate(() => window.messages.at(-1));
 		assert.deepEqual(result, { action: 'save', values: { ...values, city: 'Paris' } });
