@@ -41,9 +41,18 @@ end
 
 helpers.describe("modules/keymap/utils.lua: clipboard preserves non-text data (audit-v6-bug3)", function()
 	helpers.it("clipboard save uses readAllData() instead of getContents()", function()
-		local src = read_unit("local function invalidate_ignored_win_cache")
+		-- The paste path snapshots through the clipboard adapter's guarded owner,
+		-- which is the one place that reads every pasteboard type.
+		local src = strip_line_comments(read_unit("local function invalidate_ignored_win_cache"))
 		helpers.assert_true(
-			src:find("hs.pasteboard.readAllData()", 1, true) ~= nil,
+			src:find("pcall(Clipboard.save, true)", 1, true) ~= nil,
+			"paste must snapshot through the clipboard adapter")
+		local adapter = strip_line_comments(read_unit("function M.save(quiet)"))
+		local save_pos = adapter:find("function M.save(quiet)", 1, true)
+		local save_end = save_pos and adapter:find("\nfunction M.", save_pos + 1, true)
+		helpers.assert_not_nil(save_end, "the adapter save owner must remain independently bounded")
+		helpers.assert_true(
+			adapter:sub(save_pos, save_end):find("hs.pasteboard.readAllData()", 1, true) ~= nil,
 			"paste must save images, RTF, files, and text")
 	end)
 
