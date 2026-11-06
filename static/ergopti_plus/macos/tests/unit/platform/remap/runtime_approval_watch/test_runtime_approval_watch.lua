@@ -20,16 +20,24 @@ local function line(state)
 		.. "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice\t[" .. state .. "]\n"
 end
 
-local function fake(listings)
+--- @param listings table Successive listing texts; the last one repeats.
+--- @param options table|nil listing_sec: clock cost of each listing; opened: opener result.
+local function fake(listings, options)
+	options = options or {}
 	package.loaded["platform.remap.runtime_approval_watch"] = nil
 	local Watch = require("platform.remap.runtime_approval_watch")
-	local world = { opened = {}, reloads = 0, looks = 0, pending = nil }
+	local world = { opened = {}, reloads = 0, looks = 0, pending = nil, clock = 1000 }
 	local watch = Watch.new({
 		listing = function(callback)
 			world.looks = world.looks + 1
+			world.clock = world.clock + (options.listing_sec or 0)
 			callback(listings[math.min(world.looks, #listings)])
 		end,
-		after = function(_, fn) world.pending = fn; return "handle", true end,
+		now = function() return world.clock end,
+		after = function(seconds, fn)
+			world.pending = function() world.clock = world.clock + seconds; fn() end
+			return "handle", true
+		end,
 		cancel = function() end,
 		open_settings = function(url) world.opened[#world.opened + 1] = url end,
 		reload = function() world.reloads = world.reloads + 1 end,
@@ -61,6 +69,31 @@ helpers.describe("owned runtime driver approval watch", function()
 			next_look()
 		end
 		helpers.assert_eq(world.reloads, 0)
+		helpers.assert_eq(watch.active(), false)
+	end)
+
+	-- MRT-001: the deadline counted poll intervals only, so four-second listings
+	-- kept the watch alive for 2,104 s instead of 900 s.
+	helpers.it("spends its deadline on slow listings too (mrt-001)", function()
+		local watch, world, Watch = fake({ line("activated waiting for user") }, { listing_sec = 4 })
+		local started = world.clock
+		watch.start()
+		while world.pending and watch.active() do
+			local next_look = world.pending
+			world.pending = nil
+			next_look()
+		end
+		helpers.assert_eq(watch.active(), false)
+		helpers.assert_true(world.clock - started < Watch.APPROVAL_TIMEOUT_SEC + Watch.APPROVAL_POLL_SEC + 4,
+			"the watch must stop within its wall-clock budget, stopped after " .. (world.clock - started) .. " s")
+	end)
+
+	helpers.it("does not reload for an approval seen after its deadline (mrt-001)", function()
+		local watch, world, Watch = fake({ line("activated waiting for user"), line("activated enabled") })
+		watch.start()
+		world.clock = world.clock + Watch.APPROVAL_TIMEOUT_SEC
+		world.pending()
+		helpers.assert_eq(world.reloads, 0, "a late approval is left to the menu, the watch is over")
 		helpers.assert_eq(watch.active(), false)
 	end)
 end)

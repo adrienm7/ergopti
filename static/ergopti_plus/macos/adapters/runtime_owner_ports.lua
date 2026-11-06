@@ -211,6 +211,7 @@ local function approval()
 				callback(code == 0 and output or nil)
 			end)
 		end,
+		now = function() return hs.timer.absoluteTime() / 1e9 end,
 		after = function(seconds, fn) return require("adapters.timer_scheduler").after(seconds, fn) end,
 		cancel = function(handle) return require("adapters.timer_scheduler").cancel(handle) end,
 		open_settings = function(url) return hs.urlevent.openURL(url) end,
