@@ -38,6 +38,16 @@ function M.run(helpers, corpus_path)
 			end
 		end)
 
+		helpers.it("applies the resume layout at a running start and the pause one at a paused start", function()
+			helpers.assert_eq(#corpus.startup, 2, "complete startup vectors")
+			for _, row in ipairs(corpus.startup) do
+				helpers.assert_eq(Policy.startup_event(row.paused), row.event, row.id)
+			end
+			for _, value in ipairs(corpus.invalid_startup_states) do
+				helpers.assert_eq(pcall(Policy.startup_event, value), false, "startup state " .. tostring(value))
+			end
+		end)
+
 		helpers.it("refuses an unknown event and settings that are not a table", function()
 			for _, event in ipairs(corpus.invalid_events) do
 				helpers.assert_eq(pcall(Policy.target, { enabled = true, on_pause = "x" }, event), false,
