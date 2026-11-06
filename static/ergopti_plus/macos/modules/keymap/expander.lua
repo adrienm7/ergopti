@@ -1393,6 +1393,13 @@ function M.try_repeat_feature(chars, is_ignored)
 	if before_last == pred_char and _state.start_is_word_boundary == false then return false end
 
 	local next_buffer = _state.buffer:sub(1, magic_offset - 1) .. last_char
+	-- The repeated scalar is derived from a secret whenever the text before the
+	-- magic key is still inside the span a private expansion marked (nothing
+	-- public typed since, or a Backspace inside it): it keeps the private
+	-- classification, which also extends the mark so a further repeat stays private.
+	local private_mark = _state.llm_private_mark
+	local is_private = type(private_mark) == "string" and before ~= ""
+		and private_mark:sub(1, #before) == before
 	local replaced = M.perform_text_replacement(
 		is_ignored and char_len or 0,
 		function() return km_utils.emit_text(last_char) end,
@@ -1400,10 +1407,14 @@ function M.try_repeat_feature(chars, is_ignored)
 			_state.buffer = next_buffer
 			if _state.llm_context_text ~= nil then LlmContext.replace_tail(_state, char_len, last_char) end
 		end,
-		false, is_ignored, "hotstring", ConfigKeys.COMMAND.REPEAT_KEY, false)
+		false, is_ignored, "hotstring", ConfigKeys.COMMAND.REPEAT_KEY, is_private)
 	if replaced ~= true then return false end
 
-	Logger.debug(LOG, "Repeat feature: repeated '%s'.", last_char)
+	if is_private then
+		Logger.debug(LOG, "Repeat feature: repeated a private character (content withheld).")
+	else
+		Logger.debug(LOG, "Repeat feature: repeated '%s'.", last_char)
+	end
 	return true
 end
 
