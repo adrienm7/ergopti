@@ -289,8 +289,8 @@ _LayoutComposer_Report(Deps, Action, Ok, Code := "", Detail := "", Used := false
  * Handles one composer message of the page.
  * @param {string} Action - composer_open, composer_save or composer_remove.
  * @param {Map} Payload - Decoded message.
- * @param {Map} Deps - "config_dir", "local_dir", "push", "selected", "select",
- *   "after", "install_local", "uninstall", "write_text", "delete"; the
+ * @param {Map} Deps - "config_dir", "local_dir", "push", "selected",
+ *   "select_settled", "after", "install_local", "uninstall", "write_text", "delete"; the
  *   production ones by default.
  * @returns {boolean} Whether the message was accepted.
  */
@@ -326,7 +326,7 @@ _LayoutComposer_Deps(Deps) {
 		"local_dir", LayoutRegistry_LocalDir(_ConfigDir),
 		"push", _LayMgrWeb_Push,
 		"selected", KeylayoutEmulation_SelectedId,
-		"select", LayoutManager_Select,
+		"select_settled", LayoutManager_SelectSettled,
 		"after", _LayMgrWeb_After,
 		"install_local", LayoutCatalogue_InstallLocal,
 		"uninstall", LayoutCatalogue_Uninstall,
@@ -380,11 +380,17 @@ _LayoutComposer_OnInstalled(Deps, Use, Ok, CodeOrDetail := "", Detail := "") {
 	if Use && !Selected {
 		; The selection writes the configuration and reloads: the emulation
 		; registers its hotkeys at boot only.
-		if !Deps["select"].Call(Id) {
-			_LayoutComposer_Report(Deps, Action, false, LAYOUT_COMPOSER_FAILURE_USE, "the layout could not be selected")
-			return
+		; Launch acceptance is not use: the result is published once the
+		; reload commits, or fails if the successor later refuses the handoff.
+		Settled(SelectOk, SelectDetail := "") {
+			_LayoutComposer_Report(Deps, Action, SelectOk, SelectOk ? "" : LAYOUT_COMPOSER_FAILURE_USE,
+				SelectDetail, SelectOk)
 		}
-		_LayoutComposer_Report(Deps, Action, true, "", "", true)
+		try Deps["select_settled"].Call(Id, Settled)
+		catch as Err {
+			LoggerError("LayoutComposer", "Selecting the composed layout failed: {1}", Err.Message)
+			Settled(false, "the layout could not be selected")
+		}
 		return
 	}
 	if Selected {
