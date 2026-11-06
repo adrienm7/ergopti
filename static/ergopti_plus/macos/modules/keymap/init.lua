@@ -2022,7 +2022,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- Enter / Tab with no predictions visible clears prediction state.
 	-- When predictions ARE visible, Tab is consumed upstream by handle_llm_keys
 	-- (fast-accepts pred #1) and never reaches this point.
-	if keyCode == Keycodes.RETURN or keyCode == 48 then
+	if keyCode == Keycodes.RETURN or keyCode == Keycodes.ENTER or keyCode == Keycodes.TAB then
 		cancel_action_preview_recovery()
 		LLMBridge.check_nav_reset()
 	end
@@ -2030,7 +2030,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- A bare Return in a terminal submits the line: the prompt that follows is
 	-- empty and a Backspace there deletes nothing. Shift+Return inserts a
 	-- newline in the multi-line TUIs and keeps no such promise.
-	if keyCode == Keycodes.RETURN and not (flags.shift or flags.alt or flags.cmd or flags.ctrl)
+	if (keyCode == Keycodes.RETURN or keyCode == Keycodes.ENTER) and not (flags.shift or flags.alt or flags.cmd or flags.ctrl)
 		and focused_input_kind() == "terminal" then
 		CoreState.buffer = ""
 		CoreState.start_is_word_boundary = true

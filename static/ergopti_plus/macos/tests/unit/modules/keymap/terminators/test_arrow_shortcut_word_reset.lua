@@ -394,8 +394,10 @@ end)
 
 local KEYCODE_HOME = 115
 local KEYCODE_RETURN = 36
+local KEYCODE_KEYPAD_ENTER = 76
 local OPTION = { cmd = false, ctrl = false, alt = true, shift = false }
 local CMD = { cmd = true, ctrl = false, alt = false, shift = false }
+local SHIFT = { cmd = false, ctrl = false, alt = false, shift = true }
 
 --- Makes the focused application the one named.
 --- @param bundle string Bundle identifier.
@@ -498,6 +500,29 @@ helpers.describe("erasing what was typed (bs-word-start)", function()
 			f.press("a")
 			backspaces(f, 2)
 			helpers.assert_eq(then_r(f), "", "in an editor the extra Backspace joined the lines")
+		end)
+	end)
+
+	helpers.it("bs-word-start: a terminal prompt after keypad Enter keeps its word start (WRM-002)", function()
+		for _, payload in ipairs({ "\r", "\3" }) do
+			with_keymap(function(f)
+				focus_app("com.apple.Terminal", "Terminal")
+				f.press("a")
+				f.press(payload, nil, KEYCODE_KEYPAD_ENTER)
+				f.pause(10)
+				f.press("a")
+				backspaces(f, 2)
+				helpers.assert_eq(then_r(f), "R",
+					"keypad Enter submits like Return: the extra Backspace hit the empty prompt")
+			end)
+		end
+		with_keymap(function(f)
+			focus_app("com.apple.Terminal", "Terminal")
+			f.press("a")
+			f.press("\r", SHIFT, KEYCODE_KEYPAD_ENTER)
+			f.press("a")
+			backspaces(f, 2)
+			helpers.assert_eq(then_r(f), "", "Shift+keypad Enter keeps no empty-prompt promise (multiline)")
 		end)
 	end)
 
