@@ -155,6 +155,7 @@ helpers.describe("diagnostics probes (linux)", function()
 				done({ status = 200, body = "{}" }); return false
 			end
 			local run, answers = start(Probes, { llm = { is_enabled = function() return true end,
+				get_backend = function() return "ollama" end,
 				get_base_url = function() return "http://127.0.0.1:11434" end } })
 			helpers.assert_eq(answers.github_api.result.state, "ok")
 			helpers.assert_eq(answers.ai_health.result.state, "ok")
@@ -166,6 +167,7 @@ helpers.describe("diagnostics probes (linux)", function()
 		with_probes(true, function(Probes, world)
 			package.loaded["adapters.http_client"].get = function() return false end
 			local run, answers = start(Probes, { llm = { is_enabled = function() return true end,
+				get_backend = function() return "ollama" end,
 				get_base_url = function() return "http://127.0.0.1:11434" end } })
 			helpers.assert_eq(answers.github_api.result.state, "error")
 			helpers.assert_eq(answers.ai_health.result.state, "error")
