@@ -34,7 +34,7 @@ local function wait_for(done)
 	assert(done(), "owned switch did not settle before its deadline")
 end
 local ok, err = xpcall(function()
-	assert(os.execute("setxkbmap -layout us,fr") == 0)
+	assert(os.execute("setxkbmap -layout us,fr -variant ,oss -option ctrl:nocaps") == 0)
 	assert(x.XkbLockGroup(display, 0x100, 1) ~= 0)
 	x.XSync(display, 0)
 	assert(state() == 1, "precondition requires the second group")
@@ -43,7 +43,7 @@ local ok, err = xpcall(function()
 	port.backend = function() return Switch.X11 end
 	local switcher = Switch.new(port)
 	local completed, accepted, reason = false, nil, nil
-	switcher.select("fr", function(success, detail) completed, accepted, reason = true, success, detail end)
+	switcher.select("fr(oss)", function(success, detail) completed, accepted, reason = true, success, detail end)
 	wait_for(function() return completed end)
 	assert(accepted == true, tostring(reason))
 	assert(state() == 0, "successful switch left a different group active")
@@ -51,6 +51,8 @@ local ok, err = xpcall(function()
 	local listing = query:read("*a"); assert(query:close())
 	local parsed = assert(Switch.parse_setxkbmap_query(listing))
 	assert(parsed.layouts[1] == "fr" and parsed.layouts[2] == "us", "other layouts were lost")
+	assert(parsed.variants[1] == "oss" and parsed.variants[2] == "", "layout variants lost alignment")
+	assert(listing:match("\noptions:%s*ctrl:nocaps"), "the existing XKB option was lost")
 
 	-- A latched group can make the effective state nonzero even after a
 	-- successful XkbLockGroup(0). The actual worker must refuse that state.
