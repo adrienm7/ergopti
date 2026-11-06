@@ -330,10 +330,12 @@ helpers.describe("context writer incomplete evidence and callback retirement", f
 		end)
 	end)
 
-	helpers.it("keeps missing AX role evidence denied instead of treating its false cache as classification", function()
+	helpers.it("keeps missing AX role evidence denied and its cached verdict fail-closed", function()
 		with_fixture(function(_, state, c)
 			c.bind(); c.role = nil; c.activate()
-			helpers.assert_eq(state.is_secure_field, false); assert_denied(last(c.records))
+			-- A missing AXRole is an incomplete privacy read: the cached secure
+			-- verdict fails closed (secure-role-malformed) and the record is denied.
+			helpers.assert_eq(state.is_secure_field, true); assert_denied(last(c.records))
 		end)
 	end)
 
