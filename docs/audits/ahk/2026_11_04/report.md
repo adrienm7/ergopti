@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **146 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **147 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -2197,3 +2197,21 @@ Sourced304d10b bounds the candidate before the existing byte-repair loop, retain
 Selectione679ca58 contains9 cases: the4 repaired-composition command pause probes, the first-line work/scalar/script3 and2 new calendar-focus cases. The25 preceding postfix cases remain qualified and are not repeated. No command-lifecycle source fix is integrated before a usable baseline.
 
 Tests77e5065c retain real initialization, native owned GUI/focus, monotonic elapsed intervals, public midnight maintenance, stop, durable journal ingestion and canonical SQLite reader. Only the calendar date/timestamp functions are explicit boundary ports. App and title durations must retain their before/after calendar ownership without manufacturing an app switch; the same-day control also calls real maintenance. Other OS producers already split their foreground intervals at the calendar boundary. This remains an unexecuted Windows hypothesis, with no finding added before its native receipts.
+
+### Native qualification: bounded notice work
+
+Replay42132417328 at17a0e9f0 completes9 timed cases in each order, with4PASS/5FAIL, exact matching names/statuses and no manifest errors or omissions. All3 first-line work/scalar/script cases pass afterd304d10b. The isolated receipt records2 size calls over65736 cumulative input units, retaining the201-unit result, versus65338 calls/2147562052 input units before correction. Its0ms instrumented value is below timer resolution, not a zero-cost claim. This qualifies146 for the declared capture/notice domain and companion boundaries.
+
+Both calendar cases remain unqualified: actual KL_Hook_Stop reaches an unassigned HookDispatcherConst before the durable reader/dated assertions. Commit476ab293 adds the genuine class owner through the production census, preserving all calendar oracles. No calendar finding or source correction is admitted from that fixture dependency failure.
+
+### AHK-147: command authority survives requested lifecycle revocation
+
+The unchanged-epoch command control now passes with the real process owner included. Three actual revoked paths fail in both orders. Retired type/copy trees retain an explicit user-programs debt across both reactor calls, then produce actual native canary output and one forbidden final publication, with diagnostics0/notices0/pending0. The acquisition path also returns started1/native_creates1/canary1/typed1 after revocation before any process existed. The tests call genuine native Suspend/Resume and the real reactor; their deliberate physical refusal is not presented as successful quiescence.
+
+UserActions_StopCommands does not invalidate a request before attempted physical retirement. An uncertain handle remains logically current, and a returning acquisition has no generation to withdraw. This is one147 across both sinks and acquisition, separate from146 sizing and145 byte admission. Sourcec09b00b1 invalidates logical authority before attempted physical cleanup and retains exact acquisition/handle custody through return; no command-lifecycle postfix is claimed. The register reaches147 distinct findings.
+
+### Command cancellation integrated and additional environment probes
+
+Sourcec09b00b1 binds command admission to an epoch captured before parameter lookup, marks every retained request withdrawn before physical termination, retains acquiring/returning handles and separates physical retry from business authority. Report/delivery carry the exact owner across capture reads, vocabulary loading and feedback callouts. The pre-start cleanup guard skips unattempted capture paths; predictable capture ownership after an attempted start remains a separate071 hypothesis. Existing145/146 decoding/sizing sections are preserved. Source parity already revokes callbacks before uncertain cleanup in macOS AuxOwner and Linux OwnedProcess; no new native macOS/Linux execution is claimed.
+
+Tests3eea0498 add five real public-command environment probes: inherited command in either casing, inherited stdout/stderr targets and a clean control. Native snapshots restore the original private variable presence/value; all alternative commands and redirections use private canaries. Buffer duplication is observed without being an oracle: actual Windows execution decides whether native normalization already preserves the requested override. No environment defect or correction is admitted before those receipts.
