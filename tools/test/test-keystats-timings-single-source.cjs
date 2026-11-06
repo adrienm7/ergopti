@@ -205,6 +205,15 @@ const SOURCE_PINS = [
 		file: '_shared/ui/hotstring_editor/script.js',
 		pattern
 	})),
+	...[
+		['token_prompt_focus_retry_first_ms', /\bconst FOCUS_RETRY_FIRST_MS = (\d+);/g],
+		['token_prompt_focus_retry_second_ms', /\bconst FOCUS_RETRY_SECOND_MS = (\d+);/g]
+	].map(([key, pattern]) => ({
+		section: 'ui',
+		key,
+		file: '_shared/ui/token_prompt/script.js',
+		pattern
+	})),
 	{
 		section: 'ui',
 		key: 'metrics_typing_dispatch_delay_ms',

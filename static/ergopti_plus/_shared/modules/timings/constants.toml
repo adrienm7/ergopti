@@ -955,6 +955,16 @@ hotstring_editor_add_entry_delay_ms = 300
 # Delay before the typing metrics page dispatches its next chart update.
 metrics_typing_dispatch_delay_ms = 50
 
+# The token prompt takes the focus again at these two delays after its page
+# loaded, only while no control has been chosen.
+token_prompt_focus_retry_first_ms = 50
+token_prompt_focus_retry_second_ms = 150
+
+# Windows: the pause between two checks that a custom modifier's input hook
+# reported its end, once the first check yielded without delivering it
+# (infra/suppressive_inputhook_ownership.ahk).
+custom_modifier_settle_poll_ms = 1
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Logger
