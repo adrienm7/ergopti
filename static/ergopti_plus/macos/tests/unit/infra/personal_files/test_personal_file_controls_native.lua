@@ -12,6 +12,7 @@
 local helpers = require("tests.helpers")
 local lfs = require("lfs")
 local Files = require("hotstrings.personal_files")
+local SectionBackups = require("tests.support.section_settings_backups")
 
 local function read(path)
 	local file = io.open(path, "rb")
@@ -93,7 +94,7 @@ priority = 40
 [foreign]
 future = "keep every neighbor"
 ]=])
-		local controls, observations = {}, { writes = {}, publications = 0, reads = {}, enumerations = {} }
+		local controls, observations = {}, { writes = {}, backups = {}, publications = 0, reads = {}, enumerations = {} }
 		local cleanup_sources = options.setup and options.setup(root, controls, observations)
 		local native_paths = require("infra.config_paths")
 		package.loaded["infra.config_paths"] = setmetatable({ get = function(key)
@@ -120,6 +121,12 @@ future = "keep every neighbor"
 				return read(path)
 			end,
 			write_if_unchanged = function(path, content, expected)
+				if SectionBackups.is_beside(preferences, path) then
+					observations.backups[#observations.backups + 1] = path
+					local _, status = read(path)
+					if status ~= expected.status then return false end
+					write(path, content); return true
+				end
 				observations.writes[#observations.writes + 1] = { path = path, content = content, expected = expected }
 				if controls.source_inverse_refusal and path == alpha and content == controls.original_source then return false end
 				if controls.source_race and path == alpha then
@@ -217,6 +224,7 @@ future = "keep every neighbor"
 		for _, path in ipairs({ primary, alpha, beta, overrides, preferences, root .. "/gamma.toml" }) do
 			os.remove(path); os.remove(path .. ".owned-stage")
 		end
+		SectionBackups.remove_beside(preferences)
 		assert(lfs.rmdir(root))
 		if not ok then error(detail, 0) end
 	end)
@@ -289,7 +297,7 @@ local function native_fixture(body)
 				local handle, detail = saved_open(path, mode)
 				-- The lock lives in the per-user lock directory: map it back to its file.
 				local source = nil
-				for _, owned in ipairs({ f.alpha, f.overrides }) do
+				for _, owned in ipairs({ f.alpha, f.overrides, table.unpack(observations.backups) }) do
 					if path == native.write_lock_path(owned) then source = owned end
 				end
 				if not handle or mode ~= "a+" or source == nil then
@@ -319,6 +327,10 @@ local function native_fixture(body)
 				return native_read(path, on_error)
 			end
 			files.write_if_unchanged = function(path, content, expected, on_error)
+				if SectionBackups.is_beside(f.root .. "/_preferences.toml", path) then
+					observations.backups[#observations.backups + 1] = path
+					return native_publish(path, content, expected, on_error)
+				end
 				observations.writes[#observations.writes + 1] = { path = path, content = content, expected = expected }
 				local requested, diagnostic = path, on_error
 				if path == f.alpha and controls.foreign_receipt == "callback" then diagnostic = function() end end
