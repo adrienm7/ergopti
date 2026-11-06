@@ -15,22 +15,19 @@ _TSC_FailedReplace(LockStage) {
 	Foreign := Path . ".foreign.tmp"
 	Original := '[sample]`nvalue = "old"`n'
 	TargetLock := 0
-	StageLock := 0
-	OwnedStage := ""
 	SawPrimary := false
-	SawCleanup := false
+	StagesAtRefusal := -1
+	; The owned writer holds and retires its own stage: by the time it reports
+	; the refusal, no stage of this save may remain for anyone to lock.
 	Capture(Line) {
-		if InStr(Line, "Write-through atomic replace") {
+		if InStr(Line, "Owned staging/publication of") && InStr(Line, "refused") {
 			SawPrimary := true
-			if LockStage && !IsObject(StageLock) {
-				loop files Path . "." . A_ScriptHwnd . "-*.tmp", "F" {
-					OwnedStage := A_LoopFileFullPath
-					StageLock := FileOpen(OwnedStage, "r-wd")
-				}
+			if LockStage {
+				StagesAtRefusal := 0
+				loop files Path . "." . A_ScriptHwnd . "-*.tmp", "F"
+					StagesAtRefusal += 1
 			}
 		}
-		if InStr(Line, "Owned staging file cleanup failed")
-			SawCleanup := true
 	}
 	try {
 		_ParseTomlCache := Map()
@@ -46,14 +43,8 @@ _TSC_FailedReplace(LockStage) {
 			AssertEqual(Original, FileRead(Path, "UTF-8"))
 		}
 		AssertTrue(SawPrimary, "the native target lock must reach atomic replacement refusal")
-		if LockStage {
-			AssertTrue(IsObject(StageLock), "the diagnostic hook must lock the actual abandoned stage")
-			AssertTrue(SawCleanup, "a refused deletion must remain visible alongside the primary save failure")
-			AssertTrue(FileExist(OwnedStage))
-			StageLock.Close()
-			StageLock := 0
-			AssertTrue(_TOML_RemoveOwnedStage(OwnedStage))
-		}
+		if LockStage
+			AssertEqual(0, StagesAtRefusal, "the owned stage is retired before its refusal is reported")
 		Count := 0
 		loop files Path . "." . A_ScriptHwnd . "-*.tmp", "F"
 			Count += 1
@@ -64,8 +55,6 @@ _TSC_FailedReplace(LockStage) {
 		AssertTrue(TOML_BatchWrite(Path, Updates))
 		AssertEqual("new", ParseTomlFile(Path)["sample"]["value"])
 	} finally {
-		if IsObject(StageLock)
-			StageLock.Close()
 		if IsObject(TargetLock)
 			TargetLock.Close()
 		_ParseTomlCache := Saved[1]

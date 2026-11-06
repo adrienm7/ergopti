@@ -837,15 +837,6 @@ _TOML_ReapStaleTemps(Path, MaxAgeMs) {
 		}
 }
 
-; Retire only a stage owned and abandoned by the current save operation.
-; A refusal must remain visible without replacing the primary save failure.
-_TOML_RemoveOwnedStage(Path) {
-	if FSDelete(Path)
-		return true
-	try LoggerError("TomlWrite", "Owned staging file cleanup failed for '{1}'.", Path)
-	return false
-}
-
 ; A successful Write call is not proof that the complete qualified image
 ; reached the stage. Read it back exactly before any rename can make it live.
 _TOML_StageMatches(Path, Expected, ReadFn := 0) {
