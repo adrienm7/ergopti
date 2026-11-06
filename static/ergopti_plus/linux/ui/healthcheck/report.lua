@@ -38,6 +38,7 @@ local ReportRunner = require("healthcheck.report")
 local ConfigKeys = require("config_keys")
 
 local LOG = "healthcheck.report"
+local EEXIST = 17 -- Linux exclusive-create collision receipt.
 
 
 
@@ -73,9 +74,9 @@ local DEFAULT_EFFECTS = {
 		local files = require("adapters.file_system")
 		for index = 0, 999 do
 			local path = dir .. "/" .. stem .. (index == 0 and "" or "-" .. index) .. extension
-			local written, reason = files.write_new(path, text)
+			local written, errno = files.write_new(path, text)
 			if written == true then return path end
-			if reason ~= "EEXIST" and reason ~= 17 then return nil, "cannot complete writing " .. path end
+			if errno ~= EEXIST and errno ~= "EEXIST" then return nil, "cannot complete writing " .. path end
 		end
 		return nil, "no unused diagnostic report name"
 	end,

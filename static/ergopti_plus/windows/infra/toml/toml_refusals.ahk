@@ -47,8 +47,8 @@ TOML_WriteRefusal(Path) {
 _TOML_RecordPartialPublication(Path, Publication) {
 	if !(Publication is Object) || !Publication.renamed || Publication.durable
 		throw ValueError("A partial TOML publication requires a real incomplete rename receipt.")
-	Reason := "a native publication in this session was not fully acknowledged; restart before further writes"
-	_TOML_WriteRefusals()[_TOML_WriteRefusalKey(Path)] := {reason: Reason, partial: true}
+	Message := "a native publication in this session was not fully acknowledged; restart before further writes"
+	_TOML_WriteRefusals()[_TOML_WriteRefusalKey(Path)] := {reason: Message, partial: true}
 }
 
 ; Pure reporting query. A blocked retry did not perform another native rename.

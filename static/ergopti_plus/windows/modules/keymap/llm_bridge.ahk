@@ -2167,13 +2167,13 @@ LLM_Bridge_OnPointerActivity(reason := "?") {
  * debounce go, a late answer is dropped by the engine's cancellation, and the
  * tooltip hides at once. The AI context stays: activity is not navigation (a
  * click resets it separately through _OnMouseClickReset).
- * @param {String} Reason The activity, for the debug log.
+ * @param {String} Activity The activity, for the debug log.
  * @returns {Boolean} True when pending prediction work was cancelled.
  */
-LLM_Bridge_OnUserActivity(Reason := "?") {
+LLM_Bridge_OnUserActivity(Activity := "?") {
 	if !LLM_Bridge_HasActivePredictionWork()
 		return false
-	try LoggerDebug("LLM.tt", "DISMISS: user activity ({1}) — cancelling in-progress generation + tooltip.", Reason)
+	try LoggerDebug("LLM.tt", "DISMISS: user activity ({1}) — cancelling in-progress generation + tooltip.", Activity)
 	try LLM_Tooltip_MarkChainTimingOnly(A_TickCount)
 	LLM_Engine_StopGeneration()
 	if ((IsSet(LLM_Tooltip_IsVisible) && LLM_Tooltip_IsVisible())

@@ -262,15 +262,15 @@ local function load_app_overrides()
 	local invalid_type = invalid_parent or (raw ~= nil and type(raw) ~= "string")
 	local overrides, reason
 	if invalid_type then
-		reason = "invalid stored type"
+		reason = "invalid"
 	else
 		overrides, reason = AppOverrides.decode(values[APP_OVERRIDES_KEY] or "")
 	end
 	_app_overrides_source = source
 	if not overrides then
 		ConfigOutdated.report(APP_OVERRIDES_KEY, ConfigOutdated.REFUSED, Logger)
-		Logger.error(LOG, "Stored application profile overrides are unreadable (%s); none apply and none is written.",
-			tostring(reason))
+		Logger.error(LOG, "Stored application profile overrides are unreadable (%s%s); none apply and none is written.",
+			tostring(reason), invalid_type and ": the stored value is not a string" or "")
 		_app_overrides_refused = true
 		overrides = {}
 	end
