@@ -2636,6 +2636,38 @@
 		}
 	},
 	{
+		"path": "accented_letter_picker_frame.accented_letter_off",
+		"visibility": "hide",
+		"labels": { "fr": "Désactivé", "en": "Disabled" },
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Each driver builds this part of the menu from its own parent, frame and child rows, because the native menu toolkits differ (AutoHotkey menus, Hammerspoon menubar tables, the Linux tray). The other drivers carry the same controls under rows of their own: this is a menu-structure difference, not a missing control.",
+				"fr": "Each driver builds this part of the menu from its own parent, frame and child rows, because the native menu toolkits differ (AutoHotkey menus, Hammerspoon menubar tables, the Linux tray). The other drivers carry the same controls under rows of their own: this is a menu-structure difference, not a missing control."
+			},
+			"macos": {
+				"en": "Each driver builds this part of the menu from its own parent, frame and child rows, because the native menu toolkits differ (AutoHotkey menus, Hammerspoon menubar tables, the Linux tray). The other drivers carry the same controls under rows of their own: this is a menu-structure difference, not a missing control.",
+				"fr": "Each driver builds this part of the menu from its own parent, frame and child rows, because the native menu toolkits differ (AutoHotkey menus, Hammerspoon menubar tables, the Linux tray). The other drivers carry the same controls under rows of their own: this is a menu-structure difference, not a missing control."
+			}
+		}
+	},
+	{
+		"path": "accented_letter_picker_frame.accented_letter_choices",
+		"visibility": "hide",
+		"labels": { "fr": "accented_letter_choices", "en": "accented_letter_choices" },
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Each driver builds this part of the menu from its own parent, frame and child rows, because the native menu toolkits differ (AutoHotkey menus, Hammerspoon menubar tables, the Linux tray). The other drivers carry the same controls under rows of their own: this is a menu-structure difference, not a missing control.",
+				"fr": "Each driver builds this part of the menu from its own parent, frame and child rows, because the native menu toolkits differ (AutoHotkey menus, Hammerspoon menubar tables, the Linux tray). The other drivers carry the same controls under rows of their own: this is a menu-structure difference, not a missing control."
+			},
+			"macos": {
+				"en": "Each driver builds this part of the menu from its own parent, frame and child rows, because the native menu toolkits differ (AutoHotkey menus, Hammerspoon menubar tables, the Linux tray). The other drivers carry the same controls under rows of their own: this is a menu-structure difference, not a missing control.",
+				"fr": "Each driver builds this part of the menu from its own parent, frame and child rows, because the native menu toolkits differ (AutoHotkey menus, Hammerspoon menubar tables, the Linux tray). The other drivers carry the same controls under rows of their own: this is a menu-structure difference, not a missing control."
+			}
+		}
+	},
+	{
 		"path": "layout_native_record_choice.layout_native_select",
 		"visibility": "hide",
 		"labels": { "fr": "layout_native_select", "en": "layout_native_select" },

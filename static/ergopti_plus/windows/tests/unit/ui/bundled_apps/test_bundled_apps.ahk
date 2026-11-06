@@ -101,10 +101,10 @@ Test("(bundled-apps-encryptor-vectors) refuses a wrong password", _BAT_RefusesWr
 
 _BAT_NamesDestinations() {
 	Envelope := _BAT_Format()
-	for Case in _BAT_Vectors()["names"] {
-		Target := Encryptor_Destination(Envelope, StrReplace(Case["source"], "/", "\"))
-		AssertEqual(Case["mode"], Target["mode"], Case["source"])
-		AssertEqual(StrReplace(Case["destination"], "/", "\"), Target["destination"], Case["source"])
+	for Vector in _BAT_Vectors()["names"] {
+		Target := Encryptor_Destination(Envelope, StrReplace(Vector["source"], "/", "\"))
+		AssertEqual(Vector["mode"], Target["mode"], Vector["source"])
+		AssertEqual(StrReplace(Vector["destination"], "/", "\"), Target["destination"], Vector["source"])
 	}
 }
 Test("(bundled-apps-encryptor-names) names destinations as the macOS Encryptor does", _BAT_NamesDestinations)

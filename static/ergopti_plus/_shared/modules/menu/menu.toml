@@ -4881,6 +4881,7 @@ id = "layout_picker_choices"
 [[menu.accented_letter_picker_frame]]
 type = "check"
 id = "accented_letter_off"
+platforms = ["linux"]
 i18n = "common.disabled"
 checked_when = ["accented_letter_off_checked"]
 
@@ -4890,6 +4891,7 @@ type = "---"
 [[menu.accented_letter_picker_frame]]
 type = "list"
 id = "accented_letter_choices"
+platforms = ["linux"]
 
 # Complete macOS Layout frames; native providers supply exact records and callbacks.
 # Native record captions are literal data, never placeholder translation identities.

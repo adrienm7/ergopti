@@ -5907,6 +5907,9 @@
 		{
 			"type": "check",
 			"id": "accented_letter_off",
+			"platforms": [
+				"linux"
+			],
 			"i18n": "common.disabled",
 			"checked_when": [
 				"accented_letter_off_checked"
@@ -5917,7 +5920,10 @@
 		},
 		{
 			"type": "list",
-			"id": "accented_letter_choices"
+			"id": "accented_letter_choices",
+			"platforms": [
+				"linux"
+			]
 		}
 	],
 	"layout_native_record_choice": [
