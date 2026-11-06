@@ -113,15 +113,19 @@ local function backgrounded(Gestures, action, answer)
 	return text
 end
 
+-- The read-modify-write toggles queue on one session lock (toggle-serialized-lds-002).
+local SERIAL = "flock \"${XDG_RUNTIME_DIR:-$HOME/.cache}/ergopti/system-toggle.lock\" sh -c "
+
 local EXPECTED = {
-	show_desktop = "{ desktop=$(wmctrl -m 2>/dev/null) && case \"$desktop\" in"
-		.. " *'mode: ON'*) wmctrl -k off;; *'mode: OFF'*) wmctrl -k on;; *) false;; esac; }",
+	show_desktop = "{ " .. SERIAL .. "'desktop=$(wmctrl -m 2>/dev/null) && case \"$desktop\" in"
+		.. " *'\\''mode: ON'\\''*) wmctrl -k off;; *'\\''mode: OFF'\\''*) wmctrl -k on;; *) false;; esac'; }",
 	-- Powered off at once, the release of the triggering keys woke them again.
 	sleep_displays = "{ sleep 1 && xset dpms force off; }",
-	toggle_dark_mode = "{ scheme=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null) && case \"$scheme\" in"
-		.. " \"'prefer-dark'\") gsettings set org.gnome.desktop.interface color-scheme default;;"
-		.. " \"'default'\"|\"'prefer-light'\") gsettings set org.gnome.desktop.interface color-scheme prefer-dark;;"
-		.. " *) false;; esac; }",
+	toggle_dark_mode = "{ " .. SERIAL .. "'scheme=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null)"
+		.. " && case \"$scheme\" in"
+		.. " \"'\\''prefer-dark'\\''\") gsettings set org.gnome.desktop.interface color-scheme default;;"
+		.. " \"'\\''default'\\''\"|\"'\\''prefer-light'\\''\") gsettings set org.gnome.desktop.interface color-scheme prefer-dark;;"
+		.. " *) false;; esac'; }",
 
 	mic_mute_toggle = "{ pactl set-source-mute @DEFAULT_SOURCE@ toggle; }",
 	-- The desktop and the panels belong to the desktop shell: signalling their
@@ -729,4 +733,45 @@ helpers.describe("Linux system actions", function()
 			helpers.assert_nil(io.open(dir .. "/clipboard", "r"), "nothing reached the clipboard: " .. log)
 			helpers.assert_true(not log:find("tesseract", 1, true), "nothing was read: " .. log)
 		end)
+
+	-- Two accepted toggles background two shells. Unserialized, both read the
+	-- old state before either writes, so both write the same new state and one
+	-- toggle is lost. The stubs widen that window with a slow read.
+	local TOGGLES = {
+		toggle_dark_mode = {
+			stub = "gsettings",
+			body = 'if [ "$1" = get ]; then v=$(cat "$STUBS/state"); sleep 0.3; printf "\'%s\'\\n" "$v";'
+				.. ' else printf "%s" "$4" > "$STUBS/state"; fi',
+			initial = "default", once = "prefer-dark",
+		},
+		show_desktop = {
+			stub = "wmctrl",
+			body = 'if [ "$1" = -m ]; then v=$(cat "$STUBS/state"); sleep 0.3; printf "Name: stub\\n'
+				.. 'Window manager\'s \\"showing the desktop\\" mode: %s\\n" "$v";'
+				.. ' else case "$2" in on) printf ON;; off) printf OFF;; esac > "$STUBS/state"; fi',
+			initial = "OFF", once = "ON",
+		},
+	}
+	for action, toggle in pairs(TOGGLES) do
+		helpers.it(action .. ": overlapping toggles both apply (toggle-serialized-lds-002)", function()
+			local command = backgrounded(Gestures, action)
+			local function run(times)
+				local jobs = {}
+				for index = 1, times do jobs[index] = "( " .. command .. " ) &" end
+				local script = 'printf "%s" ' .. toggle.initial .. ' > "$STUBS/state"\n'
+					.. 'export XDG_RUNTIME_DIR="$STUBS"\nmkdir -p "$STUBS/ergopti"\n'
+					.. table.concat(jobs, "\n") .. "\nwait"
+				local log, dir = run_with_stubs(script, { [toggle.stub] = toggle.body })
+				local fh = io.open(dir .. "/state", "r")
+				local state = fh and fh:read("*a")
+				if fh then fh:close() end
+				os.execute("rm -rf '" .. dir .. "'")
+				return state, log
+			end
+			local once = run(1)
+			helpers.assert_eq(once, toggle.once, "one toggle flips the state")
+			local twice, log = run(2)
+			helpers.assert_eq(twice, toggle.initial, "two overlapping toggles flip it back; calls: " .. log)
+		end)
+	end
 end)

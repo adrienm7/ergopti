@@ -283,7 +283,7 @@ Evidence: [12-scope flow review](docs/audits/platform-parity/2026-11-04-flows/re
 - [ ] **[CODE] LCF-001:** Failed legacy alias cleanup resurrects a later accepted neutral preference. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-config/report.md).
 - [ ] **[CODE] LCF-002:** Rejected locale change remains canonical startup authority after native alias refusal. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-config/report.md). Shared rejected-locale publication root; retain the macOS timer-race subtype and Linux startup control.
 - [ ] **[CODE] LDS-001:** Desktop command producer hides both shell acquisition and background child failures. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-desktop/report.md).
-- [ ] **[CODE] LDS-002:** Serialize independently accepted Linux theme read-modify-write toggles; overlapping calls currently lose one transition. [Public-dispatch reproduction and controls](docs/audits/platform-parity/2026-11-04-flows/linux-desktop/report.md).
+- [x] **[CODE] LDS-002:** Serialize independently accepted Linux theme read-modify-write toggles; overlapping calls currently lose one transition. [Public-dispatch reproduction and controls](docs/audits/platform-parity/2026-11-04-flows/linux-desktop/report.md). Done: toggle_dark_mode and show_desktop queue on one flock in the session lock folder; a real-shell test runs two overlapping toggles.
 
 - [ ] **[PHYS-W] / [PHYS-M] / [PHYS-L]:** execute only the receiving scenarios named by each flow report on isolated native hosts. Source/recording-port tests do not close native focus, selection, keyring, application or device qualification.
 
