@@ -168,7 +168,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 ### windows-webview
 
 - [x] **[CODE] WVB-001:** Personal editor save refusal emits invalid JavaScript and leaves Saved visible. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/windows-webview/report.md). Done: the refusal toast splices the JSON literal bare through a tested script builder.
-- [ ] **[CODE] WVB-002:** Hotstring settings replace an unlimited zero delay with the default in the displayed control. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/windows-webview/report.md).
+- [x] **[CODE] WVB-002:** Hotstring settings replace an unlimited zero delay with the default in the displayed control. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/windows-webview/report.md). Already fixed by 80f7ca753d (`ms ?? defaultMs`, gate `test-hotstrings-config-zero-delay.cjs`).
 
 ### windows-diagnostics
 
@@ -177,9 +177,9 @@ and the next module candidates. The audit is paused at the maintainer's request.
 ### macos-runtime
 
 - [x] **[CODE] MRT-001:** Approval-watch deadline counts polling intervals rather than elapsed time. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md). Done: the watch takes a monotonic `now` port and checks one absolute deadline before each look and each result.
-- [ ] **[CODE] MRT-002:** Refused command watchdog leaves pending installation without its local deadline. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md).
+- [x] **[CODE] MRT-002:** Refused command watchdog leaves pending installation without its local deadline. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md). Already fixed by b4335a81ec (refused deadline retires the exact child; case `field-command-timer-refusal`).
 - [x] **[CODE] MRT-003:** Malformed cached receipt is accepted by Lua but permanently refused by the Swift install source. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md). Done: the Lua cache requires the exact `digest\n` bytes the Swift source requires, so a damaged receipt is refetched.
-- [ ] **[CODE] MRT-004:** Advertised reinstall route always refuses an already published runtime needing service recovery. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md).
+- [ ] **[CODE] MRT-004:** Advertised reinstall route always refuses an already published runtime needing service recovery. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md). Needs a maintainer choice: a new authenticated Swift recovery role for a published runtime, or a distinct recovery reason and menu action; both need native macOS qualification.
 - [x] **[CODE] MRT-006:** False native System Settings opener result is accepted without failure diagnostics. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md). Done: the watch keeps the native boolean and logs a false/nil opening as a refusal.
 
 ### macos-webview
@@ -199,7 +199,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 - [x] **[CODE] LDG-001:** API diagnostics report and probe the Ollama backend instead of the selected backend. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-diagnostics/report.md). Done: collector and probe read `get_backend()`; a backend without a schema health path answers unsupported, as on macOS.
 - [x] **[CODE] LDG-002:** Disabled AI becomes unknown in diagnostics and disappears from its export. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-diagnostics/report.md). Done: the collector keeps a known `false` and leaves only a missing switch unknown.
-- [ ] **[CODE] LDG-003:** Refused timer admission leaves the configuration diagnostic pending without a completion path. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-diagnostics/report.md).
+- [ ] **[CODE] LDG-003:** Refused timer admission leaves the configuration diagnostic pending without a completion path. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-diagnostics/report.md). Fixed on `fix/linux` by cc280519f5 (unarmed configuration and CPU timers finish with an error); closes when that branch merges.
 
 ### Qualification and policy follow-up
 
