@@ -625,6 +625,7 @@ class _Converter:
         self.keycodes = list(keycodes)
         self.keysyms = load_keysym_table()
         self.overrides = list(hints.keysym_overrides)
+        self.base_level_only = list(hints.base_level_only)
         self.level_indices = [layout.key_map_index(mods) for mods in XKB_LEVELS]
         self.result = Conversion()
         # Insertion order matters: XCompose lists these in this order.
@@ -712,6 +713,9 @@ class _Converter:
         stays first when a key sends it, so those lines keep their historical
         form; a dead key also using the action adds its own trigger, and an
         action no key uses (untypable on macOS too) keeps its base keysym.
+        A ``base_level_only`` key (Ergopti+'s magic key ★) also adds the
+        keysym its base level sends: inside a dead state macOS types the
+        action's output for it, so ^ then ★ gives what ^ then j gives.
         """
         typed = self._keysyms_typing_action(action_id)
         base = self.base_keysym(action_id)
@@ -719,8 +723,9 @@ class _Converter:
             return [base]
         if base not in typed:
             return list(typed)
-        dead = set(self.dead_triggers.values())
-        return [base] + [keysym for keysym in typed if keysym in dead and keysym != base]
+        extra = set(self.dead_triggers.values())
+        extra.update(self.text_keysym(text) for text in self.base_level_only if len(text) == 1)
+        return [base] + [keysym for keysym in typed if keysym in extra and keysym != base]
 
     def dead_trigger(self, state: str) -> str:
         """Keysym a dead key entering ``state`` produces."""
