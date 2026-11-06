@@ -60,9 +60,10 @@ end
 
 --- Runs one isolated real-module graph over a temporary personal-info file.
 --- @param scenario function Receives the fixture table.
-local function with_fixture(scenario)
+--- @param source string|nil Initial file content; a default phone-only file when nil.
+local function with_fixture(scenario, source)
 	local path = os.tmpname()
-	local initial = table.concat({
+	local initial = source or table.concat({
 		"[info]",
 		'phone_number = "' .. OLD_PHONE .. '"',
 		'phone_number_clean = "06 12 34 56 78"',
@@ -285,6 +286,28 @@ helpers.describe("personal-info save refreshes literal prefix mappings", functio
 			helpers.assert_eq(fixture.PersonalInfo.get_info().phone_number, external_phone)
 			helpers.assert_eq(fixture.read_file(), external)
 		end)
+	end)
+end)
+
+helpers.describe("personal-info added aliases (PIM-001)", function()
+	helpers.it("keeps a user-added lowercase alias through load and an unrelated save (PIM-001)", function()
+		local source = table.concat({
+			"[info]",
+			'phone_number = "' .. OLD_PHONE .. '"',
+			'city = "Lyon"',
+			"",
+			"[letters]",
+			'x = "city"',
+			"",
+		}, "\n")
+		with_fixture(function(fixture)
+			local resolved = fixture.PersonalInfo._resolve_combo_for_test(
+				fixture.PersonalInfo.get_info(), fixture.PersonalInfo.get_letters(), "x")
+			helpers.assert_eq(resolved[1], "Lyon", "the added alias must resolve at load")
+			helpers.assert_true(fixture.PersonalInfo.save_info({ last_name = "Durand" }))
+			helpers.assert_contains(fixture.read_file(), 'x = "city"')
+			helpers.assert_contains(fixture.read_file(), 'p = "first_name"')
+		end, source)
 	end)
 end)
 

@@ -215,6 +215,9 @@ end
 -- ===========================================
 
 --- Validates a decoded section before filling genuinely absent schema fields.
+--- The `info` section is a closed schema. The `letters` section is an open alias
+--- map: any single lowercase ASCII letter (the alphabet the combo collector
+--- accepts) may name a field, so user-added aliases survive load and save.
 --- @param document table Decoded TOML document.
 --- @param section string Section name (without brackets).
 --- @return table|nil values Validated values, or nil for invalid declared data.
@@ -224,12 +227,21 @@ local function parse_toml_section(document, section)
 	if type(declared) ~= "table" then return nil end
 	for key in pairs(declared) do
 		if type(key) ~= "string" then return nil end
+		-- An alias outside the collector alphabet could never be typed; refuse it
+		-- explicitly rather than dropping it and erasing it on the next save.
+		if section == "letters" and not key:match("^[a-z]$") then return nil end
 	end
 	local result = {}
 	for key, default in pairs(DEFAULT_CONFIG[section]) do
 		local value = declared[key]
 		if value ~= nil and type(value) ~= "string" then return nil end
 		result[key] = value == nil and default or value
+	end
+	if section == "letters" then
+		for key, value in pairs(declared) do
+			if type(value) ~= "string" then return nil end
+			result[key] = value
+		end
 	end
 	return result
 end
@@ -276,9 +288,16 @@ local function serialize_config(candidate)
 	end
 	lines[#lines + 1] = ""
 	lines[#lines + 1] = "[letters]"
+	-- Every alias, user-added ones included, not just the shipped defaults.
+	local alias_keys = {}
+	for key in pairs(_letters) do alias_keys[#alias_keys + 1] = key end
 	for _, key in ipairs(LETTER_KEYS) do
+		if _letters[key] == nil then alias_keys[#alias_keys + 1] = key end
+	end
+	table.sort(alias_keys)
+	for _, key in ipairs(alias_keys) do
 		local value = _letters[key]
-		if type(value) ~= "string" then
+		if type(key) ~= "string" or not key:match("^[a-z]$") or type(value) ~= "string" then
 			Logger.error(LOG, "Personal-info serializer rejected a non-string letter mapping.")
 			return nil
 		end
@@ -848,6 +867,9 @@ end
 --- Retrieves the current personal info table.
 --- @return table The info table.
 function M.get_info()         return _info    end
+--- The live [letters] alias map (shortcut letter -> info field name).
+--- @return table
+function M.get_letters()      return _letters end
 
 --- Seeds the two lookup tables and resolves a combo. TESTS ONLY.
 ---
