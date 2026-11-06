@@ -299,6 +299,7 @@ local _channel         = nil       -- registry channel id; resolved at the end o
 local _config_path     = nil       -- config.toml holding [updater] channel; set by init()
 local _channel_persisted = false   -- whether config.toml names the channel (else it is the default)
 local _installed_launcher = nil  -- wrapper of the installation an update replaced
+local _installed_root = nil      -- root of that installation, whose .old the restart watcher restores
 local _download_part   = nil
 local _download_dest   = nil
 local native_transfer, native_verified, native_install, native_channel_intent
@@ -1830,6 +1831,7 @@ local function install_archive(archive_path, expected_version)
 	_verified_archive = nil
 	_verified_release = nil
 	_installed_launcher = context.wrapper
+	_installed_root = context.install_root
 	_state = "idle"
 	return true
 end
@@ -1897,7 +1899,7 @@ local function install_native_archive(path, tag, callback, admission)
   local completed = work.result.installed == true
   if completed then
    native_verified, _verified_archive, _verified_release = nil, nil, nil
-   _installed_launcher, _state = captured_context.wrapper, "idle"
+   _installed_launcher, _installed_root, _state = captured_context.wrapper, captured_context.install_root, "idle"
   else _state = "available" end
   pcall(callback, completed, work.result.detail, work.result.receipt)
  end
@@ -1941,6 +1943,13 @@ end
 --- @return string|nil
 function M.installed_launcher()
 	return _installed_launcher
+end
+
+--- The root of the installation the last update replaced; its `.old` sibling
+--- holds the previous installation the restart watcher puts back.
+--- @return string|nil
+function M.installed_root()
+	return _installed_root
 end
 
 -- =========================================

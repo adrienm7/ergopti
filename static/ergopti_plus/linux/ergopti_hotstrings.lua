@@ -753,10 +753,13 @@ end
 local function restart_on_installed_release(paused)
 	local launch_args = {}
 	for index = 1, #arg do launch_args[index] = arg[index] end
+	local root = updater.installed_root()
 	local how = require("modules.updater.restarter").restart({
 		wrapper = updater.installed_launcher(),
 		args = launch_args,
 		paused = paused,
+		-- The previous installation returns unless the new daemon reports ready.
+		successor = root and { root = root } or nil,
 	})
 	if how == "relay" then shutdown.request("update installed") end
 	return how ~= nil
@@ -3382,6 +3385,8 @@ local function main()
 		device, opts.layout, mapping_count, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
 	if not privacy_owners.startup_checkpoint() then return end
 	local boot_ms = BootProfiler.complete()
+	-- An update watcher that started this daemon keeps it only once it reports ready.
+	require("infra.updater_boot_ready").report("daemon ready")
 	-- The Reload this boot completes, if any, from its request in the previous daemon.
 	local reload_ms = require("infra.reload_timing").complete()
 	if not privacy_owners.startup_checkpoint() then return end
