@@ -402,6 +402,11 @@ local API_STATE_KEY      = "llm_api_state_v1"
 local API_CLEANUP_JOURNAL_KEY = "llm_api_keychain_cleanup_v1"
 local API_STATE_VERSION  = 1
 local KEYCHAIN_REFERENCE_PREFIX = "keychain:"
+-- A replaced credential is written to a fresh account "<id>#r<n>" rather than
+-- over the account the durable entry still references: a refused publication
+-- then rolls back to metadata whose account still holds the previous secret,
+-- and the superseded account is retired only after the new one commits.
+local KEYCHAIN_REVISION_SEPARATOR = "#r"
 local TokenCrypto = require("modules.llm.api_token_crypto")
 local ApiCommon = require("modules.llm.api_common")
 local WarmupController = require("modules.llm.warmup_controller")
@@ -446,6 +451,25 @@ local function dense_array_length(value)
 	return count
 end
 
+--- Returns the Keychain account a persisted token references, or nil.
+--- @param token any Persisted token field.
+--- @return string|nil account
+local function keychain_account(token)
+	if not TokenCrypto.is_encrypted(token) then return nil end
+	return token:sub(#KEYCHAIN_REFERENCE_PREFIX + 1)
+end
+
+--- Whether an account belongs to an entry: its id, or one of its revisions.
+--- @param account string Keychain account.
+--- @param entry_id string Entry identity.
+--- @return boolean owned
+local function account_belongs_to_entry(account, entry_id)
+	if account == entry_id then return true end
+	local revision_prefix = entry_id .. KEYCHAIN_REVISION_SEPARATOR
+	return account:sub(1, #revision_prefix) == revision_prefix
+		and account:sub(#revision_prefix + 1):match("^[1-9]%d*$") ~= nil
+end
+
 --- Validates the canonical entry-array shape shared by legacy migration,
 --- combined-state load, and runtime publication. The legacy path alone may
 --- contain cleartext; every durable combined entry must carry an opaque ref,
@@ -457,6 +481,7 @@ end
 local function validate_api_entries(entries, allow_plaintext, active_id)
 	if dense_array_length(entries) == nil or type(active_id) ~= "string" then return false end
 	local ids = {}
+	local accounts = {}
 	for _, entry in ipairs(entries) do
 		if type(entry) ~= "table"
 			or type(entry.id) ~= "string" or entry.id == ""
@@ -472,11 +497,13 @@ local function validate_api_entries(entries, allow_plaintext, active_id)
 		end
 		ids[entry.id] = true
 		local encrypted = TokenCrypto.is_encrypted(entry.token)
-		if encrypted and entry.token ~= KEYCHAIN_REFERENCE_PREFIX .. entry.id then
+		local account = keychain_account(entry.token)
+		if encrypted and (not account_belongs_to_entry(account, entry.id) or accounts[account] == true) then
 			Logger.error(LOG, "API state entry '%s' points at a different Keychain account; refusing the snapshot.",
 				tostring(entry.id))
 			return false
 		end
+		if account then accounts[account] = true end
 		if not allow_plaintext and not encrypted and entry.token ~= "" then
 			Logger.error(LOG, "Persisted API state contains a plaintext token; refusing the snapshot.")
 			return false
@@ -632,7 +659,7 @@ end
 --- state exists (legacy migration and first Add). The legacy two-key snapshot
 --- remains authoritative until final combined publication, so a crash can retry
 --- without either exposing plaintext in the new key or hiding legacy entries.
---- @param candidate table Sorted entry-id array.
+--- @param candidate table Sorted Keychain account array (an entry id or one of its revisions).
 --- @return boolean committed
 local function write_cleanup_journal(candidate)
 	local previous = copy_settings_value(CoreState.api_cleanup_journal or {})
@@ -712,11 +739,14 @@ function M.retry_pending_api_token_deletes(callback)
 		local ids = pending_id_set(current)
 		for _, entry_id in ipairs(CoreState.api_cleanup_journal or {}) do ids[entry_id] = true end
 		local referenced = {}
-		-- Never delete a credential still referenced by the durable entry list.
+		-- Never delete a credential still referenced by the durable entry list:
+		-- the account a reference names, or for an entry without one (a token
+		-- not yet in the Keychain) the account named after its id.
 		for _, entry in ipairs(current.entries or {}) do
-			if type(entry.id) == "string" and ids[entry.id] then
-				referenced[entry.id] = true
-				ids[entry.id] = nil
+			local account = keychain_account(entry.token) or entry.id
+			if type(account) == "string" and ids[account] then
+				referenced[account] = true
+				ids[account] = nil
 			end
 		end
 		local queue = sorted_ids(ids)
@@ -1002,6 +1032,36 @@ function M.persist_api_entries(callback, options)
 		return false, "refused"
 	end
 
+	-- Every account a committed, logical or pending state may still name. A new
+	-- secret is never written over one of them.
+	local persisted = CoreState.api_persisted_state or empty_api_state()
+	local durable = CoreState.api_durable_combined_state
+	local taken_accounts = pending_id_set(persisted)
+	for _, account in ipairs(CoreState.api_cleanup_journal or {}) do taken_accounts[account] = true end
+	local prior_accounts = {}
+	for _, state in ipairs({ persisted, durable or empty_api_state() }) do
+		for _, entry in ipairs(state.entries or {}) do
+			local account = keychain_account(entry.token)
+			if account and type(entry.id) == "string" then
+				taken_accounts[account] = true
+				prior_accounts[entry.id] = prior_accounts[entry.id] or {}
+				prior_accounts[entry.id][account] = true
+			end
+		end
+	end
+
+	--- First free account for an entry: its id, else its next free revision.
+	local function fresh_account(entry_id)
+		local account = entry_id
+		local revision = 0
+		while taken_accounts[account] == true do
+			revision = revision + 1
+			account = entry_id .. KEYCHAIN_REVISION_SEPARATOR .. tostring(revision)
+		end
+		taken_accounts[account] = true
+		return account
+	end
+
 	local serialised = copy_settings_value(entries)
 	local encrypt_jobs = {}
 	for index, entry in ipairs(serialised) do
@@ -1011,16 +1071,21 @@ function M.persist_api_entries(callback, options)
 				finish(false, "invalid_entry_id", false)
 				return
 			end
-			encrypt_jobs[#encrypt_jobs + 1] = { index = index, id = entry.id, token = token }
+			encrypt_jobs[#encrypt_jobs + 1] = {
+				index = index, id = entry.id, account = fresh_account(entry.id), token = token,
+			}
 			entry.token = nil
 		end
 	end
 
-	local desired_pending = pending_id_set(CoreState.api_persisted_state or empty_api_state())
+	local desired_pending = pending_id_set(persisted)
 	local delete_ids = type(options) == "table" and options.delete_entry_ids or nil
 	if type(delete_ids) == "table" then
 		for _, entry_id in ipairs(delete_ids) do
-			if type(entry_id) == "string" and entry_id ~= "" then desired_pending[entry_id] = true end
+			if type(entry_id) == "string" and entry_id ~= "" then
+				desired_pending[entry_id] = true
+				for account in pairs(prior_accounts[entry_id] or {}) do desired_pending[account] = true end
+			end
 		end
 	end
 
@@ -1032,7 +1097,13 @@ function M.persist_api_entries(callback, options)
 			M.retry_pending_api_token_deletes()
 			return
 		end
-		for _, job in ipairs(encrypt_jobs) do desired_pending[job.id] = nil end
+		for _, job in ipairs(encrypt_jobs) do
+			desired_pending[job.account] = nil
+			-- The superseded account is retired only once the new reference commits
+			for account in pairs(prior_accounts[job.id] or {}) do
+				if account ~= job.account then desired_pending[account] = true end
+			end
+		end
 		local candidate = {
 			version = API_STATE_VERSION,
 			entries = serialised,
@@ -1074,14 +1145,14 @@ function M.persist_api_entries(callback, options)
 		local owner_epoch = operation.crypto_owner_epoch
 		local encrypt_callback_done = false
 		local launch_ok, operation_or_err = xpcall(function()
-			return TokenCrypto.encrypt_async(job.id, job.token, function(ok, reference, reason)
+			return TokenCrypto.encrypt_async(job.account, job.token, function(ok, reference, reason)
 				if encrypt_callback_done then return end
 				encrypt_callback_done = true
 				if operation.crypto_owner_epoch == owner_epoch then
 					operation.crypto_operation = nil
 				end
 				if operation.done then return end
-				if ok ~= true or reference ~= KEYCHAIN_REFERENCE_PREFIX .. job.id then
+				if ok ~= true or reference ~= KEYCHAIN_REFERENCE_PREFIX .. job.account then
 					-- Publish cleanup ownership before settlement waiters may resume a
 					-- successor. The native helper has exited at this point, so the
 					-- idempotent delete cannot race its Security.framework mutation.
@@ -1112,20 +1183,20 @@ function M.persist_api_entries(callback, options)
 		if CoreState.api_durable_combined_state == nil then
 			local journal_ids = {}
 			for _, entry_id in ipairs(CoreState.api_cleanup_journal or {}) do journal_ids[entry_id] = true end
-			for _, job in ipairs(encrypt_jobs) do journal_ids[job.id] = true end
+			for _, job in ipairs(encrypt_jobs) do journal_ids[job.account] = true end
 			if not write_cleanup_journal(sorted_ids(journal_ids)) then
 				finish(false, "cleanup_tombstone_failed", false)
 				return
 			end
 			local logical = copy_settings_value(CoreState.api_persisted_state or empty_api_state())
 			local logical_pending = pending_id_set(logical)
-			for _, job in ipairs(encrypt_jobs) do logical_pending[job.id] = true end
+			for _, job in ipairs(encrypt_jobs) do logical_pending[job.account] = true end
 			logical.pending_keychain_deletes = sorted_ids(logical_pending)
 			CoreState.api_persisted_state = logical
 		else
 			local stage = copy_settings_value(CoreState.api_persisted_state or empty_api_state())
 			local stage_pending = pending_id_set(stage)
-			for _, job in ipairs(encrypt_jobs) do stage_pending[job.id] = true end
+			for _, job in ipairs(encrypt_jobs) do stage_pending[job.account] = true end
 			stage.pending_keychain_deletes = sorted_ids(stage_pending)
 			local rollback = CoreState.api_durable_combined_state
 			if not write_combined_state(stage, rollback) then
