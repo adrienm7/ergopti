@@ -221,10 +221,9 @@ local function load_wrap_pairs()
 					and type(pair.left) == "string" and pair.left ~= ""
 					and type(pair.right) == "string" and pair.right ~= "" then
 				ordered[#ordered + 1] = { left = pair.left, right = pair.right }
-				lookup[pair.left] = { left = pair.left, right = pair.right }
-				if pair.right ~= pair.left then
-					lookup[pair.right] = { left = pair.left, right = pair.right }
-				end
+				-- Every trigger form of each end, so the bare typed guillemet reaches
+				-- the catalogue's spaced pair; the output keeps its delimiters.
+				WrapPair.register(lookup, pair)
 			end
 		end
 	end

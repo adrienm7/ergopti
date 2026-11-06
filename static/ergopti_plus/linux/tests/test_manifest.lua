@@ -763,6 +763,7 @@ return {
 	"tests.unit.modules.shortcuts.text_actions.test_dry_run_remap_dispatch",
 	"tests.unit.modules.shortcuts.keyboard.test_script_chords",
 	"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type",
+	"tests.unit.modules.shortcuts.text_actions.test_wrap_guillemet_trigger",
 	"tests.unit.modules.gestures.config.test_gesture_binding_transaction",
 	"tests.unit.modules.gestures.actions.test_desktop_navigation_actions",
 	"tests.unit.modules.gestures.actions.test_desktop_navigation_vectors",
