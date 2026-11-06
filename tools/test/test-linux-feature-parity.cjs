@@ -110,6 +110,44 @@ assert.throws(
 	() => inventory.render(unexplainedModel, inventoryLocales, inventoryActions, inventoryMenu),
 	/Missing translated platform reason/
 );
+// A hidden restricted menu row must name its reason, and a registry entry that no row uses is stale.
+const noBehaviors = [];
+assert.throws(
+	() =>
+		inventory.render(
+			inventoryModel,
+			inventoryLocales,
+			inventoryActions,
+			inventoryMenu,
+			{},
+			{},
+			noBehaviors,
+			{}
+		),
+	/Restricted menu entry has no translated reason/
+);
+assert.throws(
+	() =>
+		inventory.render(
+			inventoryModel,
+			inventoryLocales,
+			inventoryActions,
+			inventoryMenu,
+			{},
+			{},
+			noBehaviors,
+			{
+				...JSON.parse(
+					fs.readFileSync(
+						path.join(ROOT, 'static/ergopti_plus/_shared/modules/menu/hidden_row_reasons.json'),
+						'utf8'
+					)
+				),
+				retired_section: 'platform_reason.remap_engine_is_per_driver'
+			}
+		),
+	/Stale hidden-row reason: retired_section/
+);
 const generators = require('../build/generators.cjs').GENERATORS;
 const inventoryGenerator = generators.find(
 	(entry) => entry.script === 'codegen/codegen-feature-inventory.cjs'
