@@ -1077,6 +1077,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/modules/keystats/metrics/test_metrics_edge_sidecar.ahk
 #Include unit/modules/keystats/metrics/test_metrics_store_isolation.ahk
 #Include unit/modules/keystats/metrics/test_metrics_store_publication.ahk
+#Include unit/modules/keystats/metrics/test_metrics_reader_image_reset.ahk
 #Include unit/modules/keystats/metrics/test_metrics_store_edge.ahk
 #Include unit/modules/keystats/metrics/test_metrics_store_projection.ahk
 #Include unit/ui/webview/test_webview_script_outcomes.ahk

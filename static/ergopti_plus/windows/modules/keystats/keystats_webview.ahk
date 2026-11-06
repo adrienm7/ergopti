@@ -711,6 +711,12 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						if IsSet(KLPF_LAST_JSON) && KLPF_LAST_JSON.Has(path)
 								KLPF_LAST_JSON.Delete(path)
 						try FileDelete(path)
+						; The durable reader image would otherwise be restored by the
+						; successor build, so an explicit reset must retire it too.
+						if !KLR_CacheRetire(entry["metrics_dir"]) {
+								LoggerError("Keystats", "KLWV_OnWebMessage: the reader image could not be retired; caches were not fully purged.")
+								return
+						}
 						if KLWV_IsCurrent(which, Epoch)
 								KLWV.windows[which]["full_build_done"] := false
 						try LoggerDebug("Keystats", "KLWV_OnWebMessage: dashboard caches purged.")
