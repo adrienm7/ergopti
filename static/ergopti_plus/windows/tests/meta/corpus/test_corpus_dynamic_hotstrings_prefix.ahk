@@ -90,8 +90,8 @@ _CorpusDynHS_CountDynamicSectionMatchesCorpus() {
 		PersonalInformation := Map(
 			"phone_number", Vector["phone"],
 			"phone_number_clean", Vector["fphone"],
-			"social_security_number", Vector["ssn_raw"],
-			"iban", Vector["iban_raw"]
+			"social_security_number", Vector["ssn"],
+			"iban", Vector["iban"]
 		)
 		_TomlCountCache := Map()
 

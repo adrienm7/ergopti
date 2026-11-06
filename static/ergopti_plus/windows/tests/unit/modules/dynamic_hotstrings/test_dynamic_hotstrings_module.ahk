@@ -466,13 +466,9 @@ _DynHSTest_GateAdmitsBody(Triggers) {
 ; The corpus consumer proves CountDynamicSection, the menu's hand-written count.
 ; This proves the registrations themselves: the menu must announce as many
 ; triggers as actually fire (PAR-63). Each family registers alone, so the registry
-; size is its count. An SSN or IBAN is given one decorative space, as it is stored:
-; without one the spaced trigger IS the raw trigger and is rightly not registered
-; twice, which the corpus counts as two.
-_DynHSTest_Decorate(Raw) {
-	return StrLen(Raw) < 2 ? Raw : SubStr(Raw, 1, 1) . " " . SubStr(Raw, 2)
-}
-
+; size is its count. The corpus gives an SSN or IBAN as it is stored: a value with
+; no spaces has one trigger, because its spaced trigger IS the raw one and is not
+; registered twice.
 _DynHSTest_CorpusFamilyCount(Vector, Family, Key) {
 	global HSE_StarSpecs
 	AllFamilies := ["date_fr", "date_long_fr", "date", "phone_prefixes", "ssn_prefixes", "iban_prefixes"]
@@ -481,8 +477,8 @@ _DynHSTest_CorpusFamilyCount(Vector, Family, Key) {
 		if Name != Family
 			Disabled.Push(Name)
 	Personal := Map("phone_number", Vector["phone"], "phone_number_clean", Vector["fphone"],
-		"social_security_number", _DynHSTest_Decorate(Vector["ssn_raw"]),
-		"iban", _DynHSTest_Decorate(Vector["iban_raw"]))
+		"social_security_number", Vector["ssn"],
+		"iban", Vector["iban"])
 	Count := -1
 	Read() {
 		Count := HSE_StarSpecs.Length

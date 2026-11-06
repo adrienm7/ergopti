@@ -83,27 +83,42 @@ function M.spaced_prefix(spaced, raw_count)
 end
 
 
+--- How many distinct triggers a stored value registers for a prefix length: none
+--- below the threshold, one for the unspaced prefix, two when the spaced prefix
+--- differs from it.
+--- @param stored string The value as stored, spacing included.
+--- @param raw_count integer Raw (non-space) characters in the trigger.
+--- @return integer count 0, 1 or 2.
+function M.distinct_trigger_count(stored, raw_count)
+	local raw = M.strip_prefix_spacing(stored)
+	if TextUtils.utf8_len(raw) < raw_count then return 0 end
+	local raw_prefix = TextUtils.utf8_sub(raw, 1, raw_count)
+	return M.spaced_prefix(stored, raw_count) ~= raw_prefix and 2 or 1
+end
+
 --- Computes the real hotstring count for each prefix section given personal data.
 --- Returns a table keyed by section name with integer counts.
 --- Mirrors the exact threshold logic used in AHK hotstrings.ahk section 5.2,
 --- so both drivers expose the same section counts in their respective UIs.
 --- @param phone string Raw phone number string (digits only, no spaces).
 --- @param fphone string Formatted phone number (may contain spaces).
---- @param ssn_raw string SSN with spaces stripped.
---- @param iban_raw string IBAN with spaces stripped.
+--- @param ssn string SSN as stored, spacing included: the spaced trigger only exists
+---   when it differs from the raw one, so a value without spaces has one trigger.
+--- @param iban string IBAN as stored, spacing included (same rule).
 --- @return table Counts per section: {phoneprefixes, ssnprefixes, ibanprefixes}.
-function M.compute_prefix_counts(phone, fphone, ssn_raw, iban_raw)
+function M.compute_prefix_counts(phone, fphone, ssn, iban)
 	local phone_n = 0
 	if TextUtils.utf8_len(phone) >= 2 then phone_n = phone_n + 2 end  -- phone[1:2]+★ and +33+phone[1:2]
 	if TextUtils.utf8_len(phone) >= 4 then phone_n = phone_n + 2 end  -- phone[1:4] and +33+phone[2:4]
 	if TextUtils.utf8_len(phone) >= 6 then phone_n = phone_n + 1 end  -- phone[2:5]
 	if TextUtils.utf8_len(fphone) >= 5 then phone_n = phone_n + 1 end -- fphone[1:5]
 
-	-- No-space + spaced triggers — both fire when ssn_raw has >= 5 digits
-	local ssn_n = (TextUtils.utf8_len(ssn_raw) >= 5) and 2 or 0
+	-- The no-space trigger fires from 5 raw digits; the spaced one is registered
+	-- only when its prefix differs, exactly as the producers on every driver do.
+	local ssn_n = M.distinct_trigger_count(ssn, 5)
 
-	-- 6 raw chars (no-space, case-insensitive) and 7-char spaced trigger
-	local iban_n = (TextUtils.utf8_len(iban_raw) >= 6) and 2 or 0
+	-- 6 raw chars (no-space, case-insensitive) and the 7-char spaced trigger.
+	local iban_n = M.distinct_trigger_count(iban, 6)
 
 	return { phoneprefixes = phone_n, ssnprefixes = ssn_n, ibanprefixes = iban_n }
 end

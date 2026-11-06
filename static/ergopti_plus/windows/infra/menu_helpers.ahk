@@ -57,11 +57,14 @@ CountDynamicSection(SectionName) {
 								N += 1  ; fphone[1:5]
 						Count := N
 				case "SsnPrefixes", ConfigLeaf.SSN_PREFIXES:
-						; No-space + spaced triggers — both fire when ssn_raw has >= 5 digits
-						Count := StrLen(SsnRaw) >= 5 ? 2 : 0
+						; The no-space trigger fires from 5 digits; the spaced one is only
+						; registered when it differs, so an unspaced value has one trigger.
+						Count := StrLen(SsnRaw) >= 5
+								? (SpacedPrefix(Ssn, 5) != SubStr(SsnRaw, 1, 5) ? 2 : 1) : 0
 				case "IbanPrefixes", ConfigLeaf.IBAN_PREFIXES:
-						; 6 raw chars (no-space) and 7-char spaced trigger if iban_raw has >= 6 chars
-						Count := StrLen(IbanRaw) >= 6 ? 2 : 0
+						; 6 raw chars (no-space) and, only when it differs, the spaced trigger
+						Count := StrLen(IbanRaw) >= 6
+								? (SpacedPrefix(Iban, 6) != SubStr(IbanRaw, 1, 6) ? 2 : 1) : 0
 				case "TextExpansionPersonalInformation", ConfigLeaf.TEXT_EXPANSION_PERSONAL_INFORMATION:
 						N := 0
 						for Key, Val in PersonalInformation {

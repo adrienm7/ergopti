@@ -70,7 +70,7 @@ helpers.describe("dynamic hotstrings prefix corpus (macOS): shared reference mat
 	helpers.it("compute_prefix_counts matches every prefix_count_vector", function()
 		if not corpus then return end
 		for _, v in ipairs(corpus.prefix_count_vectors) do
-			local result = DynamicHotstrings.compute_prefix_counts(v.phone, v.fphone, v.ssn_raw, v.iban_raw)
+			local result = DynamicHotstrings.compute_prefix_counts(v.phone, v.fphone, v.ssn, v.iban)
 			helpers.assert_eq(result.phoneprefixes, v.expected.phoneprefixes,
 				"[" .. v.id .. "] phoneprefixes")
 			helpers.assert_eq(result.ssnprefixes, v.expected.ssnprefixes,

@@ -419,8 +419,8 @@ end
 --- Publishes prefix counts into the exact section descriptors owned by the menu.
 --- @param personal_data table Personal-information snapshot.
 local function publish_prefix_counts(personal_data)
-	local phone, formatted_phone, ssn_raw, _, iban_raw = prefix_values(personal_data)
-	local counts = SharedEngine.compute_prefix_counts(phone, formatted_phone, ssn_raw, iban_raw)
+	local phone, formatted_phone, _, ssn, _, iban = prefix_values(personal_data)
+	local counts = SharedEngine.compute_prefix_counts(phone, formatted_phone, ssn, iban)
 	if type(_sections) ~= "table" then return end
 	for _, section in ipairs(_sections) do
 		if type(section) == "table" and counts[section.name] ~= nil then
