@@ -153,10 +153,10 @@ local function _seed_missing_source(path)
 	local _, status = TomlWriter.read_classified(path)
 	if status ~= "absent" then return true end
 	Logger.info(LOG, "Writing default personal_info.toml at '%s'…", path)
-	local written, reason = require("adapters.file_system").write_new(path, _first_boot_source())
-	if written or reason == "EEXIST" then return true end
+	local written, errno = require("adapters.file_system").write_new(path, _first_boot_source())
+	if written or errno == "EEXIST" or errno == 17 then return true end
 	Logger.error(LOG, "Could not create the default personal_info.toml (%s) — the editor has no source.",
-		tostring(reason))
+		tostring(errno))
 	return false
 end
 
