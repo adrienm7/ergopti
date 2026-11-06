@@ -138,20 +138,30 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 				value := ""
 				PreviewFields := []
 				PreviewValues := []
+				Complete := true
 				loop parse, combo {
-					if (hotstrings.Has(A_LoopField) and fieldsByLetter.Has(A_LoopField)) {
-						if (value != "") {
-							value := value . "{Tab}"
-						}
-
-						value := value . hotstrings[A_LoopField]
-						PreviewFields.Push(fieldsByLetter[A_LoopField])
-						PreviewValues.Push(hotstrings[A_LoopField])
+					; The fire-time resolver (HSE_TryPersonalInfoCombo) declines the
+					; WHOLE combo for an unknown letter or an empty field, so a typo
+					; or a cleared field cannot type a partial identity into a form.
+					; Registered combos follow the same rule.
+					if (!hotstrings.Has(A_LoopField) or !fieldsByLetter.Has(A_LoopField)
+							or hotstrings[A_LoopField] == "") {
+						Complete := false
+						break
 					}
+					if (value != "") {
+						value := value . "{Tab}"
+					}
+
+					; Each value is escaped on its own: the separator between fields
+					; must stay an interpreted {Tab}, while a value that itself holds
+					; braces or modifier symbols must stay literal.
+					value := value . EscapeSpecialChars(hotstrings[A_LoopField])
+					PreviewFields.Push(fieldsByLetter[A_LoopField])
+					PreviewValues.Push(hotstrings[A_LoopField])
 				}
-				if (value != "") {
-					CreateHotstringCombo(combo, EscapeSpecialChars(value),
-						PreviewFields, PreviewValues)
+				if (Complete and value != "") {
+					CreateHotstringCombo(combo, value, PreviewFields, PreviewValues)
 				}
 				return
 			}
