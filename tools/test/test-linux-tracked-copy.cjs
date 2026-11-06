@@ -304,7 +304,11 @@ try {
 		fs.symlinkSync(foreignDirectory, sourceDirectory);
 		try {
 			const output = path.join(scratch, 'source-alias-output');
-			const copied = spawnSync(process.execPath, [helper, scratch, path.join(scratch, 'source'), output], { encoding: 'utf8' });
+			const copied = spawnSync(
+				process.execPath,
+				[helper, scratch, path.join(scratch, 'source'), output],
+				{ encoding: 'utf8' }
+			);
 			assert.notEqual(copied.status, 0, 'a source directory replaced by a symlink must be refused');
 			assert.equal(fs.existsSync(path.join(output, 'private-parent/tracked.txt')), false);
 		} finally {
@@ -403,7 +407,11 @@ try {
 		const helperStart = subject.indexOf('\t_lua_with_path() {');
 		const helperEnd = subject.indexOf('\n\t# Test 1:', helperStart);
 		assert.ok(helperStart >= 0 && helperEnd > helperStart, 'the production Lua probe must exist');
-		const realLua = spawnSync(bashExecutable(), ['-c', 'command -v luajit || command -v lua5.4 || command -v lua'], { encoding: 'utf8' });
+		const realLua = spawnSync(
+			bashExecutable(),
+			['-c', 'command -v luajit || command -v lua5.4 || command -v lua'],
+			{ encoding: 'utf8' }
+		);
 		assert.equal(realLua.status, 0, 'a Lua smoke runtime is required');
 		const helpRoot = path.join(scratch, 'help;source?');
 		fs.mkdirSync(helpRoot);
@@ -413,21 +421,40 @@ try {
 		const helpEnd = subject.indexOf('\n\t# On real Linux', helpStart);
 		assert.ok(helpStart >= 0 && helpEnd > helpStart);
 		const help = spawnSync(bashExecutable(), ['-s', '--', helpRoot, realLua.stdout.trim()], {
-			input: 'set -euo pipefail\nLUA_BIN="$2"\nBUILD_DIR="$1"\n' + subject.slice(helpStart, helpEnd),
-			encoding: 'utf8', timeout: 15000, env: { ...process.env, HOME: scratch }
+			input:
+				'set -euo pipefail\nLUA_BIN="$2"\nBUILD_DIR="$1"\n' + subject.slice(helpStart, helpEnd),
+			encoding: 'utf8',
+			timeout: 15000,
+			env: { ...process.env, HOME: scratch }
 		});
-		assert.equal(help.status, 0, `help smoke with Lua path delimiters: ${help.stderr || help.stdout}`);
+		assert.equal(
+			help.status,
+			0,
+			`help smoke with Lua path delimiters: ${help.stderr || help.stdout}`
+		);
 		const relativeBin = path.join(scratch, 'relative-bin');
 		fs.mkdirSync(relativeBin);
 		fs.symlinkSync(realLua.stdout.trim(), path.join(relativeBin, 'lua'));
 		const relativeHelp = spawnSync(bashExecutable(), ['-s', '--', helpRoot], {
 			input: 'set -euo pipefail\nLUA_BIN=lua\nBUILD_DIR="$1"\n' + subject.slice(helpStart, helpEnd),
-			encoding: 'utf8', timeout: 15000, cwd: scratch,
+			encoding: 'utf8',
+			timeout: 15000,
+			cwd: scratch,
 			env: { ...process.env, HOME: scratch, PATH: 'relative-bin:/usr/bin:/bin' }
 		});
-		assert.equal(relativeHelp.status, 0, `help smoke with relative PATH: ${relativeHelp.stderr || relativeHelp.stdout}`);
+		assert.equal(
+			relativeHelp.status,
+			0,
+			`help smoke with relative PATH: ${relativeHelp.stderr || relativeHelp.stdout}`
+		);
 
-		for (const name of ["bundle's source", 'bundle\\source', 'bundle\nsource', 'bundle;source', 'bundle?source']) {
+		for (const name of [
+			"bundle's source",
+			'bundle\\source',
+			'bundle\nsource',
+			'bundle;source',
+			'bundle?source'
+		]) {
 			const buildRoot = path.join(scratch, name);
 			const moduleFile = path.join(buildRoot, '_shared/lua/packaging_path_probe.lua');
 			fs.mkdirSync(path.dirname(moduleFile), { recursive: true });

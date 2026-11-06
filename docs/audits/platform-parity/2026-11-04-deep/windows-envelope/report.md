@@ -4,8 +4,8 @@ Audited SHA: `89b0b774c8c960c7ad458ac3cb98d5c97598e518`. Date: 2026-11-04.
 
 This immutable evidence groups separately reviewed modules. Reproductions using real modules and controlled native seams are distinguished from unexecuted native scenarios in each source report. Native desktop certification is not claimed.
 
-| Module             | Findings                            | Evidence, intentional differences and limits                                        |
-| ------------------ | ----------------------------------- | ----------------------------------------------------------------------------------- |
+| Module             | Findings                            | Evidence, intentional differences and limits     |
+| ------------------ | ----------------------------------- | ------------------------------------------------ |
 | windows-hotstrings | AHK-001                             | [Module report](../windows-hotstrings/report.md) |
 | windows-input      | AHK-002, AHK-003                    | [Module report](../windows-input/report.md)      |
 | windows-llm        | No new confirmed actionable finding | [Module report](../windows-llm/report.md)        |
