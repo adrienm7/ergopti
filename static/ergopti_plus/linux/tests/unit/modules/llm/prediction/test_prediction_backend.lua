@@ -301,6 +301,13 @@ helpers.describe("prediction backend: requests are paced, variants are diverse",
 			scheduler.settle()
 			calls.remote[3].done(" troisième suite", nil, { prompt_tokens = 50, completion_tokens = 5,
 				total_tokens = 55, est_cost_usd = 0.5 })
+			-- This fixture's parser keeps none of them, so the retry budget (3 x 2)
+			-- is spent before the prediction reports its single generation row.
+			for index = 4, 6 do
+				scheduler.settle()
+				calls.remote[index].done(" autre suite", nil)
+			end
+			helpers.assert_eq(#calls.remote, 6, "the shared attempt budget bounds the retries")
 			helpers.assert_eq(#calls.generations, 1, "one generation row per prediction")
 			local info = calls.generations[1]
 			helpers.assert_eq(info.prompt_tokens, 150)
@@ -1149,18 +1156,19 @@ helpers.describe("prediction resident global privacy admission", function()
 		local okay, problem = pcall(function()
 			-- An automatic request (no prompt override): its variants go back to back.
 			engine.predict("Bonjour à tous")
-			for index = 1, 3 do calls.remote[index].done(" que tout le monde aille bien", nil) end
-			helpers.assert_eq(#calls.remote, 3, "the variants of one request are never held")
+			-- Identical answers spend the whole shared retry budget (3 x 2) refilling.
+			for index = 1, 6 do calls.remote[index].done(" que tout le monde aille bien", nil) end
+			helpers.assert_eq(#calls.remote, 6, "the variants of one request are never held")
 			-- The next automatic request is inside the interval: it waits.
 			engine.predict("Bonjour à tous, et vous")
-			helpers.assert_eq(#calls.remote, 3, "the next request must still be paced")
+			helpers.assert_eq(#calls.remote, 6, "the next request must still be paced")
 			blocked = true; scheduler.settle()
-			helpers.assert_eq(#calls.remote, 3, "revoked context must not send the next request")
+			helpers.assert_eq(#calls.remote, 6, "revoked context must not send the next request")
 			helpers.assert_eq(engine.has_suggestions(), false)
 			helpers.assert_true(engine.is_enabled())
 			blocked = false; request(engine); scheduler.settle()
-			helpers.assert_eq(#calls.remote, 4, "privacy recovery permits a new independent request")
-			calls.remote[4].done(" que tout le monde aille bien", nil)
+			helpers.assert_eq(#calls.remote, 7, "privacy recovery permits a new independent request")
+			calls.remote[7].done(" que tout le monde aille bien", nil)
 			helpers.assert_true(engine.accept(1))
 		end)
 		restore(); if not okay then error(problem, 0) end
