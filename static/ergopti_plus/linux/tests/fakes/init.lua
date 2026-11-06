@@ -466,6 +466,26 @@ function M.storage(opts)
 		generations[key] = (generations[key] or 0) + 1
 		return true
 	end
+	-- A modal string edit: a one-shot receipt that commits only while the
+	-- captured cell and its generation are unchanged, as the real adapter does.
+	local string_edits = setmetatable({}, { __mode = "k" })
+	function fake.capture_string_edit(key)
+		if type(key) ~= "string" or key == "" or aliases[key] ~= nil then return nil end
+		local receipt = {}
+		string_edits[receipt] = { key = key, cell = cell(key), generation = generations[key] or 0 }
+		return copy(fake.values[key]), receipt
+	end
+	function fake.commit_string_edit(receipt, value)
+		if type(receipt) ~= "table" then return false end
+		local expected = string_edits[receipt]
+		string_edits[receipt] = nil
+		if not expected or type(value) ~= "string" or opts.writes_fail or aliases[expected.key] ~= nil
+			or not cells_equal(cell(expected.key), expected.cell)
+			or (generations[expected.key] or 0) ~= expected.generation then return false end
+		fake.values[expected.key] = value
+		generations[expected.key] = expected.generation + 1
+		return true
+	end
 	function fake.set_many(values)
 		if opts.writes_fail or type(values) ~= "table" then return false end
 		for key in pairs(values) do if aliases[key] ~= nil then return false end end
