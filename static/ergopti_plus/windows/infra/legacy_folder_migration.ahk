@@ -23,7 +23,8 @@
 ;    _shared/lua/legacy_folder_migration.lua is the Lua twin.
 ; 2. Before paths.toml: infra/boot.ahk runs it before the configuration
 ;    transition recovery reads paths.toml, and before the logger opens its
-;    folder; its lines are queued until LoggerInit.
+;    folder; its lines are queued until LoggerInit. A transition journal the
+;    old build left beside its own paths.toml is recovered there first.
 ; 3. Never in Tests: the startup smoke and the unit harness never call it, so
 ;    no test moves a real user folder.
 ; 4. Maintainer Machines Only: no build was published with the old folders
@@ -523,6 +524,12 @@ LegacyFolderMigrationRun(PathsFile) {
 				. AppDirsMigrationWindowsLegacyConfigRelative()
 		LegacyLocal := LocalAppData . "\" . AppDirsMigrationWindowsLegacyLocalFolder()
 		NewConfig := RTrim(AppFoldersDefaultConfigDir(), "\")
+		; A transition the old build left beside its paths.toml is settled in
+		; place before anything moves: its journal names the old locator and
+		; folders, and once paths.toml left, boot recovery would only look beside
+		; the new one. Quarantine throws, as it does at boot.
+		if (FileExist(LegacyPaths) != "")
+				ConfigTransitionRecoverAtBootOrThrow(LegacyPaths)
 		LegacyFolderMoveEntry(LegacyPaths, AppFoldersPathsFile(),
 				Backup . "\" . AppDirsMigrationWindowsLegacyPathsFileRelative(), Report)
 		SplitPath(LegacyPaths, , &LegacyPathsDir)

@@ -336,3 +336,32 @@ _LFM_ChosenDescendantFollowsItsAncestor() {
 }
 Test("legacy folder migration: a folder chosen below the old configuration follows it (legacy-folder-migration-descendant)",
 	_LFM_ChosenDescendantFollowsItsAncestor)
+
+; A transition journal the old build left beside its paths.toml must be
+; recovered there before paths.toml moves: afterwards boot recovery looks only
+; beside the new one, and a quarantined journal became invisible (WFM-004).
+; A malformed journal is quarantine, which refuses the boot before any move.
+_LFM_OldTransitionJournalIsRecoveredFirst() {
+	_LFM_WithOldConfigProfile(Body)
+	Body(OldConfig) {
+		global _DefaultLogsDir
+		OldPaths := EnvGet("APPDATA") . "\" . AppDirsMigrationWindowsLegacyPathsFileRelative()
+		FileAppend("not a journal", OldPaths . CONFIG_TRANSITION_WAL_SUFFIX, "UTF-8-RAW")
+		SavedLogs := IsSet(_DefaultLogsDir) ? _DefaultLogsDir : ""
+		_DefaultLogsDir := EnvGet("LOCALAPPDATA") . "\logs\"
+		try {
+			Refused := false
+			try LegacyFolderMigrationRun(AppFoldersPathsFile())
+			catch
+				Refused := true
+			Assert(Refused, "a quarantined old journal refuses the migration")
+			Assert(FileExist(OldPaths), "the old paths.toml stays beside its journal")
+			Assert(FileExist(OldConfig . "\config.toml"), "the configuration it names stays")
+			Assert(!FileExist(AppFoldersPathsFile()), "nothing moved")
+		} finally {
+			_DefaultLogsDir := SavedLogs
+		}
+	}
+}
+Test("legacy folder migration: an old transition journal is recovered before paths.toml moves (legacy-folder-migration-journal)",
+	_LFM_OldTransitionJournalIsRecoveredFirst)
