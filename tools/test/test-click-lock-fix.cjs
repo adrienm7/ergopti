@@ -93,18 +93,18 @@ const onKeyDownBody = ahkFunctionBody(clickSource, 'GestureOnKeyDown');
 // The watcher is non-consuming, publishes its exact cleanup owner before native
 // admission, and lets the release transactions retire it only after Button Up.
 checkSource(
-	'AHK: keyboard watcher is a non-consuming Level-3 InputHook ("V L3")',
+	'AHK: keyboard watcher is a non-consuming, text-free InputHook ("V L0", every key "NI")',
 	startWatcherBody,
 	(body) =>
-		/Hook\s*:=\s*InputHook\("V L3"\)/.test(body) && /Hook\.KeyOpt\("\{All\}", "N"\)/.test(body),
-	'GestureStartKeyboardWatcher must construct InputHook("V L3") and subscribe to every key'
+		/Hook\s*:=\s*InputHook\("V L0"\)/.test(body) && /Hook\.KeyOpt\("\{All\}", "NI"\)/.test(body),
+	'GestureStartKeyboardWatcher must construct InputHook("V L0") and subscribe to every key with NI'
 );
 
 checkSource(
 	'AHK: keyboard watcher publishes exact ownership before native Start',
 	startWatcherBody,
 	(body) => {
-		const construct = body.indexOf('Hook := InputHook("V L3")');
+		const construct = body.indexOf('Hook := InputHook("V L0")');
 		const publish = body.indexOf('GestureKeyboardHook := Hook');
 		const start = body.indexOf('Hook.Start()');
 		return construct >= 0 && publish > construct && start > publish;
