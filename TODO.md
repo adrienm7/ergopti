@@ -606,6 +606,11 @@ Hands needed:
       prompt reports `cancelled` and changes nothing.
 - [ ] Run the field report once: its `scpt_recompile` step rebuilds `Encryptor.app/.../main.scpt` from its updated
       `.applescript` (keystats rename) and commits it on the field branch (710f0a379d); cherry-pick that commit.
+- [ ] Predictions stop on activity (feat/predictions-stop-on-activity): on a real Mac, during the spinner and over
+      a shown prediction, a pointer move, a trackpad scroll, a pinch or swipe gesture, Cmd+Tab, a click in
+      another app and F5 each cancel and hide; Tab, Shift+Tab, the arrows and the validation digits still act on
+      it; a resting hand keeps it. Check that mouseMoved now in the keymap mouse tap adds no visible pointer lag
+      (Debug log `User activity (mouseMoved)` appears once per cancellation, not per event).
 
 ## To confirm on the Windows PC
 
@@ -676,6 +681,10 @@ Account and tester actions (maintainer, from the PC):
 - [ ] Decide: squash the old steps of `migrations.toml` (recommended, it would cut most remaining config test time) and
       whether a registry change seen only at the sweep's next capture is acceptable.
 - [ ] Review the machine translations of 1 November (curl, proxy, token exchange, WebView2, chord and case-twin keys).
+- [ ] Predictions stop on activity (feat/predictions-stop-on-activity): with a slow model, type, pause, and during
+      the spinner move the mouse by a few pixels, turn the wheel, use a precision-touchpad scroll, Alt+Tab, press
+      F5: each cancels the request and hides the tooltip at once (no 100 px threshold, no grace window). Tab, the
+      validation digits and the cycle chords still act on a shown prediction; a still mouse keeps it.
 
 ## To confirm on Linux
 
@@ -703,6 +712,9 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 - [ ] Ten window-toggle actions on GNOME Wayland and X11 (a covered page is raised, not closed); release notes pane
       (PAR-52); tap delay row and every tray dialog in the owned GTK host (ca680655d7), group restore and clear, open target, Backspace word start.
 - [ ] Some `local_servers.json` servers installed: the detection names them.
+- [ ] Predictions stop on activity (feat/predictions-stop-on-activity): with a slow model, during the spinner move
+      the mouse, turn the wheel, touch the touchpad (absolute pad and relative pad), switch window (the 250 ms poll),
+      press F5: each cancels and hides. The validation digits and the navigation chords keep a shown prediction.
 
 ## Remaining code work
 
