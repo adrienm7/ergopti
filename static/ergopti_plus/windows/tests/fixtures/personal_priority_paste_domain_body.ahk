@@ -176,7 +176,7 @@ try {
  _PPNC_Run(A_Args[1])
  FileAppend("PASS personal-priority-paste-domain " . A_Args[1] . "`n", "*", "UTF-8-RAW")
  ExitApp(0)
-} catch Any as Failure {
- FileAppend("FAIL personal-priority-paste-domain " . Failure.Message . "`n" . Failure.Stack . "`n", "*", "UTF-8-RAW")
+} catch Any as MainFailure {
+ FileAppend("FAIL personal-priority-paste-domain " . MainFailure.Message . "`n" . MainFailure.Stack . "`n", "*", "UTF-8-RAW")
  ExitApp(1)
 }

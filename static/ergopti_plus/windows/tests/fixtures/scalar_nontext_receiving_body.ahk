@@ -140,7 +140,7 @@ try {
 	_SNR_Main()
 	FileAppend("PASS scalar-nontext " . _SNR.Owner . " " . _SNR.Mode, "*")
 	ExitApp(0)
-} catch as Err {
-	FileAppend(Err.Message . "`n" . Err.Stack, "**")
+} catch as MainErr {
+	FileAppend(MainErr.Message . "`n" . MainErr.Stack, "**")
 	ExitApp(1)
 }

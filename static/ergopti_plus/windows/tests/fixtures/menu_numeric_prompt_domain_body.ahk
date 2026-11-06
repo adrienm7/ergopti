@@ -51,15 +51,15 @@ _MDPN_Run(Mode) {
 try {
  Mode := A_Args[1]
  _MDPN_Require(Mode == "base" || Mode == "category" || Mode == "personal-delay" || Mode == "personal-priority", "Explicit prompt mode required")
- Field := Mode == "personal-priority" ? "priority" : "delay"
+ ExpectedField := Mode == "personal-priority" ? "priority" : "delay"
  for Raw in ["3", "0003", "0"] {
   _MDPN_World.Answer := {Result: "OK", Value: Raw}
   Before := _MDPN_World.Calls.Length
   _MDPN_Run(Mode)
   _MDPN_Require(_MDPN_World.Calls.Length == Before + 1, "Ordinary, padded and zero values must still publish once")
-  Seen := _MDPN_World.Calls[-1]
-  Expected := Field == "priority" ? Integer(Raw) : Integer(Raw) / 1000
-  _MDPN_Require(Seen.Field == Field && Seen.Value == Expected, "The original numeric intention and field must survive")
+  LastCall := _MDPN_World.Calls[-1]
+  Expected := ExpectedField == "priority" ? Integer(Raw) : Integer(Raw) / 1000
+  _MDPN_Require(LastCall.Field == ExpectedField && LastCall.Value == Expected, "The original numeric intention and field must survive")
  }
  _MDPN_World.Answer := {Result: "Cancel", Value: "3"}
  Before := _MDPN_World.Calls.Length
@@ -75,7 +75,7 @@ try {
  _MDPN_Require(_MDPN_World.Prompts == 8, "All eight cases must traverse the actual prompt display port")
  FileAppend("PASS menu-numeric-prompt-domain " . Mode . "`n", "*", "UTF-8-RAW")
  ExitApp(0)
-} catch Any as Failure {
- FileAppend("FAIL menu-numeric-prompt-domain " . Failure.Message . "`n" . Failure.Stack . "`n", "*", "UTF-8-RAW")
+} catch Any as MainFailure {
+ FileAppend("FAIL menu-numeric-prompt-domain " . MainFailure.Message . "`n" . MainFailure.Stack . "`n", "*", "UTF-8-RAW")
  ExitApp(1)
 }

@@ -416,8 +416,8 @@ try {
 	}
 	FileAppend("PASS model-show " . _MBSW.Mode . "`n", "*", "UTF-8")
 	ExitCode := 0
-} catch Any as Failure {
-	FileAppend(Type(Failure) . ": " . Failure.Message . "`n", "*", "UTF-8")
+} catch Any as MainFailure {
+	FileAppend(Type(MainFailure) . ": " . MainFailure.Message . "`n", "*", "UTF-8")
 	ExitCode := 1
 } finally {
 	if _MBSW.ResetHookInstalled {
