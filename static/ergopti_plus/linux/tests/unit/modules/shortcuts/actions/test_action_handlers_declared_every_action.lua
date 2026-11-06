@@ -143,6 +143,10 @@ helpers.describe("linux actions: the driver's own surfaces", function()
 	end)
 
 	helpers.it("the three personal files each resolve to their own path", function()
+		-- The recorded shell fakes mkdir, and the Lua source is created before
+		-- it opens: the scratch configuration folder must really exist.
+		local made = os.execute("mkdir -p '" .. require("infra.config_paths").config() .. "'")
+		helpers.assert_true(made == true or made == 0, "scratch configuration folder")
 		with_recorded_shell(function(commands)
 			for _, id in ipairs({ "open_personal_info", "open_personal_hotstrings", "open_personal_shortcuts" }) do
 				Gestures.execute_action(id, "test__slot")
@@ -150,7 +154,7 @@ helpers.describe("linux actions: the driver's own surfaces", function()
 			local text = joined(commands)
 			helpers.assert_true(text:find("personal_info.toml", 1, true) ~= nil, "personal_info.toml")
 			helpers.assert_true(text:find("personal_hotstrings.toml", 1, true) ~= nil, "personal_hotstrings.toml")
-			helpers.assert_true(text:find("personal_shortcuts.toml", 1, true) ~= nil, "personal_shortcuts.toml")
+			helpers.assert_true(text:find("personal_shortcuts.lua", 1, true) ~= nil, "personal_shortcuts.lua, the programmable source")
 		end)
 	end)
 
