@@ -563,3 +563,9 @@ new delay counts from the last keystroke and 0 stops the idle check. A hand
 edit of `config.toml` still waits for the next activation. Linux owner:
 `modules/shortcuts/manager.caps_word_policy_published`, called by
 `caps_word_auto_off` after each acknowledged write.
+
+## The CapsWord star delimiter is the literal ★ (6 November 2026)
+
+Aligned on the policy every OS already applies (Windows documents it): the
+CapsWord ★ delimiter is the built-in literal ★, not the renamed magic key, and
+its menu caption says ★ on Windows, macOS and Linux.

@@ -15,7 +15,6 @@ local ParameterLabel = require("action_parameter_label")
 local RowDialect = require("menu.row_dialect")
 local Logger = require("logger.shim")
 local Extensions = require("hotstrings.extensions")
-local MagicKey = require("modules.hotstrings.magic_key")
 local TextPrompt = require("ui.text_prompt")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
@@ -677,7 +676,9 @@ local function _build_shortcuts(ctx)
 				else
 					local key = row.key
 					rows[#rows + 1] = {
-						label = (i18n_safe(row.label_key):gsub("★", MagicKey.get())),
+						-- The star delimiter is the literal built-in ★ on every OS, as the
+						-- policy reads it: the caption never takes a renamed magic key (CWS-002).
+						label = i18n_safe(row.label_key),
 						checked = checked[key] == true,
 						action = function() return changed(AutoOff.set_terminator(key, not checked[key])) end,
 					}
