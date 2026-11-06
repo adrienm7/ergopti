@@ -206,6 +206,36 @@ helpers.describe("macOS legacy folder migration", function()
 		assert(ok, err)
 	end)
 
+	helpers.it("reports a folder whose listing raises instead of aborting the boot (legacy-folder-migration-macos-list)",
+		function()
+		local dir = scratch()
+		local ok, err = pcall(with_real_fs, function()
+			local home = dir .. "/home"
+			local old_logs = home .. "/" .. AppDirs.migration.macos.legacy_logs_relative
+			assert(os.execute("mkdir -p -- '" .. old_logs .. "'"))
+			write(old_logs .. "/a.log", "OLD")
+			local real_dir = hs.fs.dir
+			-- hs.fs.dir raises on a folder it cannot open (permission, gone after the stat).
+			hs.fs.dir = function(path)
+				if path == old_logs then error(path .. ": Permission denied") end
+				return real_dir(path)
+			end
+			local warned = {}
+			local logger = { info = function() end,
+				warn = function(_, fmt, ...) warned[#warned + 1] = fmt:format(...) end }
+			local run_ok, report = pcall(Migration.run, logger, { home = home })
+			helpers.assert_true(run_ok, "the refusal does not escape the migration: " .. tostring(report))
+			local reasons = {}
+			for _, kept in ipairs(report.kept) do reasons[#reasons + 1] = kept.from .. "=" .. kept.reason end
+			helpers.assert_true(table.concat(reasons, " "):find(old_logs .. "=list_failed", 1, true) ~= nil,
+				"the unlistable folder is reported: " .. table.concat(reasons, " "))
+			helpers.assert_eq(read(old_logs .. "/a.log"), "OLD", "its entry stays")
+			helpers.assert_true(#warned >= 1, "and warned")
+		end)
+		drop(dir)
+		assert(ok, err)
+	end)
+
 	helpers.it("names the owned runtime folder apart from the Ergopti root", function()
 		local KePaths = require("platform.remap.ke_paths")
 		helpers.assert_true(KePaths.OWNED.ARTIFACT_HOME:find(AppDirs.macos.support_relative, 1, true) ~= nil,

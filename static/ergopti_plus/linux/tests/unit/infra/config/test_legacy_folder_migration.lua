@@ -110,6 +110,55 @@ helpers.describe("Linux legacy folder migration", function()
 		assert(ok, err)
 	end)
 
+	helpers.it("lists exact names and reports an unlistable folder, on real folders (legacy-folder-migration-linux-list)",
+		function()
+		local dir = scratch()
+		local ok, err = pcall(function()
+			assert(os.execute("mkdir -p -- '" .. dir .. "/old' '" .. dir .. "/new'"))
+			-- A newline is a legal filename byte: line-split listing invented two names.
+			write(dir .. "/old/line\nbreak", "NL")
+			write(dir .. "/notdir", "FILE")
+			local Core = require("legacy_folder_migration")
+			local ports = Migration.native_ports()
+			local report = Core.apply({
+				{ from_dir = dir .. "/old", to_dir = dir .. "/new", backup_dir = dir .. "/new/bak/old" },
+				{ from_dir = dir .. "/notdir", to_dir = dir .. "/new", backup_dir = dir .. "/new/bak/notdir" },
+			}, ports)
+			helpers.assert_eq(read(dir .. "/new/line\nbreak"), "NL", "the newline-named entry moved")
+			helpers.assert_eq(#report.moved, 1, "one move")
+			helpers.assert_eq(#report.removed, 1, "the emptied old folder is removed")
+			helpers.assert_eq(#report.kept, 1, "the unlistable source is reported")
+			helpers.assert_eq(report.kept[1].reason, "list_failed", "not read as an empty folder")
+			helpers.assert_eq(read(dir .. "/notdir"), "FILE", "and left untouched")
+		end)
+		drop(dir)
+		assert(ok, err)
+	end)
+
+	helpers.it("reports a folder the user cannot read (legacy-folder-migration-linux-permission)", function()
+		local id = io.popen("id -u")
+		local uid = id and id:read("*l")
+		if id then id:close() end
+		-- root reads any folder, so the refusal exists only for an ordinary user.
+		if uid == "0" then return end
+		local dir = scratch()
+		local ok, err = pcall(function()
+			assert(os.execute("mkdir -p -- '" .. dir .. "/old' '" .. dir .. "/new'"))
+			write(dir .. "/old/storage.json", "LEGACY")
+			assert(os.execute("chmod 000 -- '" .. dir .. "/old'"))
+			local report = require("legacy_folder_migration").apply({
+				{ from_dir = dir .. "/old", to_dir = dir .. "/new", backup_dir = dir .. "/new/bak/old" } },
+				Migration.native_ports())
+			assert(os.execute("chmod 700 -- '" .. dir .. "/old'"))
+			helpers.assert_eq(#report.kept, 1, "the refusal is reported")
+			helpers.assert_eq(report.kept[1].reason, "list_failed", "not read as an empty folder")
+			helpers.assert_eq(read(dir .. "/old/storage.json"), "LEGACY", "the old entry stays")
+		end)
+		os.execute("chmod 700 -- '" .. dir .. "/old' 2>/dev/null")
+		drop(dir)
+		assert(ok, err)
+	end)
+
 	helpers.it("logs every move, backup and kept entry", function()
 		local lines = {}
 		local logger = {

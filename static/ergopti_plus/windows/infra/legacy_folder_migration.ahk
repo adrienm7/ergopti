@@ -136,9 +136,20 @@ LegacyFolderMoveEntry(From, To, Backup, Report) {
 LegacyFolderMergeEntries(FromDir, ToDir, BackupDir, Report) {
 		if !DirExist(FromDir)
 				return
+		; A loop files over a folder it cannot open yields nothing, as if the
+		; folder were empty; the strict listing throws, and the refusal is kept.
 		Names := []
-		loop files, FromDir . "\*", "FD"
-				Names.Push(A_LoopFileName)
+		try {
+				for Directories in [false, true] {
+						for Path in FSListDirectoryStrict(FromDir, Directories) {
+								SplitPath(Path, &Name)
+								Names.Push(Name)
+						}
+				}
+		} catch as ListError {
+				Report["kept"].Push(Map("from", FromDir, "to", ToDir, "reason", "list_failed", "detail", ListError.Message))
+				return
+		}
 		for Name in Names
 				LegacyFolderMoveEntry(FromDir . "\" . Name, ToDir . "\" . Name, BackupDir . "\" . Name, Report)
 		LegacyFolderRemoveIfEmpty(FromDir, Report)
@@ -301,9 +312,12 @@ LegacyFolderLogReport(Report) {
 		for Row in Report["backed_up"]
 				LoggerWarn("Boot", "Moved legacy folder entry '{1}' to the backup '{2}': '{3}' is already taken.",
 						Row["from"], Row["to"], Row["taken"])
+		; The reason phrases of KEPT_REASONS in _shared/lua/legacy_folder_migration.lua.
+		Reasons := Map("backup_exists", "a backup already exists", "list_failed", "its folder could not be listed",
+				"remove_failed", "its emptied folder could not be removed")
 		for Row in Report["kept"]
 				LoggerWarn("Boot", "Kept legacy folder entry '{1}': {2} at '{3}' ({4}).", Row["from"],
-						Row["reason"] == "backup_exists" ? "a backup already exists" : "it could not be moved",
+						Reasons.Has(Row["reason"]) ? Reasons[Row["reason"]] : "it could not be moved",
 						Row["to"], Row.Has("detail") ? Row["detail"] : Row["reason"])
 		for Dir in Report["removed"]
 				LoggerInfo("Boot", "Removed the emptied legacy folder '{1}'.", Dir)

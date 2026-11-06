@@ -51,12 +51,18 @@ function M.native_ports()
 	local function exists(path) return fs.symlinkAttributes(path, "mode") ~= nil end
 	return {
 		exists = exists,
+		-- fs.dir raises on a folder it cannot open (no permission, gone after the
+		-- stat): the refusal is returned to the core, which reports it, instead
+		-- of escaping the migration and aborting init.lua.
 		list = function(dir)
-			if fs.attributes(dir, "mode") ~= "directory" then return nil end
+			if fs.attributes(dir, "mode") ~= "directory" then return nil, "not a folder" end
 			local names = {}
-			for name in fs.dir(dir) do
-				if name ~= "." and name ~= ".." then names[#names + 1] = name end
-			end
+			local listed, list_error = pcall(function()
+				for name in fs.dir(dir) do
+					if name ~= "." and name ~= ".." then names[#names + 1] = name end
+				end
+			end)
+			if not listed then return nil, tostring(list_error) end
 			return names
 		end,
 		-- os.rename replaces an existing destination file or empty folder, so a

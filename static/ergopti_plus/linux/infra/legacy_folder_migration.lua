@@ -15,8 +15,8 @@
 ---    folders it moves. Its report is logged once the logger is ready.
 --- 2. Shared Rules: what moves and what is refused is _shared/lua/
 ---    legacy_folder_migration.lua; this module only resolves the folders and
----    owns the shell effects (POSIX test, ls, mkdir, rmdir) and the no-replace
----    rename of infra/no_replace_move.
+---    owns the native effects (POSIX test, libuv scandir, mkdir, rmdir) and the
+---    no-replace rename of infra/no_replace_move.
 --- 3. Maintainer Machines Only: no Linux build was published with the old
 ---    folders; this exists for the maintainer's own installs and goes once they
 ---    are moved (docs/tooling/one-folder-name-handoff.md).
@@ -27,6 +27,8 @@ local M = {}
 local AppDirs = require("app_dirs")
 local Core = require("legacy_folder_migration")
 local NoReplaceMove = require("infra.no_replace_move")
+-- The installer bundles luv; without it a folder is reported as unlistable.
+local uv_loaded, uv = pcall(require, "luv")
 local quote = require("text_utils").shell_quote
 
 local LOG = "infra.legacy_folder_migration"
@@ -55,15 +57,22 @@ function M.native_ports()
 		exists = function(path)
 			return succeeds("test -e " .. quote(path) .. " || test -L " .. quote(path))
 		end,
+		-- libuv's scandir returns each name's exact bytes, a newline included,
+		-- and an error for a folder it cannot read: a line-split `ls` invented
+		-- names for a newline and reported a refused folder as empty.
 		list = function(dir)
-			local pipe = io.popen("ls -A -- " .. quote(dir) .. " 2>/dev/null")
-			if not pipe then return nil end
+			if not uv_loaded then return nil, "libuv (luv) is unavailable" end
+			local request, open_error = uv.fs_scandir(dir)
+			if not request then return nil, tostring(open_error) end
 			local names = {}
-			for line in pipe:lines() do
-				if line ~= "" then names[#names + 1] = line end
+			while true do
+				local name, next_error = uv.fs_scandir_next(request)
+				if not name then
+					if next_error ~= nil then return nil, tostring(next_error) end
+					return names
+				end
+				names[#names + 1] = name
 			end
-			pipe:close()
-			return names
 		end,
 		-- os.rename replaces an existing destination, so a file published after
 		-- the core's check would be lost; renameat2 RENAME_NOREPLACE never does.

@@ -139,6 +139,48 @@ local function move_entry(from, to, backup, ports, report)
 	end
 end
 
+--- Moves the entries of one merge step, then removes its emptied old folder.
+---
+--- A folder that cannot be listed is a refusal, not an empty folder: its
+--- entries stay where they are and the report names it, so the boot log says
+--- why the old settings were not found in the new folder.
+--- @param step table Merge step (from_dir, to_dir, backup_dir, entries).
+--- @param ports table Native effects.
+--- @param report table Report being filled.
+local function merge_entries(step, ports, report)
+	local listed, list_error
+	if step.entries then
+		listed = step.entries
+	else
+		listed, list_error = ports.list(step.from_dir)
+	end
+	if type(listed) ~= "table" then
+		report.kept[#report.kept + 1] = { from = step.from_dir, to = step.to_dir, reason = "list_failed",
+			detail = list_error }
+		return
+	end
+	-- A copy: the named entries come from the generated app_dirs table.
+	local names = {}
+	for _, name in ipairs(listed) do names[#names + 1] = name end
+	table.sort(names)
+	for _, name in ipairs(names) do
+		move_entry(join(step.from_dir, name), join(step.to_dir, name), join(step.backup_dir, name), ports, report)
+	end
+	-- A folder already gone once its entries left has nothing to remove.
+	if not ports.exists(step.from_dir) then return end
+	local left, left_error = ports.list(step.from_dir)
+	if type(left) ~= "table" then
+		report.kept[#report.kept + 1] = { from = step.from_dir, to = step.to_dir, reason = "list_failed",
+			detail = left_error }
+	elseif #left == 0 then
+		if ports.remove_empty_dir(step.from_dir) then
+			report.removed[#report.removed + 1] = step.from_dir
+		else
+			report.kept[#report.kept + 1] = { from = step.from_dir, to = step.from_dir, reason = "remove_failed" }
+		end
+	end
+end
+
 --- Applies a plan of folder moves.
 ---
 --- Each step is either a single move (`from`, `to`, `backup`) or a merge
@@ -147,7 +189,8 @@ end
 --- to the same name in `backup_dir` when that name is taken, and `from_dir` is
 --- removed once it is empty. A merge keeps entries it is not asked to move.
 --- @param plan table Array of steps.
---- @param ports table exists, list, rename, make_dir, remove_empty_dir.
+--- @param ports table exists, list (names, or nil and an error when the folder
+---   cannot be listed), rename (never replacing), make_dir, remove_empty_dir.
 --- @return table report { moved = {{from,to}}, backed_up = {{from,to,taken}},
 ---   kept = {{from,to,reason}}, removed = {dir} }.
 function M.apply(plan, ports)
@@ -165,18 +208,7 @@ function M.apply(plan, ports)
 				"legacy folder migration step " .. index .. " needs from_dir, to_dir and backup_dir")
 		end
 		if step.from_dir and ports.exists(step.from_dir) then
-			-- A copy: the named entries come from the generated app_dirs table.
-			local names = {}
-			for _, name in ipairs(step.entries or ports.list(step.from_dir) or {}) do names[#names + 1] = name end
-			table.sort(names)
-			for _, name in ipairs(names) do
-				move_entry(join(step.from_dir, name), join(step.to_dir, name), join(step.backup_dir, name), ports,
-					report)
-			end
-			local left = ports.list(step.from_dir)
-			if left and #left == 0 and ports.remove_empty_dir(step.from_dir) then
-				report.removed[#report.removed + 1] = step.from_dir
-			end
+			merge_entries(step, ports, report)
 		end
 	end
 	return report
@@ -260,6 +292,13 @@ end
 -- ================================
 -- ================================
 
+--- What a kept row's reason means, for its warning.
+local KEPT_REASONS = {
+	backup_exists = "a backup already exists",
+	list_failed = "its folder could not be listed",
+	remove_failed = "its emptied folder could not be removed",
+}
+
 --- Logs a migration report through the driver's logger.
 --- @param logger table Logger with info and warn.
 --- @param log string Logger module name.
@@ -274,8 +313,7 @@ function M.log_report(logger, log, report)
 	end
 	for _, entry in ipairs(report.kept) do
 		logger.warn(log, "Kept legacy folder entry %s: %s at %s (%s).", entry.from,
-			entry.reason == "backup_exists" and "a backup already exists" or "it could not be moved",
-			entry.to, tostring(entry.detail or entry.reason))
+			KEPT_REASONS[entry.reason] or "it could not be moved", entry.to, tostring(entry.detail or entry.reason))
 	end
 	for _, dir in ipairs(report.removed) do
 		logger.info(log, "Removed the emptied legacy folder %s.", dir)
