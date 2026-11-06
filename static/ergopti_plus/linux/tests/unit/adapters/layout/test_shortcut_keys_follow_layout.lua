@@ -38,12 +38,15 @@ helpers.describe("shortcut keys: the live layout decides the key", function()
 		local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+		-- A clipboard that holds what was last written: the paste reads it back
+		-- before Ctrl+V, and refuses to press it over another owner's bytes.
+		local clipboard = "before"
 		package.loaded["adapters.shell_runner"] = {
 			has_command = function() return true end,
-			exec = function() return "before" end,
-			exec_checked = function() return true, "before", nil end,
-			with_exact_stdin = function(command) return command end,
-			run = function() return true end,
+			exec = function() return clipboard end,
+			exec_checked = function() return true, clipboard, nil end,
+			with_exact_stdin = function(command, stdin) return { command = command, stdin = stdin } end,
+			run = function(command) clipboard = command.stdin; return true end,
 		}
 		package.loaded["infra.display_server"] = {
 			UNKNOWN = "unknown",
