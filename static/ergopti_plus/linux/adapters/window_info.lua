@@ -421,6 +421,15 @@ function M.use_native_x11()
 	return bound
 end
 
+--- The X server readings the metrics take beside the focus: the cursor
+--- position (pointer distance in screen pixels) and the EWMH current desktop.
+--- Only a native X11 session answers them; under Wayland a client reads neither.
+--- @return table sources { pointer = function|nil, desktop = function|nil }
+function M.metrics_sources()
+	if not DisplayServer.is_x11() or not X11Focus.has_transport() then return {} end
+	return { pointer = X11Focus.pointer_position, desktop = X11Focus.current_desktop }
+end
+
 --- Returns the identity of the currently focused window.
 --- Every field is "" when the session cannot answer; the table is never nil.
 --- @return table WindowInfo: { appId, windowTitle, bundleId, executablePath }

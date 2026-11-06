@@ -2019,6 +2019,16 @@ id = "metrics_reset_session"
 i18n = "menu.metrics.reset_session"
 
 
+# The metrics this session cannot measure, each with its reason: Wayland gives a
+# client neither the cursor position (pointer distance in screen pixels) nor the
+# current desktop (desktop changes). Linux's alone: Windows and macOS measure
+# both on every session. Empty when everything is measured.
+[[menu.metrics_menu]]
+type = "list"
+id = "metrics_availability"
+platforms = ["linux"]
+reason_key = "platform_reason.only_linux_lacks_metric_sources"
+
 # The at-rest migration readout. Converting a year of stored rows takes minutes,
 # and without this row the user ticks « chiffrer au repos » and sees nothing
 # happen at all — so it reports progress and offers to stop. Linux's alone: it is

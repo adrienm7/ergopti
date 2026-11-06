@@ -2271,6 +2271,14 @@
 		},
 		{
 			"type": "list",
+			"id": "metrics_availability",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.only_linux_lacks_metric_sources"
+		},
+		{
+			"type": "list",
 			"id": "metrics_migration",
 			"platforms": [
 				"linux"

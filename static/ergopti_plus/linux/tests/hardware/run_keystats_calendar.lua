@@ -252,7 +252,8 @@ scenario({ month = 10, day = 25, sec = 0 }, function(k, _, advance, rows)
 		Fixture.flush(k)
 		equal(rows("SELECT date,awake_ms,battery_count,wifi_changes FROM agg_system_day ORDER BY date;"),
 			{ "2026-10-25|60000|2|1", "2026-10-26|30000|2|1" })
-		equal(rows("SELECT date,action FROM events_system ORDER BY id;"),
+		-- system_load samples the host's /proc: the calendar contract is about transitions.
+		equal(rows("SELECT date,action FROM events_system WHERE action<>'system_load' ORDER BY id;"),
 			{ "2026-10-25|wifi_change", "2026-10-26|wifi_change" })
 		equal(system.snapshot().values["2026-10-25"], nil)
 	end, debug.traceback)
