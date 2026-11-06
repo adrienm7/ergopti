@@ -391,6 +391,23 @@ KLR_CacheDiscard(md, logPath, Observed) {
 	return 0
 }
 
+; Retires the durable reader image for an explicit full reset. The publication
+; guard excludes a peer save, and the verified delete accepts any complete image
+; because the caller asked to forget it, not to preserve its history.
+; @param md {String} Metrics directory.
+; @returns {Boolean} True when no image remains; false when it is held elsewhere.
+KLR_CacheRetire(md) {
+	Path := KLR_CachePath(md)
+	if !FSExists(Path)
+		return true
+	Guard := FSOpenExclusiveGuard(Path . ".publish.lock")
+	if !Guard
+		return false
+	try Retired := FSDeleteVerified(Path, (*) => true)
+	finally FSCloseExclusiveGuard(Guard)
+	return Retired ? true : false
+}
+
 ; A killed worker cannot execute CacheSave's finally block. Only recognize
 ; completed Ergopti images whose hidden producer window no longer exists.
 ; Unknown/truncated files and SQLite recovery companions need separate review.
