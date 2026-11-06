@@ -409,9 +409,11 @@ local function scenarios(repo)
 		-- runtime's admission, with no error, dialog or reverted setting.
 		{ name = "the recommended preset imported without Ergopti's own runtime installed boots and saves",
 			setup = neutral_defaults, steps = { "restore_recommended" }, marker = BOOTED_MARKER },
-		{ name = "a native three-finger conflict is reported and held (gesture-conflict-boot)",
+		-- macOS keeps a three-finger tap it runs itself: the slot is held and
+		-- greyed, and the boot shows no dialog, since only macOS would react.
+		{ name = "a native three-finger conflict is held without a boot dialog (gesture-conflict-boot)",
 			setup = neutral_defaults, steps = { "restore_recommended", "gesture_conflict" }, marker = BOOTED_MARKER,
-			machine = "gesture_conflict", expected_gesture_conflict = true },
+			machine = "gesture_conflict", held_gesture_conflict = true },
 		-- world.MACHINES: the machine each boot runs on, and the lease facts it ends with.
 		{ name = "an Ergopti layout boots while the lease worker answers late, on one lease worker",
 			setup = kept_shared_runtime, steps = { "boot" }, marker = BOOTED_MARKER,
@@ -511,9 +513,8 @@ end
 --- @param action string
 --- @param marker string|nil Line the boot must reach.
 --- @return table problems
-local function judge(output, action, marker, expect_gesture_conflict)
+local function judge(output, action, marker)
 	local problems = {}
-	local conflict_dialogs = 0
 	for line in output:gmatch("[^\n]+") do
 		if line:find("%[ERROR%]") or line:find("%[FATAL%]") then
 			problems[#problems + 1] = "logged " .. line:gsub("^%S+ %S+ ", "")
@@ -523,20 +524,13 @@ local function judge(output, action, marker, expect_gesture_conflict)
 			problems[#problems + 1] = "logged an unformatted placeholder: " .. line:gsub("^%S+ %S+ ", "")
 		else
 			local kind = line:match("^E2E_([%u_]+) ")
-			if kind == "DIALOG" and expect_gesture_conflict
-				and line:find("blockAlert: Gesture conflict", 1, true)
-				and line:find("3-finger tap", 1, true) then
-				conflict_dialogs = conflict_dialogs + 1
-			elseif kind == "DIALOG" or kind == "EXIT" or kind == "BUNDLE_WRITE" or kind == "BUNDLE_READ_MISSING"
+			if kind == "DIALOG" or kind == "EXIT" or kind == "BUNDLE_WRITE" or kind == "BUNDLE_READ_MISSING"
 				or kind == "OPEN_MISSING" or kind == "ROSETTA"
 				or kind == "TIMER_RAISED" or kind == "TAP_RAISED" or kind == "BOOT_RAISED"
 				or kind == "SCENARIO_FAILED" then
 				problems[#problems + 1] = line
 			end
 		end
-	end
-	if expect_gesture_conflict and conflict_dialogs ~= 1 then
-		problems[#problems + 1] = "expected exactly one native tap conflict dialog, got " .. conflict_dialogs
 	end
 	if not output:find("E2E_DONE " .. action, 1, true) then
 		problems[#problems + 1] = "the " .. action .. " child never finished: " .. output:sub(-400)
@@ -714,14 +708,14 @@ function M.run(check, options)
 			local marker = action ~= "restore_recommended" and scenario.marker or nil
 			for context_index, ctx in ipairs(contexts) do
 				local output = outputs[context_index]
-				local expect_conflict = scenario.expected_gesture_conflict and action == "gesture_conflict"
-				for _, problem in ipairs(judge(output, action, marker, expect_conflict)) do
+				local held_conflict = scenario.held_gesture_conflict and action == "gesture_conflict"
+				for _, problem in ipairs(judge(output, action, marker)) do
 					ctx.problems[#ctx.problems + 1] = action .. ": " .. problem
 				end
 				for _, problem in ipairs(judge_facts(output, scenario.facts)) do
 					ctx.problems[#ctx.problems + 1] = action .. ": " .. problem
 				end
-				if expect_conflict then
+				if held_conflict then
 					for _, problem in ipairs(judge_facts(output, { system_tap_3_state = "taken" })) do
 						ctx.problems[#ctx.problems + 1] = action .. ": " .. problem
 					end
