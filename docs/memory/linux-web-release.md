@@ -10,6 +10,21 @@ Observe mode and `EVIOCGRAB` mode have different correctness contracts. A driver
 that does not grab cannot prevent a physical terminator from reaching the app;
 replay logic must reflect the active mode.
 
+### project-linux-update-restart-is-watched-until-the-daemon-reports
+
+After an update, `modules/updater/restarter.lua` starts the new daemon under a
+watcher (`WATCH_SCRIPT`), the Windows boot-ready and probation contract: the
+daemon reports its pid to a one-shot token (`infra/updater_boot_ready.lua`, after
+`BootProfiler.complete()`), and a daemon that does not within 60 s, reports
+garbage or dies in 0.75 s is stopped, its tree moved to `<root>.failed-<pid>`,
+`<root>.old` put back and the previous daemon started. The relay runs the
+watcher itself; under systemd it is a `systemd-run --user --collect` transient
+unit (the service's cgroup would kill it), the token goes through
+`systemctl --user set-environment`, and a refused restart or a Quit
+(`cancel("systemd")`) stops that unit first so it never rolls a good update
+back. A tree without the reporter file is only started; the rollback start is
+not watched. Moves are `mv -T -n` plus an existence check, not renameat2.
+
 ### project-linux-device-descriptors-are-close-on-exec
 
 `EVIOCGRAB` and a uinput device belong to the open file, not to the daemon: the

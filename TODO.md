@@ -288,7 +288,13 @@ Evidence: [six-scope recovery/lifecycle audit](docs/audits/platform-parity/2026-
       ARMED-on-quit is unchanged. Recorded lower guarantees (memory `project-macos-release-swap-keeps-a-build-that-reports-ready`):
       the rollback relaunch is not checked, and an older chosen release without the reporter is only opened. Real
       Mac check under « To confirm on the Mac ».
-- [ ] **[CODE] Linux standalone updater:** evaluate successor-ready receiving and recovery beyond pre-restart wrapper smoke plus systemd/relay request admission. Windows has the stronger boot-ready/probation contract; an equivalent or an explicit scoped reason remains to be established. [Compared contracts](docs/audits/platform-parity/2026-11-04-recovery/capabilities.md).
+- [x] **[CODE] Linux standalone updater:** evaluate successor-ready receiving and recovery beyond pre-restart wrapper smoke plus systemd/relay request admission. Windows has the stronger boot-ready/probation contract; an equivalent or an explicit scoped reason remains to be established. [Compared contracts](docs/audits/platform-parity/2026-11-04-recovery/capabilities.md).
+      Done: the restart on an installed update runs under a watcher (the relay itself, or a `systemd-run` transient
+      unit under systemd) that keeps the new tree once `infra/updater_boot_ready.lua` reports the daemon pid within
+      60 s and it survives 0.75 s; otherwise it stops it, moves the tree to `<root>.failed-<pid>`, puts `<root>.old`
+      back and starts the previous daemon. A refused restart or a Quit stops the watcher first. Lower than Windows,
+      recorded in memory `project-linux-update-restart-is-watched-until-the-daemon-reports`: the rollback start is
+      not watched and a tree without the reporter is only started. Live check under « To confirm on Linux ».
 
 ## End-to-end parity follow-up
 
@@ -829,6 +835,10 @@ Account and tester actions (maintainer, from the PC):
 No machine is available. First `bash tools/dev/collect-linux-field-report.sh` on a real desktop: the field run
 without a click (53c1766514), the report marks, and `driver_reload` (one daemon restart under a real user manager).
 
+- [ ] Update restart watcher: install an update in a standalone install under the systemd unit and from a terminal
+      (relay); `…update-watch.log` beside the settings reads « reported a healthy start ». With a new tree whose
+      `bin/` launcher exits at once, the tree moves to `<root>.failed-<pid>` within 60 s, `<root>.old` is back and the
+      previous daemon runs; a Quit during the wait leaves the update installed and nothing restarted.
 - [ ] AI inline auto-type: with the trigger menu switch on, a finished prediction is typed into a real editor through
       uinput without Tab, and nothing is typed into a password field.
 - [ ] Navigation layer mouse buttons and repeat counts: with `MouseMiddle = "escape"` and the recommended number row,
