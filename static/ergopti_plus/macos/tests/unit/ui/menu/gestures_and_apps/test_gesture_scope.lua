@@ -132,6 +132,41 @@ helpers.describe("macOS complete gesture scope", function()
 		helpers.assert_eq(gestures.get_action("tap_4"), gestures.RECOMMENDED_GESTURES.tap_4)
 		helpers.assert_eq(files.config, committed)
 	end)
+	-- Field report 2026-11-05: the restore never touches the macOS settings, so
+	-- a recommended slot macOS still takes stayed greyed with no word said.
+	helpers.it("shows the Trackpad settings dialog when macOS still takes a restored slot (restore-claimed-dialog)", function()
+		local owner, gestures, _, state = fixture()
+		local free_owner, free_gestures, _, free_state = fixture()
+		local claimed_slot
+		for slot, action in pairs(gestures.RECOMMENDED_GESTURES) do
+			if action ~= "none" then claimed_slot = slot end
+		end
+		local dialogs, opened, deferred = {}, 0, {}
+		local saved = {}
+		for _, name in ipairs({ "infra.dialog_util", "infra.deferred_work" }) do saved[name] = package.loaded[name] end
+		package.loaded["infra.dialog_util"] = { block_alert = function(_, message, first)
+			dialogs[#dialogs + 1] = message
+			return first
+		end }
+		package.loaded["infra.deferred_work"] = { after = function(_, fn) deferred[#deferred + 1] = fn; return true end }
+		local ok, err = pcall(function()
+			gestures.system_slot_state = function(slot) return slot == claimed_slot and "taken" or "free" end
+			gestures.open_system_gestures = function() opened = opened + 1; return true end
+			helpers.assert_eq(menu_commands(owner, gestures, state).scope_restore(), true)
+			for _, fn in ipairs(deferred) do fn() end
+			helpers.assert_eq(#dialogs, 1, "one dialog names the macOS gesture still on")
+			helpers.assert_eq(dialogs[1], require("infra.i18n").get("menu.gestures.recommended_reason_macos"))
+			helpers.assert_eq(opened, 1, "its first button opens the Trackpad settings")
+			dialogs, deferred = {}, {}
+			free_gestures.system_slot_state = function() return "free" end
+			helpers.assert_eq(menu_commands(free_owner, free_gestures, free_state).scope_restore(), true)
+			for _, fn in ipairs(deferred) do fn() end
+			helpers.assert_eq(#dialogs, 0, "no dialog when macOS takes none of them")
+		end)
+		for name, value in pairs(saved) do package.loaded[name] = value end
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("a pause leaves every store untouched", function()
 		for _, mode in ipairs({ "clear", "recommended" }) do
 			local owner, gestures, files, _, controls, _, _, writes, original = fixture()

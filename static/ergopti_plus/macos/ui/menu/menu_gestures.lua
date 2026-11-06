@@ -454,7 +454,39 @@ function M.build(ctx)
 		return ctx.apply_gesture_scope(mode) == true
 	end
 	local function cmd_scope_clear() return apply_scope("clear") end
-	local function cmd_scope_restore() return apply_scope("recommended") end
+
+	--- The slots the recommended defaults just assigned that macOS still
+	--- takes: the restore never touches the macOS settings, so such a slot
+	--- stays greyed and never fires until the user turns the macOS gesture off.
+	--- @return boolean claimed
+	local function recommended_slot_claimed()
+		if type(gestures.system_slot_state) ~= "function" then return false end
+		for slot in pairs(gestures.RECOMMENDED_GESTURES or {}) do
+			local action = gestures.get_action(slot)
+			if action ~= nil and action ~= "none" and gestures.system_slot_state(slot) ~= "free" then
+				return true
+			end
+		end
+		return false
+	end
+
+	--- Restores the recommended assignments, then shows the Trackpad settings
+	--- dialog when macOS still takes one of them (field report 2026-11-05: the
+	--- restore said nothing, and the restored slot stayed greyed).
+	--- @return boolean committed
+	local function cmd_scope_restore()
+		if apply_scope("recommended") ~= true then return false end
+		if not recommended_slot_claimed() then return true end
+		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+			local settings = i18n.get("menu.gestures.open_settings")
+			local clicked = dialog.block_alert(i18n.get("menu.gestures.notify_title"),
+				i18n.get("menu.gestures.recommended_reason_macos"), settings, i18n.get("button.ok"), "informational")
+			if clicked == settings and gestures.open_system_gestures() ~= true then
+				Logger.error(LOG, "Trackpad settings could not open after the recommended restore.")
+			end
+		end, "menu_gestures.recommended_claimed")
+		return true
+	end
 
 	--- Shows the recommended-defaults rule and the macOS reason behind the
 	--- menu's « Infos… » row: several sentences do not fit a menu row.
