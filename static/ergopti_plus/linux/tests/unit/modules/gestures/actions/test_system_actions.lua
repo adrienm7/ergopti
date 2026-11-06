@@ -54,6 +54,14 @@ local function launched(commands)
 	return out
 end
 
+--- The command an observed background launch runs, without the wrapper that
+--- records its status and stderr (modules/gestures/background_commands.lua).
+--- @param text string The recorded os.execute command.
+--- @return string|nil
+local function unwrap(text)
+	return text:match("^%( %( (.*) %) </dev/null >/dev/null 2>'")
+end
+
 --- Replaces modules in package.loaded for the duration of body.
 --- @param stubs table name -> module
 --- @param body function
@@ -113,7 +121,8 @@ local function backgrounded(Gestures, action, answer)
 		Gestures.execute_action(action, "tap_3")
 		local run = launched(commands)
 		helpers.assert_eq(#run, 1, action .. " must background exactly one command")
-		text = run[1]:gsub(" 2>/dev/null &$", "")
+		text = unwrap(run[1])
+		helpers.assert_not_nil(text, action .. " must run as an observed background command")
 	end, answer)
 	return text
 end
@@ -153,7 +162,7 @@ helpers.describe("Linux system actions", function()
 		helpers.it(action .. " backgrounds its exact command (system-actions)", function()
 			with_recorded_shell(function(commands)
 				Gestures.execute_action(action, "tap_3")
-				helpers.assert_eq(launched(commands)[1], expected .. " 2>/dev/null &")
+				helpers.assert_eq(unwrap(launched(commands)[1]), expected)
 				helpers.assert_eq(#launched(commands), 1)
 			end)
 		end)
@@ -187,11 +196,12 @@ helpers.describe("Linux system actions", function()
 					.. ' && pid=$(xdotool getwindowpid "$win" 2>/dev/null)'
 					.. ' && [ "$pid" -gt 1 ] && [ "$pid" != "$PPID" ]'
 					.. " && " .. DIALOG .. " --question --no-markup --default-cancel "
-				helpers.assert_eq(run[1]:sub(1, #head), head,
-					"the active window is read, then the question comes, with Cancel focused: " .. run[1])
-				local chained = " && { " .. FORCE_QUIT_KILL .. "; }; } 2>/dev/null &"
-				helpers.assert_eq(run[1]:sub(-#chained), chained, "the kill runs only on Continue")
-				helpers.assert_eq(select(2, run[1]:gsub("getactivewindow", "")), 1,
+				local command = unwrap(run[1])
+				helpers.assert_eq(command:sub(1, #head), head,
+					"the active window is read, then the question comes, with Cancel focused: " .. command)
+				local chained = " && { " .. FORCE_QUIT_KILL .. "; }; }"
+				helpers.assert_eq(command:sub(-#chained), chained, "the kill runs only on Continue")
+				helpers.assert_eq(select(2, command:gsub("getactivewindow", "")), 1,
 					"the window is never read again after the question")
 			end)
 		end)
@@ -260,10 +270,11 @@ helpers.describe("Linux system actions", function()
 			local run = launched(commands)
 			helpers.assert_eq(#run, 1)
 			local head = DIALOG .. " --question --no-markup --default-cancel "
-			helpers.assert_true(run[1]:sub(1, #head) == head,
-				"the question comes first, with Cancel focused: " .. run[1])
-			local chained = " && { gio trash --empty; } 2>/dev/null &"
-			helpers.assert_eq(run[1]:sub(-#chained), chained, "the trash is emptied only on Continue")
+			local command = unwrap(run[1])
+			helpers.assert_true(command:sub(1, #head) == head,
+				"the question comes first, with Cancel focused: " .. command)
+			local chained = " && { gio trash --empty; }"
+			helpers.assert_eq(command:sub(-#chained), chained, "the trash is emptied only on Continue")
 		end)
 	end)
 
@@ -363,7 +374,7 @@ helpers.describe("Linux system actions", function()
 			with_recorded_shell(function(commands)
 				Gestures.execute_action("make_executable_selection", "tap_3")
 				local run = launched(commands)
-				helpers.assert_eq(run[1], "chmod +x '/home/ana/run.sh' '/home/ana/it'\\''s here.sh' 2>/dev/null &")
+				helpers.assert_eq(unwrap(run[1]), "chmod +x '/home/ana/run.sh' '/home/ana/it'\\''s here.sh'")
 			end)
 		end)
 	end)
@@ -789,6 +800,8 @@ helpers.describe("Linux system actions", function()
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
 			local cached = package.loaded["modules.gestures.manager"]
+			local cached_runner = package.loaded["modules.gestures.background_commands"]
+			package.loaded["modules.gestures.background_commands"] = nil
 			local ok, failure = pcall(function()
 				local Fresh = helpers.load_module_with_dependency("modules.gestures.manager", "logger.shim", logger)
 				local real = os.execute
@@ -808,6 +821,7 @@ helpers.describe("Linux system actions", function()
 				helpers.assert_true(not errors[1]:find("pactl", 1, true), "the command is never logged: " .. errors[1])
 			end)
 			package.loaded["modules.gestures.manager"] = cached
+			package.loaded["modules.gestures.background_commands"] = cached_runner
 			if not ok then error(failure, 0) end
 		end)
 end)
