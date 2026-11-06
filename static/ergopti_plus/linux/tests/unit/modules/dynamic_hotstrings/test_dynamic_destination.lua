@@ -107,7 +107,7 @@ local function run_case(family, change, route)
 				if change == "absent" or change == "deferred" then
 					local destination = change == "deferred" and assert(guard.capture_text_owner()) or nil
 					if destination then retire() end
-					local fired, event = dynamic.on_trigger(trigger, "★", true, destination)
+					local fired, event = dynamic.on_trigger(trigger, "★", true, destination, function() return true end)
 					helpers.assert_eq(fired, false, "missing or retired publication must refuse the single-field API")
 					helpers.assert_nil(event)
 					helpers.assert_eq(#session.rows, 0, "refusal must precede any authored key")

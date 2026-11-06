@@ -70,7 +70,7 @@ function M.trigger(manager, buffer, trigger, start_is_boundary)
 	local fired, event
 	require("tests.support.text_owner_fixture").with(function(guard)
 		fired, event = manager.on_trigger(buffer, trigger, start_is_boundary,
-			assert(guard.capture_text_owner()))
+			assert(guard.capture_text_owner()), function() return true end)
 	end)
 	return fired, event
 end

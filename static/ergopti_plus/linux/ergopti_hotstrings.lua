@@ -1727,8 +1727,17 @@ local function main()
 			-- Must run AFTER the static hotstring matcher so explicit triggers
 			-- take precedence over dynamic expansions.
 			if not opts.dry_run and dyn_hotstrings and dyn_hotstrings.is_enabled() and not result then
+				-- The built-in dates, @-tags and @-combos honour the expansion delay
+				-- like every other source: the tail they would erase, the trigger
+				-- included, is timed by this engine and judged by the same gate.
+				local function dynamic_within_delay(group, section, count)
+					local timing = engine:tail_timing_receipt(count)
+					if not timing then return false end
+					timing.group, timing.section, timing.trigger = group, section, "dynamic " .. tostring(section)
+					return within_delay(timing)
+				end
 				local ok_dh2, expanded, dynamic_event = pcall(function()
-					return dyn_hotstrings.on_trigger(buf, ch, start_is_boundary, destination)
+					return dyn_hotstrings.on_trigger(buf, ch, start_is_boundary, destination, dynamic_within_delay)
 				end)
 				if ok_dh2 and expanded then
 					if dynamic_event and not dynamic_event.pending_user then

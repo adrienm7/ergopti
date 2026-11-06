@@ -364,4 +364,38 @@ h.describe("Main previews registered single-field expansions (single-field-previ
 	end)
 end)
 
+-- dynamic-expansion-delay (LIN-003): the built-in dates, @-tags and @-combos
+-- ignored the category's expansion delay that the prefix mappings and the
+-- programmable source honour, so "td", a pause and the magic key still expanded.
+local DELAY_SECTIONS = { personal = "personal_info", date = "date", fields = "personal_info" }
+
+h.describe("Main applies the expansion delay to built-in dynamic output (dynamic-expansion-delay)", function()
+	for _, kind in ipairs({ "personal", "date", "fields" }) do
+		h.it("dynamic-expansion-delay " .. kind .. " expires after its delay", function()
+			exercise(kind, false, { delay = 0.5, pause_ms = 1000, observe = function(report)
+				h.assert_eq(report.document, routes[kind].trigger, "a late magic key types itself only")
+				h.assert_eq(report.commits, 0, "and records no expansion")
+				local read = false
+				for _, entry in ipairs(report.delay_reads) do
+					if entry.group == "dynamichotstrings" and entry.section == DELAY_SECTIONS[kind] then read = true end
+				end
+				h.assert_true(read, "the delay is the family's own cascade, as for the prefix mappings")
+			end })
+		end)
+
+		h.it("dynamic-expansion-delay " .. kind .. " fires within its delay", function()
+			exercise(kind, false, { delay = 0.5, pause_ms = 500, observe = function(report)
+				h.assert_eq(report.document, routes[kind].output, "the exact deadline still expands")
+				h.assert_eq(report.commits, 1)
+			end })
+		end)
+	end
+
+	h.it("dynamic-expansion-delay zero means always", function()
+		exercise("date", false, { delay = 0, pause_ms = 2500, observe = function(report)
+			h.assert_eq(report.document, routes.date.output, "a zero delay never expires")
+		end })
+	end)
+end)
+
 return true
