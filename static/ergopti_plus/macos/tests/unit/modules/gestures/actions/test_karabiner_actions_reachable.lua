@@ -76,6 +76,15 @@ local function fresh_registry(variable_write_result)
 			return variable_write_result, seen.current_revision
 		end,
 		capsword_revision = function() return seen.current_revision end,
+		capsword_known_active = function() return seen.capsword_active == true end,
+	}
+	seen.deactivations = 0
+	package.loaded["platform.remap.watchers"] = {
+		deactivate_capsword_by_action = function()
+			seen.deactivations = seen.deactivations + 1
+			return true
+		end,
+		note_capsword_activated = function() return true end,
 	}
 	package.loaded["platform.remap.lease_controller"] = {
 		status = function()
@@ -269,6 +278,20 @@ helpers.describe("Karabiner catalogue actions: engine variables", function()
 			"the catalogue entry locks CapsLock after setting the variable. macOS "
 			.. "delivers CapsLock as flagsChanged, so a keystroke would fail silently — the "
 			.. "variable would be set with no visible effect and CapsWord would look broken")
+	end)
+
+	-- The catalogue action toggles on every OS (decision of 2026-11-06); macOS
+	-- used to request ACTIVE again, so a second invocation left CapsWord on.
+	helpers.it("(capsword-toggle) a second capsword invocation switches the running CapsWord off", function()
+		local Actions, seen = fresh_registry()
+		seen.capsword_active = true
+		helpers.assert_true(Actions.execute_single("capsword"))
+		helpers.assert_eq(seen.deactivations, 1, "the watcher's clear ends the running CapsWord")
+		helpers.assert_eq(#seen.variables, 0, "no second ACTIVE request is written")
+		seen.capsword_active = false
+		helpers.assert_true(Actions.execute_single("capsword"))
+		helpers.assert_eq(#seen.variables, 1, "control: an inactive CapsWord is switched on")
+		helpers.assert_eq(seen.deactivations, 1)
 	end)
 
 	helpers.it("capsword leaves CapsLock unchanged when the variable write is refused", function()

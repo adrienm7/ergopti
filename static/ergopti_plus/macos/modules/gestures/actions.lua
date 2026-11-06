@@ -1003,6 +1003,19 @@ sg("layer_off", function() set_nav_layer(false) end)
 sg("capsword", function()
 	local ke = ke_variables()
 	if not ke then return end
+	-- The action toggles, as on Windows and Linux (decision of 2026-11-06): a
+	-- second invocation ends the running CapsWord through the watcher's clear.
+	if ke.capsword_known_active() then
+		local watchers_ok, watchers = pcall(require, "platform.remap.watchers")
+		if not watchers_ok or type(watchers) ~= "table" or type(watchers.deactivate_capsword_by_action) ~= "function" then
+			Logger.error(LOG, "CapsWord action cannot switch CapsWord off: %s.", tostring(watchers))
+			return
+		end
+		if not watchers.deactivate_capsword_by_action() then
+			Logger.error(LOG, "CapsWord action could not switch CapsWord off: no running CapsWord watcher.")
+		end
+		return
+	end
 	local function finish_activation(ok, reason, revision)
 		if ok ~= true or reason ~= "written" then
 			Logger.debug(LOG, "CapsWord gesture activation did not settle: %s.", tostring(reason))
