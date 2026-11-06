@@ -64,10 +64,20 @@ local function with_fixture(options, callback)
 		end
 
 		local task_stub = {}
-		function task_stub.new(_, done, stream, _args)
+		function task_stub.new(executable, done, stream, args)
 			if fixture.start_mode == "construction_nil" then return nil end
-			local task = { done = done, stream = stream, live = false, terminates = 0 }
+			local task = {
+				done = done, stream = stream, live = false, terminates = 0,
+				executable = executable, args = args, inputs = {}, started = false,
+			}
+			function task:setInput(data)
+				self.inputs[#self.inputs + 1] = { data = data, before_start = not self.started }
+				if fixture.input_mode == "throw" then error("HF stdin refusal") end
+				if fixture.input_mode == "false" then return false end
+				return self
+			end
 			function task:start()
+				self.started = true
 				if fixture.start_mode == "task_reentrant_pause_before_activation" then
 					fixture.nested_pause_results[#fixture.nested_pause_results + 1]
 						= fixture.pause()
@@ -486,6 +496,54 @@ helpers.describe("HuggingFace prompt/webview/task exact requirement ownership", 
 			end)
 		end)
 	end
+
+	helpers.it("(hf-token-not-in-argv) sends the token through stdin, never through the task arguments", function()
+		with_fixture({}, function(fixture)
+			local secret = "hf_SENTINEL_secret_token"
+			helpers.assert_true(fixture.prompt())
+			fixture.fire_prompt_timer()
+			fixture.validate(secret)
+			local task = fixture.tasks[1]
+			helpers.assert_not_nil(task, "the login task is constructed")
+			helpers.assert_eq(task.executable, "/bin/bash")
+			helpers.assert_true(#task.args >= 2, "bash receives its script as arguments")
+			for index, argument in ipairs(task.args) do
+				helpers.assert_nil(argument:find("SENTINEL", 1, true),
+					"argument " .. index .. " carries no credential byte")
+			end
+			helpers.assert_eq(#task.inputs, 1, "the token is queued once on stdin")
+			helpers.assert_eq(task.inputs[1].data, secret .. "\n")
+			helpers.assert_true(task.inputs[1].before_start, "stdin is bound before the process starts")
+			helpers.assert_true(task.started)
+			task:complete(0)
+			helpers.assert_eq(fixture.terminals[1], true)
+		end)
+	end)
+
+	for _, mode in ipairs({ "false", "throw" }) do
+		helpers.it("(hf-token-not-in-argv) settles a " .. mode .. " stdin refusal without starting", function()
+			with_fixture({}, function(fixture)
+				fixture.input_mode = mode
+				helpers.assert_true(fixture.prompt())
+				fixture.fire_prompt_timer()
+				fixture.validate()
+				helpers.assert_eq(fixture.tasks[1].started, false, "no process runs without its token")
+				helpers.assert_eq(fixture.settles, 1)
+				helpers.assert_eq(fixture.terminals, { false })
+				helpers.assert_nil(fixture.deps.active_tasks.hf_login)
+			end)
+		end)
+	end
+
+	helpers.it("(hf-token-not-in-argv) refuses a token with a line break before any task", function()
+		with_fixture({}, function(fixture)
+			helpers.assert_true(fixture.prompt())
+			fixture.fire_prompt_timer()
+			fixture.validate("hf_first\nhf_second")
+			helpers.assert_eq(#fixture.tasks, 0)
+			helpers.assert_eq(fixture.terminals, { false })
+		end)
+	end)
 
 	helpers.it("commits one synchronous successful task terminal after start", function()
 		with_fixture({}, function(fixture)

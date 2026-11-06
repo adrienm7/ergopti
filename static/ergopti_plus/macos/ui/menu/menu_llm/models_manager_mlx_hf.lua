@@ -1069,11 +1069,19 @@ function M.install(ctx)
 				"HuggingFace token-processing sibling refusal")
 			return false
 		end
-		local escaped_token = token:gsub('\\', '\\\\'):gsub('"', '\\"')
+		-- The token crosses stdin as one line: a line break would split it
+		if token:find("[\r\n]") then
+			request_terminal(flow, false,
+				"HuggingFace token-processing line-break refusal")
+			return false
+		end
 
+		-- The token never enters the task arguments, which any local process
+		-- can read through the process table: Python reads it from stdin, fed
+		-- by setInput below, and the script carries no secret.
+		local login_shell = 'export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"\n'
+			.. 'exec python3 -u -c "$1"'
 		local login_script = [[
-export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-python3 -u - <<'PY'
 import sys
 import os
 import warnings
@@ -1082,7 +1090,7 @@ import pathlib
 warnings.filterwarnings('ignore')
 os.environ['PYTHONWARNINGS'] = 'ignore'
 
-token = "]] .. escaped_token .. [["
+token = sys.stdin.readline().strip()
 
 if not token or len(token.strip()) == 0:
     print("Erreur: Token vide", file=sys.stderr)
@@ -1142,8 +1150,7 @@ try:
 except Exception as e:
     print(f"Erreur HuggingFace: {str(e)}", file=sys.stderr)
     sys.exit(1)
-PY
-		]]
+]]
 
 		local task
 		local pending_completion = nil
@@ -1210,7 +1217,7 @@ PY
 					print("[HF Login] " .. out)
 				end
 				return true
-			end, { "-c", login_script })
+			end, { "-c", login_shell, "hf_login", login_script })
 
 		if task == nil or task == false then
 			flow.task_starting = false
@@ -1232,6 +1239,20 @@ PY
 			else
 				terminate_or_prove_stopped(
 					"HuggingFace login pre-start pause")
+			end
+			return false
+		end
+
+		-- Queued before start; Python reads its one line without waiting for EOF
+		local input_ok, assigned = pcall(function() return task:setInput(token .. "\n") end)
+		if not input_ok or assigned ~= task then
+			flow.task_starting = false
+			Logger.error(LOG, "HuggingFace login stdin setup refused: %s.",
+				tostring(input_ok and "no task returned" or assigned))
+			if task_proven_not_running(task) then
+				finish_task(nil, false)
+			else
+				terminate_or_prove_stopped("HuggingFace login stdin refusal")
 			end
 			return false
 		end
