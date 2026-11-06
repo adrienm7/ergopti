@@ -129,6 +129,14 @@ M.TARGETS = {
 	force_quit_frontmost = ACTIVE_WINDOW_OWNER,
 }
 
+--- The actions of COMMANDS that read a state and write the one derived from
+--- it. Each accepted toggle backgrounds its own shell: unserialized, two of
+--- them both read the old state and one toggle is lost. They queue on one
+--- flock in the session lock folder install/launch.sh creates (`flock` is a
+--- launcher dependency), so the second reads what the first wrote.
+M.SERIALIZED = { show_desktop = true, toggle_dark_mode = true }
+local SERIAL_LOCK = '"${XDG_RUNTIME_DIR:-$HOME/.cache}/ergopti/system-toggle.lock"'
+
 --- The notification daemons whose client can dismiss every notification.
 --- GNOME Shell and KDE Plasma expose no such command.
 M.NOTIFICATION_CLIENTS = { "dunstctl", "makoctl", "swaync-client" }
@@ -162,6 +170,7 @@ end
 function M.command_for(action_name, action_label, confirm)
 	local command = M.COMMANDS[action_name]
 	if not command then error("system_actions: no command for '" .. tostring(action_name) .. "'", 2) end
+	if M.SERIALIZED[action_name] then command = "flock " .. SERIAL_LOCK .. " sh -c " .. quote(command) end
 	local target = M.TARGETS[action_name]
 	local read_target = target and (target .. " && ") or ""
 	if not confirm then return "{ " .. read_target .. command .. "; }" end
