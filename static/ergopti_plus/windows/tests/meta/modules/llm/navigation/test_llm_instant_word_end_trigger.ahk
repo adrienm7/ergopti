@@ -33,7 +33,7 @@ _LIWE_AssertWordEndTrigger() {
 	Assert(OnChar != "", "LLM_Bridge_OnChar must exist")
 	AssertContains(OnChar, "Generation := _LLM_Bridge_ContentGeneration",
 		"the observer must retain the committed edit's generation")
-	Captured := InStr(OnChar, "Buffer := _LLM_Bridge_Buffer")
+	Captured := InStr(OnChar, "BridgeBuffer := _LLM_Bridge_Buffer")
 	Released := InStr(OnChar, "Critical(PreviousCritical)")
 	Assert(Captured > 0 && Released > Captured,
 		"the ordinary observer must capture its buffer before releasing the edit claim")
@@ -41,7 +41,7 @@ _LIWE_AssertWordEndTrigger() {
 		"the shared observer cannot borrow a later edit's generation")
 	Notify := _DriverFuncBody("_LLM_Bridge_NotifyChar")
 	Assert(Notify != "", "the shared character observer must exist")
-	AssertContains(OnChar, "_LLM_Bridge_NotifyChar(ch, Buffer, Current, Source, Receipt)",
+	AssertContains(OnChar, "_LLM_Bridge_NotifyChar(ch, BridgeBuffer, Current, Source, Receipt)",
 		"ordinary character admission must reach the shared observer")
 	AssertContains(Notify, "_LLM_Bridge_IsWordEndTrigger(ch)",
 		"the observer must recognize a completed word (llm-instant-word-end-trigger)")
