@@ -524,7 +524,7 @@ _EngineVariantFail_RefusedKeyIsNeverRetried() {
 		_LLM_Engine["active_request_signature"] := "auth-no-retry"
 		_LLM_Engine["inline_autotype"] := false
 		_Stub_LlmTooltipCalls := []
-		for Case in [
+		for Vector in [
 			Map("failure", Map("reason", "http_401", "status", 401, "message", ""), "dispatches", 0),
 			Map("failure", Map("reason", "http_403", "status", 403, "message", ""), "dispatches", 0),
 			Map("failure", Map("reason", "http_400", "status", 400, "message", "API key not valid."), "dispatches", 0),
@@ -540,9 +540,9 @@ _EngineVariantFail_RefusedKeyIsNeverRetried() {
 			State["show_all_at_once"] := true
 			State["dispatch_stream_fn"] := ""
 			State["dispatch_fn"] := (Temp, OnSuccess, OnFail, Tokens := 0) => Dispatches += 1
-			_LLM_Engine_OnVariantFail(State, Case["failure"])
-			AssertEqual(Case["dispatches"], Dispatches,
-				"authentication failures send no retry, other failures keep the retry policy: " . Case["failure"]["reason"])
+			_LLM_Engine_OnVariantFail(State, Vector["failure"])
+			AssertEqual(Vector["dispatches"], Dispatches,
+				"authentication failures send no retry, other failures keep the retry policy: " . Vector["failure"]["reason"])
 		}
 	} finally {
 		_LLM_Engine := SavedEngine
