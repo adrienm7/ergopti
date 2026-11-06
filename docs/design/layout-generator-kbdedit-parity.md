@@ -2,7 +2,7 @@
 
 # Layout editor: KbdEdit parity target
 
-Maintainer request of 2026-11-06, part of the « Layout generator from a `.keylayout` source » project in `TODO.md`.
+Maintainer request of 2026-11-06, part of the « Layout generator from an Ergopti TOML source » project in `TODO.md`.
 Ergopti's layout editor must offer every capability of [KbdEdit](http://www.kbdedit.com/) (Windows layout editor,
 release 26.10.0), or better, in a modern, free, online interface that also runs locally inside ErgoptiPlus.
 
