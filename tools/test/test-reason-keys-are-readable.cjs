@@ -75,7 +75,18 @@ const MIN_UNAVAILABLE = 40;
 // reads is how `description_key` came to be dead weight in both manifests.
 const READERS = [
 	{ file: path.join(SP, '_shared', 'lua', 'manifest_reader.lua'), token: 'unavailable' },
-	{ file: path.join(SP, 'macos', 'ui', 'healthcheck', 'helpers.lua'), token: 'coverage_gaps' },
+	{
+		file: path.join(SP, 'macos', 'ui', 'healthcheck', 'helpers.lua'),
+		token: 'healthcheck.unavailable'
+	},
+	{
+		file: path.join(SP, 'linux', 'ui', 'healthcheck', 'bridge.lua'),
+		token: 'healthcheck.unavailable'
+	},
+	{
+		file: path.join(SP, '_shared', 'lua', 'healthcheck', 'unavailable.lua'),
+		token: 'coverage_gaps'
+	},
 	{ file: path.join(SP, 'macos', 'ui', 'healthcheck', 'core.lua'), token: 'platform_coverage' }
 ];
 
