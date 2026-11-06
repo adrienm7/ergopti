@@ -229,7 +229,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 			["infra.manifest_reader"] = { default_for = function() return "★" end },
 			["modules.diagnostics.hid_diagnostic_mailbox"] = {},
 		}, function(bridge)
-			helpers.assert_eq(bridge.init({ buffer = "", mappings = {} }, {}), false)
+			helpers.assert_eq(bridge.init({ buffer = "", mappings = {}, llm_context_text = "", llm_context_mark = "" }, {}), false)
 			helpers.assert_eq(engine_calls, 1)
 			helpers.assert_eq(engine_guard_calls, 0,
 				"a refused engine must not receive a live runtime guard")
