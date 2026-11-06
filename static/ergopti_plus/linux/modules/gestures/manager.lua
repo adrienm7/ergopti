@@ -373,10 +373,18 @@ end
 
 register_modifier_chords(load_modifier_chords())
 
---- Runs a shell command in the background, discarding its output.
+--- Runs a shell command in the background, discarding its output. The shell
+--- that forks it answers at once, and its refusal is logged, never dropped;
+--- the command itself is not logged, as it can carry a selected path or URL.
 --- @param cmd string A fully composed command.
+--- @return boolean started
 local function run_background(cmd)
-	pcall(function() os.execute(cmd .. " 2>/dev/null &") end)
+	local called, result, _, code = pcall(os.execute, cmd .. " 2>/dev/null &")
+	-- LuaJIT returns the status number; Lua 5.2+ returns true, or nil and the code.
+	if called and (result == true or result == 0) then return true end
+	Logger.error(LOG, "The shell refused to start a background action command (%s).",
+		tostring(called and (code or result) or result))
+	return false
 end
 
 local function shell_quote(value)

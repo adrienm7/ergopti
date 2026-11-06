@@ -774,4 +774,35 @@ helpers.describe("Linux system actions", function()
 			helpers.assert_eq(twice, toggle.initial, "two overlapping toggles flip it back; calls: " .. log)
 		end)
 	end
+
+	-- The shell that backgrounds a command answers at once. Its refusal (no
+	-- fork, no shell, status 126 under either os.execute ABI, or a raise) was
+	-- dropped by an ignored pcall, so the action failed with no line logged.
+	helpers.it("a refused background shell is logged, a started one is not (background-acquisition-lds-001)",
+		function()
+			local errors = {}
+			local logger = helpers.make_logger_stub()
+			logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
+			local cached = package.loaded["modules.gestures.manager"]
+			local ok, failure = pcall(function()
+				local Fresh = helpers.load_module_with_dependency("modules.gestures.manager", "logger.shim", logger)
+				local real = os.execute
+				local function dispatch(answer)
+					errors = {}
+					os.execute = answer
+					local called, raised = pcall(Fresh.execute_action, "mic_mute_toggle", "tap_3")
+					os.execute = real
+					if not called then error(raised, 0) end
+					return #errors
+				end
+				helpers.assert_eq(dispatch(function() return true end), 0, "Lua 5.2+ success logs nothing")
+				helpers.assert_eq(dispatch(function() return 0 end), 0, "LuaJIT success logs nothing")
+				helpers.assert_eq(dispatch(function() return nil, "exit", 126 end), 1, "Lua 5.2+ refusal is logged")
+				helpers.assert_eq(dispatch(function() return 126 * 256 end), 1, "LuaJIT refusal is logged")
+				helpers.assert_eq(dispatch(function() error("fork refused") end), 1, "a raise is logged")
+				helpers.assert_true(not errors[1]:find("pactl", 1, true), "the command is never logged: " .. errors[1])
+			end)
+			package.loaded["modules.gestures.manager"] = cached
+			if not ok then error(failure, 0) end
+		end)
 end)
