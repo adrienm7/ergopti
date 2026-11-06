@@ -2308,6 +2308,13 @@ local function main()
 		-- An absolute coordinate is no distance in the relative units the metrics count.
 		if kind_of_event ~= "absolute_motion" then keystats.record_pointer(kind_of_event, code, value, source) end
 		if kind_of_event == "frame" or kind_of_event == "reset" or kind_of_event == "dropped" then return end
+		-- Motion, a wheel turn or a touchpad coordinate is user activity: a
+		-- pending prediction stops (a zero-distance report is none). Presses
+		-- already cancel through on_click.
+		if prediction_engine and ((kind_of_event == "motion" and value ~= 0)
+			or kind_of_event == "absolute_motion") then
+			prediction_engine.note_user_activity("pointer " .. kind_of_event)
+		end
 		if not (shortcuts and shortcuts.is_caps_word_active()) then return end
 		shortcuts.caps_word_observe_pointer_event(kind_of_event, code)
 	end
@@ -2479,6 +2486,9 @@ local function main()
 			and prediction_engine.handle_shortcut(detail) == true then
 			return true
 		end
+		-- A key the tooltip did not own is user activity: a pending prediction
+		-- stops before the typing path arms the next pause.
+		if prediction_engine then prediction_engine.note_user_activity("keystroke") end
 		return consume_bound_chord(detail)
 	end)
 	-- Bind the same privacy owner for both ends of a physical measurement.

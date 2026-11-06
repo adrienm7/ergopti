@@ -354,13 +354,26 @@ helpers.describe("Main retires AI at forwarded document controls", function()
 		end)
 	end)
 
+	-- Predictions run only while the user does nothing (2026-11-06): a key the
+	-- tooltip does not own is activity even when the document is unchanged.
 	for _, control in ipairs({ { "f1", 59 }, { "f12", 88 }, { "shortcut", 31, { ctrl = true } } }) do
-		helpers.it("preserves an unchanged document's offer through " .. control[1], function()
+		helpers.it("cancels the request in flight and its late offer through " .. control[1], function()
 			scenario({}, function(s)
 				s.type("hello"); s.scheduler.test.advance(.5); s.control(control[1], control[2], control[3])
 				s.respond(1, RESPONSE)
-				helpers.assert_true(s.prediction.has_suggestions())
-				helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.text, "hello" .. RESPONSE)
+				helpers.assert_eq(s.prediction.has_suggestions(), false)
+				helpers.assert_eq(s.overlay_showing, false)
+				helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.text, "hello")
+			end)
+		end)
+
+		helpers.it("hides a shown offer through " .. control[1], function()
+			scenario({}, function(s)
+				s.type("hello"); s.scheduler.test.advance(.5); s.respond(1, RESPONSE)
+				helpers.assert_true(s.prediction.has_suggestions() and s.overlay_showing)
+				s.control(control[1], control[2], control[3])
+				helpers.assert_eq(s.prediction.has_suggestions(), false)
+				helpers.assert_eq(s.overlay_showing, false)
 			end)
 		end)
 	end
@@ -405,6 +418,81 @@ helpers.describe("Main retires AI at forwarded document controls", function()
 			s.respond(1, RESPONSE)
 			helpers.assert_eq(s.prediction.has_suggestions(), false)
 			helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.text, "ab")
+		end)
+	end)
+end)
+
+--- Compiles Main's real pointer callback against the scenario's engine.
+--- @param prediction table The real prediction engine.
+--- @return function on_pointer_event
+local function main_pointer_callback(prediction)
+	local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+	local source = assert(file:read("*a")); assert(file:close())
+	local first = assert(source:find("\tlocal function on_pointer_event(", 1, true))
+	local last = assert(source:find("\n\tend\n", first, true))
+	local body = source:sub(first, last + #"\n\tend") .. "\nreturn on_pointer_event"
+	local environment = setmetatable({
+		keystats = { record_pointer = function() end },
+		shortcuts = nil,
+		prediction_engine = prediction,
+	}, { __index = _G })
+	local chunk
+	if loadstring then chunk = assert(loadstring(body)); setfenv(chunk, environment)
+	else chunk = assert(load(body, "actual Main pointer callback", "t", environment)) end
+	return chunk()
+end
+
+helpers.describe("Main cancels AI on pointer activity (predictions run only while idle)", function()
+	local REL_X, REL_WHEEL = 0, 8
+	for _, vector in ipairs({
+		{ label = "a pointer move", kind = "motion", code = REL_X, value = 3 },
+		{ label = "a wheel turn", kind = "motion", code = REL_WHEEL, value = -1 },
+		{ label = "a touchpad coordinate", kind = "absolute_motion", code = 0, value = 512 },
+	}) do
+		helpers.it("cancels the request in flight and drops its late answer on " .. vector.label, function()
+			scenario({}, function(s)
+				local on_pointer_event = main_pointer_callback(s.prediction)
+				s.type("hello"); s.scheduler.test.advance(.5)
+				helpers.assert_eq(#s.requests, 1)
+				on_pointer_event(vector.kind, vector.code, vector.value, "mouse")
+				s.respond(1, RESPONSE)
+				helpers.assert_eq(s.prediction.has_suggestions(), false)
+				helpers.assert_eq(s.overlay_showing, false)
+				helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.text, "hello")
+			end)
+		end)
+
+		helpers.it("hides a shown prediction on " .. vector.label, function()
+			scenario({}, function(s)
+				local on_pointer_event = main_pointer_callback(s.prediction)
+				s.type("hello"); s.scheduler.test.advance(.5); s.respond(1, RESPONSE)
+				helpers.assert_true(s.prediction.has_suggestions() and s.overlay_showing)
+				on_pointer_event(vector.kind, vector.code, vector.value, "mouse")
+				helpers.assert_eq(s.prediction.has_suggestions(), false)
+				helpers.assert_eq(s.overlay_showing, false)
+			end)
+		end)
+	end
+
+	helpers.it("cancels a debounce still waiting, so no request leaves", function()
+		scenario({}, function(s)
+			local on_pointer_event = main_pointer_callback(s.prediction)
+			s.type("hello")
+			on_pointer_event("motion", REL_X, 1, "mouse")
+			s.scheduler.test.advance(.5)
+			helpers.assert_eq(#s.requests, 0, "the pause was interrupted by the pointer")
+		end)
+	end)
+
+	helpers.it("ignores a zero-distance report and frames", function()
+		scenario({}, function(s)
+			local on_pointer_event = main_pointer_callback(s.prediction)
+			s.type("hello"); s.scheduler.test.advance(.5)
+			on_pointer_event("motion", REL_X, 0, "mouse")
+			on_pointer_event("frame", 0, 0, "mouse")
+			s.respond(1, RESPONSE)
+			helpers.assert_true(s.prediction.has_suggestions(), "an idle user sees the answer")
+			helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.text, "hello" .. RESPONSE)
 		end)
 	end)
 end)
@@ -1192,13 +1280,16 @@ do
 			end)
 		end)
 
-		helpers.it("an unclassified nil-text input leaves the unchanged Main field and offer alone", function()
+		-- The key is still a press the tooltip does not own: predictions run
+		-- only while the user does nothing (2026-11-06), so the offer goes while
+		-- the field and the hotstring buffer stay untouched.
+		helpers.it("an unclassified nil-text input leaves the unchanged Main field alone and hides the offer", function()
 			whole_main({ semantic_input = {}, phase = "visible" }, function(s)
 				s.prepare(); local buffer, resets = s.matcher:current_buffer(), #s.resets
 				s.control(); helpers.assert_eq(s.controls, 0); helpers.assert_eq(s.chars, 0)
 				helpers.assert_eq(s.after_control, s.before_control); helpers.assert_eq(s.matcher:current_buffer(), buffer)
-				helpers.assert_eq(#s.resets, resets); helpers.assert_true(s.prediction.has_suggestions())
-				helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.output, 1)
+				helpers.assert_eq(#s.resets, resets); helpers.assert_eq(s.prediction.has_suggestions(), false)
+				helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.output, 0)
 			end)
 		end)
 	end)

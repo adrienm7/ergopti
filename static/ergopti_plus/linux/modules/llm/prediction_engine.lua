@@ -3141,6 +3141,28 @@ function M.dismiss(resync_owner)
 end
 
 
+--- Cancels a pending prediction because the user did something: moved the
+--- pointer, scrolled, touched the touchpad, switched window, or pressed a key
+--- the tooltip does not own. Predictions run only while the user does nothing
+--- (maintainer decision 2026-11-06): the debounce, the pacing timer and the
+--- request in flight (with its retries, which fail the epoch check) go, and the
+--- tooltip hides. The buffer stays: motion does not move the caret, and the
+--- next typing pause asks again. A tone or vision action the user asked for is
+--- left alone. The pointer stream calls this on every report, so an idle engine
+--- costs four field reads.
+--- @param reason string Diagnostic label of the activity.
+--- @return boolean cancelled True when pending prediction work was cancelled.
+function M.note_user_activity(reason)
+	if not _predicting and _pending_trigger == nil and _rate_timer == nil
+		and #_suggestions == 0 then return false end
+	if _runtime_closed or _scope_owner then return false end
+	_debounce.cancel()
+	M.dismiss()
+	Logger.debug(LOG, "User activity (%s) — pending prediction cancelled.", tostring(reason))
+	return true
+end
+
+
 --- Retires an accepted offer without recording an automatic agent rejection.
 --- A streaming partial or an early sequential variant can be accepted while its
 --- request still runs. Revoke callbacks before cancelling native work: cancellation
