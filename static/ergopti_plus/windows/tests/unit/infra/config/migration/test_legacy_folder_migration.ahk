@@ -147,6 +147,29 @@ _LFM_RewriteKeepsTheBackup() {
 Test("legacy folder migration: paths.toml is backed up before it is rewritten (legacy-folder-migration-backup)",
 	_LFM_RewriteKeepsTheBackup)
 
+; A folder the user cannot list is a refusal, not an empty folder: loop files
+; yielded nothing over it, so its entries were silently left behind. The deny
+; ACE (Everyone, list folder) is removed again before the tree is deleted.
+_LFM_UnlistableFolderIsReported() {
+	Root := A_Temp . "\ergopti_test_legacy_folder_list_" . A_TickCount
+	DirCreate(Root . "\old")
+	DirCreate(Root . "\new")
+	FileAppend("LEGACY", Root . "\old\storage.json")
+	try {
+		AssertEqual(0, RunWait('icacls "' . Root . '\old" /deny *S-1-1-0:(RD)', , "Hide"), "the deny ACE is set")
+		Report := Map("moved", [], "backed_up", [], "kept", [], "removed", [])
+		LegacyFolderMergeEntries(Root . "\old", Root . "\new", Root . "\new\bak\old", Report)
+		AssertEqual(1, Report["kept"].Length, "the refusal is reported")
+		AssertEqual("list_failed", Report["kept"][1]["reason"], "not read as an empty folder")
+		AssertEqual(0, Report["moved"].Length + Report["removed"].Length, "nothing moved or removed")
+	} finally {
+		RunWait('icacls "' . Root . '\old" /remove:d *S-1-1-0', , "Hide")
+		DirDelete(Root, true)
+	}
+}
+Test("legacy folder migration: an unlistable folder is reported, not read as empty (legacy-folder-migration-list-refused)",
+	_LFM_UnlistableFolderIsReported)
+
 ; Boot runs the migration before anything reads paths.toml, and never under
 ; the startup smoke, which must not touch the real user folders.
 _LFM_BootRunsItFirstAndNeverUnderTheSmoke() {

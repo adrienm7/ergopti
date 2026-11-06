@@ -173,6 +173,30 @@ function M.run(helpers, shared_root)
 			helpers.assert_true(after:find("/h/new/storage.json/", 1, true) ~= nil, "the newer entry is untouched")
 		end)
 
+		helpers.it("reports a folder it cannot list or remove (legacy-folder-migration-list-refused)", function()
+			local ports, snapshot = M.memory_ports({ "/h/old/storage.json", "/h/new/", "/h/gone/" })
+			local list = ports.list
+			ports.list = function(dir)
+				if dir == "/h/old" then return nil, "Permission denied" end
+				return list(dir)
+			end
+			ports.remove_empty_dir = function() return false end
+			local report = Migration.apply({
+				{ from_dir = "/h/old", to_dir = "/h/new", backup_dir = "/h/new/bak/old" },
+				{ from_dir = "/h/gone", to_dir = "/h/new", backup_dir = "/h/new/bak/gone" },
+			}, ports)
+			helpers.assert_eq(#report.kept, 2, "both refusals are reported")
+			helpers.assert_eq(report.kept[1].reason, "list_failed", "an unlistable folder is not an empty one")
+			helpers.assert_eq(report.kept[1].detail, "Permission denied", "the refusal says why")
+			helpers.assert_eq(report.kept[2].reason, "remove_failed", "an emptied folder left behind is reported")
+			helpers.assert_true(table.concat(snapshot(), " "):find("/h/old/storage.json", 1, true) ~= nil,
+				"the unlisted entry stays where it is")
+			local lines = {}
+			Migration.log_report({ info = function() end,
+				warn = function(_, fmt, ...) lines[#lines + 1] = fmt:format(...) end }, "test", report)
+			helpers.assert_true(lines[1]:find("could not be listed", 1, true) ~= nil, lines[1])
+		end)
+
 		helpers.it("refuses a plan without its ports or its backup", function()
 			helpers.assert_true(not pcall(Migration.apply, {}, { exists = function() return false end }),
 				"a missing port stops the migration")
