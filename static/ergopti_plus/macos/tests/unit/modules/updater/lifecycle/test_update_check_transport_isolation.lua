@@ -13,6 +13,7 @@ local OWNED = {
 	"modules.updater.auto_check", "modules.updater", "infra.paths", "infra.logger", "infra.timings",
 	"adapters.http_client", "adapters.timer_scheduler", "adapters.file_system",
 	"adapters.json_codec", "adapters.update_launcher", "infra.notifications", "infra.i18n",
+	"infra.http_header_policy",
 }
 local FEED = '<feed xmlns="http://www.w3.org/2005/Atom"><entry>'
 	.. '<id>tag:github.com,2008:Repository/1/v0.0.0-dev.150</id><updated>2026-09-02T00:00:00Z</updated>'
@@ -26,6 +27,9 @@ local function with_owner(run)
 		-- The real registry reader, loaded before infra.paths is stubbed below:
 		-- updater.list_cache reads its bound from [limits] when auto_check loads it.
 		local Timings = require("infra.timings")
+		-- The real header policy reads shared data, so it loads before the path
+		-- and file stubs below; every request must pass its admission.
+		package.loaded["infra.http_header_policy"] = require("tests.support.network.header_policy_fixture").load()
 		local function shared(path)
 			local file = assert(io.open(helpers.shared(path), "rb"))
 			local raw = assert(file:read("*a"))
