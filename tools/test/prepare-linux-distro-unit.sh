@@ -24,7 +24,7 @@ case "$distro" in
 	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel glib2 sqlite openssl tzdata tar libxkbcommon xkeyboard-config libX11-common iproute procps-ng nodejs curl ;;
 	arch) pacman -Sy --noconfirm luajit python ca-certificates git gcc make cmake pkgconf libuv glib2 sqlite openssl tzdata tar libxkbcommon xkeyboard-config libx11 iproute2 nodejs curl ;;
 	alpine) apk add --no-cache luajit python3 ca-certificates git build-base cmake pkgconf luajit-dev libuv-dev glib sqlite openssl tzdata tar libxkbcommon xkeyboard-config libx11 iproute2-ss nodejs curl ;;
-	opensuse) zypper --non-interactive install luajit python3 ca-certificates git gcc make cmake pkg-config luajit-devel libuv-devel libglib-2_0-0 sqlite3 openssl timezone tar libxkbcommon0 xkeyboard-config libX11-data iproute2 nodejs-default curl ;;
+	opensuse) zypper --non-interactive install luajit python3 ca-certificates git gcc make cmake pkg-config luajit-devel libuv-devel libglib-2_0-0 libgio-2_0-0 sqlite3 openssl timezone tar libxkbcommon0 xkeyboard-config libX11-data iproute2 nodejs-default curl ;;
 	*) echo 'Unsupported mandatory unit distribution.' >&2; exit 1 ;;
 esac
 
