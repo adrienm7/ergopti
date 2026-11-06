@@ -59,6 +59,10 @@
 			"nix_package": "xorg.libX11"
 		}
 	},
+	"optional_libraries": {
+		"description": "Loaded by LuaJIT FFI only when present; a missing one turns its feature off instead of failing the install.",
+		"wayland_client": "libwayland-client.so.0"
+	},
 	"package_requirements": {
 		"deb": [
 			"xclip",

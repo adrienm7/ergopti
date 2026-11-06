@@ -43,6 +43,8 @@ graph TD
         LINUX_atspi_focus_watch_worker["AtspiFocusWatchWorker.lua"]
         LINUX_atspi_native_identity["AtspiNativeIdentity.lua"]
         LINUX_clipboard["Clipboard.lua"]
+        LINUX_clipboard_owner["ClipboardOwner.lua"]
+        LINUX_clipboard_owner_worker["ClipboardOwnerWorker.lua"]
         LINUX_crypto["Crypto.lua"]
         LINUX_curl_http_client["CurlHttpClient.lua"]
         LINUX_desktop_opener["DesktopOpener.lua"]
