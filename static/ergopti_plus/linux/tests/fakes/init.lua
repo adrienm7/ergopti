@@ -927,7 +927,15 @@ function M.sqlite_writer(opts)
 	end
 
 	function fake.exec_sql(sql) fake.executed[#fake.executed + 1] = sql ; return true end
-	function fake.query_rows() return {} end
+	-- The ledger identity asks whether the store already knows its pre-ledger
+	-- "linux-<hostname>" id. A fake store is an existing one unless the test
+	-- says it is new (opts.fresh_store), so the historical id stays in force.
+	function fake.query_rows(sql)
+		if type(sql) == "string" and sql:match("^SELECT count%(%*%) FROM devices WHERE device_id=") then
+			return { opts.fresh_store and "0" or "1" }
+		end
+		return {}
+	end
 	function fake.get_meta(key) return fake.meta[key] end
 	function fake.set_meta(key, value) fake.meta[key] = value ; return true end
 	function fake.upsert_open_walk(device_id, encoded)

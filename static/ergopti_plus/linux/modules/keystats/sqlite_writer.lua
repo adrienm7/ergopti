@@ -10,8 +10,9 @@
 --- and aggregate tables consumed by the shared metrics dashboard.
 ---
 --- This module is the Linux counterpart to macOS's modules/keystats/sqlite_writer.lua
---- (which uses hs.sqlite3). Both write to the same canonical schema so the
---- dashboard and cross-device sync work identically.
+--- (which uses hs.sqlite3). Both write to the same canonical schema; the raw
+--- rows reach the other devices through metrics_ledger.lua, which projects them
+--- to this device's by_device/<id>/data.sql.
 ---
 --- FEATURES & RATIONALE:
 --- 1. CLI-based: every SQL statement is executed through `sqlite3 <db> "<sql>"`
@@ -461,8 +462,8 @@ local function migration_backup_current(backup)
 end
 
 --- Moves a store to the current n-gram token encoding, once. This database is
---- the only copy of its derived keys: unlike Windows and macOS there is no ledger
---- replay, so the keys are rewritten in place. VACUUM INTO first leaves a
+--- the only copy of its derived keys: the Linux ledger carries raw rows only and
+--- nothing rebuilds aggregates from it, so the keys are rewritten in place. VACUUM INTO first leaves a
 --- consistent backup beside it, the update is one transaction that also records
 --- the version. The caller stops using a store this refuses: writing new keys
 --- beside old ones would make a later retry escape them twice.

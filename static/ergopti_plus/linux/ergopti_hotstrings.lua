@@ -3202,6 +3202,9 @@ local function main()
 		-- Deliberately NOT on the idle callback: that one runs between keystrokes,
 		-- and a batch costs one openssl spawn per value.
 		RuntimeGuard.call("keystats migration pump", keystats.pump_migration)
+		-- The per-device ledger follows the committed store one bounded slice
+		-- at a time, so the other drivers can import this device's metrics.
+		RuntimeGuard.call("keystats ledger pump", keystats.pump_ledger)
 
 		-- Persist. Until now the ONLY two flush() call sites were the SIGTERM
 		-- handler and the clean exit after the loop returns — so a SIGKILL, an OOM
