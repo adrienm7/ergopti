@@ -125,6 +125,51 @@ TapHoldLoneTapReadConfig(Cache) {
 	LoggerInfo("TapHold", "Lone modifier tap window read: {1} ms.", TapHoldLoneTapMaxMs())
 }
 
+; Refuses a one-shot timeout that is not a positive whole number of
+; milliseconds (tap_holds.sticky_timeout_ms, the leaf macOS reads). No zero
+; or unlimited value: macOS refuses them too (decision of 2026-11-06).
+; @param Ms {Number} Milliseconds.
+; @returns {Integer}
+TapHoldValidOneShotTimeoutMs(Ms) {
+	if !(Ms is Integer) || Ms <= 0
+		throw ValueError("tap_holds.sticky_timeout_ms must be a positive whole number of milliseconds.", -1, String(Ms))
+	return Ms
+}
+
+; Reads the one-shot Shift timeout from config.toml at boot, after
+; TapHoldsLoadTimings(): absent, the timing registry's default stays; a value
+; that is not a positive whole number is reported and the default stays.
+; @param Cache {Map} The parsed config (IniCacheGet's source).
+TapHoldOneShotTimeoutReadConfig(Cache) {
+	global ONE_SHOT_SHIFT_TIMEOUT_SEC
+	DefaultMs := TimingsGet("tap_hold", "one_shot_shift_timeout_ms")
+	ONE_SHOT_SHIFT_TIMEOUT_SEC := DefaultMs / 1000
+	Stored := (Cache is Map) && Cache.Has(ConfigLeaf.TAP_HOLDS) && (Cache[ConfigLeaf.TAP_HOLDS] is Map)
+		? Cache[ConfigLeaf.TAP_HOLDS] : Map()
+	if !Stored.Has(ConfigLeaf.STICKY_TIMEOUT_MS) {
+		LoggerInfo("TapHold", "One-shot Shift timeout not set: the default {1} ms applies.", DefaultMs)
+		return
+	}
+	Value := Stored[ConfigLeaf.STICKY_TIMEOUT_MS]
+	if ConfigTomlTryReadBootValue(Cache, ConfigLeaf.TAP_HOLDS, ConfigLeaf.STICKY_TIMEOUT_MS, &Admitted)
+		Value := Admitted
+	try Ms := TapHoldValidOneShotTimeoutMs(IsInteger(Value) ? Integer(Value) : Value)
+	catch as Err {
+		LoggerWarn("TapHold", "[tap_holds] sticky_timeout_ms = '{1}' is refused ({2}): the default {3} ms applies.",
+			(Value is Object) ? Type(Value) : Value, Err.Message, DefaultMs)
+		return
+	}
+	ONE_SHOT_SHIFT_TIMEOUT_SEC := Ms / 1000
+	LoggerInfo("TapHold", "One-shot Shift timeout read: {1} ms.", Ms)
+}
+
+; The one-shot Shift timeout in force, in milliseconds.
+; @returns {Integer}
+TapHoldOneShotTimeoutMs() {
+	global ONE_SHOT_SHIFT_TIMEOUT_SEC
+	return Round(ONE_SHOT_SHIFT_TIMEOUT_SEC * 1000)
+}
+
 ; The longest press (ms) that still types KeyId's tap: its threshold, or the
 ; lone tap window when KeyId's hold is a modifier taken at key-down and the
 ; window is longer. The typing keys ([tap_hold.rollover]) and a one-shot

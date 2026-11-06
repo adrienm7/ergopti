@@ -232,7 +232,10 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	; 50: the chord bulk copy (KeyCombinationCopyTapsToChords) returns false and
 	; skips its reload on a refusal, driven for real by
 	; test_key_combination_chord_engine.ahk.
-	AssertEqual(50, Calls,
+	; 51: the one-shot Shift timeout writer (_TH_CommitOneShotTimeoutMs) returns
+	; false and skips its reload on a refusal, driven for real by
+	; test_tap_hold_one_shot_timeout.ahk.
+	AssertEqual(51, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",

@@ -547,3 +547,10 @@ Apps or Search capture), macOS TextSender and keymap output do not snapshot it:
 they type the text as keystrokes, as Windows' `SendInstant` does when the
 shared clipboard owner is busy. Output is neither dropped nor delayed
 (`infra/clipboard_borrowers.lua`, MCP-002).
+
+## The one-shot Shift timeout is a user setting on every OS (6 November 2026)
+
+Aligned on macOS: `sticky_timeout_ms` (2000 ms registry default) is editable on
+Windows (`config.toml` `[tap_holds]`, `_TH_CommitOneShotTimeoutMs`) and Linux
+(`tap_hold.toml` `[tap_hold]`, `set_one_shot_timeout_ms`), each with a tray row;
+only a positive whole number of milliseconds is admitted, no zero or unlimited.

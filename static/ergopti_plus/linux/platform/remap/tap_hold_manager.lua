@@ -479,6 +479,7 @@ local function roll_capture_runtime()
 	local generation, engine, installed, enabled, file_enabled = _generation, _engine, _installed_engine, _enabled, loaded.enabled
 	local path, defaults = _user_path, _defaults_path
 	local keys_ref, rolls_ref, catalog_ref, holds_ref = loaded.keys, loaded.roll_keys, loaded.catalog, loaded.hold_picker
+	local one_shot_ms = loaded.one_shot_timeout_ms
 	local lone, rolls, catalog, holds, keys = loaded.lone_tap_max_ms, copy_fields(loaded.roll_keys),
 		copy_fields(loaded.catalog), copy_fields(loaded.hold_picker), copy_fields(loaded.keys)
 	local inventory = capture()
@@ -490,6 +491,7 @@ local function roll_capture_runtime()
 			and rawequal(_engine, engine) and rawequal(_installed_engine, installed) and _enabled == enabled
 			and _user_path == path and _defaults_path == defaults and rawequal(_loaded, loaded)
 			and loaded.enabled == file_enabled and loaded.lone_tap_max_ms == lone
+			and loaded.one_shot_timeout_ms == one_shot_ms
 			and rawequal(loaded.keys, keys_ref) and rawequal(loaded.roll_keys, rolls_ref)
 			and rawequal(loaded.catalog, catalog_ref) and rawequal(loaded.hold_picker, holds_ref)
 			and rawequal(_combinations, combinations) and rawget(combinations, "capture_collision_inventory") == capture
@@ -669,7 +671,8 @@ local function _build(loaded, boot)
 		tap_min_ms = Timings.ms("tap_hold", "tap_min_duration_ms"),
 		-- tap_hold.toml's [tap_hold] lone_modifier_tap_max_ms, or the manifest's default.
 		lone_tap_max_ms = loaded.lone_tap_max_ms,
-		one_shot_timeout_ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms"),
+		-- tap_hold.toml's [tap_hold] sticky_timeout_ms, or the timing registry's default.
+		one_shot_timeout_ms = loaded.one_shot_timeout_ms,
 		key_text = function(code) return _hook.key_text(code) end,
 		plan_text = function(text) return (require("adapters.keyboard_layout").plan(text)) end,
 		one_shot_result = _one_shot_result,
@@ -929,6 +932,24 @@ function M.set_lone_tap_max_ms(ms, guard)
 	return require("platform.remap.tap_hold_writer").set_lone_tap_max_ms(ms, guard)
 end
 
+--- How long a one-shot Shift waits for its key, in milliseconds: the value of
+--- the configuration in force, read from tap_hold.toml.
+--- @return number
+function M.one_shot_timeout_ms()
+	_require_init()
+	return _loaded.one_shot_timeout_ms
+end
+
+--- Sets how long a one-shot Shift waits for its key: written to tap_hold.toml
+--- by the writer, which reloads this manager.
+--- @param ms number A positive whole number of milliseconds.
+--- @param guard function|nil Original deferred editor, strict true required.
+--- @return boolean True when the new engine is in force.
+function M.set_one_shot_timeout_ms(ms, guard)
+	_require_init()
+	return require("platform.remap.tap_hold_writer").set_one_shot_timeout_ms(ms, guard)
+end
+
 --- Follows the daemon's pause: a paused script remaps nothing.
 --- @param paused boolean
 function M.set_paused(paused)
@@ -992,7 +1013,7 @@ function M.capture_configuration_edit()
 	local enabled, combinations = _enabled, _combinations
 	local keys, rolls, catalog, holds = copy_fields(loaded.keys), copy_fields(loaded.roll_keys),
 		copy_fields(loaded.catalog), copy_fields(loaded.hold_picker)
-	local file_enabled, lone = loaded.enabled, loaded.lone_tap_max_ms
+	local file_enabled, lone, one_shot_ms = loaded.enabled, loaded.lone_tap_max_ms, loaded.one_shot_timeout_ms
 	local function runtime()
 		return rawequal(package.loaded["platform.remap.tap_hold_manager"], M)
 			and M.capture_configuration_edit == factory and _initialized and not _paused
@@ -1000,6 +1021,7 @@ function M.capture_configuration_edit()
 			and rawequal(_loaded, loaded) and rawequal(_engine, engine) and rawequal(_installed_engine, installed)
 			and _enabled == enabled and rawequal(_combinations, combinations)
 			and loaded.enabled == file_enabled and loaded.lone_tap_max_ms == lone
+			and loaded.one_shot_timeout_ms == one_shot_ms
 			and fields_equal(loaded.keys, keys) and fields_equal(loaded.roll_keys, rolls)
 			and fields_equal(loaded.catalog, catalog) and fields_equal(loaded.hold_picker, holds) and config_exports_current()
 			and rawequal(package.loaded["adapters.file_system"], Files) and Files.read_with_status == read
@@ -1010,6 +1032,7 @@ function M.capture_configuration_edit()
 		or (status == "ok" and type(bytes) ~= "string") or type(shipped) ~= "string" then return nil end
 	local ok, decoded = pcall(original_config_load, defaults, path)
 	if not ok or type(decoded) ~= "table" or decoded.enabled ~= file_enabled or decoded.lone_tap_max_ms ~= lone
+		or decoded.one_shot_timeout_ms ~= one_shot_ms
 		or not fields_equal(decoded.keys, keys) or not fields_equal(decoded.roll_keys, rolls)
 		or not fields_equal(decoded.catalog, catalog) or not fields_equal(decoded.hold_picker, holds) or not runtime() then return nil end
 	local function current()

@@ -1207,6 +1207,13 @@
 		}
 	},
 	{
+		"path": "tap_holds_menu.tap_hold_one_shot_delay",
+		"visibility": "hide",
+		"labels": { "fr": "tap_hold_one_shot_delay", "en": "tap_hold_one_shot_delay" },
+		"platforms": { "windows": true, "macos": false, "linux": true },
+		"reasons": { "macos": { "en": "", "fr": "" } }
+	},
+	{
 		"path": "llm_api_add_provider_group.api_add_entry",
 		"visibility": "hide",
 		"labels": { "fr": "+ Ajouter une API", "en": "+ Add an API" },
