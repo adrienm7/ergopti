@@ -23,7 +23,8 @@
 --- verifies and installs it through the updater manager's update path and
 --- restarts the daemon on it. Each phase is pushed as install_progress. The
 --- restore banner posts restore_backup; the daemon restarts on the restored
---- configuration.
+--- configuration. An installed release whose daemon restart is refused waits
+--- (restart_pending): the page and the About menu offer to restart on it.
 --- ==============================================================================
 
 local M = {}
@@ -63,6 +64,8 @@ local _sources = nil
 local _last_list = nil
 -- The one install session of this window (created on the first request).
 local _install_session = nil
+-- The tray menu's redraw, told when a release starts or stops waiting for its restart.
+local _pending_observer = nil
 local _failure_contract = nil
 local _daemon_state = nil
 local _page_epoch, _page_document = nil, nil
@@ -399,6 +402,8 @@ function M._install_context()
 		installed = Version.VERSION,
 		blocked_key = blocked or "",
 		backup = restorable_backup(),
+		-- An installed release whose daemon restart was refused, for a window opened later.
+		pending = _install_session and _install_session.pending() or nil,
 	}
 end
 
@@ -599,6 +604,9 @@ local function install_session()
 			end
 			return restart(accepted and accepted.tag or Parser.parse_tag(chunk)) == true
 		end,
+		pending_changed = function()
+			if _pending_observer then _pending_observer() end
+		end,
 		report = function(message, retained_owner)
 			local payload = { action = "install_progress" }
 			for key, value in pairs(message) do payload[key] = value end
@@ -646,12 +654,33 @@ local function restore(id)
 	return { action = "restore_progress", phase = "restored", backup_path = backup_path }
 end
 
+--- The installed release that waits for a daemon restart that was refused.
+--- @return table|nil { tag, backup_path }
+function M.pending_install()
+	return _install_session and _install_session.pending() or nil
+end
+
+--- Asks again for the restart that completes the held release (the tray row).
+--- @return boolean accepted
+function M.complete_pending_install()
+	return _install_session ~= nil and _install_session.complete_restart() == true
+end
+
+--- Names the tray menu's redraw, so its completing row appears and goes away
+--- with the held release. A later menu build replaces the previous redraw.
+--- @param observer function
+function M.set_pending_install_observer(observer)
+	assert(type(observer) == "function", "the held-install observer must be a function")
+	_pending_observer = observer
+end
+
 --- Clears cached state; used by tests.
 function M._reset()
 	_fetch_generation = 0
 	_sources = nil
 	_last_list = nil
 	_install_session = nil
+	_pending_observer = nil
 	_daemon_state = nil
 	_page_epoch, _page_document = nil, nil
 	M._config_backup = nil
@@ -726,6 +755,12 @@ function M.on_message(payload, state, context)
 				reason_key = reason }
 		end
 		install_session().install(payload.tag, payload.channel)
+		return nil
+	end
+
+	-- « Restart now » of an installed release whose daemon restart was refused.
+	if action == "complete_install_restart" then
+		if _install_session then _install_session.complete_restart() end
 		return nil
 	end
 

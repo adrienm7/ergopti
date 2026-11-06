@@ -29,6 +29,10 @@
  *    own (macOS, Sparkle) offers the channel's newest release only, through
  *    install_through_updater and the handed_off phase; older rows, hosts
  *    without that updater and API lists keep the direct request.
+ * 7. An installed release whose restart the host refused (restart_pending,
+ *    from a phase or the host's install context) is neither failed nor idle:
+ *    it names the release, offers « Restart now », which posts
+ *    complete_install_restart once, and keeps the install buttons greyed.
  * ==============================================================================
  */
 
@@ -238,6 +242,67 @@ function checkProgressFailureAndRetry() {
 		page.el('install-text').textContent === EN['changelog_window.install_error_unexpected'],
 		'an unknown phase must be ignored'
 	);
+}
+
+/** A refused restart showed a failure with Retry over an armed install (MUR-001). */
+function checkRestartPendingOffersTheRestart() {
+	const page = openPage({ __installed_version: INSTALLED });
+	page.select('v0.0.0-dev.139');
+	page.el('btn-install').dispatch('click');
+	page.sandbox.setInstallProgress({
+		tag: 'v0.0.0-dev.139',
+		phase: 'restart_pending',
+		backup_path: '/cfg/backups/pre-install-x'
+	});
+	expect(
+		page.el('install-text').textContent ===
+			fill('changelog_window.install_restart_pending', {
+				tag: 'v0.0.0-dev.139',
+				path: '/cfg/backups/pre-install-x'
+			}),
+		`a waiting release names itself and its backup (got ${page.el('install-text').textContent})`
+	);
+	expect(page.el('install-panel').className === '', 'a waiting release is not styled as a failure');
+	expect(!page.shown('btn-install-retry'), 'a waiting release offers no Retry');
+	expect(page.shown('btn-install-restart'), 'a waiting release offers to restart');
+	expect(
+		page.el('btn-install-restart').textContent === EN['changelog_window.install_restart_now'],
+		'the restart button is translated'
+	);
+	page.select('v0.0.0-dev.141');
+	expect(page.el('btn-install').disabled === true, 'no other release installs over a waiting one');
+	page.el('btn-install-restart').dispatch('click');
+	page.el('btn-install-restart').dispatch('click');
+	expect(
+		page.payloads('complete_install_restart').length === 1 &&
+			page.payloads('complete_install_restart')[0].tag === 'v0.0.0-dev.139',
+		'one click posts complete_install_restart once until the host answers'
+	);
+	expect(page.el('btn-install-restart').disabled === true, 'the button waits for the host');
+	page.sandbox.setInstallProgress({ tag: 'v0.0.0-dev.139', phase: 'restart_pending' });
+	expect(page.el('btn-install-restart').disabled === false, 'a refused restart can be asked again');
+	page.sandbox.setInstallProgress({ tag: 'v0.0.0-dev.139', phase: 'restarting' });
+	expect(!page.shown('btn-install-restart'), 'an accepted restart hides the button');
+
+	const seeded = openPage({
+		__installed_version: INSTALLED,
+		__install_pending: { tag: 'v0.0.0-dev.141', backup_path: '/cfg/b' }
+	});
+	seeded.select('v0.0.0-dev.139');
+	expect(seeded.shown('install-panel'), 'a window opened later shows the waiting release');
+	expect(seeded.shown('btn-install-restart'), 'and offers to restart on it');
+	expect(seeded.el('btn-install').disabled === true, 'and keeps the install buttons greyed');
+
+	const linux = openPage({});
+	linux.answer({
+		action: 'releases',
+		channel: LEAST_STABLE,
+		releases: [],
+		cache_miss: true,
+		install: { installed: INSTALLED, blocked_key: '', pending: { tag: 'v0.0.0-dev.141' } }
+	});
+	linux.select('v0.0.0-dev.139');
+	expect(linux.shown('btn-install-restart'), 'the Linux context names the waiting release too');
 }
 
 // ==========================================
@@ -548,6 +613,7 @@ function checkFeedHandoffNeedsTheHostAndTheFeed() {
 checkEveryOtherReleaseCarriesTheButton();
 checkOneClickPostsTheRequest();
 checkProgressFailureAndRetry();
+checkRestartPendingOffersTheRestart();
 checkSourceRunGreysEveryButton();
 checkNoAnnouncedBuildShowsNoButton();
 checkLinuxAnnouncesItsContext();

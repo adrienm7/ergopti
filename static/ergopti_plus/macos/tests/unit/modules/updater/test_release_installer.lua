@@ -104,6 +104,19 @@ helpers.describe("release_installer: the authenticated asset", function()
 	end)
 end)
 
+-- The Versions session holds a release whose quit was refused for exactly the
+-- swap worker's own wait; a second copy of that bound would drift (MUR-001).
+helpers.describe("release_installer: the held-install wait (release-restart-pending)", function()
+	helpers.it("reads the launcher wait from the swap script it emits", function()
+		local Installer = fresh_installer()
+		helpers.assert_eq(Installer.SWAP_WAIT_SECONDS, Installer.SWAP_WAIT_TICKS / 10)
+		helpers.assert_true(Installer.SWAP_WAIT_SECONDS >= 60, "the worker waits at least a minute")
+		helpers.assert_true(Installer.SWAP_SCRIPT:find('[ "$waited" -gt ' .. Installer.SWAP_WAIT_TICKS .. ' ]', 1, true) ~= nil,
+			"the emitted loop counts the same ticks")
+		helpers.assert_true(Installer.SWAP_SCRIPT:find("/bin/sleep 0.1", 1, true) ~= nil, "each tick sleeps 0.1 s")
+	end)
+end)
+
 helpers.describe("release_installer: staging and replacement dispatch", function()
 	local Installer = fresh_installer()
 	local env = {

@@ -45,6 +45,10 @@
  *    phase through setInstallProgress(). A failure stays in the window with a
  *    Retry button. A host that cannot install (a source run, a system package)
  *    names why, and the button stays greyed with that reason.
+ *    An installed release whose restart the host refused is not a failure: the
+ *    host reports restart_pending (also in its install context, for a window
+ *    opened later), the install buttons stay greyed, and « Restart now » posts
+ *    complete_install_restart until the host restarts or the wait lapses.
  * 8. Restoring the backup: the host names the latest pre-install backup it can
  *    restore; the banner's button posts restore_backup with its id.
  * 9. Feed-only lists: the Atom feed names no files and no digests, so no host
@@ -107,6 +111,8 @@ var INSTALL_PHASES = {
 	downloading: true,
 	installing: true,
 	restarting: true,
+	// Installed (or armed for the quit), waiting for a restart the host refused.
+	restart_pending: true,
 	failed: true
 };
 // The restore phases a host reports.
@@ -132,6 +138,8 @@ var _installBlockedKey = _hostKey(window.__install_blocked_key, INSTALL_BLOCKED_
 var _install = null;
 // The pre-install backup the host can restore ({ id, createdAt, tag }), or null.
 var _restorable = _hostBackup(window.__restorable_backup);
+// An installed release the host holds for its restart, seeded before the page runs.
+_adoptPendingInstall(_hostPendingInstall(window.__install_pending));
 // Restore state: 'idle', 'pending' (request posted), 'restoring', 'restored' or 'failed'.
 var _restoreState = 'idle';
 var _restoreReasonKey = '';
@@ -174,6 +182,18 @@ function _hostString(value) {
  */
 function _hostKey(value, family) {
 	return typeof value === 'string' && family.test(value) ? value : '';
+}
+
+/**
+ * The installed release a host holds for its restart, or null for anything else.
+ * @param {*} value - { tag, backup_path } as the host sends it.
+ * @return {?{tag: string, backupPath: string}}
+ */
+function _hostPendingInstall(value) {
+	if (!value || typeof value !== 'object') return null;
+	var tag = _hostString(value.tag);
+	if (!tag) return null;
+	return { tag: tag, backupPath: _hostString(value.backup_path) || '' };
 }
 
 /**
@@ -402,9 +422,11 @@ function _initializePage() {
 	var cancel = document.getElementById('btn-subscribe-cancel');
 	var install = document.getElementById('btn-install');
 	var installRetry = document.getElementById('btn-install-retry');
+	var installRestart = document.getElementById('btn-install-restart');
 	var restore = document.getElementById('btn-restore');
 	if (install) install.addEventListener('click', requestInstall);
 	if (installRetry) installRetry.addEventListener('click', retryInstall);
+	if (installRestart) installRestart.addEventListener('click', completeInstallRestart);
 	if (restore) restore.addEventListener('click', requestRestore);
 	if (subscribe) subscribe.addEventListener('click', requestSubscription);
 	if (confirm) confirm.addEventListener('click', confirmSubscription);
@@ -1043,6 +1065,8 @@ function _installStatusText() {
 		return _fillInstall('changelog_window.install_installing', tag, path);
 	if (_install.phase === 'restarting')
 		return _fillInstall('changelog_window.install_restarting', tag, path);
+	if (_install.phase === 'restart_pending')
+		return _fillInstall('changelog_window.install_restart_pending', tag, path);
 	var reason = _fillInstall(
 		(_install.failureReport && _install.failureReport.message_key) ||
 			_install.reasonKey ||
@@ -1097,6 +1121,13 @@ function _renderInstallControls() {
 		retryButton.style.display =
 			_install && _install.phase === 'failed' && !_install.managedFailure ? '' : 'none';
 	}
+	var restartButton = document.getElementById('btn-install-restart');
+	if (restartButton) {
+		var waiting = _install !== null && _install.phase === 'restart_pending';
+		restartButton.textContent = _t('changelog_window.install_restart_now') || '';
+		restartButton.style.display = waiting ? '' : 'none';
+		restartButton.disabled = waiting && _install.restartRequested === true;
+	}
 	_renderInstallFailureActions();
 }
 
@@ -1121,6 +1152,39 @@ function retryInstall() {
 	if (_installBlockedKey !== '') return;
 	if (_install.handoff) _postHandoff(_install.tag, _install.channel);
 	else _postInstall(_install.tag, _install.channel);
+}
+
+/**
+ * Asks the host again for the restart that completes an installed release.
+ * The button stays greyed until the host answers with the next phase.
+ */
+function completeInstallRestart() {
+	if (!_install || _install.phase !== 'restart_pending' || _install.restartRequested) return;
+	_install.restartRequested = true;
+	_renderInstallControls();
+	_postChangelogMessage({ action: 'complete_install_restart', tag: _install.tag });
+}
+
+/**
+ * Shows the installed release a host holds for its restart, unless the page
+ * already follows an install of its own.
+ * @param {?{tag: string, backupPath: string}} pending
+ */
+function _adoptPendingInstall(pending) {
+	if (!pending) return;
+	if (_install !== null && _install.phase !== 'failed' && _install.phase !== 'handed_off') return;
+	_install = {
+		tag: pending.tag,
+		channel: _currentChannel,
+		phase: 'restart_pending',
+		handoff: false,
+		reasonKey: '',
+		backupPath: pending.backupPath,
+		operation: 0,
+		failureEpoch: 0,
+		managedFailure: false,
+		failureReport: null
+	};
 }
 
 /**
@@ -1262,6 +1326,7 @@ function setInstallContext(context) {
 	if (Object.prototype.hasOwnProperty.call(context, 'backup')) {
 		_restorable = _hostBackup(context.backup);
 	}
+	_adoptPendingInstall(_hostPendingInstall(context.pending));
 	renderReleaseList();
 	if (_selectedIndex >= 0) {
 		document.querySelectorAll('.release-item').forEach(function (el) {

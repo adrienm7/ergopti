@@ -217,6 +217,15 @@ end
 -- =================================
 -- =================================
 
+-- How long the armed swap waits for the launcher to quit, read from the script
+-- itself (the physical probe runs its literal text): that many sleeps of 0.1 s,
+-- so never less than SWAP_WAIT_SECONDS. The Versions session holds a release
+-- whose restart was refused for that long, then reports it not installed: the
+-- worker has given up and replaced nothing.
+M.SWAP_WAIT_TICKS = tonumber(M.SWAP_SCRIPT:match('%[ "%$waited" %-gt (%d+) %]'))
+assert(M.SWAP_WAIT_TICKS, "The release swap script names no launcher wait")
+M.SWAP_WAIT_SECONDS = M.SWAP_WAIT_TICKS / 10
+
 --- Downloads and verifies one release into a fresh staging folder.
 --- @param asset table M.find_asset() result.
 --- @param done function fn(staged_app|nil, stage "download"|"verify", detail).

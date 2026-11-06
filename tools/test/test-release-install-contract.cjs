@@ -20,8 +20,9 @@
  *    scheduler bodies never reach one. A new caller fails here until it is
  *    reviewed and listed.
  * 2. One set of reasons: the shared Lua sequence and its Windows port name the
- *    same page keys, each exists in en.json, and each matches the family the
- *    page accepts from a host.
+ *    same page keys, except the two that only the macOS armed app swap can
+ *    produce, each exists in en.json, and each matches the family the page
+ *    accepts from a host.
  * 3. Backup first on Windows: in ReleaseInstall_Start the backup port is
  *    called before the asset and install ports (the Lua order is proven by the
  *    shared contract in both Lua suites; AutoHotkey does not run in this gate).
@@ -304,8 +305,17 @@ function checkReasonKeys() {
 		[...ahkBlock.matchAll(/"([a-z_]+)",\s*"([^"]+)"/g)].map((m) => [m[1], m[2]])
 	);
 	expect(Object.keys(luaMap).length >= 9, 'the Lua reasons could not be read');
+	// Only the macOS armed app swap can stop for these: Windows never keeps an
+	// app backup beside the bundle, and its swap worker is cancelled with the
+	// exit instead of waiting for a later quit (MUR-001).
+	const SWAP_ONLY = ['previous_backup', 'restart_expired'];
+	for (const name of SWAP_ONLY) {
+		expect(name in luaMap, `the macOS swap-only reason ${name} is no longer a shared reason`);
+		expect(!(name in ahkMap), `the macOS swap-only reason ${name} reached the Windows port`);
+	}
+	const shared = Object.entries(luaMap).filter(([name]) => !SWAP_ONLY.includes(name));
 	expect(
-		same(Object.entries(luaMap).sort(), Object.entries(ahkMap).sort()),
+		same(shared.sort(), Object.entries(ahkMap).sort()),
 		`the Windows install reasons drifted from the shared ones: ${JSON.stringify(ahkMap)}`
 	);
 	const page = fs.readFileSync(path.join(DRIVERS, '_shared/ui/changelog/script.js'), 'utf8');

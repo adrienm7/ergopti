@@ -41,7 +41,8 @@ local function with_declared_about_provider(offer, body)
 		}
 		package.loaded["ui.update_check"] = {open = function(opts) session.opens[#session.opens + 1] = opts; return true end}
 		package.loaded["ui.menu.start_at_login"] = {enabled = function() return false end}
-		package.loaded["ui.changelog"] = {open = function() error("A provider build must not open its changelog") end}
+		package.loaded["ui.changelog"] = {open = function() error("A provider build must not open its changelog") end,
+			pending_install = function() return nil end}
 		session.channel = "dev"
 		session.owner = {get = function() return session.channel end, set = function() return false end}
 		session.checks = {latest = function() return session.offer end, interval = function() return 86400 end,

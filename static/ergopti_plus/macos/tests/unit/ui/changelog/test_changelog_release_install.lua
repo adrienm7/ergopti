@@ -27,7 +27,7 @@ end
 
 --- Stubbed owners recording every effect in order.
 --- @param opts table { source, asset = false, stage = { path, stage }, armed = false, restore,
----   reload = false | "throw" }
+---   reload = false | "throw", exits = { accepted… } }
 --- @return table deps, table events
 local function owners(opts)
 	opts = opts or {}
@@ -62,6 +62,7 @@ local function owners(opts)
 				if opts.asset == false then return nil end
 				return { tag = release.tag_name, url = "u", digest = "d", version = "v" }
 			end,
+			SWAP_WAIT_SECONDS = 120,
 			stage = function(_, done)
 				event("stage")
 				local result = opts.stage or { path = "/tmp/stage/app/ErgoptiPlus.app" }
@@ -78,12 +79,23 @@ local function owners(opts)
 			end,
 		},
 		coordinator = {
-			request_user_exit = function(reason) event("exit:" .. reason); return true end,
+			request_user_exit = function(reason)
+				event("exit:" .. reason)
+				if opts.exits then return table.remove(opts.exits, 1) end
+				return true
+			end,
 			request_reload_owned = function(reason, on_aborted)
 				event("reload:" .. reason)
 				opts.reload_aborted = on_aborted
 				if opts.reload == "throw" then error("reload raised") end
 				return opts.reload ~= false
+			end,
+		},
+		timer = {
+			after = function(delay, fn)
+				event("expiry:" .. tostring(delay))
+				opts.expire = fn
+				return {}, true
 			end,
 		},
 	}
@@ -209,6 +221,55 @@ helpers.describe("Changelog one-click release install (macOS)", function()
 			helpers.assert_eq(phases(state), "backing_up,downloading,installing,restarting")
 			options.arm_done(false, "late refusal")
 			helpers.assert_eq(phases(state), "backing_up,downloading,installing,restarting")
+		end)
+	end)
+
+	-- A refused quit after ARMED was reported failed and idle while the armed
+	-- worker still waited to replace the app (MUR-001).
+	helpers.it("holds an armed release whose quit is refused (release-restart-pending)", function()
+		with_changelog(function(changelog, state, post)
+			local options = { exits = { false, false, true } }
+			local deps, events = owners(options)
+			open_listed(changelog, state, post, deps)
+			post({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" })
+			helpers.assert_eq(phases(state), "backing_up,downloading,installing,restarting,restart_pending")
+			helpers.assert_eq(events[#events], "expiry:120", "the hold lasts as long as the swap worker waits")
+			helpers.assert_eq(changelog.pending_install().tag, "v0.0.0-dev.139")
+			post({ action = "install_release", tag = "v0.0.0-dev.141", channel = "dev" })
+			helpers.assert_eq(phases(state), "backing_up,downloading,installing,restarting,restart_pending,restart_pending",
+				"a second install is refused while the armed release waits")
+			helpers.assert_eq(#events, 6, "the refused second install backs nothing up")
+			helpers.assert_true(changelog.close())
+			helpers.assert_true(changelog.open({ channel = "dev" }))
+			helpers.assert_true(state.view.options.html_string:find(
+				'window.__install_pending={"backup_path":"/cfg/backups/pre-install-x","tag":"v0.0.0-dev.139"}', 1, true) ~= nil
+				or state.view.options.html_string:find(
+				'window.__install_pending={"tag":"v0.0.0-dev.139","backup_path":"/cfg/backups/pre-install-x"}', 1, true) ~= nil,
+				"a window opened later shows the waiting release")
+			post("ready")
+			post({ action = "complete_install_restart" })
+			helpers.assert_eq(events[#events], "exit:release_install")
+			helpers.assert_eq(changelog.pending_install().tag, "v0.0.0-dev.139", "a second refusal keeps it waiting")
+			helpers.assert_eq(changelog.complete_pending_install(), true, "the menu row completes it")
+			helpers.assert_eq(changelog.pending_install(), nil)
+			helpers.assert_true(last_install_message(state):find('"phase":"restarting"', 1, true) ~= nil)
+		end)
+	end)
+
+	helpers.it("reports an armed release not installed once the swap worker stops waiting (release-restart-pending)", function()
+		with_changelog(function(changelog, state, post)
+			local options = { exits = { false } }
+			local deps = owners(options)
+			open_listed(changelog, state, post, deps)
+			local redraws = 0
+			changelog.set_pending_install_observer(function() redraws = redraws + 1 end)
+			post({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" })
+			helpers.assert_eq(redraws, 1, "the menu redraws its completing row")
+			options.expire()
+			helpers.assert_eq(redraws, 2)
+			helpers.assert_eq(phases(state), "backing_up,downloading,installing,restarting,restart_pending,failed")
+			helpers.assert_true(last_install_message(state):find("changelog_window.install_error_restart_expired", 1, true) ~= nil)
+			helpers.assert_eq(changelog.pending_install(), nil)
 		end)
 	end)
 

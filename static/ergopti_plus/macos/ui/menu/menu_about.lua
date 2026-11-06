@@ -226,6 +226,16 @@ function M.build(ctx, actions)
 				return ok and accepted == true
 			end
 		end
+		-- An installed release whose quit was refused waits for a restart: the
+		-- row completes it rather than checking for another release.
+		local pending = changelog.pending_install()
+		if type(pending) == "table" and type(pending.tag) == "string" then
+			offered_label = fill(i18n.get("menu.about.restart_to_finish_install"), "{tag}", pending.tag)
+			check_action = function()
+				Logger.info(LOG, "User asked to restart on installed release %s.", pending.tag)
+				return changelog.complete_pending_install()
+			end
+		end
 		local check_row = ManifestMenu.command_row("about_source_menu", require("config_keys").COMMAND.ABOUT_SOURCE_CHECK, {
 			[require("config_keys").COMMAND.ABOUT_SOURCE_CHECK] = check_action,
 		}, { ["about_source_release_ready"] = function() return not local_src end })
