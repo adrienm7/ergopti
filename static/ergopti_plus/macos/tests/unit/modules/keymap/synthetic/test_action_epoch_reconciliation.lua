@@ -288,7 +288,9 @@ local function load_fixture()
 			helpers.assert_type(mouse_tap and mouse_tap.callback, "function")
 			local before = #callback_errors
 			record_nav_reset = true
-			local results = table.pack(mouse_tap.callback({}))
+			local results = table.pack(mouse_tap.callback({
+				getType = function() return hs_stub.eventtap.event.types.leftMouseDown end,
+			}))
 			helpers.assert_eq(#callback_errors, before,
 				"the mouse wrapper must not hide a fixture/runtime error as pass-through")
 			local pending = deferred
@@ -341,7 +343,7 @@ helpers.describe("keymap action epochs", function()
 			getFlags = function() return { shift = true } end })
 		helpers.assert_nil(fixture.keymap.get_shift_side(), "a retained flags tap cannot mutate stopped state")
 		fixture.state.buffer = "guard"
-		fixture.taps[4].callback({})
+		fixture.taps[4].callback({ getType = function() return hs.eventtap.event.types.leftMouseDown end })
 		helpers.assert_eq(fixture.state.buffer, "guard", "a retained mouse tap cannot mutate stopped state")
 		for index, stop in pairs(old_stops) do fixture.taps[index].stop = stop end
 		helpers.assert_true(fixture.keymap.stop())

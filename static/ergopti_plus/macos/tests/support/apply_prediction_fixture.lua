@@ -168,6 +168,7 @@ function M.run(options)
 		stop_timer = function() return true end,
 		perform_check = noop,
 		handle_chain_signal = function() return false end,
+		has_pending_work    = function() return false end,
 		navigate = noop,
 	}
 	package.loaded["modules.llm.prediction_engine"] = engine

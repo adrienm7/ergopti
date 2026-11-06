@@ -783,6 +783,8 @@ M.eventtap = {
 			scrollWheelEventDeltaAxis2 = 7,
 			scrollWheelEventScrollPhase = 9,
 			scrollWheelEventMomentumPhase = 10,
+			mouseEventDeltaX = 11,
+			mouseEventDeltaY = 12,
 		},
 		-- Every type the driver actually names. It used to carry five, and the
 		-- gap was invisible in the worst way: keep-awake builds its watch list as
@@ -800,6 +802,8 @@ M.eventtap = {
 			leftMouseDown = 3, rightMouseDown = 4, mouseMoved = 5,
 			middleMouseDown = 6, otherMouseDown = 25, otherMouseUp = 26,
 			scrollWheel = 22,
+			leftMouseDragged = 7, rightMouseDragged = 8, otherMouseDragged = 27,
+			rotate = 18, gesture = 29, magnify = 30, swipe = 31, smartMagnify = 32,
 		},
 		newKeyEvent   = function(mods, key, isDown)
 			local properties = {}

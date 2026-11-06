@@ -65,6 +65,7 @@ local function load_fixture()
 		get_llm_enabled = function() return false end,
 		reset = function() effects.visible = false; return true end,
 		handle_chain_signal = function() return false end,
+		has_pending_work    = function() return false end,
 		is_visible = function() return false end,
 	}, {
 		__index = function() return function() end end,
