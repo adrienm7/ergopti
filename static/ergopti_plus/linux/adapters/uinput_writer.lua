@@ -412,6 +412,9 @@ end
 local function build_kernel_node_ports(ffi)
 	if not ffi.abi("64bit") or (ffi.arch ~= "x64" and ffi.arch ~= "arm64") then return nil end
 	if not kernel_declared[ffi] then
+	-- ffi.C is one namespace per process: a typed global statx would make every
+	-- later void* declaration a no-op and break the file readers and writers'
+	-- descriptor fallback. A private symbol alias keeps this type to itself.
 	ffi.cdef([[
 		typedef struct { int64_t tv_sec; uint32_t tv_nsec; int32_t reserved; } ErgoptiStatxTime107;
 		typedef struct {
@@ -424,7 +427,8 @@ local function build_kernel_node_ports(ffi)
 			uint64_t subvol; uint32_t atomic_write_unit_min, atomic_write_unit_max;
 			uint32_t atomic_write_segments_max, spare1; uint64_t spare3[9];
 		} ErgoptiStatx107;
-		int statx(int dirfd, const char *pathname, int flags, unsigned int mask, ErgoptiStatx107 *buf);
+		int ergopti_uinput_statx107(int dirfd, const char *pathname, int flags, unsigned int mask,
+			ErgoptiStatx107 *buf) __asm__("statx");
 		int openat(int dirfd, const char *pathname, int flags, ...);
 		long pread(int fd, void *buf, unsigned long count, long offset);
 	]])
@@ -435,10 +439,10 @@ local function build_kernel_node_ports(ffi)
 		or ffi.offsetof("ErgoptiStatx107", "rdev_major") ~= 128
 		or ffi.offsetof("ErgoptiStatx107", "rdev_minor") ~= 132 then return nil end
 	-- These are additional optional ports; existing ordinary Writer ports stay intact.
-	local ports = { openat = ffi.C.openat, statx = ffi.C.statx, pread = ffi.C.pread,
+	local ports = { openat = ffi.C.openat, statx = ffi.C.ergopti_uinput_statx107, pread = ffi.C.pread,
 		close = ffi.C.close, ioctl = ffi.C.ioctl, new = ffi.new, string = ffi.string, errno = ffi.errno }
 	local function ports_current()
-		return ffi.C.openat == ports.openat and ffi.C.statx == ports.statx and ffi.C.pread == ports.pread
+		return ffi.C.openat == ports.openat and ffi.C.ergopti_uinput_statx107 == ports.statx and ffi.C.pread == ports.pread
 			and ffi.C.close == ports.close and ffi.C.ioctl == ports.ioctl
 			and ffi.new == ports.new and ffi.string == ports.string and ffi.errno == ports.errno
 	end
