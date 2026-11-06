@@ -27,6 +27,11 @@ MIT notice has to ship and the design can go further (one `.keylayout` source, g
       « ISO only » or « ANSI only », the last two giving a single `.keylayout`.
       Decided 2026-11-06: the user edits one ISO `.keylayout`; the ANSI variant is derived from it by a fixed rule that
       moves the extra ISO key, and the editor can change where that key goes.
+- [ ] **KbdEdit parity, or better.** The editor offers every KbdEdit capability (extra modifier levels such as Kana,
+      Ctrl/Alt shortcuts that send another key than the typed character, Caps Lock modes, chained dead keys and
+      compose, ligatures, numpad and media keys, key remapping, sticker printing, Unicode palette, live preview),
+      for free and on all three OS, emulating what a target format cannot express and never dropping a mapping
+      silently. Inventory and design: [layout-generator-kbdedit-parity.md](docs/design/layout-generator-kbdedit-parity.md).
 - [ ] **Layout editor on the Svelte site.** A new tab where a user configures their own layout and edits it as a
       `.keylayout`, then downloads every generated target.
 - [ ] **The same UI inside ErgoptiPlus.** The editor page runs locally in the app's webview on Windows, macOS and
