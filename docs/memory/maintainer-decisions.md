@@ -678,3 +678,9 @@ lock, hot journal) and `test_sqlite_reader_busy_wait.lua` (macOS).
 
 The dashboard's « Purger » removes the data on every device. The owning writer appends a dated tombstone row to its
 append-only ledger, and each device applies it while replaying, so a sibling device never re-imports purged rows.
+
+## One layout editor for every layer (2026-11-06)
+
+The layout generator's editor unifies the navigation layer editor (`_shared/ui/layer_editor`), the layout composer
+(`_shared/ui/layout_composer`) and the layout manager window into one shared model and page. No second layout
+editor is written; the navigation layer becomes one layer of the Ergopti TOML source.
