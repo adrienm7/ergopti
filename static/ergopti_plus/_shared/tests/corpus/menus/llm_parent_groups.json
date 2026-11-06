@@ -410,6 +410,11 @@
 					"checked": false
 				},
 				{
+					"title": "✍️ Saisie automatique en ligne (style Copilot)",
+					"callback": true,
+					"checked": false
+				},
+				{
 					"title": "Prédiction IA pendant une bulle hotstring : Attendre l’expiration de la bulle hotstring",
 					"callback": false,
 					"children": [
