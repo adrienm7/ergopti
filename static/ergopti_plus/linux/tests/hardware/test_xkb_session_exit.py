@@ -34,12 +34,23 @@ class SessionKeymapExitTests(unittest.TestCase):
                     defaults.write_text('XKBLAYOUT="us"\n', encoding="utf-8")
                     # Redirect only the two system-default reads to private files;
                     # all metadata processes and the native parser remain genuine.
+                    # The driver pins sources through a native descriptor, so the
+                    # redirect wraps its reader: an io.open hook never sees those
+                    # paths and the host's own /etc/default/keyboard would answer.
                     private_reads = r"""
-local native_open = io.open
-io.open = function(path, mode)
-  if path == '/etc/default/keyboard' then return native_open(arg[2], mode) end
-  if path == '/etc/vconsole.conf' then return nil end
-  return native_open(path, mode)
+local native_require = require
+require = function(name)
+  local module = native_require(name)
+  if name == 'infra.regular_file_reader' and not module.private_reads then
+    local open_source = module.open_source
+    module.open_source = function(path)
+      if path == '/etc/default/keyboard' then return open_source(arg[2]) end
+      if path == '/etc/vconsole.conf' then return nil, 'source is absent', 2 end
+      return open_source(path)
+    end
+    module.private_reads = true
+  end
+  return module
 end
 """
                     probe = root / "probe.lua"
