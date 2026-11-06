@@ -38,6 +38,8 @@ local MODULES = {
 	"compat.base64",
 	-- The overrides owner copies tables through this shared owner.
 	"table_util",
+	-- The trigger orchestrator trims shortcut modifiers through this re-export (ea1da6c3).
+	"infra.text_utils",
 	-- The real JSON codec and text helpers decode UTF-8 through this owner.
 	"compat.utf8",
 	-- The application identity owner normalizes names through these helpers.
