@@ -148,6 +148,15 @@ helpers.describe("field run: Ergopti runs, so its runtime closes the user's Kara
 		helpers.assert_eq(steps.runtime_ready.value, "unavailable:virtual_hid_incompatible")
 	end)
 
+	-- Field report 2026-11-05: a runtime that never became ready closes
+	-- nothing, and the user's running Karabiner was failed on top of it.
+	helpers.it("skips the close of a runtime that is not ready (owned-start-not-ready)", function()
+		local steps = run("owned_start", (mac({ state = "unavailable", reason = "virtual_hid_incompatible",
+			marker = false, others = 1 })))
+		helpers.assert_eq(steps.user_karabiner_closed.state, "skip")
+		helpers.assert_eq(steps.user_karabiner_closed.value, "runtime_not_ready")
+	end)
+
 	helpers.it("skips what it cannot prove instead of passing it", function()
 		local shared = run("owned_start", (mac({ owned = false })))
 		helpers.assert_eq(shared.artifact.value, "shared_runtime")

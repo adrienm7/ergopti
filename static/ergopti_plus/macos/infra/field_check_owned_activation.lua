@@ -84,6 +84,13 @@ function M.start(ports, report, finish)
 		wait_for(ports, state, function(value) return SETTLED_ON[value] == true end, function(value)
 			report.step("runtime_ready", value == "ready" and "pass" or "fail",
 				value == "ready" and "ready" or (tostring(value) .. ":" .. tostring(port.owner_reason())))
+			-- A runtime that never became ready closes nothing: leaving the
+			-- user's Karabiner-Elements running is then correct, and the
+			-- runtime_ready step already names why (field report 2026-11-05)
+			if value ~= "ready" then
+				report.step("user_karabiner_closed", "skip", "runtime_not_ready")
+				return finish()
+			end
 			port.other_active(function(count)
 				if port.marker() ~= true then
 					-- Nothing was closed: a running user Karabiner here is the failure.
