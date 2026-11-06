@@ -645,6 +645,7 @@ return {
 	"tests.unit.modules.keystats.core.test_configuration_scope",
 	"tests.unit.modules.keystats.aggregation.test_hold_durations",
 	"tests.unit.modules.keystats.privacy.test_keystats_privacy_filters",
+	"tests.unit.modules.keystats.privacy.test_excluded_span_boundary",
 	"tests.unit.modules.keystats.privacy.test_metrics_collector_privacy",
 	"tests.unit.modules.keystats.core.test_metrics_toggles_persist",
 	"tests.unit.modules.keystats.storage.test_owned_flush",
