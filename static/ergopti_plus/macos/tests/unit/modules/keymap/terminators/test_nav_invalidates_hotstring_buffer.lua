@@ -196,6 +196,62 @@ helpers.describe("navigation invalidates hotstring buffer", function()
 			if not ok then error(err, 0) end
 		end
 	end)
+	-- DKM-001 / DKM-002: a native dead-key fallback can deliver two scalars in one
+	-- event. The automatic matcher must key the bucket on the final scalar, and a
+	-- consumed event matched on a shorter suffix must return its unmatched prefix
+	-- exactly once, in agreement with the logical buffer.
+	helpers.it("a grouped event payload expands on its final scalar and keeps its prefix", function()
+		local ACUTE = utf8.char(0x00B4)
+		local function run(trigger, final, events)
+			local Keymap, hs_stub, state, _, cleanup = load_fixture()
+			local observed = {}
+			local ok, err = xpcall(function()
+				Keymap.add(trigger, "EXPANDED", {
+					auto_expand = true, is_case_sensitive = true,
+					is_case_sensitive_strict = true, final_result = final,
+				})
+				Keymap.sort_mappings()
+				local key_tap = find_tap(hs_stub, hs_stub.eventtap.event.types.keyDown)
+				helpers.assert_not_nil(key_tap)
+				-- A first empty event starts the typing-speed clock, as a pending
+				-- native dead key does.
+				key_tap.fn(physical_key("", 14))
+				drain_immediate_timers(hs_stub)
+				for _, characters in ipairs(events) do
+					local consumed, returned = key_tap.fn(physical_key(characters))
+					drain_immediate_timers(hs_stub)
+					local text = {}
+					for _, native in ipairs(returned or {}) do
+						if native.isDown and type(native.getUnicodeString) == "function" then
+							text[#text + 1] = native:getUnicodeString()
+						end
+					end
+					observed[#observed + 1] = { consumed = consumed, text = table.concat(text) }
+				end
+				observed.buffer = state.buffer
+			end, debug.traceback)
+			cleanup()
+			if not ok then error(err, 0) end
+			return observed
+		end
+
+		local grouped = run("^0", true, { "^0" })
+		helpers.assert_eq(grouped[1].consumed, true, "two ASCII scalars in one event reach the 0 bucket")
+		helpers.assert_eq(grouped[1].text, "EXPANDED")
+		local split = run("^0", true, { "^", "0" })
+		helpers.assert_eq(split[1].consumed, false)
+		helpers.assert_eq(split[2].consumed, true, "the split control expands on its second event")
+		helpers.assert_eq(split[2].text, "EXPANDED")
+
+		local suffix = run("0", false, { ACUTE .. "0" })
+		helpers.assert_eq(suffix[1].consumed, true, "the grouped event is consumed for its suffix")
+		helpers.assert_eq(suffix[1].text, ACUTE .. "EXPANDED", "the unmatched prefix is typed exactly once")
+		helpers.assert_eq(suffix.buffer, ACUTE .. "EXPANDED", "constructed output and logical buffer agree")
+		local separated = run("0", false, { ACUTE, "0" })
+		helpers.assert_eq(separated[2].consumed, true)
+		helpers.assert_eq(separated[2].text, "EXPANDED", "an earlier event's prefix is not typed again")
+		helpers.assert_eq(separated.buffer, ACUTE .. "EXPANDED")
+	end)
 end)
 
 return true
