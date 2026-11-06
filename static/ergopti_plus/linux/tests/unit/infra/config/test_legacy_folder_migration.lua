@@ -159,6 +159,31 @@ helpers.describe("Linux legacy folder migration", function()
 		assert(ok, err)
 	end)
 
+	helpers.it("leaves a legacy folder linked to the current one, on real folders (legacy-folder-migration-linux-alias)",
+		function()
+		local dir = scratch()
+		local ok, err = pcall(function()
+			local base = dir .. "/config"
+			assert(os.execute("mkdir -p -- '" .. base .. "/" .. NAME .. "'"))
+			write(base .. "/" .. NAME .. "/config.toml", "ACTIVE")
+			assert(os.execute("ln -s -- '" .. base .. "/" .. NAME .. "' '" .. base .. "/" .. LEGACY .. "'"))
+			local paths = {
+				config_home = function() return base end,
+				state_home = function() return dir .. "/state" end,
+				data_home = function() return dir .. "/data" end,
+				cache = function() return dir .. "/cache/" .. NAME end,
+			}
+			for _ = 1, 2 do
+				local report = Migration.run({ config_paths = paths })
+				helpers.assert_eq(read(base .. "/" .. NAME .. "/config.toml"), "ACTIVE", "the live file stays")
+				helpers.assert_eq(#report.aliased, 1, "the link is recognised as the current folder")
+				helpers.assert_eq(#report.backed_up + #report.kept + #report.moved, 0, "nothing is archived")
+			end
+		end)
+		drop(dir)
+		assert(ok, err)
+	end)
+
 	helpers.it("logs every move, backup and kept entry", function()
 		local lines = {}
 		local logger = {
@@ -170,6 +195,7 @@ helpers.describe("Linux legacy folder migration", function()
 			backed_up = { { from = "/e", to = "/bak/e", taken = "/f" } },
 			kept = { { from = "/c", to = "/d", reason = "backup_exists" } },
 			removed = {},
+			aliased = {},
 			cache_ready = true,
 		})
 		helpers.assert_eq(#lines, 3)

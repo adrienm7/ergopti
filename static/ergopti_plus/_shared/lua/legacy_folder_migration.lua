@@ -62,7 +62,7 @@ end
 --- @param ports table Native effects.
 local function require_ports(ports)
 	assert(type(ports) == "table", "legacy folder migration needs its ports")
-	for _, name in ipairs({ "exists", "list", "rename", "make_dir", "remove_empty_dir" }) do
+	for _, name in ipairs({ "exists", "list", "rename", "make_dir", "remove_empty_dir", "same_object" }) do
 		assert(type(ports[name]) == "function", "legacy folder migration port missing: " .. name)
 	end
 end
@@ -120,6 +120,12 @@ end
 --- @param report table Report being filled.
 local function move_entry(from, to, backup, ports, report)
 	if not ports.exists(from) then return end
+	if ports.exists(to) and ports.same_object(from, to) then
+		-- One physical entry reached by two names (a link): nothing to move, and
+		-- archiving it as its own clash would take the live entry away.
+		report.aliased[#report.aliased + 1] = { from = from, to = to }
+		return
+	end
 	if ports.exists(to) then
 		-- An empty folder a newer build created ahead of the migration holds no
 		-- data: it gives way to the old entry.
@@ -190,13 +196,14 @@ end
 --- removed once it is empty. A merge keeps entries it is not asked to move.
 --- @param plan table Array of steps.
 --- @param ports table exists, list (names, or nil and an error when the folder
----   cannot be listed), rename (never replacing), make_dir, remove_empty_dir.
+---   cannot be listed), rename (never replacing), make_dir, remove_empty_dir,
+---   same_object(a, b) (true when both names reach one physical entry).
 --- @return table report { moved = {{from,to}}, backed_up = {{from,to,taken}},
----   kept = {{from,to,reason}}, removed = {dir} }.
+---   kept = {{from,to,reason}}, removed = {dir}, aliased = {{from,to}} }.
 function M.apply(plan, ports)
 	assert(type(plan) == "table", "legacy folder migration needs a plan")
 	require_ports(ports)
-	local report = { moved = {}, backed_up = {}, kept = {}, removed = {} }
+	local report = { moved = {}, backed_up = {}, kept = {}, removed = {}, aliased = {} }
 	for index, step in ipairs(plan) do
 		if step.from then
 			assert(type(step.to) == "string" and type(step.backup) == "string",
@@ -208,7 +215,13 @@ function M.apply(plan, ports)
 				"legacy folder migration step " .. index .. " needs from_dir, to_dir and backup_dir")
 		end
 		if step.from_dir and ports.exists(step.from_dir) then
-			merge_entries(step, ports, report)
+			if ports.exists(step.to_dir) and ports.same_object(step.from_dir, step.to_dir) then
+				-- The old folder is a link to the new one: its entries are the live
+				-- ones, and its backup folder lies inside it.
+				report.aliased[#report.aliased + 1] = { from = step.from_dir, to = step.to_dir }
+			else
+				merge_entries(step, ports, report)
+			end
 		end
 	end
 	return report
@@ -317,6 +330,9 @@ function M.log_report(logger, log, report)
 	end
 	for _, dir in ipairs(report.removed) do
 		logger.info(log, "Removed the emptied legacy folder %s.", dir)
+	end
+	for _, entry in ipairs(report.aliased or {}) do
+		logger.info(log, "Left legacy folder entry %s: it is %s under another name.", entry.from, entry.to)
 	end
 	if report.paths_file == "rewritten" then
 		logger.info(log, "paths.toml now names the new default folders; its previous text is kept beside it.")

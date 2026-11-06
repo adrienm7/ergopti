@@ -104,6 +104,12 @@ function M.native_ports()
 			return true
 		end,
 		remove_empty_dir = function(path) return fs.rmdir(path) == true end,
+		-- fs.attributes follows links: a legacy folder linked to the new one has
+		-- the new one's device and inode.
+		same_object = function(a, b)
+			local left, right = fs.attributes(a), fs.attributes(b)
+			return type(left) == "table" and type(right) == "table" and left.dev == right.dev and left.ino == right.ino
+		end,
 		read = function(path)
 			local file = io.open(path, "rb")
 			if not file then return nil end

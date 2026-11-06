@@ -236,6 +236,28 @@ helpers.describe("macOS legacy folder migration", function()
 		assert(ok, err)
 	end)
 
+	helpers.it("leaves a legacy logs folder linked to the current one, on real folders (legacy-folder-migration-macos-alias)",
+		function()
+		local dir = scratch()
+		local ok, err = pcall(with_real_fs, function()
+			local home = dir .. "/home"
+			local logs = home .. "/" .. AppDirs.macos.relative
+			local old_logs = home .. "/" .. AppDirs.migration.macos.legacy_logs_relative
+			assert(os.execute("mkdir -p -- '" .. logs .. "'"))
+			write(logs .. "/active.log", "CURRENT")
+			assert(os.execute("ln -s -- '" .. logs .. "' '" .. old_logs .. "'"))
+			local logger = { info = function() end, warn = function() end }
+			for _ = 1, 2 do
+				local report = Migration.run(logger, { home = home })
+				helpers.assert_eq(read(logs .. "/active.log"), "CURRENT", "the live log stays")
+				helpers.assert_eq(#report.aliased, 1, "the link is recognised as the current folder")
+				helpers.assert_eq(#report.backed_up + #report.kept, 0, "nothing is archived")
+			end
+		end)
+		drop(dir)
+		assert(ok, err)
+	end)
+
 	helpers.it("names the owned runtime folder apart from the Ergopti root", function()
 		local KePaths = require("platform.remap.ke_paths")
 		helpers.assert_true(KePaths.OWNED.ARTIFACT_HOME:find(AppDirs.macos.support_relative, 1, true) ~= nil,

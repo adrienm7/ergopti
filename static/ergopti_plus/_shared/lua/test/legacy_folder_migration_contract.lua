@@ -76,6 +76,8 @@ function M.memory_ports(tree)
 		end
 		return true
 	end
+	-- The in-memory tree has no links: two names are one entry only when equal.
+	function ports.same_object(a, b) return a == b end
 	function ports.remove_empty_dir(path)
 		local names = ports.list(path)
 		if not names or #names > 0 then return false end
@@ -197,6 +199,24 @@ function M.run(helpers, shared_root)
 			helpers.assert_true(lines[1]:find("could not be listed", 1, true) ~= nil, lines[1])
 		end)
 
+		helpers.it("leaves an old folder that is the new one under another name (legacy-folder-migration-alias)", function()
+			local ports, snapshot = M.memory_ports({ "/h/new/config.toml", "/h/other/x" })
+			-- /h/old is a link to /h/new, and /h/other/x a link to /h/new/x.
+			local aliases = { ["/h/old"] = "/h/new", ["/h/other/x"] = "/h/new/x" }
+			local exists = ports.exists
+			ports.exists = function(path) return aliases[path] ~= nil or exists(path) end
+			ports.same_object = function(a, b) return (aliases[a] or a) == (aliases[b] or b) end
+			ports.make_dir("/h/new/x/")
+			local report = Migration.apply({
+				{ from_dir = "/h/old", to_dir = "/h/new", backup_dir = "/h/new/bak/old" },
+				{ from = "/h/other/x", to = "/h/new/x", backup = "/h/new/bak/x" },
+			}, ports)
+			helpers.assert_true(table.concat(snapshot(), " "):find("/h/new/config.toml", 1, true) ~= nil,
+				"the live entry stays where it is")
+			helpers.assert_eq(#report.backed_up + #report.moved + #report.kept, 0, "nothing is archived or moved")
+			helpers.assert_eq(#report.aliased, 2, "both aliases are recognised")
+		end)
+
 		helpers.it("refuses a plan without its ports or its backup", function()
 			helpers.assert_true(not pcall(Migration.apply, {}, { exists = function() return false end }),
 				"a missing port stops the migration")
@@ -218,6 +238,7 @@ function M.run(helpers, shared_root)
 				backed_up = { { from = "/c", to = "/bak/c", taken = "/d" } },
 				kept = { { from = "/e", to = "/bak/e", reason = "backup_exists" } },
 				removed = { "/old" },
+				aliased = {},
 				paths_file = "rewritten",
 			})
 			helpers.assert_eq(#lines, 5, "one line per outcome")
