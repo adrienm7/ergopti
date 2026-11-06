@@ -303,7 +303,7 @@
 		},
 		{
 			"id": "encryptor-conversion-receipts",
-			"ordinal": 587,
+			"ordinal": 593,
 			"name": "Encryptor conversion reads the password from a private file and never from a command argument",
 			"cmd": "node",
 			"args": ["tools/test/test-encryptor-convert.cjs"],
