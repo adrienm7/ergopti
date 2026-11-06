@@ -114,6 +114,8 @@ end
 ---   native provider with real scratch bytes and unchanged boot),
 ---   remap = { initialized, running, hold_import, import_ok, save_ok, report }|nil,
 ---   reload = "accepted"|"refused"|nil, menu_paths = table|nil,
+---   config_dir = function()|nil (the resolved folder ConfigPaths reports),
+---   active_locale = string|nil (the language before Finish, "en" by default),
 ---   layer = "fail"|nil }`. The navigation layer file is recorded in
 ---   state.layer_imports (config folders) and state.layer_undos, never written. A held
 ---   import leaves its callback in state.import_callbacks for the scenario to
@@ -248,17 +250,26 @@ function M.with_finish(opts, scenario)
 			assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
 			return M.KARABINER_CONFIG_PATH
 		end,
-		get_config_dir = function() return M.CONFIG_DIR end,
+		get_config_dir = function()
+			if type(opts.config_dir) == "function" then return opts.config_dir() end
+			return M.CONFIG_DIR
+		end,
 	}
 	if opts.menu_paths then package.loaded["ui.menu.menu_paths"] = opts.menu_paths end
+	state.active_locale = opts.active_locale or "en"
+	state.persisted_locales, state.switched_locales = {}, {}
 	package.loaded["infra.i18n"] = {
 		get = function(key) return key end,
-		set_locale_no_reload = function()
+		get_locale = function() return state.active_locale end,
+		set_locale_no_reload = function(code)
 			state.locale_switches = state.locale_switches + 1
+			state.switched_locales[#state.switched_locales + 1] = code
+			state.active_locale = code
 			return true
 		end,
-		persist_locale = function()
+		persist_locale = function(code)
 			state.locale_persists = state.locale_persists + 1
+			state.persisted_locales[#state.persisted_locales + 1] = code
 			local mode = opts.locale or "true"
 			if mode == "throw" then error("injected locale persistence failure") end
 			if mode == "nil" then return nil end
