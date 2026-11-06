@@ -368,6 +368,9 @@ function M.cancel()
 	local request = _active_request
 	local cancelled = HttpClient.cancel()
 	if cancelled ~= true then return false end
+	-- Native cancellation may settle the request synchronously, and its terminal
+	-- callback may admit a successor: that successor's epoch must stay current.
+	if request.terminal then return true end
 	_request_epoch = _request_epoch + 1
 	finish_request(request, "cancelled")
 	Logger.debug(LOG, "Request cancellation %s.", cancelled and "committed" or "failed")

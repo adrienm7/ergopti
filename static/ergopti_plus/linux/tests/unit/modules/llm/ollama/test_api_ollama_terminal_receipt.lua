@@ -229,6 +229,31 @@ helpers.describe("Ollama terminal inference ownership", function()
 		end)
 	end)
 
+	helpers.it("a successor admitted from a native cancellation callback keeps its epoch (ll-001)", function()
+		isolated(function(api, transport)
+			local successor
+			local first = { terminals = {} }
+			helpers.assert_true(api.chat("http://127.0.0.1:11434", "fixture-model", {}, {}, nil,
+				function(_, err)
+					first.terminals[#first.terminals + 1] = err
+					successor = begin(api, true)
+				end))
+			local stale_done = transport.done
+			package.loaded["adapters.http_client"].cancel = function()
+				stale_done({ ok = false, error = "transfer aborted" })
+				return true
+			end
+			helpers.assert_true(api.cancel())
+			package.loaded["adapters.http_client"].cancel = function() return true end
+			helpers.assert_eq(#first.terminals, 1)
+			helpers.assert_true(api.is_active(), "the successor still owns the request slot")
+			transport.chunk('{"message":{"content":"successor"},"done":true}\n')
+			transport.done({ ok = true, status = 200 })
+			helpers.assert_eq(#successor.terminals, 1)
+			helpers.assert_eq(successor.terminals[1].text, "successor")
+		end)
+	end)
+
 	helpers.it("refused cancellation retains the original producer until its completed receipt", function()
 		isolated(function(api, transport)
 			local observed = begin(api, true)
