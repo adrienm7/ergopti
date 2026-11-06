@@ -162,6 +162,14 @@ local function pending_coordinator(kind)
 	local coordinator = require("infra.termination_coordinator")
 	local fence
 	local function forbidden() error("no post-fence capability may run before the held fence") end
+	-- A reload must arm its deadline at acceptance; the held handle never fires
+	-- here, and the pre-fence refusal must retire it.
+	local deadline = { stopped = false }
+	function deadline:stop() self.stopped = true; return self end
+	local function schedule()
+		helpers.assert_true(kind == "reload", "only a reload arms a deadline")
+		return deadline
+	end
 	helpers.assert_true(coordinator.init({
 		request_lease = function(_, callback) fence = callback; return true end,
 		drain_input = forbidden,
@@ -173,7 +181,7 @@ local function pending_coordinator(kind)
 		fatal_exit = forbidden,
 		mark_reload = forbidden,
 		clear_reload = forbidden,
-		schedule = forbidden,
+		schedule = schedule,
 		fatal_exit_code = 70,
 		user_exit_deadline_seconds = 12,
 		reload_deadline_seconds = 12,
@@ -183,7 +191,10 @@ local function pending_coordinator(kind)
 	helpers.assert_true(requested == true, "the actual coordinator owns the terminal request")
 	helpers.assert_true(type(fence) == "function")
 	helpers.assert_true(coordinator.terminal_in_progress(), "admission runs while the real fence is pending")
-	return coordinator, function() fence(false, "controlled pre-fence refusal") end
+	return coordinator, function()
+		fence(false, "controlled pre-fence refusal")
+		helpers.assert_true(deadline.stopped, "the refused reload retires its own deadline")
+	end
 end
 
 helpers.describe("field run: terminal admission", function()
