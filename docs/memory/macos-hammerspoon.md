@@ -1883,6 +1883,23 @@ matched foreign names such as `ErgoptiPlusXapp`). Stable `ergoptiplus` and
 `ergoptiplus@dev` are separate casks: switching is uninstall then install, and
 the configuration is kept.
 
+### project-macos-release-swap-keeps-a-build-that-reports-ready
+
+The chosen-release swap (`modules/updater/release_installer.lua` `SWAP_SCRIPT`)
+keeps a new app only once its boot reports ready, as the Windows swap waits
+for its boot-ready event: it opens the app with `open --env
+ERGOPTI_UPDATER_BOOT_READY=<tmp>/ergopti-boot-ready.<x>/ready`, waits up to 60
+s for `infra/updater_boot_ready.lua` to write the launcher pid there (boot
+complete, the Accessibility wait or onboarding), then checks that pid after a
+0.75 s probation. A build that never reports, reports garbage or quits is
+stopped (its pid, else every `$app/Contents/` process except the rename-lock
+role), moved to `$app.failed-<pid>` and the previous app is put back and opened
+(exit 9). Deliberately lower than Windows: the rollback relaunch is not checked
+(the previous build can predate the token), and a chosen release without the
+reporter file is only opened, so changing that file's path breaks the
+capability probe. Five rename boundaries now exist; the concurrent probe pins
+the count.
+
 ### project-macos-missing-acl-is-an-empty-acl
 
 Apple's Libc returns NULL with ENOENT from `acl_get_fd_np` for a file that has

@@ -281,7 +281,13 @@ Evidence: [six-scope recovery/lifecycle audit](docs/audits/platform-parity/2026-
 
 ### Capability parity review
 
-- [ ] **[CODE] macOS chosen-release updater:** evaluate an equivalent of Windows successor boot-ready/probation and post-launch recovery. The custom armed swap currently observes dispatch/rename, not a healthy successor; Sparkle is a distinct engine. Preserve intentional ARMED-on-quit semantics and record any deliberate lower guarantee. [Compared contracts](docs/audits/platform-parity/2026-11-04-recovery/capabilities.md).
+- [x] **[CODE] macOS chosen-release updater:** evaluate an equivalent of Windows successor boot-ready/probation and post-launch recovery. The custom armed swap currently observes dispatch/rename, not a healthy successor; Sparkle is a distinct engine. Preserve intentional ARMED-on-quit semantics and record any deliberate lower guarantee. [Compared contracts](docs/audits/platform-parity/2026-11-04-recovery/capabilities.md).
+      Done: the swap opens the chosen app with a one-shot boot-ready token, keeps it once `infra/updater_boot_ready.lua`
+      writes the launcher pid (boot complete, Accessibility wait or onboarding) within 60 s and it survives a 0.75 s
+      probation, and otherwise stops it, moves it to `$app.failed-<pid>` and puts the previous app back (exit 9).
+      ARMED-on-quit is unchanged. Recorded lower guarantees (memory `project-macos-release-swap-keeps-a-build-that-reports-ready`):
+      the rollback relaunch is not checked, and an older chosen release without the reporter is only opened. Real
+      Mac check under « To confirm on the Mac ».
 - [ ] **[CODE] Linux standalone updater:** evaluate successor-ready receiving and recovery beyond pre-restart wrapper smoke plus systemd/relay request admission. Windows has the stronger boot-ready/probation contract; an equivalent or an explicit scoped reason remains to be established. [Compared contracts](docs/audits/platform-parity/2026-11-04-recovery/capabilities.md).
 
 ## End-to-end parity follow-up
@@ -593,6 +599,9 @@ red step with its `proves` line in `static/ergopti_plus/macos/data/field_run.jso
 
 Field run, no person needed (read the next report):
 
+- [ ] Release swap boot-ready: install a chosen release from the Versions window; `swap.log` ends with « reported a
+      healthy start ». Then a chosen build that cannot boot (rename its `init.lua` in the staged app before the quit)
+      is moved to `ErgoptiPlus.app.failed-<pid>` within 60 s and the previous app opens (exit 9).
 - [ ] Two copies and one Accessibility switch: with a local `build/macos` copy registered beside the `/Applications`
       prerelease, an untrusted boot logs the other copy, does not run `tccutil reset`, and the dialog names
       `…/build/macos/ErgoptiPlus.app`; once that copy is trashed and the switch turned on, the boot resumes.

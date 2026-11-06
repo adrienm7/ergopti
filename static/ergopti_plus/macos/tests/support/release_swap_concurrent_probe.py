@@ -238,8 +238,9 @@ def rename_case(program, physical, root, phase, native, mutant):
     for path in [mover, opener, observer]:
         path.chmod(0o700)
     expected = '"$launcher" "$rename_flag" move'
-    if program.count(expected) != 3:
-        raise RuntimeError("All three canonical exclusive move boundaries must remain present")
+    # Aside, in, restore, plus the boot-ready rollback's aside and restore.
+    if program.count(expected) != 5:
+        raise RuntimeError("All five canonical exclusive move boundaries must remain present")
     actual = program.replace(expected, shlex.quote(str(mover)))
     actual = actual.replace("/usr/bin/open", shlex.quote(str(opener)))
     if sys.platform != "darwin":
