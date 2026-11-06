@@ -69,11 +69,10 @@ SpacedPrefix(SpacedStr, RawCount) {
 ; ===== 1.1) Date =====
 ; =====================
 
-; @dt★, @td★, @date★ resolved at fire time — cannot be static TOML entries.
-; "??" flag required: after a prior expansion the output lands immediately
-; before the next "@", so the word boundary before "@" is a digit or letter —
-; not a terminator. Without "?", HSE rejects the match and the shorter
-; "t★" (InWord=true) wins instead.
+; dt★, td★, date★ resolved at fire time — cannot be static TOML entries.
+; Bare triggers (no "@"), as on macOS and Linux (maintainer decision 2026-11-06).
+; No "?" flag: the shared word-start rule applies (HSE_IsWordChar), so "update★"
+; never fires "date" and a trigger needs a boundary or a buffer start before it.
 _DateShortFr(*) {
 	return FormatTime(, "dd/MM/yyyy")
 }
@@ -135,13 +134,13 @@ _DynHS_RegisterAll() {
 	_DynOpts := Map("FinalResult", True, "TimeActivationSeconds", _DynamicHotstringDelay(),
 		"Category", "dynamichotstrings")
 	if Features["hotstrings"]["dynamic"][ConfigLeaf.DATE_FR]["enabled"] {
-		CreateHotstring("*?", "@dt" . MK, _DateShortFr, _DynOpts)
+		CreateHotstring("*", "dt" . MK, _DateShortFr, _DynOpts)
 	}
 	if Features["hotstrings"]["dynamic"][ConfigLeaf.DATE_LONG_FR]["enabled"] {
-		CreateHotstring("*?", "@date" . MK, _DateLongFr, _DynOpts)
+		CreateHotstring("*", "date" . MK, _DateLongFr, _DynOpts)
 	}
 	if Features["hotstrings"]["dynamic"]["date"]["enabled"] {
-		CreateHotstring("*?", "@td" . MK, _DateIso, _DynOpts)
+		CreateHotstring("*", "td" . MK, _DateIso, _DynOpts)
 	}
 
 

@@ -588,7 +588,7 @@ _HSE_QueueFireLog(Trigger, Replacement, HType, Category, Section, IsPrivate := f
 	; and must not create deferred work for a paused driver.
 	if A_IsSuspended
 		return false
-	; Dynamic hotstrings (@dt, @date, the phone/SSN/IBAN prefixes…) store a
+	; Dynamic hotstrings (dt, date, the phone/SSN/IBAN prefixes…) store a
 	; CALLABLE in Spec.Replacement and resolve it at fire time. HSE_DispatchMatch
 	; resolves it into a local and never writes it back, so the fire paths read
 	; the raw property and would hand the Func object straight to the drain —

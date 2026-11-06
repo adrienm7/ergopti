@@ -98,9 +98,9 @@ _DynHSTest_DateFormats() {
 	; Compared against FormatTime, not against a written-out date: a literal here
 	; would turn every midnight into a red suite for no defect.
 	AssertEqual(FormatTime(, "dd/MM/yyyy"), _DateShortFr(),
-		"@dt must expand to the short French date")
+		"dt must expand to the short French date")
 	AssertEqual(FormatTime(, "yyyy_MM_dd"), _DateIso(),
-		"@td must expand to the ISO date")
+		"td must expand to the ISO date")
 
 	; The long form is assembled by hand from French day and month names, so the
 	; shape is pinned rather than the text: day name, day number, month name,
@@ -289,15 +289,23 @@ _DynHSTest_WordFeed(Text, KnownBoundary := true) {
 }
 
 _DynHSTest_RejectDateWordsBody() {
+	; The bare triggers follow the shared word-start rule: a trigger glued to a
+	; word character never acquires a candidate, and the bare word without the
+	; magic key is only text.
 	for Word in ["update", "updates", "date", "td", "dt", "xtd", "xdt", "1date", "_date", "édate"] {
-		for Suffix in ["", Chr(0x2605)] {
-			Match := _DynHSTest_WordFeed(Word . Suffix)
-			AssertFalse(IsObject(Match), "ordinary words do not acquire a Windows @-date candidate")
+		Match := _DynHSTest_WordFeed(Word)
+		AssertFalse(IsObject(Match), "an ordinary word without the magic key does not acquire a date candidate")
+	}
+	Star := Chr(0x2605)
+	for Trigger in ["dt", "date", "td"] {
+		for Left in ["up", "x", "1", "_", "é", "@"] {
+			Match := _DynHSTest_WordFeed(Left . Trigger . Star)
+			AssertFalse(IsObject(Match), "a date trigger inside a larger word must not fire: " . Left . Trigger)
 			AssertFalse(HSE_DispatchMatch(Match, ""), "a missing dynamic candidate cannot dispatch output")
 		}
 	}
 }
-Test("dynamic hotstrings: ordinary date words never acquire or dispatch @-date candidates (dynamic-word-boundary)",
+Test("dynamic hotstrings: bare date triggers never acquire or dispatch a candidate inside a word (dynamic-word-boundary)",
 	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_RejectDateWordsBody))
 
 _DynHSTest_PrivatePrefixes() {
@@ -317,19 +325,23 @@ _DynHSTest_RejectPersonalInsideWordsBody() {
 Test("dynamic hotstrings: personal numeric prefixes reject every larger-word predecessor (dynamic-word-boundary)",
 	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_RejectPersonalInsideWordsBody))
 
-_DynHSTest_ExplicitDatesKeepContinuationBody() {
-	for Trigger in ["@dt" . Chr(0x2605), "@date" . Chr(0x2605), "@td" . Chr(0x2605)] {
-		for Left in ["", "2026", "expandedword"] {
-			Match := _DynHSTest_WordFeed(Left . Trigger, Left == "")
-			AssertTrue(IsObject(Match), "explicit @ dates remain available after prior expansion text")
-			AssertEqual(Trigger, Match.Trigger, "the actual date registration owns its explicit spelling")
-			AssertTrue(Match.InWord, "the intentional *? date continuation contract is retained")
-			AssertTrue(HasMethod(Match.Replacement), "date output remains resolved at fire time")
-		}
+_DynHSTest_BareDatesFollowWordStartBody() {
+	Star := Chr(0x2605)
+	for Name in ["dt", "date", "td"] {
+		Trigger := Name . Star
+		Match := _DynHSTest_WordFeed(Trigger, true)
+		AssertTrue(IsObject(Match), "the bare date trigger fires at a known word start: " . Trigger)
+		AssertEqual(Trigger, Match.Trigger, "the registration owns the bare spelling, without an @")
+		AssertFalse(Match.InWord, "a bare date is a word-start trigger, not an in-word one")
+		AssertTrue(HasMethod(Match.Replacement), "date output remains resolved at fire time")
+		AssertFalse(IsObject(_DynHSTest_WordFeed(Trigger, false)), "an unknown buffer start refuses the bare trigger")
+		for Left in [" ", "(", "'", "."]
+			AssertTrue(IsObject(_DynHSTest_WordFeed(Left . Trigger, false)), "a boundary before the trigger admits it: '" . Left . "'")
+		AssertFalse(IsObject(_DynHSTest_WordFeed("@" . Trigger)), "the retired @ spelling is not a date trigger: @" . Trigger)
 	}
 }
-Test("dynamic hotstrings: explicit @ dates preserve back-to-back continuation and dynamic callbacks (dynamic-word-boundary)",
-	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_ExplicitDatesKeepContinuationBody))
+Test("dynamic hotstrings: bare date triggers follow the shared word-start rule and drop the @ vocabulary (dynamic-word-boundary)",
+	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_BareDatesFollowWordStartBody))
 
 _DynHSTest_PersonalAtBoundaryBody() {
 	for Trigger in _DynHSTest_PrivatePrefixes() {
@@ -405,16 +417,16 @@ Test("dynamic hotstrings: SSN and IBAN triggers expand to the spaced or unspaced
 
 _DynHSTest_DateReplacementsBody() {
 	Star := Chr(0x2605)
-	AssertEqual(FormatTime(, "dd/MM/yyyy"), _DynHSTest_ExpandsTo("@dt" . Star), "@dt expands to the short French date")
-	AssertEqual(FormatTime(, "yyyy_MM_dd"), _DynHSTest_ExpandsTo("@td" . Star), "@td expands to the ISO date")
-	AssertEqual(4, StrSplit(_DynHSTest_ExpandsTo("@date" . Star), " ").Length, "@date expands to the long French date")
+	AssertEqual(FormatTime(, "dd/MM/yyyy"), _DynHSTest_ExpandsTo("dt" . Star), "dt expands to the short French date")
+	AssertEqual(FormatTime(, "yyyy_MM_dd"), _DynHSTest_ExpandsTo("td" . Star), "td expands to the ISO date")
+	AssertEqual(4, StrSplit(_DynHSTest_ExpandsTo("date" . Star), " ").Length, "date expands to the long French date")
 }
 Test("dynamic hotstrings: the three date triggers resolve through their own formatter",
 	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_DateReplacementsBody))
 
 _DynHSTest_DatePrivacyBody() {
 	Star := Chr(0x2605)
-	for Trigger in ["@dt" . Star, "@td" . Star, "@date" . Star]
+	for Trigger in ["dt" . Star, "td" . Star, "date" . Star]
 		AssertFalse(_DynHSTest_WordFeed(Trigger).IsPrivate, "a date is not a secret and keeps its trigger loggable")
 	for Trigger in _DynHSTest_PrivatePrefixes()
 		AssertTrue(_DynHSTest_WordFeed(Trigger).IsPrivate, "a personal prefix is the secret itself and must be marked private")
@@ -430,9 +442,9 @@ _DynHSTest_GateRefusesBody(Triggers) {
 _DynHSTest_GatesOwnTheirFamilies() {
 	Star := Chr(0x2605)
 	Families := [
-		Map("name", "date_fr", "off", ["@dt" . Star], "on", ["@td" . Star, "@date" . Star, "0612"]),
-		Map("name", "date_long_fr", "off", ["@date" . Star], "on", ["@dt" . Star, "@td" . Star]),
-		Map("name", "date", "off", ["@td" . Star], "on", ["@dt" . Star, "@date" . Star]),
+		Map("name", "date_fr", "off", ["dt" . Star], "on", ["td" . Star, "date" . Star, "0612"]),
+		Map("name", "date_long_fr", "off", ["date" . Star], "on", ["dt" . Star, "td" . Star]),
+		Map("name", "date", "off", ["td" . Star], "on", ["dt" . Star, "date" . Star]),
 		Map("name", "phone_prefixes", "off", ["06" . Star, "+3306", "0612", "6123", "06 12"], "on", ["19999", "FR7612"]),
 		Map("name", "ssn_prefixes", "off", ["19999", "1 99 99"], "on", ["0612", "FR7612"]),
 		Map("name", "iban_prefixes", "off", ["FR7612", "FR76 12"], "on", ["0612", "19999"])

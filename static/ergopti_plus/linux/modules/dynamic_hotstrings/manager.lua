@@ -530,8 +530,7 @@ function M.on_trigger(buffer, trigger, start_is_boundary, publication, within_de
 	local match = Engine.match_buffer(prefix, DYNAMIC_GROUP, M.is_rule_enabled, start_is_boundary)
 	if not match then
 		-- Nothing registered claimed the sequence. Only now try the multi-letter
-		-- @-combo, so a registered tag always wins: "@dt" spells two valid alias
-		-- letters AND is the short-date rule, and the registration is what decides.
+		-- @-combo, so a registered tag always wins over the combo of aliases.
 		-- A resolved combo whose delay expired still owns the sequence: the
 		-- programmable source is not a fallback for a late magic key.
 		local expanded, event, claimed = _fire_combo(prefix, t, publication, within_delay)
