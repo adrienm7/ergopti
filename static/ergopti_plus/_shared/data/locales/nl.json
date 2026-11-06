@@ -3995,6 +3995,7 @@
 	"physical_shortcuts.position_unavailable": "Deze toetspositie is hier niet beschikbaar.",
 	"physical_shortcuts.windows_unavailable": "Nog niet op Windows: De editor voor fysieke sneltoetsen is nog niet beschikbaar op Windows.",
 	"physical_shortcuts.collision": "Deze toetsencombinatie is al in gebruik. Kies een andere.",
+	"physical_shortcuts.delivery_unqualified": "Nog niet beschikbaar: Ergopti kan op dit systeem nog geen actie veilig uitvoeren die aan een fysieke toets is gekoppeld. De benoemde sneltoetsen blijven werken.",
 	"physical_shortcuts.window_unavailable": "Dit venster is niet beschikbaar: Probeer het opnieuw te openen.",
 	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Deze oudere emulatiehulpfuncties gebruiken Windows-sneltoetsen op basis van scancodes. Andere systemen gebruiken de toewijzingen van hun eigen toetsenbordindelingen.",
 	"gestures.system.conflicts_caption": "⚠ %s mogelijke conflicten",

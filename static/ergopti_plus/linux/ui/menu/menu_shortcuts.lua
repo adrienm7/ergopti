@@ -806,6 +806,12 @@ local function _build_shortcuts(ctx)
 	})
 	sc_ctx.commands[require("config_keys").COMMAND.PHYSICAL_SHORTCUTS_EDITOR] = physical_editor.open
 	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
+	-- The editor's honest cause while physical delivery is unqualified.
+	sc_ctx.state_getters["physical_shortcuts_delivery_unqualified"] = function()
+		local ok, host = pcall(require, "ui.physical_shortcuts.bridge")
+		return not (ok and type(host) == "table" and type(host.physical_delivery_available) == "function"
+			and host.physical_delivery_available() == true)
+	end
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return enabled end
 	sc_ctx.state_getters["key_combinations_enabled"] = function()
 		return require("modules.shortcuts.key_combinations").is_enabled() == true

@@ -1299,6 +1299,13 @@ unavailable = "grey"
 reason_key = "physical_shortcuts.windows_unavailable"
 disabled_when = ["physical_shortcuts_editor_ready"]
 disabled_reason_key = "physical_shortcuts.window_unavailable"
+# The editor stays closed while the driver cannot deliver an action bound to
+# a physical key (each driver's keyboard_shortcuts.physical_delivery_available,
+# false until source, collision and output custody are qualified): the row
+# says so rather than inviting a retry.
+disabled_reasons = [
+	{ when = "physical_shortcuts_delivery_unqualified", reason_key = "physical_shortcuts.delivery_unqualified" },
+]
 
 [[menu.shortcuts_menu]]
 type = "---"
