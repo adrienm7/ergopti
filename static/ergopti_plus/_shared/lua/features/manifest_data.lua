@@ -1053,7 +1053,7 @@ M.features = {
 		path = "gestures.sensitivities.swipe_5_horiz", id = "swipe_5_horiz", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities", platforms = { "hs" }, recommended = 3.5, family = "setting",
 	},
 	{
-		path = "layout.ergopti_base", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
+		path = "layout.ergopti_base", id = "ergopti_base", section = "layout", default = false, type = "boolean", description_key = "menu.layout.ergopti_base", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
 	},
 	{
 		path = "layout.direct_access_digits", id = "direct_access_digits", section = "layout", default = "native", type = "enum", description_key = "menu.layout.number_row", platforms = { "ahk", "hs", "linux" }, recommended = "native", family = "feature", enum_values = { "native", "digits", "symbols" },
@@ -1065,28 +1065,28 @@ M.features = {
 		path = "layout.number_row_reorder_edges", id = "number_row_reorder_edges", section = "layout", default = false, type = "boolean", description_key = "menu.layout.number_row_edges", platforms = { "ahk", "hs", "linux" }, recommended = false, family = "feature",
 	},
 	{
-		path = "layout.ergopti_alt_gr", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
+		path = "layout.ergopti_alt_gr", id = "ergopti_alt_gr", section = "layout", default = false, type = "boolean", description_key = "menu.layout.ergopti_alt_gr", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
 	},
 	{
-		path = "layout.ergopti_variant", section = "layout", reason_key = "platform_reason.legacy_helpers_use_windows_scan_code_hotkeys", platforms = { "ahk" },
+		path = "layout.ergopti_variant", id = "ergopti_variant", section = "layout", default = "none", type = "enum", description_key = "menu.layout.ergopti_plus", platforms = { "ahk", "hs", "linux" }, recommended = "ergopti_plus", family = "feature", enum_values = { "none", "ergopti", "ergopti_plus" },
 	},
 	{
-		path = "layout.emulate_number_row", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
+		path = "layout.emulate_number_row", id = "emulate_number_row", section = "layout", default = true, type = "boolean", description_key = "menu.layout.emulate_number_row", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
-		path = "layout.emulate_top_row", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
+		path = "layout.emulate_top_row", id = "emulate_top_row", section = "layout", default = true, type = "boolean", description_key = "menu.layout.emulate_top_row", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
-		path = "layout.emulate_home_row", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
+		path = "layout.emulate_home_row", id = "emulate_home_row", section = "layout", default = true, type = "boolean", description_key = "menu.layout.emulate_home_row", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
-		path = "layout.emulate_bottom_row", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
+		path = "layout.emulate_bottom_row", id = "emulate_bottom_row", section = "layout", default = true, type = "boolean", description_key = "menu.layout.emulate_bottom_row", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
 		path = "layout.ctrl_magic_save", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
 	},
 	{
-		path = "layout.emulated_layout", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
+		path = "layout.emulated_layout", id = "emulated_layout", section = "layout", default = "", type = "string", description_key = "menu.layout.emulated_layout", platforms = { "ahk", "hs", "linux" }, recommended = "", family = "feature",
 	},
 	{
 		path = "category_enabled.hotstrings", section = "category_enabled", platforms = { "ahk" },

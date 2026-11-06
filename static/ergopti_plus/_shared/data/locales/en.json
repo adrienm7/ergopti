@@ -1774,6 +1774,8 @@
 	"menu.layout.manage": "Manage layouts…",
 	"menu.layout.emulated_status": "Emulated layout: {1}",
 	"menu.layout.emulated_none": "Emulated layout: none",
+	"menu.layout.emulation_failed": "cannot be emulated, see the log",
+	"menu.layout.emulation_not_saved": "The emulated layout choice could not be saved.",
 	"menu.layout.none_installed": "No layout installed",
 	"menu.layout.add_consent": "%s is added. macOS may ask you to allow this keyboard: accept to type with it.",
 	"menu.layout.add_fail": "Add failed — see console.",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "“{1}” is ready in your applications menu. It keeps its own profile in {2}.",
 	"apps.cloner.err_source_unreadable": "This application cannot be cloned: its launcher names no program.",
 	"apps.encryptor.drop_hint": "Drop files here to encrypt them, or .enc files to decrypt them.",
-	"apps.cloner.msg_no_isolation": "This program has no option for a separate profile: on Windows its clone is a second shortcut that starts the same program with the same settings."
+	"apps.cloner.msg_no_isolation": "This program has no option for a separate profile: on Windows its clone is a second shortcut that starts the same program with the same settings.",
+	"inventory.behavior.layout_emulation": "Types the chosen .keylayout over the system layout; the three drivers replay one keystroke corpus.",
+	"inventory.behavior.dead_native_lifetime": "The native OS owns pending composition; capture and reset rules are separate from a shared driver timeout."
 }

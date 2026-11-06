@@ -2122,11 +2122,22 @@ reason_key = "platform_reason.layout_install_is_the_macos_bundle"
 
 # Two axes of the emulation, kept apart (maintainer, 2026-11-03): which Ergopti
 # LAYERS it types, under this header, and which keyboard ROWS, in the submenu
-# below. Read as one flat block they looked like the same switches twice.
+# below. Read as one flat block they looked like the same switches twice. The
+# three drivers emulate the layout (maintainer, 2026-11-06).
 [[menu.layout_menu]]
 type = "section_header"
 i18n = "menu.layout.header_layers"
-platforms = ["ahk"]
+
+# The layout the emulation types over the system layout, as a submenu of
+# choices: none, the built-in Ergopti variants and the registry layouts the app
+# ships or the layout manager installed. It writes what the onboarding choice
+# writes. Windows picks it in the shared layout manager and reports it in the
+# custom_layouts status row above, where macOS and Linux list the system's own
+# input sources, so only the Lua drivers draw it here.
+[[menu.layout_menu]]
+type = "list"
+id = "layout_emulation"
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 # `list` rather than `dynamic` since 2026-08-07: the driver answers with row
@@ -2136,62 +2147,41 @@ unavailable = "hide"
 type = "list"
 id = "layout_features_base"
 
-# AHK-only: the row draws ergopti_base, a Windows-only feature, so on the two
-# Lua drivers it had nothing to draw.
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
+# The emulated layout's base and Shift layers (ergopti_base).
 
 # The Ergopti AltGr layer and its ➕ variant. Only these two: the digit row and
 # Ctrl+★ work on any layout and sit in the second section.
 [[menu.layout_menu]]
 type = "list"
 id = "layout_features_altgr"
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
 
 # The rows the emulation types, one checkbox each (the layout.emulate_<row>
 # switches), in their own submenu: switching rows on one by one is how a user
-# learns the layout progressively. The other drivers emulate no layout: they
-# draw this submenu's row greyed with why.
+# learns the layout progressively. The same on the three drivers.
 [[menu.layout_menu]]
 type = "group"
 id = "layout_emulated_rows"
 i18n = "menu.layout.emulated_rows"
-platforms = ["ahk"]
-unavailable = "grey"
-reason_key = "platform_reason.layout_emulation_is_windows_only"
 
 [[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_number_row"
 i18n = "menu.layout.emulate_number_row"
-platforms = ["ahk"]
-unavailable = "grey"
-reason_key = "platform_reason.layout_emulation_is_windows_only"
 
 [[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_top_row"
 i18n = "menu.layout.emulate_top_row"
-platforms = ["ahk"]
-unavailable = "grey"
-reason_key = "platform_reason.layout_emulation_is_windows_only"
 
 [[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_home_row"
 i18n = "menu.layout.emulate_home_row"
-platforms = ["ahk"]
-unavailable = "grey"
-reason_key = "platform_reason.layout_emulation_is_windows_only"
 
 [[menu.layout_emulated_rows_group]]
 type = "feature"
 path = "layout.emulate_bottom_row"
 i18n = "menu.layout.emulate_bottom_row"
-platforms = ["ahk"]
-unavailable = "grey"
-reason_key = "platform_reason.layout_emulation_is_windows_only"
 
 # The Karabiner virtual keyboard type: Automatic, ISO or ANSI.
 [[menu.layout_menu]]

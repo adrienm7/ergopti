@@ -1779,6 +1779,8 @@
 	"menu.layout.manage": "ניהול פריסות…",
 	"menu.layout.emulated_status": "פריסת מקלדת מדומה: {1}",
 	"menu.layout.emulated_none": "פריסת מקלדת מדומה: אין",
+	"menu.layout.emulation_failed": "לא ניתן לדמות, ראה את היומן",
+	"menu.layout.emulation_not_saved": "לא ניתן היה לשמור את בחירת הפריסה המדומה.",
 	"menu.layout.none_installed": "לא הותקנה פריסה",
 	"menu.layout.add_consent": "%s נוספה. macOS עשוי לבקש ממך לאשר את המקלדת הזו: אשר כדי להקליד בה.",
 	"menu.layout.add_fail": "ההוספה נכשלה — ראה קונסולה.",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "„{1}” מוכן בתפריט היישומים. הוא שומר פרופיל משלו ב-{2}.",
 	"apps.cloner.err_source_unreadable": "לא ניתן לשכפל יישום זה: המפעיל שלו אינו מציין תוכנית.",
 	"apps.encryptor.drop_hint": "שחררו כאן קבצים כדי להצפין אותם, או קובצי ‎.enc כדי לפענח אותם.",
-	"apps.cloner.msg_no_isolation": "לתוכנית זו אין אפשרות לפרופיל נפרד: ב-Windows העותק שלה הוא קיצור דרך נוסף שמפעיל את אותה תוכנית עם אותן הגדרות."
+	"apps.cloner.msg_no_isolation": "לתוכנית זו אין אפשרות לפרופיל נפרד: ב-Windows העותק שלה הוא קיצור דרך נוסף שמפעיל את אותה תוכנית עם אותן הגדרות.",
+	"inventory.behavior.layout_emulation": "מקליד את קובץ ה־.keylayout שנבחר מעל פריסת המערכת; שלושת מנהלי ההתקנים מריצים קורפוס הקשות אחד.",
+	"inventory.behavior.dead_native_lifetime": "מערכת ההפעלה מנהלת הרכבה ממתינה; כללי הלכידה והאיפוס נפרדים ממגבלת זמן משותפת למנהל ההתקן."
 }

@@ -127,6 +127,47 @@ local function _build_layouts(ctx)
 		end,
 	}
 
+	-- The layout emulation (modules/keymap/layout_emulation.lua): the layout it
+	-- types over the session's XKB layout, its two layers and its four rows. A
+	-- change is stored, then the emulation reloads it at once.
+	local function emulation_changed(committed)
+		if not committed then show_error(i18n_safe("menu.layout.emulation_not_saved")) end
+		local reloaded = require("modules.keymap.layout_emulation").reload()
+		if committed and not reloaded then show_error(i18n_safe("menu.layout.emulation_failed")) end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+	end
+	local EmulationRows = require("layouts.emulation_menu")
+	providers["layout_emulation"] = function()
+		local Preferences = require("infra.layout_emulation_preferences")
+		local Registry = require("modules.keymap.layout_registry")
+		return EmulationRows.choice_rows({
+			t = i18n_safe,
+			settings = Preferences.settings(),
+			status = require("modules.keymap.layout_emulation").status(),
+			snapshot = Registry.snapshot(),
+			choose = function(choice) emulation_changed(Preferences.choose(choice)) end,
+		})
+	end
+	local function switch_rows(path, label_key)
+		local Preferences = require("infra.layout_emulation_preferences")
+		return EmulationRows.switch_row({
+			t = i18n_safe, label_key = label_key, checked = Preferences.switch(path),
+			toggle = function(value) emulation_changed(Preferences.set_switch(path, value)) end,
+		})
+	end
+	providers["layout_features_base"] = function()
+		return { switch_rows(require("config_keys").KEY.LAYOUT_ERGOPTI_BASE, "layout.ergoptibase") }
+	end
+	providers["layout_features_altgr"] = function()
+		return { switch_rows(require("config_keys").KEY.LAYOUT_ERGOPTI_ALT_GR, "layout.ergoptialtgr") }
+	end
+	render_ctx.feature_rows = {}
+	for path, row in pairs(ctx.feature_rows or {}) do render_ctx.feature_rows[path] = row end
+	for _, row in ipairs({ "number_row", "top_row", "home_row", "bottom_row" }) do
+		local path = "layout.emulate_" .. row
+		render_ctx.feature_rows[path] = function() return switch_rows(path, "menu.layout.emulate_" .. row) end
+	end
+
 	-- The physical magic key: the key typing the magic key, chosen by pressing it
 	-- or from the candidates (modules/hotstrings/magic_key_source.lua); the rows
 	-- are the shared ones macOS draws too.
@@ -203,10 +244,14 @@ local function _build_layouts(ctx)
 	providers["number_row_policy"] = function()
 		local NumberRowLive = require("modules.keymap.number_row_live")
 		local available, reason = NumberRowLive.available()
+		-- An emulation typing the number row applies the ordering itself.
+		local emulating = require("modules.keymap.layout_emulation").status().active == true
+		available = available or emulating
 		local stored = NumberRowLive.stored()
 		-- The choice is stored first; a refusal after that is told, except the two the
 		-- greyed row already explains.
 		local function applied(ok, code)
+			if emulating then require("modules.keymap.layout_emulation").reload() end
 			if not ok and code ~= "session_unsupported" and code ~= "no_source_layout" then
 				show_error(i18n_safe("layouts.linux_rows_not_applied"))
 			end

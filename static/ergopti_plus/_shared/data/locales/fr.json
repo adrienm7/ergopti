@@ -1774,6 +1774,8 @@
 	"menu.layout.manage": "Gérer les dispositions…",
 	"menu.layout.emulated_status": "Disposition émulée : {1}",
 	"menu.layout.emulated_none": "Disposition émulée : aucune",
+	"menu.layout.emulation_failed": "ne peut pas être émulée, voir le journal",
+	"menu.layout.emulation_not_saved": "Le choix de la disposition émulée n’a pas pu être enregistré.",
 	"menu.layout.none_installed": "Aucune disposition installée",
 	"menu.layout.add_consent": "%s ajouté. macOS peut vous demander d'autoriser ce clavier : acceptez pour taper avec.",
 	"menu.layout.add_fail": "Échec de l'ajout — voir la console.",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "« {1} » est prêt dans votre menu des applications. Il garde son propre profil dans {2}.",
 	"apps.cloner.err_source_unreadable": "Cette application ne peut pas être clonée : son lanceur ne désigne aucun programme.",
 	"apps.encryptor.drop_hint": "Déposez des fichiers ici pour les chiffrer, ou des fichiers .enc pour les déchiffrer.",
-	"apps.cloner.msg_no_isolation": "Ce programme n'a pas d'option de profil séparé : sous Windows, son clone est un second raccourci qui démarre le même programme avec les mêmes réglages."
+	"apps.cloner.msg_no_isolation": "Ce programme n'a pas d'option de profil séparé : sous Windows, son clone est un second raccourci qui démarre le même programme avec les mêmes réglages.",
+	"inventory.behavior.layout_emulation": "Tape le .keylayout choisi par-dessus la disposition du système ; les trois pilotes rejouent un même corpus de frappes.",
+	"inventory.behavior.dead_native_lifetime": "Le système natif gère la composition en attente ; les règles de capture et de réinitialisation sont distinctes d’un délai commun au pilote."
 }

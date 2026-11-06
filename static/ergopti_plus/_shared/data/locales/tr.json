@@ -1779,6 +1779,8 @@
 	"menu.layout.manage": "Düzenleri yönet…",
 	"menu.layout.emulated_status": "Taklit edilen klavye düzeni: {1}",
 	"menu.layout.emulated_none": "Taklit edilen klavye düzeni: yok",
+	"menu.layout.emulation_failed": "taklit edilemiyor, günlüğe bakın",
+	"menu.layout.emulation_not_saved": "Taklit edilen düzen seçimi kaydedilemedi.",
 	"menu.layout.none_installed": "Yüklü düzen yok",
 	"menu.layout.add_consent": "%s eklendi. macOS bu klavyeye izin vermenizi isteyebilir: onunla yazmak için kabul edin.",
 	"menu.layout.add_fail": "Ekleme başarısız — konsola bakın.",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "“{1}” uygulamalar menünüzde hazır. Kendi profilini {2} içinde tutar.",
 	"apps.cloner.err_source_unreadable": "Bu uygulama klonlanamaz: başlatıcısı herhangi bir program belirtmiyor.",
 	"apps.encryptor.drop_hint": "Şifrelemek için dosyaları, şifresini çözmek için .enc dosyalarını buraya bırakın.",
-	"apps.cloner.msg_no_isolation": "Bu programın ayrı profil seçeneği yok: Windows'ta klonu, aynı programı aynı ayarlarla başlatan ikinci bir kısayoldur."
+	"apps.cloner.msg_no_isolation": "Bu programın ayrı profil seçeneği yok: Windows'ta klonu, aynı programı aynı ayarlarla başlatan ikinci bir kısayoldur.",
+	"inventory.behavior.layout_emulation": "Seçilen .keylayout'u sistem düzeninin üzerine yazar; üç sürücü tek bir tuş vuruşu derlemini yeniden oynatır.",
+	"inventory.behavior.dead_native_lifetime": "Bekleyen birleştirmeyi yerel işletim sistemi yönetir; yakalama ve sıfırlama kuralları ortak sürücü zaman aşımından ayrıdır."
 }

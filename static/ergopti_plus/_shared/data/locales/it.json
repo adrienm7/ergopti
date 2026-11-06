@@ -1779,6 +1779,8 @@
 	"menu.layout.manage": "Gestisci layout…",
 	"menu.layout.emulated_status": "Layout emulato: {1}",
 	"menu.layout.emulated_none": "Layout emulato: nessuno",
+	"menu.layout.emulation_failed": "non può essere emulato, vedi il registro",
+	"menu.layout.emulation_not_saved": "Non è stato possibile salvare la scelta del layout emulato.",
 	"menu.layout.none_installed": "Nessun layout installato",
 	"menu.layout.add_consent": "%s aggiunto. macOS potrebbe chiederti di consentire questa tastiera: accetta per scriverci.",
 	"menu.layout.add_fail": "Aggiunta fallita — vedi console.",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "«{1}» è pronto nel menu delle applicazioni. Mantiene il proprio profilo in {2}.",
 	"apps.cloner.err_source_unreadable": "Questa applicazione non può essere clonata: il suo avviatore non indica alcun programma.",
 	"apps.encryptor.drop_hint": "Trascina qui i file per cifrarli, o i file .enc per decifrarli.",
-	"apps.cloner.msg_no_isolation": "Questo programma non ha un'opzione per un profilo separato: su Windows il suo clone è un secondo collegamento che avvia lo stesso programma con le stesse impostazioni."
+	"apps.cloner.msg_no_isolation": "Questo programma non ha un'opzione per un profilo separato: su Windows il suo clone è un secondo collegamento che avvia lo stesso programma con le stesse impostazioni.",
+	"inventory.behavior.layout_emulation": "Digita il .keylayout scelto sopra il layout di sistema; i tre driver riproducono un unico corpus di battute.",
+	"inventory.behavior.dead_native_lifetime": "Il sistema nativo gestisce la composizione in attesa; acquisizione e ripristino sono distinti da un limite comune del driver."
 }

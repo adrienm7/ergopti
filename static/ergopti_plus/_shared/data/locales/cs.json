@@ -1779,6 +1779,8 @@
 	"menu.layout.manage": "Spravovat rozložení…",
 	"menu.layout.emulated_status": "Emulované rozložení: {1}",
 	"menu.layout.emulated_none": "Emulované rozložení: žádné",
+	"menu.layout.emulation_failed": "nelze emulovat, viz protokol",
+	"menu.layout.emulation_not_saved": "Volbu emulovaného rozložení se nepodařilo uložit.",
 	"menu.layout.none_installed": "Není nainstalováno žádné rozložení",
 	"menu.layout.add_consent": "%s je přidáno. macOS se může zeptat, zda tuto klávesnici povolit: potvrďte, abyste s ní mohli psát.",
 	"menu.layout.add_fail": "Přidání selhalo — viz konzole.",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "„{1}“ je připraven v nabídce aplikací. Má vlastní profil v {2}.",
 	"apps.cloner.err_source_unreadable": "Tuto aplikaci nelze klonovat: její spouštěč neuvádí žádný program.",
 	"apps.encryptor.drop_hint": "Přetáhněte sem soubory k zašifrování nebo soubory .enc k dešifrování.",
-	"apps.cloner.msg_no_isolation": "Tento program nemá volbu samostatného profilu: ve Windows je jeho klon druhý zástupce, který spouští stejný program se stejným nastavením."
+	"apps.cloner.msg_no_isolation": "Tento program nemá volbu samostatného profilu: ve Windows je jeho klon druhý zástupce, který spouští stejný program se stejným nastavením.",
+	"inventory.behavior.layout_emulation": "Píše zvolený .keylayout přes rozložení systému; všechny tři ovladače přehrávají jeden korpus stisků.",
+	"inventory.behavior.dead_native_lifetime": "Nativní systém řídí čekající skládání; zachytávání a resetování jsou oddělené od společného časového limitu ovladače."
 }

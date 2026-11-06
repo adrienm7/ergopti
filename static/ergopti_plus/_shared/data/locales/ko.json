@@ -1779,6 +1779,8 @@
 	"menu.layout.manage": "자판 관리…",
 	"menu.layout.emulated_status": "에뮬레이션 키보드 배열: {1}",
 	"menu.layout.emulated_none": "에뮬레이션 키보드 배열: 없음",
+	"menu.layout.emulation_failed": "에뮬레이트할 수 없음, 로그 참조",
+	"menu.layout.emulation_not_saved": "에뮬레이트할 자판 선택을 저장하지 못했습니다.",
 	"menu.layout.none_installed": "설치된 자판 없음",
 	"menu.layout.add_consent": "%s 추가됨. macOS가 이 키보드를 허용할지 물을 수 있습니다. 이 키보드로 입력하려면 허용하세요.",
 	"menu.layout.add_fail": "추가 실패 — 콘솔을 확인하세요.",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "“{1}”이(가) 응용 프로그램 메뉴에 준비되었습니다. 자체 프로필을 {2}에 보관합니다.",
 	"apps.cloner.err_source_unreadable": "이 응용 프로그램은 복제할 수 없습니다. 실행기에 프로그램이 지정되어 있지 않습니다.",
 	"apps.encryptor.drop_hint": "암호화할 파일이나 복호화할 .enc 파일을 여기에 놓으세요.",
-	"apps.cloner.msg_no_isolation": "이 프로그램에는 별도 프로필 옵션이 없습니다. Windows에서 클론은 같은 설정으로 같은 프로그램을 시작하는 두 번째 바로 가기입니다."
+	"apps.cloner.msg_no_isolation": "이 프로그램에는 별도 프로필 옵션이 없습니다. Windows에서 클론은 같은 설정으로 같은 프로그램을 시작하는 두 번째 바로 가기입니다.",
+	"inventory.behavior.layout_emulation": "선택한 .keylayout을 시스템 자판 위에서 입력합니다. 세 드라이버가 같은 키 입력 코퍼스를 재생합니다.",
+	"inventory.behavior.dead_native_lifetime": "기본 운영 체제가 대기 중인 조합을 관리합니다. 캡처 및 초기화 규칙은 드라이버 공통 시간 제한과 별개입니다."
 }

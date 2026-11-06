@@ -1779,6 +1779,8 @@
 	"menu.layout.manage": "Zarządzaj układami…",
 	"menu.layout.emulated_status": "Emulowany układ: {1}",
 	"menu.layout.emulated_none": "Emulowany układ: brak",
+	"menu.layout.emulation_failed": "nie można emulować, zobacz dziennik",
+	"menu.layout.emulation_not_saved": "Nie udało się zapisać wyboru emulowanego układu.",
 	"menu.layout.none_installed": "Brak zainstalowanych układów",
 	"menu.layout.add_consent": "Dodano %s. macOS może poprosić o zezwolenie na tę klawiaturę: zaakceptuj, aby na niej pisać.",
 	"menu.layout.add_fail": "Dodawanie nie powiodło się — sprawdź konsolę.",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "„{1}” jest gotowy w menu aplikacji. Ma własny profil w {2}.",
 	"apps.cloner.err_source_unreadable": "Tej aplikacji nie można sklonować: jej program uruchamiający nie wskazuje żadnego programu.",
 	"apps.encryptor.drop_hint": "Upuść tutaj pliki, aby je zaszyfrować, lub pliki .enc, aby je odszyfrować.",
-	"apps.cloner.msg_no_isolation": "Ten program nie ma opcji osobnego profilu: w systemie Windows jego klon to drugi skrót uruchamiający ten sam program z tymi samymi ustawieniami."
+	"apps.cloner.msg_no_isolation": "Ten program nie ma opcji osobnego profilu: w systemie Windows jego klon to drugi skrót uruchamiający ten sam program z tymi samymi ustawieniami.",
+	"inventory.behavior.layout_emulation": "Pisze wybrany .keylayout na układzie systemu; trzy sterowniki odtwarzają jeden korpus naciśnięć.",
+	"inventory.behavior.dead_native_lifetime": "Natywny system zarządza oczekującym składaniem; przechwytywanie i resetowanie są niezależne od wspólnego limitu czasu sterownika."
 }

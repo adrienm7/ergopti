@@ -315,6 +315,9 @@ local function number_row_rows(state, save_prefs, update_menu, render_ctx)
 	local started = PhaseStats.now()
 	local available, reason = Live.available()
 	PhaseStats.stop("menu_keyboard_layout.number_row", started)
+	-- An emulation typing the number row applies the ordering itself.
+	local emulating = require("modules.keymap.layout_emulation").status().active == true
+	available = available or emulating
 	local function stored()
 		return { order = state.layout_number_row_mode, edges = state.layout_number_row_reorder_edges == true }
 	end
@@ -326,6 +329,7 @@ local function number_row_rows(state, save_prefs, update_menu, render_ctx)
 			return false
 		end
 		Logger.info(LOG, "Number-row option %s set to %s.", key, tostring(value))
+		if emulating then require("modules.keymap.layout_emulation").reload() end
 		Live.apply(stored(), function(applied, code)
 			if not applied and code ~= Live.REASON_NO_SOURCE then
 				pcall(notifications.notify, i18n.get("layouts.rows_not_applied"), nil, "error")
@@ -860,7 +864,50 @@ function M.build(ctx)
 	if custom_rows == nil then return nil end
 	local active_rows = active_layout_rows()
 	if active_rows == nil then return nil end
+	-- The layout emulation (modules/keymap/layout_emulation.lua): the layout it
+	-- types over the selected input source, its two layers and its four rows. A
+	-- change is stored, then the emulation reloads it at once.
+	local EmulationRows = require("layouts.emulation_menu")
+	local function emulation_changed(committed)
+		if not committed then pcall(notifications.notify, i18n.get("menu.layout.emulation_not_saved"), nil, "error") end
+		local reloaded = require("modules.keymap.layout_emulation").reload()
+		if committed and not reloaded then
+			pcall(notifications.notify, i18n.get("menu.layout.emulation_failed"), nil, "error")
+		end
+		schedule_menu_refresh(update_menu)
+	end
+	local function emulation_switch(path, label_key)
+		local Preferences = require("infra.layout_emulation_preferences")
+		return EmulationRows.switch_row({
+			t = i18n.get, label_key = label_key, checked = Preferences.switch(path),
+			toggle = function(value) emulation_changed(Preferences.set_switch(path, value)) end,
+		})
+	end
+	render_ctx.feature_rows = {}
+	for path, row in pairs(type(ctx) == "table" and type(ctx.feature_rows) == "table" and ctx.feature_rows or {}) do
+		render_ctx.feature_rows[path] = row
+	end
+	for _, row in ipairs({ "number_row", "top_row", "home_row", "bottom_row" }) do
+		local path = "layout.emulate_" .. row
+		render_ctx.feature_rows[path] = function() return emulation_switch(path, "menu.layout.emulate_" .. row) end
+	end
 	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, {
+		["layout_emulation"] = function()
+			local Preferences = require("infra.layout_emulation_preferences")
+			return EmulationRows.choice_rows({
+				t = i18n.get,
+				settings = Preferences.settings(),
+				status = require("modules.keymap.layout_emulation").status(),
+				snapshot = require("modules.keymap.layout_registry").snapshot(),
+				choose = function(choice) emulation_changed(Preferences.choose(choice)) end,
+			})
+		end,
+		["layout_features_base"] = function()
+			return { emulation_switch(require("config_keys").KEY.LAYOUT_ERGOPTI_BASE, "layout.ergoptibase") }
+		end,
+		["layout_features_altgr"] = function()
+			return { emulation_switch(require("config_keys").KEY.LAYOUT_ERGOPTI_ALT_GR, "layout.ergoptialtgr") }
+		end,
 		["number_row_policy"] = function() return number_row_rows(state, save_prefs, update_menu, render_ctx) end,
 		["custom_layouts"]   = function() return custom_rows end,
 		["active_layouts"]   = function() return active_rows end,

@@ -1779,6 +1779,8 @@
 	"menu.layout.manage": "Hantera layouter…",
 	"menu.layout.emulated_status": "Emulerad tangentbordslayout: {1}",
 	"menu.layout.emulated_none": "Emulerad tangentbordslayout: ingen",
+	"menu.layout.emulation_failed": "kan inte emuleras, se loggen",
+	"menu.layout.emulation_not_saved": "Valet av emulerad tangentbordslayout kunde inte sparas.",
 	"menu.layout.none_installed": "Ingen layout installerad",
 	"menu.layout.add_consent": "%s har lagts till. macOS kan be dig att tillåta det här tangentbordet: godkänn för att skriva med det.",
 	"menu.layout.add_fail": "Tillägg misslyckades — se konsolen.",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "”{1}” finns nu i programmenyn. Den har en egen profil i {2}.",
 	"apps.cloner.err_source_unreadable": "Programmet kan inte klonas: dess startare anger inget program.",
 	"apps.encryptor.drop_hint": "Släpp filer här för att kryptera dem, eller .enc-filer för att dekryptera dem.",
-	"apps.cloner.msg_no_isolation": "Programmet har inget alternativ för en separat profil: på Windows är klonen en andra genväg som startar samma program med samma inställningar."
+	"apps.cloner.msg_no_isolation": "Programmet har inget alternativ för en separat profil: på Windows är klonen en andra genväg som startar samma program med samma inställningar.",
+	"inventory.behavior.layout_emulation": "Skriver vald .keylayout ovanpå systemets layout; de tre drivrutinerna spelar upp ett korpus av tangenttryck.",
+	"inventory.behavior.dead_native_lifetime": "Det inbyggda systemet styr väntande komposition; registrering och återställning är skilda från en gemensam tidsgräns i drivrutinen."
 }

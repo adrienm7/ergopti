@@ -1779,6 +1779,8 @@
 	"menu.layout.manage": "إدارة التخطيطات…",
 	"menu.layout.emulated_status": "تخطيط لوحة المفاتيح المحاكى: {1}",
 	"menu.layout.emulated_none": "تخطيط لوحة المفاتيح المحاكى: لا يوجد",
+	"menu.layout.emulation_failed": "لا يمكن محاكاته، راجع السجل",
+	"menu.layout.emulation_not_saved": "تعذّر حفظ اختيار التخطيط المحاكى.",
 	"menu.layout.none_installed": "لا يوجد تخطيط مثبّت",
 	"menu.layout.add_consent": "تمت إضافة %s. قد يطلب منك macOS السماح بلوحة المفاتيح هذه: وافق لتكتب بها.",
 	"menu.layout.add_fail": "فشل الإضافة — راجع وحدة التحكم.",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "«{1}» جاهز في قائمة التطبيقات. يحتفظ بملف تعريف خاص به في {2}.",
 	"apps.cloner.err_source_unreadable": "لا يمكن نسخ هذا التطبيق: مُشغّله لا يحدد أي برنامج.",
 	"apps.encryptor.drop_hint": "أفلت الملفات هنا لتشفيرها، أو ملفات ‎.enc لفك تشفيرها.",
-	"apps.cloner.msg_no_isolation": "لا يوفّر هذا البرنامج خيارًا لملف تعريف منفصل: على Windows، النسخة اختصار ثانٍ يشغّل البرنامج نفسه بالإعدادات نفسها."
+	"apps.cloner.msg_no_isolation": "لا يوفّر هذا البرنامج خيارًا لملف تعريف منفصل: على Windows، النسخة اختصار ثانٍ يشغّل البرنامج نفسه بالإعدادات نفسها.",
+	"inventory.behavior.layout_emulation": "يكتب ملف .keylayout المختار فوق تخطيط النظام؛ تعيد المشغّلات الثلاثة تشغيل مجموعة ضغطات واحدة.",
+	"inventory.behavior.dead_native_lifetime": "يدير النظام الأصلي التركيب المعلّق؛ قواعد الالتقاط وإعادة الضبط منفصلة عن مهلة مشتركة لبرنامج التشغيل."
 }

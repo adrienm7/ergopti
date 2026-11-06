@@ -2292,6 +2292,21 @@ local function main()
 		defer = function(fn, delay_ms) return event_loop.defer(fn, delay_ms) end,
 	})
 
+	-- The layout emulation: each grabbed press types what the [layout] chosen
+	-- layout types there, over the session's own XKB layout, as on Windows.
+	-- Decided right after the physical magic key in the consumption callback.
+	-- Required inline: main() sits at LuaJIT's upvalue limit.
+	require("modules.keymap.layout_emulation").start({
+		injector = injector,
+		is_paused = function() return script_actions.is_paused() end,
+		dispatch_char = function(char, code) on_char(char, code) end,
+		magic_evdev = function()
+			if not hotstrings_config.is_section_enabled("magickey", "replace") then return nil end
+			return MagicKeySource.evdev_code()
+		end,
+		dry_run = opts.dry_run == true,
+	})
+
 	local function on_click()
 		TapHold.observe_copy_activity()
 		-- PRIMARY's baseline belongs to the pre-navigation selection. Its reader
@@ -2492,6 +2507,14 @@ local function main()
 			-- Retire its old PRIMARY window before the deferred action can run.
 			wrap_on_type.end_selection_window()
 			return true
+		end
+		-- The layout emulation, after the actions the user bound on a key.
+		local emulated, emulated_repeat = require("modules.keymap.layout_emulation").on_key(detail)
+		if emulated then
+			-- Typed in the key's place: like a re-emitted key, it ends a selection.
+			wrap_on_type.end_selection_window()
+			if emulated_repeat == nil then return true end
+			return { consume = true, repeat_callback = input_capture_gate.guard(emulated_repeat) }
 		end
 		if wrap_on_type.on_key(detail) then return true end
 		if prediction_engine

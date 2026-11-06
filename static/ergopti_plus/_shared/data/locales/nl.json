@@ -1779,6 +1779,8 @@
 	"menu.layout.manage": "Indelingen beheren…",
 	"menu.layout.emulated_status": "Geëmuleerde toetsenbordindeling: {1}",
 	"menu.layout.emulated_none": "Geëmuleerde toetsenbordindeling: geen",
+	"menu.layout.emulation_failed": "kan niet worden geëmuleerd, zie het logboek",
+	"menu.layout.emulation_not_saved": "De keuze van de geëmuleerde indeling kon niet worden opgeslagen.",
 	"menu.layout.none_installed": "Geen indeling geïnstalleerd",
 	"menu.layout.add_consent": "%s is toegevoegd. macOS kan je vragen dit toetsenbord toe te staan: sta het toe om ermee te typen.",
 	"menu.layout.add_fail": "Toevoegen mislukt — zie console.",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "‘{1}’ staat klaar in uw toepassingsmenu. Het houdt een eigen profiel in {2}.",
 	"apps.cloner.err_source_unreadable": "Deze toepassing kan niet worden gekloond: haar starter noemt geen programma.",
 	"apps.encryptor.drop_hint": "Zet hier bestanden neer om ze te versleutelen, of .enc-bestanden om ze te ontsleutelen.",
-	"apps.cloner.msg_no_isolation": "Dit programma heeft geen optie voor een apart profiel: op Windows is de kloon een tweede snelkoppeling die hetzelfde programma met dezelfde instellingen start."
+	"apps.cloner.msg_no_isolation": "Dit programma heeft geen optie voor een apart profiel: op Windows is de kloon een tweede snelkoppeling die hetzelfde programma met dezelfde instellingen start.",
+	"inventory.behavior.layout_emulation": "Typt het gekozen .keylayout over de systeemindeling; de drie stuurprogramma's spelen één corpus van toetsaanslagen af.",
+	"inventory.behavior.dead_native_lifetime": "Het oorspronkelijke systeem beheert wachtende compositie; registratie en reset staan los van een gedeelde tijdslimiet van het stuurprogramma."
 }

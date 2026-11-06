@@ -1371,6 +1371,27 @@ function M.read_local_copy(id, deps)
 	return text, nil
 end
 
+--- The text and index entry of a layout the app ships, read from the shipped
+--- registry the offline install uses (the layout emulation's source of a layout
+--- the layout manager has not installed). macOS has the same function.
+--- @param id string Registry id.
+--- @param deps table|nil
+--- @return table|nil shipped { entry, text }
+--- @return string|nil error
+function M.shipped_layout(id, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then return nil, deps_err end
+	local index = bundled_index(resolved)
+	for _, entry in ipairs(type(index) == "table" and index.layouts or {}) do
+		if entry.id == id then
+			local text = type(resolved.bundled_dir) == "string" and resolved.read(resolved.bundled_dir .. entry.file) or nil
+			if type(text) ~= "string" then return nil, "the shipped " .. id .. " layout is unreadable" end
+			return { entry = entry, text = text }, nil
+		end
+	end
+	return nil, "the app ships no " .. tostring(id) .. " layout"
+end
+
 --- The digest of a text, through the driver's own digest port (the Debug check of
 --- the composer compares an installed copy with its record).
 --- @param text string
