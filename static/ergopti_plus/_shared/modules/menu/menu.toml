@@ -1641,8 +1641,8 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 type = "---"
 platforms = ["ahk", "hs", "linux"]
 
-# Every OS: owned chords' symmetry and their activation delay. macOS and Linux
-# also offer the bulk copy of every pair's tap slot into its chord slot.
+# Every OS: owned chords' symmetry, their activation delay and the bulk copy of
+# every pair's tap slot into its chord slot.
 [[menu.key_combinations_group]]
 type = "check"
 id = "combo_symmetric"
@@ -1659,8 +1659,7 @@ platforms = ["ahk", "hs", "linux"]
 type = "command"
 id = "copy_tap_to_combo"
 i18n = "menu.tapholds.copy_tap_to_combo"
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
+platforms = ["ahk", "hs", "linux"]
 
 [[menu.key_combinations_group]]
 type = "---"

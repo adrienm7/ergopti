@@ -112,6 +112,80 @@ _KCCE_ChordWritersBody(World, Ports) {
 Test("key combination chords: the writers report a refused commit and never reload behind it",
 	_KCCE_ChordWritersFollowTheirCommit)
 
+; The bulk copy, as macOS and Linux plan it: a chord takes its pair's tap, an
+; empty tap empties the chord, a chord already equal is left alone and a tap no
+; chord can run keeps the chord it has.
+_KCCE_CopyRows(Source) {
+	Rows := Map()
+	for Row in KeyCombinationChordCopyRows(ConfigTomlDecodeSnapshot(Source), (*) => true)
+		Rows[Row.Section] := Row
+	return Rows
+}
+_KCCE_ChordCopySource(Symmetric) {
+	return '[shortcuts.key_combination_taps]`ncaps_lock_then_tab = "copy"`ntab_then_caps_lock = "paste"`n'
+		. 'space_then_tab = "one_shot_shift"`n'
+		. '[mod_combos]`nsymmetric = ' . (Symmetric ? "true" : "false") . '`n'
+		. '[mod_combos.config.caps_lock_then_space]`ncombo = "copy"`n'
+		. '[mod_combos.config.space_then_tab]`ncombo = "copy"`n'
+}
+_KCCE_ChordCopyPlansFromTheTaps() {
+	Rows := _KCCE_CopyRows(_KCCE_ChordCopySource(false) . '[mod_combos.config.tab_then_caps_lock]`ncombo = "paste"`n')
+	Row := Rows.Get("mod_combos.config.caps_lock_then_tab", 0)
+	AssertTrue(IsObject(Row) && Row.Key == "combo" && Row.Value == "copy", "the chord takes the pair's tap")
+	AssertFalse(Rows.Has("mod_combos.config.tab_then_caps_lock"), "a chord already equal to its tap is left alone")
+	Row := Rows.Get("mod_combos.config.caps_lock_then_space", 0)
+	AssertTrue(IsObject(Row) && Row.HasOwnProp("Delete") && Row.Delete, "an empty tap empties the chord")
+	AssertFalse(Rows.Has("mod_combos.config.space_then_tab"), "a tap no chord can run keeps the chord it has")
+	AssertEqual(2, Rows.Count, "nothing else moves")
+	AssertEqual(0, _KCCE_CopyRows("").Count, "an empty configuration has nothing to copy")
+}
+Test("key combination chords: the bulk copy plans each chord from its pair's tap (copy-tap-to-combo)",
+	_KCCE_ChordCopyPlansFromTheTaps)
+
+; Under symmetry both orders share the earlier order's chord slot: only that
+; order's tap is copied, and the later order gets no slot of its own.
+_KCCE_ChordCopyFollowsSymmetry() {
+	Owner := _KeyCombinationChordOwnerPairFor("caps_lock_then_tab", true)
+	AssertTrue(Owner == "caps_lock_then_tab" || Owner == "tab_then_caps_lock", "the owner is one of the two orders")
+	Other := Owner == "caps_lock_then_tab" ? "tab_then_caps_lock" : "caps_lock_then_tab"
+	Rows := _KCCE_CopyRows(_KCCE_ChordCopySource(true))
+	Row := Rows.Get("mod_combos.config." . Owner, 0)
+	AssertTrue(IsObject(Row) && Row.Value == (Owner == "caps_lock_then_tab" ? "copy" : "paste"),
+		"the shared slot takes its owner order's tap")
+	AssertFalse(Rows.Has("mod_combos.config." . Other), "the other order gets no slot of its own")
+}
+Test("key combination chords: the bulk copy follows the chord symmetry (copy-tap-to-combo)",
+	_KCCE_ChordCopyFollowsSymmetry)
+
+; The command commits like every chord writer: a held lease reports false with no
+; reload and no write; a free one writes and reloads once; a second copy has
+; nothing left to do and neither writes nor reloads.
+_KCCE_ChordCopyFollowsItsCommit() {
+	Path := A_Temp . "\ergopti_kcce_chord_copy_" . DllCall("GetCurrentProcessId", "UInt") . ".toml"
+	if FileExist(Path)
+		FileDelete(Path)
+	Source := _KCCE_ChordCopySource(false)
+	FileAppend(Source, Path, "UTF-8-RAW")
+	Reloads := 0
+	Reload := () => (Reloads += 1, "reloaded")
+	try {
+		Owner := _ConfigWriteLeaseTryAcquire(Path, "chord-copy-refusal")
+		AssertTrue(Owner is Object, "the test holds the write lease")
+		try AssertEqual(false, KeyCombinationCopyTapsToChords(Path, Reload, (*) => true), "a refused commit reports false")
+		finally _ConfigWriteLeaseRelease(Owner)
+		AssertEqual(0, Reloads, "a refused commit never reloads")
+		AssertEqual(Source, FileRead(Path, "UTF-8"), "a refused commit writes nothing")
+		AssertEqual("reloaded", KeyCombinationCopyTapsToChords(Path, Reload, (*) => true), "a commit answers with its reload")
+		AssertEqual(1, Reloads, "a commit reloads once")
+		Cache := ConfigTomlDecodeSnapshot(FileRead(Path, "UTF-8")).Cache
+		AssertEqual("copy", Cache["mod_combos.config.caps_lock_then_tab"]["combo"], "the copied chord reaches the file")
+		AssertEqual(true, KeyCombinationCopyTapsToChords(Path, Reload, (*) => true), "a second copy has nothing to do")
+		AssertEqual(1, Reloads, "a copy with nothing to change never reloads")
+	} finally FileDelete(Path)
+}
+Test("key combination chords: the bulk copy reports a refused commit and never reloads behind it (copy-tap-to-combo)",
+	_KCCE_ChordCopyFollowsItsCommit)
+
 _KCCE_ChordFiresInsideTheDelay() {
 	_KCCE_With(Map("caps_lock_then_tab", "copy"), false, _KCCE_ChordFiresBody)
 }
