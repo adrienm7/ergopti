@@ -2069,22 +2069,18 @@ platforms = ["ahk"]
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 
 # The keyboard-layout scope's restore and clear, right after the switch Windows
-# shows (the first group). Windows and macOS register both on their scope
-# owners. Not applicable on Linux, which has none of these settings (it types
-# through the XKB layout the system selects), so the rows are hidden there.
+# shows (the first group). Every driver registers both on its scope owner; on
+# Linux they cover the number-row ordering and edges of config.toml, which the
+# session loads before the request settles (infra/keyboard_layout_scope.lua).
 [[menu.layout_menu]]
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.layout_menu]]
 type = "command"
 id = "scope_clear"
 i18n = "common.clear_to_system"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 # Two sections, so a user reads at a glance which rows are about the custom
 # layout (the registry layouts the layout manager installs, the one typing

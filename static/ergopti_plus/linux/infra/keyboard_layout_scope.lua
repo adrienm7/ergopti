@@ -197,6 +197,24 @@ function M.participant(is_paused, ports)
 	return participant
 end
 
+--- Runs the layout scope alone, from its own menu rows: the same participant
+--- a global restore composes, so the session loads the stored rows before the
+--- request settles and a refused load reverts config.toml.
+--- @param mode string "recommended" or "clear".
+--- @param is_paused function Live pause getter.
+--- @param on_settled function on_settled(ok, detail), called once.
+--- @param ports table|nil { live } The number-row live owner (tests replace it).
+function M.request(mode, is_paused, on_settled, ports)
+	assert(type(on_settled) == "function", "a keyboard layout scope request needs its settlement callback")
+	local participant = M.participant(is_paused, ports)
+	participant.apply(mode, function(ok, detail)
+		-- A settled success has nothing left to revert; a failure was reverted
+		-- (or keeps its debt) by the participant itself.
+		if ok then participant.release() end
+		on_settled(ok == true, detail)
+	end)
+end
+
 --- Test seam: forgets the retained owner and its debt.
 function M._reset_for_test()
 	_owner, _sequence = nil, 0
