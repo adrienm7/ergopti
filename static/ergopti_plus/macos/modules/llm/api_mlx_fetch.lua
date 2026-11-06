@@ -221,11 +221,19 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 		-- Each variant streams its tokens via on_partial so the tooltip shows each
 		-- prediction building in its own slot; prediction_engine.lua keeps the cursor
 		-- at slot 1 (or wherever the user navigated) regardless of which slot streams
-		local variant_partial = on_partial
-
 		local function request_variant(attempt, tokens, temp)
 			if not request_is_current() then return end
-			local post_fn = streaming and _post_and_parse_streaming or _post_and_parse
+			-- Only the first attempt streams: a retry is a new completion that does
+			-- not extend the failed one's text and would overwrite the growing preview.
+			local stream_attempt = streaming and attempt == 1
+			local post_fn = stream_attempt and _post_and_parse_streaming or _post_and_parse
+			-- Every streamed variant is an independent completion. A fresh identity
+			-- per stream lets the handler restart its cumulative-prefix filter at
+			-- this boundary while still rejecting a broken prefix inside one stream.
+			local stream_identity = {}
+			local variant_partial = (stream_attempt and type(on_partial) == "function")
+				and function(partial_raw) return on_partial(partial_raw, stream_identity) end
+				or nil
 			post_fn(model_name, system_prompt, full_text, tail_text,
 				temp, tokens, 1, false,
 				function(preds)
@@ -251,14 +259,13 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 						local retry_temp   = math.min(1.30, (tonumber(temp) or ApiCommon.DEFAULT_TEMPERATURE) + _RETRY_TEMP_STEP)
 						Logger.debug(LOG, "[%s] Variant %d/%d quick chat retry: tokens=%d temp=%.2f",
 							model_name, variant_index, max_attempts, retry_tokens, retry_temp)
-						-- Retry does not stream partial updates (would overwrite the growing preview)
 						request_variant(attempt + 1, retry_tokens, retry_temp)
 						return
 					end
 					do_next()
 				end,
 				dedup_stats,
-				streaming and variant_partial or nil)
+				variant_partial)
 		end
 
 		request_variant(1, primary_tokens, variant_temp)

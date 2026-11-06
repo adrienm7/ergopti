@@ -301,12 +301,25 @@ function M.build_callbacks(ctx)
 	local partial_visible = ""
 	local partial_stream_valid = true
 	local partial_filter_settled = false
+	local partial_stream_identity = nil
 
 	--- Converts one cumulative backend snapshot into filtered visible text.
+	--- Snapshots are cumulative within one stream only. A sequential variant is an
+	--- independent completion, so its first snapshot under a new stream identity
+	--- restarts the prefix contract and the thinking filter instead of breaking it.
 	--- @param partial_raw string Accumulated raw response from the backend.
+	--- @param stream_identity table|nil Backend stream identity; nil means one stream.
 	--- @return string|nil visible Filtered accumulated text, or nil when unchanged/invalid.
-	local function filter_partial_snapshot(partial_raw)
-		if partial_filter_settled or not partial_stream_valid then return nil end
+	local function filter_partial_snapshot(partial_raw, stream_identity)
+		if partial_filter_settled then return nil end
+		if stream_identity ~= nil and stream_identity ~= partial_stream_identity then
+			partial_stream_identity = stream_identity
+			partial_thinking_filter = Parser.new_thinking_filter()
+			partial_raw_seen = ""
+			partial_visible = ""
+			partial_stream_valid = true
+		end
+		if not partial_stream_valid then return nil end
 		if partial_raw:sub(1, #partial_raw_seen) ~= partial_raw_seen then
 			partial_stream_valid = false
 			Logger.warn(LOG,
@@ -332,12 +345,12 @@ function M.build_callbacks(ctx)
 	end
 
 	-- on_partial_cb: nil when streaming multi is off (all-at-once mode suppresses interim tokens)
-	local on_partial_cb = (ctx.is_streaming_enabled and is_streaming_multi) and function(partial_raw)
+	local on_partial_cb = (ctx.is_streaming_enabled and is_streaming_multi) and function(partial_raw, stream_identity)
 		if not runtime_available() then return end
 		if not request_is_current() then return end
 		if type(partial_raw) ~= "string" or partial_raw:gsub("%s", "") == "" then return end
 
-		local stripped = filter_partial_snapshot(partial_raw)
+		local stripped = filter_partial_snapshot(partial_raw, stream_identity)
 		if not stripped or stripped:gsub("%s", "") == "" then return end
 
 		-- Split on === separator used in batch-mode prompts; each completed block is a prediction
