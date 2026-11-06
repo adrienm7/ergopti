@@ -2778,33 +2778,10 @@
 		}
 	},
 	{
-		"path": "layers.source_kinds.mouse_button",
-		"labels": { "fr": "mouse_button", "en": "mouse_button" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "Not on Linux: the Linux hook watches the mouse without grabbing it, so it cannot cancel the button press that a layer binding would replace. Grabbing the mouse would take the pointer away from the desktop.",
-				"fr": "Pas sous Linux : le crochet Linux observe la souris sans la saisir, il ne peut donc pas annuler l’appui sur le bouton qu’une liaison de couche remplacerait. Saisir la souris retirerait le pointeur au bureau.",
-				"equivalents": []
-			}
-		}
-	},
-	{
 		"path": "layers.parameters.repeat_count",
 		"labels": { "fr": "repeat_count", "en": "repeat_count" },
-		"platforms": { "windows": true, "macos": false, "linux": false },
-		"reasons": {
-			"macos": {
-				"en": "Windows only: a repeat count needs the layer to remember a number until the next key, which the Windows layer does itself. Karabiner-Elements on macOS and the Linux driver’s own tap-hold engine map each key press on its own and keep no count between two keys.",
-				"fr": "Windows uniquement : un nombre de répétitions exige que la couche retienne un nombre jusqu’à la touche suivante, ce que la couche de Windows fait elle-même. Karabiner-Elements sous macOS et le moteur tap-hold propre au pilote Linux traitent chaque appui de touche isolément et ne gardent aucun compte entre deux touches.",
-				"equivalents": []
-			},
-			"linux": {
-				"en": "Windows only: a repeat count needs the layer to remember a number until the next key, which the Windows layer does itself. Karabiner-Elements on macOS and the Linux driver’s own tap-hold engine map each key press on its own and keep no count between two keys.",
-				"fr": "Windows uniquement : un nombre de répétitions exige que la couche retienne un nombre jusqu’à la touche suivante, ce que la couche de Windows fait elle-même. Karabiner-Elements sous macOS et le moteur tap-hold propre au pilote Linux traitent chaque appui de touche isolément et ne gardent aucun compte entre deux touches.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "layers.parameters.keystroke",

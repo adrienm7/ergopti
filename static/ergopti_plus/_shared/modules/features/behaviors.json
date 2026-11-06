@@ -78,7 +78,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
 			"symbol": "local function _dispatch_post_remap(ev, source)",
-			"sha256": "4639308b98283f4e1fcb0dcff3a2be5635dd73a0c51b9bf4284c93c8b93e0598"
+			"sha256": "3fcda4f946961e756489c0a22875cfa96059771ac3e5bb4f575fca8978e62f0a"
 		}
 	],
 	"behaviors": [

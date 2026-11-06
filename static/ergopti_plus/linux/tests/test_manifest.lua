@@ -427,6 +427,7 @@ return {
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_manager_lifecycle",
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_manager_original_loader_export",
 	"tests.unit.platform.remap.test_nav_layer_native",
+	"tests.unit.platform.remap.test_nav_layer_repeat_and_pointer",
 	"tests.unit.platform.remap.test_nav_layer_reload",
 	"tests.unit.ui.menu.shortcuts.test_tap_hold_edit_owner",
 	"tests.unit.ui.menu.shortcuts.test_tap_hold_menu_holds",

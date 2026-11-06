@@ -144,7 +144,7 @@ helpers.describe("Navigation layer in the generated Karabiner config", function(
 
 	helpers.it("fails the build on a layer the rule builder rejects", function()
 		local config, err = Generator.build_karabiner_json(make_state({
-			bindings = { KeyH = { kind = "repeat_count", count = 2 } }, registry = REGISTRY,
+			bindings = { KeyH = { kind = "call", handler = "maximize_window" } }, registry = REGISTRY,
 		}), ACTIONS, {}, {}, {}, DATA_DIR, TOKEN)
 		helpers.assert_nil(config, "a navigation layer that cannot be built must not be dropped silently")
 		helpers.assert_true(type(err) == "string" and err:find("navigation layer", 1, true) ~= nil, tostring(err))

@@ -427,10 +427,10 @@ assert.ok(
 );
 assert.strictEqual(
 	layerRows.find((row) => row.path === 'layers.parameters.repeat_count').platforms.linux,
-	false
+	true
 );
 const badLayerVocabulary = structuredClone(layerVocabulary);
-delete badLayerVocabulary.source_kinds.mouse_button.reason_key;
+delete badLayerVocabulary.modifiers.fn.reason_key;
 assert.throws(
 	() =>
 		inventory.render(

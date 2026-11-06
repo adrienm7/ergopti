@@ -153,6 +153,36 @@ helpers.describe("Generator.build_karabiner_json: navigation-layer sentinel", fu
 		end
 	end)
 
+	helpers.it("(layer-repeat-count-macos) entering the layer resets the count only when the layer binds one", function()
+		local function build_with(nav_layer)
+			local state = make_state({
+				tap_hold_config = { left_command = { tap = "backspace", hold = "layer" } }, nav_layer = nav_layer,
+			})
+			return Generator.build_karabiner_json(state,
+				{ NONE_ACTION, BACKSPACE_ACTION, LAYER_ACTION }, { LCMD_KEY_DEF }, {}, nil, "/fake/data_dir/")
+		end
+		local registry = { keys = { Digit3 = { kind = "key", group = "alphanumeric", karabiner = { key_code = "3" } } } }
+		local counted = build_with({ bindings = { Digit3 = { kind = "repeat_count", count = 3 } }, registry = registry })
+		local activations = layer_activations(counted.profiles[1].complex_modifications.rules, {})
+		helpers.assert_true(#activations > 0)
+		local count_name = "ergopti_nav_repeat_count_" .. TEST_LEASE_TOKEN
+		for _, events in ipairs(activations) do
+			local reset, activation = nil, nil
+			for index, event in ipairs(events) do
+				local variable = event.set_variable
+				if type(variable) == "table" and variable.name == count_name and variable.value == 1 then reset = index end
+				if type(variable) == "table" and variable.value == 1
+					and tostring(variable.name):find("layer_active", 1, true) then activation = index end
+			end
+			helpers.assert_not_nil(reset, "entering the layer puts this lease's count back to 1")
+			helpers.assert_true(reset < activation, "layer_active stays the last event Karabiner holds")
+		end
+		for _, events in ipairs(layer_activations(build().profiles[1].complex_modifications.rules, {})) do
+			helpers.assert_true(not tostring(_G.hs.json.encode(events)):find("nav_repeat_count", 1, true),
+				"a layer without a count keeps the activation it had")
+		end
+	end)
+
 	helpers.it("confines F20 and F19 to the ACTIVE lease graph", function()
 		local mode_name = "ergopti_mode_" .. TEST_LEASE_TOKEN
 		local revoked_name = "ergopti_revoked_" .. TEST_LEASE_TOKEN

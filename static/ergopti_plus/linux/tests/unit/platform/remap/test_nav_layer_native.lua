@@ -103,13 +103,13 @@ helpers.describe("native navigation source capabilities", function()
 		helpers.assert_eq(trail(engine(native):wheel("vertical", 1)), "115:1 115:0")
 		helpers.assert_eq(engine(native):wheel("vertical", -1), nil, "an unbound direction still scrolls")
 	end)
-	for _, code in ipairs({ "MouseLeft", "MouseMiddle" }) do
-		helpers.it("refuses observed pointer input " .. code .. " with a localized reason", function()
+	for code, evdev in pairs({ MouseLeft = 272, MouseMiddle = 274 }) do
+		helpers.it("(layer-mouse-button-linux) binds pointer input " .. code .. " under its button code", function()
 			local text = '[_meta]\nschema_version = 1\n[layers.nav.linux]\n"' .. code .. '" = "none"\n'
 			local result = Layers.load(text, "linux", ctx, Toml.decode)
-			helpers.assert_eq(result.ok, false)
-			helpers.assert_eq(result.errors[1].code, "unavailable_on_os")
-			helpers.assert_true(type(result.errors[1].reason_key) == "string")
+			helpers.assert_eq(result.ok, true, "a mouse button is a Linux layer source, as on Windows")
+			local native = require("platform.remap.nav_layer").compile(result.layers.nav, ctx.registry)
+			helpers.assert_eq(native[evdev], { mods = {}, keys = {} })
 		end)
 	end
 	helpers.it("compiles numpad input and output through the physical registry", function()

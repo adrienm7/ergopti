@@ -264,6 +264,10 @@ function M.new(opts)
 		held = {},          -- code -> { down_at, cancelled, emitted = {codes}, layer = bool }
 		layer_depth = 0,     -- how many layer keys are down
 		layer_keys = {},     -- code -> chord emitted for a key pressed on the layer
+		-- How many times the next repeatable layer action sends its last chord:
+		-- a repeat_count key sets it, any layer send and leaving the layer reset
+		-- it to 1 (Windows' NumberOfRepetitions, nav_layer_helpers.ahk).
+		repeat_count = 1,
 		one_shot_until = nil,
 		-- code -> "shift" while a one-shot Shift wraps it, "spent" once a later
 		-- key took the Shift back, "rolled" for a key pressed then (several can overlap)
@@ -997,15 +1001,43 @@ local function roll_other_key(self, pending, code, value, now_ms, receipt)
 	return true, out, tap, binding, journal
 end
 
+-- The chord a repeat_count key holds until its release: nothing.
+local NO_CHORD = { mods = {}, keys = {} }
+
+--- Appends a layer binding's events: a repeat_count row sets the count and
+--- sends nothing; a counted sequence sends its last chord that many times, as
+--- Windows sends "{Up N}". Every send but `none` resets the count to 1.
+--- @return table final The chord left down, released with the source key.
+local function layer_binding_events(self, out, spec)
+	if spec.repeat_count then
+		self.repeat_count = spec.repeat_count
+		return NO_CHORD
+	end
+	local chords, first = spec.chords or { spec }, #out
+	local final = assert(chords[#chords], "a navigation binding needs a final chord")
+	for index = 1, #chords - 1 do
+		chord_events(self, out, chords[index], DOWN)
+		chord_events(self, out, chords[index], UP)
+	end
+	for _ = 2, spec.counted and self.repeat_count or 1 do
+		chord_events(self, out, final, DOWN)
+		chord_events(self, out, final, UP)
+	end
+	chord_events(self, out, final, DOWN)
+	if #out > first then self.repeat_count = 1 end
+	return final
+end
+
+--- Leaving the layer forgets a count no action used, as Windows' ActivateLayer
+--- starts every hold at 1.
+local function reset_repeat_off_layer(self)
+	if self.layer_depth <= 0 then self.repeat_count = 1 end
+end
+
 --- Presses a layer chord for `code` and remembers it until the key comes up.
 local function press_layer_key(self, code, spec)
 	local out = {}
-	local chords = spec.chords or { spec }
-	for index, item in ipairs(chords) do
-		chord_events(self, out, item, DOWN)
-		if index < #chords then chord_events(self, out, item, UP) end
-	end
-	self.layer_keys[code] = assert(chords[#chords], "a navigation binding needs a final chord")
+	self.layer_keys[code] = layer_binding_events(self, out, spec)
 	return out
 end
 
@@ -1156,7 +1188,7 @@ local function process(self, code, value, now_ms, scoped, receipt, skip_layer, s
 		self.held[code] = nil
 		mask_lone_release(self, out, state)
 		for index = #state.emitted, 1, -1 do release(self, out, state.emitted[index]) end
-		if state.layer then self.layer_depth = math.max(0, self.layer_depth - 1) end
+		if state.layer then self.layer_depth = math.max(0, self.layer_depth - 1); reset_repeat_off_layer(self) end
 		local elapsed = now_ms - state.down_at
 		local is_tap = not state.cancelled and not state.tap_blocked
 			and elapsed <= LoneTap.tap_max_ms(config.threshold_ms, config.lone_modifier, self.lone_tap_max_ms)
@@ -1456,17 +1488,49 @@ function M:activity()
 	cancel_taps(self, nil, true)
 end
 
---- Whether the held navigation layer binds a wheel direction: the keyboard hook
---- then owns the pointer, so a bound notch never also scrolls.
+--- Whether the engine needs the mouse: the held navigation layer binds a wheel
+--- direction or a mouse button, or a bound button is still down. The keyboard
+--- hook then owns the pointer, so a bound notch never also scrolls and a bound
+--- click never also clicks.
 --- @return boolean
-function M:wheel_bound()
+function M:pointer_bound()
+	for code in pairs(self.layer_keys) do
+		if InputEvent.is_pointer_button(code) then return true end
+	end
 	if self.layer_depth <= 0 then return false end
 	for _, codes in pairs(InputEvent.WHEEL_LAYER_CODES) do
 		for _, code in pairs(codes) do
 			if self.nav_layer[code] then return true end
 		end
 	end
+	for code in pairs(self.nav_layer) do
+		if InputEvent.is_pointer_button(code) then return true end
+	end
 	return false
+end
+
+--- One mouse button event of a mouse the hook took for the layer: a press the
+--- held layer binds runs that binding and keeps its last chord down until the
+--- button comes up, as a keyboard key on the layer does (Windows registers the
+--- layer's mouse buttons as hotkeys). Anything else is nil and reaches the
+--- desktop.
+--- @param code integer evdev button code (BTN_LEFT ...).
+--- @param value integer 0 up, 1 down, 2 repeat.
+--- @return table|nil events Key events to dispatch instead of the button.
+function M:button(code, value)
+	local on_layer = self.layer_keys[code]
+	if on_layer then
+		local out = {}
+		if value == UP then
+			self.layer_keys[code] = nil
+			chord_events(self, out, on_layer, UP)
+		end
+		return out
+	end
+	if value ~= DOWN or self.layer_depth <= 0 then return nil end
+	local spec = self.nav_layer[code]
+	if not spec then return nil end
+	return press_layer_key(self, code, spec)
 end
 
 --- The held layer's binding of one wheel direction, or nil.
@@ -1489,10 +1553,7 @@ function M:wheel(axis, direction)
 	local spec = self:wheel_binding(axis, direction)
 	if not spec then return nil end
 	local out = {}
-	for _, chord in ipairs(spec.chords or { spec }) do
-		chord_events(self, out, chord, DOWN)
-		chord_events(self, out, chord, UP)
-	end
+	chord_events(self, out, layer_binding_events(self, out, spec), UP)
 	return out
 end
 
@@ -1555,7 +1616,7 @@ function M:release_all()
 		if self.passed_down[code] then custody(self, code, UP, false, out)
 		else hold_row(self, out, code, UP) end
 	end
-	self.held, self.layer_keys, self.layer_depth = {}, {}, 0
+	self.held, self.layer_keys, self.layer_depth, self.repeat_count = {}, {}, 0, 1
 	self.undecided = nil
 	self.one_shot_until, self.one_shot_keys, self.key_refs = nil, {}, {}
 	self.key_order = {}
@@ -1593,7 +1654,7 @@ end
 function M:combination_release(state)
 	local out = {}
 	for index = #state.emitted, 1, -1 do release(self, out, state.emitted[index]) end
-	if state.layer then self.layer_depth = self.layer_depth - 1 end
+	if state.layer then self.layer_depth = self.layer_depth - 1; reset_repeat_off_layer(self) end
 	state.emitted, state.layer = {}, false
 	return out
 end
