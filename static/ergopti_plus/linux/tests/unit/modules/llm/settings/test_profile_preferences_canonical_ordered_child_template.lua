@@ -405,7 +405,7 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 	end
 	local oracle = read("tests/corpus/menus/profile_ordered_frame.json")
 	-- Handwritten policy amendment; the original independent frame corpus stays byte-exact.
-	oracle.sections.llm_profile_lua_frame[5].on_refusal = "omit_presentation"
+	oracle.sections.llm_profile_lua_frame[3].on_refusal = "omit_presentation"
 	oracle.sections.llm_profile_windows_frame[1].on_refusal = "omit_presentation"
 	oracle.sections.llm_profile_custom_section[1].on_refusal = "omit_presentation"
 	local function with_frame(options, body)
@@ -578,7 +578,10 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 	helpers.it("materializes actual source order changes rather than a native fixed frame", function()
 		with_frame({}, function(f)
 			local frame = f.document.llm_profile_lua_frame
-			frame[3], frame[10] = frame[10], frame[3]
+			-- Name the swapped rows so a reshaped frame fails here, not as a stale index.
+			helpers.assert_eq(frame[1].section, "llm_profile_auto_detect_control")
+			helpers.assert_eq(frame[#frame].row_id, "llm_profile_create")
+			frame[1], frame[#frame] = frame[#frame], frame[1]
 			local rows = assert(f.rows())
 			helpers.assert_eq(rows[1].title, oracle.labels.create)
 			-- The separately declared per-application section (a separator and its
@@ -590,9 +593,9 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 	end)
 	local faults = {
 		{ "missing frame", function(f) f.document.llm_profile_lua_frame = nil end },
-		{ "wrong list binding", function(f) f.document.llm_profile_lua_frame[6].id = "wrong_native_slot" end },
-		{ "missing presence binding", function(f) f.document.llm_profile_lua_frame[7].present_when = "wrong_getter" end },
-		{ "wrong command selector", function(f) f.document.llm_profile_lua_frame[10].row_id = "missing" end },
+		{ "wrong list binding", function(f) f.document.llm_profile_lua_frame[4].id = "wrong_native_slot" end },
+		{ "missing presence binding", function(f) f.document.llm_profile_lua_frame[5].present_when = "wrong_getter" end },
+		{ "wrong command selector", function(f) f.document.llm_profile_lua_frame[8].row_id = "missing" end },
 	}
 	for _, fault in ipairs(faults) do
 		helpers.it("refuses " .. fault[1] .. " without fabricating a parent or writing canonical files", function()
