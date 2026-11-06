@@ -40,11 +40,22 @@ local TOOL = "secret-tool"
 local _tool_override = nil
 local APPLICATION_ATTRIBUTE = "application"
 local KEY_ATTRIBUTE = "api_key"
+-- secret-tool's stdin reader has an 8192-byte buffer and may exit successfully
+-- after storing only that prefix. Never publish a reference to truncated data.
+local SECRET_TOOL_INPUT_BYTES = 8192
 
 -- The backend a test installed, or nil for secret-tool.
 local _backend = nil
--- Revisions stored by this process: two in the same second still differ.
-local _sequence = 0
+-- Random revisions also survive process restarts inside the same second.
+local REVISION_BYTES = 16
+
+local function revision()
+	local loaded, uv = pcall(require, "luv")
+	if not loaded or type(uv) ~= "table" or type(uv.random) ~= "function" then return nil end
+	local called, bytes = pcall(uv.random, REVISION_BYTES)
+	if not called or type(bytes) ~= "string" or #bytes ~= REVISION_BYTES then return nil end
+	return (bytes:gsub(".", function(byte) return string.format("%02x", byte:byte()) end))
+end
 
 
 
@@ -57,12 +68,12 @@ local _sequence = 0
 
 --- Reads a whole file and removes it.
 --- @param path string
---- @return string
-local function take_file(path)
-	local fh = io.open(path, "rb")
-	local text = fh and fh:read("*a") or ""
-	if fh then fh:close() end
-	os.remove(path)
+--- @param remove_owned function Cleanup bound to the created file.
+--- @return string|nil text Nil when the result cannot be read safely.
+local function take_file(path, remove_owned)
+	local text, status = require("toml_codec.writer").read_classified(path)
+	local called, removed = pcall(remove_owned)
+	if status ~= "ok" or not called or removed ~= true then return nil end
 	return text
 end
 
@@ -76,22 +87,51 @@ end
 local function run_tool(args, input)
 	local words = { ShellRunner.quote(_tool_override or TOOL) }
 	for _, arg in ipairs(args) do words[#words + 1] = ShellRunner.quote(arg) end
-	local err_path, status_path = os.tmpname(), os.tmpname()
+	local uv = require("luv")
+	local dir = uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-secret-tool-XXXXXX")
+	if not dir then return nil, "", "secret-tool result directory unavailable" end
+	local err_path, status_path = dir .. "/stderr", dir .. "/status"
+	local function reserve(path)
+		local opened, fh, _, _, remove = pcall(require("infra.regular_file_writer").open, path, "wx")
+		if not opened or not fh then return nil end
+		local closed, ack = pcall(fh.close, fh)
+		if not closed or ack ~= true or type(remove) ~= "function" then
+			if type(remove) == "function" then pcall(remove) end
+			return nil
+		end
+		return remove
+	end
+	local remove_err, remove_status = reserve(err_path), reserve(status_path)
+	if not remove_err or not remove_status then
+		if remove_err then pcall(remove_err) end
+		if remove_status then pcall(remove_status) end
+		uv.fs_rmdir(dir)
+		return nil, "", "secret-tool result files are unavailable"
+	end
 	local command = table.concat(words, " ")
 		.. (input and " >/dev/null" or "")
 		.. " 2>" .. ShellRunner.quote(err_path)
 		.. "; printf '%s' $? >" .. ShellRunner.quote(status_path)
 	local output = ""
-	local pipe = io.popen(command, input and "w" or "r")
-	if not pipe then
-		os.remove(err_path)
-		os.remove(status_path)
+	local started, pipe = pcall(io.popen, command, input and "w" or "r")
+	if not started or not pipe then
+		pcall(remove_err)
+		pcall(remove_status)
+		uv.fs_rmdir(dir)
 		return nil, "", "the shell could not be started"
 	end
-	if input then pipe:write(input) else output = pipe:read("*a") or "" end
-	pipe:close()
-	local status = tonumber(take_file(status_path))
-	return status, output, take_file(err_path)
+	local exchanged, value
+	if input then exchanged, value = pcall(pipe.write, pipe, input)
+	else exchanged, value = pcall(pipe.read, pipe, "*a"); output = type(value) == "string" and value or "" end
+	local closed, close_ack = pcall(pipe.close, pipe)
+	local status_text, stderr = take_file(status_path, remove_status), take_file(err_path, remove_err)
+	local removed_dir = uv.fs_rmdir(dir)
+	local received = input and (value == true or value == pipe) or (not input and type(value) == "string")
+	if not exchanged or not received or not closed or close_ack ~= true
+		or status_text == nil or stderr == nil or removed_dir ~= true then
+		return nil, "", "secret-tool result files are unavailable"
+	end
+	return tonumber(status_text), output, stderr
 end
 
 --- The reason a failed call gives, its stderr on one line.
@@ -120,6 +160,7 @@ end
 --- @param token string
 --- @return boolean ok, string|nil reason
 function SECRET_TOOL.store(name, token)
+	if #token > SECRET_TOOL_INPUT_BYTES then return false, "API key exceeds secret-tool input capacity" end
 	local status, _, stderr = run_tool({
 		"store", "--label=" .. Identifiers.app.name .. " API key " .. name,
 		APPLICATION_ATTRIBUTE, Identifiers.app.name, KEY_ATTRIBUTE, name,
@@ -203,8 +244,9 @@ function M.store(entry_id, token)
 		Logger.error(LOG, "API key of '%s' not stored: %s.", entry_id, unavailable)
 		return nil, unavailable
 	end
-	_sequence = _sequence + 1
-	local name = entry_id .. "#" .. os.time() .. "-" .. _sequence
+	local suffix = revision()
+	if not suffix then return nil, "secure random revision unavailable" end
+	local name = entry_id .. "#" .. suffix
 	local called, ok, reason = pcall(with_keyboard, function() return backend().store(name, token) end)
 	if not called then ok, reason = false, tostring(ok) end
 	if ok ~= true then

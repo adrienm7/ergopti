@@ -641,6 +641,33 @@ const pulling = drawnRows(page.byId).Pulling;
 assert.ok(pulling.innerHTML.includes(en['model_browser.status_downloading']));
 assert.ok(!pulling.innerHTML.includes('data-act='), 'a running download offers no other action');
 
+page.context.injectModels({
+	...payload,
+	models: [
+		{
+			backend: 'ollama',
+			name: 'Unknown',
+			installed: false,
+			available: false,
+			inventory_unknown: true,
+			hint_key: 'model_browser.inventory_unavailable'
+		}
+	]
+});
+const unknownInventory = drawnRows(page.byId).Unknown;
+assert.ok(unknownInventory.innerHTML.includes(en['model_browser.inventory_unavailable']));
+assert.ok(!unknownInventory.innerHTML.includes('data-act="download"'));
+assert.ok(!unknownInventory.innerHTML.includes(en['model_browser.status_available']));
+page.context.injectModels({
+	...payload,
+	models: [{ backend: 'ollama', name: 'Unknown', installed: false, available: true }]
+});
+assert.ok(drawnRows(page.byId).Unknown.innerHTML.includes('data-act="download"'));
+page.context.injectModels({
+	...payload,
+	models: [{ backend: 'ollama', name: 'Pulling', installed: false, pending: 'download' }]
+});
+
 // model-selector-progress: a driver's download percentage reaches the row; a
 // payload row may carry it too; an unknown row or a foreign backend is ignored.
 page.context.injectProgress({ backend: 'ollama', name: 'Pulling', percent: 42.8 });

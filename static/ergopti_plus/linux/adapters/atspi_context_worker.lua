@@ -1,4 +1,11 @@
 --- adapters/atspi_context_worker.lua
+-- The application-owned child is invoked directly, without a global Lua init.
+local literal_driver = os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT")
+if literal_driver and literal_driver ~= "" then
+	local literal_shared = assert(os.getenv("ERGOPTI_LITERAL_SHARED_ROOT"), "literal shared root unavailable")
+	assert(loadfile(literal_driver .. "/infra/literal_module_loader.lua"))().install(literal_driver, literal_shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), os.getenv("ERGOPTI_LITERAL_DIRECT") == "1" and "child-direct" or (os.getenv("ERGOPTI_LITERAL_DAEMON") == "1" and "daemon" or nil))
+end
+
 
 --- Captures one native field/frame/application observation in an owned child.
 --- The parent owns the only deadline and process group; no nested timeout exists.
@@ -18,7 +25,13 @@ function M.run(bus, path, role, shared, parent_pid, mode, first, last)
 	local source = debug.getinfo(1, "S").source:gsub("^@", "")
 	local root = assert(source:match("^(.*)/adapters/atspi_context_worker%.lua$"), "context worker source unavailable")
 	assert(type(shared) == "string" and shared:sub(1, 1) == "/", "context worker shared source unavailable")
-	package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
+	if literal_driver then
+		local resolver = assert(package.loaded["infra.literal_module_loader"])
+		resolver.prepend({ { root, ".lua" }, { root, "/init.lua" },
+			{ shared, ".lua" }, { shared, "/init.lua" } })
+	else
+		package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
+	end
 	require("logger.shim").set_level("error")
 	local ffi = require("ffi")
 	ffi.cdef([[int getppid(void); int prctl(int option, ...);]])

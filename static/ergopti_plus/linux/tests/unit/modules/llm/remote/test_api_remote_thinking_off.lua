@@ -198,6 +198,40 @@ end)
 -- =========================================
 
 helpers.describe("api_remote: a refused thinking field is dropped once and remembered", function()
+	helpers.it("does not block or remove a foreign FIFO at the refusal staging path", function()
+		local uv = require("luv")
+		local Shell = require("adapters.shell_runner")
+		local path = os.tmpname()
+		os.remove(path)
+		assert(Shell.run("mkfifo -- " .. Shell.quote(path .. ".tmp")))
+		local code = string.format([[package.path = %q
+local remote = require("modules.llm.api_remote")
+remote._reset_for_test(%q)
+local body = {}
+local _, added = remote.complete_body("deepseek", "deepseek-chat", body)
+assert(remote.thinking_refusal("deepseek", "deepseek-chat", {
+ status = 400, error_body = '{"error":{"message":"Unknown parameter: thinking"}}'
+}, added, body))
+]], package.path, path)
+		local exited, expired, status, signal = false, false, nil, nil
+		local timer = assert(uv.new_timer())
+		local child
+		child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(code, sig)
+			exited, status, signal = true, code, sig
+			uv.timer_stop(timer); uv.close(timer); uv.close(child)
+		end))
+		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+			expired = true; child:kill("sigkill")
+		end))
+		while not exited do uv.run("once") end
+		uv.run("nowait")
+		local st = uv.fs_lstat(path .. ".tmp")
+		os.remove(path .. ".tmp"); os.remove(path)
+		helpers.assert_eq(expired, false, "a foreign FIFO must not block the retry path")
+		helpers.assert_eq(status, 0)
+		helpers.assert_eq(signal, 0)
+		helpers.assert_eq(st and st.type, "fifo", "the foreign staging entry is preserved")
+	end)
 
 	helpers.it("chat() sends the request once more without the field, then never with it", function()
 		local remote, calls = load_remote()

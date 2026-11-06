@@ -31,6 +31,7 @@ local function fixture(app)
 		if pending then return nil, "SQLite flush pending" end
 		return { historical = { witness = 9 }, today = {} }
 	end
+	K.capture_app_category_edit = function() return {} end
 	K.set_app_category = function()
 		counts.writes = counts.writes + 1
 		return not debt and not pending and not stopping
@@ -64,6 +65,7 @@ local function fixture(app)
 	} }
 	local B = H.load_module("ui." .. app .. ".bridge")
 	if B._reset then B._reset() end
+	if app == "metrics_apps" then B._category_prompt = function(_, _, initial) return initial end end
 	local function settle(keep_debt)
 		pending, debt = false, keep_debt == true
 		local callbacks = subscribers
@@ -77,6 +79,129 @@ local function fixture(app)
 end
 
 H.describe("metrics flush bridge", function()
+	H.it("category edit obtains confirmed choices and respects cancellation", function()
+		local F = fixture("metrics_apps")
+		F.read_safe()
+		local answers, seen, saved = { "Research", "1.5" }, {}, nil
+		F.B._category_prompt = function(_, _, initial)
+			seen[#seen + 1] = initial
+			return table.remove(answers, 1)
+		end
+		F.K.set_app_category = function(app, category, score, receipt)
+			saved = { app, category, score, type(receipt) }
+			return true
+		end
+		local result = F.B.on_message({ action = "edit", app = "Editor", cat = "Work", score = 0 }, F.state, F.context)
+		H.assert_eq(seen, { "Work", "0" })
+		H.assert_eq(saved, { "Editor", "Research", 1.5, "table" })
+		H.assert_eq(result.saved, true)
+		F.B._category_prompt = function() return nil end
+		saved = nil
+		H.assert_nil(F.B.on_message({ action = "edit", app = "Editor", cat = "Work", score = 0 }, F.state, F.context))
+		H.assert_nil(saved)
+	end)
+
+	H.it("category edit refuses invalid scores and retired pages before writing", function()
+		for _, mode in ipairs({ "invalid", "cancel_score", "retired" }) do
+			local F = fixture("metrics_apps")
+			F.read_safe()
+			local calls = 0
+			F.B._category_prompt = function()
+				calls = calls + 1
+				if mode == "retired" then F.epoch(2); return "Work" end
+				if calls == 1 then return "Work" end
+				return mode == "invalid" and "3" or nil
+			end
+			local result = F.B.on_message({ action = "edit", app = "Editor", cat = "Work", score = 0 }, F.state, F.context)
+			H.assert_eq(F.c.writes, 0)
+			if mode == "invalid" then H.assert_eq(result.saved, false) else H.assert_nil(result) end
+		end
+	end)
+	H.it("(metrics-callback-error) a failing error formatter cannot escape the dashboard bridge", function()
+		local F = fixture("metrics_apps")
+		F.read_safe()
+		F.K.get_dashboard_payload = function()
+			error(setmetatable({}, { __tostring = function() error("formatter failed") end }))
+		end
+		local ok, result = pcall(F.B.on_message, "ready", F.state, F.context)
+		H.assert_true(ok)
+		H.assert_eq(result, nil)
+	end)
+	H.it("(metrics-callback-error) callback details do not disclose private metrics in logs", function()
+		local F = fixture("metrics_apps")
+		F.read_safe()
+		F.K.get_dashboard_payload = function() error("private-application-name") end
+		local logger = require("logger.shim")
+		local original, messages = logger.error, {}
+		logger.error = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
+		local ok, result = pcall(F.B.on_message, "ready", F.state, F.context)
+		logger.error = original
+		H.assert_true(ok)
+		H.assert_eq(result, nil)
+		H.assert_eq(#messages, 1)
+		H.assert_eq(messages[1]:find("private-application-name", 1, true), nil)
+	end)
+	H.it("(metrics-callback-error) reset refusal does not log private collector errors", function()
+		local F = fixture("metrics_apps")
+		F.read_safe()
+		F.K.request_session_reset = function() error("private-reset-application") end
+		local logger = require("logger.shim")
+		local original, messages = logger.error, {}
+		logger.error = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
+		local ok, result = pcall(F.B.on_message, { action = "reset" }, F.state, F.context)
+		logger.error = original
+		H.assert_true(ok)
+		H.assert_eq(result.reset, false)
+		H.assert_eq(#messages, 1)
+		H.assert_eq(messages[1]:find("private-reset-application", 1, true), nil)
+	end)
+	H.it("(metrics-pause-privacy) a dashboard resume cannot clear secure-field suppression", function()
+		local F = fixture("metrics_apps")
+		F.read_safe()
+		local secure, paused = true, false
+		F.K.suppress = function() secure = true end
+		F.K.unsuppress = function() secure = false end
+		F.K.is_suppressed = function() return secure end
+		F.K.suspend_collection = function() paused = true end
+		F.K.resume_collection = function() paused = false end
+		F.K.is_collection_suspended = function() return paused end
+		local pause = F.B.on_message({ action = "pause" }, F.state, F.context)
+		H.assert_eq(paused, true, "pause owns the user pause instead of the secure-field flag")
+		H.assert_eq(pause.suspended, true)
+		H.assert_eq(secure, true)
+		local resume = F.B.on_message({ action = "resume" }, F.state, F.context)
+		H.assert_eq(resume.suspended, false)
+		H.assert_eq(resume.suppressed, true)
+		H.assert_eq(secure, true, "secure focus continues to block capture")
+	end)
+	H.it("(metrics-pause-privacy) resume alone preserves an active secure-field guard", function()
+		local F = fixture("metrics_apps")
+		F.read_safe()
+		local secure = true
+		F.K.unsuppress = function() secure = false end
+		F.K.is_suppressed = function() return secure end
+		F.K.resume_collection = function() end
+		F.K.is_collection_suspended = function() return false end
+		F.B.on_message({ action = "resume" }, F.state, F.context)
+		H.assert_eq(secure, true, "resuming user collection must not disarm secure input")
+	end)
+	H.it("(metrics-pause-privacy) refuses to claim a pause without its owner", function()
+		local F = fixture("metrics_apps")
+		F.read_safe()
+		local result = F.B.on_message({ action = "pause" }, F.state, F.context)
+		H.assert_eq(result.supported, false)
+		H.assert_nil(result.suppressed)
+	end)
+	H.it("(metrics-pause-privacy) reports an explicit owner refusal", function()
+		local F = fixture("metrics_apps")
+		F.read_safe()
+		F.K.suspend_collection = function() return false end
+		F.K.is_collection_suspended = function() return true end
+		F.K.is_suppressed = function() return false end
+		local result = F.B.on_message({ action = "pause" }, F.state, F.context)
+		H.assert_eq(result.supported, false)
+		H.assert_nil(result.suppressed)
+	end)
 	for _, app in ipairs({ "metrics_apps", "metrics_typing" }) do
 		H.it(app .. " defers ready without reading then pushes complete data", function()
 			local F = fixture(app)
@@ -88,7 +213,7 @@ H.describe("metrics flush bridge", function()
 		end)
 		H.it(app .. " coalesces polls without cancelling the user's mutation", function()
 			local F = fixture(app)
-			F.B.on_message({ action = app == "metrics_apps" and "edit" or "clear_cache", app = "a" }, F.state, F.context)
+			F.B.on_message({ action = app == "metrics_apps" and "edit" or "clear_cache", app = "a", cat = "Work", score = 0 }, F.state, F.context)
 			for _ = 1, 20 do F.B.on_message("refresh", F.state, F.context) end
 			H.assert_eq(F.c.writes, 0)
 			H.assert_eq(F.c.subscriptions, 1)
@@ -98,7 +223,7 @@ H.describe("metrics flush bridge", function()
 		end)
 		H.it(app .. " refuses an action after close and replacement", function()
 			local F = fixture(app)
-			F.B.on_message({ action = app == "metrics_apps" and "edit" or "clear_cache", app = "a" }, F.state, F.context)
+			F.B.on_message({ action = app == "metrics_apps" and "edit" or "clear_cache", app = "a", cat = "Work", score = 0 }, F.state, F.context)
 			F.B.on_window_closed(1)
 			F.epoch(2)
 			F.settle()
@@ -194,10 +319,32 @@ H.describe("metrics flush bridge", function()
 		H.assert_eq(F.c.writes, 1)
 		H.assert_eq(#F.pushed, 1)
 	end)
+	for _, invalid in ipairs({ "invalid", {}, math.huge, 3 }) do
+		H.it("(metrics-edit-score) rejects invalid score " .. type(invalid), function()
+			local F = fixture("metrics_apps")
+			F.read_safe()
+			local result = F.B.on_message({ action = "edit", app = "app", cat = "Work", score = invalid }, F.state, F.context)
+			H.assert_eq(result.saved, false)
+			H.assert_eq(F.c.writes, 0, "invalid input cannot overwrite a score")
+		end)
+	end
+
+	for _, field in ipairs({ "app", "cat" }) do
+		H.it("(metrics-edit-score) rejects non-text " .. field, function()
+			local F = fixture("metrics_apps")
+			F.read_safe()
+			local payload = { action = "edit", app = "app", cat = "Work", score = 1 }
+			payload[field] = {}
+			local result = F.B.on_message(payload, F.state, F.context)
+			H.assert_eq(result.saved, false)
+			H.assert_eq(F.c.writes, 0)
+		end)
+	end
+
 	H.it("rollback permits full data while category mutation refuses", function()
 		local F = fixture("metrics_apps")
 		F.B._push = function(reply) F.pushed[#F.pushed + 1] = reply return true end
-		F.B.on_message({ action = "edit", app = "a" }, F.state, F.context)
+		F.B.on_message({ action = "edit", app = "a", cat = "Work", score = 0 }, F.state, F.context)
 		F.settle(true)
 		H.assert_eq(F.pushed[1].saved, false)
 		H.assert_eq(F.pushed[1].metrics_manifest.day.app.chars, 17)
@@ -205,7 +352,7 @@ H.describe("metrics flush bridge", function()
 	H.it("inline notification before subscription rejection cannot perform an edit", function()
 		local F = fixture("metrics_apps")
 		F.K.when_flush_settled = function(cb) F.read_safe() cb(F.K.get_flush_status()) return false end
-		H.assert_nil(F.B.on_message({ action = "edit", app = "a" }, F.state, F.context))
+		H.assert_nil(F.B.on_message({ action = "edit", app = "a", cat = "Work", score = 0 }, F.state, F.context))
 		H.assert_eq(F.c.writes, 0)
 		H.assert_eq(#F.pushed, 0)
 	end)
@@ -219,7 +366,7 @@ H.describe("metrics flush bridge", function()
 	H.it("subscription throw after inline notification cannot execute a mutation", function()
 		local F = fixture("metrics_apps")
 		F.K.when_flush_settled = function(cb) F.read_safe() cb(F.K.get_flush_status()) error("refused") end
-		H.assert_nil(F.B.on_message({ action = "edit", app = "a" }, F.state, F.context))
+		H.assert_nil(F.B.on_message({ action = "edit", app = "a", cat = "Work", score = 0 }, F.state, F.context))
 		H.assert_eq(F.c.writes, 0)
 		H.assert_eq(#F.pushed, 0)
 	end)
@@ -231,7 +378,7 @@ H.describe("metrics flush bridge", function()
 			cb(F.K.get_flush_status())
 			return true
 		end
-		F.B.on_message({ action = "edit", app = "a" }, F.state, F.context)
+		F.B.on_message({ action = "edit", app = "a", cat = "Work", score = 0 }, F.state, F.context)
 		H.assert_eq(F.c.writes, 1)
 		H.assert_eq(#F.pushed, 1)
 	end)
@@ -245,7 +392,7 @@ H.describe("metrics flush bridge", function()
 	end)
 	H.it("captured page epochs cannot be retargeted by changing a context table", function()
 		local F = fixture("metrics_apps")
-		F.B.on_message({ action = "edit", app = "a" }, F.state, F.context)
+		F.B.on_message({ action = "edit", app = "a", cat = "Work", score = 0 }, F.state, F.context)
 		F.context.epoch = 2
 		F.epoch(2)
 		F.settle()
@@ -253,8 +400,8 @@ H.describe("metrics flush bridge", function()
 	end)
 	H.it("both distinct queued edits survive read polling", function()
 		local F = fixture("metrics_apps")
-		F.B.on_message({ action = "edit", app = "a" }, F.state, F.context)
-		F.B.on_message({ action = "edit", app = "b" }, F.state, F.context)
+		F.B.on_message({ action = "edit", app = "a", cat = "Work", score = 0 }, F.state, F.context)
+		F.B.on_message({ action = "edit", app = "b", cat = "Work", score = 0 }, F.state, F.context)
 		F.B.on_message("refresh", F.state, F.context)
 		F.settle()
 		H.assert_eq(F.c.writes, 2)
@@ -335,7 +482,7 @@ H.describe("metrics flush bridge", function()
 				return false
 			end
 			F.K.set_app_category, F.K.clear_cache = revoke, revoke
-			H.assert_nil(F.B.on_message({ action = app == "metrics_apps" and "edit" or "clear_cache" }, F.state, F.context))
+			H.assert_nil(F.B.on_message({ action = app == "metrics_apps" and "edit" or "clear_cache", app = "a", cat = "Work", score = 0 }, F.state, F.context))
 			H.assert_eq(F.c.reads, 0)
 			H.assert_eq(#F.pushed, 0)
 		end)
@@ -360,3 +507,5 @@ H.describe("metrics flush bridge", function()
 	end)
 
 end)
+
+require("ui.metrics_apps.bridge")._reset()

@@ -107,6 +107,37 @@ end)
 -- =================================================================
 
 helpers.describe("keyboard shortcuts: what is stored", function()
+	helpers.it("keyboard-config-owner: refuses an edit when a sibling binding changes externally", function()
+		local shortcuts, config = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
+		local ok, err = pcall(function()
+			helpers.assert_eq(shortcuts.get_action("primary_j"), "select_line")
+			local external = '[shortcuts.keyboard]\nprimary_j = "enter"\n'
+			Sandbox.write_bytes(config.path, external)
+			helpers.assert_eq(shortcuts.set_action("primary_k", "select_line"), false)
+			helpers.assert_eq(Sandbox.read_bytes(config.path), external)
+			helpers.assert_eq(shortcuts.get_action("primary_j"), "select_line")
+		end)
+		drop_config()
+		helpers.assert_true(ok, tostring(err))
+	end)
+
+	helpers.it("keyboard-config-owner: refuses a sibling change racing the file write", function()
+		local shortcuts, config = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
+		local Writer = require("toml_codec.writer")
+		local original = Writer.batch_write
+		local external = '[shortcuts.keyboard]\nprimary_j = "enter"\n'
+		local ok, err = pcall(function()
+			helpers.assert_eq(shortcuts.get_action("primary_j"), "select_line")
+			Writer.batch_write = function(...) Sandbox.write_bytes(config.path, external); return original(...) end
+			helpers.assert_eq(shortcuts.set_action("primary_k", "select_line"), false)
+			helpers.assert_eq(Sandbox.read_bytes(config.path), external)
+			helpers.assert_eq(shortcuts.get_action("primary_j"), "select_line")
+		end)
+		Writer.batch_write = original
+		drop_config()
+		helpers.assert_true(ok, tostring(err))
+	end)
+
 	helpers.it("keyboard-config-owner: ignores legacy storage and clears persisted overrides on restart", function()
 		local shortcuts, config = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
 		local ok, err = pcall(function()
@@ -126,6 +157,7 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 			helpers.assert_eq(shortcuts.get_action("ctrl_not_a_key"), "none")
 			helpers.assert_eq(shortcuts.set_action("ctrl_not_a_key", "enter"), false)
 			Sandbox.write_bytes(config.path, Sandbox.read_bytes(config.path) .. "primary_j = \"select_line\"\n[other]\nvalue = 42\n")
+			shortcuts._reset() -- the file is the source before this fixture checks sparse editing
 			local decoded = Codec.decode(Sandbox.read_bytes(config.path))
 			local marked = {}
 			shortcuts.mark_config_reads(decoded, function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
@@ -361,16 +393,22 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 	end)
 
 	helpers.it("binds Super+Space to an explicitly configured prediction action", function()
-		local shortcuts = load_over_config({ ["shortcuts.keyboard.meta_space"] = "llm_generate_prediction" })
-		local action = shortcuts.get_action("meta_space")
-		local super_slots = shortcuts.assigned_slots("meta_")
-		local fired, slot = shortcuts.dispatch(chord("space", { meta = true }))
+		local previous_engine = package.loaded["modules.llm.prediction_engine"]
+		package.loaded["modules.llm.prediction_engine"] = { is_enabled = function() return true end }
+		local ok, detail = xpcall(function()
+			local shortcuts = load_over_config({ ["shortcuts.keyboard.meta_space"] = "llm_generate_prediction" })
+			local action = shortcuts.get_action("meta_space")
+			local super_slots = shortcuts.assigned_slots("meta_")
+			local fired, slot = shortcuts.dispatch(chord("space", { meta = true }))
+			helpers.assert_eq(action, "llm_generate_prediction",
+				"an explicit saved action remains effective")
+			helpers.assert_eq(#super_slots, 1)
+			helpers.assert_eq(fired, true)
+			helpers.assert_eq(slot, "meta_space")
+		end, debug.traceback)
 		drop_config()
-		helpers.assert_eq(action, "llm_generate_prediction",
-			"an explicit saved action remains effective")
-		helpers.assert_eq(#super_slots, 1)
-		helpers.assert_eq(fired, true)
-		helpers.assert_eq(slot, "meta_space")
+		package.loaded["modules.llm.prediction_engine"] = previous_engine
+		if not ok then error(detail, 0) end
 	end)
 
 	helpers.it("offers a Super group in the menu", function()
@@ -710,3 +748,69 @@ end)
 
 require("test.keyboard_native_publication_contract").register(helpers, "linux")
 
+
+for _, case in ipairs({
+	{ name = "script chords", module = "modules.shortcuts.script_chords", path = "modules/actions/script_chords.json",
+		invoke = function(owner) return owner.catalogue() end },
+	{ name = "tap keys", module = "modules.shortcuts.tap_keys", path = "modules/actions/tap_keys.json",
+		invoke = function(owner) return owner.keys() end },
+	{ name = "modifier chords", module = "modules.shortcuts.keyboard_shortcuts", path = "modules/actions/modifier_chords.json",
+		invoke = function(owner) return owner.available_slots("ctrl_") end, empty = true },
+	{ name = "physical keys", module = "modules.shortcuts.keyboard_shortcuts", path = "data/keycodes/physical_keys.json",
+		invoke = function(owner) return owner.physical_slot_descriptor("physical_ctrl_KeyA") end },
+	{ name = "hotstring keys", module = "modules.hotstrings.output_tokens", path = "modules/actions/send_keys.json",
+		invoke = function(owner) return owner.parse("{Enter}") end },
+}) do
+	helpers.it("shortcut catalogue refuses FIFO: " .. case.name, function()
+		local uv, Paths = require("luv"), require("infra.paths")
+		local original_shared, original_module = Paths.shared, package.loaded[case.module]
+		local source = assert(original_shared(case.path))
+		local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-shortcut-config-XXXXXX"))
+		local path = dir .. "/catalogue.json"
+		local made = os.execute("mkfifo '" .. path .. "'")
+		assert(made == 0 or made == true)
+		package.loaded[case.module] = nil
+		local owner = require(case.module)
+		Paths.shared = function(relative)
+			if relative == case.path then return path end
+			return original_shared(relative)
+		end
+		local exited, process = false, nil
+		process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$2" > "$1"', "fixture", path, source } }, function()
+			exited = true; process:close()
+		end))
+		local ok, value = pcall(case.invoke, owner)
+		Paths.shared, package.loaded[case.module] = original_shared, original_module
+		os.remove(path); os.remove(dir)
+		while not exited do uv.run("once") end
+		if case.empty then helpers.assert_true(ok); helpers.assert_eq(value, {}, "special catalogue supplies no slots")
+		else helpers.assert_eq(ok, false, "special catalogue must be refused") end
+	end)
+end
+
+helpers.describe('keyboard shortcut after a pause cycle', function()
+  for _, action in ipairs({'select_line', 'script_reload'}) do
+    helpers.it('respects pause generation for '..action, function()
+      local shortcuts = load_over_config({['shortcuts.keyboard.primary_j']=action})
+      local gestures = require('modules.gestures.manager')
+      local original = gestures.execute_action
+      local queue, fired = {}, {}
+      gestures.execute_action = function(value) fired[#fired+1]=value end
+      local script = require('modules.shortcuts.script_actions').new({reset=function() end,reload=function() end,quit=function() end})
+      local opts = { defer=function(fn) queue[#queue+1]=fn; return true end,
+        pause_epoch=script.pause_epoch,
+        admission=function() return {master=true,paused=script.is_paused(),inhibited=false} end }
+      local ok, err = pcall(function()
+        assert(shortcuts.consume(chord('j',{ctrl=true}), opts))
+        assert(script.toggle_pause()); assert(script.toggle_pause())
+        queue[1]()
+        helpers.assert_eq(fired, action == 'script_reload' and {'script_reload'} or {})
+        assert(shortcuts.consume(chord('j',{ctrl=true}),opts)); queue[2]()
+        helpers.assert_eq(fired, action == 'script_reload' and {'script_reload','script_reload'} or {'select_line'})
+      end)
+      gestures.execute_action = original
+      drop_config()
+      if not ok then error(err,0) end
+    end)
+  end
+end)

@@ -415,11 +415,15 @@ helpers.describe("managed public API: terminal global physical shutdown", functi
   helpers.assert_eq(operation.started, false)
   local settlements = 0
   operation:on_settled(function() settlements = settlements + 1 end)
-  helpers.assert_eq(client.download("http://127.0.0.1:9000", {}, "/private/destination", options,
-   function() callbacks = callbacks + 1 end), false)
+  local accepted, download = client.download("http://127.0.0.1:9000", {}, "/private/destination", options,
+   function() callbacks = callbacks + 1 end)
+  helpers.assert_eq(accepted, false)
+  helpers.assert_true(download:is_settled())
+  helpers.assert_eq(download:settled_result().error, "HTTP client stopped")
+  download:on_settled(function() settlements = settlements + 1 end)
   helpers.assert_true(client.shutdown())
   helpers.assert_eq({ callbacks, metadata, preflight, state.policy_loads or 0, #state.requests, #state.handles }, { 0, 0, 0, 0, 0, 0 })
-  helpers.assert_eq(settlements, 1, "settlement remains observable for a resource-free refusal")
+  helpers.assert_eq(settlements, 2, "both resource-free refusals expose settlement")
  end)
 
  helpers.it("keeps the download boolean ABI when caller metadata reenters shutdown", function()

@@ -52,16 +52,30 @@ end
 
 local function find_model(name, catalogue)
 	local wanted = normalise_model_name(name)
-	for _, provider in ipairs(catalogue or {}) do
-		for _, family in ipairs(provider.families or {}) do
-			for _, model in ipairs(family.models or {}) do
-				for _, alias in ipairs(aliases_for(model)) do
-					if alias ~= "" and alias == wanted then return model end
+	local malformed = type(catalogue) ~= "table"
+	local function finish(model)
+		if malformed then Logger.warn(LOG, "Model catalogue contains invalid entries; those entries were ignored.") end
+		return model
+	end
+	if malformed then return finish(nil) end
+	for _, provider in ipairs(catalogue) do
+		local families = type(provider) == "table" and provider.families or nil
+		if type(families) ~= "table" then malformed = true else
+			for _, family in ipairs(families) do
+				local models = type(family) == "table" and family.models or nil
+				if type(models) ~= "table" then malformed = true else
+					for _, model in ipairs(models) do
+						if type(model) ~= "table" then malformed = true else
+							for _, alias in ipairs(aliases_for(model)) do
+								if alias ~= "" and alias == wanted then return finish(model) end
+							end
+						end
+					end
 				end
 			end
 		end
 	end
-	return nil
+	return finish(nil)
 end
 
 --- Pure recommendation seam used by tests.

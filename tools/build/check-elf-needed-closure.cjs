@@ -10,8 +10,8 @@
  * FEATURES & RATIONALE:
  * 1. check-elf-glibc-ceiling.cjs proves the symbol versions; this proves the
  *    other half of "self-contained": every DT_NEEDED entry of every ELF file in
- *    the tree resolves to a file of the tree (by file name or by the SONAME of
- *    one of its ELF files) or to _shared/data/linux_appimage_recipient_libraries.json,
+ *    the tree has a file name or symlink in the tree or is listed in
+ *    _shared/data/linux_appimage_recipient_libraries.json,
  *    the documented list of what the recipient supplies (glibc and its loader,
  *    GLib and the C++ runtime, GTK 3). A library a build host linked by accident
  *    fails here, on the runner, instead of at the first launch on a machine
@@ -48,9 +48,11 @@ function parseDynamic(output) {
 	const needed = [];
 	let soname = null;
 	for (const line of output.split('\n')) {
-		const need = line.match(/\(NEEDED\)\s+Shared library: \[([^\]]+)\]/);
+		const need = line.match(/\(NEEDED\)\s+Shared library: \[(.+)\]\s*$/);
+		if (!need && /\(NEEDED\)/.test(line)) throw new Error('unreadable ELF needed library');
 		if (need) needed.push(need[1]);
-		const own = line.match(/\(SONAME\)\s+Library soname: \[([^\]]+)\]/);
+		const own = line.match(/\(SONAME\)\s+Library soname: \[(.+)\]\s*$/);
+		if (!own && /\(SONAME\)/.test(line)) throw new Error('unreadable ELF soname');
 		if (own) soname = own[1];
 	}
 	return { needed, soname };
@@ -75,6 +77,16 @@ function recipientLibraries(data) {
 			throw new Error(
 				`recipient library group ${group.id}: an id and a reason (40+ characters) are required`
 			);
+		for (const key of ['sonames', 'prefixes']) {
+			if (
+				group[key] !== undefined &&
+				(!Array.isArray(group[key]) ||
+					group[key].some((value) => typeof value !== 'string' || value.length === 0))
+			)
+				throw new Error(
+					`recipient library group ${group.id}: ${key} must contain nonempty strings`
+				);
+		}
 		for (const name of group.sonames || []) {
 			if (sonames.has(name)) throw new Error(`recipient library ${name} is listed twice`);
 			sonames.set(name, group.id);
@@ -89,6 +101,20 @@ function recipientLibraries(data) {
 	return { has: (name) => groupOf(name) !== null, groupOf };
 }
 
+/** ELF shared objects have type ET_DYN; executables cannot satisfy DT_NEEDED. */
+function isSharedObject(file) {
+	const descriptor = fs.openSync(file, 'r');
+	try {
+		const header = Buffer.alloc(18);
+		if (fs.readSync(descriptor, header, 0, header.length, 0) !== header.length) return false;
+		if (header[5] === 1) return header.readUInt16LE(16) === 3;
+		if (header[5] === 2) return header.readUInt16BE(16) === 3;
+		return false;
+	} finally {
+		fs.closeSync(descriptor);
+	}
+}
+
 /**
  * Checks every ELF file under the roots.
  * @param {string[]} roots Files or directories.
@@ -101,6 +127,15 @@ function checkClosure(roots, readDynamic, recipient) {
 	const checked = [];
 	const provided = new Set();
 	const dynamics = new Map();
+	const elfFiles = files.filter(isElf);
+	const outputs = new Map(elfFiles.map((file) => [file, readDynamic(file)]));
+	// PIE executables also use ET_DYN, but cannot be loaded as libraries.
+	const sharedFiles = new Set(
+		elfFiles.filter(
+			(file) => isSharedObject(file) && !/\(FLAGS_1\)[^\n]*\bPIE\b/.test(outputs.get(file))
+		)
+	);
+	const bundledElfPaths = new Set([...sharedFiles].map((file) => fs.realpathSync(file)));
 	for (const root of roots) {
 		// Symbolic links count as provided names: libfoo.so.1 is usually a link.
 		const pending = [root];
@@ -109,17 +144,25 @@ function checkClosure(roots, readDynamic, recipient) {
 			const stat = fs.lstatSync(current);
 			if (stat.isDirectory()) {
 				for (const entry of fs.readdirSync(current)) pending.push(path.join(current, entry));
-			} else {
-				provided.add(path.basename(current));
+			} else if (stat.isSymbolicLink()) {
+				let target;
+				try {
+					target = fs.realpathSync(current);
+				} catch (error) {
+					if (error.code === 'ENOENT' || error.code === 'ELOOP') continue;
+					throw error;
+				}
+				if (bundledElfPaths.has(target)) provided.add(path.basename(current));
 			}
 		}
 	}
-	for (const file of files) {
-		if (!isElf(file)) continue;
+	for (const file of elfFiles) {
 		checked.push(file);
-		const dynamic = parseDynamic(readDynamic(file));
+		const dynamic = parseDynamic(outputs.get(file));
 		dynamics.set(file, dynamic);
-		if (dynamic.soname) provided.add(dynamic.soname);
+		if (sharedFiles.has(file)) {
+			provided.add(path.basename(file));
+		}
 	}
 	const violations = [];
 	for (const [file, dynamic] of dynamics)

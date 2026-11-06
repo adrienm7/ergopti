@@ -56,6 +56,115 @@ helpers.describe("ui.bridge_handlers", function()
 			}, values, captured
 		end
 
+		helpers.it("(paths-editor-save-owner) rejects reentrant saves and cancellation during persistence", function()
+			local state, values, captured = paths_state()
+			local epoch, writes, nested, cancelled = 1, 0, nil, nil
+			state.webview_manager.current_epoch = function() return epoch end
+			state.webview_manager.page_current = function(_, value) return epoch == value end
+			local context = { app_name = "paths_editor", epoch = 1,
+				close_owned_window = function() captured.hidden = captured.hidden + 1; return true end }
+			local write = state.config_paths.set_paths
+			state.config_paths.set_paths = function(...)
+				writes = writes + 1
+				if writes == 1 then
+					nested = handler.on_message({ action = "save", configDir = "/tmp/other" }, state, context)
+					cancelled = handler.on_message({ action = "cancel" }, state, context)
+				end
+				return write(...)
+			end
+			local result = handler.on_message({ action = "save", configDir = "/tmp/wanted" }, state, context)
+			helpers.assert_eq(nested, { saved = false, busy = true })
+			helpers.assert_eq(cancelled, { cancelled = false, hidden = false, busy = true })
+			helpers.assert_true(result.saved and result.reloaded and result.hidden)
+			helpers.assert_eq(values.config_dir, "/tmp/wanted")
+			helpers.assert_eq({ writes, captured.reloaded, captured.hidden }, { 1, 1, 1 })
+		end)
+
+		helpers.it("(paths-editor-save-owner) clears the guard after an unexpected persistence error", function()
+			local state, _, captured = paths_state()
+			local write = state.config_paths.set_paths
+			state.config_paths.set_paths = function() error("controlled persistence error") end
+			local ok = pcall(handler.on_message, { action = "save", configDir = "/tmp/wanted" }, state)
+			state.config_paths.set_paths = write
+			helpers.assert_eq(ok, false)
+			local result = handler.on_message({ action = "save", configDir = "/tmp/wanted" }, state)
+			helpers.assert_true(result.saved and result.reloaded and result.hidden)
+			helpers.assert_eq(captured.reloaded, 1)
+		end)
+
+		helpers.it("(paths-editor-owner) does not push a picked path into a replacement page", function()
+			local state, _, captured = paths_state()
+			local epoch = 1
+			state.webview_manager.current_epoch = function() return epoch end
+			state.webview_manager.page_current = function(_, value) return epoch == value end
+			local picker = require("ui.config_dir_picker")
+			local original = picker.pick
+			picker.pick = function() epoch = 2; return "/tmp/selected" end
+			local ok, result = pcall(handler.on_message, { action = "browse" }, state,
+				{ app_name = "paths_editor", epoch = 1 })
+			picker.pick = original
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(#captured.pushes, 0)
+		end)
+
+		helpers.it("(paths-editor-owner) refuses a picker result when native cleanup is owed", function()
+			local state, _, captured = paths_state()
+			local ready = true
+			state.webview_manager.current_epoch = function() return 1 end
+			state.webview_manager.page_current = function() return ready end
+			local picker, original = require("ui.config_dir_picker"), require("ui.config_dir_picker").pick
+			picker.pick = function() ready = false; return "/tmp/selected" end
+			local ok, result = pcall(handler.on_message, { action = "browse" }, state,
+				{ app_name = "paths_editor", epoch = 1 })
+			picker.pick = original
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(#captured.pushes, 0)
+		end)
+
+		helpers.it("(paths-editor-owner) rechecks the epoch after the native page probe", function()
+			local state, _, captured = paths_state()
+			local epoch = 1
+			state.webview_manager.current_epoch = function() return epoch end
+			state.webview_manager.page_current = function() epoch = 2; return true end
+			local result = handler.on_message({ action = "save", configDir = "/tmp/saved" }, state,
+				{ app_name = "paths_editor", epoch = 1 })
+			helpers.assert_nil(result)
+			helpers.assert_eq(captured.reloaded, 0)
+		end)
+
+		helpers.it("(paths-editor-owner) does not close a replacement page after reload", function()
+			local state, _, captured = paths_state()
+			local epoch = 1
+			state.webview_manager.current_epoch = function() return epoch end
+			state.webview_manager.page_current = function(_, value) return epoch == value end
+			state.on_reload = function() epoch = 2; return true end
+			local context = { app_name = "paths_editor", epoch = 1,
+				close_owned_window = function() error("old page is gone") end }
+			local result = handler.on_message({ action = "save", configDir = "/tmp/saved" }, state, context)
+			helpers.assert_eq(result.saved, true)
+			helpers.assert_eq(result.hidden, false)
+			helpers.assert_eq(captured.hidden, 0)
+		end)
+
+		helpers.it("(paths-editor-owner) applies a committed change after the page is replaced", function()
+			local state, _, captured = paths_state()
+			local epoch, applied, moved = 1, 0, 0
+			state.webview_manager.current_epoch = function() return epoch end
+			state.webview_manager.page_current = function(_, value) return epoch == value end
+			state.config_paths.normalize_logs_dir = function(path) return path end
+			state.logger_sink = { prepare_dir = function() return true end,
+				repoint = function() moved = moved + 1; return true end }
+			local write = state.config_paths.set_paths
+			state.config_paths.set_paths = function(...) local ok = write(...); epoch = 2; return ok end
+			state.on_reload = function() helpers.assert_eq(moved, 1); applied = applied + 1; return true end
+			local result = handler.on_message({ action = "save", configDir = "/tmp/saved", logsDir = "/tmp/logs" }, state,
+				{ app_name = "paths_editor", epoch = 1 })
+			helpers.assert_eq(result, { saved = true, hidden = false, reloaded = true })
+			helpers.assert_eq(applied, 1)
+			helpers.assert_eq(moved, 1)
+			helpers.assert_eq(captured.hidden, 0)
+		end)
+
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "hsPaths")
     end)
@@ -152,6 +261,21 @@ helpers.describe("ui.bridge_handlers", function()
   helpers.describe("personal_info_editor_bridge", function()
     local handler = helpers.load_module("ui.personal_info_editor.bridge")
 
+		helpers.it("(personal-save-private-error) never logs a persistence exception containing a field", function()
+			local logger, lines = require("logger.shim"), {}
+			local original = logger.error
+			logger.error = function(_, fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end
+			local ok, err = pcall(function()
+				local result = handler.on_message({ action = "save", values = { first_name = "secret-canary" } }, {
+					dyn_hotstrings = { save_info = function(values) error("write failed: " .. values.first_name) end },
+				})
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_true(not table.concat(lines, "\n"):find("secret-canary", 1, true))
+			end)
+			logger.error = original
+			if not ok then error(err, 0) end
+		end)
+
     local function personal_state(save_result, reload_result)
       local captured = { close_count = 0, reload_count = 0 }
       local state = build_mock_state()
@@ -242,10 +366,12 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("pushes the curated Ollama catalogue and routes exact page actions", function()
       local selected, download = nil, nil
+      local cache_identity = {}
       handler._reset()
       local state = {
         llm = {
           get_cached_models = function() return { "qwen3.5:0.8b" } end,
+          get_cached_models_status = function() return { "qwen3.5:0.8b" }, true, cache_identity end,
           get_current_model = function() return "qwen3.5:0.8b" end,
           refresh_models = function() return {} end,
           set_model = function(name) selected = name; return true end,
@@ -399,24 +525,59 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 		for name, value in pairs(prior) do assert(package.loaded[name] == value, "every prior module identity is restored") end
 		if not called then error(failure, 0) end
 	end
+	helpers.it("(personal-save-owner) refuses cancellation during a real save", function()
+		with_native_owners(function(c)
+			local handler = helpers.load_module("ui.personal_info_editor.bridge")
+			local epoch, closes, cancelled, duplicate = 41, 0, nil, nil
+			local document = {}
+			local host = { current_epoch = function() return epoch end,
+				page_current = function(_, expected) return epoch == expected end,
+				document_owner_current = function(owner) return owner == document and epoch == 41 end,
+				document_owner_retained = function(owner) return owner == document and epoch == 41 end,
+				eval_owned_js = function(_, owner) return owner == document end,
+				eval_js = function() return true end }
+			local context = { app_name = "personal_info_editor", epoch = epoch, document_owner = document,
+				close_owned_window = function() closes = closes + 1; epoch = nil; return true end }
+			local state = { dyn_hotstrings = c.dynamic, webview_manager = host,
+				config = { reload = function() return 0, true end }, i18n = { get = function(key) return key end } }
+			helpers.assert_true(handler.on_message({ action = "ready" }, state, context).pushed)
+			local original_save = c.dynamic.save_info
+			c.dynamic.save_info = function(...)
+				duplicate = handler.on_message({ action = "save", values = { first_name = "Other" } }, state, context)
+				cancelled = handler.on_message({ action = "cancel" }, state, context)
+				return original_save(...)
+			end
+			local result = handler.on_message({ action = "save", values = { first_name = "Grace" } }, state, context)
+			c.dynamic.save_info = original_save
+			helpers.assert_eq(duplicate, { saved = false, reloaded = false, closed = false, busy = true })
+			helpers.assert_eq(cancelled, { cancelled = false, closed = false, busy = true })
+			helpers.assert_eq(result, { saved = true, reloaded = true, closed = true })
+			helpers.assert_eq(closes, 1)
+			helpers.assert_contains(read(c.path), 'first_name = "Grace"')
+		end)
+	end)
 	for _, scenario in ipairs({ "positive", "external", "recovery", "root", "page", "publication", "generation", "ready-refused", "retained", "retained-foreign", "forged", "push-reentry", "final-page", "postwrite-external", "state-refresh" }) do
 		helpers.it("personal-source-receipt: preserves the displayed file through " .. scenario, function()
 			with_native_owners(function(c)
 				local handler = helpers.load_module("ui.personal_info_editor.bridge")
 				local epoch, closes, notices = 41, 0, 0
+				local document = {}
 				local host = {
 					current_epoch = function() return epoch end,
 					page_current = function(_, expected) return expected == epoch end,
+					document_owner_current = function(owner) return owner == document and epoch == 41 end,
+					document_owner_retained = function(owner) return owner == document and epoch == 41 end,
+					eval_owned_js = function(_, owner) return owner == document end,
 					eval_js = function() return true end,
 				}
-				local context = { app_name = "personal_info_editor", epoch = epoch,
+				local context = { app_name = "personal_info_editor", epoch = epoch, document_owner = document,
 					close_owned_window = function() closes = closes + 1;return true end }
 				local state = { dyn_hotstrings = c.dynamic, webview_manager = host,
 					config = { reload = function() return 0, true end },
 					i18n = { get = function(key) return key end },
 					notify_error = function(key) helpers.assert_eq(key, "dialog.personal_info.save_failed");notices = notices + 1 end }
-				if scenario == "ready-refused" then host.eval_js = function() return false end end
-				if scenario == "push-reentry" then host.eval_js = function() epoch = epoch + 1;return true end end
+				if scenario == "ready-refused" then host.eval_owned_js = function() return false end end
+				if scenario == "push-reentry" then host.eval_owned_js = function() epoch = epoch + 1;return true end end
 				local ready = handler.on_message({ action = "ready" }, state, context)
 				helpers.assert_eq(ready.pushed, scenario ~= "ready-refused" and scenario ~= "push-reentry")
 				helpers.assert_eq(ready.data.fields[1].value, "Ada")
@@ -494,6 +655,13 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 					if scenario == "root" then helpers.assert_eq(read(c.path), c.original) end
 					if scenario == "external" or scenario == "publication" then helpers.assert_eq(notices, 1) end
 					if scenario == "recovery" then
+						-- Reload creates a new document; a duplicate ready on the old page
+						-- must retain its original source rather than borrow this winner.
+						helpers.assert_true(handler.on_message({ action = "ready" }, state, context).pushed)
+						helpers.assert_eq(handler.on_message({ action = "save", values = { first_name = "Stale" } }, state, context).saved, false)
+						helpers.assert_eq(read(target), winner)
+						document = {}
+						context.document_owner = document
 						local fresh = handler.on_message({ action = "ready" }, state, context)
 						helpers.assert_true(fresh.pushed)
 						helpers.assert_eq(fresh.data.fields[1].value, "Independent")
@@ -585,7 +753,8 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 	end
 
 	local function with_real_locale(options)
-		local names = { "infra.i18n", "infra.locale", "infra.config_paths", "adapters.storage" }
+		local names = { "infra.i18n", "infra.locale", "infra.config_paths", "adapters.storage",
+			"infra.script_scope", "infra.scope_registry" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local root = os.tmpname()
@@ -609,6 +778,8 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 				config = function(name) return root .. "/config/" .. name end }
 			package.loaded["infra.locale"] = nil
 			package.loaded["adapters.storage"] = nil
+			package.loaded["infra.script_scope"] = nil
+			package.loaded["infra.scope_registry"] = nil
 			package.loaded["infra.i18n"] = nil
 			local i18n = require("infra.i18n")
 			i18n.init()
@@ -663,6 +834,8 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 		os.rename = original_rename
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		os.remove(storage_path .. ".tmp"); os.remove(storage_path); os.remove(config_path)
+		os.execute("rm -f " .. string.format("%q", root .. "/" .. FOLDER) .. "/*.bak "
+			.. string.format("%q", root .. "/config") .. "/*.bak")
 		os.execute("rmdir " .. string.format("%q", root .. "/" .. FOLDER)
 			.. " " .. string.format("%q", root .. "/config"))
 		os.execute("rmdir " .. string.format("%q", root))

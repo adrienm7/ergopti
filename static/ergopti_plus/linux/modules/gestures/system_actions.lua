@@ -92,21 +92,27 @@ local SYSTEM_MOUNTS = "^(/|/boot|/boot/efi|/usr|/var|/home|\\[SWAP\\])$"
 M.EJECT_ALL_DISKS = 'lsblk -nrpo NAME,TYPE,RM,HOTPLUG 2>/dev/null | while read -r dev kind rm hot; do'
 	.. ' [ "$kind" = disk ] || continue;'
 	.. ' [ "$rm" = 1 ] || [ "$hot" = 1 ] || continue;'
-	.. " lsblk -nrpo MOUNTPOINT \"$dev\" | grep -qE '" .. SYSTEM_MOUNTS .. "' && continue;"
-	.. ' lsblk -nrpo NAME,MOUNTPOINT "$dev" | while read -r part mnt; do'
-	.. ' [ -n "$mnt" ] && udisksctl unmount -b "$part" </dev/null; done;'
-	.. ' udisksctl power-off -b "$dev" </dev/null; done'
+	.. ' mounts=$(lsblk -nrpo MOUNTPOINT "$dev") || continue;'
+	.. " printf '%s\\n' \"$mounts\" | grep -qE '" .. SYSTEM_MOUNTS .. "' && continue;"
+	.. ' parts=$(lsblk -nrpo NAME,MOUNTPOINT "$dev") || continue;'
+	.. ' printf "%s\\n" "$parts" | while read -r part mnt; do'
+	.. ' [ -n "$mnt" ] || continue; udisksctl unmount -b "$part" </dev/null || exit 1; done'
+	.. ' && udisksctl power-off -b "$dev" </dev/null; done'
+
 
 --- Every action this module runs as one fixed shell command, by action id.
 M.COMMANDS = {
 	-- wmctrl -m reports the EWMH "showing the desktop" mode; -k sets it.
-	show_desktop = "case \"$(wmctrl -m 2>/dev/null)\" in *'mode: ON'*) wmctrl -k off;; *) wmctrl -k on;; esac",
+	show_desktop = "desktop=$(wmctrl -m 2>/dev/null) && case \"$desktop\" in"
+		.. " *'mode: ON'*) wmctrl -k off;; *'mode: OFF'*) wmctrl -k on;; *) false;; esac",
 	-- Releasing the keys that fired it is input that would wake the displays
 	-- straight back up: they are powered off once that release has happened.
 	sleep_displays = "sleep 1 && xset dpms force off",
-	toggle_dark_mode = "case \"$(gsettings get " .. COLOR_SCHEME .. " 2>/dev/null)\" in"
-		.. " *prefer-dark*) gsettings set " .. COLOR_SCHEME .. " default;;"
-		.. " *) gsettings set " .. COLOR_SCHEME .. " prefer-dark;; esac",
+	toggle_dark_mode = "scheme=$(gsettings get " .. COLOR_SCHEME .. " 2>/dev/null) && case \"$scheme\" in"
+		.. " \"'prefer-dark'\") gsettings set " .. COLOR_SCHEME .. " default;;"
+		.. " \"'default'\"|\"'prefer-light'\") gsettings set " .. COLOR_SCHEME .. " prefer-dark;;"
+		.. " *) false;; esac",
+
 	mic_mute_toggle = "pactl set-source-mute @DEFAULT_SOURCE@ toggle",
 	empty_trash = "gio trash --empty",
 	minimize_all = M.MINIMIZE_ALL,
@@ -196,7 +202,7 @@ M.COLOR_PICKERS = {
 	},
 	x11 = {
 		{ binary = "xcolor", command = "xcolor --selection clipboard" },
-		{ binary = "gpick", command = "gpick --single --output --no-newline | xclip -selection clipboard" },
+		{ binary = "gpick", command = '{ colour=$(gpick --single --output --no-newline) && [ -n "$colour" ] && printf "%s" "$colour" | xclip -selection clipboard; }' },
 	},
 }
 
@@ -282,7 +288,17 @@ M.HANDLERS = {
 		end
 	end,
 	make_executable_selection = function(deps)
-		local ok, uri_list, reason = deps.clipboard.read_selection_uri_list(deps.emit_combo, deps.sleep_ms)
+		local admitted = require("modules.shortcuts.open_selection").capture_file_manager()
+		if not admitted then
+			Logger.warn(LOG, "make_executable_selection: no focused file manager; copy refused.")
+			return
+		end
+		local function guarded_copy(combo)
+			if admitted() ~= true then return false end
+			return deps.emit_combo(combo)
+		end
+		local ok, uri_list, reason = deps.clipboard.read_selection_uri_list(guarded_copy, deps.sleep_ms)
+		if admitted() ~= true then return end
 		if not ok then
 			if reason == "no_file_selection" then
 				Logger.info(LOG, "make_executable_selection: no file is selected.")

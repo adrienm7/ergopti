@@ -18,6 +18,7 @@ if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
 local prompt_text = require("ui.menu.menu_dialogs").prompt_text
 local show_error = require("ui.menu.menu_dialogs").show_error
+local plain_markup = require("ui.menu.menu_dialogs").plain_markup
 
 local LOG = "ui.menu.menu_tap_holds"
 
@@ -196,7 +197,7 @@ local function _build_tap_holds(ctx)
 		local ms = tonumber(value)
 		if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms + 0.5) <= 0 then
 			Logger.warn(LOG, "Invalid tap-hold delay '%s' — ignored.", tostring(value))
-			show_error(tostring(value), i18n_safe("dialog.gestures.param_error_title"))
+			show_error(plain_markup(tostring(value)), i18n_safe("dialog.gestures.param_error_title"))
 			return false
 		end
 		if guard() ~= true then changed(false); return false end
@@ -222,7 +223,7 @@ local function _build_tap_holds(ctx)
 		local ms = tonumber(value)
 		if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms + 0.5) <= 0 then
 			Logger.warn(LOG, "Invalid global tap-hold delay '%s' — ignored.", tostring(value))
-			show_error(tostring(value), i18n_safe("dialog.gestures.param_error_title"))
+			show_error(plain_markup(tostring(value)), i18n_safe("dialog.gestures.param_error_title"))
 			return false
 		end
 		if guard() ~= true then changed(false); return false end

@@ -24,20 +24,10 @@ local Logger = require("logger.shim")
 package.loaded["locale.core"] = nil
 local Core   = require("locale.core")
 
--- Resolve the JSON decoder (pcall-guarded — falls back to load("return…")).
-local function resolve_json_decoder()
-	local ok_j, json_mod = pcall(require, "json")
-	if ok_j and json_mod and type(json_mod.decode) == "function" then
-		return json_mod.decode
-	end
-	-- Minimal fallback for trusted static data (strings only).
-	return function(raw)
-		local ok, val = pcall(function()
-			return assert(load("return " .. raw))()
-		end)
-		if ok then return val end
-	end
-end
+-- Locale files are JSON data, never executable Lua. A missing decoder is a
+-- broken installation and must be reported before any locale file is read.
+local ok_json, json = pcall(require, "json")
+assert(ok_json and type(json) == "table" and type(json.decode) == "function", "locale: JSON decoder unavailable")
 
 -- Resolves _shared/data/locales/<code>.json through infra/paths.lua, the one
 -- resolver that knows both shipped layouts. This used to cut three levels off
@@ -54,7 +44,7 @@ end
 
 -- Wire the shared module at require-time.
 Core.init({
-	json_decode = resolve_json_decoder(),
+	json_decode = json.decode,
 	resolve_locale_path = resolve_locale_path,
 	log_debug = function(section, fmt, ...) Logger.debug(section, fmt, ...) end,
 	log_warn  = function(section, fmt, ...) Logger.warn(section, fmt, ...) end,

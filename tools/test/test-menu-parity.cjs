@@ -2204,7 +2204,10 @@ const {
 				'{ ["personal_default_choices"] = function() return choices end }',
 				'{ ["personal_default_choices"] = function() return {} end }'
 			],
-			['Editor.set_pref("default_section", name)', 'Editor.set_pref("default_section", "foreign")']
+			[
+				'save_editor_pref("default_section", name)',
+				'save_editor_pref("default_section", "foreign")'
+			]
 		]
 	};
 	const retainedCoordinates = {
@@ -2329,6 +2332,16 @@ const {
 			]
 		],
 		linux: [
+			[
+				'local choice = ManifestMenu.check_row("hotstring_personal_default_choice"',
+				'local save_editor_pref = Foreign\n\t\t\t\t\tlocal choice = ManifestMenu.check_row("hotstring_personal_default_choice"'
+			],
+			['local saved = Editor.set_pref(key, value)', 'local saved = true'],
+			[
+				'local saved = Editor.set_pref(key, value)\n\t\t\t\t\tif saved ~= true then',
+				'local saved = Editor.set_pref(key, value)\n\t\t\t\t\tif false then'
+			],
+			['return save_editor_pref("default_section", name)', 'return true'],
 			['local personal_choices_admitted = true', 'local personal_choices_admitted = false'],
 			['personal_choices_admitted = false', 'personal_choices_admitted = true'],
 			['personal_choices_admitted = false', 'local personal_choices_admitted = false'],

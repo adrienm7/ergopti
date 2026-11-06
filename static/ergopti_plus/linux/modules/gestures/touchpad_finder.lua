@@ -33,18 +33,10 @@
 --- such a machine twenty of the declared slots are unreachable no matter what the
 --- software does. Saying so is the point of this module.
 ---
---- THE WORD-SIZE ASSUMPTION, AND WHY IT IS SAFE:
---- The bitmaps are printed as space-separated hex words, most significant first,
---- with leading all-zero words omitted. The word is `unsigned long`, so 64 bits on
---- every machine this driver targets and 32 on a 32-bit kernel. There is no
---- reliable way to tell which from the text alone, because the omission of
---- leading zeros makes the word COUNT depend on content rather than on width.
---- This assumes 64.
----
---- What makes that assumption acceptable is the direction of its failure: an
---- unrecognised bit reports "unknown", and an unknown capability offers EVERY
---- gesture rather than none. A wrong parse can therefore fail to add a hint. It
---- can never take a working gesture away.
+--- THE WORD-SIZE AMBIGUITY:
+--- Procfs bitmap words can be either 32 or 64 bits. A word wider than
+--- eight hex digits proves a 64-bit kernel; otherwise both interpretations
+--- are considered, and ambiguous device capabilities require an fd probe.
 --- ==============================================================================
 
 local M = {}
@@ -57,8 +49,8 @@ local LOG = "gestures.touchpad_finder"
 -- Where the kernel describes every input device it has.
 local DEVICES_PATH = "/proc/bus/input/devices"
 
--- Bits per printed word. See the header for why this is an assumption and why
--- being wrong about it is safe.
+-- Default width for callers examining known 64-bit procfs fixtures. Device
+-- selection checks both widths when the bitmap does not prove its width.
 local BITS_PER_WORD = 64
 
 -- The kernel codes, read from the decoder rather than repeated here.
@@ -109,15 +101,16 @@ M.FINGER_BITS = FINGER_BITS
 --- @param bitmap string e.g. "e520 10000 0 0 0 0 0 0 0"
 --- @param bit integer
 --- @return boolean
-function M.bit_set(bitmap, bit)
+function M.bit_set(bitmap, bit, word_bits)
 	if type(bitmap) ~= "string" or type(bit) ~= "number" then return false end
 
 	local words = {}
 	for word in bitmap:gmatch("%x+") do words[#words + 1] = word end
 	if #words == 0 then return false end
 
-	local word_index = math.floor(bit / BITS_PER_WORD)
-	local bit_index  = bit % BITS_PER_WORD
+	word_bits = word_bits or BITS_PER_WORD
+	local word_index = math.floor(bit / word_bits)
+	local bit_index  = bit % word_bits
 
 	-- Counted from the right: the last printed word is word 0.
 	local position = #words - word_index
@@ -187,10 +180,57 @@ local function event_node(handlers)
 	return "/dev/input/" .. node
 end
 
+-- Confirm ambiguous procfs words against the kernel's actual fd capabilities.
+-- A 32-bit userspace process can run on a 64-bit kernel, so its ABI is not
+-- evidence of procfs word size. A failed probe never admits a device.
+local function probe_capabilities(path)
+	local available, ffi = pcall(require, "ffi")
+	if not available or type(ffi) ~= "table" or ffi.os ~= "Linux" then return nil end
+	local declared, detail = pcall(ffi.cdef, [[
+		int open(const char *path, int flags);
+		int close(int fd);
+		int ioctl(int fd, unsigned long request, ...);
+	]])
+	if not declared and not tostring(detail):find("redefin", 1, true) then return nil end
+	local bound, open_port, ioctl_port, close_port = pcall(function() return ffi.C.open, ffi.C.ioctl, ffi.C.close end)
+	if not bound then return nil end
+	local opened, fd = pcall(open_port, path, 0x80800) -- O_NONBLOCK | O_CLOEXEC
+	if not opened or fd == nil or fd < 0 then return nil end
+	local called, result = pcall(function()
+		local abs, keys = ffi.new("uint8_t[8]"), ffi.new("uint8_t[42]")
+		if tonumber(ioctl_port(fd, 0x80084523, abs)) ~= 8 then return nil end
+		-- The slot and key count are independent: a refused key bitmap leaves
+		-- the count unknown, without discarding an already confirmed touchpad.
+		local key_called, key_bytes = pcall(ioctl_port, fd, 0x802a4521, keys)
+		local function bit_set(bytes, bit)
+			return math.floor(tonumber(bytes[math.floor(bit / 8)]) / 2 ^ (bit % 8)) % 2 == 1
+		end
+		local maximum = 0
+		if key_called and tonumber(key_bytes) == 42 then
+			for _, entry in ipairs(FINGER_BITS) do
+				if bit_set(keys, entry.bit) and entry.fingers > maximum then maximum = entry.fingers end
+			end
+		end
+		return { slot = bit_set(abs, ABS_MT_SLOT), max_fingers = maximum }
+	end)
+	local closed, acknowledged = pcall(close_port, fd)
+	if not called or not closed or acknowledged ~= 0 then return nil end
+	return result
+end
+
+local function proven_64(device)
+	for _, field in ipairs({ "ev", "key", "abs", "prop" }) do
+		for word in tostring(device[field] or ""):gmatch("%x+") do
+			if #word > 8 then return true end
+		end
+	end
+	return false
+end
+
 --- Describes one device as a candidate touchpad.
 --- @param device table
 --- @return table { path, name, is_touchpad, semi_mt, max_fingers, reason }
-function M.describe(device)
+function M.describe(device, probe)
 	local out = {
 		path        = event_node(device.handlers or ""),
 		name        = device.name or "",
@@ -208,7 +248,17 @@ function M.describe(device)
 	-- Multitouch slots are the defining test, not the device's NAME: a name can
 	-- say "Touchpad" on something that reports a single point, and a real pad can
 	-- be named after its chipset.
-	if not M.bit_set(device.abs or "", ABS_MT_SLOT) then
+	local wide = proven_64(device)
+	local slot64 = M.bit_set(device.abs or "", ABS_MT_SLOT, 64)
+	local slot32 = M.bit_set(device.abs or "", ABS_MT_SLOT, 32)
+	local capabilities
+	if not wide and slot64 ~= slot32 and type(probe) == "function" then
+		local called, result = pcall(probe, out.path)
+		if called and type(result) == "table" then capabilities = result end
+	end
+	local slot = wide and slot64 or (slot64 == slot32 and slot64)
+	if not wide and slot64 ~= slot32 then slot = capabilities and capabilities.slot == true end
+	if not slot then
 		out.reason = Errors.TOUCHPAD_NO_MULTITOUCH_SLOT
 		return out
 	end
@@ -225,9 +275,21 @@ function M.describe(device)
 	-- rejected: the finger COUNT is still trustworthy, and taps only need that.
 	out.semi_mt = M.bit_set(device.prop or "", INPUT_PROP_SEMI_MT)
 
+	local maximum64, maximum32 = 0, 0
 	for _, entry in ipairs(FINGER_BITS) do
-		if M.bit_set(device.key or "", entry.bit) then
-			if entry.fingers > out.max_fingers then out.max_fingers = entry.fingers end
+		if M.bit_set(device.key or "", entry.bit, 64) then maximum64 = math.max(maximum64, entry.fingers) end
+		if M.bit_set(device.key or "", entry.bit, 32) then maximum32 = math.max(maximum32, entry.fingers) end
+	end
+	if wide or maximum64 == maximum32 then
+		out.max_fingers = maximum64
+	else
+		if not capabilities and type(probe) == "function" then
+			local called, result = pcall(probe, out.path)
+			if called and type(result) == "table" then capabilities = result end
+		end
+		local maximum = capabilities and capabilities.max_fingers
+		if type(maximum) == "number" and maximum >= 0 and maximum <= 5 and maximum % 1 == 0 then
+			out.max_fingers = maximum
 		end
 	end
 
@@ -253,20 +315,26 @@ end
 --- boot then flips between pads and their gesture sets with it.)
 --- @param text string|nil Contents of /proc/bus/input/devices; read when nil.
 --- @return table Array of describe() results.
-function M.list(text)
+function M.list(text, probe)
 	if text == nil then
+		probe = probe or probe_capabilities
 		local fh = io.open(DEVICES_PATH, "r")
 		if not fh then
 			Logger.error(LOG, "Cannot read %s — no touchpad can be found.", DEVICES_PATH)
 			return {}
 		end
-		text = fh:read("*a") or ""
-		fh:close()
+		local read_ok, content = pcall(fh.read, fh, "*a")
+		local close_ok, closed = pcall(fh.close, fh)
+		if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true then
+			Logger.error(LOG, "Cannot complete reading %s — no touchpad can be found.", DEVICES_PATH)
+			return {}
+		end
+		text = content
 	end
 
 	local found = {}
 	for _, device in ipairs(M.parse_devices(text)) do
-		local described = M.describe(device)
+		local described = M.describe(device, probe)
 		if described.is_touchpad then found[#found + 1] = described end
 	end
 
@@ -281,8 +349,8 @@ end
 --- The touchpad to read, or nil with the reason there is none.
 --- @param text string|nil
 --- @return table|nil touchpad, string|nil reason
-function M.find(text)
-	local found = M.list(text)
+function M.find(text, probe)
+	local found = M.list(text, probe)
 	if #found == 0 then
 		return nil, "no device reports multitouch slots"
 	end

@@ -55,7 +55,7 @@ function M.command(title, text, choices)
 	end
 	-- The first column holds the value: hidden, and the one printed.
 	return NativeDialog.command() .. " --list --no-markup --hide-header --title=" .. Shell.quote(WindowTitles.compose(title))
-		.. " --text=" .. Shell.quote(text) .. " --column='' --column='' --hide-column=1 --print-column=1 "
+		.. " --text=" .. Shell.quote(text) .. " --column='' --column='' --hide-column=1 --print-column=1 -- "
 		.. table.concat(rows, " ") .. " 2>/dev/null"
 end
 

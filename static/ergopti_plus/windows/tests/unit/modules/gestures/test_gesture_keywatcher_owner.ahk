@@ -84,6 +84,25 @@ _GKO_Source(OwnerReceipt) {
 			Seen[Path] := true
 		}
 	}
+	ConfigOwner := _DriverProductionFileForSymbol("_GestureCommitAssignment")
+	AssertTrue(ConfigOwner != "", "the assignment publisher must have a real owner")
+	ConfigSource := FSReadStrict(ConfigOwner)
+	for Name in ["GestureSaveAssignment", "GestureBindingId", "_GestureCommitAssignment", "_GestureCloneActionParameters", "_GestureRunAction"] {
+		Body := _DriverExtractFunctionBody(&ConfigSource, Name)
+		AssertTrue(Body != "", "the real assignment body must exist: " . Name)
+		Source .= Body . "`n"
+	}
+	Source .= "global GestureBindingWriteOwners := Map()`nglobal GestureAssignments := Map()`nglobal GestureActionParameters := Map()`nglobal ConfigurationFile := " . _GKO_Quote("fixture.toml") . "`n"
+	ActionOwner := _DriverProductionFileForSymbol("GestureActionIsAssignable")
+	AssertTrue(ActionOwner != "", "the real action catalogue must exist")
+	ActionSource := FSReadStrict(ActionOwner)
+	for Button in ["left", "right"] {
+		Pattern := '"' . Button . '_click_toggle",\s*\{\s*Fn:\s*([^\r\n]+),'
+		AssertTrue(RegExMatch(ActionSource, Pattern, &Match) > 0, "the real toggle callback must be found")
+		Source .= "global _GKO_" . Button . "Action := " . Match[1] . "`n"
+	}
+	Source .= 'global GESTURE_ACTIONS := Map("left_click_toggle", {Fn: _GKO_leftAction}, "right_click_toggle", {Fn: _GKO_rightAction})' . "`n"
+
 	Body := FSReadStrict(_DriverDir . "\tests\fixtures\gesture_keywatcher_owner_body.ahk")
 	AssertTrue(Body != "", "the isolated native ownership fixture must exist")
 	OwnerReceipt["fixture_sha256"] := CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\gesture_keywatcher_owner_body.ahk"))
@@ -190,5 +209,5 @@ _GKO_Case(Mode) {
 }
 
 for _GKO_Mode in ["retired-left-right", "retired-right-left", "current-left-right", "current-right-left",
-	"paused-left-up-refusal", "paused-right-up-refusal"]
+	"paused-left-up-refusal", "paused-right-up-refusal", "assignment-left", "assignment-right", "assignment-left-up-refusal", "assignment-right-up-refusal"]
 	Test("Gesture watcher ownership: " . _GKO_Mode . " (gesture-keywatcher-owner)", _GKO_Case.Bind(_GKO_Mode))

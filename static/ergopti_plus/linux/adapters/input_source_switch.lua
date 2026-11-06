@@ -210,17 +210,23 @@ function M.new(port)
 	end
 	local switcher = {}
 	local choices = {}
+	local listing_epoch = 0
+	local refreshing = 0
+	local refresh_waiters = {}
+	local draining_refreshes = 0
 	local busy, queued = false, nil
-	local listeners = {}
+	local listeners, delivering = {}, false
 
 	local function settle_listeners()
-		if busy or queued ~= nil then return end
-		local captured = listeners
-		listeners = {}
-		for _, listener in ipairs(captured) do
+		if delivering then return end
+		delivering = true
+		while not busy and queued == nil and refreshing == 0 and draining_refreshes == 0
+			and #refresh_waiters == 0 and #listeners > 0 do
+			local listener = table.remove(listeners, 1)
 			local ok, err = pcall(listener)
 			if not ok then Logger.error(LOG, "A switch settlement listener failed: %s.", tostring(err)) end
 		end
+		delivering = false
 	end
 
 	--- Runs one command and hands its stdout, or nil and the reason, to on_done.
@@ -292,9 +298,20 @@ function M.new(port)
 	--- a refused reading keeps the previous list and reports changed = false.
 	--- @param on_done function|nil
 	function switcher.refresh(on_done)
+		-- A menu repaint must not supersede a pause/quit switch already reading
+		-- the desktop. Read the choices after the queued switches have finished.
+		if busy then
+			refresh_waiters[#refresh_waiters + 1] = type(on_done) == "function" and on_done or false
+			return
+		end
+		listing_epoch = listing_epoch + 1
+		local epoch = listing_epoch
+		refreshing = refreshing + 1
 		read_listing(function(listing, reason)
 			local changed = false
-			if listing then
+			if epoch ~= listing_epoch then
+				listing = nil
+			elseif listing then
 				local fresh = choices_of(listing)
 				changed = #fresh ~= #choices
 				for index, choice in ipairs(fresh) do
@@ -302,28 +319,43 @@ function M.new(port)
 					if not old or old.id ~= choice.id or old.label ~= choice.label then changed = true end
 				end
 				choices = fresh
-			else
+			elseif epoch == listing_epoch then
 				Logger.warn(LOG, "Keyboard layouts not listed: %s.", tostring(reason))
 			end
-			if type(on_done) == "function" then on_done(changed) end
+			if type(on_done) == "function" then
+				local called, err = pcall(on_done, changed)
+				if not called then Logger.error(LOG, "A layout refresh callback failed: %s.", tostring(err)) end
+			end
+			refreshing = refreshing - 1
+			settle_listeners()
 		end)
 	end
 
 	local function start(id, on_done)
 		busy = true
+		listing_epoch = listing_epoch + 1
+		local epoch = listing_epoch
 		read_listing(function(listing, reason)
 			local function done(ok, detail)
-				busy = false
+				-- Keep the slot occupied during delivery: a reentrant selection must
+				-- replace the queued request, not start alongside it.
 				local ran, err = pcall(on_done, ok, detail)
 				if not ran then Logger.error(LOG, "A switch completion callback failed: %s.", tostring(err)) end
+				busy = false
 				if queued ~= nil then
 					local next_request = queued
 					queued = nil
 					return start(next_request.id, next_request.on_done)
 				end
+				local waiting = refresh_waiters
+				refresh_waiters = {}
+				draining_refreshes = draining_refreshes + 1
+				for _, callback in ipairs(waiting) do switcher.refresh(callback or nil) end
+				draining_refreshes = draining_refreshes - 1
 				settle_listeners()
 			end
 			if listing == nil then return done(false, reason) end
+			if epoch ~= listing_epoch then return done(false, "the keyboard layout listing was superseded") end
 			choices = choices_of(listing)
 			local steps, plan_reason = M.plan(listing, id)
 			if steps == nil then return done(false, plan_reason) end
@@ -350,11 +382,13 @@ function M.new(port)
 		start(id, on_done)
 	end
 
-	--- Whether no switch is running or queued.
+	--- Whether no switch or layout-listing operation remains in flight.
 	--- @return boolean
-	function switcher.is_settled() return not busy and queued == nil end
+	function switcher.is_settled()
+		return not busy and queued == nil and refreshing == 0 and draining_refreshes == 0 and #refresh_waiters == 0
+	end
 
-	--- Calls listener once no switch is running or queued (at once if none is).
+	--- Calls listener once switches and layout listings have settled.
 	--- @param listener function
 	function switcher.when_settled(listener)
 		if type(listener) ~= "function" then error("a settlement listener is required", 2) end
@@ -392,10 +426,46 @@ function M.native_port()
 		end,
 		run = function(program, args, on_done)
 			sequence = sequence + 1
+			local owner = "input_source_switch:" .. sequence
+			local needs_group = program == "setxkbmap" and args[1] == "-layout"
+			local delivered = false
+			local phase = "layout"
+			local function finish(result)
+				if delivered then return end
+				delivered = true
+				on_done(result)
+			end
 			local operation = OwnedProcess.start(program, args, {
-				owner = "input_source_switch:" .. sequence, timeout_ms = timeout_ms,
-			}, function(result) on_done(result) end)
-			return type(operation) == "table" and operation.started == true and operation.error == nil
+				owner = owner, timeout_ms = timeout_ms,
+			}, function(result)
+				if phase ~= "layout" then return end
+				phase = "group"
+				if not needs_group or type(result) ~= "table" or result.ok ~= true then return finish(result) end
+				local loaded, uv = pcall(require, "luv")
+				if not loaded or type(uv.os_getpid) ~= "function" or type(uv.exepath) ~= "function" then
+					return finish({ ok = false, error = "X11 group worker unavailable" })
+				end
+				local prepared, executable, arguments = pcall(function()
+					local Paths = require("infra.paths")
+					local Runtime = require("_generated.native_runtime")
+					assert(type(Runtime.x11) == "string" and Runtime.x11:match("^[%w_+%.%-]+$"), "invalid X11 soname")
+					return uv.exepath(), {
+						Paths.driver_root() .. "/adapters/input_source_group_worker.lua",
+						string.format("%.0f", uv.os_getpid()), Runtime.x11,
+					}
+				end)
+				if not prepared then return finish({ ok = false, error = "X11 group worker could not start" }) end
+				local child = OwnedProcess.start(executable, arguments,
+					{ owner = owner .. ":group", timeout_ms = timeout_ms }, finish)
+				-- A returned owner may still owe pipe/timer retirement even if its
+				-- dispatch was refused. Only a missing owner completes here.
+				if type(child) ~= "table" then
+					finish({ ok = false, error = "X11 group worker could not start" })
+				end
+			end)
+			-- Even refused dispatch can own pipes or timers until the operation's
+			-- completion callback acknowledges their physical retirement.
+			return type(operation) == "table"
 		end,
 	}
 end

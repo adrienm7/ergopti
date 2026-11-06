@@ -289,7 +289,20 @@ _SearchSelectionReady(Text, SearchInExplorer) {
 ; searched. A target that is recognised but cannot be opened (a path that
 ; does not exist, a bare file name) is reported, never searched instead:
 ; the user asked to open that thing.
-SearchPath(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened) {
+; Only the native absence receipts allow trying a punctuation-stripped path.
+_SearchPathStatus(Path) {
+		try {
+				Attributes := DllCall("Kernel32\GetFileAttributesW", "Str", Path, "UInt")
+				if (Attributes != 0xFFFFFFFF)
+						return "present"
+				NativeError := A_LastError
+				return (NativeError == 2 || NativeError == 3) ? "absent" : "error"
+		} catch {
+				return "error"
+		}
+}
+
+SearchPath(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened, PathStatusFn := _SearchPathStatus) {
 		Target := OpenTarget_Classify(SelectedText)
 		Kind := Target["kind"]
 		Value := Target["target"]
@@ -311,6 +324,17 @@ SearchPath(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened) {
 		}
 		LoggerStart("Search", "Opening the selected {1} '{2}'…", Kind, Value)
 		if (Kind == "path") {
+				if Target.Has("exact_path") {
+						try Status := PathStatusFn.Call(Target["exact_path"])
+						catch
+								Status := "error"
+						if (Status != "present" && Status != "absent") {
+								ReportFn.Call("open_target.open_failed", Target["exact_path"], "exact selected path could not be inspected")
+								return false
+						}
+						if (Status == "present")
+								Value := Target["exact_path"]
+				}
 				if !FileExist(Value) {
 						ReportFn.Call("open_target.missing_path", Value, "no file or folder exists at that path")
 						return false

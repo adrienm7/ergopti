@@ -62,7 +62,12 @@ function hostHasCapability(name) {
 // Other hosts and pages keep the original payload contract. This private state
 // belongs to this exact JS document.
 const linuxDocumentBridges = new Map();
-const linuxDocumentBridgeNames = ['changelog_bridge', 'dl_bridge', 'model_browser_bridge'];
+const linuxDocumentBridgeNames = [
+	'changelog_bridge',
+	'dl_bridge',
+	'model_browser_bridge',
+	'hsPersonalInfo'
+];
 
 function getLinuxDocumentNonce(name) {
 	if (!hostHasCapability('document_bridge') || !linuxDocumentBridgeNames.includes(name))

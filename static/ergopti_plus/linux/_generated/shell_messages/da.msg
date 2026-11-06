@@ -79,6 +79,7 @@ install.xdg_autostart=XDG-autostart: {1}
 launch.already_running=Ergopti+ kører allerede i denne session ({1} er optaget); denne start blev afvist.
 launch.authorization_failed=Godkendelsen af inputadgang blev annulleret eller mislykkedes.
 launch.groups_unavailable=Sessionen kunne ikke få sine konfigurerede inputgrupper.
+launch.session_lock_invalid=Sessionslåsens mappe skal være en absolut sti.
 launcher.dependencies_installed=Afhængigheder installeret.
 launcher.driver_missing=Fejl: Linux-driverens mappe blev ikke fundet: {1}
 launcher.install_deps_hint=Kør: ergopti-hotstrings --install-deps

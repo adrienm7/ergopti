@@ -35,6 +35,28 @@ local function fixture()
 end
 
 helpers.describe("menu rebuild: coalesced publication owner", function()
+	for _, disabled in ipairs({ "row", "parent" }) do
+		helpers.it("(menu-replay-disabled) does not replay into a disabled " .. disabled, function()
+			local state = fixture()
+			local build = state.options.build
+			state.options.build = function()
+				local items, context = build()
+				if state.disable then
+					if disabled == "parent" then items[1].disabled = true else items[1].menu[1].disabled = true end
+				end
+				return items, context
+			end
+			local owner = Factory.new(state.options)
+			owner.request(); helpers.assert_true(owner.pump())
+			local old = state.visible[1].menu[1].fn
+			owner.request(); helpers.assert_eq(old(), false)
+			state.disable = true
+			helpers.assert_true(owner.pump())
+			helpers.assert_eq(state.actions, 0, "disabled native rows cannot be activated by replay")
+			helpers.assert_eq(state.lost, 1, "the user is told the click was not applied")
+		end)
+	end
+
 	helpers.it("coalesces a callback burst and publishes only the latest committed context", function()
 		local state = fixture()
 		local owner = Factory.new(state.options)

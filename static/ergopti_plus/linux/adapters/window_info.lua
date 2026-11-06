@@ -78,6 +78,12 @@ local function empty_info()
 	return { appId = "", windowTitle = "", bundleId = "", executablePath = "" }
 end
 
+--- Compositor text fields may be JSON null; never turn its sentinel into an
+--- application identity or window title.
+local function text_field(value)
+	return type(value) == "string" and value or ""
+end
+
 --- Decodes JSON, returning nil rather than raising on anything unexpected.
 --- @param raw string
 --- @return table|nil
@@ -104,8 +110,11 @@ end
 --- @param pid string|number|nil
 --- @return string
 local function comm_of(pid)
-	if not pid then return "" end
-	local comm = Shell.exec("cat " .. Shell.quote("/proc/" .. tostring(pid) .. "/comm"))
+	if type(pid) ~= "string" and type(pid) ~= "number" then return "" end
+	local literal = tostring(pid)
+	local number = tonumber(literal)
+	if not literal:match("^%d+$") or not number or number <= 0 or number > 2147483647 then return "" end
+	local comm = Shell.exec("cat " .. Shell.quote("/proc/" .. literal .. "/comm"))
 	return process_name_record(comm)
 end
 
@@ -116,8 +125,9 @@ end
 local function read_proc_comm(pid)
 	local handle = io.open("/proc/" .. tostring(pid) .. "/comm", "rb")
 	if not handle then return "" end
-	local comm = handle:read("*a") or ""
-	handle:close()
+	local read_ok, comm = pcall(handle.read, handle, "*a")
+	local close_ok, closed = pcall(handle.close, handle)
+	if not read_ok or type(comm) ~= "string" or not close_ok or closed ~= true then return "" end
 	return process_name_record(comm)
 end
 _read_proc_comm = read_proc_comm
@@ -172,13 +182,17 @@ local function focused_x11()
 		if not win_id then return nil end
 		title = Shell.exec_line("xdotool getwindowname " .. Shell.quote(win_id) .. " 2>/dev/null")
 		if not title then return nil end
-		native_pid = nil
+		native_pid = Shell.exec_line("xdotool getwindowpid " .. Shell.quote(win_id) .. " 2>/dev/null")
 	end
 
 	local info = empty_info()
 	info.windowTitle = title
 
-	if win_id == _x11_cache.id and title == _x11_cache.title and _x11_cache.appId ~= "" then
+	-- The X server can reuse a window ID and title for a different process.
+	-- A native query already carries its PID, so it must still match the owner
+	-- behind the cached attribution (including when the property disappears).
+	local same_native_owner = tonumber(native_pid) == _x11_cache.pid
+	if win_id == _x11_cache.id and title == _x11_cache.title and same_native_owner and _x11_cache.appId ~= "" then
 		info.appId = _x11_cache.appId
 		return info, _x11_cache.identity, _x11_cache.pid
 	end
@@ -188,9 +202,6 @@ local function focused_x11()
 	-- already attributed to, and what the other two drivers report; WM_CLASS
 	-- would be a nicer identity and a silent break of every stored attribution.
 	local pid = native_pid
-	if pid == nil and (native_reason ~= nil or not X11Focus.has_transport()) then
-		pid = Shell.exec_line("xdotool getwindowpid " .. Shell.quote(win_id) .. " 2>/dev/null")
-	end
 	info.appId = comm_of(pid)
 
 	_x11_cache.id = win_id
@@ -305,13 +316,14 @@ local function focused_sway()
 	if not node then return nil end
 
 	local info = empty_info()
-	info.windowTitle = tostring(node.name or "")
+	info.windowTitle = text_field(node.name)
 	-- app_id is the Wayland-native identity; window_properties.class is what an
 	-- XWayland client reports instead, and mixing them up means every X11
 	-- application under sway resolves to nothing.
-	info.appId = tostring(node.app_id
-		or (type(node.window_properties) == "table" and node.window_properties.class)
-		or "")
+	info.appId = text_field(node.app_id)
+	if info.appId == "" and type(node.window_properties) == "table" then
+		info.appId = text_field(node.window_properties.class)
+	end
 	if info.appId == "" then info.appId = comm_of(node.pid) end
 	return info, native_identity("sway", node.id, node.pid), tonumber(node.pid)
 end
@@ -323,8 +335,8 @@ local function focused_hyprland()
 	local win = checked_json("hyprctl activewindow -j 2>/dev/null")
 	if not win then return nil end
 	local info = empty_info()
-	info.windowTitle = tostring(win.title or "")
-	info.appId = tostring(win.class or "")
+	info.windowTitle = text_field(win.title)
+	info.appId = text_field(win.class)
 	if info.appId == "" then info.appId = comm_of(win.pid) end
 	return info, native_identity("hyprland", win.address, win.pid), tonumber(win.pid)
 end
@@ -336,8 +348,8 @@ local function focused_niri()
 	local win = checked_json("niri msg --json focused-window 2>/dev/null")
 	if not win then return nil end
 	local info = empty_info()
-	info.windowTitle = tostring(win.title or "")
-	info.appId = tostring(win.app_id or "")
+	info.windowTitle = text_field(win.title)
+	info.appId = text_field(win.app_id)
 	if info.appId == "" then info.appId = comm_of(win.pid) end
 	return info, native_identity("niri", win.id, win.pid), tonumber(win.pid)
 end

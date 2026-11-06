@@ -14,6 +14,117 @@ local helpers, OPENING_SOURCE, OPENING_FOREIGN, opening_model, with_opening_file
 
 
 
+helpers.describe("personal editor literal brace payload", function()
+	helpers.it("persists literal symbols and non-BMP text through the real bridge", function()
+		with_opening_file(function(f)
+			helpers.assert_true(f.ready())
+			local output = "x {a&b} {x<😀} {foo}"
+			helpers.assert_true(f.save(output).saved)
+			local decoded = assert(require("toml_codec").decode(f.read()))
+			helpers.assert_eq(decoded.english.old.output, output)
+		end)
+	end)
+end)
+
+helpers.describe("personal editor row origins", function()
+	helpers.it("preserves source metadata and comment across move, rename and later save", function()
+		with_opening_file(function(f)
+			f.put('[_meta]\nsections_order = ["english", "second"]\n[english]\n"café" = { output = "résumé", future = "keep", priority = 73, is_case_sensitive = true, is_case_sensitive_strict = true } # retained\n[second]\n')
+			helpers.assert_true(f.ready())
+			local script = f.seen.deliveries[1]
+			local opening = require("json").decode(assert(script:match("window.initData%((.*)%)")))
+			local row = opening.sections[1].entries[1]
+			row.trigger, row.output = "été", "changed"
+			local data = { sections_order = { "english", "second" }, sections = {
+				english = { description = "english", entries = {} },
+				second = { description = "second", entries = { row } },
+			} }
+			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
+			local parsed = assert(require("toml_codec").decode(f.read()))
+			helpers.assert_eq(parsed.second["été"].future, "keep")
+			helpers.assert_eq(parsed.second["été"].output, "changed")
+			helpers.assert_eq(parsed.second["été"].priority, 73)
+			helpers.assert_eq(parsed.second["été"].is_case_sensitive_strict, true)
+			helpers.assert_eq(select(2, f.read():gsub("# retained", "")), 1)
+			row.trigger, row.output = "été2", "again"
+			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
+			parsed = assert(require("toml_codec").decode(f.read()))
+			helpers.assert_eq(parsed.second["été2"].future, "keep")
+			helpers.assert_eq(parsed.second["été2"].output, "again")
+			data.sections_order = { "english", "second", "third" }
+			data.sections.second.entries = {}
+			data.sections.third = { description = "third", entries = { row } }
+			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
+			parsed = assert(require("toml_codec").decode(f.read()))
+			local third = parsed.third[1] or parsed.third
+			helpers.assert_eq(third["été2"].future, "keep")
+			helpers.assert_eq(select(2, f.read():gsub("# retained", "")), 1)
+		end)
+	end)
+	helpers.it("does not attach a removed row's metadata to a new row with the same trigger", function()
+		with_opening_file(function(f)
+			f.put('[_meta]\nsections_order = ["english"]\n[english]\n"old" = { output = "a", future = "secret" } # comment\n')
+			helpers.assert_true(f.ready())
+			local row = { origin_id = "new:1", trigger = "old", output = "new", is_word = false, auto_expand = false,
+				is_case_sensitive = false, final_result = false, is_case_sensitive_strict = false }
+			local data = { sections_order = { "english" }, sections = { english = { description = "english", entries = { row } } } }
+			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
+			local parsed = assert(require("toml_codec").decode(f.read()))
+			helpers.assert_nil(parsed.english.old.future)
+			helpers.assert_eq(parsed.english.old.output, "new")
+		end)
+	end)
+	helpers.it("refuses duplicated or unrecognized snapshot identities", function()
+		with_opening_file(function(f)
+			helpers.assert_true(f.ready())
+			local opening = require("json").decode(assert(f.seen.deliveries[1]:match("window.initData%((.*)%)")))
+			local row = opening.sections[1].entries[1]
+			local second = {}; for key, value in pairs(row) do second[key] = value end
+			second.trigger = "different"
+			local data = { sections_order = { "english" }, sections = { english = { description = "english", entries = { row, second } } } }
+			helpers.assert_eq(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved, false)
+			helpers.assert_eq(f.read(), OPENING_SOURCE)
+			row.origin_id = "row:999"; data.sections.english.entries = { row }
+			helpers.assert_eq(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved, false)
+			helpers.assert_eq(f.read(), OPENING_SOURCE)
+		end)
+	end)
+
+	helpers.it("retains the opening origin after a refused save", function()
+		with_opening_file(function(f)
+			f.put('[_meta]\nsections_order = ["english"]\n[english]\n"old" = { output = "a", future = "retained" }\n')
+			helpers.assert_true(f.ready())
+			local opening = require("json").decode(assert(f.seen.deliveries[1]:match("window.initData%((.*)%)")))
+			local row = opening.sections[1].entries[1]; row.trigger = "renamed"
+			local data = { sections_order = { "english" }, sections = { english = { description = "english", entries = { row } } } }
+			local write = f.publisher.write; f.publisher.write = function() return false, "refused" end
+			helpers.assert_eq(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved, false)
+			f.publisher.write = write
+			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
+			local parsed = assert(require("toml_codec").decode(f.read()))
+			helpers.assert_eq(parsed.english.renamed.future, "retained")
+		end)
+	end)
+
+	helpers.it("keeps identities distinct for matching triggers in different sections", function()
+		with_opening_file(function(f)
+			f.put('[_meta]\nsections_order = ["english", "second"]\n[english]\n"same" = { output = "one", future = "first" }\n[second]\n"same" = { output = "two", future = "second" }\n')
+			helpers.assert_true(f.ready())
+			local opening = require("json").decode(assert(f.seen.deliveries[1]:match("window.initData%((.*)%)")))
+			local first, second = opening.sections[1].entries[1], opening.sections[2].entries[1]
+			local data = { sections_order = { "english", "second" }, sections = {
+				english = { description = "english", entries = { second } },
+				second = { description = "second", entries = { first } },
+			} }
+			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
+			local parsed = assert(require("toml_codec").decode(f.read()))
+			helpers.assert_eq(parsed.english.same.future, "second")
+			helpers.assert_eq(parsed.second.same.future, "first")
+		end)
+	end)
+
+end)
+
 helpers.describe("personal editor fixture process ABI", function()
 	local function with_real_shell(body)
 		local prior = package.loaded["adapters.shell_runner"]
@@ -78,6 +189,127 @@ end)
 
 
 helpers.describe("personal editor opening-source admission", function()
+	for _, mode in ipairs({ "missing_order", "missing_section", "unlisted_section", "duplicate_order" }) do
+		helpers.it("(personal-save-model) refuses incomplete section model: " .. mode, function()
+			with_opening_file(function(f)
+				helpers.assert_true(f.ready())
+				local data = opening_model("edited")
+				if mode == "missing_order" then data.sections_order = nil
+				elseif mode == "missing_section" then data.sections[data.sections_order[1]] = nil
+				elseif mode == "unlisted_section" then data.sections.foreign = { entries = {} }
+				else data.sections_order[#data.sections_order + 1] = data.sections_order[1] end
+				local result = f.handler.on_message({ action = "save", data = data }, f.state, f.context)
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_eq(f.read(), OPENING_SOURCE)
+				helpers.assert_eq(f.seen.writes, 0)
+			end)
+		end)
+	end
+
+	for _, mode in ipairs({ "missing_entries", "invalid_entries", "missing_output", "invalid_output" }) do
+		helpers.it("(personal-save-entries) refuses incomplete entry model: " .. mode, function()
+			with_opening_file(function(f)
+				helpers.assert_true(f.ready())
+				local data = opening_model("edited")
+				local section = data.sections.english
+				if mode == "missing_entries" then section.entries = nil
+				elseif mode == "invalid_entries" then section.entries = "invalid"
+				elseif mode == "missing_output" then section.entries[1].output = nil
+				else section.entries[1].output = {} end
+				local result = f.handler.on_message({ action = "save", data = data }, f.state, f.context)
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_eq(f.read(), OPENING_SOURCE)
+				helpers.assert_eq(f.seen.writes, 0)
+			end)
+		end)
+	end
+
+	for _, mode in ipairs({ "invalid_flag", "invalid_priority", "infinite_priority" }) do
+		helpers.it("(personal-save-flags) refuses invalid row field: " .. mode, function()
+			with_opening_file(function(f)
+				helpers.assert_true(f.ready())
+				local data = opening_model("edited")
+				local entry = data.sections.english.entries[1]
+				if mode == "invalid_flag" then entry.is_word = "true"
+				elseif mode == "invalid_priority" then entry.priority = "42"
+				else entry.priority = math.huge end
+				local result = f.handler.on_message({ action = "save", data = data }, f.state, f.context)
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_eq(f.read(), OPENING_SOURCE)
+				helpers.assert_eq(f.seen.writes, 0)
+			end)
+		end)
+	end
+
+	for _, mode in ipairs({ "missing", "empty", "invalid" }) do
+		helpers.it("(personal-save-trigger) refuses a " .. mode .. " trigger without erasing its row", function()
+			with_opening_file(function(f)
+				helpers.assert_true(f.ready())
+				local data = opening_model("edited")
+				local entry = data.sections.english.entries[1]
+				if mode == "missing" then entry.trigger = nil
+				elseif mode == "empty" then entry.trigger = ""
+				else entry.trigger = 12 end
+				local result = f.handler.on_message({ action = "save", data = data }, f.state, f.context)
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_eq(f.read(), OPENING_SOURCE)
+				helpers.assert_eq(f.seen.writes, 0)
+			end)
+		end)
+	end
+
+	for _, mode in ipairs({ "missing", "invalid" }) do
+		helpers.it("(personal-save-description) refuses " .. mode .. " section description", function()
+			with_opening_file(function(f)
+				local original = '[_meta]\nsections_order = ["english"]\n[_meta.sections]\nenglish = "Existing description"\n[english]\n"old" = { output = "original" }\n'
+				f.put(original)
+				helpers.assert_true(f.ready())
+				local data = opening_model("edited")
+				if mode == "missing" then data.sections.english.description = nil
+				else data.sections.english.description = {} end
+				local result = f.handler.on_message({ action = "save", data = data }, f.state, f.context)
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_eq(f.read(), original)
+				helpers.assert_eq(f.seen.writes, 0)
+			end)
+		end)
+	end
+	helpers.it("(personal-save-serialization) rejects a reentrant save while the committed model reloads", function()
+		with_opening_file(function(f)
+			helpers.assert_true(f.ready())
+			local nested, stale
+			f.state.config.reload = function()
+				f.seen.reloads = f.seen.reloads + 1
+				if not nested then
+					nested = {}
+					stale = f.save("stale edit", {})
+					nested = f.save("second edit")
+				end
+				return 0, true
+			end
+			local first = f.save("first edit")
+			helpers.assert_eq(first.saved, true)
+			helpers.assert_eq(stale, { saved = false, busy = true })
+			helpers.assert_eq(nested, { saved = false, busy = true })
+			helpers.assert_contains(f.read(), "first edit")
+			helpers.assert_true(not f.read():find("second edit", 1, true))
+			helpers.assert_eq(f.seen.writes, 1)
+			helpers.assert_eq(f.seen.reloads, 1)
+		end)
+	end)
+
+	helpers.it("(personal-save-flags) refuses a missing displayed flag without clearing it", function()
+		with_opening_file(function(f)
+			helpers.assert_true(f.ready())
+			local data = opening_model("edited")
+			data.sections.english.entries[1].is_word = nil
+			local result = f.handler.on_message({ action = "save", data = data }, f.state, f.context)
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(f.read(), OPENING_SOURCE)
+			helpers.assert_eq(f.seen.writes, 0)
+		end)
+	end)
+
 	helpers.it("refuses a foreign section added after the actual displayed model", function()
 		with_opening_file(function(f)
 			helpers.assert_eq(f.ready(), true)

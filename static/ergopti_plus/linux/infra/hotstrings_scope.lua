@@ -166,13 +166,17 @@ function M.new(options)
 	local function restore(snapshot)
 		if snapshot.programmable and Dynamic.user_code_scope_current(snapshot.programmable) ~= true then return false end
 		if secondary and secondary.restore() ~= true then return false end
+		-- Preferences may already have been restored by a previous failed
+		-- inverse. Compare the dynamic owner itself when retrying that debt.
+		local current = Dynamic and type(Dynamic.get_trigger_char) == "function"
+			and Dynamic.get_trigger_char() or MagicKey.get()
 		if Preferences.restore(owner, snapshot.preferences) ~= true then return false end
 		if RepeatKey.restore_configuration(snapshot.repeat_enabled) ~= true then return false end
 		if WordReset.restore_configuration(snapshot.word_reset) ~= true then return false end
 		if Terminators.restore_configuration(snapshot.terminators) ~= true then return false end
-		local current = MagicKey.get()
+		if not apply_dependents(snapshot.trigger, current, snapshot.programmable, true) then return false end
 		if Config.restore_configuration(owner, snapshot.config) ~= true then return false end
-		return apply_dependents(snapshot.trigger, current, snapshot.programmable, true)
+		return true
 	end
 
 	local transaction = Transaction.new({
@@ -212,8 +216,8 @@ function M.new(options)
 			if Terminators.adopt_configuration(decoded) ~= true then return false end
 			local trigger = MagicKey.get()
 			if trigger ~= previous and Config.set_magic_key(trigger, MagicKey.default()) ~= true then return false end
-			if Config.apply_configuration(owner, decoded, secondary.candidate(), secondary.target()) ~= true then return false end
 			if not apply_dependents(trigger, previous, active_snapshot.programmable) then return false end
+			if Config.apply_configuration(owner, decoded, secondary.candidate(), secondary.target()) ~= true then return false end
 			-- A first write creates the configuration folder the two files share.
 			local directory = NativePath.dirname(options.path)
 			if not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then return false end
@@ -237,6 +241,79 @@ function M.new(options)
 		fences = { { acquire = Config.acquire, release = Config.release },
 			{ acquire = Preferences.acquire, release = Preferences.release } },
 		available = function() return not options.is_paused() end })
+end
+
+--- Builds the single-leaf magic-key transaction on the same fenced owners as
+--- the hotstrings scope. The loader and dynamic engine must acknowledge the
+--- candidate before its exact-source file publication.
+function M.new_magic(options)
+	local Config, Preferences, Dynamic, MagicKey = options.config, options.preferences, options.dynamic, options.magic_key
+	local owner, snapshot = {}, nil
+	local transaction = Transaction.new({
+		path = options.path, backup_path = options.backup_path,
+		files = options.files or require("adapters.file_system"),
+		manifest = { scope_plan = function() return { presets = {}, operations = {} } end },
+		validate_update = function(scope, row)
+			return scope == "magic" and row.section == "hotstrings" and row.key == ConfigKeys.LEAF.TRIGGER_CHAR
+				and (row.delete == true or MagicKey.validate(row.value) == true)
+		end,
+		capture = function()
+			local config, preferences = Config.configuration_snapshot(), Preferences.snapshot()
+			if type(config) ~= "table" or type(preferences) ~= "table" then return nil end
+			local programmable = Dynamic and Dynamic.user_code_scope_snapshot and Dynamic.user_code_scope_snapshot()
+			if Dynamic and Dynamic.user_code_time_activation and Dynamic.user_code_time_activation() ~= nil
+				and type(programmable) ~= "table" then return nil end
+			snapshot = { config = config, preferences = preferences, trigger = MagicKey.get(), programmable = programmable }
+			return snapshot
+		end,
+		apply = function(document)
+			if Preferences.adopt(owner, document, { [ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR] = true }) ~= true then return false end
+			local trigger = MagicKey.get()
+			if Config.set_magic_key(trigger, MagicKey.default()) ~= true then return false end
+			if Dynamic then
+				local ready, reason = Dynamic.refresh(snapshot.programmable)
+				if ready ~= true and not (reason == "builtin-unavailable" and Dynamic.get_rules_count() == 0) then return false end
+				if Dynamic.init({ trigger_char = trigger }) ~= true then return false end
+			end
+			if options.reload() ~= true then return false end
+			local directory = NativePath.dirname(options.path)
+			return Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") == true
+		end,
+		restore = function(previous)
+			if previous.programmable and Dynamic.user_code_scope_current(previous.programmable) ~= true then return false end
+			if Preferences.restore(owner, previous.preferences) ~= true then return false end
+			-- The catalogue provider reads dynamic prefix mappings on every load.
+			-- Restore their trigger before republishing the old matcher.
+			if Dynamic then
+				local ready, reason = Dynamic.refresh(previous.programmable, true)
+				if ready ~= true and not (reason == "builtin-unavailable" and Dynamic.get_rules_count() == 0) then return false end
+				if Dynamic.init({ trigger_char = previous.trigger }) ~= true then return false end
+			end
+			return Config.restore_configuration(owner, previous.config) == true
+		end,
+		after_restore = function()
+			return options.after_restore == nil or options.after_restore() == true
+		end,
+	})
+	return FencedTransaction.new({ owner = owner, transaction = transaction, scope = "magic",
+		fences = { { acquire = Config.acquire, release = Config.release },
+			{ acquire = Preferences.acquire, release = Preferences.release } },
+		available = options.available or function() return true end })
+end
+
+--- Applies one magic-key choice, retaining any refused inverse in the shared
+--- hotstrings owner so shutdown and subsequent settings observe the debt.
+function M.apply_magic(value, options)
+	if type(options) ~= "table" or options.magic_key.validate(value) ~= true then return false end
+	if _owner and _owner.pending() and _owner.retry_restore() ~= true then return false end
+	_sequence = _sequence + 1
+	local path = require("infra.config_paths").config("config.toml")
+	_owner = M.new_magic({ path = path, backup_path = path .. ".magic-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
+		config = options.config, preferences = options.preferences, dynamic = options.dynamic,
+		magic_key = options.magic_key, reload = options.reload, after_restore = options.after_restore })
+	local row = { section = "hotstrings", key = ConfigKeys.LEAF.TRIGGER_CHAR }
+	if value == options.magic_key.default() then row.delete = true else row.value = value end
+	return _owner.apply_updates({ row })
 end
 
 --- Applies a menu request with the daemon's owners, retaining a refused inverse.

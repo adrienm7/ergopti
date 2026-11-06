@@ -1074,14 +1074,22 @@ function rowCells(m) {
 							: _t('model_browser.status_downloading')
 					) +
 					'</span>'
-				: isRemote(m)
-					? '<span class="status remote">' + _escHtml(_t('model_browser.status_remote')) + '</span>'
-					: '<span class="dot' +
-						(m.installed ? ' on' : '') +
-						'" aria-hidden="true"></span> ' +
-						_escHtml(
-							_t(m.installed ? 'model_browser.status_installed' : 'model_browser.status_available')
-						),
+				: m.inventory_unknown === true
+					? '<span class="status">' +
+						_escHtml(_t('model_browser.inventory_unavailable')) +
+						'</span>'
+					: isRemote(m)
+						? '<span class="status remote">' +
+							_escHtml(_t('model_browser.status_remote')) +
+							'</span>'
+						: '<span class="dot' +
+							(m.installed ? ' on' : '') +
+							'" aria-hidden="true"></span> ' +
+							_escHtml(
+								_t(
+									m.installed ? 'model_browser.status_installed' : 'model_browser.status_available'
+								)
+							),
 		actions: rowActions(m, current)
 	};
 	return COLUMNS.map(function (c) {

@@ -393,6 +393,114 @@ helpers.describe("layout manager (Linux): installing", function()
 		end
 	end)
 
+	helpers.it("reserves distinct private Python stages and refuses a competing destination", function()
+		local uv = require("luv")
+		local parent = assert(uv.fs_mkdtemp("/tmp/ergopti-python-stage-XXXXXX"))
+		local Registry = require("modules.keymap.layout_registry")
+		local previous = package.loaded["modules.keymap.managed_python"]
+		package.loaded["modules.keymap.managed_python"] = { ensure = function(deps, done)
+			local root = parent .. "/python"
+			local first, first_current = deps.create_stage(root)
+			local second, second_current = deps.create_stage(root)
+			helpers.assert_type(first, "string"); helpers.assert_type(second, "string")
+			helpers.assert_true(first ~= second)
+			helpers.assert_true(first_current()); helpers.assert_true(second_current())
+			assert(uv.fs_rename(first, first .. ".other"))
+			assert(uv.fs_mkdir(first, 448))
+			helpers.assert_eq(first_current(), false, "a replacement directory cannot inherit cleanup authority")
+			assert(uv.fs_mkdir(root, 448))
+			local marker = assert(io.open(root .. "/owned", "wb")); assert(marker:write("foreign")); assert(marker:close())
+			helpers.assert_eq(deps.rename(second, root), false, "a concurrent installation cannot be replaced")
+			local retained = assert(io.open(root .. "/owned", "rb")); helpers.assert_eq(retained:read("*a"), "foreign"); retained:close()
+			helpers.assert_true(second_current())
+			done(true)
+		end }
+		local ok, err = pcall(function() Registry._managed_python_for_probe()(function() end) end)
+		package.loaded["modules.keymap.managed_python"] = previous
+		os.execute("rm -rf '" .. parent .. "'")
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("settles a refused Python download even if the cleanup runner has stopped", function()
+		local Registry = require("modules.keymap.layout_registry")
+		local Managed = require("modules.keymap.managed_python")
+		local Http, Process = require("adapters.http_client"), require("adapters.process_runner")
+		local Shell, Files = require("adapters.shell_runner"), require("adapters.file_system")
+		local Paths = require("infra.config_paths")
+		local saved = { download = Http.download, run = Process.run, settled = Process.is_settled,
+			shell = Shell.run, exists = Files.exists, data = Paths.data }
+		local root = assert(require("luv").fs_mkdtemp("/tmp/ergopti-python-registry-XXXXXX"))
+		assert(os.execute("mkdir -p '" .. root .. "/runtime/python'" ) == 0)
+		local calls = 0
+		local operation = { started = false }
+		function operation:is_settled() return true end
+		function operation:settled_result() return { ok = false, status = 0, error = "HTTP client stopped" } end
+		function operation:on_settled(fn) fn(); return true end
+		Http.download = function() return false, operation end
+		Process.run = function(_, _, _, callback)
+			calls = calls + 1
+			return false
+		end
+		Process.is_settled = function() return true end
+		Shell.run, Files.exists, Paths.data = function() return true end, function() return false end, function() return root end
+		Managed._reset_for_test()
+		local ok, err = pcall(function()
+			local result
+			Registry._managed_python_for_probe(function() return true end)(function(accepted, code) result = { accepted, code } end)
+			helpers.assert_eq(result, { false, Managed.FAILURE_DOWNLOAD })
+			helpers.assert_eq(calls, 1)
+		end)
+		Managed._reset_for_test()
+		Http.download, Process.run, Process.is_settled = saved.download, saved.run, saved.settled
+		Shell.run, Files.exists, Paths.data = saved.shell, saved.exists, saved.data
+		os.execute("rm -rf '" .. root .. "'")
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("does not accept cleanup success delivered before a refused process start", function()
+		local names = { "modules.keymap.layout_registry", "modules.keymap.managed_python", "adapters.process_runner" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		package.loaded["adapters.process_runner"] = {
+			run = function(_, _, _, callback) callback({ exit_code = 0 }); return false end,
+			is_settled = function() return true end,
+		}
+		package.loaded["modules.keymap.managed_python"] = { ensure = function(deps, done)
+			deps.remove_tree("/tmp/owned-python-stage", done)
+		end }
+		package.loaded["modules.keymap.layout_registry"] = nil
+		local ok, err = pcall(function()
+			local answer
+			require("modules.keymap.layout_registry")._managed_python_for_probe()(function(value) answer = value end)
+			helpers.assert_eq(answer, false)
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("reports a resource-free refusal of Python staging cleanup", function()
+		local names = { "modules.keymap.layout_registry", "modules.keymap.managed_python", "adapters.process_runner" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local native_settled = true
+		package.loaded["adapters.process_runner"] = { run = function() return false end, is_settled = function() return native_settled end }
+		package.loaded["modules.keymap.managed_python"] = { ensure = function(deps, done)
+			deps.remove_tree("/tmp/owned-python-stage", done)
+		end }
+		package.loaded["modules.keymap.layout_registry"] = nil
+		local ok, err = pcall(function()
+			local answer
+			require("modules.keymap.layout_registry")._managed_python_for_probe()(function(value) answer = value end)
+			helpers.assert_eq(answer, false, "a stopped process runner must not leave the cleanup caller waiting")
+			native_settled = false
+			answer = nil
+			require("modules.keymap.layout_registry")._managed_python_for_probe()(function(value) answer = value end)
+			helpers.assert_nil(answer, "unknown native debt cannot be reported as retired")
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("asks once before downloading Ergopti's own Python, naming its size (layout-registry-managed-python)", function()
 		local saved = { registry = package.loaded["modules.keymap.layout_registry"],
 			managed = package.loaded["modules.keymap.managed_python"], dialogs = package.loaded["ui.menu.menu_dialogs"],

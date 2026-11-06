@@ -12,6 +12,7 @@ local TableUtil = require("table_util")
 M.bridge_name = "hotstrings_config_bridge"
 
 local Logger = require("logger.shim")
+local NumberPolicy = require("number_policy")
 local Extensions = require("hotstrings.extensions")
 local LOG = "bridge.hotstrings_config"
 
@@ -390,6 +391,13 @@ function M.on_message(payload, state, context)
 	if type(payload) ~= "table" then return nil end
 
 	local action = payload.action
+	local section_action = action == "set_delay" or action == "clear_delay" or action == "set_color"
+		or action == "clear_color" or action == "set_tooltip" or action == "clear_tooltip"
+		or action == "set_priority" or action == "clear_priority"
+	if section_action and payload.section ~= nil and type(payload.section) ~= "string" then
+		Logger.warn(LOG, "Refusing an invalid hotstring section identifier.")
+		return push_state(state, context)
+	end
 
 	-- The shared settings window speaks eleven actions; this bridge answered four
 	-- of them, so every delay, colour and preview control in it was inert on this
@@ -418,8 +426,8 @@ function M.on_message(payload, state, context)
 		-- Milliseconds on the wire, seconds in the store: the cascade, the TOMLs
 		-- and the engine all speak seconds, and the conversion belongs at this
 		-- boundary rather than in the resolver.
-		local ms = tonumber(payload.ms)
-		if not ms or ms < 0 then
+		local ms = (type(payload.ms) == "number" or type(payload.ms) == "string") and tonumber(payload.ms) or nil
+		if not NumberPolicy.is_finite(ms) or ms < 0 then
 			Logger.warn(LOG, "Refusing delay %s for '%s' — not a non-negative number of milliseconds.",
 				tostring(payload.ms), tostring(payload.category))
 			return push_state(state, context)
@@ -437,7 +445,7 @@ function M.on_message(payload, state, context)
 		-- Guarded like both references: an empty select is the page's "no choice",
 		-- and writing it as an override would pin the category to nothing.
 		local hex = payload.hex
-		if type(hex) ~= "string" or hex == "" then
+		if type(hex) ~= "string" or not require("hotstrings.personal_metadata").valid("color", hex) then
 			Logger.warn(LOG, "Refusing colour %s for '%s' — not a colour string.",
 				tostring(hex), tostring(payload.category))
 			return push_state(state, context)
@@ -456,7 +464,11 @@ function M.on_message(payload, state, context)
 		-- and a string "false" is truthy in Lua — which would turn the preview on
 		-- for a user who had just turned it off.
 		local value = payload.show_tooltip
-		if type(value) == "string" then value = (value == "true") end
+		if value == "true" then value = true elseif value == "false" then value = false end
+		if type(value) ~= "boolean" then
+			Logger.warn(LOG, "Refusing a non-boolean tooltip setting.")
+			return push_state(state, context)
+		end
 		set_override(state, payload.category, section_of(payload), "show_tooltip", value == true, context)
 		return push_state(state, context)
 	end
@@ -471,8 +483,9 @@ function M.on_message(payload, state, context)
 	-- daemon has, and a priority outside the tier range silently reorders every
 	-- source against every other.
 	if action == "set_priority" and payload.category then
-		local value = tonumber(payload.priority)
-		if not value or value < PRIORITY_MIN or value > PRIORITY_MAX then
+		local value = (type(payload.priority) == "number" or type(payload.priority) == "string")
+			and tonumber(payload.priority) or nil
+		if not NumberPolicy.is_finite(value) or value % 1 ~= 0 or value < PRIORITY_MIN or value > PRIORITY_MAX then
 			Logger.warn(LOG, "Refusing priority %s for '%s' — outside %d-%d.",
 				tostring(payload.priority), tostring(payload.category), PRIORITY_MIN, PRIORITY_MAX)
 			return push_state(state, context)
@@ -497,15 +510,39 @@ function M.on_message(payload, state, context)
 		-- who wants their timing back has no way to ask for it here.
 		local config = state and state.config
 		if type(config) == "table" and type(config.get_categories) == "function"
-			and type(config.get_neutral_color) == "function" then
+			and type(config.get_neutral_color) == "function" and type(config.set_override) == "function" then
 			-- No `or "#……"` here. The colour comes from the shared defaults, which
 			-- the config module loads fail-fast; substituting a literal would repaint
 			-- the user's categories a shade nothing else in the product uses.
+			local manager = require("ui.webview_manager")
+			local setter = config.set_override
+			local function owned()
+				return state.config == config and config.set_override == setter
+					and (context == nil or window_current(context, manager))
+			end
+			local function paint(id, section, value)
+				if not owned() then return false end
+				local called, accepted = pcall(set_override, state, id, section, "color", value, context)
+				return called and accepted == true and owned()
+			end
+			local function refused()
+				Logger.error(LOG, "All-grey stopped because a colour could not be saved; earlier changes may remain.")
+				if owned() then
+					push_state(state, context)
+					if owned() and type(state.notify_error) == "function" then
+						pcall(state.notify_error, "healthcheck.status.failed")
+					end
+				end
+				return { grey = false }
+			end
 			local neutral = config.get_neutral_color()
-			for id, category in pairs(config.get_categories()) do
-				set_override(state, id, nil, "color", neutral, context)
+			if not owned() or not require("hotstrings.personal_metadata").valid("color", neutral) then return refused() end
+			local categories = config.get_categories()
+			if not owned() or type(categories) ~= "table" then return refused() end
+			for id, category in pairs(categories) do
+				if not paint(id, nil, neutral) then return refused() end
 				for _, section in ipairs(type(category) == "table" and category.sections_order or {}) do
-					set_override(state, id, section, "color", nil, context)
+					if not paint(id, section, nil) then return refused() end
 				end
 			end
 		else
@@ -524,12 +561,44 @@ function M.on_message(payload, state, context)
 		-- by section, and that is the whole contract of this button.
 		if state.config and type(state.config.get_categories) == "function"
 			and type(state.config.clear_override) == "function" then
-			for id, category in pairs(state.config.get_categories()) do
-				state.config.clear_override(id, nil)
+			local categories = state.config.get_categories()
+			if type(categories) ~= "table" then return { reset = false } end
+			-- Personal metadata has no atomic multi-field reset. Refuse the whole
+			-- operation before changing other categories instead of reporting a partial reset.
+			for id in pairs(categories) do
+				if PersonalFiles.components(id) then
+					Logger.error(LOG, "Reset all refused: personal-file metadata cannot be reset atomically.")
+					local manager = require("ui.webview_manager")
+					if type(state.notify_error) == "function" and (context == nil or window_current(context, manager)) then
+						pcall(state.notify_error, "hs_config.reset_all_personal_unavailable")
+					end
+					return { reset = false }
+				end
+			end
+			local config, clear = state.config, state.config.clear_override
+			local manager = require("ui.webview_manager")
+			local function reset_one(id, section)
+				if state.config ~= config or config.clear_override ~= clear
+					or context ~= nil and not window_current(context, manager) then return false end
+				local ok, cleared = pcall(clear, id, section)
+				return ok and cleared == true
+			end
+			local function refused()
+				Logger.error(LOG, "Reset all stopped because an override could not be cleared; earlier changes may remain.")
+				if context == nil or window_current(context, manager) then
+					push_state(state, context)
+					if type(state.notify_error) == "function" and (context == nil or window_current(context, manager)) then
+						pcall(state.notify_error, "healthcheck.status.failed")
+					end
+				end
+				return { reset = false }
+			end
+			for id, category in pairs(categories) do
+				if not reset_one(id, nil) then return refused() end
 				-- Sections too: a per-section delay left behind after "reset
 				-- everything" is a setting the user cannot see and did not keep.
 				for _, section in ipairs(type(category) == "table" and category.sections_order or {}) do
-					state.config.clear_override(id, section)
+					if not reset_one(id, section) then return refused() end
 				end
 			end
 		end

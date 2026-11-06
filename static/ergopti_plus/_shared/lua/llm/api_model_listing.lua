@@ -67,7 +67,8 @@ function M.model_ids(format, decoded)
 	if type(list) ~= "table" then return nil, "unreadable" end
 	local ids, seen = {}, {}
 	for _, item in ipairs(list) do
-		local id = type(item) == "table" and (item.id or item.name) or nil
+		-- Some providers include an optional null id alongside their usable name.
+		local id = type(item) == "table" and (type(item.id) == "string" and item.id or item.name) or nil
 		if format == "gemini" and type(id) == "string" and id:sub(1, 7) == "models/" then id = id:sub(8) end
 		if M.valid_id(id) and not seen[id] then
 			seen[id] = true

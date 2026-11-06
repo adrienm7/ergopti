@@ -26,11 +26,12 @@ local override_initialized, override, override_refusal = false, nil, nil
 --- @return table|nil data, string|nil reason
 local function read_declaration(relative, unavailable, invalid)
 	local path = Paths.shared(relative)
-	local file = path and Reader.open_source(path)
-	if not file then return nil, unavailable end
-	local bytes = file:read(32769)
-	local closed = file:close()
-	if type(bytes) ~= "string" or #bytes > 32768 or not closed then return nil, unavailable end
+	if not path then return nil, unavailable end
+	local opened, file = pcall(Reader.open_source, path)
+	if not opened or not file then return nil, unavailable end
+	local read_ok, bytes = pcall(file.read, file, 32769)
+	local close_ok, closed = pcall(file.close, file)
+	if not read_ok or type(bytes) ~= "string" or #bytes > 32768 or not close_ok or not closed then return nil, unavailable end
 	local decoded, data = pcall(Json.decode, bytes)
 	if not decoded then return nil, invalid end
 	return data, nil

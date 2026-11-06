@@ -10,14 +10,14 @@
 --- The purge forked `find <dir> -maxdepth 1 -type f -name '<prefix>*.log'
 --- -mtime +N -delete` once per prefix: two forks at every daemon start (measured
 --- with `ergopti_hotstrings.lua --help`, before any boot stage) and two more on
---- the logging path itself at each midnight rollover. The in-process sweep must
---- delete exactly what find deleted and nothing else: only regular files directly
---- in the folder, never a link or a folder, named by either glob, older than
+--- the logging path itself at each midnight rollover. The in-process sweep
+--- restricts that historical selection to generated daily and topical names:
+--- regular files directly in the folder, never a link or folder, older than
 --- N + 1 whole days.
 ---
 --- FEATURES & RATIONALE:
---- 1. Differential: the expected deletions are what GNU find selects with the
----    same expressions over the same folder, before the sink runs.
+--- 1. Differential: expected generated files are selected by GNU find before
+---    the sink runs, then restricted to the names the application owns.
 --- 2. No fork: a rollover purge spawns nothing, and an install forks only its
 ---    folder creation.
 --- 3. Never fatal: a folder the kernel refuses to list is reported on stderr and
@@ -61,17 +61,17 @@ local function fixture(days)
 	assert(Shell.run("mkdir -p " .. Shell.quote(dir .. "/ErgoptiPlus_folder.log")))
 	local old, recent = (days + 1) * DAY + 3600, (days + 1) * DAY - 3600
 	local files = {
-		["ErgoptiPlus_2026-01-01.log"] = old, ["ErgoptiPlus_errors_2026-01-01.log"] = old,
-		["ErgoptiPlus_hotstrings.log"] = old, ["ErgoptiPlus_.log"] = old, ["ErgoptiPlus_2026-01-02.log"] = recent,
-		["ErgoptiPlus_errors_2026-01-02.log"] = recent, ["ErgoptiPlus_2026-01-01.log.bak"] = old,
-		["other_2026-01-01.log"] = old, [".ErgoptiPlus_hidden.log"] = old, ["ErgoptiPlus_line\nbreak.log"] = old,
+		["ErgoptiPlus_2000-01-01.log"] = old, ["ErgoptiPlus_errors_2000-01-01.log"] = old,
+		["ErgoptiPlus_hotstrings.log"] = old, ["ErgoptiPlus_.log"] = old, ["ErgoptiPlus_2099-01-02.log"] = recent,
+		["ErgoptiPlus_errors_2099-01-02.log"] = recent, ["ErgoptiPlus_2000-01-01.log.bak"] = old,
+		["other_2000-01-01.log"] = old, [".ErgoptiPlus_hidden.log"] = old, ["ErgoptiPlus_line\nbreak.log"] = old,
 		["ErgoptiPlus_ancient.log"] = 400 * DAY,
 	}
 	for name, age in pairs(files) do
 		local file = assert(io.open(dir .. "/" .. name, "w")); assert(file:close())
 		aged(dir .. "/" .. name, age)
 	end
-	local target = dir .. "/ErgoptiPlus_2026-01-01.log"
+	local target = dir .. "/ErgoptiPlus_2000-01-01.log"
 	assert(Shell.run("ln -s " .. Shell.quote(target) .. " " .. Shell.quote(dir .. "/ErgoptiPlus_link.log")))
 	aged(dir .. "/ErgoptiPlus_link.log", old)
 	aged(dir .. "/ErgoptiPlus_folder.log", old)
@@ -88,16 +88,21 @@ local function names(dir)
 	return list
 end
 
---- The files GNU find deletes with the sink's former command lines.
+--- Generated files GNU find selects with the sink's former command lines.
 --- @param dir string
 --- @param days number
 --- @return table set
 local function find_selection(dir, days)
 	local selected = {}
+	local topical = {}; for _, sub in ipairs(require("_generated.logger_sub_files")) do topical[sub.name] = true end
 	for _, prefix in ipairs({ "ErgoptiPlus_", "ErgoptiPlus_errors_" }) do
 		local pipe = assert(io.popen(string.format("find %s -maxdepth 1 -type f -name %s -mtime +%d -print0",
 			Shell.quote(dir), Shell.quote(prefix .. "*.log"), days)))
-		for path in pipe:read("*a"):gmatch("([^%z]+)%z") do selected[path:sub(#dir + 2)] = true end
+		for path in pipe:read("*a"):gmatch("([^%z]+)%z") do
+			local name = path:sub(#dir + 2)
+			if topical[name] or name:match("^ErgoptiPlus_%d%d%d%d%-%d%d%-%d%d%.log$")
+				or name:match("^ErgoptiPlus_errors_%d%d%d%d%-%d%d%-%d%d%.log$") then selected[name] = true end
+		end
 		pipe:close()
 	end
 	return selected
@@ -126,8 +131,78 @@ end
 -- ==========================================
 -- ==========================================
 
-helpers.describe("log retention purge deletes what find deleted", function()
-	helpers.it("removes only the aged regular files named by either glob, at install, without find", function()
+helpers.describe("log retention purge deletes aged generated files", function()
+	helpers.it("uses local calendar days through both New York DST changes", function()
+		if ON_WINDOWS then return end
+		local root = os.tmpname(); os.remove(root); assert(Shell.run("mkdir -p " .. Shell.quote(root)))
+		local fixture = helpers.driver_root() .. "/tests/fixtures/native_logger_dst_retention.lua"
+		local command = "TZ=America/New_York " .. Shell.quote(assert(arg and arg[-1])) .. " "
+			.. Shell.quote(fixture) .. " " .. Shell.quote(root)
+		local result = os.execute(command)
+		assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
+		helpers.assert_true(result == true or result == 0, "native DST retention fixture must pass")
+	end)
+	helpers.it("keeps the cutoff calendar day and rejects invalid dated names", function()
+		if ON_WINDOWS then return end
+		local days = require("infra.timings").count("logger", "retention_days")
+		local calendar = os.date("*t"); calendar.day = calendar.day - days
+		calendar.hour, calendar.min, calendar.sec, calendar.isdst = 12, 0, 0, nil
+		local cutoff = os.time(calendar)
+		calendar = os.date("*t", cutoff); calendar.day = calendar.day - 1; calendar.isdst = nil
+		local older = os.time(calendar)
+		local dir = os.tmpname(); os.remove(dir); assert(Shell.run("mkdir -p " .. Shell.quote(dir)))
+		local function put(name)
+			local path = dir .. "/" .. name; local f = assert(io.open(path, "wb")); assert(f:write("marker")); assert(f:close())
+			return path
+		end
+		local kept = put("ErgoptiPlus_" .. os.date("%Y-%m-%d", cutoff) .. ".log")
+		local expired = put("ErgoptiPlus_errors_" .. os.date("%Y-%m-%d", older) .. ".log")
+		local invalid = put("ErgoptiPlus_2000-02-30.log")
+		local Sink, logger = helpers.load_module("infra.logger_sink"), fake_logger()
+		local ok, err = pcall(function()
+			helpers.assert_true(Sink.install(logger, { log_dir = dir, redaction_context = IDENTITY }))
+			local f = assert(io.open(kept, "rb")); assert(f:close())
+			f = assert(io.open(invalid, "rb")); assert(f:close())
+			helpers.assert_nil(io.open(expired, "rb"))
+		end)
+		Sink.uninstall(logger); assert(Shell.run("rm -rf -- " .. Shell.quote(dir)))
+		if not ok then error(err, 0) end
+	end)
+	helpers.it("uses the daily filename date despite contrary native modification times", function()
+		if ON_WINDOWS then return end
+		local dir = os.tmpname(); os.remove(dir); assert(Shell.run("mkdir -p " .. Shell.quote(dir)))
+		local future, old = dir .. "/ErgoptiPlus_2099-01-01.log", dir .. "/ErgoptiPlus_2000-01-01.log"
+		for _, path in ipairs({ future, old }) do local f = assert(io.open(path, "wb")); assert(f:write("marker")); assert(f:close()) end
+		aged(future, 400 * DAY)
+		local Sink, logger = helpers.load_module("infra.logger_sink"), fake_logger()
+		local ok, err = pcall(function()
+			helpers.assert_true(Sink.install(logger, { log_dir = dir, redaction_context = IDENTITY }))
+			local f = assert(io.open(future, "rb")); helpers.assert_eq(f:read("*a"), "marker"); assert(f:close())
+			helpers.assert_nil(io.open(old, "rb"))
+		end)
+		Sink.uninstall(logger); assert(Shell.run("rm -rf -- " .. Shell.quote(dir)))
+		if not ok then error(err, 0) end
+	end)
+	helpers.it("keeps foreign prefix-matching files during real installation", function()
+		if ON_WINDOWS then return end
+		local days = require("infra.timings").count("logger", "retention_days")
+		local dir = fixture(days)
+		local foreign = dir .. "/ErgoptiPlus_notes.log"
+		local file = assert(io.open(foreign, "wb")); assert(file:write("user notes")); assert(file:close())
+		aged(foreign, (days + 2) * DAY)
+		local Sink, logger = helpers.load_module("infra.logger_sink"), fake_logger()
+		local ok, err = pcall(function()
+			helpers.assert_true(Sink.install(logger, { log_dir = dir, redaction_context = IDENTITY }))
+			local kept = assert(io.open(foreign, "rb")); helpers.assert_eq(kept:read("*a"), "user notes"); assert(kept:close())
+			helpers.assert_nil(io.open(dir .. "/ErgoptiPlus_2000-01-01.log", "rb"))
+			helpers.assert_nil(io.open(dir .. "/ErgoptiPlus_hotstrings.log", "rb"))
+		end)
+		Sink.uninstall(logger)
+		assert(Shell.run("rm -rf -- " .. Shell.quote(dir)))
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("removes only aged regular generated files at install without find", function()
 		if ON_WINDOWS then print("  SKIP native POSIX purge: Windows has no GNU find or symbolic links here"); return end
 		local days = require("infra.timings").count("logger", "retention_days")
 		local dir = fixture(days)
@@ -136,8 +211,9 @@ helpers.describe("log retention purge deletes what find deleted", function()
 		local ok, err = pcall(function()
 			local before = names(dir)
 			local expected_deleted = find_selection(dir, days)
-			helpers.assert_true(expected_deleted["ErgoptiPlus_ancient.log"] and expected_deleted["ErgoptiPlus_line\nbreak.log"]
-				and not expected_deleted["ErgoptiPlus_link.log"], "the fixture straddles find's selection")
+			helpers.assert_true(expected_deleted["ErgoptiPlus_2000-01-01.log"] and expected_deleted["ErgoptiPlus_hotstrings.log"]
+				and not expected_deleted["ErgoptiPlus_line\nbreak.log"] and not expected_deleted["ErgoptiPlus_link.log"],
+				"the fixture distinguishes generated names from foreign files and links")
 			local commands = forks_during(function()
 				helpers.assert_eq(Sink.install(logger, { log_dir = dir, redaction_context = IDENTITY }), true)
 			end)
@@ -172,13 +248,13 @@ helpers.describe("log retention purge deletes what find deleted", function()
 		local stdout, date = io.stdout, os.date
 		local ok, err = pcall(function()
 			helpers.assert_eq(Sink.install(logger, { log_dir = dir, redaction_context = IDENTITY }), true)
-			local stale = dir .. "/ErgoptiPlus_2026-01-01.log"
+			local stale = dir .. "/ErgoptiPlus_2000-01-01.log"
 			local file = assert(io.open(stale, "w")); assert(file:close())
 			aged(stale, (days + 2) * DAY)
 			io.stdout = { write = function() return true end, flush = function() return true end }
 			-- The next line belongs to another day: the sink rolls over and purges.
 			os.date = function(format, ...)
-				if format == "%Y-%m-%d" then return "2099-01-01" end
+				if format == "%Y-%m-%d" and select("#", ...) == 0 then return "2099-01-01" end
 				return date(format, ...)
 			end
 			local commands = forks_during(function() logger.emit("2099-01-01 00:00:00:000 [INFO] [probe] rollover", "info") end)
@@ -203,6 +279,58 @@ end)
 -- ==========================================
 
 helpers.describe("log retention purge reports a refused folder and keeps logging", function()
+	helpers.it("linux-log-purge-delete-error: an exceptional delete cannot prevent sink installation", function()
+		local dir = os.tmpname()
+		os.remove(dir)
+		assert(Shell.run("mkdir -p " .. Shell.quote(dir)))
+		local previous = package.loaded["infra.native_directory"]
+		local real = require("infra.native_directory")
+		package.loaded["infra.native_directory"] = {
+			entries = function() return { { name = "ErgoptiPlus_2000-01-01.log", kind = "file" } } end,
+			join = real.join,
+			stat = function() return { kind = "file", modified = 0 } end,
+		}
+		local Sink = helpers.load_module("infra.logger_sink")
+		package.loaded["infra.native_directory"] = previous
+		local logger, stderr, original_remove, reported = fake_logger(), io.stderr, os.remove, {}
+		io.stderr = { write = function(_, text) reported[#reported + 1] = text; return true end }
+		os.remove = function(path)
+			if path == dir .. "/ErgoptiPlus_2000-01-01.log" then error("controlled delete failure") end
+			return original_remove(path)
+		end
+		local ok, result = pcall(Sink.install, logger, { log_dir = dir, redaction_context = IDENTITY })
+		io.stderr, os.remove = stderr, original_remove
+		Sink.uninstall(logger)
+		helpers.load_module("infra.logger_sink")
+		assert(Shell.run("rm -rf -- " .. Shell.quote(dir)))
+		helpers.assert_true(ok and result == true, "delete failure must not prevent logging")
+		helpers.assert_eq(#reported, 1)
+		helpers.assert_true(reported[1]:find("retention purge could not delete", 1, true) ~= nil)
+	end)
+	helpers.it("linux-log-purge-stat-error: a native metadata exception cannot prevent sink installation", function()
+		local dir = os.tmpname()
+		os.remove(dir)
+		assert(Shell.run("mkdir -p " .. Shell.quote(dir)))
+		local previous = package.loaded["infra.native_directory"]
+		local real = require("infra.native_directory")
+		package.loaded["infra.native_directory"] = {
+			entries = function() return { { name = "ErgoptiPlus_2000-01-01.log", kind = "file" } } end,
+			join = real.join,
+			stat = function() error("controlled metadata failure") end,
+		}
+		local Sink = helpers.load_module("infra.logger_sink")
+		package.loaded["infra.native_directory"] = previous
+		local logger, stderr, reported = fake_logger(), io.stderr, {}
+		io.stderr = { write = function(_, text) reported[#reported + 1] = text; return true end }
+		local ok, result = pcall(Sink.install, logger, { log_dir = dir, redaction_context = IDENTITY })
+		io.stderr = stderr
+		Sink.uninstall(logger)
+		helpers.load_module("infra.logger_sink")
+		assert(Shell.run("rm -rf -- " .. Shell.quote(dir)))
+		helpers.assert_true(ok and result == true, "metadata failure must not prevent logging")
+		helpers.assert_eq(#reported, 1)
+		helpers.assert_true(reported[1]:find("retention purge could not inspect", 1, true) ~= nil)
+	end)
 	helpers.it("writes one redacted stderr line when the folder cannot be listed", function()
 		local dir = os.tmpname()
 		os.remove(dir)

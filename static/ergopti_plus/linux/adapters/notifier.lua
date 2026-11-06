@@ -147,8 +147,10 @@ local function send(message, opts, caption, native_admit)
 	end
 
 	if not available() then
-		-- The log is the fallback surface, so the message is not simply dropped.
-		Logger.info(LOG, "[notification] %s: %s", caption and title or tostring(options.title or DEFAULT_TITLE), message)
+		-- Private notices may contain user paths or process output; only a
+		-- generic diagnostic may reach the fallback log.
+		if options.private == true then Logger.info(LOG, "[notification] Private notification unavailable.")
+		else Logger.info(LOG, "[notification] %s: %s", caption and title or tostring(options.title or DEFAULT_TITLE), message) end
 		return false
 	end
 
@@ -170,7 +172,8 @@ local function send(message, opts, caption, native_admit)
 	end
 	local ok = Shell.run(command)
 	if not ok then
-		Logger.error(LOG, "send(): notify-send failed — the message stays in the log: %s", message)
+		if options.private == true then Logger.error(LOG, "send(): private notification could not be shown.")
+		else Logger.error(LOG, "send(): notify-send failed — the message stays in the log: %s", message) end
 	end
 	return ok == true
 end

@@ -124,8 +124,11 @@ end
 --- @return table|nil triage { intent, probability }, nil when unreadable.
 function M.parse_system1(config, raw)
 	if type(raw) ~= "string" then return nil end
-	local intent = raw:match("[Ii][Nn][Tt][Ee][Nn][Tt]%s*:%s*([%a]+)")
-	local probability = tonumber(raw:match("[Pp][Rr][Oo][Bb][Aa][Bb][Ii][Ll][Ii][Tt][Yy]%s*:%s*([%d%.]+)"))
+	local intent = raw:match("[Ii][Nn][Tt][Ee][Nn][Tt]%s*:%s*([^%s]+)")
+	-- Read the whole token: stopping at the exponent of 0.7e-9 would turn
+	-- an almost-zero probability into 0.7 and spuriously wake System 2.
+	local token = raw:match("[Pp][Rr][Oo][Bb][Aa][Bb][Ii][Ll][Ii][Tt][Yy]%s*:%s*([^%s]+)")
+	local probability = token and token:match("^[%d%.eE%+%-]+$") and tonumber(token) or nil
 	if intent == nil or probability == nil then return nil end
 	intent = intent:lower()
 	local known = false
@@ -263,30 +266,15 @@ end
 -- =====================================
 -- =====================================
 
---- Counts the code points of a UTF-8 text without the utf8 library LuaJIT lacks.
---- @param text string
---- @return integer|nil count Nil when the text is not valid UTF-8.
-local function utf8_length(text)
-	local count, i, n = 0, 1, #text
-	while i <= n do
-		local b = text:byte(i)
-		local len = b < 0x80 and 1 or (b >= 0xC2 and b <= 0xDF) and 2 or (b >= 0xE0 and b <= 0xEF) and 3
-			or (b >= 0xF0 and b <= 0xF4) and 4 or nil
-		if len == nil or i + len - 1 > n then return nil end
-		for k = i + 1, i + len - 1 do
-			local c = text:byte(k)
-			if c < 0x80 or c > 0xBF then return nil end
-		end
-		count, i = count + 1, i + len
-	end
-	return count
-end
+-- The shared validator rejects overlong sequences, surrogate code points and
+-- values above U+10FFFF as well as malformed continuation bytes.
+local utf8_length = require("compat.utf8").len
 
 --- Reports whether a value is an email address.
 --- @param value any
 --- @return boolean
 local function is_email(value)
-	return type(value) == "string" and #value <= 254
+	return type(value) == "string" and #value <= 254 and utf8_length(value) ~= nil
 		and value:match("^[^@%s,;<>\"]+@[^@%s,;<>\"]+%.[^@%s,;<>\"]+$") ~= nil
 end
 
@@ -305,6 +293,16 @@ local function check_field(name, rule, value, tools)
 		return true, value
 	elseif rule.type == "emails" then
 		if type(value) ~= "table" or #value > rule.max then return false, nil, name .. " is not a short list" end
+		-- ipairs alone accepts an object or a sparse list as a shorter list,
+		-- silently dropping recipients from the draft.
+		local length, count = #value, 0
+		for index in pairs(value) do
+			if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length then
+				return false, nil, name .. " is not a short list"
+			end
+			count = count + 1
+		end
+		if count ~= length then return false, nil, name .. " is not a short list" end
 		local list = {}
 		for i, item in ipairs(value) do
 			if not is_email(item) then return false, nil, name .. " holds a non-address" end
@@ -328,10 +326,10 @@ end
 function M.validate_action(config, action, opts)
 	if type(action) ~= "table" then return nil, "not an object" end
 	local schema = config.actions[action.type]
-	if schema == nil then return nil, "unknown type " .. tostring(action.type) end
+	if schema == nil then return nil, "unknown type" end
 	local out = { type = action.type }
 	for name, value in pairs(action) do
-		if name ~= "type" and schema[name] == nil then return nil, "unknown field " .. tostring(name) end
+		if name ~= "type" and schema[name] == nil then return nil, "unknown field" end
 	end
 	for name, rule in pairs(schema) do
 		local value = action[name]
@@ -427,7 +425,8 @@ end
 --- @param text string
 --- @return string
 local function ics_text(text)
-	return (text:gsub("\\", "\\\\"):gsub(";", "\\;"):gsub(",", "\\,"):gsub("\r?\n", "\\n"))
+	return (text:gsub("\\", "\\\\"):gsub(";", "\\;"):gsub(",", "\\,")
+		:gsub("\r\n", "\n"):gsub("[\r\n]", "\\n"))
 end
 
 --- Folds one content line at 75 octets without splitting a UTF-8 sequence.
@@ -475,7 +474,9 @@ function M.ics(config, action, uid, stamp)
 	lines[#lines + 1] = "SUMMARY:" .. ics_text(action.title)
 	if action.location then lines[#lines + 1] = "LOCATION:" .. ics_text(action.location) end
 	if action.notes then lines[#lines + 1] = "DESCRIPTION:" .. ics_text(action.notes) end
-	for _, address in ipairs(action.attendees or {}) do lines[#lines + 1] = "ATTENDEE:mailto:" .. address end
+	for _, address in ipairs(action.attendees or {}) do
+		lines[#lines + 1] = "ATTENDEE:mailto:" .. (TextUtils.percent_encode(address):gsub("%%40", "@"))
+	end
 	lines[#lines + 1] = "END:" .. component
 	lines[#lines + 1] = "END:VCALENDAR"
 	for i, line in ipairs(lines) do lines[i] = ics_fold(line) end
@@ -487,7 +488,7 @@ end
 --- @param text string
 --- @return string
 local function mailto_encode(text)
-	return TextUtils.percent_encode((text:gsub("\r?\n", "\r\n")))
+	return TextUtils.percent_encode((text:gsub("\r\n", "\n"):gsub("[\r\n]", "\r\n")))
 end
 
 --- Builds the mailto: link of a mail action. The "@" of an address stays

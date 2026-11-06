@@ -178,6 +178,10 @@ local _SETTINGS_Y = CONFIG.canon and CONFIG.canon.position.storage_y
 -- yields nil for a non-numeric value so the existing default-recompute fires.
 local _pos_x      = _SETTINGS_X and tonumber(Storage.get(_SETTINGS_X)) or nil
 local _pos_y      = _SETTINGS_Y and tonumber(Storage.get(_SETTINGS_Y)) or nil
+local function finite_coordinate(value)
+	return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
+end
+if not finite_coordinate(_pos_x) or not finite_coordinate(_pos_y) then _pos_x, _pos_y = nil, nil end
 
 -- Drag state.
 local _drag_start_mouse = nil
@@ -329,13 +333,14 @@ update_widget_body = function(generation)
 					-- update_widget_body() cycle and reflects the CURRENT mode
 					-- (e.g. after the user toggled graph mode post-creation).
 					local f = c:frame()
+					if type(f) ~= "table" or not finite_coordinate(f.x) or not finite_coordinate(f.y) then return end
+					local next_x, next_y = f.x, f.y
 					if _show_graph then
-						_pos_x = f.x + _canvas_geom.canvas_width  - _canvas_geom.compact_w
-						_pos_y = f.y + _canvas_geom.canvas_height - _canvas_geom.compact_h
-					else
-						_pos_x = f.x
-						_pos_y = f.y
+						next_x = f.x + _canvas_geom.canvas_width  - _canvas_geom.compact_w
+						next_y = f.y + _canvas_geom.canvas_height - _canvas_geom.compact_h
 					end
+					if not finite_coordinate(next_x) or not finite_coordinate(next_y) then return end
+					_pos_x, _pos_y = next_x, next_y
 					if _SETTINGS_X then
 						Storage.set(_SETTINGS_X, _pos_x)
 						Storage.set(_SETTINGS_Y, _pos_y)

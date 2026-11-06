@@ -36,7 +36,7 @@ BUILD_STAMP_COMMIT_KEY="commit"
 BUILD_STAMP_VERSION_KEY="version"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
+IFS= read -r -d '' REPO_ROOT < <(CDPATH= cd -Pe -- "${SCRIPT_DIR}/../.." && printf '%s\0' "$PWD")
 
 fail() { printf '[build-stamp] ERROR: %s\n' "$*" >&2; exit 1; }
 

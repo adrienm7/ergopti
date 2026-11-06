@@ -12,6 +12,7 @@ return function(gestures, state, kind, read_action, save_attempt, controls)
 	-- Exact focused discovery must not depend on another test priming Paths.
 	package.loaded["infra.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
 	local content = '[gestures]\ntap_3 = "none"\naction_parameters = { retained = "unrelated" }\n[shortcuts.keyboard]\nprimary_1 = "none"\n[shortcuts.tap_keys]\nnumber_row_left = "none"\n[shortcuts.script_control]\nscript_altgr_enter = "none"\n'
+	if controls.content ~= nil then content = controls.content end
 	if controls and controls.absent then content = nil end
 	local files = { config = content }
 	local files_port = {

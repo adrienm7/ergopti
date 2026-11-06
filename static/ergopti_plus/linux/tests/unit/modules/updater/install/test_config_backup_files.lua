@@ -62,6 +62,74 @@ helpers.describe("config_backup (Linux): real files", function()
 		os.execute("rm -rf " .. quote(dir))
 		if not ok then error(err, 0) end
 	end)
+	helpers.it("refuses a null backup file list instead of reporting an empty restore", function()
+		local dir = scratch()
+		local Backup = helpers.load_module("modules.updater.config_backup")
+		Backup._overrides = { roots = { { id = "config", dir = dir .. "/cfg" } } }
+		local ok, err = pcall(function()
+			local owner = assert(Backup.owner())
+			local record = assert(owner.create("pre_install"))
+			local Json = require("json")
+			local manifest = assert(Json.decode_lossless(assert(read(record.path .. "/backup.json"))))
+			manifest.files = Json.decode_lossless("null")
+			write(record.path .. "/backup.json", assert(Json.encode(manifest)))
+			write(dir .. "/cfg/config.toml", "kept after refusal")
+			local restored = owner.restore(record.id)
+			helpers.assert_eq(restored, false)
+			helpers.assert_eq(read(dir .. "/cfg/config.toml"), "kept after refusal")
+			manifest.files = {}
+			write(record.path .. "/backup.json", assert(Json.encode(manifest)))
+			helpers.assert_true(owner.restore(record.id), "legacy empty objects remain readable")
+			helpers.assert_eq(read(dir .. "/cfg/config.toml"), "kept after refusal")
+		end)
+		Backup._overrides = nil
+		os.execute("rm -rf " .. quote(dir))
+		if not ok then error(err, 0) end
+	end)
+	helpers.it("uses the same instant for the backup folder and manifest", function()
+		local dir = scratch()
+		local Backup = helpers.load_module("modules.updater.config_backup")
+		Backup._overrides = { roots = { { id = "config", dir = dir .. "/cfg" } } }
+		local original_date, calls = os.date, 0
+		local ok, err = pcall(function()
+			local owner = assert(Backup.owner())
+			os.date = function(format, epoch)
+				if format == "!%Y%m%d-%H%M%S" or format == "!%Y-%m-%dT%H:%M:%SZ" then
+					calls = calls + 1
+					return original_date(format, epoch or (1704067200 + calls - 1))
+				end
+				return original_date(format, epoch)
+			end
+			local record = assert(owner.create("pre_install"))
+			local stamp = record.id:match("(%d%d%d%d%d%d%d%d%-%d%d%d%d%d%d)")
+			helpers.assert_eq(stamp, record.created_at:gsub("[-:TZ]", ""):sub(1, 8) .. "-"
+				.. record.created_at:gsub("[-:TZ]", ""):sub(9, 14))
+		end)
+		os.date = original_date
+		Backup._overrides = nil
+		os.execute("rm -rf " .. quote(dir))
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("selects the tenth same-second backup after the ninth", function()
+		local dir = scratch()
+		local Backup = helpers.load_module("modules.updater.config_backup")
+		Backup._overrides = { roots = { { id = "config", dir = dir .. "/cfg" } },
+			clock = function() return { stamp = "20240101-120000", iso = "2024-01-01T12:00:00Z" } end }
+		local ok, err = pcall(function()
+			local owner = assert(Backup.owner())
+			local last
+			for index = 1, 11 do
+				write(dir .. "/cfg/config.toml", tostring(index))
+				last = assert(owner.create("pre_install", { tag = "release-9" }))
+			end
+			helpers.assert_eq(owner.latest("pre_install").id, last.id)
+		end)
+		Backup._overrides = nil
+		os.execute("rm -rf " .. quote(dir))
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("lists files, folders, and a link to a folder as neither", function()
 		local dir = scratch()
 		local Backup = helpers.load_module("modules.updater.config_backup")
@@ -230,8 +298,15 @@ helpers.describe("config-backup-native-metadata", function()
 			local previous_directory = package.loaded["infra.native_directory"]
 			local previous_backup = package.loaded["modules.updater.config_backup"]
 			local closed, probed, native_code = 0, 0, nil
+			-- Only the configuration root's descriptor is under test; the backup
+			-- owner also lists its own backups folder for collision suffixes.
+			local root_handles = setmetatable({}, { __mode = "k" })
 			local backend = {
-				fs_opendir = uv.fs_opendir,
+				fs_opendir = function(path, ...)
+					local handle, message, code = uv.fs_opendir(path, ...)
+					if handle and path == root then root_handles[handle] = true end
+					return handle, message, code
+				end,
 				fs_stat = uv.fs_stat,
 				fs_readdir = function(handle)
 					local entries, message, code = uv.fs_readdir(handle)
@@ -243,8 +318,9 @@ helpers.describe("config-backup-native-metadata", function()
 					return entries, message, code
 				end,
 				fs_closedir = function(handle)
+					local owned = root_handles[handle]
 					local result, message, code = uv.fs_closedir(handle)
-					if result == true then closed = closed + 1 end
+					if result == true and owned then closed = closed + 1 end
 					return result, message, code
 				end,
 				fs_lstat = function(path)
@@ -374,6 +450,61 @@ helpers.describe("installer-native-publication", function()
 		Fixture.remove(fixture.root)
 		if not ok then error(err, 0) end
 	end)
+
+	helpers.it("(installer-staging-cleanup) reports retained staging after extraction refusal", function()
+		local Installer = helpers.load_module("modules.updater.installer")
+		local fixture = Fixture.create(Installer)
+		local ops, work_dir = {}, nil
+		for name, operation in pairs(fixture.ops) do ops[name] = operation end
+		ops.make_work_dir = function(parent)
+			work_dir = Installer.DEFAULT_OPS.make_work_dir(parent)
+			return work_dir
+		end
+		ops.extract = function(_, path)
+			Fixture.write(path .. "/retained.marker", "staged bytes\n")
+			return false
+		end
+		ops.remove_tree = function() return false end
+		local ok, err = pcall(function()
+			local installed, reason = Installer.install({ archive_path = fixture.archive, expected_version = "1.2.3", context = fixture.context, ops = ops })
+			helpers.assert_eq(installed, false)
+			helpers.assert_contains(reason, "archive extraction failed")
+			helpers.assert_contains(reason, work_dir)
+			helpers.assert_eq(Fixture.read(work_dir .. "/retained.marker"), "staged bytes\n")
+			helpers.assert_eq(Fixture.read(fixture.installed .. "/old.marker"), "original installation\n")
+		end)
+		Fixture.remove(fixture.root)
+		if not ok then error(err, 0) end
+	end)
+
+	for _, boundary in ipairs({ "activation", "smoke" }) do
+		helpers.it("(installer-staging-cleanup) reports retained staging after " .. boundary .. " rollback", function()
+			local Installer = helpers.load_module("modules.updater.installer")
+			local fixture = Fixture.create(Installer)
+			local ops, work_dir = {}, nil
+			for name, operation in pairs(fixture.ops) do ops[name] = operation end
+			ops.make_work_dir = function(parent)
+				work_dir = Installer.DEFAULT_OPS.make_work_dir(parent)
+				return work_dir
+			end
+			ops.move = function(source, destination)
+				if boundary == "activation" and source == work_dir .. "/candidate" then return false end
+				return Installer.DEFAULT_OPS.move(source, destination)
+			end
+			if boundary == "smoke" then ops.smoke = function() return false end end
+			ops.remove_tree = function() return false end
+			local ok, err = pcall(function()
+				local installed, reason = Installer.install({ archive_path = fixture.archive, expected_version = "1.2.3", context = fixture.context, ops = ops })
+				helpers.assert_eq(installed, false)
+				helpers.assert_contains(reason, "previous installation restored")
+				helpers.assert_contains(reason, "staging cleanup failed at " .. work_dir)
+				helpers.assert_true(uv.fs_stat(work_dir) ~= nil)
+				helpers.assert_eq(Fixture.read(fixture.installed .. "/old.marker"), "original installation\n")
+			end)
+			Fixture.remove(fixture.root)
+			if not ok then error(err, 0) end
+		end)
+	end
 
 	helpers.it("(installer-native-publication) genuine absent destinations still install and retain the rollback root", function()
 		local Installer = helpers.load_module("modules.updater.installer")
@@ -534,6 +665,40 @@ helpers.describe("installer-native-exit-receipt", function()
 		Fixture.remove(root)
 		if not ok then error(err, 0) end
 	end
+
+	helpers.it("(installer-archive-valid-name) accepts a regular filename containing consecutive dots", function()
+		local Installer = helpers.load_module("modules.updater.installer")
+		local root = Fixture.scratch()
+		local archive = root .. "/bundle.tar.gz"
+		local ok, err = pcall(function()
+			for _, name in ipairs({ "linux", "_shared", "bin" }) do assert(uv.fs_mkdir(root .. "/" .. name, 448)) end
+			Fixture.write(root .. "/linux/notes..toml", "valid ordinary file\n")
+			Fixture.write(root .. "/install.sh", "#!/bin/sh\n")
+			-- Run the shipped archive builder, with only its stamp/runtime staging
+			-- collaborators replaced; the real tar and admission owner remain.
+			local scripts = root .. "/scripts"
+			assert(uv.fs_mkdir(scripts, 448))
+			helpers.assert_true(Shell.run("mkdir -p -- " .. Shell.quote(root .. "/AppDir/usr/lib/ergopti")))
+			Fixture.write(root .. "/AppDir/usr/lib/ergopti/network-runtime-env.sh", "runtime fixture\n")
+			Fixture.write(scripts .. "/write_build_stamp.sh", "#!/bin/bash\nexit 0\n")
+			Fixture.write(scripts .. "/stage-linux-private-runtime.sh", "#!/bin/bash\nmkdir -p -- \"$2\"\n")
+			local builder = helpers.driver_root() .. "/../../../tools/build/build-linux-bundle-archive.sh"
+			assert(uv.fs_copyfile(builder, scripts .. "/builder.sh"))
+			helpers.assert_true(Shell.run("ERGOPTI_LINUX_BUILD_DIR=" .. Shell.quote(root) .. " bash " .. Shell.quote(scripts .. "/builder.sh") .. " bundle.tar.gz >/dev/null"))
+			local accepted, reason = Installer.DEFAULT_OPS.validate_archive(archive)
+			helpers.assert_eq(accepted, true, tostring(reason))
+			-- An actual parent component remains unsafe even though dots within
+			-- a filename are admitted. GNU tar may itself refuse the listing.
+			local unsafe = root .. "/unsafe.tar.gz"
+			helpers.assert_true(Shell.run("tar -czf " .. Shell.quote(unsafe) .. " -C " .. Shell.quote(root)
+				.. " --transform=" .. Shell.quote("s|^linux/notes[.][.]toml$|linux/../outside|") .. " linux _shared bin install.sh"))
+			local admitted, refusal = Installer.DEFAULT_OPS.validate_archive(unsafe)
+			helpers.assert_eq(admitted, false, "actual parent components remain refused")
+			helpers.assert_contains(refusal, "archive contains an unsafe path:")
+		end)
+		Fixture.remove(root)
+		if not ok then error(err, 0) end
+	end)
 
 	for _, exit_code in ipairs({ 0, 73 }) do
 		helpers.it("(installer-native-exit-receipt) complete native listings retain exit " .. exit_code, function()

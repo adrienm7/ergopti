@@ -92,6 +92,9 @@ local function fresh(config)
 	local saved_paths = package.loaded["infra.paths"]
 	local saved_logger = package.loaded["logger.shim"]
 	local ok, adapter = pcall(function()
+	if config.throw_logger then
+		package.loaded["logger.shim"] = { error = function() error("controlled diagnostic failure") end }
+	end
 	if config.capture_logger then
 		state.logs = {}
 		package.loaded["logger.shim"] = { error = function(_, message) state.logs[#state.logs + 1] = message end }
@@ -135,6 +138,30 @@ local function dispatch(adapter)
 end
 
 helpers.describe("system_proxy: exact native process ownership", function()
+	for _, failure in ipairs({ "terminal", "completion", "settlement" }) do
+		helpers.it("retains native settlement when callback and diagnostic throw: " .. failure, function()
+			local adapter, state = fresh({ throw_logger = true })
+			local options = { owner = "private-owner", timeout_ms = 317 }
+			if failure == "terminal" then options.on_native_terminal = function() error("controlled terminal failure") end end
+			local operation = assert(adapter.lookup_owned("https://destination.invalid/", options, function()
+				if failure == "completion" then error("controlled completion failure") end
+			end))
+			local delivered = 0
+			if failure == "settlement" then operation.on_settled(function() error("controlled listener failure") end) end
+			operation.on_settled(function() delivered = delivered + 1 end)
+			state.input_finished()
+			state.output(selection())
+			local completed, reason = pcall(state.completed)
+			helpers.assert_true(completed, tostring(reason))
+			local closed, close_reason = pcall(state.ack_closes)
+			helpers.assert_true(closed, tostring(close_reason))
+			helpers.assert_true(operation.is_settled())
+			helpers.assert_eq(delivered, 1)
+			helpers.assert_eq(adapter.is_owned("private-owner"), false)
+			local late = pcall(operation.on_settled, function() error("controlled late listener failure") end)
+			helpers.assert_true(late, "a late listener and failing diagnostic must be isolated too")
+		end)
+	end
 	helpers.it("uses private stdin and publishes only after exit and every close acknowledgement", function()
 		local adapter, state = fresh()
 		local operation, results = dispatch(adapter)

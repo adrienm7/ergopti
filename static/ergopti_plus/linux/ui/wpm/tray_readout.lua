@@ -72,6 +72,7 @@ local _state = {
 	last_key = nil,
 	flip = false,
 	presentation = nil,
+	pending = nil,
 }
 
 -- The tray backend and the icon painter; replaceable by tests.
@@ -179,15 +180,15 @@ local function write_icon(frame)
 		Logger.error(LOG, "Cannot create '%s' — no tray readout icon.", dir)
 		return nil
 	end
-	_state.flip = not _state.flip
-	local path = dir .. (_state.flip and "/wpm-a.png" or "/wpm-b.png")
+	local next_flip = not _state.flip
+	local path = dir .. (next_flip and "/wpm-a.png" or "/wpm-b.png")
 	local painter = _painter or paint_png
 	local ok, written = pcall(painter, frame, path)
 	if not ok or written ~= true then
 		Logger.error(LOG, "The tray readout icon could not be painted: %s.", tostring(ok and "refused" or written))
 		return nil
 	end
-	return path
+	return path, next_flip
 end
 
 
@@ -214,6 +215,7 @@ local function remove_item()
 	_state.handle = nil
 	_state.last_key = nil
 	_state.presentation = nil
+	_state.pending = nil
 	return true
 end
 
@@ -248,10 +250,24 @@ function M.start()
 	return start_readout(true)
 end
 
+--- A refused native update may already have selected the new icon.
+--- Retry that exact publication before either icon file can be reused.
+--- @return boolean settled
+local function settle_pending()
+	if not _state.pending then return true end
+	local pending, Tray = _state.pending, tray()
+	if not Tray or not _state.handle then return false end
+	local called, updated = pcall(Tray.update_item, _state.handle, clone(pending.presentation))
+	if not called or updated ~= true then return false end
+	_state.presentation, _state.last_key, _state.flip = pending.presentation, pending.key, pending.flip
+	_state.pending = nil
+	return true
+end
+
 --- Captures choices and presentation independently of the mutable native handle.
 --- @return table snapshot Detached runtime state.
 function M.configuration_snapshot()
-	if _restore_debt then return nil end
+	if _restore_debt or _state.pending then return nil end
 	local copy = {}
 	for key, value in pairs(_state) do
 		if key ~= "handle" then copy[key] = clone(value) end
@@ -297,6 +313,7 @@ end
 function M.stop()
 	if _restore_debt or not Preferences.admit() then return false end
 	if not _state.running then return true end
+	if not settle_pending() then return false end
 	local candidate = M.configuration_snapshot()
 	_restore_debt = M.configuration_snapshot()
 	candidate.running, candidate.presentation = false, nil
@@ -350,14 +367,20 @@ function M.tick(stats, now_s)
 	if not _state.running then return nil end
 	if _state.last_update_s and (now_s - _state.last_update_s) < UPDATE_S then return nil end
 	_state.last_update_s = now_s
+	if not settle_pending() then return nil end
 	local canon = Constants.load()
 	if not canon then return nil end
 	local frame = Model.menubar_frame(canon, stats, Widget.frame_options(now_s, _state.use_colors))
 	local Tray = tray()
 	if not Model.menubar_visible(stats, frame.source, Widget.tooltip_visible()) then
 		if _state.handle and Tray then
+			local hidden = clone(_state.presentation or {})
+			hidden.active = false
 			local called, updated = pcall(Tray.update_item, _state.handle, { active = false })
-			if not called or updated ~= true then return nil end
+			if not called or updated ~= true then
+				_state.pending = { presentation = hidden, key = nil, flip = _state.flip }
+				return nil
+			end
 			if _state.presentation then _state.presentation.active = false end
 		end
 		_state.last_key = nil
@@ -365,15 +388,18 @@ function M.tick(stats, now_s)
 	end
 	local key = frame.number .. "|" .. tostring(frame.background)
 	if key == _state.last_key then return frame end
-	local icon = write_icon(frame)
+	local icon, next_flip = write_icon(frame)
 	if not icon then return nil end
 	local handle = ensure_item(icon)
 	if not handle or not Tray then return nil end
 	local presentation = { icon = icon, title = frame.label, active = true }
 	local called, updated = pcall(Tray.update_item, handle, presentation)
-	if not called or updated ~= true then return nil end
+	if not called or updated ~= true then
+		_state.pending = { presentation = clone(presentation), key = key, flip = next_flip }
+		return nil
+	end
 	_state.presentation = presentation
-	_state.last_key = key
+	_state.last_key, _state.flip = key, next_flip
 	return frame
 end
 
@@ -388,6 +414,7 @@ end
 function M._reset()
 	_restore_debt = nil
 	_state.presentation = nil
+	_state.pending = nil
 	_state.running = false
 	_state.use_colors = DEFAULTS.colors
 	_state.handle = nil

@@ -31,9 +31,9 @@ local _policy = nil
 local function policy()
 	if _policy then return _policy end
 	local path = Paths.shared("modules/llm/inference.json")
-	local fh = path and io.open(path, "r")
-	local root = fh and Json.decode(fh:read("*a")) or nil
-	if fh then fh:close() end
+	local text, status
+	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	local root = status == "ok" and Json.decode(text) or nil
 	if type(root) ~= "table" or type(root.diversity_temperature) ~= "table" then
 		error("inference.json is missing or malformed: " .. tostring(path), 0)
 	end

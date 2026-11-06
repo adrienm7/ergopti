@@ -55,7 +55,9 @@ function M.with_session(options, body)
 		close = function(fd)
 			s.source_closes = (s.source_closes or 0) + 1
 			descriptors[fd] = nil; released_fds[#released_fds + 1] = fd
-			return options.fail_reader_close and -1 or 0
+			local fail = type(options.fail_reader_close) == "function" and options.fail_reader_close(fd)
+				or options.fail_reader_close == true
+			return fail and -1 or 0
 		end,
 		ioctl = function(fd, request, argument)
 			if request == 0x80044520 then
@@ -129,13 +131,17 @@ function M.with_session(options, body)
 		end,
 		process = function(code, value)
 			s.captures[#s.captures + 1] = { code, value }
+			if options.capture_error and options.capture_error(code, value) then return nil, nil, "capture refused" end
 			if value == 1 then down[code] = true elseif value == 0 then down[code] = nil end
 			return code == 30 and value ~= 0 and (down[42] and "A" or "a") or nil
 		end,
 	}
 	package.loaded["adapters.xkb_capture"] = options.capture or capture
 	package.loaded["modules.hotstrings.device_finder"] = {
-		find_devices = function() return { paths.a, paths.b }, {} end,
+		find_devices = function()
+			local found = {}; for _, id in ipairs(options.source_ids or { "a", "b" }) do found[#found + 1] = paths[id] end
+			return found, {}
+		end,
 		is_key_device = function() return true end,
 		-- Controlled keyboard sources have no REL/ABS axes.
 		is_interceptable_key_device = function() return true end,
@@ -234,6 +240,8 @@ function M.with_session(options, body)
 		end))
 		s.start_options = { intercept = true, requireOutputBroker = true, onEmitRaw = s.writer.emit,
 			onChar = options.on_char,
+			onPhysical = options.on_physical and function(...) return options.on_physical(s, ...) end or nil,
+			onConsume = options.on_consume and function(...) return options.on_consume(s, ...) end or nil,
 			onCaptureReacquired = options.on_capture_reacquired }
 		s.hook.start(s.start_options)
 		assert(s.hook.isRunning())
@@ -280,16 +288,18 @@ function M.with_manager_session(options, body)
 		local ConfigPaths = require("infra.config_paths")
 		local Files = require("adapters.file_system")
 		local original_route, original_read = ConfigPaths.config, Files.read_with_status
-		local names = { "platform.remap.tap_hold_manager", "adapters.keyboard_layout", "platform.remap.nav_layer" }
+		local names = { "platform.remap.tap_hold_manager", "adapters.keyboard_layout", "platform.remap.nav_layer", "adapters.clipboard" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local folder = os.tmpname(); os.remove(folder)
 		assert(os.execute("mkdir '" .. folder:gsub("'", "'\\''") .. "'"))
 		local source_path, tap_path = folder .. "/config.toml", folder .. "/tap_hold.toml"
+		s.tap_path = tap_path
+		if options.nav_fixture then require("tests.support.nav_layer_fixture").write(folder) end
 		local function write(path, text)
 			local file = assert(io.open(path, "w")); assert(file:write(text)); assert(file:close())
 		end
 		write(source_path, s.bytes)
-		write(tap_path, require("tests.support.tap_hold_fixture").with_preset(""))
+		write(tap_path, require("tests.support.tap_hold_fixture").with_preset(options.tap_hold_text or ""))
 		ConfigPaths.config = function(name) return name == "config.toml" and source_path or original_route(name) end
 		Files.read_with_status = function(path)
 			if path == source_path then
@@ -300,12 +310,13 @@ function M.with_manager_session(options, body)
 		end
 		local manager
 		local called, failure = pcall(function()
+			if options.clipboard then package.loaded["adapters.clipboard"] = options.clipboard end
 			if options.before_manager then options.before_manager(s) end
 			local Layout = h.load_module("adapters.keyboard_layout")
 			Layout._set_table_for_test({ a = { keycode = 30, level = 1, mods = {} }, A = { keycode = 30, level = 2, mods = { "shift" } } })
 			manager = options.cached_manager or h.load_module("platform.remap.tap_hold_manager")
 			s.actions = {}
-			assert(manager.init({ keyboard_hook = s.hook,
+			assert(manager.init({ keyboard_hook = s.hook, capture_copy_owner = options.capture_copy_owner,
 				execute_action = function(action, binding)
 					s.actions[#s.actions + 1] = { action, binding }
 					if options.on_generic_action then return options.on_generic_action(s, action, binding) end
@@ -319,7 +330,7 @@ function M.with_manager_session(options, body)
 		if manager then pcall(manager._reset_for_test) end
 		ConfigPaths.config, Files.read_with_status = original_route, original_read
 		for _, name in ipairs(names) do package.loaded[name] = saved[name][1] end
-		os.remove(source_path); os.remove(tap_path)
+		os.remove(source_path); os.remove(tap_path); os.remove(folder .. "/layers.toml")
 		os.execute("rmdir '" .. folder:gsub("'", "'\\''") .. "'")
 		if not called then error(failure, 0) end
 	end)

@@ -84,15 +84,18 @@ local function with_case(options, body)
 	require("config_outdated").reset_for_tests()
 	local fault = options.fault
 	if fault then
+		fault.reads, fault.closes = 0, 0
 		local function fault_stream(file)
 			return {
 				read = function(_, ...)
+					fault.reads = fault.reads + 1
 					local bytes = file:read(...)
 					if fault.stage ~= "read" then return bytes end
 					if fault.kind == "throw" then error("catalogue read refused") end
 					return fault.value
 				end,
 				close = function()
+					fault.closes = fault.closes + 1
 					local closed = file:close()
 					if fault.stage ~= "close" then return closed end
 					if fault.kind == "throw" then error("catalogue close refused") end
@@ -100,16 +103,12 @@ local function with_case(options, body)
 				end,
 			}
 		end
-		-- Cloud still owns its stdio port; local sources now acquire pinned native
-		-- streams. Inject each refusal at its actual public acquisition boundary.
-		io.open = function(file_path, mode)
-			local file, detail = original_open(file_path, mode)
-			if not file or fault.lane ~= "cloud" or file_path ~= cloud or not mode:match("r") then return file, detail end
-			return fault_stream(file)
-		end
+		-- Both catalogue lanes now acquire classified streams. Preserve the real
+		-- acquisition and close the real handle while injecting its receipts.
 		Reader.open_source = function(file_path)
 			local file, detail, errno = original_source_open(file_path)
-			if not file or fault.lane ~= "local" or file_path ~= local_path then return file, detail, errno end
+			local target = fault.lane == "cloud" and cloud or local_path
+			if not file or file_path ~= target then return file, detail, errno end
 			return fault_stream(file)
 		end
 	end
@@ -126,6 +125,10 @@ local function with_case(options, body)
 		body({ entries = entries, remote = remote, path = path, cloud = cloud, local_path = local_path,
 			warnings = warnings, errors = errors, read = function() return read(path) end,
 			write = function(bytes) write(path, bytes) end, create_private = create_private })
+		if fault then
+			helpers.assert_true(fault.reads > 0, "the requested catalogue read must be exercised")
+			helpers.assert_true(fault.closes > 0, "the requested catalogue handle must be retired")
+		end
 	end)
 	io.open, Paths.shared = original_open, original_shared
 	Reader.open_source = original_source_open

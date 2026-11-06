@@ -78,6 +78,35 @@ local function with_editor(body, logger)
 end
 
 helpers.describe("prompt editor save error ownership", function()
+	helpers.it("(prompt-private-exception) withholds the saved prompt from callback errors", function()
+		local logger, lines = require("logger.shim"), {}
+		local original = logger.error
+		logger.error = function(_, fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end
+		local ok, err = pcall(function()
+			with_editor(function(f)
+				local payload, context = f.open(function(candidate) error("failed " .. candidate.system_single) end)
+				payload.prompt = "secret-canary"
+				helpers.assert_eq(f.save(payload, context).saved, false)
+				helpers.assert_true(not table.concat(lines, "\n"):find("secret-canary", 1, true))
+			end)
+		end)
+		logger.error = original
+		if not ok then error(err, 0) end
+	end)
+	helpers.it("(prompt-save-owner) refuses reentrant cancellation while a save is committing", function()
+		with_editor(function(f)
+			local payload, context, cancelled
+			payload, context = f.open(function(candidate)
+				cancelled = f.bridge.on_message({ action = "cancel", edit_id = payload.edit_id, epoch = payload.epoch }, f.state, context)
+				return f.persist(candidate)
+			end)
+			local result = f.save(payload, context)
+			helpers.assert_eq(cancelled, { cancelled = false, closed = false, busy = true })
+			helpers.assert_eq(result, { saved = true, closed = true })
+			helpers.assert_eq(f.seen.closes, 1)
+		end)
+	end)
+
 	helpers.it("reports a real outdated profile registry without changing its bytes", function()
 		with_editor(function(f)
 			local original = "[llm]\nuser_profiles = []\n"

@@ -49,13 +49,13 @@ local function settle(request)
 	if _owned[request.owner] == operation then _owned[request.owner] = nil end
 	if not operation._cancelled then
 		local ok = pcall(request.callback, request.result)
-		if not ok then Logger.error(LOG, "Native proxy completion callback raised.") end
+		if not ok then pcall(Logger.error, LOG, "Native proxy completion callback raised.") end
 	end
 	local listeners = operation._listeners
 	operation._listeners = {}
 	for _, listener in ipairs(listeners) do
 		local ok = pcall(listener)
-		if not ok then Logger.error(LOG, "Native proxy settlement callback raised.") end
+		if not ok then pcall(Logger.error, LOG, "Native proxy settlement callback raised.") end
 	end
 end
 
@@ -99,7 +99,7 @@ local function finish(request, result)
 	request.terminal, request.result = true, result
 	if request.on_native_terminal then
 		local ok = pcall(request.on_native_terminal, result)
-		if not ok then Logger.error(LOG, "Native proxy terminal callback raised.") end
+		if not ok then pcall(Logger.error, LOG, "Native proxy terminal callback raised.") end
 	end
 	cleanup(request)
 end
@@ -251,7 +251,7 @@ function M.lookup_owned(url, options, callback)
 		if type(listener) ~= "function" then return false end
 		if operation._settled then
 			local ok = pcall(listener)
-			if not ok then Logger.error(LOG, "Native proxy settlement callback raised.") end
+			if not ok then pcall(Logger.error, LOG, "Native proxy settlement callback raised.") end
 		else operation._listeners[#operation._listeners + 1] = listener end
 		return true
 	end

@@ -18,6 +18,7 @@
 
 let _strings = {};
 let _initialValues = new WeakMap();
+let _initialized = false;
 
 /**
  * Returns the translated string for key, or the key itself as a fallback.
@@ -67,6 +68,7 @@ window.initData = function (data) {
 		applyDomStrings();
 	}
 
+	if (_initialized || !Array.isArray(data.fields)) return;
 	const rows = document.getElementById('rows');
 	rows.innerHTML = '';
 	_initialValues = new WeakMap();
@@ -78,7 +80,10 @@ window.initData = function (data) {
 		label.textContent = f.hint ? f.label + ' ' + f.hint : f.label;
 
 		const original = typeof f.value === 'string' ? f.value : '';
-		const input = document.createElement(/[\r\n]/.test(original) ? 'textarea' : 'input');
+		// Every field is a textarea so a single-line value can still become
+		// multiline; an input would silently drop the typed line breaks.
+		const input = document.createElement('textarea');
+		input.setAttribute('rows', /[\r\n]/.test(original) ? '3' : '1');
 		input.setAttribute('name', f.key);
 		input.setAttribute('autocomplete', 'off');
 		input.value = original;
@@ -90,6 +95,7 @@ window.initData = function (data) {
 		rows.appendChild(row);
 	});
 
+	_initialized = true;
 	const first = document.querySelector('#rows input, #rows textarea');
 	if (first) first.focus();
 };
@@ -99,7 +105,7 @@ window.initData = function (data) {
  * @returns {Object} A map of {key: value}.
  */
 function collectValues() {
-	const values = {};
+	const values = Object.create(null);
 	document.querySelectorAll('#rows input, #rows textarea').forEach(function (input) {
 		const initial = _initialValues.get(input);
 		values[input.getAttribute('name')] =

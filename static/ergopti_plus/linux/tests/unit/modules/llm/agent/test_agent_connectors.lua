@@ -85,6 +85,31 @@ local function with_connectors(opts, body)
 	if not ok then error(err, 0) end
 end
 
+helpers.it("agent calendar preserves the complete private directory receipt", function()
+	local Shell = require("adapters.shell_runner")
+	local previous_line, previous_checked = Shell.exec_line, Shell.exec_checked
+	local prior = package.loaded["modules.llm.agent_connectors"]
+	local dir = "/tmp/base\nwith-newline/ergopti-agent.abcdefgh"
+	Shell.exec_line = function() return "/tmp/base" end
+	Shell.exec_checked = function() return true, dir .. "\n" end
+	package.loaded["modules.llm.agent_connectors"] = nil
+	local connector = require("modules.llm.agent_connectors")
+	local written
+	connector._set_deps_for_test({
+		random_hex = function() return "00ff" end,
+		utc_stamp = function() return "20261023T120000Z" end,
+		write_file = function(path) written = path; return true end,
+		remove = function() return true end,
+		run = function(_, _, _, callback) callback({ ok = true, code = 0 }); return {} end,
+	})
+	local ok, err = pcall(connector.run, config(), { type = "reminder", title = "Reminder" }, function() end)
+	connector.shutdown()
+	Shell.exec_line, Shell.exec_checked = previous_line, previous_checked
+	package.loaded["modules.llm.agent_connectors"] = prior
+	assert(ok, err)
+	helpers.assert_eq(written, dir .. "/task.ics", "calendar file must stay in the created private directory")
+end)
+
 helpers.describe("AI agent connectors: one program per action, never a shell", function()
 
 	helpers.it("a calendar event is an .ics file in a private folder, opened with xdg-open", function()
@@ -142,6 +167,16 @@ helpers.describe("AI agent connectors: one program per action, never a shell", f
 		end)
 	end)
 
+	helpers.it("opens a draft for a valid recipient beginning with a hyphen", function()
+		with_connectors({ has_xdg_email = true }, function(Connectors, world, done)
+			local action = { type = "mail", to = { "-billing@example.com" }, body = "Bonjour" }
+			Connectors.run(config(), action, done)
+			helpers.assert_eq(world.runs[1].executable, "xdg-email")
+			helpers.assert_eq(world.runs[1].args, { Agent.mailto(action) },
+			"xdg-email treats a positional address starting with '-' as an option")
+		end)
+	end)
+
 	helpers.it("without xdg-email, a mail is the mailto: link opened with xdg-open", function()
 		with_connectors({}, function(Connectors, world, done)
 			local action = { type = "mail", body = "Bonjour" }
@@ -165,6 +200,92 @@ helpers.describe("AI agent connectors: one program per action, never a shell", f
 			Connectors.run(cfg, { type = "shortcut", name = "gone" }, done)
 			helpers.assert_eq(#world.runs, 2, "a tool no longer in the folder does not run")
 			helpers.assert_eq(world.outcomes[1].ok, false)
+		end)
+	end)
+
+	helpers.it("does not split a newline in an executable filename into phantom tools", function()
+		local uv = require("luv")
+		local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-tools-XXXXXX"))
+		local strange, valid = dir .. "/phantom\nsecond", dir .. "/valid"
+		for _, path in ipairs({ strange, valid }) do
+			local file = assert(io.open(path, "wb")); assert(file:write("#!/bin/sh\n")); assert(file:close())
+			assert(uv.fs_chmod(path, 448))
+		end
+		local previous = package.loaded["modules.llm.agent_connectors"]
+		package.loaded["modules.llm.agent_connectors"] = nil
+		local connectors = require("modules.llm.agent_connectors")
+		connectors._set_deps_for_test({ tools_dir = function() return dir end })
+		local ok, err = pcall(function()
+			helpers.assert_eq(connectors.tools(config()), { "valid" })
+		end)
+		connectors._set_deps_for_test(nil)
+		package.loaded["modules.llm.agent_connectors"] = previous
+		assert(uv.fs_unlink(strange)); assert(uv.fs_unlink(valid)); assert(uv.fs_rmdir(dir))
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("omits executable tool names that are not valid UTF-8", function()
+		local uv = require("luv")
+		local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-tools-XXXXXX"))
+		local invalid, valid = dir .. "/bad" .. string.char(0xff), dir .. "/valid"
+		for _, path in ipairs({ invalid, valid }) do
+			local file = assert(io.open(path, "wb")); assert(file:write("#!/bin/sh\n")); assert(file:close())
+			assert(uv.fs_chmod(path, 448))
+		end
+		local previous = package.loaded["modules.llm.agent_connectors"]
+		package.loaded["modules.llm.agent_connectors"] = nil
+		local connectors = require("modules.llm.agent_connectors")
+		connectors._set_deps_for_test({ tools_dir = function() return dir end })
+		local ok, err = pcall(function() helpers.assert_eq(connectors.tools(config()), { "valid" }) end)
+		connectors._set_deps_for_test(nil)
+		package.loaded["modules.llm.agent_connectors"] = previous
+		assert(uv.fs_unlink(invalid)); assert(uv.fs_unlink(valid)); assert(uv.fs_rmdir(dir))
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("refuses a cached tool replaced by a symlink before execution", function()
+		local uv = require("luv")
+		local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-tools-XXXXXX"))
+		local path = dir .. "/valid"
+		local file = assert(io.open(path, "wb")); assert(file:write("#!/bin/sh\n")); assert(file:close())
+		assert(uv.fs_chmod(path, 448))
+		local previous = package.loaded["modules.llm.agent_connectors"]
+		package.loaded["modules.llm.agent_connectors"] = nil
+		local connectors = require("modules.llm.agent_connectors")
+		local started = 0
+		connectors._set_deps_for_test({ tools_dir = function() return dir end,
+			run_tool = function() started = started + 1; return nil end })
+		local ok, err = pcall(function()
+			helpers.assert_eq(connectors.tools(config()), { "valid" })
+			assert(uv.fs_unlink(path)); assert(uv.fs_symlink("/bin/true", path))
+			connectors.run(config(), { type = "shortcut", name = "valid" }, function() end)
+			helpers.assert_eq(started, 0, "a symlink is not an executable regular tool")
+		end)
+		connectors._set_deps_for_test(nil)
+		package.loaded["modules.llm.agent_connectors"] = previous
+		assert(uv.fs_unlink(path)); assert(uv.fs_rmdir(dir))
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("a caller cannot alter the cached tool admission list", function()
+		with_connectors({ tools = { "valid" } }, function(Connectors, world, done)
+			local cfg = config()
+			local offered = Connectors.tools(cfg)
+			offered[1] = "../outside"
+			helpers.assert_eq(Connectors.tools(cfg), { "valid" })
+			Connectors.run(cfg, { type = "shortcut", name = "../outside" }, done)
+			helpers.assert_eq(#world.runs, 0, "a detached list cannot authorize another executable")
+		end)
+	end)
+
+	helpers.it("refreshes the tool cache when the wall clock moves backwards", function()
+		with_connectors({ tools = { "valid" } }, function(Connectors, world)
+			local cfg = config()
+			world.clock = 1000
+			Connectors.tools(cfg)
+			world.clock = 500
+			Connectors.tools(cfg)
+			helpers.assert_eq(world.listed, 2, "a backwards clock must not extend cache lifetime")
 		end)
 	end)
 

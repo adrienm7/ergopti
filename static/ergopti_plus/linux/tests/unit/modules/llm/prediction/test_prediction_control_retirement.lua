@@ -143,6 +143,7 @@ local function scenario(options, body)
 		local gate = require("infra.input_capture_gate").new()
 		local keyboard_identity = require("modules.shortcuts.keyboard_shortcuts").collision_identity
 		local environment = setmetatable({ engine = matcher, engine_mod = require("modules.hotstrings.engine"),
+			TapHold = { observe_copy_activity = function() end },
 			prediction_engine = prediction, injector = injector, secure_focus_guard = guard,
 			shortcuts = options.restart_prediction and { is_enabled = function() return true end,
 				is_caps_word_active = function() return false end } or nil,
@@ -569,7 +570,7 @@ do
 			local config = { init = noop, migrate_legacy_delays = yes, set_magic_key = yes, load_all = function() return 0, true, nil, { complete = true } end,
 			  parse_error_count = function() return 0 end, get_categories = function() return {} end }
 			put("modules.hotstrings.hotstrings_config", config)
-			put("platform.remap.tap_hold_manager", { init = noop, user_path = function() return marker .. ".tap_hold.toml" end,
+			put("platform.remap.tap_hold_manager", { init = yes, observe_copy_activity = function() end, user_path = function() return marker .. ".tap_hold.toml" end,
 			  reload = yes, is_tap_action = no, canonical_hold = function() return "none" end, is_active = no, keys = function() return {} end, set_paused = yes })
 			put("platform.remap.tap_hold_writer", { FILE_NAME = "tap_hold.toml", init = noop, migrate_file = noop })
 			-- Gesture/action sources have no configured bindings in this scope.

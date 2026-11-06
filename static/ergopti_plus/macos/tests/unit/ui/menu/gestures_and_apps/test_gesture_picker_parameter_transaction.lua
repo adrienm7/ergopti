@@ -9,7 +9,7 @@ local function with_picker(options, callback)
 	local saved = {}
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local fixture = { assigned = "none", parameters = { retained = "unrelated" },
-		saves = 0, updates = 0, assignments = 0, conflicts = 0, errors = 0 }
+		saves = 0, updates = 0, assignments = 0, conflicts = 0, errors = 0, click_results = {}, blocked = false }
 	local function copy(source)
 		local result = {}
 		for key, value in pairs(source) do result[key] = value end
@@ -24,10 +24,13 @@ local function with_picker(options, callback)
 		get_action = function() return fixture.assigned end,
 		set_action = function(_, value)
 			fixture.assignments = fixture.assignments + 1
+			if value == "none" and options.refuse_restore then return false end
 			fixture.assigned = value
 			if value == selected then return result(options.assign) end
 			return true
 		end,
+		begin_click_binding_change = function(slot) fixture.blocked = true; return { slot = slot } end,
+		finish_click_binding_change = function(_, committed) fixture.blocked = false; fixture.click_results[#fixture.click_results + 1] = committed; return true end,
 		get_action_parameter = function() return fixture.parameters["tap_3__" .. selected] or "" end,
 		get_all_action_parameters = function() return copy(fixture.parameters) end,
 		replace_action_parameters = function(snapshot)
@@ -88,6 +91,7 @@ local function with_picker(options, callback)
 		local owner = require("tests.support.program_parameter_fixture")(runtime, { gestures = true }, "gesture",
 			function() return fixture.assigned end,
 			function() fixture.saves = fixture.saves + 1; return result(options.save) end)
+		fixture.owner = owner
 		local menu = require("ui.menu.menu_gestures")
 		menu.build({ gestures = runtime, state = { gestures = true },
 			commit_program_parameter = owner.apply,
@@ -149,6 +153,7 @@ helpers.describe("gesture picker acknowledged parameter transaction", function()
 				helpers.assert_eq(fixture.assigned, "none")
 				helpers.assert_eq(fixture.parameters, { retained = "unrelated" })
 				helpers.assert_eq(fixture.saves, 1)
+				helpers.assert_eq(fixture.click_results, { false })
 				helpers.assert_eq(fixture.updates, 0)
 				helpers.assert_eq(fixture.conflicts, 0)
 			end)
@@ -164,12 +169,28 @@ helpers.describe("gesture picker acknowledged parameter transaction", function()
 		end)
 	end
 
+	helpers.it("holds the slot closed until real pending compensation settles", function()
+		local options = { save = "false", refuse_restore = true }
+		with_picker(options, function(fixture, pick)
+			pick()
+			helpers.assert_true(fixture.owner.pending(), "the transaction owns unresolved compensation")
+			helpers.assert_true(fixture.blocked, "the old binding must not reacquire while compensation is pending")
+			helpers.assert_eq(fixture.click_results, {})
+			options.refuse_restore = false
+			helpers.assert_true(fixture.owner.retry_restore())
+			helpers.assert_eq(fixture.owner.pending(), false)
+			helpers.assert_eq(fixture.blocked, false)
+			helpers.assert_eq(fixture.click_results, { false })
+		end)
+	end)
+
 	helpers.it("stores and publishes one successful choice", function()
 		with_picker({}, function(fixture, pick)
 			pick()
 			helpers.assert_eq(fixture.assigned, "run_program")
 			helpers.assert_eq(fixture.parameters, { retained = "unrelated", tap_3__run_program = "new scalar" })
 			helpers.assert_eq(fixture.saves, 1)
+			helpers.assert_eq(fixture.click_results, { true })
 			helpers.assert_eq(fixture.conflicts, 1)
 		end)
 	end)

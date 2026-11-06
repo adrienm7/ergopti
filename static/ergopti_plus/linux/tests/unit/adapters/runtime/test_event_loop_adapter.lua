@@ -34,7 +34,7 @@ local function stop_fixture(source)
 	function backend.timer_start(handle, _, _, callback) handle.active, handle.callback = true, callback; return 0 end
 	function backend.idle_stop(handle) handle.active = false; return 0 end
 	function backend.timer_stop(handle) handle.active = false; return 0 end
-	function backend.close(handle) handle.closed = true end
+	function backend.close(handle, callback) handle.closed = true; callback() end
 	function backend.stop() state.stops = state.stops + 1 end
 	function backend.run()
 		local stops_before = state.stops
@@ -56,6 +56,30 @@ local function stop_fixture(source)
 end
 
 helpers.describe("linux-event-stop-receipts", function()
+	helpers.it("linux-event-close-ack: retains pending closes until callbacks arrive", function()
+		local loop, state, backend = stop_fixture("idle")
+		local run, pending, admit = backend.run, {}, false
+		backend.close = function(handle, callback)
+			handle.closed = true
+			pending[#pending + 1] = callback
+		end
+		backend.run = function(mode)
+			if mode ~= "nowait" then return run() end
+			if admit then
+				local callbacks = pending
+				pending = {}
+				for _, callback in ipairs(callbacks) do callback() end
+			end
+		end
+		local options = { onIdle = function() loop.stop() end, onPeriodic = function() end }
+		helpers.assert_true(not pcall(loop.run, options), "unacknowledged closes must fail")
+		helpers.assert_eq(#state.handles, 2)
+		helpers.assert_true(not pcall(loop.run, options), "pending handles block replacement")
+		helpers.assert_eq(#state.handles, 2)
+		admit = true
+		loop.run(options)
+		helpers.assert_eq(#state.handles, 4, "a later acknowledged cleanup permits a new run")
+	end)
 	for _, source in ipairs({ "idle", "periodic", "deferred" }) do
 		helpers.it("linux-event-stop-receipts: " .. source .. " signals native stop without stealing handles", function()
 			local loop, state = stop_fixture(source)
@@ -495,6 +519,13 @@ helpers.describe("event loop backend isolation", function()
 
   -- The isolated child uses the POSIX transport of this Linux driver.
   if native_ok and package.config:sub(1, 1) == "/" then
+    helpers.it("linux-event-close-ack: installed luv retires its own handles before return", function()
+      local executable = assert(arg and arg[-1], "the running Lua interpreter must be identifiable")
+      local fixture = helpers.driver_root() .. "/tests/fixtures/native_event_loop_close_ack.lua"
+      local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+      local result = os.execute(quote(executable) .. " " .. quote(fixture))
+      helpers.assert_true(result == true or result == 0, "native close callbacks must be acknowledged")
+    end)
     helpers.it("installed luv dispatches callbacks, closes its handles and waits through child exits", function()
       -- libuv's default loop is process-wide: other tests may own active handles.
       local executable = assert(arg and arg[-1], "the running Lua interpreter must be identifiable")
@@ -540,6 +571,39 @@ helpers.describe("linux-event-reentry", function()
 				helpers.assert_true(not loop.isRunning())
 			end)
 		end
+	end
+
+	for _, failure in ipairs({ "idle_stop", "timer_stop", "close_idle", "close_timer" }) do
+		helpers.it("linux-event-cleanup-retention: retries " .. failure .. " before a new run", function()
+			local loop, state, backend = stop_fixture("periodic")
+			local original_stop_idle, original_stop_timer, original_close = backend.idle_stop, backend.timer_stop, backend.close
+			local refuse = true
+			backend.idle_stop = function(handle)
+				if refuse and failure == "idle_stop" then return nil, "controlled refusal" end
+				return original_stop_idle(handle)
+			end
+			backend.timer_stop = function(handle)
+				if refuse and failure == "timer_stop" then return nil, "controlled refusal" end
+				return original_stop_timer(handle)
+			end
+			backend.close = function(handle, callback)
+				if refuse and failure == "close_" .. handle.kind then return false, "controlled refusal" end
+				return original_close(handle, callback)
+			end
+			local options = { onPeriodic = function() loop.stop() end }
+			local ok, reason = pcall(loop.run, options)
+			helpers.assert_true(not ok and tostring(reason):find("cleanup remains pending", 1, true) ~= nil)
+			helpers.assert_eq(#state.handles, 2)
+			local pending = failure:find("idle", 1, true) and state.handles[1] or state.handles[2]
+			helpers.assert_true(not pending.closed, "the exact refused native handle stays owned")
+			ok = pcall(loop.run, options)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(#state.handles, 2, "no successor may replace cleanup debt")
+			refuse = false
+			loop.run(options)
+			helpers.assert_true(pending.closed, "retry closes the original native handle")
+			helpers.assert_eq(#state.handles, 4)
+		end)
 	end
 
 	helpers.it("linux-event-reentry: raised native run releases the admission guard for retry", function()

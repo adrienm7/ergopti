@@ -84,6 +84,35 @@ helpers.describe("evdev_reader: wait_any_readable", function()
 		helpers.assert_nil(reader.wait_any_readable(8))
 		reader._reset_backend()
 	end)
+
+	helpers.it("answers nil when the backend declines the wait", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = waiting_backend(nil)
+		reader._set_backend(backend)
+		reader.open("/dev/input/event3")
+		helpers.assert_nil(reader.wait_any_readable(8), "no wait must use the idle loop's fallback")
+		reader._reset_backend()
+	end)
+
+	helpers.it("answers nil when native poll fails", function()
+		Fixture.controlled_native_reader({}, { poll_result = -1 }, function(reader)
+			helpers.assert_true(reader.use_ffi_backend())
+			helpers.assert_true(reader.open("/dev/input/event3"))
+			helpers.assert_nil(reader.wait_any_readable(8), "a failed poll did not wait for the timeout")
+			reader._reset_backend()
+		end)
+	end)
+
+	helpers.it("distinguishes native timeout from native readiness", function()
+		for _, scenario in ipairs({ { result = 0, ready = false }, { result = 1, ready = true } }) do
+			Fixture.controlled_native_reader({}, { poll_result = scenario.result }, function(reader)
+				helpers.assert_true(reader.use_ffi_backend())
+				helpers.assert_true(reader.open("/dev/input/event3"))
+				helpers.assert_eq(reader.wait_any_readable(8), scenario.ready)
+				reader._reset_backend()
+			end)
+		end
+	end)
 end)
 
 -- The real poll(2) through the FFI backend, on a FIFO standing in for a device.

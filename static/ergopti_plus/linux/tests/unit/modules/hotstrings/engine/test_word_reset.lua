@@ -160,6 +160,63 @@ helpers.describe("word reset: the settings", function()
 		end)
 	end)
 
+	helpers.it("word reset, publishes the fresh neighboring settings after an external edit", function()
+		with_settings('[hotstrings]\nidle_reset_seconds = 5\n', function(subject, _, path, _, sandbox)
+			helpers.assert_eq(subject.idle_seconds(), 5)
+			local file = assert(io.open(path, "wb"))
+			assert(file:write('[hotstrings]\nidle_reset_seconds = 9\n')); assert(file:close())
+			helpers.assert_true(subject.set_click_resets_word(false))
+			helpers.assert_eq(require("toml_codec").decode(sandbox.read_bytes(path)).hotstrings.idle_reset_seconds, 9)
+			helpers.assert_eq(subject.idle_seconds(), 9, "the active delay must reflect the source used for the write")
+			helpers.assert_eq(subject.click_resets_word(), false)
+		end)
+	end)
+
+	for _, publication in ipairs({ "commit", "refuse", "raise" }) do
+		helpers.it("word reset, retains a scope candidate adopted during " .. publication .. " publication (word-reset-reentrant-cache)", function()
+			local source = '[hotstrings]\nidle_reset_seconds = 5\n'
+			with_settings(source, function(subject, _, path, _, sandbox)
+				local Writer = require("toml_codec.writer")
+				local write = Writer.batch_write
+				local before = subject.snapshot()
+				local candidate = { hotstrings = { idle_reset_seconds = 12, click_resets_word = true,
+					arrow_resets_word = false, shortcut_resets_word = false, tap_hold_resets_word = false,
+					cascade_max_arrows = 2 } }
+				local adopted
+				Writer.batch_write = function(...)
+					helpers.assert_true(subject.adopt_configuration(candidate))
+					adopted = subject.snapshot()
+					if publication == "refuse" then return false, "controlled publication refusal" end
+					if publication == "raise" then error("controlled publication exception") end
+					return write(...)
+				end
+				helpers.assert_eq(subject.set_click_resets_word(false), publication == "commit")
+				helpers.assert_eq(subject.snapshot(), adopted, "the setter cannot replace a newer scope candidate")
+				if publication == "commit" then
+					local stored = require("toml_codec").decode(sandbox.read_bytes(path)).hotstrings
+					helpers.assert_eq(stored.click_resets_word, false)
+					helpers.assert_eq(stored.idle_reset_seconds, 5)
+				else
+					helpers.assert_eq(sandbox.read_bytes(path), source)
+				end
+				helpers.assert_true(subject.restore_configuration(before))
+				helpers.assert_eq(subject.snapshot(), before, "the scope still owns its restoration image")
+			end)
+		end)
+	end
+
+	helpers.it("word reset, does not publish fresh neighboring settings when the write refuses", function()
+		with_settings('[hotstrings]\nidle_reset_seconds = 5\n', function(subject, controls, path, _, sandbox)
+			local before = subject.snapshot()
+			local external = '[hotstrings]\nidle_reset_seconds = 9\n'
+			local file = assert(io.open(path, "wb")); assert(file:write(external)); assert(file:close())
+			controls.refuse = true
+			helpers.assert_eq(subject.set_click_resets_word(false), false)
+			helpers.assert_eq(subject.snapshot(), before, "uncommitted neighboring values never enter runtime")
+			helpers.assert_eq(sandbox.read_bytes(path), external)
+		end)
+	end)
+
 	helpers.it("word reset, persists both leaves sparsely, keeping neighbours", function()
 		with_settings('[hotstrings]\nunknown = "keep"\n', function(subject, _, path, reload, sandbox)
 			helpers.assert_true(subject.set_idle_seconds(7.5))
@@ -398,6 +455,24 @@ helpers.describe("word reset: the daemon wiring", function()
 		local newline = body:find("if not result then WordReset.apply_typed_newline(engine, ch, app_id) end", 1, true)
 		helpers.assert_true(fired ~= nil and newline ~= nil and fired < newline,
 			"a typed newline empties the terminal line only when nothing fired")
+	end)
+
+	helpers.it("does not reset a word or authorize a later action when the catalogue refuses", function()
+		local text = source("ergopti_hotstrings.lua")
+		local start = assert(text:find("execute_action = function(action, binding)", 1, true)) + #"execute_action = "
+		local finish = assert(text:find("\n\t\tend,\n", start, true)) + #"\n\t\tend" - 1
+		local resets, result = 0, false
+		local env = { action_catalogue = { execute_action = function() return result end },
+			WordReset = { apply_tap_action = function() resets = resets + 1; return "word_start" end },
+			Logger = { debug = function() end }, tostring = tostring, error = error, engine = {}, LOG = "test" }
+		local chunk = assert(loadstring("return " .. text:sub(start, finish)))
+		setfenv(chunk, env)
+		local execute = chunk()
+		helpers.assert_eq(execute("copy", "tap_hold__escape"), false)
+		helpers.assert_eq(resets, 0)
+		result = true
+		helpers.assert_true(execute("copy", "tap_hold__escape"))
+		helpers.assert_eq(resets, 1)
 	end)
 
 	helpers.it("word reset, tells the engine of each tap-hold command the catalogue runs", function()

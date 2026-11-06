@@ -43,6 +43,7 @@ end
 local function rejecting_writer(detail)
 	local calls = {}
 	return {
+		read_classified = require("toml_codec.writer").read_classified,
 		batch_write = function(path, updates)
 			calls[#calls + 1] = { path = path, updates = updates }
 			return false, detail

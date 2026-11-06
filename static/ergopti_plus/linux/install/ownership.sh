@@ -58,6 +58,10 @@ if [ "$#" -eq 5 ]; then
 	esac
 	[ -d "$EXTRA_SOURCE" ] || ownership_refuse invalid_extra_source 1
 fi
+target="$INSTALL_ROOT/$OWNERSHIP_MANIFEST"
+if [ -L "$target" ] || { [ -e "$target" ] && [ ! -f "$target" ]; }; then
+	ownership_refuse invalid_destination 1
+fi
 manifest="$(mktemp "$INSTALL_ROOT/$OWNERSHIP_MANIFEST.XXXXXX")"
 trap 'rm -f -- "$manifest"' EXIT
 trees=("$OWNERSHIP_DRIVER_TREE" "$OWNERSHIP_SHARED_TREE")
@@ -94,4 +98,4 @@ if [ -f "$launcher" ]; then
 	digest="$(sha256sum < "$launcher")"
 	printf '%s\t%s\n' "${digest%% *}" "$OWNERSHIP_LAUNCHER" >> "$manifest"
 fi
-mv -- "$manifest" "$INSTALL_ROOT/$OWNERSHIP_MANIFEST"
+mv -T -- "$manifest" "$target"

@@ -451,3 +451,225 @@ helpers.describe("hotstring choice rollback keeps the published catalogue", func
 		end)
 	end
 end)
+
+helpers.describe("hotstring catalogue: removed source lifetime", function()
+	helpers.it("does not revive a removed override when its path returns malformed", function()
+		local uv = require("luv")
+		local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-source-life-XXXXXX"))
+		local path = root .. "/autocorrection.toml"
+		local function write(bytes)
+			local f = assert(io.open(path, "wb")); assert(f:write(bytes)); assert(f:close())
+		end
+		local function match(engine)
+			engine:reset(false)
+			local result
+			for c in ("owned"):gmatch(".") do result = engine:on_char(c) end
+			return result
+		end
+		local ok, err = pcall(function()
+			write('[probe]\n"owned" = { output = "OLD", auto_expand = true }\n')
+			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+			local engine = require("hotstring_engine").new()
+			Config._set_override_config_dir_for_test(root)
+			local id = "autocorrection"
+			require("tests.support.hotstring_choices").with_file(Config,
+				'[hotstrings]\ngroups = { autocorrection = true }\n[hotstrings.modules]\nautocorrection = { probe = true }\n', function()
+				assert(Config.init(engine, root))
+				local _, published = Config.load_all(); helpers.assert_true(published)
+				local first = match(engine); helpers.assert_not_nil(first, "the override source is live")
+				helpers.assert_eq(first.replacement, "OLD")
+				-- A healthy sibling read in a refused aggregate is not the live source.
+				write('[probe]\n"owned" = { output = "UNPUBLISHED", auto_expand = true }\n')
+				local sibling = root .. "/incomplete.toml"
+				local f = assert(io.open(sibling, "wb")); assert(f:write('[probe]\n"broken" = { output = ')); assert(f:close())
+				_, published = Config.reload(); helpers.assert_eq(published, false)
+				helpers.assert_eq(match(engine).replacement, "OLD")
+				write('[probe]\n"owned" = { output = '); assert(os.remove(sibling))
+				_, published = Config.reload(); helpers.assert_true(published)
+				helpers.assert_eq(match(engine).replacement, "OLD", "unpublished source cannot replace the active fallback")
+				assert(os.remove(path))
+				local original_load = engine.load_mappings
+				engine.load_mappings = function() return false end
+				_, published = Config.reload(); helpers.assert_eq(published, false)
+				engine.load_mappings = original_load
+				helpers.assert_eq(match(engine).replacement, "OLD", "a refused removal leaves the live engine intact")
+				local owner = {}; helpers.assert_true(Config.acquire(owner))
+				local inverse = assert(Config.configuration_snapshot())
+				local borrowed = require("modules.hotstrings.loader").capture_source_snapshots()
+				_, published = Config.load_all(); helpers.assert_true(published)
+				write('[probe]\n"owned" = { output = ')
+				_, published = Config.load_all()
+				helpers.assert_eq(published, false, "an ordinary candidate cannot borrow an inverse-only snapshot")
+				_, published = Config.load_all(nil, nil, borrowed)
+				helpers.assert_eq(published, false, "a public load cannot supply its own inverse receipt")
+				helpers.assert_nil(match(engine), "the removed mapping stays inactive during the transaction")
+				helpers.assert_true(Config.restore_configuration(owner, inverse), "the explicit inverse may restore its retained source")
+				helpers.assert_eq(match(engine).replacement, "OLD")
+				helpers.assert_true(Config.release(owner))
+				assert(os.remove(path))
+				_, published = Config.reload(); helpers.assert_true(published)
+				helpers.assert_nil(match(engine), "a removed source is no longer live")
+				write('[probe]\n"owned" = { output = ')
+				_, published = Config.reload()
+				helpers.assert_eq(published, false, "a newly reappearing malformed source has no current snapshot")
+				helpers.assert_nil(match(engine), "the old removed mapping must not be revived")
+			end)
+		end)
+		os.remove(path); uv.fs_rmdir(root)
+		if not ok then error(err, 0) end
+	end)
+end)
+
+helpers.describe("hotstring catalogue: unreadable discovery", function()
+	helpers.it("continues to load an explicitly selected TOML file", function()
+		local uv = require("luv")
+		local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-explicit-file-XXXXXX"))
+		local path = root .. "/custom.toml"
+		local file = assert(io.open(path, "wb"))
+		assert(file:write('[probe]\n"exactfile" = { output = "FOUND", auto_expand = true }\n')); assert(file:close())
+		local ok, err = pcall(function()
+			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+			local engine = require("hotstring_engine").new()
+			Config._set_override_config_dir_for_test(root)
+			require("tests.support.hotstring_choices").with_file(Config, { custom = true }, function()
+				assert(Config.init(engine, path))
+				local _, published = Config.load_all(nil, true)
+				helpers.assert_true(published)
+				helpers.assert_eq(Config.mapping_count(), 1)
+			end)
+		end)
+		os.remove(path); uv.fs_rmdir(root)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("discovers a personal folder created after daemon startup", function()
+		local uv = require("luv")
+		local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-late-personal-XXXXXX"))
+		local personal = root .. "/hotstrings"
+		local file = assert(io.open("ergopti_hotstrings.lua", "rb"))
+		local source = assert(file:read("*a")); assert(file:close())
+		local first = assert(source:find("local function resolve_config_path(", 1, true))
+		local last = assert(source:find("local function reload_hotstrings(", first, true))
+		local chunk = assert(loadstring(source:sub(first, last - 1) .. "\nreturn resolve_config_path"))
+		setfenv(chunk, setmetatable({ DEFAULT_CONFIG_DIR = personal }, { __index = _G }))
+		local resolve = chunk()
+		local ok, err = pcall(function()
+			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+			local engine = require("hotstring_engine").new()
+			Config._set_override_config_dir_for_test(root)
+			local id = require("hotstrings.personal_files").describe({ "custom.toml" }).id
+			require("tests.support.hotstring_choices").with_file(Config, { [id] = true }, function()
+				assert(Config.init(engine, resolve(nil)))
+				local _, published = Config.load_all(nil, true); helpers.assert_true(published)
+				assert(uv.fs_mkdir(personal, 448))
+				local out = assert(io.open(personal .. "/custom.toml", "wb"))
+				assert(out:write('[probe]\n"lateword" = { output = "FOUND", auto_expand = true }\n')); assert(out:close())
+				_, published = Config.reload(); helpers.assert_true(published)
+				engine:reset(false)
+				local match
+				for c in ("lateword"):gmatch(".") do match = engine:on_char(c) end
+				helpers.assert_not_nil(match, "reload must read the newly created personal folder")
+				helpers.assert_eq(match.replacement, "FOUND")
+			end)
+		end)
+		os.remove(personal .. "/custom.toml"); uv.fs_rmdir(personal); uv.fs_rmdir(root)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("distinguishes an absent personal root from an absent bundled root", function()
+		local uv = require("luv")
+		local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-scan-roots-XXXXXX"))
+		local bad_root, link_root = root .. "/not-a-directory", root .. "/link-directory"
+		local stream = assert(io.open(bad_root, "wb")); assert(stream:write("not a directory")); assert(stream:close())
+		assert(uv.fs_symlink(root, link_root))
+		local paths = require("infra.paths")
+		local original_shared = paths.shared
+		local ok, err = pcall(function()
+			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+			local engine = require("hotstring_engine").new()
+			Config._set_override_config_dir_for_test(root)
+			require("tests.support.hotstring_choices").with_file(Config, {}, function()
+				assert(Config.init(engine, root .. "/absent-personal"))
+				local _, published, _, receipt = Config.load_all(nil, true)
+				helpers.assert_true(published, "an absent personal root is optional")
+				helpers.assert_true(receipt.complete)
+				paths.shared = function(path)
+					if path == "modules/hotstrings" then return root .. "/absent-bundled" end
+					return original_shared(path)
+				end
+				_, published = Config.load_all(nil, true)
+				helpers.assert_eq(published, false, "an absent bundled root cannot certify a catalogue")
+				paths.shared = function(path)
+					if path == "modules/hotstrings" then return nil end
+					return original_shared(path)
+				end
+				_, published = Config.load_all(nil, true)
+				helpers.assert_eq(published, false, "an unresolved bundled root cannot certify a catalogue")
+				for _, invalid in ipairs({ bad_root, link_root }) do
+					paths.shared = function(path)
+						if path == "modules/hotstrings" then return invalid end
+						return original_shared(path)
+					end
+					local _, published, reason = Config.load_all(nil, true)
+					helpers.assert_eq(published, false, "a file or no-follow link cannot certify a bundled directory")
+					helpers.assert_eq(reason, "source-unavailable", "discovery must reject the root itself")
+				end
+			end)
+		end)
+		paths.shared = original_shared
+		os.remove(bad_root); os.remove(link_root)
+		uv.fs_rmdir(root)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("retains the published personal source when a nested directory cannot be listed", function()
+		local uv = require("luv")
+		local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-scan-refusal-XXXXXX"))
+		local nested = root .. "/private"
+		assert(uv.fs_mkdir(nested, 448))
+		local path = nested .. "/owned.toml"
+		local f = assert(io.open(path, "wb"))
+		assert(f:write('[probe]\n"owned" = { output = "OLD", auto_expand = true }\n')); assert(f:close())
+		local function match(engine, trigger)
+			engine:reset(false)
+			local result
+			for c in (trigger or "owned"):gmatch(".") do result = engine:on_char(c) end
+			return result
+		end
+		local ok, err = pcall(function()
+			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+			local engine = require("hotstring_engine").new()
+			Config._set_override_config_dir_for_test(root)
+			local id = require("hotstrings.personal_files").describe({ "private", "owned.toml" }).id
+			require("tests.support.hotstring_choices").with_file(Config, { [id] = true }, function()
+				assert(Config.init(engine, root))
+				Config.set_extra_mappings_provider(function()
+					return { { trigger = "independent", replacement = "KEPT", auto_expand = true, is_case_sensitive_strict = true } }
+				end)
+				assert(uv.fs_chmod(nested, 0))
+				local probe = uv.fs_opendir(nested)
+				if probe then
+					uv.fs_closedir(probe)
+					print("  SKIP filesystem identity can list a mode-000 directory")
+					return
+				end
+				local _, published, _, startup = Config.load_all(nil, true)
+				helpers.assert_true(published, "cold boot must retain independently available mappings")
+				helpers.assert_eq(startup.complete, false, "partial source discovery must be explicit")
+				helpers.assert_eq(match(engine, "independent").replacement, "KEPT")
+				assert(uv.fs_chmod(nested, 448))
+				_, published = Config.reload(); helpers.assert_true(published)
+				helpers.assert_eq(match(engine).replacement, "OLD")
+				assert(uv.fs_chmod(nested, 0))
+				_, published = Config.reload()
+				helpers.assert_eq(published, false, "a failed directory listing cannot certify a removed source")
+				helpers.assert_eq(match(engine).replacement, "OLD", "the last acknowledged matcher remains live")
+				assert(uv.fs_chmod(nested, 448))
+				_, published = Config.reload(); helpers.assert_true(published)
+				helpers.assert_eq(match(engine).replacement, "OLD")
+			end)
+		end)
+		uv.fs_chmod(nested, 448); os.remove(path); uv.fs_rmdir(nested); uv.fs_rmdir(root)
+		if not ok then error(err, 0) end
+	end)
+end)

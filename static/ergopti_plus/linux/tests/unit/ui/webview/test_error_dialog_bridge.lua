@@ -51,11 +51,17 @@ local function load_bridge(controls)
 			show = function(app)
 				context.shown = context.shown + 1
 				context.shown_app = app
+				if context.on_show then return context.on_show() end
 				if controls.show == false then return false end
 				context.epoch = (context.epoch or 0) + 1
 				return true
 			end,
-			hide = function() context.hidden = context.hidden + 1; context.epoch = nil; return true end,
+			hide = function()
+				context.hidden = context.hidden + 1
+				context.epoch = nil
+				if context.on_hide then context.on_hide() end
+				return true
+			end,
 			eval_js = function(_, js) context.pushed[#context.pushed + 1] = js; return true end,
 			get_daemon_state = function() return {} end,
 		},
@@ -65,6 +71,7 @@ local function load_bridge(controls)
 				return { redaction = context.redaction, templates = document("issue_templates"), repository = document("../updater/defaults").github, schema = sharing_schema }
 			end,
 			build_snapshot = function()
+				if context.on_snapshot then context.on_snapshot() end
 				return {
 					driver = "linux",
 					generated_at = "2026-09-24T08:15:02Z",
@@ -96,6 +103,19 @@ local function load_bridge(controls)
 				return default
 			end,
 			set = function(key, value) context.stored[key] = value; return true end,
+		},
+		["infra.script_scope"] = {
+			retry_edit = function() return true end,
+			edit_setting = function(key, value)
+				context.stored[key] = value
+				local bridge = require("ui.error_dialog.bridge")
+				local token = { pending = function() return false end, edit_key = key }
+				assert(bridge.scope_acquire(token))
+				local receipt = assert(bridge.scope_capture(token))
+				local applied = bridge.scope_apply(token, receipt, value)
+				assert(bridge.scope_release(token)); assert(bridge.scope_forget(token, receipt))
+				return applied
+			end,
 		},
 		["infra.manifest_reader"] = {
 			default_for = function(path) return path == "script.show_error_dialog" and true or nil end,
@@ -190,6 +210,138 @@ local function reported(bridge, record)
 end
 
 helpers.describe("error window bridge (linux): policy and deferral (error-dialog-linux)", function()
+	helpers.it("(error-dialog-ready-owner) discards a report when its page closes during collection", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			local owner = page(context)
+			context.on_snapshot = function()
+				context.on_snapshot = nil
+				context.epoch = nil
+				bridge.on_window_closed(owner.epoch)
+			end
+			helpers.assert_nil(bridge.on_message("ready", {}, owner))
+			helpers.assert_nil(bridge.on_message({ action = "copy" }, {}, owner))
+		end)
+	end)
+
+	helpers.it("(error-dialog-ready-owner) preserves a replacement report during collection", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			local owner = page(context)
+			context.on_snapshot = function()
+				context.on_snapshot = nil
+				context.epoch = nil
+				bridge.on_window_closed(owner.epoch)
+				bridge.on_error("second", "second failure", "second failure")
+				run_deferred(context)
+				helpers.assert_eq(bridge.on_message("ready", {}, page(context)).module, "second")
+			end
+			helpers.assert_nil(bridge.on_message("ready", {}, owner))
+			local answer = bridge.on_message({ action = "copy" }, {}, page(context))
+			helpers.assert_true(answer and answer.ok)
+		end)
+	end)
+
+	helpers.it("(error-dialog-open-owner) failed old opening preserves a reentrant replacement", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			context.on_show = function()
+				context.on_show = nil
+				context.epoch = 1
+				bridge.on_window_closed(context.epoch)
+				context.epoch = nil
+				bridge.on_error("second", "second failure", "second failure")
+				run_deferred(context)
+				helpers.assert_eq(bridge.on_message("ready", {}, page(context)).module, "second")
+				return false
+			end
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			helpers.assert_eq(#context.notified, 0)
+			local answer = bridge.on_message({ action = "copy" }, {}, page(context))
+			helpers.assert_true(answer and answer.ok)
+		end)
+	end)
+
+	helpers.it("(error-dialog-open-owner) retiring an old window preserves a reentrant replacement", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			context.epoch = 1
+			context.on_hide = function()
+				context.on_hide = nil
+				bridge.on_window_closed(1)
+				bridge.on_error("second", "second failure", "second failure")
+				run_deferred(context)
+				helpers.assert_eq(bridge.on_message("ready", {}, page(context)).module, "second")
+			end
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			local answer = bridge.on_message({ action = "copy" }, {}, page(context))
+			helpers.assert_true(answer and answer.ok)
+			helpers.assert_eq(context.shown, 1)
+		end)
+	end)
+
+	helpers.it("(error-dialog-open-owner) disabling during old window close cancels the pending opening", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			context.epoch = 1
+			context.on_hide = function()
+				context.on_hide = nil
+				bridge.on_window_closed(1)
+				helpers.assert_true(bridge.set_enabled(false))
+			end
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			helpers.assert_eq(context.shown, 0)
+			helpers.assert_eq(#context.notified, 0)
+		end)
+	end)
+
+	helpers.it("(error-dialog-close-refusal) retains the report until its window closes", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			bridge.on_message("ready", {}, page(context))
+			local attempts = 0
+			local owner = { app_name = "error_dialog", epoch = context.epoch, close_owned_window = function()
+				attempts = attempts + 1
+				return attempts > 1
+			end }
+			bridge.on_message({ action = "close" }, {}, owner)
+			local result = bridge.on_message({ action = "copy" }, {}, owner)
+			helpers.assert_true(result and result.ok, "the still-open page retains its report")
+			bridge.on_message({ action = "close" }, {}, owner)
+			helpers.assert_eq(attempts, 2)
+			helpers.assert_nil(bridge.on_message({ action = "copy" }, {}, owner))
+		end)
+	end)
+
+	helpers.it("(error-dialog-close-refusal) a close callback cannot settle a replacement session", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			bridge.on_message("ready", {}, page(context))
+			local old = context.epoch
+			bridge.on_message({ action = "close" }, {}, { app_name = "error_dialog", epoch = old,
+				close_owned_window = function()
+					context.epoch = nil
+					bridge.on_window_closed(old)
+					bridge.on_error("second", "second failure", "second failure")
+					run_deferred(context)
+					bridge.on_message("ready", {}, page(context))
+					return true
+				end })
+			local result = bridge.on_message({ action = "copy" }, {}, page(context))
+			helpers.assert_true(result and result.ok, "the replacement retains its own report")
+		end)
+	end)
 	helpers.it("disabling invalidates queued windows across reactivation (error-dialog-cancel)", function()
 		with_bridge(nil, function(bridge, context)
 			helpers.assert_true(bridge.init())
@@ -242,6 +394,25 @@ helpers.describe("error window bridge (linux): policy and deferral (error-dialog
 			helpers.assert_eq(#context.deferred, 0, "a signature already shown this session never opens again")
 			bridge.on_error("updater", "New failure", "New failure")
 			helpers.assert_eq(#context.deferred, 1, "after close, a new error opens a window again")
+		end)
+	end)
+
+	helpers.it("(error-dialog-fold-owner) a deferred fold cannot update a replacement window", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			bridge.on_message("ready", {}, page(context))
+			bridge.on_error("second", "second failure", "second failure")
+			local old_fold = context.deferred[1].fn
+			context.deferred = {}
+			bridge.on_message({ action = "close" }, {}, page(context))
+			context.epoch = nil
+			bridge.on_error("third", "third failure", "third failure")
+			run_deferred(context)
+			bridge.on_message("ready", {}, page(context))
+			old_fold()
+			helpers.assert_eq(#context.pushed, 0, "the old fold must not reach its successor")
 		end)
 	end)
 

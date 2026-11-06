@@ -43,6 +43,52 @@ local function fake_channel(open)
 	return ch
 end
 
+helpers.describe("injector: unbrokered channel retirement", function()
+	helpers.it("retains an unbrokered channel when close is refused", function()
+		local injector = helpers.load_module("modules.hotstrings.injector")
+		local attempts = 0
+		local channel = { close = function() attempts = attempts + 1; return attempts > 1 end }
+		injector._set_uinput(channel)
+		helpers.assert_eq(injector.close_fast_channel(), false)
+		helpers.assert_eq(attempts, 1)
+		helpers.assert_eq(injector.close_fast_channel(), true)
+		helpers.assert_eq(attempts, 2, "the original channel must remain available for retirement")
+	end)
+
+	helpers.it("does not forget a successor installed during channel close", function()
+		local injector = helpers.load_module("modules.hotstrings.injector")
+		local closed = 0
+		local successor = { close = function() closed = closed + 1; return true end }
+		local original = { close = function() injector._set_uinput(successor); return true end }
+		injector._set_uinput(original)
+		helpers.assert_eq(injector.close_fast_channel(), false)
+		helpers.assert_eq(closed, 0)
+		helpers.assert_eq(injector.close_fast_channel(), true)
+		helpers.assert_eq(closed, 1, "the successor remains available to its own retirement")
+	end)
+
+	helpers.it("does not detach a replacement broker installed during channel close", function()
+		local injector = helpers.load_module("modules.hotstrings.injector")
+		local previous = package.loaded["adapters.modifier_broker"]
+		local original, successor, detached = {}, {}, 0
+		local current = original
+		package.loaded["adapters.modifier_broker"] = {
+			for_channel = function() return current end,
+			detach = function() detached = detached + 1; current = nil end,
+		}
+		local channel = { close = function() current = successor; return true end }
+		injector._set_uinput(channel)
+		local ok, err = pcall(function()
+			helpers.assert_eq(injector.close_fast_channel(), false)
+			helpers.assert_eq(current, successor)
+			helpers.assert_eq(detached, 0)
+		end)
+		injector._set_uinput(nil)
+		package.loaded["adapters.modifier_broker"] = previous
+		if not ok then error(err, 0) end
+	end)
+end)
+
 
 
 
@@ -254,6 +300,7 @@ local function output_fixture(capture, layout, state, body)
 		emit = function(code, value)
 			rows[#rows + 1] = tostring(code) .. ":" .. tostring(value)
 			if state.on_emit then state.on_emit(code, value) end
+			if state.reject_once and code == 44 and value == 0 then state.reject_once = false; return false end
 			return true
 		end,
 	}
@@ -268,6 +315,45 @@ end
 
 
 helpers.describe("injector: source currency before new DOWN and owned cleanup UP", function()
+	helpers.it("does not forward the original magic source after a partial output stops its capture", function()
+		cohort_fixture(function(capture, layout, state)
+			output_fixture(capture, layout, state, function(injector, rows)
+				local fixture = require("tests.support.modules.hotstrings.magic_key.magic_key_source_fixture")
+				fixture.with_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(source)
+					local previous = package.loaded["adapters.keyboard_hook"]
+					local hook = helpers.load_module("adapters.keyboard_hook")
+					local raw, stopped, retired, dispatched = {}, false, false, 0
+				local emergency = hook.emergency_stop
+				hook.emergency_stop = function(...) stopped = true; return emergency(...) end
+				source.init({ is_active = function() return true end, replace_on = function() return true end,
+						magic_key = function() return "z" end, can_type = injector.can_type_directly,
+						type_text = function(text) return injector.type_directly(text).ok end,
+						dispatch_char = function() dispatched = dispatched + 1 end, end_selection = function() end,
+						can_capture = function() return true end, key_text = function() return "j" end,
+						defer = function() return true end })
+					local ok, err = pcall(function()
+						state.reject_once = true
+						hook._test_drive({ { type = 1, code = 36, value = 1 }, { type = 1, code = 36, value = 0 } }, {
+							captureEvent = function() return "j", "j" end,
+							onConsume = function(detail)
+								local consumed = source.on_key(detail)
+								retired = not hook.isRunning()
+								return consumed
+							end,
+							onEmitRaw = function(code, value) raw[#raw + 1] = code .. ":" .. value; return true end,
+						}, true)
+						helpers.assert_true(rows():find("44:1", 1, true) ~= nil, "magic key DOWN was delivered")
+						helpers.assert_true(stopped and retired, "the real hook must retire its session")
+						helpers.assert_eq(raw, {}, "the retired session must not replay the physical key")
+						helpers.assert_eq(dispatched, 0)
+					end)
+					source._reset_for_test(); hook.emergency_stop = emergency; package.loaded["adapters.keyboard_hook"] = previous
+					if not ok then error(err, 0) end
+				end)
+			end)
+		end)
+	end)
+
 	helpers.it("refuses stale native planning before any output", function()
 		cohort_fixture(function(capture, layout, state)
 			output_fixture(capture, layout, state, function(injector, rows)

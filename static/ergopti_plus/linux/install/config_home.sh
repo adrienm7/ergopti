@@ -11,7 +11,14 @@ ergopti_resolve_config_home() {
 	case "$ergopti_config_base" in
 		/*) ;;
 		*)
-			local ergopti_account_home="$HOME"
+			local ergopti_account_home="${HOME:-}"
+			case "$ergopti_account_home" in
+				/*) ;;
+				*)
+					ergopti_account_home="${TMPDIR:-}"
+					case "$ergopti_account_home" in /*) ;; *) ergopti_account_home=/tmp ;; esac
+					;;
+			esac
 			while [[ "$ergopti_account_home" != / && "$ergopti_account_home" == */ ]]; do
 				ergopti_account_home="${ergopti_account_home%/}"
 			done

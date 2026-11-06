@@ -31,6 +31,7 @@ M.bridge_name = "numeric_prompt_bridge"
 
 local Json = require("json")
 local Logger = require("logger.shim")
+local NumberPolicy = require("number_policy")
 local LOG = "bridge.numeric_prompt"
 local APP_NAME = "numeric_prompt"
 
@@ -111,8 +112,8 @@ function M.ask(request, webview)
 		Logger.error(LOG, "ask(): a request with an on_save callback is required.")
 		return false
 	end
-	if type(request.value) ~= "number" or type(request.min) ~= "number"
-		or type(request.max) ~= "number" or request.min > request.max
+	if not NumberPolicy.is_finite(request.value) or not NumberPolicy.is_finite(request.min)
+		or not NumberPolicy.is_finite(request.max) or request.min > request.max
 		or request.value < request.min or request.value > request.max then
 		Logger.error(LOG, "ask(): a range is required — an unbounded numeric field "
 			.. "accepts anything and the caller then has to reject it after the fact.")
@@ -239,14 +240,14 @@ function M.on_message(payload, _state)
 		-- is the guarantee, because a bridge is reachable by anything that can
 		-- post to it and the caller's setter should never see a value its own
 		-- range forbids.
-		if type(value) ~= "number" or value < request.min or value > request.max then
+		if not NumberPolicy.is_finite(value) or value < request.min or value > request.max then
 			Logger.error(LOG, "Prompt returned %s, outside %s..%s — refused.",
 				tostring(payload.value), tostring(request.min), tostring(request.max))
 			return { saved = false }
 		end
 
 		request.saving = true
-		local ok, accepted = pcall(request.on_save, value)
+		local ok, accepted = pcall(request.on_save, value, function() return current(request) end)
 		request.saving = false
 		if not current(request) then return { saved = false, closed = false, stale = true } end
 		if not ok or accepted == false then

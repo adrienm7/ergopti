@@ -157,6 +157,51 @@ function M.prepare(source, model, normalize)
 			group.records[#group.records + 1] = record
 		end
 	end
+	-- The page supplies only opaque row tokens; the bridge resolves each token
+	-- against the exact previously committed snapshot before passing this origin.
+	local claimed, relocated = {}, {}
+	for name, section in pairs(requested) do
+		for _, entry in ipairs(section.entries or {}) do
+			local origin = entry._origin
+			if origin ~= nil then
+				if type(origin) ~= "table" or type(origin.section) ~= "string" or type(origin.trigger) ~= "string" then
+					return nil, "invalid-personal-origin"
+				end
+				local group = groups[origin.section]
+				local record = group and group.owned[origin.trigger]
+				if not record or claimed[record] then return nil, "invalid-personal-origin" end
+				claimed[record] = true
+				if origin.section ~= name or origin.trigger ~= entry.trigger then relocated[record] = true end
+			end
+		end
+	end
+	local function render_entry(name, entry, group)
+		local origin = entry._origin
+		local origin_group = origin and groups[origin.section]
+		local record = origin and origin_group and origin_group.owned[origin.trigger]
+			or (not origin and not entry._identity_new and group and group.owned[entry.trigger] and not claimed[group.owned[entry.trigger]]
+				and group.owned[entry.trigger])
+		local projected = origin and origin_group and origin_group.projected[origin.trigger]
+			or (not origin and record and group and group.projected[entry.trigger])
+		local text
+		if record and not relocated[record] and same_entry(projected, entry) then text = raw_record(scan, record)
+		else
+			local value = normalized(entry, normalize)
+			if record and type(record.value) == "table" then
+				for key, previous in pairs(record.value) do
+					if value[key] == nil and key ~= "priority" then value[key] = previous end
+				end
+			end
+			local comment, eol = "", "\n"
+			if record then
+				comment, eol = record_tail(scan, record)
+				if comment ~= "" then comment = " " .. comment end
+			end
+			text = Codec.encode_value(entry.trigger) .. " = " .. render_value(value, record) .. comment .. eol
+		end
+		if record and relocated[record] and text:sub(-1) ~= "\n" then text = text .. "\n" end
+		return text
+	end
 	local replacements, removed, insertions = {}, {}, {}
 	local function insert(index, text) insertions[index] = (insertions[index] or "") .. text end
 	for name, group in pairs(groups) do
@@ -166,23 +211,7 @@ function M.prepare(source, model, normalize)
 			if type(entry) ~= "table" or type(entry.trigger) ~= "string" or entry.trigger == ""
 				or type(entry.output) ~= "string" or desired[entry.trigger] then return nil, "invalid-personal-row" end
 			desired[entry.trigger] = entry
-			local record = group.owned[entry.trigger]
-			local text
-			if record and same_entry(group.projected[entry.trigger], entry) then text = raw_record(scan, record)
-			else
-				local value = normalized(entry, normalize)
-				if record and type(record.value) == "table" then
-					for key, previous in pairs(record.value) do
-						if value[key] == nil and key ~= "priority" then value[key] = previous end
-					end
-				end
-				local comment, eol = "", "\n"
-				if record then
-					comment, eol = record_tail(scan, record)
-					if comment ~= "" then comment = " " .. comment end
-				end
-				text = Codec.encode_value(entry.trigger) .. " = " .. render_value(value, record) .. comment .. eol
-			end
+			local text = render_entry(name, entry, group)
 			lines[#lines + 1] = text
 		end
 		if group.foreign then
@@ -209,7 +238,7 @@ function M.prepare(source, model, normalize)
 		for _, record in ipairs(group.records) do
 			if record.trigger then
 				for index = record.first, record.last do removed[index] = true end
-				if not desired[record.trigger] then
+				if not desired[record.trigger] and not relocated[record] then
 					local comment, eol = record_tail(scan, record)
 					if comment ~= "" then replacements[record.first] = comment .. eol end
 				end
@@ -243,7 +272,7 @@ function M.prepare(source, model, normalize)
 				lines = ""
 				for _, entry in ipairs(requested[name].entries or {}) do
 					if type(entry.trigger) ~= "string" or type(entry.output) ~= "string" then return nil, "invalid-personal-row" end
-					lines = lines .. Codec.encode_value(entry.trigger) .. " = " .. Codec.encode_value(normalized(entry, normalize)) .. "\n"
+					lines = lines .. render_entry(name, entry, nil)
 				end
 			end
 			body = body .. (body ~= "" and body:sub(-1) ~= "\n" and "\n" or "") .. "[[" .. name .. "]]\n" .. lines

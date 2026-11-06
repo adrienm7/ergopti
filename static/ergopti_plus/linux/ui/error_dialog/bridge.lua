@@ -126,15 +126,10 @@ end
 --- @param enabled boolean
 --- @return boolean saved
 function M.set_enabled(enabled)
-	if not _scope.admit_change() then return false end
-	-- config.toml's [script] show_error_dialog wins at start: rewrite it first.
-	if type(enabled) == "boolean" and not require("infra.script_scope").rewrite_configured(SETTING, enabled) then
-		return false
-	end
-	if not DialogCore.save_enabled(Logger, LOG, function() return require("adapters.storage") end, SETTING, enabled) then
-		return false
-	end
-	_enabled = enabled
+	if type(enabled) ~= "boolean" then return false end
+	local script_scope = require("infra.script_scope")
+	if not script_scope.retry_edit(SETTING) or not _scope.admit_change() then return false end
+	if not script_scope.edit_setting(SETTING, enabled) then return false end
 	if not enabled and _scheduled ~= nil then
 		_scheduled = nil
 		_busy, _folded, _pending = false, 0, nil
@@ -250,8 +245,12 @@ local function open_window()
 		Logger.error(LOG, "The open error window could not be replaced.")
 		return false
 	end
+	-- The close hook normally clears the old request, but can admit a new one.
+	if (_pending ~= nil and _pending ~= record) or not M.is_enabled() then return false end
 	_busy, _pending = true, record
 	local opened = manager.show(APP, require("infra.i18n").get_locale())
+	-- Native callbacks may close this request and open a successor before show returns.
+	if _pending ~= record then return false end
 	if not opened then
 		-- Without a window (no WebKitGTK, no display) the error is announced and
 		-- stays in the errors file
@@ -276,7 +275,7 @@ local function schedule(record)
 		_scheduled = nil
 		local ok, opened = xpcall(open_window, debug.traceback)
 		if not ok then Logger.error(LOG, "The error window could not open: %s", tostring(opened)) end
-		if not ok or not opened then settle() end
+		if (not ok or not opened) and _pending == record then settle() end
 	end, _policy.present_delay_ms)
 	if not queued then
 		settle()
@@ -306,8 +305,12 @@ end
 local function perform(name, context)
 	if name == "close" then
 		local owned = type(context) == "table" and type(context.close_owned_window) == "function"
-		settle()
-		if owned then context.close_owned_window() end
+		local session = _session
+		if owned and context.close_owned_window() ~= true then
+			Logger.warn(LOG, "Error window close was refused; its report remains available.")
+			return nil
+		end
+		if _session == session then settle() end
 		Logger.info(LOG, "Error window closed.")
 		return nil
 	end
@@ -360,17 +363,23 @@ function M.on_message(payload, _state, context)
 			Logger.warn(LOG, "The error window asked for an error while none is pending.")
 			return nil
 		end
-		local ok, fields = pcall(build_report, _pending)
+		local record, previous = _pending, _session
+		local epoch = type(context) == "table" and context.epoch or nil
+		local function current()
+			return _pending == record and _session == previous
+				and (epoch == nil or require("ui.webview_manager").current_epoch(APP) == epoch)
+		end
+		local ok, fields = pcall(build_report, record)
+		if not current() then return nil end
 		if not ok then
 			Logger.error(LOG, "The error report could not be built: %s.", tostring(fields))
 			return nil
 		end
-		local previous = _session
 		local revision = cancel_action(previous)
-		if _session ~= previous or revision ~= _action_revision then return nil end
+		if not current() or revision ~= _action_revision then return nil end
 		_session = fields
 		_session.epoch = type(context) == "table" and context.epoch or nil
-		_session.record = _pending
+		_session.record = record
 		return init_message(_session)
 	end
 	if not _session then
@@ -424,7 +433,8 @@ function M.on_error(module_name, template, message)
 	if verdict == "folded" then
 		_folded = _folded + 1
 		if _session then
-			M.defer(function() push({ type = "more", count = _folded }) end, 0)
+			local session = _session
+			M.defer(function() push({ type = "more", count = _folded }, session) end, 0)
 		end
 	elseif verdict == "show" then
 		schedule(DialogCore.error_record(module_name, message))
@@ -448,7 +458,10 @@ function M._reset()
 	settle()
 end
 
-local function scope_ready()
+local function scope_ready(owner)
+	if type(owner) == "table" and owner.edit_key == SETTING then
+		return _enabled == nil or type(_enabled) == "boolean"
+	end
 	return (_enabled == nil or type(_enabled) == "boolean") and _busy == false
 		and _scheduled == nil and _session == nil and _folded == 0 and _pending == nil
 end

@@ -164,6 +164,66 @@ local function check_outcome_delivery(delivered, outcome)
 end
 
 helpers.describe("api_remote_callback_siblings: protected public wrappers", function()
+	helpers.it("settles model listing once when HTTP refuses synchronously", function()
+		isolated(function(remote)
+			local http = require("adapters.http_client")
+			http.get = function(_, _, _, callback)
+				callback({ ok = false, status = 0, error = "preflight refused" })
+				return false
+			end
+			local results = {}
+			local entry = { provider = "openai_compat", model = "fixture-model", token = "fixture-key", base_url = "https://example.invalid/v1" }
+			helpers.assert_eq(remote.list_models(entry, function(state) results[#results + 1] = state end), false)
+			helpers.assert_eq(results, { { state = "failed", reason = "unavailable" } })
+		end)
+	end)
+	helpers.it("settles model listing once under a reentrant repeated callback", function()
+		isolated(function(remote, calls)
+			local results = {}
+			local entry = { provider = "openai_compat", model = "fixture-model", token = "fixture-key", base_url = "https://example.invalid/v1" }
+			helpers.assert_true(remote.list_models(entry, function(state)
+				results[#results + 1] = state
+				calls[1].callback({ ok = false, status = 0 })
+			end))
+			calls[1].callback({ ok = true, status = 200, body = '{"data":[{"id":"one"}]}' })
+			helpers.assert_eq(results, { { state = "listed", ids = { "one" } } })
+		end)
+	end)
+	helpers.it("lists a Gemini model named alongside a null optional id", function()
+		isolated(function(remote, calls)
+			local listed
+			local entry = { provider = "gemini", model = "fixture-model", token = "fixture-key", base_url = "" }
+			helpers.assert_true(remote.list_models(entry, function(state) listed = state end))
+			calls[1].callback({ ok = true, status = 200,
+				body = '{"models":[{"id":null,"name":"models/gemini-2.0-flash"}]}' })
+			helpers.assert_eq(listed, { state = "listed", ids = { "gemini-2.0-flash" } })
+		end)
+	end)
+	helpers.it("rejects non-array Gemini model lists but accepts an empty array", function()
+		isolated(function(remote, calls)
+			local results = {}
+			local entry = { provider = "gemini", model = "fixture-model", token = "fixture-key", base_url = "" }
+			for index, body in ipairs({ '{"models":null}', '{"models":{}}', '{"models":[]}' }) do
+				helpers.assert_true(remote.list_models(entry, function(state) results[index] = state end))
+				calls[index].callback({ ok = true, status = 200, body = body })
+			end
+			helpers.assert_eq(results[1], { state = "failed", reason = "unreadable" })
+			helpers.assert_eq(results[2], { state = "failed", reason = "unreadable" })
+			helpers.assert_eq(results[3], { state = "listed", ids = {} })
+		end)
+	end)
+	helpers.it("withholds listing callback failures containing private output", function()
+		isolated(function(remote, calls, logs)
+			local secret = "private model listing token"
+			local entry = { provider = "openai_compat", model = "fixture-model", token = "owned-fixture-token",
+				base_url = "https://example.invalid/v1" }
+			helpers.assert_true(remote.list_models(entry, function() error(secret, 0) end))
+			calls[1].callback({ ok = true, status = 200, body = '{"data":[{"id":"model"}]}' })
+			helpers.assert_eq(#logs, 1)
+			helpers.assert_eq(logs[1].message, "Remote model listing callback raised — %s")
+			helpers.assert_eq(logs[1].detail, "details withheld")
+		end)
+	end)
 	for _, spec in ipairs(SPECS) do
 		for _, case in ipairs({ "healthy", "string", "object", "throwing-object", "reentry-object", "reentry-throwing-object" }) do
 			helpers.it("api_remote_callback_siblings: " .. spec.owner .. " " .. spec.provider .. " " .. case, function()
@@ -213,7 +273,7 @@ helpers.describe("api_remote_callback_siblings: protected public wrappers", func
 					if case == "healthy" then helpers.assert_eq(#logs, 0)
 					else
 						helpers.assert_eq(#logs, 1)
-						check_log(logs[1], case == "string" and "owned ordinary wrapper failure" or "error object (table)")
+						check_log(logs[1], case == "string" and "details withheld" or "error object (table)")
 					end
 					local retries = 0
 					assert(start(remote, spec, function(a, b, c)

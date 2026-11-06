@@ -59,6 +59,7 @@ local _input_reader_ports = {}
 for _, name in ipairs(INPUT_READER_PORT_NAMES) do
 	_input_reader_ports[name] = rawget(EvdevReader, name)
 end
+_input_reader_ports.has_native_origin_debt = rawget(EvdevReader, "has_native_origin_debt")
 local EvdevCodes = require("infra.evdev_codes")
 local Monotonic = require("infra.monotonic")
 local Perf = require("infra.perf_counters")
@@ -602,7 +603,24 @@ end
 local _owned_row_receipt = nil
 local _dispatch_owned_rows
 local _deliver_owned_rows
-local function _combination_source(source)
+-- A pair policy may suppress one keyboard's duplicate DOWN before the base
+-- engine sees it. Blocker rules need the physical cohort, including that key.
+function _source_recovery.physical_snapshot(source, code, value)
+	local physical_down = {}
+	for _, down in pairs(_physical_down) do physical_down[down.code] = true end
+	for key, down in pairs(_forwarded_down) do
+		if key == source_key(down.source, down.code)
+			and not (value == InputEvent.VALUE_UP and down.source == source and down.code == code) then
+			physical_down[down.code] = true
+		end
+	end
+	for key in pairs(_remap_orphans) do
+		local code = tonumber(key:match(":(%d+)$"))
+		if code then physical_down[code] = true end
+	end
+	return physical_down
+end
+local function _combination_source(source, code, value)
 	local receipt = M.physical_source_receipt()
 	local slot = keyboard_slot(source)
 	local owner = _input_source_owners and _input_source_owners[slot]
@@ -633,6 +651,7 @@ local function _combination_source(source)
 		end
 	end
 	return { source = source, generation = receipt.generation, ready = receipt.ready,
+		physical_down = _source_recovery.physical_snapshot(source, code, value),
 		physical = _physical_sources[source] == true,
 		source_owner = original and original.owner or owner, source_current = current }
 end
@@ -996,6 +1015,15 @@ local function _forward_raw(ev, source)
 	return false
 end
 
+-- A callback failure has already stopped capture and released old owners.
+-- Preserve a grabbed press as a complete tap; no later UP belongs to us.
+function _source_recovery.salvage_press(ev, source)
+	if ev.value ~= InputEvent.VALUE_DOWN then return end
+	if _forward_raw(ev, source) then
+		_forward_raw({ type = EVDEV_TYPE_KEY, code = ev.code, value = InputEvent.VALUE_UP }, source)
+	end
+end
+
 --- Whether this pass-through transition changes the aggregate desktop key.
 --- A coalesced dead-key press must not feed Compose when the desktop sees none.
 --- @param ev table Post-remap key event.
@@ -1024,9 +1052,15 @@ end
 local function _call_callback(label, callback, ...)
 	local args = { n = select("#", ...), ... }
 	local unpack_args = table.unpack or unpack
-	return RuntimeGuard.call(label, function() return callback(unpack_args(args, 1, args.n)) end, function()
-		M.emergency_stop(label .. " failed")
+	local session = _capture_session
+	local retired = false
+	local ok, result = RuntimeGuard.call(label, function() return callback(unpack_args(args, 1, args.n)) end, function()
+		if _capture_session == session then
+			M.emergency_stop(label .. " failed")
+			retired = true
+		end
 	end)
+	return ok, result, retired
 end
 
 local function _resynchronise(source, snapshot, cohort)
@@ -1065,6 +1099,17 @@ local function _resynchronise(source, snapshot, cohort)
 	for code in pairs(source_keys) do
 		pressed[source_key(source, code)] = { source = source, code = code, held_origin = held_receipt }
 	end
+	-- An orphan is owed only while its original physical key remains down.
+	-- Queue loss may have swallowed its UP; a held orphan must not be replayed.
+	for key in pairs(_remap_orphans) do
+		if pressed[key] then pressed[key] = nil
+		elseif cohort or key:match("^(.*):%d+$") == source then _remap_orphans[key] = nil end
+	end
+	for key in pairs(_source_recovery.native_handoff or {}) do
+		if not pressed[key] and (cohort or key:match("^(.*):%d+$") == source) then
+			_source_recovery.native_handoff[key] = nil
+		end
+	end
 
 	-- The engine's keys are released and its physically held keys consumed:
 	-- replaying a held CapsLock as itself would toggle the lock, where the user
@@ -1073,7 +1118,7 @@ local function _resynchronise(source, snapshot, cohort)
 		if _release_remapped() == false then return false, "combination key retirement refused" end
 		if _remapper.activate and _remapper:activate() ~= true then return false, "combination activation refused" end
 		for key, current in pairs(pressed) do
-			if _remapper:handles(current.code) then
+			if _remapper:handles(current.code) and not (_source_recovery.native_handoff and _source_recovery.native_handoff[key]) then
 				_remap_orphans[key] = true
 				pressed[key] = nil
 			end
@@ -1638,6 +1683,7 @@ end
 --- Dispatches the original post-remapper path without widening the LuaJIT closure.
 --- The event/source and all native capture, modifier, callback and IO guards stay live.
 local function _dispatch_post_remap(ev, source)
+	local session = _capture_session
 	local original_source = source
 	if ev.remapped and not ev.original_owner then
 		local holder_key = _remapper_generation .. ":" .. (ev.holder or "transient") .. ":" .. ev.code
@@ -1691,29 +1737,17 @@ local function _dispatch_post_remap(ev, source)
 	-- Down and up are both exposed so consumers can choose their metric; repeat is
 	-- not a new physical transition. This includes modifiers and CapsLock.
 	if _on_physical and ev.value ~= InputEvent.VALUE_REPEAT and ev.code > 0 then
-		if not _call_callback("physical-key callback", _on_physical,
-			ev.code, EvdevCodes.key_name(ev.code), char, ev.value, source) then
+		local called, _, retired = _call_callback("physical-key callback", _on_physical,
+			ev.code, EvdevCodes.key_name(ev.code), char, ev.value, source)
+		if not called then
+			if not retired then return end
 			-- The callback already triggered the emergency stop; the grabbed
 			-- event must still reach the application before giving up on it.
 			_number_row.abandon(row_plan, ev, false)
-			_forward_raw(ev, source)
+			_source_recovery.salvage_press(ev, source)
 			return
 		end
-	end
-
-	-- XKB has already consumed the transition above. Modifiers still produce no
-	-- domain event; returning here prevents a test double or a malformed keymap
-	-- from inventing a typed character for a physical modifier.
-	if is_modifier then
-		_forward_raw(ev, source)
-		return
-	end
-	if ev.code == EvdevCodes.KEY_CAPSLOCK then
-		-- The desktop's CapsLock is the user's again: a CapsWord session riding
-		-- on it ends, and must not toggle it back.
-		if ev.value == InputEvent.VALUE_DOWN and _locks.word then _locks.end_word(false, "CapsLock pressed") end
-		_forward_raw(ev, source)
-		return
+		if not _running or _capture_session ~= session then return end
 	end
 
 	-- How long the key was held, measured here because this is the only place a
@@ -1724,12 +1758,14 @@ local function _dispatch_post_remap(ev, source)
 	-- metrics: on a keyboard whose whole design is tap-hold, how long a key was
 	-- held is the difference between the two things it can mean, and
 	-- agg_app_day_kc_hold was empty because nothing measured it.
-	if ev.value == InputEvent.VALUE_DOWN and ev.code > 0 then
+	local eligible_hold = not ev.remapped or ev.original_owner
+		or (not is_modifier and ev.code ~= EvdevCodes.KEY_CAPSLOCK)
+	if eligible_hold and ev.value == InputEvent.VALUE_DOWN and ev.code > 0 then
 		local key = source_key(source, ev.code)
 		local token, callback = hold_owner()
 		_pressed_at[key] = token and Monotonic.now_ms() or nil
 		_hold_owners[key] = token and { token = token, callback = callback } or nil
-	elseif ev.value == InputEvent.VALUE_UP and ev.code > 0 then
+	elseif eligible_hold and ev.value == InputEvent.VALUE_UP and ev.code > 0 then
 		local pressed_key = source_key(source, ev.code)
 		local down_at, owner = _pressed_at[pressed_key], _hold_owners[pressed_key]
 		_pressed_at[pressed_key], _hold_owners[pressed_key] = nil, nil
@@ -1740,7 +1776,9 @@ local function _dispatch_post_remap(ev, source)
 			-- descriptor or a lid close, and one such reading would dominate every
 			-- average it entered for the rest of the day.
 			local held_ms = math.min(math.max(0, Monotonic.now_ms() - down_at), MAX_PLAUSIBLE_HOLD_MS)
-			if not _call_callback("key-hold callback", _on_hold, ev.code, held_ms, source) then
+			local called, _, retired = _call_callback("key-hold callback", _on_hold, ev.code, held_ms, source)
+			if not called then
+				if not retired then return end
 				-- A release owns the application's key state: it must go back
 				-- even when the metrics consumer just died, or the key sticks
 				-- down over there while nothing is held here.
@@ -1748,7 +1786,22 @@ local function _dispatch_post_remap(ev, source)
 				_forward_raw(ev, source)
 				return
 			end
+			if not _running or _capture_session ~= session then return end
 		end
+	end
+
+	-- XKB has already consumed the transition above. Modifiers produce no text;
+	-- retire their admitted hold first, then forward them without inventing a character.
+	if is_modifier then
+		_forward_raw(ev, source)
+		return
+	end
+	if ev.code == EvdevCodes.KEY_CAPSLOCK then
+		-- The desktop's CapsLock is the user's again: a CapsWord session riding
+		-- on it ends, and must not toggle it back.
+		if ev.value == InputEvent.VALUE_DOWN and _locks.word then _locks.end_word(false, "CapsLock pressed") end
+		_forward_raw(ev, source)
+		return
 	end
 
 	local consumed_key = source_key(source, ev.code)
@@ -1780,14 +1833,17 @@ local function _dispatch_post_remap(ev, source)
 	-- the source stream. XKB and modifier state are current before the decision;
 	-- raw pass-through and semantic callbacks happen only if it declines.
 	if _intercept and not is_modifier and ev.value == InputEvent.VALUE_DOWN and _on_consume then
-		local ok_consume, consume = _call_callback("key-consumption callback", _on_consume,
+		local ok_consume, consume, retired = _call_callback("key-consumption callback", _on_consume,
 			consumption_detail(ev, source, identity, char))
 		local repeat_callback = consumed_repeat_callback(consume)
 		if not ok_consume then
+			if not retired then return end
 			_number_row.abandon(row_plan, ev, false)
 			-- A missing verdict is not a suppression: the event still belongs
 			-- to the application.
-			_forward_raw(ev, source)
+			_source_recovery.salvage_press(ev, source)
+			return
+		elseif not _running or _capture_session ~= session then
 			return
 		elseif consume == true or repeat_callback ~= nil then
 			if _number_row.abandon(row_plan, ev, true) == false then
@@ -1881,6 +1937,7 @@ end
 --- @param at_ms number Original event time.
 local function _run_owned_tap_frame(frame, tap, binding, exact, original_generation, origin, origin_view, source, at_ms)
 	if tap and _on_tap then
+		local delivered
 		local callback = _on_tap
 		local prior = _live_input_context
 		_live_input_context = nil
@@ -1908,17 +1965,105 @@ local function _run_owned_tap_frame(frame, tap, binding, exact, original_generat
 		if tap == "one_shot_shift" then
 			-- The action callback returns semantic intent only. Retain construction
 			-- originals: a late Manager snapshot of public ports is not an issuer.
-			frame.run(function(action, selected)
+			local ran, result = pcall(function() return frame.run(function(action, selected)
 				local requested = callback(action, selected)
 				if requested ~= tap or action ~= tap then return false end
 				local lease = original_input_hook_ports.capture_input_owner()
 				if not lease or original_input_hook_ports.input_owner_current(lease) ~= true then return false end
 				return original_input_hook_ports.arm_one_shot(lease) == true
 					and original_input_hook_ports.input_owner_current(lease) == true
-			end, _combination_source(source))
-		else frame.run(callback, _combination_source(source)) end
+			end, _combination_source(source)) end)
+			delivered = ran and result == true
+		else
+			local ran, result = pcall(function() return frame.run(callback, _combination_source(source)) end)
+			delivered = ran and result == true
+		end
 		_live_input_context = prior
+		return delivered == true
 	end
+	return tap == nil
+end
+
+-- Delivers an original wrapper's ordered journal one acknowledged step at a
+-- time. Each step owns the receipt of its own physical DOWN; a later key must
+-- never lend its source to an earlier one.
+local function _run_owned_journal(frame, exact, generation)
+	local broker = _broker
+	local retire_broker = type(broker) == "table" and rawget(broker, "retire") or nil
+	local function current()
+		return _running and _intercept and _remapper == exact
+			and _remapper_generation == generation and _broker == broker
+	end
+	local function refuse()
+		if current() and type(frame.abort) == "function" then
+			local called, retired = pcall(frame.abort)
+			if called and type(retired) == "table" and type(retired.rows) == "table"
+				and type(retired.frame) == "table" and type(retired.frame.ack) == "function" and current() then
+				local delivered, accepted = pcall(_deliver_owned_rows, exact, retired.rows, _device)
+				local observed, acknowledged = pcall(retired.frame.ack, delivered and accepted == true)
+				if delivered and accepted == true and observed and acknowledged == true and current() then
+					for _, token in ipairs(retired.frame.orphans or {}) do
+						if original_input_hook_ports.retire_buffered_input(token, exact) ~= true then
+							M.emergency_stop("ordered remap input retirement refused"); return false
+						end
+					end
+					return false
+				end
+			end
+		end
+		if current() then M.emergency_stop("ordered remap delivery refused")
+		elseif type(retire_broker) == "function" then pcall(retire_broker) end
+		return false
+	end
+	for _ = 1, 64 do
+		if not current() then return refuse() end
+		local called, step, state = pcall(frame.next)
+		if not called then return refuse() end
+		if step == nil then
+			if state == "done" then return true end
+			return refuse()
+		end
+		if type(step) ~= "table" or type(step.rows) ~= "table" or type(step.ack) ~= "function"
+			or type(step.admit) ~= "function" or type(step.finish) ~= "function"
+			or type(step.restore) ~= "function" or not step.buffered then return refuse() end
+		local buffered = original_input_hook_ports.buffered_input_view(step.buffered)
+		if not buffered or not current() then return refuse() end
+		local source = buffered.source
+		local delivered, accepted = pcall(_deliver_owned_rows, exact, step.rows, source, step)
+		local acknowledged, ack = pcall(step.ack, delivered and accepted == true)
+		if not delivered or accepted ~= true or not acknowledged or ack ~= true or not current() then return refuse() end
+		local admitted, allowed = pcall(function() return step.admit(_combination_source(source)) end)
+		if not admitted or allowed ~= true or not current() then return refuse() end
+		if step.tap ~= nil then
+			if type(step.run) ~= "function" or type(step.fresh) ~= "function" then return refuse() end
+			local checked, fresh = pcall(step.fresh)
+			if not checked or fresh ~= true or not current() then return refuse() end
+			local ran, delivered = pcall(_run_owned_tap_frame, step, step.tap, step.binding,
+				exact, generation, buffered.origin, buffered.origin_view, source, buffered.at_ms)
+			if not ran or delivered ~= true or not current() then return refuse() end
+			checked, fresh = pcall(step.fresh)
+			if not checked or fresh ~= true or not current() then return refuse() end
+		end
+		local restored_ok, restored, restore_frame = pcall(function() return step.restore(_combination_source(source)) end)
+		if not restored_ok or type(restored) ~= "table" or not current() then return refuse() end
+		if restore_frame then
+			if type(restore_frame.delivery_current) ~= "function" or type(step.fresh) ~= "function" then return refuse() end
+			local delivery_frame = { buffered = step.buffered, delivery_current = restore_frame.delivery_current, fresh = step.fresh }
+			local delivered_restore, restored_ack = pcall(_deliver_owned_rows, exact, restored, source, delivery_frame)
+			local observed, ack_restore = pcall(restore_frame.ack, delivered_restore and restored_ack == true)
+			if not delivered_restore or restored_ack ~= true or not observed or ack_restore ~= true or not current() then return refuse() end
+		elseif #restored ~= 0 then return refuse() end
+		-- An empty step can still commit a held layer or a one-shot state.
+		-- Its source must be fresh before that invisible state survives.
+		if #step.rows == 0 and step.tap == nil then
+			if type(step.fresh) ~= "function" then return refuse() end
+			local checked, fresh = pcall(step.fresh)
+			if not checked or fresh ~= true or not current() then return refuse() end
+		end
+		local finished, done = pcall(function() return step.finish(_combination_source(source)) end)
+		if not finished or done ~= true or not current() then return refuse() end
+	end
+	return refuse()
 end
 
 -- Position capture observes the original stream. It never suppresses a key,
@@ -2126,6 +2271,10 @@ local function _dispatch_event(ev, source)
 	-- virtual keyboard all see one consistent stream.
 	local owned_key = source_key(source, ev.code)
 	if not ev.remapped then
+		-- A repeat has no press to own on this source (for example a key held
+		-- before capture). It cannot repeat another keyboard's output owner.
+		if _intercept and ev.value == InputEvent.VALUE_REPEAT
+			and not _physical_down[owned_key] and not _forwarded_down[owned_key] then return end
 		if ev.value == InputEvent.VALUE_DOWN and not _physical_down[owned_key] then
 			_physical_down[owned_key] = { source = source, code = ev.code, origin = _event_receipts[ev] }
 		elseif ev.value == InputEvent.VALUE_UP then _physical_down[owned_key] = nil end
@@ -2133,6 +2282,11 @@ local function _dispatch_event(ev, source)
 	if _remap_orphans[owned_key] and not ev.remapped then
 		if ev.value == InputEvent.VALUE_UP then _remap_orphans[owned_key] = nil end
 		return
+	end
+	if not ev.remapped and _source_recovery.native_handoff and _source_recovery.native_handoff[owned_key] then
+		if ev.value == InputEvent.VALUE_UP then _source_recovery.native_handoff[owned_key] = nil end
+		if _remapper and _remapper.activity then _remapper:activity() end
+		return _dispatch_post_remap(ev, source)
 	end
 	if _remapper and _intercept and not ev.remapped then
 		if _armed_input then
@@ -2155,7 +2309,9 @@ local function _dispatch_event(ev, source)
 		local origin_view = origin and _input_exports_current() and _input_reader_ports.event_view(origin) or nil
 		local custody = {}
 		if _remapper then
-			local receipt = _remapper.has_combinations and _combination_source(source) or nil
+			local receipt = _remapper.has_combinations and _combination_source(source, ev.code, ev.value)
+				or { source = source, generation = _remapper_generation,
+					physical_down = _source_recovery.physical_snapshot(source, ev.code, ev.value) }
 			local previous_buffer = _buffer_dispatch
 			_buffer_dispatch = {engine=_remapper,event=ev,source=source,origin=origin,at_ms=at_ms}
 			local process_started = Perf.clock()
@@ -2190,6 +2346,11 @@ local function _dispatch_event(ev, source)
 		if out then
 			if frame and frame.owned then
 				local exact = _remapper
+				if type(frame.next) == "function" then
+					if not _run_owned_journal(frame, exact, original_generation) then return end
+					if frame.replay then _remap_owned[owned_key] = nil; _dispatch_event(ev, source) end
+					return
+				end
 				local buffered = frame.buffered and original_input_hook_ports.buffered_input_view(frame.buffered) or nil
 				if frame.buffered and not buffered then M.emergency_stop("buffered input source refused"); return end
 				local delivery_source = buffered and buffered.source or source
@@ -2285,8 +2446,13 @@ _dispatch_owned_rows = function(rows, source, exact, frame)
 		if original_input_hook_ports.buffered_input_current(frame.buffered,false) ~= true or frame.delivery_current() ~= true then return false end
 		return _remapper == exact and _remapper_generation == generation and _broker == output
 	end
+	local function fresh()
+		if not frame or type(frame.fresh) ~= "function" then return true end
+		local called, current = pcall(frame.fresh)
+		return called and current == true
+	end
 	for _, row in ipairs(rows) do
-		if not buffered_current() then return false end
+		if not buffered_current() or not fresh() or not buffered_current() then return false end
 		if armed and (_remapper ~= exact or _remapper_generation ~= generation or _broker ~= output
 			or row.value ~= InputEvent.VALUE_UP and not _input_guard_current(armed)) then
 			_withdraw_input_arm(armed); return false
@@ -2298,7 +2464,8 @@ _dispatch_owned_rows = function(rows, source, exact, frame)
 			holder = row.holder or (exact.output_holder and exact:output_holder(row)), handoff = row.handoff, original_owner = row.physical == true }, source)
 		_owned_row_receipt = prior
 		if not dispatched then return false end
-		if receipt.count ~= 1 or receipt.accepted ~= true or not buffered_current() then return false end
+		if receipt.count ~= 1 or receipt.accepted ~= true or not buffered_current()
+			or not fresh() or not buffered_current() then return false end
 		if armed and (_remapper ~= exact or _remapper_generation ~= generation or _broker ~= output
 			or not _input_guard_current(armed)) then _withdraw_input_arm(armed); return false end
 	end
@@ -2362,8 +2529,10 @@ end
 --- the holds that came due (RCtrl's one-shot Shift past its threshold), each
 --- on the keyboard its key went down on.
 --- @param now_ms number
-_tick_remapper = function(now_ms)
+_tick_remapper = function(now_ms, journal_count)
 	if not (_remapper and _intercept) then return end
+	journal_count = journal_count or 0
+	if journal_count >= 64 then M.emergency_stop("ordered remap timer did not settle"); return false end
 	Perf.count("taphold.ticks")
 	local exact, generation, output = _remapper, _remapper_generation, _broker
 	local due_rows = exact:tick(now_ms)
@@ -2373,6 +2542,11 @@ _tick_remapper = function(now_ms)
 	for _, due in ipairs(due_rows) do
 		if not _remapper_batch_current(exact, generation, output) then return false end
 		if due.owned_rows then
+			if due.frame and type(due.frame.next) == "function" then
+				if #due_rows ~= 1 then M.emergency_stop("ordered remap timer returned an ambiguous batch"); return false end
+				if not _run_owned_journal(due.frame, exact, generation) then return false end
+				return _tick_remapper(now_ms, journal_count + 1)
+			else
 			local buffered = due.frame.buffered and original_input_hook_ports.buffered_input_view(due.frame.buffered) or nil
 			if due.frame.buffered and not buffered then M.emergency_stop("buffered deadline source refused"); return false end
 			local source = buffered and buffered.source or _device
@@ -2386,6 +2560,7 @@ _tick_remapper = function(now_ms)
 			if buffered then
 				if due.frame.admit(_combination_source(source)) ~= true then M.emergency_stop("buffered deadline terminal source refused"); return false end
 				_run_owned_tap_frame(due.frame,due.tap,due.binding,exact,generation,buffered.origin,buffered.origin_view,source,buffered.at_ms)
+			end
 			end
 		elseif due.tap ~= nil then
 			-- The action of a key replayed under a hold that just came due.
@@ -2426,12 +2601,29 @@ end
 -- =========================================
 -- =========================================
 
--- Event-type bits of EVIOCGBIT(0): a mouse reports EV_REL, a touchpad or a tablet EV_ABS.
-LayerPointer.EV_REL_BIT, LayerPointer.EV_ABS_BIT = 0x02, 0x03
+-- Event-type bit of EVIOCGBIT(0): a mouse reports EV_REL.
+LayerPointer.EV_REL_BIT = 0x02
 
 --- Whether bit `bit` of an event-type mask is set (no bit operators under LuaJIT).
 function LayerPointer.has_type(mask, bit)
 	return math.floor(mask / 2 ^ bit) % 2 == 1
+end
+
+function LayerPointer.forwardable(mask)
+	if type(mask) ~= "number" or not LayerPointer.has_type(mask, LayerPointer.EV_REL_BIT)
+		or not LayerPointer.has_type(mask, 1) then return false end
+	-- EV_SYN, EV_KEY and EV_REL are relayed; EV_MSC includes scan metadata.
+	-- Every other event type would be lost while the whole device is grabbed.
+	for bit = 3, 31 do
+		if bit ~= 4 and LayerPointer.has_type(mask, bit) then return false end
+	end
+	return true
+end
+
+-- A wheel-capable capture needs mouse reports even without observer callbacks;
+-- the navigation layer may be enabled or replaced after capture starts.
+function LayerPointer.wants_sources()
+	return _on_click ~= nil or _on_pointer_event ~= nil or (_intercept and LayerPointer.emit_relative ~= nil)
 end
 
 --- Whether the held navigation layer binds a wheel direction now.
@@ -2441,28 +2633,52 @@ function LayerPointer.wanted()
 end
 
 --- Takes the mice while the layer binds the wheel, gives them back once it does
---- not and no forwarded button is still down. A touchpad is never taken: it
---- scrolls with its fingers, and its absolute reports cannot be forwarded.
+--- not and no forwarded key is still down. Devices with absolute axes, switches,
+--- LEDs or other unsupported event types remain with the desktop.
 function LayerPointer.sync()
+	local session = _capture_session
 	local wanted, held = LayerPointer.wanted(), next(LayerPointer.slots) ~= nil
-	if wanted and not held then
+	if wanted then
+		local grabbed = false
 		for _, path in ipairs(_pointer_devices) do
 			local slot = pointer_slot(path)
-			local mask = EvdevReader.is_open(slot) and EvdevReader.event_capabilities(slot) or nil
-			if mask and LayerPointer.has_type(mask, LayerPointer.EV_REL_BIT)
-				and not LayerPointer.has_type(mask, LayerPointer.EV_ABS_BIT) then
-				if EvdevReader.grab(slot) then
-					LayerPointer.slots[slot] = path
-				else
-					Logger.warn(LOG, "The navigation layer cannot take %s: its wheel keeps scrolling.", path)
+			local mask = not LayerPointer.slots[slot] and not _sync_dropped[slot]
+				and EvdevReader.is_open(slot) and EvdevReader.event_capabilities(slot) or nil
+			if mask and LayerPointer.forwardable(mask) then
+				if LayerPointer.has_type(mask, 4) then
+					local misc = EvdevReader.event_capabilities(slot, 4)
+					if not _running or _capture_session ~= session then return end
+					-- MSC_SCAN duplicates the following key code. Other MSC reports
+					-- have independent meaning and cannot pass through this output.
+					if misc == nil or misc ~= 0 and misc ~= 0x10 then goto next_pointer end
+				end
+				local keys = EvdevReader.pressed_keys(slot, KEY_MAX)
+				if not _running or _capture_session ~= session then return end
+				if keys and next(keys) == nil then
+					if EvdevReader.grab(slot) then
+						if not _running or _capture_session ~= session then return end
+						local after = EvdevReader.pressed_keys(slot, KEY_MAX)
+						if not _running or _capture_session ~= session then return end
+						if after and next(after) == nil then
+							LayerPointer.slots[slot] = path
+							grabbed = true
+						elseif EvdevReader.ungrab(slot) ~= true then
+							M.emergency_stop("navigation layer could not release pointer " .. path)
+							return
+						end
+					else
+						Logger.warn(LOG, "The navigation layer cannot take %s: its wheel keeps scrolling.", path)
+					end
 				end
 			end
+			::next_pointer::
 		end
-		if next(LayerPointer.slots) ~= nil then Logger.debug(LOG, "The navigation layer took the mouse wheel.") end
+		if grabbed then Logger.debug(LOG, "The navigation layer took the mouse wheel.") end
 	elseif held and not wanted and next(LayerPointer.buttons) == nil then
 		for slot, path in pairs(LayerPointer.slots) do
 			if EvdevReader.is_open(slot) and EvdevReader.ungrab(slot) ~= true then
-				Logger.error(LOG, "The navigation layer could not give %s back to the desktop.", path)
+				M.emergency_stop("navigation layer could not release pointer " .. path)
+				return
 			end
 		end
 		LayerPointer.slots = {}
@@ -2501,18 +2717,47 @@ function LayerPointer.forward(ev, slot)
 				return
 			end
 		end
-		if LayerPointer.emit_relative(ev.code, ev.value) ~= true then
-			Logger.warn(LOG, "A mouse report under the navigation layer was not forwarded (axis %d).", ev.code)
+		local session = _capture_session
+		local called, accepted = pcall(LayerPointer.emit_relative, ev.code, ev.value)
+		if not called or accepted ~= true then
+			if _capture_session == session then M.emergency_stop("grabbed mouse relative output failed") end
+			return
 		end
-	elseif ev.type == EVDEV_TYPE_KEY and InputEvent.is_pointer_button(ev.code) and ev.value ~= InputEvent.VALUE_REPEAT then
-		if ev.value == InputEvent.VALUE_DOWN then LayerPointer.buttons[ev.code] = true
-		else LayerPointer.buttons[ev.code] = nil end
+	elseif ev.type == EVDEV_TYPE_KEY and ev.code >= 1 and ev.code <= 0x2ff
+		and (ev.value == InputEvent.VALUE_DOWN or ev.value == InputEvent.VALUE_UP or ev.value == InputEvent.VALUE_REPEAT) then
+		local key = source_key(slot, ev.code)
+		if ev.value == InputEvent.VALUE_DOWN then LayerPointer.buttons[key] = true
+		elseif ev.value == InputEvent.VALUE_UP then LayerPointer.buttons[key] = nil end
 		_forward_raw({ type = EVDEV_TYPE_KEY, code = ev.code, value = ev.value }, slot)
 	end
 end
 
 local function _dispatch_pointer(ev, slot)
-	if ev.type == EVDEV_TYPE_KEY and ev.code >= InputEvent.POINTER_BUTTON_FIRST then
+	local session = _capture_session
+	-- A grabbed mouse may have lost a button release. Retire its output and
+	-- ungrab it before any untrustworthy reports can reach the desktop.
+	if ev.type == EVDEV_TYPE_SYN and ev.code == SYN_DROPPED and slot ~= nil and LayerPointer.slots[slot] then
+		M.emergency_stop("grabbed pointer queue desynchronised")
+		return
+	end
+	if slot ~= nil then
+		if ev.type == EVDEV_TYPE_SYN and ev.code == SYN_DROPPED then
+			_sync_dropped[slot] = true
+		elseif _sync_dropped[slot] then
+			if ev.type == EVDEV_TYPE_SYN and ev.code == SYN_REPORT then _sync_dropped[slot] = nil
+			else return end
+		end
+	end
+	local pointer_key = ev.type == EVDEV_TYPE_KEY and (InputEvent.is_pointer_button(ev.code)
+		or ev.code >= 0x140 and ev.code <= 0x14f) -- BTN_DIGI contacts and tools
+	if ev.type == EVDEV_TYPE_KEY and ev.code >= 1 and not pointer_key then
+		-- A mouse may also expose keyboard/media keys on the same node. Those
+		-- keys reach the desktop and count as activity for a held tap-hold.
+		if _remapper then
+			_remapper:activity()
+			local at_ms = _event_clock_now_ms(); if at_ms then _tick_remapper(at_ms) end
+		end
+	elseif pointer_key then
 		-- A click while a tap-hold key is down makes it a chord (Shift+click),
 		-- and so does the release of one, as on Windows (hook_dispatcher's
 		-- _OnLUp ... _OnX2Up): a click begun before the tap ends inside it.
@@ -2525,7 +2770,8 @@ local function _dispatch_pointer(ev, slot)
 		-- the kernel reports a touch and no BTN_LEFT, and that touch moves the
 		-- caret all the same, so the password-field verdict and the typing
 		-- buffer must be dropped as on a click.
-		if ev.value == InputEvent.VALUE_DOWN then
+		if ev.value == InputEvent.VALUE_DOWN and _on_click then
+			if not _running or _capture_session ~= session then return end
 			_call_callback("pointer callback", _on_click, ev.code)
 		end
 	elseif ev.type == InputEvent.EV_REL and InputEvent.REL_WHEEL_AXES[ev.code] and _remapper then
@@ -2535,31 +2781,84 @@ local function _dispatch_pointer(ev, slot)
 		_remapper:activity()
 		local at_ms=_event_clock_now_ms(); if at_ms then _tick_remapper(at_ms) end
 	end
+	if not _running or _capture_session ~= session then return end
 	if slot ~= nil and LayerPointer.slots[slot] then
 		LayerPointer.forward(ev, slot)
+		if not _running or _capture_session ~= session then return end
 		LayerPointer.sync()
 	end
+	if not _running or _capture_session ~= session then return end
 	if _on_pointer_event then
 		-- The value and the frame's SYN_REPORT let the metrics measure a movement.
 		if ev.type == InputEvent.EV_REL then
-			_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code, ev.value)
-		elseif ev.type == EVDEV_TYPE_KEY and ev.value == InputEvent.VALUE_DOWN then
-			_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value)
-		elseif ev.type == InputEvent.EV_SYN and ev.code == InputEvent.SYN_REPORT then
-			_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value)
+			_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code, ev.value, slot)
+		elseif pointer_key and ev.value == InputEvent.VALUE_DOWN then
+			_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)
+		elseif ev.type == InputEvent.EV_SYN then
+			if ev.code == InputEvent.SYN_REPORT then
+				_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value, slot)
+			elseif ev.code == SYN_DROPPED then
+				_call_callback("pointer event callback", _on_pointer_event, "dropped", ev.code, ev.value, slot)
+			end
 		end
 	end
 end
 
+-- A lost last keyboard stops the pump, so no seized pointer can wait for a
+-- later layer release. Retire its forwarded keys before returning it to the desktop.
+function LayerPointer.release_for_recovery(session)
+	local slots = {}
+	for slot in pairs(LayerPointer.slots) do slots[#slots + 1] = slot end
+	if #slots == 0 then return true end
+	local called, released = pcall(_release_forwarded_sources, slots)
+	if _capture_session ~= session then return false end
+	if not called or released ~= true then
+		M.emergency_stop("could not retire pointer output during keyboard recovery"); return false
+	end
+	for _, slot in ipairs(slots) do
+		local checked, opened = pcall(EvdevReader.is_open, slot)
+		if _capture_session ~= session then return false end
+		if not checked then M.emergency_stop("could not inspect pointer during keyboard recovery"); return false end
+		if opened then
+			local ungrabbed, acknowledged = pcall(EvdevReader.ungrab, slot)
+			if _capture_session ~= session then return false end
+			if not ungrabbed or acknowledged ~= true then
+				M.emergency_stop("could not release pointer during keyboard recovery"); return false
+			end
+		end
+	end
+	LayerPointer.slots, LayerPointer.buttons = {}, {}
+	return true
+end
+
 local function _read_source(source)
+	local session = _capture_session
 	local event, status, reason = EvdevReader.read_event(source.slot)
+	if not _running or _capture_session ~= session then return nil end
 	if event and EvdevReader.capture_event then
 		_event_receipts[event] = EvdevReader.capture_event(event, source.slot)
 	end
 	if status ~= "fatal" then return event end
+	-- The failed read closes its descriptor before returning. If that close was
+	-- not acknowledged the Reader cannot issue any new native input receipts,
+	-- including for other keyboards still grabbed by this session.
+	local debt = _input_reader_ports.has_native_origin_debt
+	if type(debt) == "function" and debt() == true then
+		M.emergency_stop("native source retirement was not acknowledged")
+		return nil
+	end
 	Logger.error(LOG, "Fatal evdev read on %s — %s; scheduling re-acquisition.",
 		source.path, tostring(reason))
 	_pending_events[source.slot] = nil
+	if not source.keyboard then _sync_dropped[source.slot] = nil end
+	if not source.keyboard and _on_pointer_event then
+		_call_callback("pointer event callback", _on_pointer_event, "reset", nil, nil, source.slot)
+		if not _running or _capture_session ~= session then return nil end
+	end
+	if not source.keyboard and LayerPointer.slots[source.slot] then
+		M.emergency_stop("grabbed pointer reader failed")
+		return nil
+	end
 	if source.keyboard then
 		if _source_recovery.retire_remaps({ source.path }) ~= true then
 			M.emergency_stop("could not retire the failed source remapper")
@@ -2577,6 +2876,7 @@ local function _read_source(source)
 				break
 			end
 		end
+		if not any_open and not LayerPointer.release_for_recovery(session) then return nil end
 		_running = any_open
 		_reacquiring = true
 	end
@@ -2595,8 +2895,9 @@ end
 
 --- Reads the next event of every source that has none pending.
 --- @param sources table The pump's sources.
-local function _read_empty_sources(sources)
+local function _read_empty_sources(sources, session)
 	for _, source in ipairs(sources) do
+		if not _running or _capture_session ~= session then return end
 		if not _pending_events[source.slot] then
 			_pending_events[source.slot] = _read_source(source)
 		end
@@ -2624,9 +2925,10 @@ end
 --- Called from the daemon's idle callback. Nothing here blocks: the descriptor is
 --- O_NONBLOCK and the merge is globally bounded, so the tray, periodic tick and
 --- file watchers advance even under an autorepeat backlog.
-function M.pump()
+function LayerPointer.pump_once()
 	if not _running then return end
 	if _source_reconciliation then return end
+	local session = _capture_session
 	Perf.count("input.pump_calls")
 	local open_keyboards = 0
 	local sources = {}
@@ -2638,6 +2940,7 @@ function M.pump()
 		end
 	end
 	if open_keyboards == 0 then
+		if not LayerPointer.release_for_recovery(session) then return end
 		_number_row.retire()
 		Logger.warn(LOG, "Every keyboard source is closed — waiting for re-acquisition.")
 		_running = false
@@ -2645,7 +2948,7 @@ function M.pump()
 		return
 	end
 
-	if _on_click then
+	if LayerPointer.wants_sources() then
 		for _, path in ipairs(_pointer_devices) do
 			local slot = pointer_slot(path)
 			if EvdevReader.is_open(slot) then
@@ -2655,7 +2958,9 @@ function M.pump()
 	end
 
 	_number_row.drive() -- Same original pump/queue; no additional reader/timer.
-	_read_empty_sources(sources)
+	if not _running or _capture_session ~= session then return end
+	_read_empty_sources(sources, session)
+	if not _running or _capture_session ~= session then return end
 	local drained = false
 	for _ = 1, EvdevReader.MAX_EVENTS_PER_DRAIN do
 		local selected = _earliest_pending(sources)
@@ -2663,7 +2968,8 @@ function M.pump()
 			-- A source is read again only once its event is dispatched: one
 			-- empty at the start of the drain is read once more before the
 			-- queues count as empty.
-			_read_empty_sources(sources)
+			_read_empty_sources(sources, session)
+			if not _running or _capture_session ~= session then return end
 			selected = _earliest_pending(sources)
 			if not selected then
 				drained = true
@@ -2678,6 +2984,7 @@ function M.pump()
 			Perf.count("input.key_events")
 			_dispatch_event(selected_event, selected.path)
 			Perf.span("input.dispatch", dispatch_started)
+			if not _running or _capture_session ~= session then return end
 			LayerPointer.sync()
 		else
 			Perf.count("input.pointer_events")
@@ -2686,8 +2993,12 @@ function M.pump()
 			-- only keep the events' clock fresh here.
 			if _remapper and _intercept then _event_time_ms(selected_event) end
 			_dispatch_pointer(selected_event, selected.slot)
+			if not _running or _capture_session ~= session then return end
+			LayerPointer.sync()
 		end
+		if not _running or _capture_session ~= session then return end
 		_pending_events[selected.slot] = _read_source(selected)
+		if not _running or _capture_session ~= session then return end
 	end
 
 	-- Time passes with no event: a hold that came due since the last one goes
@@ -2698,6 +3009,14 @@ function M.pump()
 		local now_ms = _event_clock_now_ms()
 		if now_ms then _tick_remapper(now_ms) end
 	end
+end
+
+function M.pump()
+	if LayerPointer.pumping then return end
+	LayerPointer.pumping = true
+	local ok, err = pcall(LayerPointer.pump_once)
+	LayerPointer.pumping = false
+	if not ok then error(err, 0) end
 end
 
 --- Sleeps the idle loop until an input source has data, at most `timeout_ms`.
@@ -2975,9 +3294,13 @@ local function _best_pointers()
 	return pointer and { pointer } or {}
 end
 
-local function _close_paths(paths, slot_for, tx)
+local function _close_paths(paths, slot_for, tx, cancelled)
 	for _, path in ipairs(paths) do
+		if cancelled and cancelled() then return false end
 		local slot = slot_for(path)
+		-- A failed observer may reenter cleanup after this descriptor closed;
+		-- that nested pass must not send another reset for the same lifetime.
+		local pointer_open = slot_for == pointer_slot and EvdevReader.is_open(slot)
 		if tx and tx.authority then
 			local lease = tx.close_owners[slot]
 			if lease then _input_reader_ports.retire_source(lease) end
@@ -2988,8 +3311,15 @@ local function _close_paths(paths, slot_for, tx)
 			local lease=_buffered_reader_cleanup[slot]
 			if lease then _input_reader_ports.retire_source(lease) end
 		else EvdevReader.close(slot) end
+		if cancelled and cancelled() then return false end
 		_pending_events[slot] = nil
+		if slot_for == pointer_slot then _sync_dropped[slot] = nil end
+		if pointer_open and _on_pointer_event then
+			_call_callback("pointer event callback", _on_pointer_event, "reset", nil, nil, slot)
+		end
+		if cancelled and cancelled() then return false end
 	end
+	return true
 end
 
 --- Releases virtual keys whose last physical owner is leaving the source set.
@@ -3016,13 +3346,19 @@ _release_forwarded_sources = function(paths)
 		_track_modifier(entry.owner_source or entry.source, entry.code, InputEvent.VALUE_UP)
 		local retained = false
 		for _, current in ipairs(_modifier_order) do if current.code == entry.code then retained = true end end
-		if role and not retained then _capture(entry.code, InputEvent.VALUE_UP) end
+		if role and not retained then
+			local _, _, capture_err = _capture(entry.code, InputEvent.VALUE_UP)
+			if capture_err then return false, "departed modifier capture refused: " .. tostring(capture_err) end
+		end
 	end
 	-- Reconciliation may already have dropped an orphan's physical record.
 	-- Its encoded source still owns that old suppressed press, not a later
 	-- descriptor that happens to reuse the same path.
 	for key in pairs(_remap_orphans) do
 		if retiring[key:match("^(.*):%d+$")] then _remap_orphans[key] = nil end
+	end
+	for key in pairs(_source_recovery.native_handoff or {}) do
+		if retiring[key:match("^(.*):%d+$")] then _source_recovery.native_handoff[key] = nil end
 	end
 	for key, entry in pairs(_physical_down) do
 		if retiring[entry.source] then
@@ -3409,10 +3745,21 @@ local function _acquire_pointers(paths, tx)
 		end
 		retained[path] = nil
 	end
-	for path in pairs(retained) do _close_paths({ path }, pointer_slot, tx) end
+	for path in pairs(retained) do
+		local slot = pointer_slot(path)
+		local released = _release_forwarded_sources({ slot })
+		if not released then return false end
+		_close_paths({ path }, pointer_slot, tx)
+		LayerPointer.slots[slot] = nil
+	end
 	_pointer_devices = {}
-	LayerPointer.slots, LayerPointer.buttons = {}, {}
 	for index, path in ipairs(paths) do _pointer_devices[index] = path end
+	LayerPointer.buttons = {}
+	for key, row in pairs(_forwarded_down) do
+		if LayerPointer.slots[row.owner_source] then
+			LayerPointer.buttons[key] = true
+		end
+	end
 	return true
 end
 
@@ -3604,7 +3951,7 @@ function M.check_device()
 	
 		local keyboards, pointers = {}, {}
 		if _pinned_device then
-			pointers = _on_click and _best_pointers() or {}
+			pointers = LayerPointer.wants_sources() and _best_pointers() or {}
 			local available = EvdevReader.is_available(_pinned_device)
 			if not available then
 				_pinned_missing = true
@@ -3639,7 +3986,7 @@ function M.check_device()
 			keyboards = { _pinned_device }
 		else
 			keyboards, pointers = _best_devices()
-			if not _on_click then pointers = {} end
+			if not LayerPointer.wants_sources() then pointers = {} end
 		end
 		if #keyboards == 0 then
 			if not _reported_missing then
@@ -3856,6 +4203,7 @@ function M.start(opts)
 	-- retain their cold-construction originals and authenticate every returned receipt.
 	_input_reader_ports.capture_event = rawget(EvdevReader, "capture_event")
 	local options = type(opts) == "table" and opts or {}
+	if type(options.layout) == "string" and not M.valid_layout(options.layout) then return false end
 	local admission = options.onHoldAdmission
 	if admission ~= nil and type(admission) ~= "function" then return false end
 	if _number_row.retire() ~= true then return false end
@@ -3878,18 +4226,16 @@ function M.start(opts)
 		and options.device ~= "" and options.device or nil
 	_pinned_missing = false
 	_reacquiring = false
-	if type(options.onChar) == "function" then _on_char = options.onChar end
-	if type(options.onKey)  == "function" then _on_key  = options.onKey  end
-	if type(options.onPhysical) == "function" then _on_physical = options.onPhysical end
-	if type(options.onHold) == "function" then _on_hold = options.onHold end
-	if type(options.onClick) == "function" then _on_click = options.onClick end
-	if type(options.onPointerEvent) == "function" then _on_pointer_event = options.onPointerEvent end
+	_on_char = type(options.onChar) == "function" and options.onChar or nil
+	_on_key = type(options.onKey) == "function" and options.onKey or nil
+	_on_physical = type(options.onPhysical) == "function" and options.onPhysical or nil
+	_on_hold = type(options.onHold) == "function" and options.onHold or nil
+	_on_click = type(options.onClick) == "function" and options.onClick or nil
+	_on_pointer_event = type(options.onPointerEvent) == "function" and options.onPointerEvent or nil
 	_on_consume = type(options.onConsume) == "function" and options.onConsume or nil
 	_on_desync = type(options.onDesync) == "function" and options.onDesync or nil
-	if type(options.layout) == "string"  then _layout   = options.layout end
 	_intercept = options.intercept == true
-	-- Bound unconditionally (not "kept if absent" like the domain callbacks):
-	-- an emitter left over from an earlier session would satisfy the guard below
+	-- An emitter left over from an earlier session would satisfy the guard below
 	-- while pointing at a channel this session never asked for.
 	_emit_raw  = type(options.onEmitRaw) == "function" and options.onEmitRaw or nil
 	LayerPointer.emit_relative = type(options.onEmitRelative) == "function" and options.onEmitRelative or nil
@@ -3941,10 +4287,10 @@ function M.start(opts)
 	local targets, pointers = {}, {}
 	if type(options.device) == "string" and options.device ~= "" then
 		targets = { options.device }
-		if _on_click then pointers = _best_pointers() end
+		if LayerPointer.wants_sources() then pointers = _best_pointers() end
 	else
 		targets, pointers = _best_devices()
-		if not _on_click then pointers = {} end
+		if not LayerPointer.wants_sources() then pointers = {} end
 		if #targets == 0 then
 			Logger.error(LOG, "start(): no keyboard device found (set --device or check /proc/bus/input/devices).")
 			return
@@ -4007,7 +4353,7 @@ function M.start(opts)
 		-- It simply cannot notice a click, which is the behaviour this driver had for
 		-- its whole life until now.
 		-- Managed capture must also retain its complete original cleanup cohort.
-		if _on_click and _acquire_pointers(pointers, tx) == false then return false end
+		if LayerPointer.wants_sources() and _acquire_pointers(pointers, tx) == false then return false end
 	
 		_ticks_since_check = 0
 		_reported_missing = false
@@ -4016,7 +4362,7 @@ function M.start(opts)
 		-- at the completed lifecycle boundary so the first press can own repeats.
 		M.physical_source_receipt()
 		Logger.success(LOG, "Keyboard hook started (keyboards=%d pointers=%d layout=%s intercept=%s).",
-			#_devices, #_pointer_devices, _layout, tostring(_intercept))
+			#_devices, #_pointer_devices, type(options.layout) == "string" and options.layout or _layout, tostring(_intercept))
 		return _publish_source_transaction(tx)
 	end)
 	if not called or accepted ~= true then _retire_source_transaction(tx, "startup source publication refused") end
@@ -4024,6 +4370,7 @@ function M.start(opts)
 	if called and accepted == true then
 		_number_row.construct()
 		if not _running or not rawequal(_capture_session, capture_session) then return false end
+		if type(options.layout) == "string" then _layout = options.layout end
 		_on_hold_admission = admission
 		_hold_admission_session = capture_session
 	end
@@ -4041,14 +4388,14 @@ function M.get_layout()
 	return _layout
 end
 
---- Changes the physical keyboard family used by metrics and the heatmap.
+--- Checks a physical keyboard family without publishing it.
 ---
 --- Text capture deliberately ignores this label and follows the active XKB
 --- keymap. Keeping the setter is still required for finger maps and aggregate
 --- layout metrics, whose qwerty/azerty choice describes the physical board.
 --- @param layout string "qwerty" or "azerty".
 --- @return boolean Whether the layout was accepted.
-function M.set_layout(layout)
+function M.valid_layout(layout)
 	if type(layout) ~= "string" or layout == "" then
 		Logger.error(LOG, "set_layout(): a layout name is required — layout unchanged.")
 		return false
@@ -4062,28 +4409,47 @@ function M.set_layout(layout)
 		Logger.error(LOG, "set_layout(): '%s' is not a layout this driver knows — layout unchanged.", layout)
 		return false
 	end
+	return true
+end
+
+--- Changes the physical keyboard family used by metrics and the heatmap.
+--- @param layout string Physical family.
+--- @return boolean accepted
+function M.set_layout(layout)
+	if not M.valid_layout(layout) then return false end
 	_layout = layout
 	Logger.info(LOG, "Layout: %s.", layout)
 	return true
 end
 
 function M.stop()
-	if _number_row.retire() ~= true then M.emergency_stop("native number-row stop cleanup pending"); return false end
+	local session = _capture_session
+	local retired = _number_row.retire()
+	if _capture_session ~= session then return false end
+	if retired ~= true then M.emergency_stop("native number-row stop cleanup pending"); return false end
 	-- First, while the daemon's device can still carry the unlock.
 	_locks.end_word(true, "keyboard hook stopped")
+	if _capture_session ~= session then return false end
 	_capture_session = nil
 	if not _running and not _reacquiring then return end
-	if _release_remapped() == false then
+	local remaps_released = _release_remapped()
+	if _capture_session ~= nil then return false end
+	if remaps_released == false then
 		M.emergency_stop("combination key retirement refused during stop")
 		return false
 	end
-	local released, release_err = _release_forwarded_sources(_devices)
+	local sources = {}
+	for _, path in ipairs(_devices) do sources[#sources + 1] = path end
+	for _, path in ipairs(_pointer_devices) do sources[#sources + 1] = pointer_slot(path) end
+	local released, release_err = _release_forwarded_sources(sources)
+	if _capture_session ~= nil then return false end
 	if not released then
 		M.emergency_stop("could not release virtual keys during stop: " .. tostring(release_err))
 		return
 	end
-	_close_paths(_pointer_devices, pointer_slot)
-	_close_paths(_devices, keyboard_slot)
+	local function successor() return _capture_session ~= nil end
+	if not _close_paths(_pointer_devices, pointer_slot, nil, successor) then return false end
+	if not _close_paths(_devices, keyboard_slot, nil, successor) then return false end
 	_buffered_reader_cleanup=nil
 	_pointer_devices = {}
 	LayerPointer.slots, LayerPointer.buttons = {}, {}
@@ -4096,6 +4462,7 @@ function M.stop()
 	_consumed_down = {}
 	_remap_owned = {}
 	_remap_orphans = {}
+	_source_recovery.native_handoff = {}
 	_remap_source_of = {}
 	_clock_event_ms, _clock_read_ms = nil, nil
 	_sync_dropped = {}
@@ -4112,13 +4479,17 @@ end
 --- the descriptor is the kernel-guaranteed emergency ungrab.
 --- @param reason string|nil
 function M.emergency_stop(reason)
+	local session = _capture_session
 	_number_row.retire() -- Unknown original row/output debt stays retained.
+	if _capture_session ~= session then return false end
 	_capture_session = nil
 	local message = tostring(reason or "keyboard output path failed")
 	Logger.error(LOG, "Emergency keyboard stop — %s.", message)
+	if _capture_session ~= nil then return false end
 	-- Best effort as below: a CapsLock left locked types every later letter in
 	-- capitals, and Ergopti's CapsLock key taps Enter instead of unlocking it.
 	pcall(_locks.end_word, true, "emergency keyboard stop")
+	if _capture_session ~= nil then return false end
 	-- Best effort, before the descriptors close: a Ctrl the virtual keyboard
 	-- still holds would stay down in every application once nothing forwards
 	-- its release. The output path may be what failed, so nothing here throws.
@@ -4128,19 +4499,24 @@ function M.emergency_stop(reason)
 			pcall(original.release_all, original.engine)
 		else pcall(function() _remapper:release_all() end) end
 	end
+	if _capture_session ~= nil then return false end
 	if _broker and _broker.has_debt() then
 		_broker.retire()
+		if _capture_session ~= nil then return false end
 	elseif _broker and type(_emit_raw) == "function" then
 		for key, entry in pairs(_forwarded_down) do
 			local owner = _output_owners[key]
 			if owner then
 				local receipt = _broker.edge(owner, entry.code, InputEvent.VALUE_UP, _emit_raw)
+				if _capture_session ~= nil then return false end
 				if not receipt.ok then _broker.retire(); break end
 			end
 		end
 	end
-	_close_paths(_pointer_devices, pointer_slot)
-	_close_paths(_devices, keyboard_slot)
+	if _capture_session ~= nil then return false end
+	local function successor() return _capture_session ~= nil end
+	if not _close_paths(_pointer_devices, pointer_slot, nil, successor) then return false end
+	if not _close_paths(_devices, keyboard_slot, nil, successor) then return false end
 	_buffered_reader_cleanup=nil
 	_pointer_devices = {}
 	LayerPointer.slots, LayerPointer.buttons = {}, {}
@@ -4153,6 +4529,7 @@ function M.emergency_stop(reason)
 	_consumed_down = {}
 	_remap_owned = {}
 	_remap_orphans = {}
+	_source_recovery.native_handoff = {}
 	_remap_source_of = {}
 	_clock_event_ms, _clock_read_ms = nil, nil
 	_sync_dropped = {}
@@ -4214,12 +4591,24 @@ function M.while_released(fn, opts)
 		else M.emergency_stop(reason) end
 	end
 	if _intercept then
-		local release_call, released, release_err = pcall(_release_forwarded_sources, paths)
+		local sources = {}
+		for _, path in ipairs(paths) do sources[#sources + 1] = path end
+		for slot in pairs(LayerPointer.slots) do sources[#sources + 1] = slot end
+		local release_call, released, release_err = pcall(_release_forwarded_sources, sources)
 		if not release_call or not released then
 			stop_modal("could not release virtual keys before a dialog: " .. tostring(release_err or "release refused"))
 			observe("refused", { ok = false, reason = "release_failed" })
 			return nil, "virtual key retirement refused"
 		end
+		for slot, path in pairs(LayerPointer.slots) do
+			local called, acknowledged = pcall(EvdevReader.ungrab, slot)
+			if not called or acknowledged ~= true then
+				stop_modal("could not release the pointer before a dialog: " .. path)
+				observe("refused", { ok = false, reason = "ungrab_failed" })
+				return nil, "pointer release refused"
+			end
+		end
+		LayerPointer.slots, LayerPointer.buttons = {}, {}
 		for _, path in ipairs(paths) do
 			local called, acknowledged = pcall(EvdevReader.ungrab, keyboard_slot(path))
 			if not called or acknowledged ~= true then
@@ -4289,6 +4678,14 @@ end
 function M.set_remapper(engine, on_tap)
 	if _number_row.retire() ~= true then return false end
 	if _release_remapped() == false then return false end
+	-- A physical press already forwarded under the previous configuration must
+	-- keep its repeat and release on that same native output owner.
+	_source_recovery.native_handoff = _source_recovery.native_handoff or {}
+	for key, row in pairs(_forwarded_down) do
+		for _, path in ipairs(_devices) do
+			if key == source_key(path, row.code) then _source_recovery.native_handoff[key] = true end
+		end
+	end
 	for key in pairs(_remap_owned) do _remap_orphans[key] = true end
 	_remap_owned = {}
 	_remap_source_of = {}

@@ -93,21 +93,21 @@ end
 local function lookup(document, path)
 	local value, walked = document, {}
 	for key in path:gmatch("[^.]+") do
-		if value == nil then return nil end
+		if value == nil then return nil, "absent" end
 		if type(value) ~= "table" then
 			ConfigOutdated.report(table.concat(walked, "."), "a table of settings is expected here", Logger)
-			return nil
+			return nil, "invalid"
 		end
 		walked[#walked + 1] = key
 		value = value[key]
 	end
-	if value == nil then return nil end
+	if value == nil then return nil, "absent" end
 	local definition = Manifest.find_entry_by_path(path)
 	if definition and not pcall(validate, definition, value) then
 		ConfigOutdated.report(path, "the value no longer fits its " .. tostring(definition.type) .. " setting", Logger)
-		return nil
+		return nil, "invalid"
 	end
-	return value
+	return value, "ok"
 end
 
 local function read()
@@ -145,6 +145,17 @@ function M.get(path, absent)
 	if value == nil then return absent end
 	if type(value) == "table" then return TableUtil.deep_copy(value) end
 	return value
+end
+
+--- Reads a preference while distinguishing proven absence from a refused value.
+--- @param path string Declared preference path.
+--- @return any value Detached accepted value or nil.
+--- @return string status "ok", "absent", or "invalid".
+function M.get_with_status(path)
+	entry(path)
+	local value, status = lookup(read(), path)
+	if type(value) == "table" then value = TableUtil.deep_copy(value) end
+	return value, status
 end
 
 --- Resolves related choices from one exact source snapshot.
@@ -191,7 +202,7 @@ end
 --- @param expected_source table|nil Exact snapshot used to build a cached candidate.
 --- @param admission function|nil Captured final writer admission.
 --- @return boolean committed
-function M.set_many(values, expected_source, admission)
+local function set_many(values, expected_source, admission, on_notice)
 	if not M.admit() or (admission ~= nil and type(admission) ~= "function") then return false end
 	local called, committed, detail = pcall(function()
 		assert(type(values) == "table", "AI preference batch requires a table")
@@ -202,7 +213,7 @@ function M.set_many(values, expected_source, admission)
 			operations[#operations + 1] = Manifest.sparse_operation(path, value)
 		end
 		local _, source = read()
-		return Writer.batch_write(Paths.config("config.toml"), operations, nil, expected_source or source, nil, admission)
+		return Writer.batch_write(Paths.config("config.toml"), operations, nil, expected_source or source, nil, admission, on_notice)
 	end)
 	if not called or committed ~= true then
 		Logger.error(LOG, "AI preferences were not persisted: %s.", tostring(called and detail or committed))
@@ -210,6 +221,20 @@ function M.set_many(values, expected_source, admission)
 	end
 	_generation = _generation + 1
 	return true
+end
+
+function M.set_many(values, expected_source, admission)
+	return set_many(values, expected_source, admission)
+end
+
+--- Publishes a batch with notice acknowledgement for this exact write.
+function M.set_many_with_notice(values, expected_source, admission, on_notice)
+	return set_many(values, expected_source, admission, on_notice)
+end
+
+--- Publishes one leaf with notice acknowledgement for this exact write.
+function M.set_with_notice(path, value, on_notice)
+	return set_many({ [path] = value }, nil, nil, on_notice)
 end
 
 --- Persists a desired value sparsely against the manifest neutral default.

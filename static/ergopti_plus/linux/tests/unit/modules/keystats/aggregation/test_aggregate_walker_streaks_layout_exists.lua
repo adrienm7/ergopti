@@ -43,6 +43,18 @@ local helpers, it, Walker, key, typed, count_of =
 -- =================================================================
 
 helpers.describe("aggregate walker: the streaks the layout exists to reduce", function()
+	helpers.it("maps both levels of actual Linux AZERTY and QWERTY keys", function()
+		for _, case in ipairs({
+			{ layout = "azerty", text = "é2", streak = 2 },
+			{ layout = "azerty", text = ",?", streak = 2 },
+			{ layout = "azerty", text = "!?", streak = 1 },
+			{ layout = "qwerty", text = "1!", streak = 2 },
+		}) do
+			local batch = Walker.walk(typed(case.text, 90), "2026-08-06", "app", nil,
+				{ physical_layout = case.layout })
+			helpers.assert_eq(batch.ergo["2026-08-06\1app"].same_finger_streak_max, case.streak, case.text)
+		end
+	end)
 
 	local FingerMap = helpers.load_module("keystats.finger_map")
 
@@ -545,4 +557,31 @@ helpers.describe("layout-capture-context", function()
 		helpers.assert_nil(next(batch.layouts))
 		helpers.assert_eq(context, {})
 	end)
+end)
+
+helpers.it("refuses a FIFO finger catalogue without blocking aggregation", function()
+	local uv = require("luv")
+	local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-finger-fifo-XXXXXX"))
+	local fifo, script = directory .. "/catalogue", directory .. "/child.lua"
+	local made = os.execute("mkfifo " .. require("text_utils").shell_quote(fifo))
+	assert(made == 0 or made == true)
+	local file = assert(io.open(script, "wb"))
+	assert(file:write(string.format([[
+package.path = %q
+local paths = require("infra.paths")
+local previous = paths.shared
+paths.shared = function(name)
+  if name == "data/keycodes/azerty.json" then return arg[1] end
+  return previous(name)
+end
+require("keystats.finger_map")._reset()
+local ok, err = pcall(require("modules.keystats.aggregate_walker").walk,
+  {}, "2026-01-01", "app", nil, { physical_layout = "qwerty" })
+assert(not ok and tostring(err):find("finger catalogue is unavailable", 1, true))
+]], package.path)))
+	assert(file:close())
+	local quote = require("text_utils").shell_quote
+	local status = os.execute("timeout 3 " .. quote(assert(uv.exepath())) .. " " .. quote(script) .. " " .. quote(fifo))
+	assert(uv.fs_unlink(script)); assert(uv.fs_unlink(fifo)); assert(uv.fs_rmdir(directory))
+	helpers.assert_true(status == 0 or status == true, "a special catalogue must be refused before a blocking read")
 end)

@@ -27,6 +27,7 @@
 local M = {}
 local ManifestKeys = require("keystats.manifest_keys")
 local TableUtil = require("table_util")
+local StrictUtf8 = require("compat.utf8")
 local ErrorDescription = require("error_description")
 local Calendar = require("modules.keystats.calendar")
 
@@ -411,12 +412,16 @@ local _secure_apps = _default_secure_apps()
 -- Active full list, kept for diagnostics and the stats snapshot.
 local _password_apps = _default_password_apps()
 
+-- A partially admitted SQLite store cannot safely accept or durably retain
+-- raw events. Keep the persisted user preference separate from this gate.
+local _storage_blocked = false
+
 --- The single decision point for "may this keystroke be recorded?".
 --- Every recording entry point asks this and nothing else, so a new filter is
 --- added in one place and cannot be forgotten on one of the five paths.
 --- @return boolean
 local function may_record()
-	if _flush_stopping then return false end
+	if _flush_stopping or _storage_blocked then return false end
 	if not _enabled then return false end
 	if _suppressed or _suspended then return false end
 	if _secure_filter_enabled and _secure_field then return false end
@@ -434,6 +439,12 @@ local _log_dir = nil
 
 -- SQLite database path (primary persistence).
 local _sqlite_path = nil
+local _sqlite_admitted = false
+
+-- Availability alone does not acknowledge migration and device registration.
+local function sqlite_available()
+	return _sqlite_admitted and SqliteWriter and SqliteWriter.is_available() == true
+end
 
 -- Device identifier for SQLite registration (derived from hostname).
 local _device_id = "linux-unknown"
@@ -660,10 +671,29 @@ function M.init(opts)
 	end
 	hostname = hostname:gsub("%s+", "")
 	_device_id = "linux-" .. hostname
+	_pointer.bind_fractions(_sqlite_path, _device_id)
 
-	-- Open the SQLite database (bootstraps schema on first run).
-	if SqliteWriter and SqliteWriter.open_db(_sqlite_path) and SqliteWriter.ensure_token_encoding() then
-		SqliteWriter.register_device(_device_id, hostname, "linux", "", hostname)
+	-- A usable writer must also acknowledge migration and actual registration.
+	_sqlite_admitted = false
+	local open_called, open_result, open_reason = false, false, "sqlite_unavailable"
+	if SqliteWriter then open_called, open_result, open_reason = pcall(SqliteWriter.open_db, _sqlite_path) end
+	local sqlite_opened = open_called and open_result == true
+	-- Verify the real device registration before any n-gram rewrite. A schema
+	-- can contain the word "linux" in an unrelated constraint and still reject
+	-- this OS; a failed transactional registration must leave keys untouched.
+	local registration_ok, registered = false, false
+	if sqlite_opened then
+		registration_ok, registered = pcall(SqliteWriter.register_device, _device_id, hostname, "linux", "", hostname)
+	end
+	local migration_ok, migrated = false, false
+	if registration_ok and registered == true then
+		migration_ok, migrated = pcall(SqliteWriter.ensure_token_encoding)
+	end
+	local sqlite_ready = migration_ok and migrated == true
+	local sqlite_unavailable = not SqliteWriter or (open_called and open_result == false and open_reason == "sqlite_unavailable")
+	_storage_blocked = not sqlite_ready and not sqlite_unavailable
+	if sqlite_ready then
+		_sqlite_admitted = true
 		if SqliteReader then migrate_legacy_categories() end
 		-- A live walk owns the record; only a fresh process reads back what the
 		-- previous one left open when it stopped without its final flush.
@@ -689,7 +719,15 @@ function M.init(opts)
 		end
 		Logger.info(LOG, "SQLite persistence active: %s", _sqlite_path)
 	else
-		Logger.info(LOG, "SQLite unavailable — JSON fallback active.")
+		if sqlite_opened then
+			local closed, detail = pcall(SqliteWriter.close_db)
+			if not closed or detail == false then Logger.error(LOG, "SQLite cleanup after failed admission was refused.") end
+		end
+		if _storage_blocked then
+			Logger.error(LOG, "Metrics capture blocked: the SQLite store, migration or device registration was refused.")
+		else
+			Logger.info(LOG, "SQLite unavailable — JSON fallback active.")
+		end
 	end
 
 	-- The stored encryption choice, read before the cipher is configured below:
@@ -708,9 +746,11 @@ function M.init(opts)
 	-- Resume only a pass a previous run left unfinished. Starting one
 	-- unconditionally would re-read every stored row at every daemon start, on
 	-- machines that may never have enabled the setting at all.
-	TextMigration.resume(
-		_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
-		_device_id)
+	if sqlite_available() then
+		TextMigration.resume(
+			_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
+			_device_id)
+	end
 
 	-- The user's stored choices, applied over the manifest defaults. Here rather
 	-- than at module load: see the note beside the declarations.
@@ -740,6 +780,7 @@ function M.init(opts)
 
 	Logger.success(LOG, "Keystats initialised (log_dir=%s, password_apps=%d).",
 		_log_dir, #_password_apps)
+	return not _storage_blocked
 end
 
 
@@ -751,7 +792,7 @@ end
 
 --- Records a single keypress event with app context.
 --- @param ch           string  The character typed.
---- @param timestamp_ms number  Wall-clock timestamp in ms.
+--- @param timestamp_ms number  Monotonic timestamp in ms.
 --- @param app_id       string|nil  The focused app identifier (from window_info).
 --- @param scancode     number|nil  Physical evdev code captured at keydown.
 local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
@@ -1083,6 +1124,7 @@ end
 --- @param timestamp_ms number|nil
 function M.record_suggestion(app_id, kind, timestamp_ms)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	if M.is_unrecorded_app(app_id) then return end
 	local field = (kind == "llm") and "llm_suggested" or "hs_suggested"
 	local live, dated = app_pair(app_id, timestamp_ms)
 	for _, app in ipairs({ live, dated }) do app[field] = app[field] + 1 end
@@ -1092,6 +1134,7 @@ end
 --- @param replay_terminator string|nil Already typed delimiter erased and replayed after the replacement.
 function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, deletes, is_private, replay_terminator)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	if M.is_unrecorded_app(app_id) then return end
 	if type(replacement) ~= "string" or replacement == "" then return end
 	local live, dated, clock = app_pair(app_id, timestamp_ms, capture_input_clock())
 	for _, app in ipairs({ live, dated }) do
@@ -1146,6 +1189,7 @@ end
 ---   stamps its own time.
 function M.record_shortcut(app_id, key, timestamp_ms)  -- luacheck: ignore 212
 	if not may_record() then return end
+	if M.is_unrecorded_app(app_id) then return end
 	if type(key) ~= "string" or key == "" then
 		Logger.warn(LOG, "record_shortcut(): no key name — the event would say only that "
 			.. "something fired, so it is dropped.")
@@ -1165,12 +1209,21 @@ end
 --- focused application and are written with its next typing row, as macOS
 --- carries them to the next flushed run. Gated like every recording entry
 --- point, and never for an application whose input stays out of the metrics.
---- @param kind string "press", "motion" or "frame" (pointer_metrics).
---- @param code integer evdev code.
---- @param value integer evdev value.
-function M.record_pointer(kind, code, value)
-	local delta = _pointer.observe(kind, code, value)
-	if not delta or not may_record() then return end
+--- @param kind string "press", "motion", "frame", "dropped" or "reset" (pointer_metrics).
+--- @param code integer|nil evdev code.
+--- @param value integer|nil evdev value.
+--- @param source any|nil Pointer device identity.
+function M.record_pointer(kind, code, value, source)
+	if not may_record() or M.is_unrecorded_app(_focused_app_id) then
+		_pointer.discard_frames()
+		-- Keep device lifecycle and queue-loss state in sync while collection is off.
+		if kind == "reset" or kind == "dropped" or kind == "frame" then
+			_pointer.observe(kind, code, value, source)
+		end
+		return
+	end
+	local delta = _pointer.observe(kind, code, value, source)
+	if not delta then return end
 	local clock = capture_input_clock()
 	queue_session_events(forward_session(clock, "input", clock.mono_ms, false), clock)
 	local app_id = _focused_app_id
@@ -1203,6 +1256,7 @@ local LLM_EVENT_FIELDS = {
 --- @param fields table|nil The fields of that kind (LLM_EVENT_FIELDS).
 function M.record_llm_event(app_id, kind, fields)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	if M.is_unrecorded_app(app_id) then return end
 	local allowed = LLM_EVENT_FIELDS[kind]
 	if not allowed then
 		Logger.error(LOG, "record_llm_event(): '%s' is not an events_llm kind; the event is dropped.", tostring(kind))
@@ -1227,6 +1281,7 @@ end
 --- appears as a false logical keystroke.
 function M.record_synthetic_output(app_id, text, source, timestamp_ms, deletes, input_chars)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	if M.is_unrecorded_app(app_id) then return end
 	if type(text) ~= "string" or text == "" then return end
 	local kind = type(source) == "string" and source or "other"
 	local live, dated, clock = app_pair(app_id, timestamp_ms, capture_input_clock())
@@ -1249,6 +1304,7 @@ end
 --- @param timestamp_ms number|nil Monotonic transition timestamp in milliseconds.
 function M.on_app_focus(app_id, timestamp_ms)
 	if type(app_id) ~= "string" or app_id == "" then return end
+	if _focused_app_id ~= app_id then _pointer.discard_frames() end
 	M.observe_hold_focus(app_id)
 	local clock = observe_calendar()
 	-- Gated like every other recording entry point: focus time and app
@@ -1256,7 +1312,7 @@ function M.on_app_focus(app_id, timestamp_ms)
 	-- forbidden would persist them on the next flush. The in-flight interval
 	-- is forgotten rather than closed — time that must not be recorded
 	-- cannot be credited later without backfilling the forbidden gap.
-	if not may_record() then
+	if not may_record() or M.is_unrecorded_app(app_id) then
 		_focused_app_id, _focused_app_started_at = nil, nil
 		_current_title, _title_since, _current_title_app = nil, nil, nil
 		return
@@ -1414,7 +1470,8 @@ end
 --- @return table manifest Persisted manifest, partial when a query failed.
 --- @return boolean complete Whether every native query was accepted.
 local function persisted_manifest()
-	if not (SqliteWriter and SqliteWriter.is_available() and SqliteReader) then return {}, true end
+	-- An unavailable store cannot certify that no historical rows exist.
+	if not (sqlite_available() and SqliteReader) then return {}, false end
 	local revision = SqliteWriter.get_revision and SqliteWriter.get_revision() or nil
 	if _manifest_cache.manifest and revision ~= nil and _manifest_cache.revision == revision then
 		return _manifest_cache.manifest, true
@@ -1441,17 +1498,33 @@ function M.clear_cache()
 	return true
 end
 
---- Records the category and score a user assigned to an application.
----
---- Stored in the shared category file the dashboard page reads back as
---- `user_categories`, the same document macOS keeps. An unhandled edit is a
---- control that appears to work and silently discards what the user typed into
---- it, so every refusal is logged and answered false.
+-- An editor retains the exact file image observed before its native dialogs.
+local app_category_edits = setmetatable({}, { __mode = "k" })
+
+--- Captures an opaque, single-use category source for an interactive edit.
+--- @return table|nil receipt Source authority, or nil when capture is refused.
+function M.capture_app_category_edit()
+	if M.has_flush_debt() or _flush_stopping then return nil end
+	local model, _, source = AppCategoryFile.load_owned()
+	if not model or not source then return nil end
+	local receipt = {}
+	app_category_edits[receipt] = { model = model, source = source }
+	return receipt
+end
+
+--- Stores a category in the shared dashboard file, optionally against an interactive edit receipt.
 --- @param app_name string
 --- @param category string
---- @param score number|nil Productivity score, as the shared page defines it.
---- @return boolean Whether it was persisted.
-function M.set_app_category(app_name, category, score)
+--- @param score number|nil
+--- @param receipt table|nil Single-use receipt from capture_app_category_edit().
+--- @return boolean persisted
+function M.set_app_category(app_name, category, score, receipt)
+	local edit
+	if receipt ~= nil then
+		edit = app_category_edits[receipt]
+		if not edit then return false end
+		app_category_edits[receipt] = nil
+	end
 	if M.has_flush_debt() or _flush_stopping then return false end
 	if type(app_name) ~= "string" or app_name == "" then
 		Logger.error(LOG, "set_app_category(): an application name is required.")
@@ -1461,14 +1534,20 @@ function M.set_app_category(app_name, category, score)
 		Logger.error(LOG, "set_app_category(): a category is required for '%s'.", app_name)
 		return false
 	end
-	local model = AppCategoryFile.load()
+	local model, source
+	if edit then
+		model, source = edit.model, edit.source
+	else
+		local reason
+		model, reason, source = AppCategoryFile.load()
+	end
 	if not model then return false end
 	local stored, reason = AppCategoryStore.set(model, app_name, category, tonumber(score) or 0)
 	if not stored then
 		Logger.error(LOG, "set_app_category(): refused for '%s': %s.", app_name, tostring(reason))
 		return false
 	end
-	if not AppCategoryFile.save(model) then return false end
+	if not AppCategoryFile.save(model, source) then return false end
 	-- The cached manifest was built before the edit, and the page re-reads
 	-- immediately after it. Without this the user sees their change reverted and
 	-- tries again.
@@ -1518,10 +1597,11 @@ local function add_live_ngram_delta(payload, apps, start_date, end_date, clock)
 		if type(app) == "string" and app ~= "" then selected[app] = true end
 	end
 	local unrestricted = next(selected) == nil
+	local future_requested = SqliteReader.includes_future(start_date, end_date, clock.date)
 	for date, entries in pairs(snapshot_calendar(clock).values) do
-		if date <= clock.date and SqliteReader.includes_date(date, start_date, end_date) then
+		if (date <= clock.date or future_requested) and SqliteReader.includes_date(date, start_date, end_date) then
 			for app, stats in pairs(entries) do
-				if unrestricted or selected[app] then
+				if unrestricted or app == "Unknown" or selected[app] then
 					local target = payload.historical
 					if date == clock.date then
 						payload.today[app] = payload.today[app] or empty_ngrams()
@@ -1545,7 +1625,7 @@ function M.get_dashboard_payload(opts)
 	if not SqliteReader then return nil, "SQLite projection unavailable" end
 	local options = type(opts) == "table" and opts or {}
 	local categories = {}
-	if SqliteWriter and SqliteWriter.is_available() then
+	if sqlite_available() then
 		local model = AppCategoryFile.load()
 		if model == nil then return nil, "app category file unavailable" end
 		categories = AppCategoryStore.projection(model)
@@ -1575,8 +1655,9 @@ function M.get_range_payload(start_date, end_date, apps)
 	if not SqliteReader then return nil, "SQLite projection unavailable" end
 	local clock = observe_calendar()
 	local bounds = SqliteReader.split_bounds(start_date, end_date, clock.date)
-	local payload, complete = { historical = empty_ngrams(), today = {} }, true
-	if SqliteWriter and SqliteWriter.is_available() then
+	-- RAM remains useful, but unavailable SQLite history is not a complete range.
+	local payload, complete = { historical = empty_ngrams(), today = {} }, false
+	if sqlite_available() then
 		payload, complete = SqliteReader.read_range_split_today(_sqlite_path, start_date, end_date, apps, bounds.today)
 	end
 	-- The page shows the partial counts and says the history is incomplete
@@ -1645,6 +1726,7 @@ end
 local hold_password_app = M.is_unrecorded_app
 settle_capture_policy = function()
 	if not may_record() or hold_password_app(_hold_focus_app) then
+		_pointer.discard_frames()
 		retire_focus_prefix()
 		_hold_token = {}
 		-- Privacy can close while the same window stays focused. Retire its
@@ -1999,7 +2081,7 @@ end
 --- posture. Idempotent: a pass over an already-converted table skips every row.
 --- @return boolean True when a pass is in flight.
 function M.migrate_stored_text()
-	if M.has_flush_debt() or _flush_stopping then return false end
+	if M.has_flush_debt() or _flush_stopping or not sqlite_available() then return false end
 	if not Preferences.admit() then return false end
 	TextMigration.cancel()
 	return TextMigration.start(
@@ -2012,7 +2094,7 @@ end
 --- one openssl spawn per value, and the flush path runs on the keystroke side of
 --- the daemon where that cost would be felt as input lag.
 function M.pump_migration()
-	if M.has_flush_debt() then return end
+	if M.has_flush_debt() or not sqlite_available() then return end
 	TextMigration.pump()
 end
 
@@ -2097,6 +2179,7 @@ end
 function M.get_privacy_state()
 	return {
 		enabled                    = _enabled,
+		storage_blocked            = _storage_blocked,
 		private_filter_enabled     = _private_filter_enabled,
 		secure_filter_enabled      = _secure_filter_enabled,
 		system_auth_filter_enabled = _system_auth_filter_enabled,
@@ -2123,7 +2206,7 @@ function M.export_session()
 	local wpm = 0.0
 	if Metrics then
 		stats = Metrics.get_session_stats()
-		wpm   = Metrics.get_wpm()
+		wpm   = Metrics.get_wpm(Monotonic.now_ms())
 	end
 	local apps  = M.get_app_stats()
 
@@ -2140,11 +2223,18 @@ function M.export_session()
 	}
 end
 
---- Serialises the session to a JSON string.
---- @return string
+--- Serialises the session only when the result is valid UTF-8 JSON.
+--- @return string|nil json JSON text, or nil when native bytes are not UTF-8.
+--- @return string|nil reason Refusal reason when no JSON could be published.
 function M.export_json()
 	local data = M.export_session()
-	return _to_json(data)
+	-- Application ids and evdev codes are maps even when empty or when their
+	-- numeric keys happen to form an array prefix.
+	local objects = { [data.apps] = true }
+	for _, app in pairs(data.apps) do objects[app.physical_scancodes] = true end
+	local json = _to_json(data, objects)
+	if not StrictUtf8.len(json) then return nil, "session contains invalid UTF-8" end
+	return json
 end
 
 --- Copies only caller-owned RAM data; no I/O or persistence is implied.
@@ -2249,6 +2339,7 @@ local function capture_flush(close_session)
 	-- 1. Compose buffered physical key events and their matching aggregates. This is
 	-- the canonical, replayable source shared with the macOS/AHK drivers.
 	local typing_batch = {}
+	local pointer_fractions = _pointer.snapshot_fractions()
 	-- The nine n-gram families, walked from the SAME buffered stream the raw
 	-- events are built from. Built here rather than accumulated per keystroke
 	-- because a sequence is only knowable in context — a bigram needs the
@@ -2263,6 +2354,13 @@ local function capture_flush(close_session)
 			-- Pointer activity alone is a row too, with no text, as macOS flushes it.
 			local mouse = pending.mouse
 			if #pending.events > 0 or mouse then
+				local distance = 0
+				if mouse then
+					pointer_fractions[date] = pointer_fractions[date] or {}
+					local exact = mouse.distance + (pointer_fractions[date][app_id] or 0)
+					distance = math.floor(exact)
+					pointer_fractions[date][app_id] = exact - distance
+				end
 				local total_time_ms = 0
 				for _, event in ipairs(pending.events) do total_time_ms = total_time_ms + (event[2] or 0) end
 				typing_batch[#typing_batch + 1] = {
@@ -2273,7 +2371,7 @@ local function capture_flush(close_session)
 					events_json = _to_json(pending.events),
 					mouse_clicks = mouse and mouse.clicks or 0,
 					mouse_scrolls = mouse and mouse.scrolls or 0,
-					mouse_distance_px = mouse and math.floor(mouse.distance) or 0,
+					mouse_distance_px = distance,
 				}
 			end
 			if #pending.events > 0 then
@@ -2504,6 +2602,7 @@ local function capture_flush(close_session)
 			totals = _flushed_app_totals, titles = _flushed_app_titles, holds = _flushed_app_holds,
 			ngrams = _flushed_app_ngrams, scancodes = _flushed_app_scancodes, sources = _flushed_app_sources,
 			walker = walker_contexts, open_walk = open_walk, recovered = recovered ~= nil,
+			pointer_fractions = pointer_fractions,
 		},
 	}
 end
@@ -2623,6 +2722,7 @@ function M.pump_flush()
 			local marks = state.snapshot.watermarks
 			_flushed_app_totals, _flushed_app_titles, _flushed_app_holds = marks.totals, marks.titles, marks.holds
 			_flushed_app_ngrams, _flushed_app_scancodes, _flushed_app_sources = marks.ngrams, marks.scancodes, marks.sources
+			_pointer.commit_fractions(marks.pointer_fractions)
 			_walker_contexts = marks.walker
 			_persisted_open_walk = marks.open_walk
 			if marks.recovered then _recovered_walks = nil end
@@ -2756,7 +2856,12 @@ local function flush_json()
 		Logger.error(LOG, "flush(): cannot read the previous summary at '%s' — %s.", path, tostring(read_err or status))
 		return false
 	end
-	local written, write_err = FileSystem.write_if_unchanged(path, M.export_json() .. "\n", { status = status, content = previous })
+	local json, export_err = M.export_json()
+	if not json then
+		Logger.error(LOG, "flush(): cannot encode session summary — %s.", tostring(export_err))
+		return false
+	end
+	local written, write_err = FileSystem.write_if_unchanged(path, json .. "\n", { status = status, content = previous })
 	if written ~= true then
 		Logger.error(LOG, "flush(): cannot publish the summary at '%s' — %s.", path, tostring(write_err))
 		return false
@@ -2776,7 +2881,7 @@ local function flush_dispatch(close_session)
 		end
 		return M.pump_flush()
 	end
-	if SqliteWriter and SqliteWriter.is_available() then return dispatch_flush(close_session) end
+	if sqlite_available() then return dispatch_flush(close_session) end
 	_last_flush_committed = false
 	flush_json()
 	return false
@@ -2848,7 +2953,7 @@ function M.stop()
 	end
 	if _stop_final_dispatched then return true end
 	_stop_final_dispatched = true
-	if SqliteWriter and SqliteWriter.is_available() then
+	if sqlite_available() then
 		if dispatch_flush() then return true end
 		if _flush_state then return M.stop() end
 		if SqliteWriter.flush_transport_available() then
@@ -2877,7 +2982,7 @@ end
 --- @return number
 function M.get_wpm()
 	if not Metrics then return 0.0 end
-	return Metrics.get_wpm()
+	return Metrics.get_wpm(Monotonic.now_ms())
 end
 
 --- The readouts' live numbers: { wpm, source, source_variant, source_time (s) }.
@@ -2917,7 +3022,7 @@ end
 --- @return boolean acknowledged False while persistence is refused or pending.
 reset_session_step = function()
 	if _session_reset_attempt or M.has_flush_debt() or _flush_stopping then return false end
-	if not (SqliteWriter and SqliteWriter.is_available()) then
+	if not (sqlite_available()) then
 		Logger.error(LOG, "Metrics session reset refused: durable SQLite persistence is unavailable.")
 		return false
 	end
@@ -3031,7 +3136,7 @@ end
 --- NOTE: assigned (not "local function") so it writes to the forward-declared
 --- upvalue.  Using "local function" would create a shadow local and leave the
 --- upvalue nil for closures defined between the forward-decl and this point.
-_to_json = function(val)
+_to_json = function(val, objects)
 	if type(val) == "nil" then return "null" end
 	if type(val) == "boolean" then return val and "true" or "false" end
 	if type(val) == "number" then
@@ -3056,15 +3161,15 @@ _to_json = function(val)
 		end) .. '"'
 	end
 	if type(val) == "table" then
-		local is_array = #val > 0 or next(val) == nil
+		local is_array = not (objects and objects[val]) and (#val > 0 or next(val) == nil)
 		if is_array then
 			local parts = {}
-			for _, v in ipairs(val) do parts[#parts + 1] = _to_json(v) end
+			for _, v in ipairs(val) do parts[#parts + 1] = _to_json(v, objects) end
 			return "[" .. table.concat(parts, ",") .. "]"
 		else
 			local parts = {}
 			for k, v in pairs(val) do
-				parts[#parts + 1] = _to_json(tostring(k)) .. ":" .. _to_json(v)
+				parts[#parts + 1] = _to_json(tostring(k), objects) .. ":" .. _to_json(v, objects)
 			end
 			return "{" .. table.concat(parts, ",") .. "}"
 		end

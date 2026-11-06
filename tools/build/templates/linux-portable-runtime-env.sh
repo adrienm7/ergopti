@@ -10,11 +10,25 @@ fi
 ERGOPTI_PACKAGE_PREFIX="$1"
 DRIVER_ROOT="$2"
 SHARED_LUA="$DRIVER_ROOT/_shared/lua"
+unset ERGOPTI_LITERAL_DIRECT ERGOPTI_LITERAL_DAEMON ERGOPTI_LITERAL_NATIVE_MODULES
 # The private prefix's Lua packages (luaposix) after the driver's own modules.
-export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;$ERGOPTI_PACKAGE_PREFIX/share/lua/5.1/?.lua;$ERGOPTI_PACKAGE_PREFIX/share/lua/5.1/?/init.lua;;"
+case "$DRIVER_ROOT$ERGOPTI_PACKAGE_PREFIX" in
+  *[\;\?]*)
+    # Lua templates cannot encode these filename bytes. Explicit app entry
+    # points use the literal owner; host/default search paths stay available.
+    export ERGOPTI_LITERAL_DRIVER_ROOT="$DRIVER_ROOT"
+    export ERGOPTI_LITERAL_SHARED_ROOT="$SHARED_LUA"
+    export LUA_PATH=';;'
+    export LUA_CPATH="${LUA_CPATH:-;;}"
+    ;;
+  *)
+    unset ERGOPTI_LITERAL_DRIVER_ROOT ERGOPTI_LITERAL_SHARED_ROOT
+    export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;$ERGOPTI_PACKAGE_PREFIX/share/lua/5.1/?.lua;$ERGOPTI_PACKAGE_PREFIX/share/lua/5.1/?/init.lua;;"
+    export LUA_CPATH="$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/?.so${LUA_CPATH:+;$LUA_CPATH};;"
+    ;;
+esac
 # The driver runs its owned programs from this prefix only (infra/owned_programs.lua).
 export ERGOPTI_RUNTIME_PREFIX="$ERGOPTI_PACKAGE_PREFIX"
-export LUA_CPATH="$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/?.so${LUA_CPATH:+;$LUA_CPATH};;"
 export PATH="$ERGOPTI_PACKAGE_PREFIX/bin:$PATH"
 # No LD_LIBRARY_PATH: every staged file finds lib/ through its own RUNPATH, and
 # this environment reaches every host program the daemon starts.

@@ -50,11 +50,7 @@ local MIN5_STEP_MINUTES = 5
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	local handle = io.open(path, "r")
-	if not handle then return nil end
-	local content = handle:read("*a")
-	handle:close()
-	return content
+	return require("adapters.file_system").read(path)
 end
 
 --- Validates the physical family against its actual provider registry.
@@ -84,7 +80,31 @@ local function finger_lookup(family)
 	if not path then return nil end
 	local ok_json, Json = pcall(require, "json")
 	if not ok_json then return nil end
-	return FingerMap.load(family, read_file, Json.decode, path)
+	-- The shared finger catalogue names physical keys in QWERTY; its AZERTY
+	-- labels describe an Apple keyboard, whose punctuation differs from Linux.
+	-- Resolve each Linux evdev level back to that same physical QWERTY key.
+	local reference = FingerMap.load("qwerty", read_file, Json.decode, path)
+	local layouts = require("modules.hotstrings.input_reader").get_layouts()
+	local qwerty = type(layouts) == "table" and layouts.qwerty or nil
+	local target = type(layouts) == "table" and layouts[family] or nil
+	if type(reference) ~= "table" or type(qwerty) ~= "table" or type(qwerty.unshifted) ~= "table"
+		or type(target) ~= "table" then return nil end
+	local result, ambiguous = {}, {}
+	for _, level in ipairs({ "unshifted", "shifted" }) do
+		local keys = target[level]
+		if type(keys) == "table" then
+			for code, char in pairs(keys) do
+				local physical = reference[qwerty.unshifted[code]]
+				if type(char) == "string" and physical and not ambiguous[char] then
+					local previous = result[char]
+					if previous and (previous.finger ~= physical.finger or previous.hand ~= physical.hand) then
+						result[char], ambiguous[char] = nil, true
+					else result[char] = physical end
+				end
+			end
+		end
+	end
+	return result
 end
 
 local WALK_TIMINGS = {

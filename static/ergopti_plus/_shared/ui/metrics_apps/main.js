@@ -151,12 +151,12 @@ function rebuildFilterButtons() {
 	renderCats();
 
 	// ── Weekdays ──────────────────────────────────────────────────────
-	const wkLabels = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+	const wkLabels = metricWeekdayLabels();
 	const renderWk = () => {
 		wkBox.innerHTML = wkLabels
 			.map((label, idx) => {
 				const active = !currentWeekdayFilter || currentWeekdayFilter.has(idx);
-				return `<button class="filter-btn${active ? ' active' : ''}" data-dow="${idx}" style="padding:3px 9px;font-size:11px;">${label}</button>`;
+				return `<button class="filter-btn${active ? ' active' : ''}" data-dow="${idx}" style="padding:3px 9px;font-size:11px;">${escapeHtml(label)}</button>`;
 			})
 			.join('');
 		[...wkBox.querySelectorAll('button[data-dow]')].forEach((btn) => {
@@ -430,6 +430,7 @@ function renderDashboard() {
 					density: density,
 					sessions: appData.session_count || 0,
 					focus_lat_mean: focus_lat_mean,
+					focus_lat_count: appData.focus_latency_count || 0,
 					hs_pct: hs_pct,
 					destinations: topDestinations.join(', ') || '-'
 				});
@@ -684,7 +685,7 @@ function renderDashboard() {
 		const flMs = (fl.count || 0) > 0 ? fl.sum_ms / fl.count : 0;
 		setText(
 			'kpi-tx-focus-lat',
-			flMs > 0 ? _t('ui_apps.value_ms').replace('{n}', flMs.toFixed(0)) : '—'
+			(fl.count || 0) > 0 ? _t('ui_apps.value_ms').replace('{n}', flMs.toFixed(0)) : '—'
 		);
 		setText(
 			'kpi-tx-focus-lat-detail',
@@ -714,7 +715,7 @@ function renderDashboard() {
 		setText(
 			'kpi-tx-autorepeat-detail',
 			autoRepCount > 0
-				? `${format_int(autoRepCount)} touches répétées`
+				? `${format_int(autoRepCount)} ${_t('ui_apps.h2_autorepeat')}`
 				: _t('ui_apps.kpi_no_repeat')
 		);
 
@@ -724,7 +725,7 @@ function renderDashboard() {
 		Object.entries(aggData.apps || {}).forEach(([name, a]) => {
 			if ((a.chars || 0) >= 200) {
 				const p = ((a.bs_total || 0) / a.chars) * 100;
-				if (p > wErrPct) {
+				if (wErrApp === null || p > wErrPct) {
 					wErrPct = p;
 					wErrApp = name;
 				}
@@ -742,7 +743,7 @@ function renderDashboard() {
 		Object.entries(aggData.apps || {}).forEach(([name, a]) => {
 			if ((a.recovery_count || 0) >= 5) {
 				const m = a.recovery_sum_ms / a.recovery_count;
-				if (m > wRecMs) {
+				if (wRecApp === null || m > wRecMs) {
 					wRecMs = m;
 					wRecApp = name;
 				}
@@ -774,7 +775,7 @@ function renderDashboard() {
 					datasets: [
 						{
 							label: 'CPM',
-							data: cats.map((c) => +c.cpm.toFixed(0)),
+							data: cats.map((c) => c.cpm),
 							backgroundColor: cats.map((c) => getCategoryColor(c.cat, 0)),
 							borderRadius: 4
 						}
@@ -783,7 +784,10 @@ function renderDashboard() {
 				options: {
 					responsive: true,
 					maintainAspectRatio: false,
-					plugins: { legend: { display: false } },
+					plugins: {
+						legend: { display: false },
+						tooltip: { callbacks: { label: formatCpmTooltip } }
+					},
 					scales: {
 						x: { grid: { display: false }, ticks: { color: ThemeTokens.color('grey-ccc') } },
 						y: {
@@ -846,9 +850,10 @@ function renderDashboard() {
 		}
 
 		// #22 Dominant category per weekday — render as compact 7-day rundown
-		const DOW_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+		const DOW_LABELS = metricWeekdayLabels();
 		const wkLines = [];
-		let domToday = null;
+		let domToday = null,
+			firstCategory = null;
 		const todayDow = (new Date().getDay() + 6) % 7;
 		Object.entries(r.weekday_category || {}).forEach(([dow, cats]) => {
 			let topCat = null,
@@ -860,11 +865,12 @@ function renderDashboard() {
 				}
 			});
 			if (topCat) {
+				if (firstCategory === null) firstCategory = topCat;
 				wkLines.push(`${DOW_LABELS[+dow]} : ${topCat}`);
 				if (+dow === todayDow) domToday = topCat;
 			}
 		});
-		setText('kpi-dom-cat', domToday || (wkLines.length > 0 ? wkLines[0].split(' : ')[1] : '—'));
+		setText('kpi-dom-cat', domToday || firstCategory || '—');
 		setText(
 			'kpi-dom-cat-detail',
 			wkLines.length > 0 ? wkLines.join(' · ') : _t('ui_apps.kpi_no_day_data')
@@ -1003,17 +1009,11 @@ function renderDashboard() {
 				: _t('ui_apps.kpi_no_data')
 		);
 
-		const muted_pct = (rt.focus_ms || 0) > 0 ? ((sys.audio_muted_ms || 0) / rt.focus_ms) * 100 : 0;
 		setText(
 			'kpi-sys-mute',
 			(sys.audio_muted_ms || 0) > 0 ? formatDuration(sys.audio_muted_ms) : '—'
 		);
-		setText(
-			'kpi-sys-mute-detail',
-			(sys.audio_muted_ms || 0) > 0
-				? _t('ui_apps.kpi_pct_focus_time').replace('{pct}', muted_pct.toFixed(0))
-				: _t('ui_apps.kpi_no_mute')
-		);
+		setText('kpi-sys-mute-detail', (sys.audio_muted_ms || 0) > 0 ? '' : _t('ui_apps.kpi_no_mute'));
 
 		setText('kpi-sys-spaces', String(sys.space_switches || 0));
 		setText(
@@ -1050,18 +1050,18 @@ function renderDashboard() {
 		renderSankey(aggData);
 
 		// Radial top 8 (#27) and burst histogram (#34)
-		renderRadialTop8(appsArray);
+		renderRadialTop8(apps_by_time);
 		renderBurstHistogram(aggData);
 
 		// Daily trajectories (#29-32)
 		renderDailyTrajectories(aggData);
 
 		// Day timeline (#33) and app-pairs table (#36)
-		renderDayTimeline();
+		renderDayTimeline(aggData);
 		renderAppPairsTable(aggData);
 
 		// Top sessions (#37) and top days (#38)
-		renderTopSessionsTable();
+		renderTopSessionsTable(aggData);
 		renderTopDaysTable(aggData);
 
 		// Session boxplots (#28) and top windows table (#39)
@@ -1137,7 +1137,7 @@ function renderDashboard() {
 			const tdLat = document.createElement('td');
 			tdLat.className = 'app-time-cell';
 			tdLat.textContent =
-				app.focus_lat_mean > 0
+				app.focus_lat_count > 0
 					? _t('ui_apps.value_ms').replace('{n}', Math.round(app.focus_lat_mean))
 					: '—';
 			tr.appendChild(tdLat);
@@ -1193,3 +1193,14 @@ function renderDashboard() {
 
 // =====================================================
 // =====================================================
+
+// Native locale deliveries can arrive after the page data. Preserve the
+// selected category identities while rebuilding labels and derived charts.
+document.addEventListener('i18n:applied', () => {
+	if (currentCategoryFilter) {
+		currentCategoryFilter = new Set([...currentCategoryFilter].map(translateCategory));
+	}
+	invalidateAggregationCache();
+	rebuildFilterButtons();
+	renderDashboard();
+});

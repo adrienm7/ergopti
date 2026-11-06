@@ -61,11 +61,21 @@ end
 --- @return string|nil
 local function os_release_value(text, key)
 	if type(text) ~= "string" then return nil end
+	local value
 	for line in text:gmatch("[^\n]+") do
 		local k, v = line:match("^([%u_]+)=(.*)$")
-		if k == key then return (v:gsub('^"(.*)"$', "%1")) end
+		if k == key then value = v end
 	end
-	return nil
+	if value == nil then return nil end
+	local quote = value:sub(1, 1)
+	if #value >= 2 and quote == "'" and value:sub(-1) == quote then return value:sub(2, -2) end
+	if #value >= 2 and quote == '"' and value:sub(-1) == quote then
+		return (value:sub(2, -2):gsub("\\(.)", function(char)
+			if char == "\\" or char == '"' or char == "$" or char == string.char(96) then return char end
+			return "\\" .. char
+		end))
+	end
+	return value
 end
 
 --- Reads one "Key:   value kB" entry of /proc/meminfo, in kilobytes.
@@ -113,6 +123,7 @@ function M.system_facts(env)
 	local meminfo = env.read("/proc/meminfo")
 	local desktop = DisplayServer.desktop()
 	local locale = os.getenv("LC_ALL")
+	if not locale or locale == "" then locale = os.getenv("LC_MESSAGES") end
 	if not locale or locale == "" then locale = os.getenv("LANG") end
 	return {
 		os_name        = os_release_value(os_release, "PRETTY_NAME") or os_release_value(os_release, "NAME"),

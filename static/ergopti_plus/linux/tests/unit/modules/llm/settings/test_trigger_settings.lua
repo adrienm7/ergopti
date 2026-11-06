@@ -33,6 +33,34 @@ local function load_settings(initial, writes_fail)
 end
 
 helpers.describe("LLM trigger settings: durable manifest-backed values", function()
+	helpers.it("matches Unicode exclusions without migrating legacy bytes (unicode-app-identity)", function()
+		local invalid = string.char(0x80)
+		local settings, storage = load_settings({ ["llm.trigger.disabled_apps"] = { "Éditeur", "É" .. invalid } })
+		helpers.assert_true(settings.is_app_disabled("éditeur"))
+		helpers.assert_true(settings.is_app_disabled("É" .. invalid))
+		helpers.assert_eq(settings.is_app_disabled("é" .. invalid), false, "invalid UTF-8 has no Unicode fallback")
+		helpers.assert_eq(storage.get("llm.trigger.disabled_apps"), { "Éditeur", "É" .. invalid })
+		restore()
+	end)
+	helpers.it("refreshes the bounded exclusion index on publication and restore (unicode-app-cache)", function()
+		local settings, storage = load_settings()
+		assert(settings.set_disabled_apps({ "Éditeur" }))
+		helpers.assert_true(settings.is_app_disabled("éditeur"))
+		local snapshot = settings.configuration_snapshot()
+		local detached = settings.disabled_apps(); detached[1] = "Autre"
+		helpers.assert_true(settings.is_app_disabled("éditeur"), "detached rows cannot alter the index")
+		settings._reset() -- A configuration transaction replaces the values table.
+		assert(settings.set_disabled_apps({ "Autre" }))
+		helpers.assert_eq(settings.is_app_disabled("éditeur"), false)
+		helpers.assert_true(settings.is_app_disabled("autre"))
+		assert(settings.restore_configuration(snapshot))
+		helpers.assert_true(settings.is_app_disabled("éditeur"))
+		helpers.assert_eq(settings.is_app_disabled("autre"), false)
+		storage.set = function() return false end
+		helpers.assert_eq(settings.set_disabled_apps({ "Autre" }), false)
+		helpers.assert_true(settings.is_app_disabled("éditeur"), "refused persistence retains the published index")
+		restore()
+	end)
 	helpers.it("uses the Linux manifest defaults without storing them", function()
 		local settings, storage = load_settings()
 		local manifest = require("infra.manifest_reader")
@@ -110,7 +138,8 @@ end)
 --- @param body function Receives observed request/probe counts and the real lifecycle.
 local function with_url_request(options, body)
 	local observed = { chats = 0, probes = 0, windows = 0 }
-	replace("infra.llm_preferences", PreferencesFixture.new({ initial = {
+	local scheduler = Fakes.timer_scheduler()
+	replace("infra.llm_preferences", options.preferences or PreferencesFixture.new({ initial = {
 		["llm.models.selected"] = "ollama", ["llm.trigger.secure_filter_enabled"] = false,
 		["llm.trigger.url_bar_filter_enabled"] = true,
 	} }))
@@ -126,7 +155,7 @@ local function with_url_request(options, body)
 			attributes = {}, active_scope = true, native_bus_name = ":1.42",
 			native_object_path = "/org/a11y/atspi/accessible/7" })
 	end)
-	replace("adapters.secure_field_detector", nil)
+	replace("adapters.secure_field_detector", options.detector)
 	replace("adapters.window_info", { focused_snapshot = function()
 		observed.windows = observed.windows + 1
 		if options.window_throw then error("controlled native window failure") end
@@ -148,11 +177,17 @@ local function with_url_request(options, body)
 	replace("modules.llm.prediction_engine", nil)
 	local engine = require("modules.llm.prediction_engine")
 	engine.init({ focus_id = function() return "owned-native-text-field" end,
+		scheduler = scheduler,
 		privacy_guard = options.privacy_guard, privacy_context = options.privacy_context })
 	if options.before then options.before(engine) end
 	local okay, problem = xpcall(function()
-		engine.predict("Bonjour à tous", nil, { num_predictions = 1,
-			profile = { id = "raw", system_single = "{context}" } })
+		if options.automatic then
+			engine.on_char("/", "Bonjour à tous //", options.output_context)
+			scheduler.test.advance(2)
+		else
+			engine.predict("Bonjour à tous", options.output_context, { num_predictions = 1,
+				profile = { id = "raw", system_single = "{context}" } })
+		end
 		body(observed, lifecycle)
 	end, debug.traceback)
 	engine.dismiss()
@@ -160,6 +195,63 @@ local function with_url_request(options, body)
 	restore()
 	if not okay then error(problem, 0) end
 end
+
+helpers.describe("prediction engine: invalid exclusions retain privacy", function()
+	local vectors = {
+		{ name = "mixed-case entries", config = '[llm.trigger]\ndisabled_apps = ["firefox", "Firefox"]\n', app = "firefox", expected = 0 },
+		{ name = "unlisted app with invalid list", config = '[llm.trigger]\ndisabled_apps = ["firefox", "Firefox"]\n', app = "editor", expected = 0 },
+		{ name = "wrong leaf type", config = '[llm.trigger]\ndisabled_apps = "firefox"\n', app = "firefox", expected = 0 },
+		{ name = "wrong parent type", config = '[llm]\ntrigger = "firefox"\n', app = "firefox", expected = 0 },
+		{ name = "valid matching list", config = '[llm.trigger]\ndisabled_apps = ["firefox"]\n', app = "firefox", expected = 0 },
+		{ name = "valid unlisted app", config = '[llm.trigger]\ndisabled_apps = ["firefox"]\nsecure_filter_enabled = false\nurl_bar_filter_enabled = false\n', app = "editor", expected = 1 },
+	}
+	for _, vector in ipairs(vectors) do
+		helpers.it("classifies " .. vector.name .. " before chat", function()
+			local path = os.tmpname()
+			local file = assert(io.open(path, "wb"))
+			assert(file:write(vector.config))
+			assert(file:close())
+			local original_paths = require("infra.config_paths")
+			replace("infra.config_paths", setmetatable({ config = function(name)
+				if name == "config.toml" then return path end
+				return original_paths.config(name)
+			end }, { __index = original_paths }))
+			replace("infra.llm_preferences", nil)
+			local storage = require("infra.llm_preferences")
+			local ok, err = xpcall(function()
+				with_url_request({ preferences = storage, automatic = true, app = vector.app,
+					output_context = { app_id = vector.app }, privacy_guard = function() return false end,
+					detector = { isSecureField = function() return false end, isUrlBar = function() return false end },
+					privacy_context = function() return { app_id = vector.app, title = "Document", native_identity = "window-1" } end }, function(observed)
+					helpers.assert_eq(observed.chats, vector.expected, "chat admission must follow the stored exclusion")
+				end)
+			end, debug.traceback)
+			os.remove(path)
+			restore()
+			if not ok then error(err, 0) end
+		end)
+	end
+	helpers.it("suppresses predictions when exclusion storage cannot be read", function()
+		local settings, storage = load_settings()
+		storage.get_with_status = function() error("controlled read failure") end
+		helpers.assert_true(settings.is_app_disabled("editor", true))
+		helpers.assert_true(settings.is_app_disabled(nil, true))
+		restore()
+	end)
+	helpers.it("retains refusal through snapshots and clears it only after a valid save", function()
+		local settings = load_settings({ ["llm.trigger.disabled_apps"] = { "firefox", "Firefox" } })
+		helpers.assert_true(settings.is_app_disabled("editor", true))
+		local refused = settings.configuration_snapshot()
+		helpers.assert_eq(settings.set_disabled_apps({ "firefox", "" }), false)
+		helpers.assert_true(settings.is_app_disabled("editor", true))
+		settings._reset() -- A detached configuration replaces the cache before publication.
+		helpers.assert_true(settings.set_disabled_apps({ "firefox" }))
+		helpers.assert_eq(settings.is_app_disabled("editor", true), false)
+		helpers.assert_true(settings.restore_configuration(refused))
+		helpers.assert_true(settings.is_app_disabled("editor", true))
+		restore()
+	end)
+end)
 
 helpers.describe("prediction engine: trigger settings affect requests", function()
 	helpers.it("waits for the configured debounce and cancels a pending owner", function()
@@ -820,6 +912,46 @@ end)
 
 
 helpers.describe("LLM trigger settings: applications the trigger never runs in", function()
+	helpers.it("keeps trigger exclusions when a caller mutates a returned list (trigger-apps-alias)", function()
+		local settings, storage = load_settings()
+		assert(settings.set_disabled_apps({ "bank" }))
+		local exposed = settings.get("disabled_apps")
+		exposed[1] = nil
+		local disabled, stored = settings.is_app_disabled("bank"), storage.get("llm.trigger.disabled_apps")
+		restore()
+		helpers.assert_true(disabled, "mutating a returned list cannot turn predictions back on")
+		helpers.assert_eq(stored, { "bank" })
+	end)
+
+	helpers.it("owns direct trigger exclusion input independently after persistence (trigger-apps-alias)", function()
+		local settings = load_settings()
+		local candidate = { "bank" }
+		assert(settings.set("disabled_apps", candidate))
+		candidate[1] = nil
+		local disabled = settings.is_app_disabled("bank")
+		restore()
+		helpers.assert_true(disabled, "caller-owned edits cannot change the committed runtime list")
+	end)
+	helpers.it("refuses sparse exclusion edits without erasing protected applications (trigger-apps-sparse)", function()
+		local settings, storage = load_settings()
+		assert(settings.set_disabled_apps({ "firefox", "bank" }))
+		local edited = { [1] = "firefox", [3] = "bank" }
+		local accepted = settings.set_disabled_apps(edited)
+		local still_disabled, stored = settings.is_app_disabled("bank"), storage.get("llm.trigger.disabled_apps")
+		restore()
+		helpers.assert_eq(accepted, false)
+		helpers.assert_true(still_disabled, "a missing list index cannot silently remove an exclusion")
+		helpers.assert_eq(stored, { "firefox", "bank" })
+	end)
+
+	helpers.it("refuses a non-array whose entry count matches its Lua length (trigger-apps-sparse)", function()
+		local settings = load_settings()
+		local malformed = { "firefox", nil, "bank", "terminal" }
+		malformed[0] = "editor"
+		local accepted = settings.set("disabled_apps", malformed)
+		restore()
+		helpers.assert_eq(accepted, false, "a count equal to #value does not prove a dense array")
+	end)
 	helpers.it("trigger-apps: stores normalised distinct identifiers and matches the focused application", function()
 		local settings, storage = load_settings()
 		helpers.assert_eq(settings.disabled_apps(), {})

@@ -1046,27 +1046,11 @@ local function _process_release_response(body, channel, check_only)
 
 	local signature_url = _select_signature_asset(body)
 
-	if current == "local" then
-		-- Running from source — always show the latest as available for dev.
-		Logger.info(LOG, "Local source — latest release: %s.", latest_tag)
-		_cached_release = {
-			tag          = latest_tag,
-			notes        = Parser.parse_notes(body),
-			download_url = _select_update_asset(body),
-			checksum_url = _select_checksum_asset(body),
-			signature_url = signature_url ~= "" and signature_url or nil,
-			published_at = Parser.parse_published_at(body),
-			prerelease   = Parser.parse_prerelease_flag(body),
-			check_only   = check_only == true or nil,
-		}
-		_state = "available"
-		return true
-	end
-
 	-- A deliberate switch to another channel offers that channel's latest release
 	-- even when semver orders it below the installed build (the same rule as the
-	-- other drivers, pinned by channel_vectors.json).
-	if not CHANNELS.should_offer(latest_tag, current, channel, M.installed_channel()) then
+	-- other drivers, pinned by channel_vectors.json). A source checkout offers the
+	-- latest too, but still needs the same installable asset admission below.
+	if current ~= "local" and not CHANNELS.should_offer(latest_tag, current, channel, M.installed_channel()) then
 		-- Info, not debug: "the check ran and found nothing" is the answer a user
 		-- asking "why did it not update" needs, and it happens a few times a day.
 		Logger.info(LOG, "Update check result: up to date (current %s, latest %s).", current, latest_tag)

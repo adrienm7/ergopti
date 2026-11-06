@@ -20,6 +20,12 @@
 
 local helpers = require("tests.helpers")
 
+-- The displayed editor model carries explicit matching flags for every entry.
+local function editor_entry(trigger, output)
+	return { trigger = trigger, output = output, is_word = false, auto_expand = true,
+		is_case_sensitive = false, final_result = false, is_case_sensitive_strict = false }
+end
+
 
 --- The existing persistence action now starts from a manager-owned displayed model.
 --- @param handler table Actual personal editor bridge.
@@ -170,7 +176,7 @@ helpers.describe("bridge handler TOML persistence", function()
 					data = {
 						sections_order = { "english" },
 						sections = { english = { description = "English", entries = {
-							{ trigger = "btw", output = "by the way" },
+							editor_entry("btw", "by the way"),
 						} } },
 					},
 				}, state, context)
@@ -223,8 +229,8 @@ helpers.describe("bridge handler TOML persistence", function()
           data = {
             sections_order = { "english" },
             sections = { english = { description = "English", entries = {
-              { trigger = "btw", output = "by the way" },
-              { trigger = "hi", output = "hello" },
+              editor_entry("btw", "by the way"),
+              editor_entry("hi", "hello"),
             } } } },
         }, state, context)
       end)
@@ -277,8 +283,8 @@ helpers.describe("bridge handler TOML persistence", function()
 			handler.on_message({ action = "save", data = {
 				sections_order = { "english", "metiers" },
 				sections = {
-					english = { description = "English", entries = { { trigger = "btw", output = "by the way" } } },
-					metiers = { description = "Metiers", entries = { { trigger = "sru", output = "SRU" } } },
+					english = { description = "English", entries = { editor_entry("btw", "by the way") } },
+					metiers = { description = "Metiers", entries = { editor_entry("sru", "SRU") } },
 				},
 			} }, state, context)
 			handler.on_message({ action = "save", data = {
@@ -478,7 +484,7 @@ helpers.describe("hotstring editor classified source admission", function()
 			local bridge = helpers.load_module("ui.hotstring_editor.bridge")
 			obs.opened = bridge.push_init(state, context)
 			obs.result = bridge.on_message({ action = "save", data = {
-				sections_order = { "english" }, sections = { english = { entries = { { trigger = "new", output = "next" } } } },
+				sections_order = { "english" }, sections = { english = { description = "English", entries = { editor_entry("new", "next") } } },
 			} }, state, context)
 		end)
 		release_source()
@@ -554,6 +560,15 @@ end)
 
 
 helpers.describe("configuration filesystem root persistence", function()
+	helpers.it("linux-config-invalid-stored-path: refuses embedded NUL in persisted override", function()
+		local saved_storage = package.loaded["adapters.storage"]
+		package.loaded["adapters.storage"] = { get = function() return "/tmp\0/other" end }
+		local paths = require("infra.config_paths")
+		local ok, actual = pcall(paths.get_config_dir)
+		package.loaded["adapters.storage"] = saved_storage
+		helpers.assert_true(ok)
+		helpers.assert_eq(actual, paths.default_config_dir(), "a corrupt override must not reach native path APIs")
+	end)
 	for _, selected in ipairs({ "/", "///" }) do
 		helpers.it("linux-config-root: selected root survives bootstrap storage: " .. selected, function()
 			local saved_storage, saved_paths = package.loaded["adapters.storage"], package.loaded["infra.config_paths"]

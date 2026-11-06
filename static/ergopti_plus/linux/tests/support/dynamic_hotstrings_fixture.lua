@@ -9,7 +9,6 @@
 --- ==============================================================================
 
 local M = {}
-local _sequence = 0
 
 --- Selects the declared families through the current preference owner.
 --- @param manager table Dynamic hotstrings owner.
@@ -26,14 +25,18 @@ end
 --- @return string path The private configuration file.
 function M.route()
 	local Preferences = require("infra.hotstring_preferences")
-	_sequence = _sequence + 1
-	local path = string.format("%s/ergopti_dynamic_families_%d_%d_%d.toml",
-		(os.getenv("TMPDIR") or "/tmp"):gsub("/+$", ""), os.time(), math.random(100000, 999999), _sequence)
-	assert(Preferences._set_file_for_test(path), "the preference owner must accept a private file")
+	local uv = require("luv")
+	local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-dynamic-families-XXXXXX"))
+	local path = dir .. "/config.toml"
+	if not Preferences._set_file_for_test(path) then
+		assert(uv.fs_rmdir(dir))
+		error("the preference owner must accept a private file")
+	end
 	return function()
 		Preferences._set_file_for_test(nil)
 		os.remove(path)
 		os.remove(path .. ".tmp")
+		assert(uv.fs_rmdir(dir))
 	end, path
 end
 

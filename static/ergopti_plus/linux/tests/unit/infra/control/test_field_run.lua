@@ -118,6 +118,24 @@ local function started(options)
 end
 
 helpers.describe("Linux field run (linux-field-run)", function()
+	helpers.it("refuses a FIFO declaration without blocking (field-run-source-admission)", function()
+		if package.config:sub(1, 1) == "\\" then return end
+		local uv = require("luv")
+		local quote = require("text_utils").shell_quote
+		local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-field-source-XXXXXX"))
+		assert(uv.fs_mkdir(dir .. "/data", 448))
+		local fifo = dir .. "/" .. FieldRun.PROTOCOL_PATH
+		local made = os.execute("mkfifo " .. quote(fifo))
+		assert(made == true or made == 0)
+		local root = helpers.driver_root()
+		local code = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/../_shared/lua/?.lua;")
+			.. "..package.path; assert(not pcall(require('infra.field_run').load, " .. string.format("%q", dir)
+			.. ", " .. string.format("%q", root) .. "))"
+		local result = os.execute("timeout 3 " .. quote(uv.exepath()) .. " -e " .. quote(code))
+		assert(os.remove(fifo)); assert(uv.fs_rmdir(dir .. "/data")); assert(uv.fs_rmdir(dir))
+		helpers.assert_true(result == true or result == 0, "a FIFO declaration must refuse promptly")
+	end)
+
 	helpers.it("reads the protocol from the shared declaration and repeats none of it", function()
 		local shared, spec = protocol(), shipped()
 		for key, name in pairs(spec.files) do helpers.assert_eq(name, shared.files[key], "files." .. key) end

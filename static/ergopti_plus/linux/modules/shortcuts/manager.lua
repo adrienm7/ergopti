@@ -276,15 +276,20 @@ function M.resolve_wrap_pair(value)
 	return WrapPair.parse(value, WRAP_PAIR_LIST)
 end
 
---- Types a text at the text destination focused now, as send_text does: the
---- run_command and its output use it once their child has finished.
+--- Retains the current destination for an asynchronous text producer.
+--- @return table|nil publication
+function M.capture_text_destination() return capture_text_destination() end
+
+--- Types text at the retained destination, or captures the current one for a
+--- synchronous caller.
 --- @param text string Text to type.
 --- @param publication table|nil A destination already captured (send_text).
 --- @return boolean typed
 function M.insert_text(text, publication)
 	publication = publication or capture_text_destination()
 	if not publication then Logger.warn(LOG, "Text insertion refused: no retained text destination."); return false end
-	local result = Injector.inject(0, text, false, nil, publication)
+	-- Text can be arbitrary command output or configured user content.
+	local result = Injector.inject(0, text, true, nil, publication)
 	return type(result) == "table" and result.ok == true
 end
 
@@ -296,10 +301,9 @@ end
 function M.send_vocabulary()
 	if _send_vocabulary then return _send_vocabulary end
 	local path = Paths.shared(SEND_KEYS_REL_PATH)
-	local handle = path and io.open(path, "r")
-	if not handle then error("shortcuts: cannot read " .. tostring(path)) end
-	local body = handle:read("*a")
-	handle:close()
+	local body, status
+	if path then body, status = require("toml_codec.writer").read_classified(path) end
+	if status ~= "ok" then error("shortcuts: cannot read " .. tostring(path)) end
 	local ok, parsed = pcall(require("json").decode, body)
 	if not ok or type(parsed) ~= "table" or type(parsed.keys) ~= "table"
 		or type(parsed.modifiers) ~= "table" or type(parsed.text_max_code_points) ~= "number" then
@@ -675,7 +679,8 @@ function M.paste_plain()
 		Logger.warn(LOG, "Plain-text paste failed: %s.", tostring(reason or "clipboard is empty"))
 		return false
 	end
-	local result = Injector.inject(0, text, false, nil, publication)
+	-- Clipboard text can contain private user data and must not enter TRACE.
+	local result = Injector.inject(0, text, true, nil, publication)
 	return type(result) == "table" and result.ok == true
 end
 

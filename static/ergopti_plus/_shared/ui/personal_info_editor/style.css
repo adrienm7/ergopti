@@ -69,6 +69,7 @@ textarea {
 	border: 1px solid var(--theme-grey-ccc);
 	border-radius: 6px;
 	color: var(--theme-label);
+	font-family: inherit;
 	font-size: 14px;
 	outline: none;
 	padding: 7px 10px;

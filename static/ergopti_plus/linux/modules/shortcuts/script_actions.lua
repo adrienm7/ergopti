@@ -41,12 +41,14 @@ function M.new(opts)
 	end
 
 	local paused = false
+	local pause_epoch = 0
 	local controller = {}
 
 	--- Flips the pause state, clears transient automation on the way in, and
 	--- tells the tray so the menu greys or un-greys its feature rows.
 	local function toggle_pause()
 		paused = not paused
+		pause_epoch = pause_epoch + 1
 		if paused then
 			opts.reset()
 			if opts.hide_preview then opts.hide_preview() end
@@ -85,6 +87,10 @@ function M.new(opts)
 	function controller.is_paused()
 		return paused
 	end
+
+	--- Returns the transition counter used to retire actions claimed before a pause.
+	--- @return number epoch
+	function controller.pause_epoch() return pause_epoch end
 
 	--- Whether an action may run now: everything while running, only the
 	--- script-control actions while paused.

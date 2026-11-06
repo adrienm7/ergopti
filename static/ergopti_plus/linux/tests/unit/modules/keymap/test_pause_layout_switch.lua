@@ -124,7 +124,7 @@ helpers.describe("pause layout switch", function()
 		-- infra/quit_request, selected by a declaration unique to it.
 		local handler = helpers.read_driver_unit('local LOG = "infra.quit_request"')
 		helpers.assert_true(handler ~= nil, "the tray quit handler is found")
-		local switched = handler:find("ports.apply_pause_layout()", 1, true)
+		local switched = handler:find("pcall(ports.apply_pause_layout)", 1, true)
 		local requested = handler:find('ports.shutdown.request("tray quit")', 1, true)
 		helpers.assert_true(switched ~= nil and requested ~= nil and switched < requested,
 			"the layout switches before the shutdown starts, and only after the admission")

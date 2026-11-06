@@ -20,15 +20,26 @@ end
 --- @return table options For llm.local_server_menu rows or page_rows.
 local function server_options(llm, dialogs, changed, context)
 	local function admit()
-		return type(context) == "table" and type(context.is_paused) == "function"
-			and context.paused ~= true and context.is_paused() ~= true
-			and type(llm.can_configure_local_servers) == "function" and llm.can_configure_local_servers() == true
+		if type(context) ~= "table" or type(context.is_paused) ~= "function" then return false end
+		local function page_owned()
+			if context.page_current == nil then return true end
+			local ok, current = pcall(context.page_current)
+			return ok and current == true
+		end
+		if not page_owned() or context.paused == true then return false end
+		local paused_ok, paused = pcall(context.is_paused)
+		if not paused_ok or paused ~= false or not page_owned()
+			or type(llm.can_configure_local_servers) ~= "function" then return false end
+		local scope_ok, allowed = pcall(llm.can_configure_local_servers)
+		return scope_ok and allowed == true and page_owned()
 	end
 	local function ai_on()
-		return type(llm.is_enabled) == "function" and llm.is_enabled() == true
+		if type(llm.is_enabled) ~= "function" then return false end
+		local ok, enabled = pcall(llm.is_enabled)
+		return ok and enabled == true
 	end
 	-- The sweep's own fences recheck the switch: one switched off mid-sweep publishes nothing.
-	local function sweep_admit() return admit() and ai_on() end
+	local function sweep_admit() return admit() and ai_on() and admit() end
 	local function redraw() if type(changed) == "function" then changed() end end
 	local function rescan()
 		return Servers.rescan(sweep_admit, function(changed_models) if changed_models then redraw() end end)
@@ -66,7 +77,7 @@ local function server_options(llm, dialogs, changed, context)
 			server.label, server.base_url)
 		local value = dialogs.prompt(I18n.get("menu.llm.local_servers.header"), text,
 			address and target.base_url or "", not address)
-		if value == nil then return false end
+		if value == nil or not admit() then return false end
 		if address and not Remote.normalize_base_url(value) then
 			dialogs.error(format("llm.local_servers.invalid_address", server.base_url), server.label)
 			return false

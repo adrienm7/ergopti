@@ -30,6 +30,78 @@ local Shell = require("adapters.shell_runner")
 
 local ON_WINDOWS = package.config:sub(1, 1) == "\\"
 
+helpers.it("linux-native-directory-nul: rejects paths before native truncation", function()
+	local directory = require("infra.native_directory")
+	for _, name in ipairs({ "stat", "kind", "target_kind", "entries" }) do
+		local value, _, code = directory[name]("/tmp\0/not-the-same-directory")
+		helpers.assert_nil(value, name .. " must not inspect /tmp instead")
+		helpers.assert_eq(code, "EINVAL")
+	end
+end)
+
+helpers.describe("extension manifest native read", function()
+	helpers.it("does not block when the bundled priority policy is a FIFO", function()
+		local uv = require("luv")
+		local path, pack = os.tmpname(), os.tmpname()
+		os.remove(path)
+		assert(Shell.run("mkfifo -- " .. Shell.quote(path)))
+		local file = assert(io.open(pack, "w"))
+		assert(file:write('[probe]\n"pqx" = { output = "owned", auto_expand = true }\n'))
+		assert(file:close())
+		local code = string.format([[package.path = %q
+local loader = require("modules.hotstrings.loader")
+local paths = require("infra.paths")
+local original = paths.shared
+paths.shared = function(name) if name == "modules/hotstrings/priority.json" then return %q end; return original(name) end
+local result = loader.load_catalogue({ %q })
+assert(result.committed and #result.mappings == 1)
+]], package.path, path, pack)
+		local exited, expired, status, signal = false, false, nil, nil
+		local timer = assert(uv.new_timer())
+		local child
+		child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(code, sig)
+			exited, status, signal = true, code, sig
+			uv.timer_stop(timer); uv.close(timer); uv.close(child)
+		end))
+		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+			expired = true; child:kill("sigkill")
+		end))
+		while not exited do uv.run("once") end
+		uv.run("nowait")
+		os.remove(path); os.remove(pack)
+		helpers.assert_eq(expired, false, "catalogue loading must not wait for a FIFO writer")
+		helpers.assert_eq(status, 0)
+		helpers.assert_eq(signal, 0)
+	end)
+	helpers.it("refuses a FIFO manifest without waiting for a writer", function()
+		local uv = require("luv")
+		local path = os.tmpname()
+		os.remove(path)
+		assert(Shell.run("mkfifo -- " .. Shell.quote(path)))
+		local code = string.format([[package.path = %q
+local loader = require("modules.hotstrings.loader")
+local ok = pcall(loader.read_file, %q)
+assert(ok == false, "a FIFO is not an absent manifest")
+]], package.path, path)
+		local exited, expired, status, signal = false, false, nil, nil
+		local timer = assert(uv.new_timer())
+		local child
+		child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(code, sig)
+			exited, status, signal = true, code, sig
+			uv.timer_stop(timer); uv.close(timer); uv.close(child)
+		end))
+		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+			expired = true; child:kill("sigkill")
+		end))
+		while not exited do uv.run("once") end
+		uv.run("nowait")
+		os.remove(path)
+		helpers.assert_eq(expired, false, "manifest discovery must not block on a FIFO")
+		helpers.assert_eq(status, 0)
+		helpers.assert_eq(signal, 0)
+	end)
+end)
+
 --- Every name the walks must classify, relative to the fixture root.
 local FILES = {
 	"a.toml", "_index.toml", "notes.txt", ".hidden.toml", ".toml", "line\nbreak.toml", "trailing .toml",

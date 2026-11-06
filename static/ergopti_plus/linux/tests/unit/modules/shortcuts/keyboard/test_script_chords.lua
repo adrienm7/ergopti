@@ -36,8 +36,9 @@ local PRESETS = {
 --- @return table chords, table log
 local function fresh(source)
 	local log = { deferred = {}, executed = {}, paused = false }
+	local names = { "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.script_chords" }
 	local previous = {}
-	for _, name in ipairs({ "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.script_chords" }) do
+	for _, name in ipairs(names) do
 		previous[name] = package.loaded[name]
 	end
 	local path = os.tmpname()
@@ -64,7 +65,7 @@ local function fresh(source)
 		for _, fn in ipairs(queued) do fn() end
 	end
 	log.restore = function()
-		for name, value in pairs(previous) do package.loaded[name] = value end
+		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 		os.remove(path)
 		os.remove(path .. ".tmp")
 	end
@@ -79,7 +80,56 @@ local function with_chords(source, body)
 	helpers.assert_true(ok, tostring(err))
 end
 
+for _, initial in ipairs({ "absent", "false" }) do
+	helpers.it("script-chord fixture restores " .. initial .. " cached dependencies", function()
+		local names = { "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.script_chords" }
+		local previous = {}
+		for _, name in ipairs(names) do
+			previous[name] = package.loaded[name]
+			if initial == "false" then package.loaded[name] = false else package.loaded[name] = nil end
+		end
+		local ok, detail = pcall(function()
+			local _, log = fresh(nil)
+			log.restore()
+			for _, name in ipairs(names) do
+				if initial == "false" then helpers.assert_eq(package.loaded[name], false, name)
+				else helpers.assert_nil(package.loaded[name], name) end
+			end
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+		if not ok then error(detail, 0) end
+	end)
+end
+
 helpers.describe("Linux script-management chords (script-chords-three-os-2026-09-30)", function()
+	helpers.it("script-chord: refuses an edit when the external switch differs from runtime", function()
+		with_chords(nil, function(Chords, log)
+			helpers.assert_eq(Chords.chords_enabled(), true)
+			local external = "[shortcuts.script_control]\nchords_enabled = false\n"
+			Sandbox.write_bytes(log.path, external)
+			helpers.assert_eq(Chords.set_action("script_altgr_enter", "script_reload"), false)
+			helpers.assert_eq(Sandbox.read_bytes(log.path), external)
+			helpers.assert_eq(Chords.chords_enabled(), true)
+		end)
+	end)
+
+	helpers.it("script-chord: refuses a switch change racing the file write", function()
+		with_chords(nil, function(Chords, log)
+			helpers.assert_eq(Chords.chords_enabled(), true)
+			local Writer = require("toml_codec.writer")
+			local original = Writer.batch_write
+			local external = "[shortcuts.script_control]\nchords_enabled = false\n"
+			local ok, err = pcall(function()
+				Writer.batch_write = function(...) Sandbox.write_bytes(log.path, external); return original(...) end
+				helpers.assert_eq(Chords.set_action("script_altgr_enter", "script_reload"), false)
+				helpers.assert_eq(Sandbox.read_bytes(log.path), external)
+				helpers.assert_eq(Chords.chords_enabled(), true)
+			end)
+			Writer.batch_write = original
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("script-chord: an empty configuration runs the four presets and keeps each chord from the application", function()
 		with_chords(nil, function(Chords, log)
 			helpers.assert_eq(Chords.chords_enabled(), true)
@@ -178,4 +228,29 @@ helpers.describe("Linux script-management chords (script-chords-three-os-2026-09
 				"an outdated action reads as the slot's preset")
 		end)
 	end)
+end)
+
+helpers.describe('script chord after a pause cycle', function()
+  helpers.it('retires non-script action but preserves new presses after resume', function()
+    with_chords('[shortcuts.script_control]\nscript_altgr_delete = "screen_capture"\n', function(chords, log)
+      local script = require('modules.shortcuts.script_actions').new({reset=function() end,reload=function() end,quit=function() end})
+      chords.init({is_paused=script.is_paused,pause_epoch=script.pause_epoch,defer=function(fn) log.deferred[#log.deferred+1]=fn; return true end})
+      assert(chords.on_key({code=KEY_DELETE,mods=ALTGR}))
+      assert(script.toggle_pause()); assert(script.toggle_pause())
+      log.run()
+      helpers.assert_eq(log.executed, {})
+      assert(chords.on_key({code=KEY_DELETE,mods=ALTGR})); log.run()
+      helpers.assert_eq(log.executed, {'screen_capture@script__script_altgr_delete'})
+    end)
+  end)
+  helpers.it('keeps script-control commands available across a pause cycle', function()
+    with_chords(nil, function(chords, log)
+      local script = require('modules.shortcuts.script_actions').new({reset=function() end,reload=function() end,quit=function() end})
+      chords.init({is_paused=script.is_paused,pause_epoch=script.pause_epoch,defer=function(fn) log.deferred[#log.deferred+1]=fn; return true end})
+      assert(chords.on_key({code=KEY_BACKSPACE,mods=ALTGR}))
+      assert(script.toggle_pause()); assert(script.toggle_pause())
+      log.run()
+      helpers.assert_eq(log.executed, {'script_reload@script__script_altgr_backspace'})
+    end)
+  end)
 end)

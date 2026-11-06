@@ -132,6 +132,36 @@
 			"toggle_title": "Straße"
 		},
 		{
+			"id": "final_sigma_after_cased_ordinal",
+			"drivers": ["hs", "linux"],
+			"input": "ªΣ",
+			"upper": "ªΣ",
+			"lower": "ªς",
+			"title": "ªς",
+			"toggle_upper": "ªς",
+			"toggle_title": "ªς"
+		},
+		{
+			"id": "final_sigma_after_cased_ordinal_and_ignorable_mark",
+			"drivers": ["hs", "linux"],
+			"input": "ª́Σ",
+			"upper": "ª́Σ",
+			"lower": "ª́ς",
+			"title": "ª́ς",
+			"toggle_upper": "ª́ς",
+			"toggle_title": "ª́ς"
+		},
+		{
+			"id": "sigma_followed_by_cased_ordinal",
+			"drivers": ["hs", "linux"],
+			"input": "ΑΣª",
+			"upper": "ΑΣª",
+			"lower": "ασª",
+			"title": "Ασª",
+			"toggle_upper": "ασª",
+			"toggle_title": "Ασª"
+		},
+		{
 			"id": "greek_final_sigma",
 			"drivers": ["hs", "linux"],
 			"input": "ΟΔΟΣ ΚΑΙ ΟΣΑ",

@@ -1473,7 +1473,14 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 		return `rgb(${r},${g},${b})`;
 	};
 
-	const grand_total = Object.values(sfb_by_kc).reduce((s, c) => s + c, 0);
+	// A pair between distinct keys appears once for each key, whereas a
+	// self-pair appears once. Recover the number of distinct pair occurrences.
+	const key_total = Object.values(sfb_by_kc).reduce((s, c) => s + c, 0);
+	const self_total = Object.entries(sfb_pairs_by_kc).reduce(
+		(sum, [kc, pairs]) => sum + pairs.reduce((n, p) => n + (p.partner_kc === kc ? p.count : 0), 0),
+		0
+	);
+	const grand_total = (key_total + self_total) / 2;
 	const uid = 'sfbhm_' + Date.now().toString(36);
 
 	const SHORT_LABELS_MAC = {

@@ -38,7 +38,7 @@ local _shared_lua = _linux_root and (_linux_root .. "../_shared/lua") or nil
 if _shared_lua then
 	-- Prepend to package.path only when the entry is not already present.
 	local entry = _shared_lua .. "/?.lua"
-	if not package.path:find(entry, 1, true) then
+	if not package.loaded["infra.literal_module_loader"] and not package.path:find(entry, 1, true) then
 		package.path = entry .. ";" .. package.path
 	end
 end

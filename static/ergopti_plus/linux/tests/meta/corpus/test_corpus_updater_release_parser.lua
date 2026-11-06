@@ -199,6 +199,10 @@ helpers.describe("updater release parser corpus — vector replay", function()
 	end
 
 	-- parse_html_url vectors
+	helpers.it("reads only the release html_url and decodes JSON escapes", function()
+		helpers.assert_eq(P.parse_html_url('{"html_url":null,"author":{"html_url":"https://wrong.example"}}'), "")
+		helpers.assert_eq(P.parse_html_url('{"author":{"html_url":"https://wrong.example"},"html_url":"https:\\/\\/correct.example\\/release"}'), "https://correct.example/release")
+	end)
 	for _, vec in ipairs(by_cat["parse_html_url"] or {}) do
 		helpers.it("parse_html_url: " .. vec.id, function()
 			helpers.assert_eq(dispatch(P, vec), vec.expected,

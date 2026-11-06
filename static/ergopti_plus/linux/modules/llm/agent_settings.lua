@@ -36,6 +36,7 @@ local ConfigOutdated = require("config_outdated")
 local Json = require("json")
 local Vision = require("llm.vision")
 local Agent = require("llm.agent")
+local AppIdentity = require("llm.app_identity")
 local Manifest = require("infra.manifest_reader")
 local ConfigKeys = require("config_keys")
 
@@ -83,6 +84,10 @@ local function number_in(value, min, max)
 	return type(value) == "number" and value == value and value >= min and value <= max
 end
 
+local function integer_in(value, min, max)
+	return number_in(value, min, max) and value % 1 == 0
+end
+
 --- Parses agent.json. Exposed for tests.
 --- @param text string|nil The file's content.
 --- @return table|nil config, string|nil reason
@@ -93,24 +98,59 @@ function M.parse_config(text)
 	if type(root.default_models) ~= "table" then return nil, "agent.json has no default_models" end
 	local s1, s2 = root.system1, root.system2
 	if type(s1) ~= "table" or type(s1.prompt) ~= "string" or s1.prompt == ""
-		or not number_in(s1.pause_ms, 0, 60000) or not number_in(s1.min_chars, 1, 10000)
-		or not number_in(s1.max_tokens, 1, 100000) or not number_in(s1.threshold, 0, 1) then
+		or not number_in(s1.pause_ms, 0, 60000) or not integer_in(s1.min_chars, 1, 10000)
+		or not integer_in(s1.max_tokens, 1, 100000) or not number_in(s1.threshold, 0, 1) then
 		return nil, "agent.json system1 is invalid"
+	end
+	local jev = s1.jev
+	if type(jev) ~= "table" or type(jev.question_id) ~= "string" or jev.question_id == ""
+		or type(jev.instructions) ~= "string" or jev.instructions == "" or type(jev.criteria) ~= "table" then
+		return nil, "agent.json system1 Jev question is invalid"
+	end
+	for _, intent in ipairs(root.intents) do
+		if type(intent) ~= "string" or intent == "" or type(jev.criteria[intent]) ~= "string"
+			or jev.criteria[intent] == "" then return nil, "agent.json system1 Jev criteria are invalid" end
 	end
 	if type(s2) ~= "table" or type(s2.prompt) ~= "string" or s2.prompt == ""
 		or type(s2.tag) ~= "string" or s2.tag == "" or type(s2.user_prefix) ~= "string"
-		or not number_in(s2.max_actions, 1, 100) or not number_in(s2.max_tokens, 1, 100000) then
+		or not integer_in(s2.max_actions, 1, 100) or not integer_in(s2.max_tokens, 1, 100000) then
 		return nil, "agent.json system2 is invalid"
 	end
 	for _, key in ipairs({ "actions", "source_kinds", "learning", "ics" }) do
 		if type(root[key]) ~= "table" then return nil, "agent.json has no " .. key end
+	end
+	for _, source in ipairs({ "selection", "command", "typing" }) do
+		local label = root.source_kinds[source]
+		if type(label) ~= "string" or label == "" then
+			return nil, "agent.json source label is invalid"
+		end
+	end
+	-- The action validator uses these rules as executable schema. Reject a
+	-- broken rule here instead of raising after a model has returned an action.
+	for _, action in ipairs({ "calendar", "reminder", "mail", "shortcut" }) do
+		if type(root.actions[action]) ~= "table" then return nil, "agent.json action schema is invalid" end
+	end
+	for _, schema in pairs(root.actions) do
+		if type(schema) ~= "table" then return nil, "agent.json action schema is invalid" end
+		for name, rule in pairs(schema) do
+			if type(name) ~= "string" or type(rule) ~= "table"
+				or (rule.required ~= nil and type(rule.required) ~= "boolean")
+				or (rule.type ~= "text" and rule.type ~= "datetime" and rule.type ~= "emails" and rule.type ~= "tool")
+				or ((rule.type == "text" or rule.type == "emails") and not integer_in(rule.max, 0, math.huge)) then
+				return nil, "agent.json action field is invalid"
+			end
+		end
+	end
+	local start = root.actions.calendar.start
+	if type(start) ~= "table" or start.type ~= "datetime" or start.required ~= true then
+		return nil, "agent.json calendar start rule is invalid"
 	end
 	local learning = root.learning
 	if not number_in(learning.step, 0, 1) or not number_in(learning.min_threshold, 0, 1)
 		or not number_in(learning.max_threshold, learning.min_threshold, 1) then
 		return nil, "agent.json learning is invalid"
 	end
-	if not number_in(root.default_duration_minutes, 1, 100000) or not number_in(root.max_tools, 0, 1000) then
+	if not number_in(root.default_duration_minutes, 1, 100000) or not integer_in(root.max_tools, 0, 1000) then
 		return nil, "agent.json default_duration_minutes or max_tools is invalid"
 	end
 	if type(root.ics.prodid) ~= "string" or root.ics.prodid == "" then return nil, "agent.json has no ics.prodid" end
@@ -123,9 +163,9 @@ end
 function M.config()
 	if _config then return _config end
 	local path = require("infra.paths").shared(CONFIG_FILE)
-	local fh = path and io.open(path, "r")
-	local text = fh and fh:read("*a") or nil
-	if fh then fh:close() end
+	local text, status
+	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if status ~= "ok" then text = nil end
 	local config, reason = M.parse_config(text)
 	if not config then
 		Logger.error(LOG, "AI agent unavailable: %s.", tostring(reason))
@@ -266,8 +306,10 @@ function M.get_disabled_apps()
 		report_invalid(DISABLED_APPS_PATH)
 		return list
 	end
+	local seen = {}
 	for _, app in ipairs(value) do
-		if type(app) == "string" and app ~= "" then list[#list + 1] = app end
+		local key = AppIdentity.normalize(app)
+		if key and not seen[key] then seen[key] = true; list[#list + 1] = app end
 	end
 	return list
 end
@@ -277,14 +319,21 @@ end
 --- @return boolean saved
 function M.set_disabled_apps(apps)
 	if type(apps) ~= "table" then error("agent_settings.set_disabled_apps: a list is required", 2) end
+	local length, count = #apps, 0
+	for index in pairs(apps) do
+		count = count + 1
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length then return false end
+	end
+	if count ~= length then return false end
 	local list, seen = {}, {}
 	for _, app in ipairs(apps) do
-		if type(app) ~= "string" or app == "" then
-			Logger.error(LOG, "set_disabled_apps(): '%s' is not an application — refused.", tostring(app))
+		local key = AppIdentity.normalize(app)
+		if not key then
+			Logger.error(LOG, "set_disabled_apps(): an application identifier was refused.")
 			return false
 		end
-		if not seen[app] then
-			seen[app] = true
+		if not seen[key] then
+			seen[key] = true
 			list[#list + 1] = app
 		end
 	end
@@ -299,12 +348,14 @@ end
 --- Reports whether the automatic mode ignores an application.
 --- @param app string|nil
 --- @return boolean
+local indexed_owner, disabled_index = setmetatable({}, { __mode = "v" }), nil
 function M.is_app_disabled(app)
-	if type(app) ~= "string" or app == "" then return false end
-	for _, disabled in ipairs(M.get_disabled_apps()) do
-		if disabled == app then return true end
+	local apps = read(DISABLED_APPS_PATH)
+	if type(apps) ~= "table" then report_invalid(DISABLED_APPS_PATH); return false end
+	if apps ~= indexed_owner[1] then
+		indexed_owner[1], disabled_index = apps, AppIdentity.exclusion_index(apps)
 	end
-	return false
+	return AppIdentity.exclusion_contains(disabled_index, app, apps)
 end
 
 --- Captures the cached settings without reading or publishing preferences.

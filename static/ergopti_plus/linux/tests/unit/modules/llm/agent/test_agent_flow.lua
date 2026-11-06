@@ -27,6 +27,15 @@ local ANSWER = 'ACTIONS: [{"type":"calendar","title":"Devis avec Paul","start":"
 local CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions"
 
 helpers.describe("AI agent: missing local model admission", function()
+	helpers.it("accepts optional JSON null fields without accepting invalid null actions", function()
+		Scenario.run({ selection = SELECTION }, function(world)
+			helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
+			world.wait_for(1)
+			world.respond(1, 'ACTIONS: [{"type":"calendar","title":"Meeting","start":"2026-10-01T14:00","location":null,"attendees":null},'
+				.. '{"type":"reminder","title":null},{"type":"calendar","title":"Invalid","start":"2026-10-01T14:00","attendees":[null]}]')
+			helpers.assert_eq(world.offered(), { Scenario.text("llm.agent.label.calendar", { "Meeting", "2026-10-01 14:00" }) })
+		end)
+	end)
 	helpers.it("asks tags before local System 2 and offers the exact model without sending selection text", function()
 		Scenario.run({ local_backend = true, selection = SELECTION,
 			stored = { ["llm.agent_system2"] = "local" }, download_choice = true }, function(world)
@@ -163,6 +172,49 @@ helpers.describe("AI agent: the selection's actions offered and run", function()
 			world.runs[1].callback({ ok = true, code = 0 })
 			helpers.assert_eq(world.notices[1], Scenario.text("llm.agent.done_mail"))
 		end)
+	end)
+
+	helpers.it("does not log private text echoed by a failing provider", function()
+		local previous = package.loaded["logger.shim"]
+		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local lines = {}
+		logger.set_level("trace")
+		logger.set_sink(function(line) lines[#lines + 1] = line end)
+		package.loaded["logger.shim"] = logger
+		local ok, err = pcall(function()
+			Scenario.run({ selection = SELECTION }, function(world)
+				world.handlers.llm_agent_selection("tap_3")
+				world.wait_for(1)
+				world.refuse(1, 400, "private_server_echo_628")
+			end)
+			local log = table.concat(lines, "\n")
+			helpers.assert_nil(log:find("private_server_echo_628", 1, true))
+			helpers.assert_true(log:find("HTTP 400", 1, true) ~= nil, "the status remains diagnosable")
+		end)
+		package.loaded["logger.shim"] = previous
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("does not log arbitrary model-provided action type or field text", function()
+		local previous = package.loaded["logger.shim"]
+		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local lines = {}
+		logger.set_level("trace")
+		logger.set_sink(function(line) lines[#lines + 1] = line end)
+		package.loaded["logger.shim"] = logger
+		local ok, err = pcall(function()
+			Scenario.run({ selection = SELECTION }, function(world)
+				world.handlers.llm_agent_selection("tap_3")
+				world.wait_for(1)
+				world.respond(1, 'ACTIONS: [{"type":"private_type_829"},{"type":"reminder","private_field_493":"x","title":"OK"}]')
+			end)
+			local log = table.concat(lines, "\n")
+			helpers.assert_nil(log:find("private_type_829", 1, true))
+			helpers.assert_nil(log:find("private_field_493", 1, true))
+			helpers.assert_true(log:find("Agent action refused", 1, true) ~= nil, "a generic refusal is still reported")
+		end)
+		package.loaded["logger.shim"] = previous
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("drops the invalid actions and logs why, never offering them", function()

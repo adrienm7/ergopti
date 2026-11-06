@@ -30,6 +30,7 @@ function page(seed, host = 'linux', cryptoAvailable = true) {
 				changelog_bridge: { postMessage: (x) => messages.push(x) },
 				dl_bridge: { postMessage: (x) => messages.push(x) },
 				model_browser_bridge: { postMessage: (x) => messages.push(x) },
+				hsPersonalInfo: { postMessage: (x) => messages.push(x) },
 				token_bridge: { postMessage: (x) => messages.push(x) }
 			}
 		}
@@ -215,6 +216,17 @@ test('network progress rejects successor queued old phase effect', () => {
 		false
 	);
 	assert.equal(b.context.effects, 0);
+});
+test('personal info actions require their actual document challenge', () => {
+	const p = page(1);
+	assert.equal(p.call("makeHostBridge('hsPersonalInfo')({action:'ready'})"), false);
+	const n = p.call("getLinuxDocumentNonce('hsPersonalInfo')");
+	assert.equal(p.call(`initializeLinuxDocumentBridge('hsPersonalInfo',1,'${token}','${n}')`), true);
+	assert.equal(p.call("makeHostBridge('hsPersonalInfo')({action:'save',values:{}})"), false);
+	assert.equal(p.call(`confirmLinuxDocumentBridge('hsPersonalInfo',1,'${token}','${n}')`), true);
+	assert.equal(p.messages[1].payload, 'ready');
+	assert.equal(p.call("makeHostBridge('hsPersonalInfo')({action:'save',values:{}})"), true);
+	assert.equal(p.messages[2].__ergopti_document.page_nonce, n);
 });
 test('model browser requires its nonce ACK before fresh ready and actions', () => {
 	const p = page(1);

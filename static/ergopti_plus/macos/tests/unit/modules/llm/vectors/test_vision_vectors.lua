@@ -56,6 +56,10 @@ end
 helpers.describe("screen reading helpers replay the shared vision corpus", function()
 	local corpus = read_json("tests/corpus/llm/vision_vectors.json")
 	local config = read_json("modules/llm/vision.json")
+	helpers.it("preserves code operators in transcriptions and answers", function()
+		helpers.assert_eq(Vision.extract("**SCREEN:** result = x**2", "SCREEN:"), "result = x**2")
+		helpers.assert_eq(Vision.extract("ANSWER: result = x**2", "ANSWER:"), "result = x**2")
+	end)
 
 	for _, v in ipairs(corpus.parse_vectors) do
 		helpers.it("parse vector '" .. v.id .. "'", function()

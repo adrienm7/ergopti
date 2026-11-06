@@ -93,11 +93,21 @@ helpers.describe("macOS n-gram reads: the shared catalogue", function()
 		reader.read_ngrams("/declared/db.sqlite", "2026-10-01", "2026-10-02", { "Code" })
 		local issued = {}
 		for _, sql in ipairs(statements) do issued[sql] = true end
-		local where = " WHERE date >= '2026-10-01' AND date <= '2026-10-02' AND app IN ('Code')"
+		local where = " WHERE date >= '2026-10-01' AND date <= '2026-10-02' AND app IN ('Code','Unknown')"
 		for _, family in ipairs({ "ngram_chars", "ngram_bigrams", "ngram_trigrams", "ngram_quadgrams",
 			"ngram_pentagrams", "ngram_hexagrams", "ngram_heptagrams", "ngram_words", "ngram_word_bigrams" }) do
 			local sql = Queries.render("ngram.tokens", "native", { table = family, where = where, conjunction = " AND " })
 			helpers.assert_true(issued[sql] == true, family .. " is read through the catalogue")
+		end
+	end)
+
+	helpers.it("keeps the unselectable Unknown bucket in every selected today query", function()
+		local reader, statements = reader_with({})
+		local _, complete = reader.read_today_split("/declared/db.sqlite", "2026-10-02", "2026-10-02", { "Code" }, nil, "2026-10-02")
+		helpers.assert_true(complete)
+		helpers.assert_true(#statements > 0)
+		for _, sql in ipairs(statements) do
+			helpers.assert_true(sql:find("app IN ('Code','Unknown')", 1, true) ~= nil, "selected today query must keep Unknown")
 		end
 	end)
 

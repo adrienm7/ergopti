@@ -79,6 +79,7 @@ install.xdg_autostart=التشغيل التلقائي لـ XDG: {1}
 launch.already_running=يعمل Ergopti+ بالفعل في هذه الجلسة ({1} محجوز)؛ رُفض هذا التشغيل.
 launch.authorization_failed=أُلغي تفويض الوصول إلى الإدخال أو فشل.
 launch.groups_unavailable=تعذّر على الجلسة الحصول على مجموعات الإدخال المكوّنة لها.
+launch.session_lock_invalid=يجب أن يكون مسار مجلد قفل الجلسة مطلقًا.
 launcher.dependencies_installed=تم تثبيت التبعيات.
 launcher.driver_missing=خطأ: لم يُعثر على مجلد مشغّل Linux: {1}
 launcher.install_deps_hint=شغّل: ergopti-hotstrings --install-deps

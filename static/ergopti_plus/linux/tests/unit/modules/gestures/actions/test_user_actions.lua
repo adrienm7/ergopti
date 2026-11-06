@@ -75,7 +75,10 @@ local function with_world(body)
 			return true
 		end }
 		package.loaded["adapters.clipboard"] = { write = function(text) world.clipboard[#world.clipboard + 1] = text; return true end }
-		package.loaded["modules.shortcuts.manager"] = { insert_text = function(text) world.typed[#world.typed + 1] = text; return true end }
+		package.loaded["modules.shortcuts.manager"] = {
+			capture_text_destination = function() return { current = function() return true end, cached = function() return true end } end,
+			insert_text = function(text) world.typed[#world.typed + 1] = text; return true end,
+		}
 		package.loaded["adapters.file_system"] = { exists = function(path) return world.present[path] == true end }
 		package.loaded["adapters.shell_runner"] = {
 			quote = require("text_utils").shell_quote,
@@ -83,6 +86,9 @@ local function with_world(body)
 			run = function(command) world.shell[#world.shell + 1] = command; return true end,
 			run_async = function(executable, args, options, callback)
 				local handle = { executable = executable, args = args, options = options, callback = callback }
+				local listeners = {}
+				function handle.on_settled(callback) listeners[#listeners + 1] = callback; return true end
+				function handle.settle() for _, callback in ipairs(listeners) do callback() end end
 				function handle.cancel() handle.cancelled = true; return true end
 				world.async[#world.async + 1] = handle
 				return handle
@@ -144,6 +150,33 @@ helpers.describe("run_command runs the user's line hidden or in a terminal (Linu
 		end)
 	end)
 
+	helpers.it("does not type asynchronous output into a later focused application", function()
+		with_world(function(User, world)
+			local focused = "original"
+			local manager = package.loaded["modules.shortcuts.manager"]
+			manager.capture_text_destination = function()
+				local captured = focused
+				return { current = function() return focused == captured end, cached = function() return focused == captured end }
+			end
+			manager.insert_text = function(text, publication)
+				if publication == nil or publication.current() then world.typed[#world.typed + 1] = text; return true end
+				return false
+			end
+			helpers.assert_true(User.run_command({ command = "echo test", mode = "hidden", output = "type" }, 500))
+			focused = "another application"
+			world.async[1].callback({ ok = true, stdout = "private result" })
+			helpers.assert_eq(world.typed, {})
+		end)
+	end)
+
+	helpers.it("does not start a typed-output command without an admitted destination", function()
+		with_world(function(User, world)
+			package.loaded["modules.shortcuts.manager"].capture_text_destination = function() return nil end
+			helpers.assert_eq(User.run_command({ command = "echo test", mode = "hidden", output = "type" }, 500), false)
+			helpers.assert_eq(#world.async, 0)
+		end)
+	end)
+
 	helpers.it("pausing stops the hidden commands and refuses new ones (user-actions)", function()
 		with_world(function(User, world)
 			User.run_command({ command = "sleep 99", mode = "hidden", output = "none" }, 500)
@@ -155,6 +188,40 @@ helpers.describe("run_command runs the user's line hidden or in a terminal (Linu
 			helpers.assert_eq(#world.async, 1)
 			User.set_paused(false)
 			helpers.assert_eq(User.run_command({ command = "true", mode = "hidden", output = "none" }, 500), true)
+		end)
+	end)
+
+	helpers.it("retains a cancelled child until native settlement", function()
+		with_world(function(User, world)
+			User.run_command({ command = "sleep 99", mode = "hidden", output = "none" }, 500)
+			local handle = world.async[1]
+			handle.cancel = function() return false end
+			local notifications = 0
+			helpers.assert_true(User.when_settled(function() notifications = notifications + 1 end))
+			helpers.assert_eq(User.stop(), false)
+			helpers.assert_eq(notifications, 0)
+			helpers.assert_eq(User.busy(), true)
+			helpers.assert_eq(User.stop(), false)
+			handle.settle()
+			helpers.assert_eq(notifications, 1)
+			helpers.assert_eq(User.busy(), false)
+			helpers.assert_eq(User.stop(), true)
+		end)
+	end)
+
+	helpers.it("retains refused command cleanup until native settlement (user-actions)", function()
+		with_world(function(User)
+			local settled
+			local debt = { cancel = function() return false end,
+				on_settled = function(listener) settled = listener; return true end }
+			package.loaded["adapters.shell_runner"].run_async = function()
+				return nil, "pipe activation failed", debt
+			end
+			helpers.assert_eq(User.run_command({ command = "sleep 99", mode = "hidden", output = "none" }, 500), false)
+			helpers.assert_true(User.busy(), "a refused live child remains owned")
+			helpers.assert_eq(User.set_paused(true), false)
+			settled()
+			helpers.assert_true(not User.busy())
 		end)
 	end)
 
@@ -278,4 +345,35 @@ helpers.describe("ShellRunner.run_async takes a caller's output bound (Linux)", 
 		helpers.assert_eq(handle, nil)
 		helpers.assert_eq(refusal, "max_output_bytes must be a positive integer")
 	end)
+end)
+
+helpers.describe("private user-action notification fallback", function()
+	for _, mode in ipairs({ "unavailable", "refused" }) do
+		helpers.it("does not log command stderr when notifier is " .. mode, function()
+			local names = { "logger.shim", "infra.i18n", "adapters.shell_runner", "adapters.notifier",
+				"adapters.application_notifier", "modules.gestures.user_actions" }
+			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local logs = {}
+			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
+			package.loaded["logger.shim"] = logger
+			package.loaded["infra.i18n"] = { get = function() return "Command failed: {1}: {2}" end }
+			package.loaded["adapters.shell_runner"] = {
+				has_command = function() return mode ~= "unavailable" end,
+				quote = function(value) return "'" .. value .. "'" end,
+				run = function() return false end,
+			}
+			package.loaded["adapters.notifier"] = nil
+			package.loaded["adapters.application_notifier"] = nil
+			package.loaded["modules.gestures.user_actions"] = nil
+			local ok, err = xpcall(function()
+				local user = require("modules.gestures.user_actions")
+				user.notify("user_actions.command_failed_detail", 6, "secretmarker")
+				helpers.assert_true(not table.concat(logs, "\n"):find("secretmarker", 1, true),
+					"the command's stderr must not be copied into logs")
+			end, debug.traceback)
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			if not ok then error(err, 0) end
+		end)
+	end
 end)

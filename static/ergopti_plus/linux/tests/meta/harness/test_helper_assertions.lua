@@ -142,3 +142,29 @@ helpers.describe("helper assertions (smoke)", function()
   end)
 
 end)
+
+helpers.describe("fresh module failure isolation", function()
+  for _, cached in ipairs({ false, true }) do
+    helpers.it("failed dependency load restores target cache: " .. tostring(cached), function()
+      local name, dependency = "fixture.failing_target", "fixture.failing_dependency"
+      local old_module, old_preload = package.loaded[name], package.preload[name]
+      local old_dependency, old_dep_preload = package.loaded[dependency], package.preload[dependency]
+      local previous = cached and { marker = true } or nil
+      package.loaded[name] = previous
+      package.preload[name] = function() return require(dependency) end
+      local ok, failure = pcall(function()
+        helpers.assert_throws(function()
+          helpers.load_module_with_dependency(name, dependency, false)
+        end)
+        helpers.assert_eq(package.loaded[name], previous, "a failed require must not leave LuaJIT's sentinel")
+        if not cached then
+          package.preload[dependency] = function() return { recovered = true } end
+          helpers.assert_true(require(name).recovered, "a later healthy load must work")
+        end
+      end)
+      package.loaded[name], package.preload[name] = old_module, old_preload
+      package.loaded[dependency], package.preload[dependency] = old_dependency, old_dep_preload
+      if not ok then error(failure, 0) end
+    end)
+  end
+end)

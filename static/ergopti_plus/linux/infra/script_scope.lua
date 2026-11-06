@@ -8,8 +8,12 @@ local Transaction = require("config_scope_transaction")
 local Fenced = require("config_scope_fenced_transaction")
 local Logger = require("logger.shim")
 local ConfigKeys = require("config_keys")
-local _owner, _sequence = nil, 0
-require("infra.scope_registry").register("script_scope", function() return _owner ~= nil and _owner.pending() == true end)
+local _owner, _edit_owners, _sequence = nil, {}, 0
+require("infra.scope_registry").register("script_scope", function()
+	if _owner ~= nil and _owner.pending() == true then return true end
+	for _, owner in pairs(_edit_owners) do if owner.pending() == true then return true end end
+	return false
+end)
 
 --- Native storage alias of each directly declared script row.
 local ALIAS_NAMES = {
@@ -84,12 +88,14 @@ end
 function M.new(options)
 	assert(type(options) == "table" and type(options.is_paused) == "function", "script scope requires its pause owner")
 	local transaction
-	local token = { pending = function() return transaction ~= nil and transaction.pending() end }
+	local token = { pending = function() return transaction ~= nil and transaction.pending() end, edit_key = options.edit_key }
 	local runtime = Runtime.new({ manifest = Manifest, platform = "linux", aliases = options.aliases or aliases(),
 		storage = options.storage or require("adapters.storage"), token = token, files = options.files,
-		storage_backup_path = function() return options.storage_backup_path end })
+		only = options.only, allow_invalid_source = options.allow_invalid_source, storage_backup_path = function() return options.storage_backup_path end })
 	transaction = Transaction.new({ path = options.path, backup_path = options.backup_path, files = options.files,
 		manifest = runtime.manifest,
+		prepare_batch = options.prepare_batch, preserve_unchanged = options.preserve_unchanged,
+		validate_update = options.validate_update, allow_boolean = options.allow_boolean,
 		capture = function(source, _, updates) return runtime.capture(updates, source) end,
 		apply = runtime.apply, restore = runtime.restore })
 	local owner
@@ -104,6 +110,57 @@ function M.new(options)
 	end
 	return owner
 end
+
+--- Settles an earlier native inverse before admitting another edit.
+--- @param key string Canonical script row.
+--- @return boolean settled
+function M.retry_edit(key)
+	local owner = _edit_owners[key]
+	return not owner or not owner.pending() or owner.retry_restore() == true
+end
+
+function M.retry_locale() return M.retry_edit(ConfigKeys.KEY.SCRIPT_LOCALE) end
+
+--- Atomically changes one native alias and any already configured source row.
+--- @param key string Canonical script row.
+--- @param value any Native value admitted by the field owner.
+--- @return boolean committed
+function M.edit_setting(key, value)
+	local alias, native_name = ALIAS_NAMES[key], NATIVE_OWNERS[key]
+	if not alias or not native_name or not M.retry_edit(key) then return false end
+	local previous = _edit_owners[key]
+	if previous and previous.release() ~= true then return false end
+	_sequence = _sequence + 1
+	local path = require("infra.config_paths").config("config.toml")
+	local timestamp = os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence
+	local backup = path .. ".edit-" .. timestamp .. ".bak"
+	local field = assert(key:match("^script%.([%w_]+)$"))
+	local function prepare(target, updates, files)
+		local Writer, Codec = require("toml_codec.writer"), require("toml_codec")
+		local content, status, detail = Writer.read_classified(target, files)
+		if status ~= "ok" and status ~= "absent" then return false, detail end
+		local source = { status = status, content = status == "ok" and content or nil }
+		local decoded = Codec.decode(content or "")
+		if type(decoded) ~= "table" then return false, "config.toml is not valid TOML" end
+		local script = decoded.script
+		if script ~= nil and type(script) ~= "table" then return false, "script configuration is not a table" end
+		return Writer.prepare_batch(target, script and script[field] ~= nil and updates or {}, files, source)
+	end
+	local owner = M.new({ path = path, backup_path = backup,
+		storage_backup_path = require("infra.config_paths").default_config_dir() .. "/storage.edit-" .. timestamp .. ".bak",
+		files = require("adapters.file_system"), is_paused = function() return false end, allow_invalid_source = true, edit_key = key, allow_boolean = key == ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG,
+		aliases = { [key] = { alias = alias, native = require(native_name) } }, only = { [key] = true },
+		prepare_batch = prepare, preserve_unchanged = true,
+		validate_update = function(scope, row)
+			return scope == "global" and row.section == "script" and row.key == field
+		end })
+	_edit_owners[key] = owner
+	local committed = owner.apply_updates({ { section = "script", key = field, value = value } })
+	if committed ~= true then return false end
+	return owner.release() == true
+end
+
+function M.edit_locale(value) return M.edit_setting(ConfigKeys.KEY.SCRIPT_LOCALE, value) end
 
 --- Applies requested script rows, retaining its exact native/file inverse.
 --- @param mode string Recommended or clear.

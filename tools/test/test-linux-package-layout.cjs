@@ -410,7 +410,7 @@ for (const line of installSrc.split('\n')) {
 // so a normal systemd install launched two daemons racing for one evdev grab.
 
 const startupOwner = 'STARTUP_OWNER="systemd"';
-const autostartWrite = 'cat > "${AUTOSTART_FILE}" << AUTOSTART';
+const autostartWrite = 'mv -f -- "$AUTOSTART_TMP" "$AUTOSTART_FILE"';
 const autostartRetire = 'rm -f -- "${AUTOSTART_FILE}"';
 if (installSrc.split(startupOwner).length - 1 !== 2) {
 	errors.push(
@@ -429,9 +429,13 @@ if (installSrc.split(autostartWrite).length - 1 !== 1) {
 	);
 }
 const xdgGuard = 'if [ "${STARTUP_OWNER}" = "xdg" ]; then';
+const xdgStart = installSrc.indexOf(xdgGuard);
+const xdgEnd = installSrc.indexOf('\n\tfi\nfi', xdgStart);
+const xdgBranch = xdgStart < 0 || xdgEnd < 0 ? '' : installSrc.slice(xdgStart, xdgEnd);
 if (
-	!installSrc.includes(xdgGuard) ||
-	installSrc.indexOf(xdgGuard) > installSrc.indexOf(autostartWrite)
+	!xdgBranch.includes('write_autostart_entry > "$AUTOSTART_TMP"') ||
+	!xdgBranch.includes(autostartWrite) ||
+	xdgBranch.indexOf('write_autostart_entry > "$AUTOSTART_TMP"') > xdgBranch.indexOf(autostartWrite)
 ) {
 	errors.push(`${INSTALL_SH}: the XDG writer must be inside the explicit xdg-owner branch.`);
 }
@@ -640,13 +644,38 @@ if (!tarLine) {
 	}
 }
 
-if (!new RegExp(`sha256sum "${ASSET}" > "${ASSET}\\.sha256"`).test(workflowSrc)) {
+if (!new RegExp(`sha256sum (?:-- )?"${ASSET}" > "${ASSET}\\.sha256"`).test(workflowSrc)) {
 	errors.push(
 		`${WORKFLOW}: the canonical Linux bundle must publish a filename-bound SHA-256 record.`
 	);
 }
-if (!new RegExp(`sha256sum --check "${ASSET}\\.sha256"`).test(workflowSrc)) {
+if (!new RegExp(`sha256sum --check (?:-- )?"${ASSET}\\.sha256"`).test(workflowSrc)) {
 	errors.push(`${WORKFLOW}: CI must verify the generated Linux bundle checksum before upload.`);
+}
+// The checksum must describe the staged basename, pass verification before
+// either artifact is published, and the CI builder must run before upload.
+if (viaBuilder) {
+	const checksumStage =
+		'(cd "$STAGE" && sha256sum -- "$ASSET" > "$ASSET.sha256" && sha256sum --check -- "$ASSET.sha256")';
+	const publishArchive = 'mv -T -- "$STAGE/$ASSET" "$BUILD_DIR/$ASSET"';
+	const publishChecksum = 'mv -T -- "$STAGE/$ASSET.sha256" "$BUILD_DIR/$ASSET.sha256"';
+	const checksumIndex = workflowSrc.indexOf(checksumStage);
+	const archiveIndex = workflowSrc.indexOf(publishArchive);
+	const checksumPublishIndex = workflowSrc.indexOf(publishChecksum);
+	const builderIndex = packageLinux.body.indexOf(`bash ${ARCHIVE_BUILDER} "$LINUX_BUNDLE_ASSET"`);
+	const uploadIndex = packageLinux.body.indexOf('name: assets-linux');
+	if (
+		checksumIndex < 0 ||
+		archiveIndex <= checksumIndex ||
+		checksumPublishIndex <= archiveIndex ||
+		builderIndex < 0 ||
+		uploadIndex <= builderIndex ||
+		!packageLinux.body.includes('build/linux/${{ env.LINUX_BUNDLE_ASSET }}.sha256')
+	) {
+		errors.push(
+			`${WORKFLOW}: verify the staged checksum before publishing and uploading both artifacts.`
+		);
+	}
 }
 // The release tarball carries the private runtime install.sh installs with the
 // driver (owned runtimes, PIN): the source install runs no host LuaJIT or curl.

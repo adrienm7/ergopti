@@ -21,6 +21,9 @@
 local M = {}
 
 local NativeTimer = require("infra.native_timer")
+local Logger = require("logger.shim")
+local LOG = "adapters.tcp_probe"
+local function diagnostic(message) pcall(Logger.error, LOG, message) end
 
 --- Starts one probe.
 --- @param host string Host name or address (brackets already removed).
@@ -30,39 +33,78 @@ local NativeTimer = require("infra.native_timer")
 --- @param luv table|nil Native backend (tests pass the real one explicitly).
 --- @return table|nil child { cancel, is_settled, on_settled }, string|nil err
 function M.probe(host, port, timeout_ms, callback, luv)
-	if type(host) ~= "string" or host == "" or type(port) ~= "number" or port < 1 or port > 65535
+	if type(host) ~= "string" or host == "" or host:find("\0", 1, true) or type(port) ~= "number" or port < 1 or port > 65535
 		or port % 1 ~= 0 or type(timeout_ms) ~= "number" or timeout_ms <= 0 or type(callback) ~= "function" then
 		return nil, "tcp probe arguments are invalid"
 	end
 	luv = luv or require("luv")
-	local answered, cancelled, settled = false, false, false
+	local answered, cancelled, settled, closing_batch = false, false, false, false
 	local open_handles, resolving, listeners = 0, false, {}
-	local timer, tcp, request
+	local retiring = {}
+	local timer, tcp, request, result
 
 	local function settle()
-		if settled or not answered or resolving or open_handles > 0 then return end
+		if settled or not answered or resolving or closing_batch or open_handles > 0 then return end
 		settled = true
 		local pending = listeners
 		listeners = {}
-		for _, listener in ipairs(pending) do listener() end
+		-- A successor may replace this child as soon as it receives the answer.
+		-- Publish only after the resolver and both exact handles have retired.
+		if not cancelled then
+			local ok = pcall(callback, result.reachable, result.reason)
+			if not ok then diagnostic("TCP probe completion callback raised.") end
+		end
+		for _, listener in ipairs(pending) do
+			local ok = pcall(listener)
+			if not ok then diagnostic("TCP probe settlement callback raised.") end
+		end
 	end
 
 	local function close(handle)
-		if handle == nil or handle:is_closing() then return end
-		open_handles = open_handles + 1
-		handle:close(function()
+		if handle == nil then return end
+		local entry = retiring[handle]
+		if not entry then
+			entry = { closing = false, closed = false }
+			retiring[handle] = entry
+			open_handles = open_handles + 1
+		end
+		if entry.closed or entry.closing then return end
+		local inspected, closing = pcall(handle.is_closing, handle)
+		if not inspected then
+			diagnostic("TCP probe handle inspection failed; retirement remains pending.")
+			return
+		end
+		if closing ~= false then
+			if closing ~= true then diagnostic("TCP probe handle inspection was inconclusive.") end
+			return
+		end
+		entry.closing = true
+		local called, ack, detail = pcall(handle.close, handle, function()
+			if entry.closed then return end
+			entry.closed = true
+			retiring[handle] = nil
 			open_handles = open_handles - 1
 			settle()
 		end)
+		if not entry.closed and (not called or ack == false or detail ~= nil) then
+			diagnostic("TCP probe handle close was refused; retirement remains pending.")
+			local observed, scheduled = pcall(handle.is_closing, handle)
+			-- A close that may already be scheduled is never issued twice.
+			if observed and scheduled == false then entry.closing = false end
+		end
 	end
 
 	local function answer(reachable, reason)
 		if answered then return end
 		answered = true
+		result = { reachable = reachable, reason = reason }
 		if resolving and request then pcall(luv.cancel, request) end
+		-- A callback may run synchronously in a native adapter: account for the
+		-- entire batch before allowing either close to settle the operation.
+		closing_batch = true
 		close(timer)
 		close(tcp)
-		if not cancelled then callback(reachable, reason) end
+		closing_batch = false
 		settle()
 	end
 
@@ -77,14 +119,34 @@ function M.probe(host, port, timeout_ms, callback, luv)
 	request = luv.getaddrinfo(host, tostring(port), { socktype = "stream" }, function(err, addresses)
 		resolving = false
 		if answered then settle(); return end
-		local first = type(addresses) == "table" and addresses[1] or nil
-		if err or not first then answer(false, "resolve"); return end
-		tcp = luv.new_tcp()
-		if not tcp then answer(false, "connect"); return end
-		local started = tcp:connect(first.addr, first.port, function(connect_error)
-			answer(connect_error == nil, connect_error and "connect" or nil)
-		end)
-		if not started then answer(false, "connect") end
+		if err or type(addresses) ~= "table" or not addresses[1] then answer(false, "resolve"); return end
+		local index = 0
+		local function try_next()
+			if answered then return end
+			index = index + 1
+			local address = addresses[index]
+			if not address then answer(false, "connect"); return end
+			tcp = luv.new_tcp()
+			if not tcp then answer(false, "connect"); return end
+			local candidate = tcp
+			-- luv's getaddrinfo result exposes the numeric address but omits
+			-- sin6_scope_id. Retain the originating literal's interface zone.
+			local zone = host:match("^[%x:%.]+(%%[%w_.%-]+)$")
+			local destination = address.addr
+			if zone and address.family == "inet6" and type(destination) == "string"
+				and not destination:find("%", 1, true) then destination = destination .. zone end
+			local function failed()
+				close(candidate)
+				if tcp == candidate then tcp = nil end
+				try_next()
+			end
+			local started = candidate:connect(destination, address.port, function(connect_error)
+				if answered then return end
+				if connect_error then failed() else answer(true) end
+			end)
+			if not started then failed() end
+		end
+		try_next()
 	end)
 	if not request then
 		resolving = false
@@ -94,13 +156,22 @@ function M.probe(host, port, timeout_ms, callback, luv)
 	local child = {}
 	function child.cancel()
 		cancelled = true
-		answer(false, "cancelled")
+		if not answered then answer(false, "cancelled")
+		else
+			closing_batch = true
+			for handle in pairs(retiring) do close(handle) end
+			closing_batch = false
+			settle()
+		end
 		return true
 	end
 	function child.is_settled() return settled end
 	function child.on_settled(listener)
 		if type(listener) ~= "function" then return false end
-		if settled then listener() else listeners[#listeners + 1] = listener end
+		if settled then
+			local ok = pcall(listener)
+			if not ok then diagnostic("TCP probe settlement callback raised.") end
+		else listeners[#listeners + 1] = listener end
 		return true
 	end
 	return child, nil
@@ -111,13 +182,24 @@ end
 --- @return string|nil host, integer|nil port
 function M.relay_address(relay)
 	if type(relay) ~= "string" then return nil, nil end
-	local authority = relay:match("^%l[%l%d]*://([^/]+)$")
+	-- Policy and curl both use the URL authority, independently of its suffix.
+	local scheme, authority = relay:match("^(%a[%w+%.%-]*)://([^/?#]+)")
 	if not authority then return nil, nil end
+	scheme = scheme:lower()
 	authority = authority:gsub("^.*@", "")
-	local host, port = authority:match("^%[([%x:]+)%]:(%d+)$")
+	-- IPv4-mapped IPv6 addresses may contain a dotted decimal suffix.
+	local host, port = authority:match("^%[([^%]]+)%]:(%d+)$")
 	if not host then host, port = authority:match("^([^:]+):(%d+)$") end
+	if not host then
+		host = authority:match("^%[([^%]]+)%]$") or authority:match("^([^:%[%]]+)$")
+		if host then port = scheme == "https" and 443 or 1080 end -- libcurl proxy defaults.
+	end
 	port = tonumber(port)
 	if not host or not port or port < 1 or port > 65535 then return nil, nil end
+	-- Curl resolves percent-encoded hostname bytes before connecting; the
+	-- reachability probe must contact that same host, including IPv6 zones.
+	host = host:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end)
+	if host:find("\0", 1, true) then return nil, nil end
 	return host, port
 end
 

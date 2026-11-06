@@ -31,6 +31,44 @@ local SPEC = Policy.validate(Json.decode(read(shared .. "/modules/control/driver
 local TOKEN = Json.decode(read(shared .. "/tests/corpus/control/driver_control.json")).token
 local FOLDER = "/run/user/1000/" .. APP_FOLDER .. "/control"
 
+if require("tests.win_compat").is_windows() then
+	helpers.it("SKIP [CONF-LINUX-RELOAD-CLI] — a Windows host lacks Linux flock, SIGUSR1 and procfs descriptors", function()
+		helpers.assert_eq(package.config:sub(1, 1), "\\")
+	end)
+else
+helpers.it("(linux-reload-cli-overlap) a second client cannot overwrite a pending request", function()
+	local quote = require("text_utils").shell_quote
+	local driver = helpers.driver_root()
+	local fixture = driver .. "/tests/fixtures/reload_cli_overlap.sh"
+	local tool = driver .. "/../../../tools/control/request_driver_reload.sh"
+	local status = os.execute("sh " .. quote(fixture) .. " " .. quote(tool))
+	helpers.assert_true(status == true or status == 0, "concurrent real CLI requests must retain the first request and refuse the second")
+end)
+
+helpers.it("(linux-reload-cli-lock-types) refuses FIFO, symlink and directory locks without blocking", function()
+	local quote = require("text_utils").shell_quote
+	local driver = helpers.driver_root()
+	local fixture = driver .. "/tests/fixtures/reload_cli_lock_types.sh"
+	local tool = driver .. "/../../../tools/control/request_driver_reload.sh"
+	local status = os.execute("sh " .. quote(fixture) .. " " .. quote(tool))
+	helpers.assert_true(status == true or status == 0, "invalid lock objects must be refused without changing them")
+end)
+
+helpers.it("(linux-reload-cli-decimal) accepts leading zeroes and refuses overflow before publication", function()
+	local quote = require("text_utils").shell_quote
+	local driver = helpers.driver_root()
+	local fixture = driver .. "/tests/fixtures/reload_cli_decimal.sh"
+	local tool = driver .. "/../../../tools/control/request_driver_reload.sh"
+	for _, shell in ipairs({ "sh", "dash", "bash" }) do
+		local available = os.execute("command -v " .. quote(shell) .. " >/dev/null 2>&1")
+		if available == true or available == 0 then
+			local status = os.execute("sh " .. quote(fixture) .. " " .. quote(tool) .. " " .. quote(shell))
+			helpers.assert_true(status == true or status == 0, shell .. " must accept decimal timeouts and reject overflow before signalling")
+		end
+	end
+end)
+end
+
 --- A session over in-memory files.
 local NOW = 1700000000
 
@@ -63,6 +101,31 @@ local function request(files, token, id)
 end
 
 helpers.describe("Linux local driver control", function()
+	helpers.it("linux-control-session-read: retains unreadable session ownership until retry", function()
+		local session, files = world(function() return true end)
+		session:start()
+		local path = FOLDER .. "/session.json"
+		local original = files[path]
+		session.ports.read_status = function() return nil, "error", "controlled EIO" end
+		helpers.assert_eq(session:stop(), false, "an unreadable session is not proven absent")
+		helpers.assert_eq(files[path], original)
+		session.ports.read_status = function(target) return files[target], "ok" end
+		helpers.assert_eq(session:stop(), true)
+		helpers.assert_nil(files[path])
+	end)
+	for _, mode in ipairs({ "write", "rename" }) do
+		helpers.it("linux-control-reload-receipt: refuses restart when requested record cannot " .. mode, function()
+			local session, files, calls = world(function() return true end)
+			session:start()
+			local original = session.ports[mode]
+			session.ports[mode] = function(...) return false end
+			request(files, TOKEN, "receipt-failure")
+			local handled = session:handle()
+			session.ports[mode] = original
+			helpers.assert_eq(handled, false)
+			helpers.assert_eq(#calls, 0, "a successor cannot claim a requested result that was not published")
+		end)
+	end
 	helpers.it("publishes its session and writes a pending record for an authenticated reload", function()
 		local session, files, calls = world(function() return true end)
 		session:start()

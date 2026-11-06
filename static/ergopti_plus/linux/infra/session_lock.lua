@@ -48,6 +48,20 @@ local function ffi_c()
 	return ffi
 end
 
+--- Resolves the same absolute lock base as the launcher.
+--- @return string|nil root
+--- @return string|nil error_message
+local function lock_root()
+	local root = os.getenv("XDG_RUNTIME_DIR")
+	if root == nil or root == "" then
+		local home = require("infra.config_paths").account_home()
+		if home == nil then return nil, "Neither XDG_RUNTIME_DIR nor an absolute HOME is set; no session lock folder." end
+		root = home .. FALLBACK_ROOT
+	end
+	if root:sub(1, 1) ~= "/" then return nil, "The session lock root must be absolute." end
+	return root
+end
+
 --- Restricts the inherited launcher lock to the daemon's own process lifetime.
 --- Direct CLI runs have no launcher marker and need no inherited lock.
 --- @return boolean protected
@@ -63,6 +77,22 @@ function M.protect()
 	if ffi.C.fcntl(LOCK_FD, F_SETFD, ffi.new("int", bit.bor(flags, FD_CLOEXEC))) < 0 then
 		return false, "The inherited session lock could not be restricted to the daemon."
 	end
+	-- A marker alone does not prove fd 9 is the launcher's lock. Bind the
+	-- inherited description to the canonical inode and take the same flock;
+	-- an unrelated inherited descriptor must not bypass the singleton.
+	local root, reason = lock_root()
+	if not root then return false, reason end
+	local uv = require("luv")
+	local held = uv.fs_fstat(LOCK_FD)
+	local expected = uv.fs_stat(root .. "/" .. LOCK_FOLDER .. "/" .. LOCK_NAME)
+	if not held or not expected or held.type ~= "file" or expected.type ~= "file"
+		or type(held.dev) ~= "number" or type(held.ino) ~= "number"
+		or held.dev ~= expected.dev or held.ino ~= expected.ino then
+		return false, "The inherited session lock descriptor does not match the lock file."
+	end
+	if ffi.C.flock(LOCK_FD, bit.bor(LOCK_EX, LOCK_NB)) ~= 0 then
+		return false, "The inherited session lock could not be verified."
+	end
 	-- External children must not inherit a marker for the descriptor exec closes.
 	if ffi.C.unsetenv(MARKER) ~= 0 then return false, "The session lock marker could not be cleared." end
 	_inherited = true
@@ -76,14 +106,8 @@ end
 --- @return boolean|nil contended True when another instance holds the lock.
 function M.acquire()
 	if _inherited or _held_fd then return true end
-	local root = os.getenv("XDG_RUNTIME_DIR")
-	if root == nil or root == "" then
-		-- The account home, never home()'s temporary fallback: a lock under /tmp
-		-- would not be the file launch.sh takes, so two instances could both run.
-		local home = require("infra.config_paths").account_home()
-		if home == nil then return false, "Neither XDG_RUNTIME_DIR nor an absolute HOME is set; no session lock folder." end
-		root = home .. FALLBACK_ROOT
-	end
+	local root, reason = lock_root()
+	if not root then return false, reason end
 	local ffi = ffi_c()
 	local folder = root .. "/" .. LOCK_FOLDER
 	-- The runtime or cache root may not exist yet on a fresh account.

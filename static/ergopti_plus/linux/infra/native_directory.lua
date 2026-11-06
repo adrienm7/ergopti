@@ -45,6 +45,10 @@ local READDIR_BATCH = 64
 --- libuv entry and stat types this module names; any other one is "other".
 local KINDS = { file = "file", directory = "directory", link = "link" }
 
+local function valid_path(path)
+	return type(path) == "string" and path ~= "" and not path:find("\0", 1, true)
+end
+
 local Native = (function()
 	local ok, uv = pcall(require, "luv")
 	if not ok or type(uv) ~= "table" then return nil end
@@ -93,6 +97,7 @@ end
 --- @return string|nil message libuv's refusal.
 --- @return string|nil code libuv's error code (e.g. "ENOENT").
 function M.stat(path)
+	if not valid_path(path) then return nil, "invalid native directory path", "EINVAL" end
 	local stat, message, code = native().lstat(path)
 	if type(stat) ~= "table" then return nil, message, code end
 	local mtime, modified = stat.mtime, nil
@@ -132,6 +137,7 @@ end
 --- @return string|nil message libuv's refusal (a dangling link is ENOENT).
 --- @return string|nil code libuv's error code (e.g. "ENOENT").
 function M.target_kind(path)
+	if not valid_path(path) then return nil, "invalid native directory path", "EINVAL" end
 	local stat, message, code = native().stat(path)
 	if type(stat) ~= "table" then return nil, message, code end
 	return KINDS[stat.type] or "other"
@@ -144,6 +150,7 @@ end
 --- @return string|nil message libuv's refusal.
 --- @return string|nil code libuv's error code.
 function M.entries(path)
+	if not valid_path(path) then return nil, "invalid native directory path", "EINVAL" end
 	local backend = native()
 	local dir, open_message, open_code = backend.opendir(path, nil, READDIR_BATCH)
 	if dir == nil then return nil, open_message, open_code end

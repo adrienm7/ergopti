@@ -130,7 +130,7 @@ function M.get_config_dir()
 		return M.default_config_dir()
 	end
 	local configured = Storage.get(CONFIG_DIR_STORAGE_KEY, nil)
-	if type(configured) ~= "string" or configured:sub(1, 1) ~= "/" then
+	if type(configured) ~= "string" or configured:sub(1, 1) ~= "/" or configured:find("\0", 1, true) then
 		return M.default_config_dir()
 	end
 	if configured:match("^/+$") then return "/" end
@@ -277,13 +277,14 @@ end
 --- @return string|nil error_message
 function M.normalize_logs_dir(path)
 	if type(path) ~= "string" then return nil, "the logs folder must be a string" end
-	local normalized = path:gsub("/+$", "")
-	if normalized == "" then return "" end
+	if path:find("\0", 1, true) then return nil, "the logs folder must not contain NUL" end
+	if path == "" then return "" end
+	local normalized = path:match("^/+$") and "/" or path:gsub("/+$", "")
 	if normalized:sub(1, 1) ~= "/" then
 		return nil, "the logs folder must be an absolute path"
 	end
 	if normalized ~= M.default_logs_dir() and NativePath.basename(normalized) ~= AppDirs.linux.folder_name then
-		normalized = normalized .. "/" .. AppDirs.linux.folder_name
+		normalized = child_directory(normalized, AppDirs.linux.folder_name)
 	end
 	return normalized
 end

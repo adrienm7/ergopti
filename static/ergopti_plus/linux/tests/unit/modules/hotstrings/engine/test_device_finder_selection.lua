@@ -158,6 +158,53 @@ end)
 
 helpers.describe("device_finder: synthetic devices are excluded", function()
 
+	helpers.it("keeps a physical keyboard whose name contains a synthetic-device word", function()
+		local Finder = require("modules.hotstrings.device_finder")
+		local descriptor = block({ name = "Acme Virtual Keyboard", sysfs = "/devices/pci0000:00/usb1/input/input31",
+			ev = "120013", handlers = "sysrq kbd event31" })
+		local devices = Finder.parse_devices(descriptor)
+		local paths = Finder.select_keyboards(devices)
+		helpers.assert_eq(paths, { "/dev/input/event31" }, "physical sysfs must take precedence over name heuristics")
+		local origins = Finder.physical_sources(paths, devices)
+		helpers.assert_true(origins[1].physical, "the same physical identity must be available to input admission")
+	end)
+
+	helpers.it("still excludes virtual sysfs and synthetic names without a kernel path", function()
+		local Finder = require("modules.hotstrings.device_finder")
+		local virtual = block({ name = "Generic Keyboard", sysfs = "/devices/virtual/input/input32",
+			ev = "120013", handlers = "kbd event32" })
+		local unknown = block({ name = "Ergopti Virtual Keyboard", sysfs = "",
+			ev = "120013", handlers = "kbd event33" })
+		local devices = Finder.parse_devices(virtual .. unknown)
+		helpers.assert_eq(Finder.select_keyboards(devices), {})
+		local origins = Finder.physical_sources({ "/dev/input/event32", "/dev/input/event33" }, devices)
+		helpers.assert_eq(origins[1].physical, false)
+		helpers.assert_eq(origins[2].physical, false)
+	end)
+
+	helpers.it("does not certify malformed sysfs text as physical origin", function()
+		local Finder = require("modules.hotstrings.device_finder")
+		local descriptor = block({ name = "Keyboard", sysfs = "not-a-kernel-path",
+			ev = "120013", handlers = "kbd event34" })
+		local devices = Finder.parse_devices(descriptor)
+		local origins = Finder.physical_sources({ "/dev/input/event34" }, devices)
+		helpers.assert_eq(origins[1].physical, false)
+	end)
+
+	helpers.it("does not trust malformed or virtual-root sysfs as a physical keyboard", function()
+		local Finder = require("modules.hotstrings.device_finder")
+		for _, sysfs in ipairs({ "/devices/virtual", "/devices/pci0000:00", "/devices/pci/input/input42/extra",
+			"/devices/../virtual/input/input42",
+			"/devices/pci//input/input42", "/devices/pci/./input/input42", "/devices/pci/input/input42/" }) do
+			for _, name in ipairs({ "Virtual Keyboard", "Generic Keyboard" }) do
+				local devices = Finder.parse_devices(block({ name = name, sysfs = sysfs,
+					ev = "120013", handlers = "kbd event42" }))
+				helpers.assert_eq(Finder.select_keyboards(devices), {}, sysfs .. ": " .. name)
+				helpers.assert_eq(Finder.physical_sources({ "/dev/input/event42" }, devices)[1].physical, false, sysfs)
+			end
+		end
+	end)
+
 	helpers.it("never grabs our own uinput device, even though its name says keyboard", function()
 		-- The regression. "Ergopti Virtual Keyboard" contains "keyboard", so the
 		-- name heuristic put it in the preferred tier; listing it first is what a
@@ -209,6 +256,69 @@ end)
 -- =================================================================
 
 helpers.describe("device_finder: ranking when no remap daemon is running", function()
+	helpers.it("keeps a complete final device block without a trailing newline (device-final-block)", function()
+		local text = PHYSICAL_KEYBOARD:gsub("\n+$", "")
+		local path = select_from(text)
+		helpers.assert_eq(path, "/dev/input/event3", "the last complete device must not disappear")
+	end)
+	helpers.it("includes an unnamed alphanumeric keyboard alongside a named keyboard (keyboard-capability-selection)", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local unnamed = block({ name = "ZSA Moonlander Mark I", sysfs = "/devices/pci0000:00/usb1/input/input4",
+			ev = "120013", handlers = "sysrq kbd event4 leds" })
+		-- Q, A and Z are keyboard keys; the bitmap is the actual procfs KEY syntax.
+		for _, bitmap in ipairs({ "100040010000", "7 100040010000" }) do
+			local described = unnamed:gsub("\n\n$", "\nB: KEY=" .. bitmap .. "\n\n")
+			local paths = finder.select_keyboards(finder.parse_devices(PHYSICAL_KEYBOARD .. described .. POWER_BUTTON))
+			helpers.assert_eq(paths, { "/dev/input/event3", "/dev/input/event4" },
+				"a second keyboard must not bypass capture merely because its product name omits keyboard")
+		end
+	end)
+
+	helpers.it("does not join separate procfs key words into a keyboard (keyboard-capability-selection)", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local other = block({ name = "Auxiliary input", sysfs = "/devices/pci0000:00/usb1/input/input4",
+			ev = "120013", handlers = "kbd event4" })
+		-- On a 64-bit kernel the high word names key 76, not KEY_Z (44).
+		other = other:gsub("\n\n$", "\nB: KEY=1000 40010000\n\n")
+		local paths = finder.select_keyboards(finder.parse_devices(PHYSICAL_KEYBOARD .. other))
+		helpers.assert_eq(paths, { "/dev/input/event3" }, "a high-word key cannot masquerade as KEY_Z")
+	end)
+
+	helpers.it("confirms ambiguous 32-bit key words through the native fd (keyboard-32-bit-probe)", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local unnamed = block({ name = "ZSA Moonlander Mark I", sysfs = "/devices/pci0000:00/usb1/input/input4",
+			ev = "120013", handlers = "sysrq kbd event4 leds" })
+		unnamed = unnamed:gsub("\n\n$", "\nB: KEY=1000 40010000\n\n")
+		local original_open, original_ffi = io.open, package.loaded.ffi
+		for _, mode in ipairs({ "keyboard", "other", "short", "exception", "close_failure" }) do
+			local queries, closes = {}, 0
+			io.open = function(path, ...)
+				if path == "/proc/bus/input/devices" then
+					return { read = function() return PHYSICAL_KEYBOARD .. unnamed end, close = function() return true end }
+				end
+				return original_open(path, ...)
+			end
+			package.loaded.ffi = { os = "Linux", cdef = function() end,
+				new = function() return { [2] = 0, [3] = 0, [5] = 0 } end,
+				C = { open = function(path, flags) queries.path, queries.flags = path, flags; return 7 end,
+					ioctl = function(_, request, bits)
+						queries.request = request
+						if mode == "exception" then error("controlled ioctl failure") end
+						bits[2], bits[3], bits[5] = 1, 64, mode == "other" and 0 or 16
+						return mode == "short" and 5 or 6
+					end,
+					close = function() closes = closes + 1; return mode == "close_failure" and -1 or 0 end } }
+			local called, paths = pcall(finder.find_devices)
+			io.open, package.loaded.ffi = original_open, original_ffi
+			helpers.assert_true(called)
+			helpers.assert_eq(queries.path, "/dev/input/event4")
+			helpers.assert_eq(queries.flags, 0x80800)
+			helpers.assert_eq(queries.request, 0x80064521)
+			helpers.assert_eq(closes, 1)
+			helpers.assert_eq(paths, mode == "keyboard" and { "/dev/input/event3", "/dev/input/event4" }
+				or { "/dev/input/event3" }, mode)
+		end
+	end)
 
 	helpers.it("returns every physical keyboard when no consolidated remap output exists", function()
 		local finder = helpers.load_module("modules.hotstrings.device_finder")
@@ -340,6 +450,14 @@ helpers.describe("device_finder: a path must be able to produce key events", fun
 			"and the reason must say what kind of path was expected")
 	end)
 
+	helpers.it("refuses a different file with the basename of a listed event node", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local devices = finder.parse_devices(PHYSICAL_KEYBOARD)
+		local ok, why = finder.is_key_device("/tmp/event3", devices)
+		helpers.assert_true(not ok, "an unrelated readable file must not inherit a keyboard's capabilities")
+		helpers.assert_true(type(why) == "string" and why:find("eventN", 1, true) ~= nil)
+	end)
+
 	helpers.it("refuses an eventN node the kernel does not list", function()
 		local finder = helpers.load_module("modules.hotstrings.device_finder")
 		local ok, why = finder.is_key_device("/dev/input/event99", {})
@@ -423,3 +541,27 @@ helpers.describe("device_finder: shared descriptor mask policy", function()
 		end)
 	end
 end)
+
+for _, fault in ipairs({ "read_throw", "close_false", "close_throw" }) do
+	helpers.it("keyboard finder refuses an incomplete device snapshot " .. fault, function()
+		local Finder = require("modules.hotstrings.device_finder")
+		local original, closes = io.open, 0
+		io.open = function(path, mode)
+			if path ~= "/proc/bus/input/devices" then return original(path, mode) end
+			return { read = function()
+				if fault == "read_throw" then error("injected read failure") end
+				return PHYSICAL_KEYBOARD
+			end, close = function()
+				closes = closes + 1
+				if fault == "close_throw" then error("injected close failure") end
+				return fault ~= "close_false"
+			end }
+		end
+		local called, keyboards, pointers = pcall(Finder.find_devices)
+		io.open = original
+		helpers.assert_true(called)
+		helpers.assert_eq(keyboards, {}, "an unacknowledged snapshot must not select a keyboard")
+		helpers.assert_eq(pointers, {})
+		helpers.assert_eq(closes, 1)
+	end)
+end

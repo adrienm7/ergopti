@@ -134,8 +134,10 @@ function M.download_offered(updater, release, ctx)
 		if not current() or type(ctx.on_open_today_log) ~= "function" then return false end
 		local shell = require("adapters.shell_runner")
 		if shell.has_command("xdg-open") ~= true then return false end
-		local file = io.open(require("infra.logger_sink").main_log_path(), "rb")
-		return file ~= nil and file:close() == true
+		local file = require("infra.regular_file_reader").open(require("infra.logger_sink").main_log_path())
+		if not file then return false end
+		local closed, accepted = pcall(file.close, file)
+		return closed and accepted == true and current()
 	end
 	local completion_hook = ctx.on_update_finished
 	local function finished(installed, stage)
@@ -251,9 +253,12 @@ end
 --- @return table session
 local function new_session(updater)
 	local manager = require("ui.webview_manager")
-	return CheckSession.new({
+	local session
+	session = CheckSession.new({
 		push = push,
 		check = function(channel, on_result)
+			-- Publishing "checking" can synchronously retire this session.
+			if _session ~= session then return false end
 			local dispatched = updater.check_for_updates(channel, function(_, _, _, result)
 				on_result(result)
 				hook("on_menu_changed")
@@ -313,13 +318,20 @@ local function new_session(updater)
 			return open() == true
 		end,
 		close = function()
-			if _session ~= nil then _session.retire() end
-			_session = nil
-			manager.hide(APP)
+			if _session ~= session then return end
+			if manager.hide(APP) ~= true then
+				Logger.warn(LOG, "The update-check window could not close; its session is retained.")
+				return
+			end
+			if _session == session then
+				_session = nil
+				session.retire()
+			end
 		end,
 		log_path = function() return require("infra.logger_sink").main_log_path() end,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
 	})
+	return session
 end
 
 
@@ -365,17 +377,23 @@ function M.open(ctx)
 	-- A click while the window shows an answer checks again, over the updater
 	-- and hooks of the menu that asked; the replaced session's late answer is
 	-- ignored
-	if _session ~= nil then _session.retire() end
+	local previous = _session
+	if previous ~= nil then
+		previous.retire()
+		if _session ~= previous then return false end
+	end
 	_ctx = ctx
 	local session = new_session(ctx.updater)
 	_session = session
 	if require("ui.webview_manager").show(APP) ~= true then
+		if _session == session then _session = nil end
 		session.retire()
-		_session = nil
 		Logger.error(LOG, "The update-check window could not open.")
 		return false
 	end
+	if _session ~= session then return false end
 	session.start()
+	if _session ~= session then return false end
 	Logger.success(LOG, "Update-check window opened.")
 	return true
 end
@@ -394,8 +412,9 @@ end
 
 --- Forgets the session when the user closes the window with its close box.
 function M.on_window_closed()
-	if _session ~= nil then _session.retire() end
+	local previous = _session
 	_session = nil
+	if previous ~= nil then previous.retire() end
 end
 
 --- Test seam: forgets the session and the context.

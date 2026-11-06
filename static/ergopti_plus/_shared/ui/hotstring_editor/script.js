@@ -36,6 +36,8 @@ let autoClose = false;
 let defaultSec = null;
 let defaultPrio = null;
 let openMode = 'menu';
+let rowIdentityMode = false;
+let nextNewRowId = 0;
 
 // Lower-cased, trimmed live filter applied to the entry list (trigger + output).
 let searchQuery = '';
@@ -812,11 +814,18 @@ function dispTrig(s) {
 
 function dispOutput(s) {
 	if (!s) return '';
-	let out = escapeHtml(toDisplay(s));
-	out = out.replace(/\{([^}]+)\}/g, function (_, name) {
-		const canon = normToken(name);
-		return '<span class="tc" data-tok="' + escapeHtml(canon) + '">' + escapeHtml(canon) + '</span>';
-	});
+	const display = toDisplay(s);
+	const tokens = /\{([^}]+)\}/g;
+	let out = '';
+	let last = 0;
+	let match;
+	while ((match = tokens.exec(display)) !== null) {
+		out += escapeHtml(display.slice(last, match.index));
+		const canon = normToken(match[1]);
+		out += '<span class="tc" data-tok="' + escapeHtml(canon) + '">' + escapeHtml(canon) + '</span>';
+		last = tokens.lastIndex;
+	}
+	out += escapeHtml(display.slice(last));
 	if (!compactView) {
 		out = out.replace(/<span class="tc" data-tok="Enter">Enter<\/span>/g, '<br>');
 	}
@@ -1224,6 +1233,19 @@ function showEditEntry(si, ei, focusField) {
 	}, 80);
 }
 
+// Sorting uses the same normalized key for single edits and bulk moves. The
+// original trigger is never changed, and ASCII punctuation keeps its old order.
+function compareTriggers(a, b) {
+	const key = (entry) =>
+		(entry.trigger || '')
+			.toLowerCase()
+			.normalize('NFC')
+			.replace(/[^\p{L}\p{M}\p{N}_]/gu, '');
+	const left = key(a);
+	const right = key(b);
+	return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function saveEntry(andNew) {
 	clearEntryErrors();
 	const trig = serializeTrigEditor(document.getElementById('e-trig'));
@@ -1270,6 +1292,12 @@ function saveEntry(andNew) {
 			// personal "sru" -> "SRU" still fired on a typed "SRU".
 			is_case_sensitive_strict: document.getElementById('cb-case').checked
 		};
+		if (rowIdentityMode) {
+			entry.origin_id =
+				edEntry.ei === null
+					? 'new:' + ++nextNewRowId
+					: D.sections[edEntry.si].entries[edEntry.ei].origin_id;
+		}
 		// Optional collision-priority override; omitted when the field is blank
 		// so the entry inherits the personal source default.
 		const prio = parsePrio(document.getElementById('e-prio').value);
@@ -1279,11 +1307,7 @@ function saveEntry(andNew) {
 		if (edEntry.ei === null) D.sections[si].entries.push(entry);
 		else D.sections[si].entries[edEntry.ei] = entry;
 
-		D.sections[si].entries.sort((a, b) => {
-			const ta = (a.trigger || '').toLowerCase().replace(/[^\w]/g, '');
-			const tb = (b.trigger || '').toLowerCase().replace(/[^\w]/g, '');
-			return ta < tb ? -1 : ta > tb ? 1 : 0;
-		});
+		D.sections[si].entries.sort(compareTriggers);
 
 		persist();
 
@@ -1408,11 +1432,7 @@ window.bulkMove = function () {
 		D.sections[destSi].entries.push(entry);
 	});
 
-	D.sections[destSi].entries.sort((a, b) => {
-		const ta = (a.trigger || '').toLowerCase().replace(/[^\w]/g, '');
-		const tb = (b.trigger || '').toLowerCase().replace(/[^\w]/g, '');
-		return ta < tb ? -1 : ta > tb ? 1 : 0;
-	});
+	D.sections[destSi].entries.sort(compareTriggers);
 
 	sel.value = '';
 	window.clearBulk();
@@ -1441,6 +1461,7 @@ function persist() {
 					final_result: !!e.final_result,
 					is_case_sensitive_strict: !!e.is_case_sensitive_strict
 				};
+				if (rowIdentityMode && typeof e.origin_id === 'string') o.origin_id = e.origin_id;
 				// Carry an explicit per-hotstring priority through the save.
 				if (typeof e.priority === 'number') o.priority = e.priority;
 				return o;
@@ -1456,6 +1477,8 @@ function persist() {
 }
 
 window.initData = function (d) {
+	rowIdentityMode = d.row_identity === true;
+	nextNewRowId = 0;
 	D = d;
 	TRIGGER_CHAR = d.trigger_char || '★';
 	STAR = d.star || '★';

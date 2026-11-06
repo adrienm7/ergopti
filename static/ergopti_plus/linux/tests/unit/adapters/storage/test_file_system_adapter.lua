@@ -86,6 +86,332 @@ local function with_toml_staging(body)
 	if not okay then error(detail, 0) end
 end
 
+helpers.describe("exclusive file publication", function()
+	helpers.it("reads the pinned image if the export name is swapped away and back (diagnostic-create-identity)", function()
+		local native = require("infra.regular_file_writer")
+		local open, path = native.open, os.tmpname(); os.remove(path)
+		local retained, foreign = path .. ".original", path .. ".foreign"
+		native.open = function(target, mode, keep)
+			local stream, detail, code, cleanup, current, owned, release = open(target, mode, keep)
+			if target ~= path or mode ~= "wx" or not stream then return stream, detail, code, cleanup, current, owned, release end
+			return stream, detail, code, cleanup, function(bytes)
+				assert(os.rename(path, retained))
+				local changed = assert(io.open(retained, "wb")); assert(changed:write("changed")); assert(changed:close())
+				local replacement = assert(io.open(path, "wb")); assert(replacement:write(bytes)); assert(replacement:close())
+				local answer = current(bytes)
+				assert(os.rename(path, foreign)); assert(os.rename(retained, path))
+				return answer
+			end, owned, release
+		end
+		local called, written = pcall(fs.write_new, path, "diagnostic")
+		native.open = open
+		local file = io.open(path, "rb"); local content = file and file:read("*a") or nil
+		if file then file:close() end; os.remove(path); os.remove(retained); os.remove(foreign)
+		helpers.assert_true(called); helpers.assert_eq(written, false)
+		helpers.assert_eq(content, "changed")
+	end)
+	for _, refusal in ipairs({ "none", "return", "throw" }) do
+		helpers.it("closes the diagnostic identity descriptor once " .. refusal .. " (diagnostic-create-pin-close)", function()
+			local uv = require("luv")
+			local previous_writer = package.loaded["infra.regular_file_writer"]
+			local writer = helpers.fresh_module("infra.regular_file_writer")
+			package.loaded["infra.regular_file_writer"] = writer
+			local open, close = uv.fs_open, uv.fs_close
+			local path, pinned, closes = os.tmpname(), nil, 0; os.remove(path)
+			uv.fs_open = function(target, flags, mode)
+				local fd, detail, code = open(target, flags, mode)
+				if target == path and not pinned then pinned = fd end
+				return fd, detail, code
+			end
+			uv.fs_close = function(fd)
+				local result, detail, code = close(fd)
+				if fd == pinned then
+					closes = closes + 1
+					if refusal == "return" then return nil, "controlled uncertain close" end
+					if refusal == "throw" then error("controlled unknown close") end
+				end
+				return result, detail, code
+			end
+			local called, written = pcall(fs.write_new, path, "diagnostic")
+			uv.fs_open, uv.fs_close = open, close
+			local pending = writer.diagnostic_pin_close_pending()
+			local next_path = path .. ".next"
+			local next_written
+			if refusal ~= "none" then next_written = fs.write_new(next_path, "next") end
+			package.loaded["infra.regular_file_writer"] = previous_writer
+			local after = pinned and uv.fs_fstat(pinned)
+			local next_file = io.open(next_path, "rb")
+			if next_file then next_file:close() end
+			local file = io.open(path, "rb"); local content = file and file:read("*a") or nil
+			if file then file:close() end; os.remove(path); os.remove(next_path)
+			helpers.assert_true(called); helpers.assert_eq(written, refusal == "none")
+			helpers.assert_eq(closes, 1, "an uncertain descriptor close must not be retried")
+			helpers.assert_eq(pending, refusal ~= "none")
+			if refusal ~= "none" then helpers.assert_eq(next_written, false, "unknown close blocks the next diagnostic create") end
+			if refusal ~= "none" then helpers.assert_nil(next_file, "refusal must precede file creation") end
+			helpers.assert_nil(after); helpers.assert_eq(content, "diagnostic")
+		end)
+	end
+	helpers.it("retains unknown descriptor-close debt when stream admission fails (diagnostic-create-pin-close)", function()
+		local uv, writer = require("luv"), helpers.fresh_module("infra.regular_file_writer")
+		local old_open, old_close, old_io = uv.fs_open, uv.fs_close, io.open
+		local path, pinned, closes = os.tmpname(), nil, 0; os.remove(path)
+		uv.fs_open = function(target, flags, mode)
+			local fd, detail, code = old_open(target, flags, mode)
+			if target == path and not pinned then pinned = fd end
+			return fd, detail, code
+		end
+		uv.fs_close = function(fd)
+			local result, detail, code = old_close(fd)
+			if fd == pinned then closes = closes + 1; return nil, "controlled uncertain close" end
+			return result, detail, code
+		end
+		io.open = function(target, mode)
+			if target:match("^/proc/self/fd/%d+$") and mode == "w" then return nil, "controlled stream refusal" end
+			return old_io(target, mode)
+		end
+		local called, stream = pcall(writer.open, path, "wx", true)
+		uv.fs_open, uv.fs_close, io.open = old_open, old_close, old_io
+		local pending = writer.diagnostic_pin_close_pending()
+		local next_path = path .. ".next"
+		local next_stream = writer.open(next_path, "wx", true)
+		local next_file = old_io(next_path, "rb"); if next_file then next_file:close() end
+		os.remove(path); os.remove(next_path)
+		helpers.assert_true(called); helpers.assert_nil(stream); helpers.assert_true(pending)
+		helpers.assert_eq(closes, 1); helpers.assert_nil(next_stream); helpers.assert_nil(next_file)
+	end)
+	helpers.it("reports unknown descriptor-close debt even after write refusal (diagnostic-create-pin-close)", function()
+		local uv = require("luv")
+		local previous = package.loaded["infra.regular_file_writer"]
+		local writer = helpers.fresh_module("infra.regular_file_writer")
+		package.loaded["infra.regular_file_writer"] = writer
+		local native_open, uv_open, uv_close = writer.open, uv.fs_open, uv.fs_close
+		local path, pinned, closes = os.tmpname(), nil, 0; os.remove(path)
+		uv.fs_open = function(target, flags, mode)
+			local fd, detail, code = uv_open(target, flags, mode)
+			if target == path and not pinned then pinned = fd end
+			return fd, detail, code
+		end
+		uv.fs_close = function(fd)
+			local result, detail, code = uv_close(fd)
+			if fd == pinned then closes = closes + 1; error("controlled unknown close") end
+			return result, detail, code
+		end
+		writer.open = function(target, mode, keep)
+			local stream, detail, code, cleanup, current, same, release = native_open(target, mode, keep)
+			if not stream then return stream, detail, code, cleanup, current, same, release end
+			return { write = function() return nil, "controlled write refusal" end,
+				close = function() return stream:close() end }, detail, code, cleanup, current, same, release
+		end
+		local called, written, reason = pcall(fs.write_new, path, "diagnostic")
+		uv.fs_open, uv.fs_close = uv_open, uv_close
+		local pending = writer.diagnostic_pin_close_pending()
+		package.loaded["infra.regular_file_writer"] = previous
+		os.remove(path)
+		helpers.assert_true(called); helpers.assert_eq(written, false)
+		helpers.assert_eq(reason, "descriptor close unconfirmed")
+		helpers.assert_true(pending); helpers.assert_eq(closes, 1)
+	end)
+	helpers.it("bounds diagnostic image comparison and distinguishes empty EOF from read errors (diagnostic-create-bound)", function()
+		local native, uv = require("infra.regular_file_writer"), require("luv")
+		local original, limit, fail_read = io.open, nil, false
+		io.open = function(path, mode)
+			local stream, detail, code = original(path, mode)
+			if not stream then return nil, detail, code end
+			if not path:match("^/proc/self/fd/%d+$") or mode ~= "r" then return stream, detail, code end
+			return {
+				read = function(_, count)
+					limit = count
+					if fail_read then return nil, "controlled read failure" end
+					return stream:read(count)
+				end,
+				close = function() return stream:close() end,
+			}
+		end
+		local path, release = os.tmpname(), nil; os.remove(path)
+		local checked, reason = pcall(function()
+			local stream, current, ignored
+			stream, ignored, ignored, ignored, current, ignored, release = native.open(path, "wx", true)
+			assert(stream); assert(stream:close())
+			helpers.assert_true(current(""), "an empty file is a valid empty image")
+			helpers.assert_eq(limit, 1)
+			fail_read = true
+			helpers.assert_eq(current(""), false, "read errors cannot become empty success")
+			fail_read = false
+			local fd = assert(uv.fs_open(path, "a", 384))
+			assert(uv.fs_ftruncate(fd, 1048576)); assert(uv.fs_close(fd))
+			helpers.assert_eq(current(""), false)
+			helpers.assert_eq(limit, 1, "a concurrent large image must not be read wholesale")
+		end)
+		if release then assert(release()) end
+		io.open = original; os.remove(path)
+		helpers.assert_true(checked, tostring(reason))
+	end)
+	for _, backend in ipairs({ "luv", "ffi" }) do
+	helpers.it("pins the created inode while checking an equal-byte successor " .. backend .. " (diagnostic-create-identity)", function()
+		if backend == "ffi" and not pcall(require, "ffi") then return end
+		local native, uv = require("infra.regular_file_writer"), require("luv")
+		local open, path, replaced, distinct = native.open, os.tmpname(), false, false
+		os.remove(path)
+		native.open = function(target, mode, keep)
+			local stream, detail, code, cleanup, current, owned, release = open(target, mode, keep)
+			if target ~= path or mode ~= "wx" or not stream then return stream, detail, code, cleanup, current, owned, release end
+			local original = assert(uv.fs_lstat(path))
+			return stream, detail, code, cleanup, current, function()
+				if not replaced then
+					replaced = true; assert(os.remove(path))
+					local successor = assert(io.open(path, "wb")); assert(successor:write("diagnostic")); assert(successor:close())
+					local now = assert(uv.fs_lstat(path))
+					distinct = original.dev ~= now.dev or original.ino ~= now.ino
+				end
+				return owned()
+			end, release
+		end
+		if backend == "ffi" then package.loaded.luv = {} end
+		local called, written = pcall(fs.write_new, path, "diagnostic")
+		package.loaded.luv = uv
+		native.open = open
+		local file = io.open(path, "rb"); local content = file and file:read("*a") or nil
+		if file then file:close() end; os.remove(path)
+		helpers.assert_true(called); helpers.assert_true(replaced)
+		helpers.assert_true(distinct, "the original inode must stay allocated through identity proof")
+		helpers.assert_eq(written, false); helpers.assert_eq(content, "diagnostic")
+	end)
+	end
+	helpers.it("retains concurrent same-inode bytes after a failed export write (diagnostic-create-retain)", function()
+		local native, uv = require("infra.regular_file_writer"), require("luv")
+		local open, path, same_inode, released = native.open, os.tmpname(), false, 0
+		os.remove(path)
+		native.open = function(target, mode, keep)
+			local stream, detail, code, cleanup, current, owned, release = open(target, mode, keep)
+			if target ~= path or mode ~= "wx" or not stream then return stream, detail, code, cleanup, current, owned, release end
+			return {
+				write = function()
+					assert(stream:write("partial"))
+					local before = assert(uv.fs_lstat(path))
+					local foreign = assert(io.open(path, "wb"))
+					assert(foreign:write("foreign concurrent bytes")); assert(foreign:close())
+					local after = assert(uv.fs_lstat(path))
+					same_inode = before.dev == after.dev and before.ino == after.ino
+					return nil, "controlled write refusal"
+				end,
+				close = function() return stream:close() end,
+			}, detail, code, cleanup, current, owned, function() released = released + 1; return release() end
+		end
+		local called, written = pcall(fs.write_new, path, "diagnostic")
+		native.open = open
+		local file = io.open(path, "rb"); local content = file and file:read("*a") or nil
+		if file then file:close() end; os.remove(path)
+		helpers.assert_true(called); helpers.assert_eq(written, false)
+		helpers.assert_true(same_inode); helpers.assert_eq(content, "foreign concurrent bytes")
+		helpers.assert_eq(released, 1, "the pinned descriptor retires on write refusal")
+	end)
+
+	helpers.it("retains same-inode bytes if export stream admission fails (diagnostic-create-retain)", function()
+		local original, path = io.open, os.tmpname(); os.remove(path)
+		io.open = function(target, mode)
+			if target:match("^/proc/self/fd/%d+$") and mode == "w" then
+				local foreign = assert(original(path, "wb"))
+				assert(foreign:write("foreign before stream open")); assert(foreign:close())
+				return nil, "controlled stream refusal"
+			end
+			return original(target, mode)
+		end
+		local called, written = pcall(fs.write_new, path, "diagnostic")
+		io.open = original
+		local file = original(path, "rb"); local content = file and file:read("*a") or nil
+		if file then file:close() end; os.remove(path)
+		helpers.assert_true(called); helpers.assert_eq(written, false)
+		helpers.assert_eq(content, "foreign before stream open")
+	end)
+
+	helpers.it("retains a same-inode rewrite when export close is refused (diagnostic-create-retain)", function()
+		local native = require("infra.regular_file_writer")
+		local open, path = native.open, os.tmpname(); os.remove(path)
+		native.open = function(target, mode, keep)
+			local stream, detail, code, cleanup, current, owned, release = open(target, mode, keep)
+			if target ~= path or mode ~= "wx" or not stream then return stream, detail, code, cleanup, current, owned, release end
+			return {
+				write = function(_, content) return stream:write(content) end,
+				close = function()
+					assert(stream:close())
+					local foreign = assert(io.open(path, "wb"))
+					assert(foreign:write("foreign after close")); assert(foreign:close())
+					return false, "controlled close refusal"
+				end,
+			}, detail, code, cleanup, current, owned, release
+		end
+		local called, written = pcall(fs.write_new, path, "diagnostic")
+		native.open = open
+		local file = io.open(path, "rb"); local content = file and file:read("*a") or nil
+		if file then file:close() end; os.remove(path)
+		helpers.assert_true(called); helpers.assert_eq(written, false)
+		helpers.assert_eq(content, "foreign after close")
+	end)
+
+	helpers.it("refuses an export if unbuffered mode cannot be established (diagnostic-create-retain)", function()
+		local original, path = io.open, os.tmpname(); os.remove(path)
+		io.open = function(target, mode)
+			local file, detail, code = original(target, mode)
+			if file and target:match("^/proc/self/fd/%d+$") and mode == "w" then
+				return {
+					setvbuf = function()
+						local foreign = assert(original(path, "wb"))
+						assert(foreign:write("foreign after create")); assert(foreign:close())
+						return nil, "controlled setvbuf refusal"
+					end,
+					close = function() return file:close() end,
+				}, detail, code
+			end
+			return file, detail, code
+		end
+		local called, written = pcall(fs.write_new, path, "diagnostic")
+		io.open = original
+		local file = original(path, "rb"); local content = file and file:read("*a") or nil
+		if file then file:close() end; os.remove(path)
+		helpers.assert_true(called); helpers.assert_eq(written, false)
+		helpers.assert_eq(content, "foreign after create")
+	end)
+
+	helpers.it("accepts an exclusive owned image through the FFI descriptor fallback", function()
+		local uv = package.loaded.luv
+		local path = os.tmpname(); os.remove(path)
+		package.loaded.luv = {}
+		local ok, written = pcall(fs.write_new, path, "owned bytes")
+		package.loaded.luv = uv
+		local file = io.open(path, "rb")
+		local bytes = file and file:read("*a") or nil
+		if file then file:close() end
+		os.remove(path)
+		helpers.assert_true(ok)
+		helpers.assert_eq(written, true)
+		helpers.assert_eq(bytes, "owned bytes")
+	end)
+	helpers.it("refuses a successor with identical bytes after exclusive creation", function()
+		local native = require("infra.regular_file_writer")
+		local open = native.open
+		local path = os.tmpname(); os.remove(path)
+		local replacement, retained = path .. ".replacement", path .. ".retained"
+		native.open = function(target, mode, keep)
+			local stream, detail, code, cleanup, current, owned, release = open(target, mode, keep)
+			if target ~= path or mode ~= "wx" or not stream then return stream, detail, code, cleanup, current, owned, release end
+			return stream, detail, code, cleanup, function(bytes)
+				assert(os.rename(path, retained))
+				local f = assert(io.open(replacement, "wb")); assert(f:write(bytes)); assert(f:close())
+				assert(os.rename(replacement, path))
+				return current(bytes)
+			end, owned, release
+		end
+		local called, written = pcall(fs.write_new, path, "same bytes")
+		native.open = open
+		local file = assert(io.open(path, "rb")); local bytes = file:read("*a"); file:close()
+		os.remove(path); os.remove(retained); os.remove(replacement)
+		helpers.assert_true(called)
+		helpers.assert_eq(written, false)
+		helpers.assert_eq(bytes, "same bytes")
+	end)
+end)
+
 helpers.describe("Linux TOML staging admission", function()
 	for _, entry in ipairs({ "direct", "adapter", "portable" }) do
 		for _, kind in ipairs(entry == "portable" and { "missing" } or { "fifo", "symlink", "hardlink", "regular", "directory", "missing" }) do
@@ -911,10 +1237,12 @@ helpers.describe("file_system adapter", function()
     end)
 
     helpers.it("exists returns true after write", function()
+	  helpers.assert_true(fs.write(tmp_file, "hello world"), "the fixture must be written")
       helpers.assert_true(fs.exists(tmp_file), "file exists after write")
     end)
 
     helpers.it("read returns exact content written", function()
+	  helpers.assert_true(fs.write(tmp_file, "hello world"), "the fixture must be written")
       local content = fs.read(tmp_file)
       helpers.assert_eq(content, "hello world", "read returns written content")
     end)
@@ -1023,12 +1351,21 @@ helpers.describe("file_system adapter", function()
       helpers.assert_eq(fs.write(nil, "content"), false, "write nil path returns false")
     end)
 
-    helpers.it("write nil content writes empty string", function()
-      local nil_file = tmp_base .. "_nil_content.txt"
-      local ok = fs.write(nil_file, nil)
-      helpers.assert_true(ok, "write nil content returns true")
-      helpers.assert_eq(fs.read(nil_file), "", "nil content stored as empty string")
-      os.remove(nil_file)
+    helpers.it("invalid write and append contents preserve the existing file", function()
+      local path = tmp_base .. "_invalid_content.txt"
+      helpers.assert_true(fs.write(path, "original"))
+      for _, value in ipairs({ false, 0, {}, true }) do
+        helpers.assert_eq(fs.write(path, value), false)
+        helpers.assert_eq(fs.read(path), "original")
+        helpers.assert_eq(fs.append(path, value), false)
+        helpers.assert_eq(fs.read(path), "original")
+      end
+      helpers.assert_eq(fs.write(path, nil), false)
+      helpers.assert_eq(fs.append(path, nil), false)
+      helpers.assert_eq(fs.read(path), "original")
+      helpers.assert_true(fs.write(path, ""), "explicit empty content remains valid")
+      helpers.assert_eq(fs.read(path), "")
+      os.remove(path)
     end)
   end)
 
@@ -1169,3 +1506,28 @@ helpers.describe("FileSystem initializer configuration identities", function()
 end)
 
 require("test.file_system_ports_contract").register(helpers, "linux", 8, function() return fs end)
+
+helpers.describe('selected path metadata classification', function()
+  helpers.it('distinguishes present, absent, dangling link and inaccessible directory', function()
+    local uv = require('luv')
+    local fs = require('adapters.file_system')
+    local dir = os.tmpname(); os.remove(dir)
+    assert(uv.fs_mkdir(dir, 448))
+    local target = dir .. '/report.'
+    local file = assert(io.open(target, 'wb')); file:write('exact'); file:close()
+    assert(uv.fs_symlink('missing', dir .. '/link.'))
+    local ok, err = xpcall(function()
+      helpers.assert_eq(fs.path_status(target), 'present')
+      helpers.assert_eq(fs.path_status(dir .. '/link.'), 'present')
+      helpers.assert_eq(fs.path_status(dir .. '/missing.'), 'absent')
+      local account = type(uv.os_get_passwd) == "function" and uv.os_get_passwd() or nil
+      if account and account.uid and account.uid ~= 0 then
+        assert(uv.fs_chmod(dir, 0))
+        helpers.assert_eq(fs.path_status(target), 'error')
+      end
+    end, debug.traceback)
+    uv.fs_chmod(dir, 448)
+    uv.fs_unlink(dir .. '/link.'); uv.fs_unlink(target); uv.fs_rmdir(dir)
+    if not ok then error(err, 0) end
+  end)
+end)

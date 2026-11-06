@@ -21,12 +21,18 @@ local DEPENDENCIES = {
 	"error_description",
 	"number_policy",
 	"modules.gestures.actions_click",
+	"modules.gestures",
+	"modules.gestures.actions",
+	"modules.gestures.engine",
+	"modules.gestures.conflicts",
 }
 
 --- Runs one isolated actions_click instance against a configurable native stub.
 --- @param config table Failure injection configuration.
 --- @param body function Test body receiving module, fixture, and event types.
 local function with_fixture(config, body)
+	local saved_all = {}
+	if config.real_gestures then for name, value in pairs(package.loaded) do saved_all[name] = value end end
 	local saved = {}
 	for _, name in ipairs(DEPENDENCIES) do saved[name] = package.loaded[name] end
 	local saved_hs = _G.hs
@@ -87,6 +93,7 @@ local function with_fixture(config, body)
 	end
 
 	local hs_stub = {
+		fs = saved_hs and saved_hs.fs,
 		mouse = {
 			absolutePosition = function() return { x = 120, y = 80 } end,
 		},
@@ -286,7 +293,11 @@ local function with_fixture(config, body)
 	package.loaded["error_description"] = nil
 	package.loaded["number_policy"] = nil
 	package.loaded["modules.gestures.actions_click"] = nil
-	_G.hs = hs_stub
+	package.loaded["modules.gestures"] = nil
+	package.loaded["modules.gestures.actions"] = nil
+	package.loaded["modules.gestures.engine"] = nil
+	package.loaded["modules.gestures.conflicts"] = nil
+	_G.hs = setmetatable(hs_stub, { __index = saved_hs or {} })
 
 	local ok, err = xpcall(function()
 		local ClickActions = require("modules.gestures.actions_click")
@@ -296,6 +307,10 @@ local function with_fixture(config, body)
 
 	_G.hs = saved_hs
 	for _, name in ipairs(DEPENDENCIES) do package.loaded[name] = saved[name] end
+	if config.real_gestures then
+		for name in pairs(package.loaded) do if saved_all[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(saved_all) do package.loaded[name] = value end
+	end
 	if not ok then error(err, 0) end
 end
 
@@ -337,6 +352,119 @@ local function assert_rejected_callbacks_are_inert(fixture, types, taps)
 end
 
 helpers.describe("click-hold acquisition transaction", function()
+	helpers.it("releases a held gesture when its original slot is cleared", function()
+		with_fixture({ real_gestures = true }, function(Click, fixture, types)
+			local logger = package.loaded["infra.logger"]
+			logger.done, logger.success, logger.start = function() end, function() end, function() end
+			logger.callback = function(_, _, callback, ...) return true, callback(...) end
+			local Gestures = require("modules.gestures")
+			local Actions = require("modules.gestures.actions")
+			helpers.assert_true(Gestures.set_action("tap_3", "left_click_toggle"))
+			helpers.assert_true(Actions.execute_single("left_click_toggle", "tap_3"))
+			helpers.assert_true(Click.is_left_click_held())
+			helpers.assert_true(Gestures.set_action("tap_3", "none"))
+			helpers.assert_eq(Click.is_left_click_held(), false)
+			helpers.assert_eq(fixture.posted, { types.leftMouseDown, types.leftMouseUp })
+		end)
+	end)
+
+	helpers.it("keeps another slot's hold and a refused release remains retryable", function()
+		with_fixture({ real_gestures = true }, function(Click, fixture, types)
+			local logger = package.loaded["infra.logger"]
+			logger.done, logger.success, logger.start = function() end, function() end, function() end
+			logger.callback = function(_, _, callback, ...) return true, callback(...) end
+			local Gestures, Actions = require("modules.gestures"), require("modules.gestures.actions")
+			assert(Gestures.set_action("tap_3", "left_click_toggle"))
+			assert(Gestures.set_action("tap_4", "right_click_toggle"))
+			assert(Actions.execute_single("left_click_toggle", "tap_3"))
+			assert(Actions.execute_single("right_click_toggle", "tap_4"))
+			assert(Gestures.set_action("tap_4", "right_click_toggle"))
+			helpers.assert_true(Click.is_right_click_held())
+			fixture.config.post[types.leftMouseUp] = "false"
+			assert(Gestures.set_action("tap_3", "none"))
+			helpers.assert_true(Click.is_left_click_held(), "refused release retains its debt")
+			helpers.assert_true(Click.is_right_click_held(), "another slot keeps its hold")
+			helpers.assert_true(Click.force_cleanup("gestures"))
+		end)
+	end)
+	helpers.it("blocks the changed slot until a refused assignment is rolled back", function()
+		with_fixture({ real_gestures = true }, function(Click, fixture)
+			local logger = package.loaded["infra.logger"]
+			logger.done, logger.success, logger.start = function() end, function() end, function() end
+			logger.callback = function(_, _, callback, ...) return true, callback(...) end
+			local Gestures, Actions = require("modules.gestures"), require("modules.gestures.actions")
+			assert(Gestures.set_action("tap_3", "left_click_toggle"))
+			assert(Actions.execute_single("left_click_toggle", "tap_3"))
+			local change = assert(Gestures.begin_click_binding_change("tap_3", "left_click_toggle"))
+			assert(Gestures.set_action("tap_3", "none", true))
+			helpers.assert_eq(Actions.execute_single("left_click_toggle", "tap_3"), false)
+			assert(Gestures.set_action("tap_3", "left_click_toggle", true))
+			assert(Gestures.finish_click_binding_change(change, false))
+			helpers.assert_true(Click.is_left_click_held(), "refused persistence must preserve the original hold")
+			assert(Click.force_cleanup("gestures"))
+		end)
+	end)
+
+	helpers.it("keeps the actual slot closed while assignment recovery is pending", function()
+		with_fixture({ real_gestures = true }, function(Click, fixture)
+			local logger = package.loaded["infra.logger"]
+			logger.done, logger.success, logger.start = function() end, function() end, function() end
+			logger.callback = function(_, _, callback, ...) return true, callback(...) end
+			local Gestures, Actions = require("modules.gestures"), require("modules.gestures.actions")
+			assert(Gestures.set_action("tap_3", "left_click_toggle"))
+			assert(Actions.execute_single("left_click_toggle", "tap_3"))
+			local content = '[gestures]\ntap_3 = "left_click_toggle"\naction_parameters = {}\n'
+			local owner = require("tests.support.program_parameter_fixture")(Gestures, { gestures = true }, "gesture",
+				function() return Gestures.get_action("tap_3") end, function() return false end, { content = content })
+			local change, refuse = nil, true
+			local mutation = { section = "gestures", key = "tap_3",
+				read = function() return Gestures.get_action("tap_3") end,
+				apply = function()
+					change = Gestures.begin_click_binding_change("tap_3", "left_click_toggle")
+					return change and Gestures.set_action("tap_3", "open_url", true)
+				end,
+				restore = function(previous)
+					if refuse then return false end
+					return Gestures.set_action("tap_3", previous, true)
+				end,
+				recovery_settled = function() return Gestures.finish_click_binding_change(change, false) end,
+			}
+			helpers.assert_eq(owner.apply("tap_3", "open_url", "https://example.test", mutation), false)
+			helpers.assert_true(owner.pending(), "real assignment compensation remains pending")
+			helpers.assert_eq(Actions.execute_single("left_click_toggle", "tap_3"), false)
+			helpers.assert_true(Click.is_left_click_held(), "blocked slot cannot toggle off its retained hold")
+			refuse = false
+			helpers.assert_true(owner.retry_restore())
+			helpers.assert_eq(owner.pending(), false)
+			helpers.assert_true(Actions.execute_single("left_click_toggle", "tap_3"))
+			helpers.assert_eq(Click.is_left_click_held(), false)
+		end)
+	end)
+
+	helpers.it("observes a real logger failure after the direct rollback already restores the slot", function()
+		with_fixture({ real_gestures = true }, function(Click)
+			package.loaded["infra.logger"] = nil
+			package.loaded["logger"] = nil
+			local Logger = require("infra.logger")
+			local Gestures, Actions = require("modules.gestures"), require("modules.gestures.actions")
+			assert(Gestures.set_action("tap_3", "left_click_toggle"))
+			assert(Actions.execute_single("left_click_toggle", "tap_3"))
+			local change = assert(Gestures.begin_click_binding_change("tap_3", "left_click_toggle"))
+			assert(Gestures.set_action("tap_3", "none", true))
+			local previous_level, previous_clock = Logger.current_level, Logger.clock_fn
+			Logger.current_level = Logger.LEVELS.DEBUG
+			Logger.clock_fn = function() error("injected native clock failure") end
+			local called = pcall(Gestures.set_action, "tap_3", "left_click_toggle", true)
+			Logger.clock_fn, Logger.current_level = previous_clock, previous_level
+			helpers.assert_eq(called, false, "the actual logger reports its failing clock")
+			helpers.assert_eq(Gestures.get_action("tap_3"), "left_click_toggle",
+				"the setter restored the old value before logging")
+			helpers.assert_true(Click.is_left_click_held())
+			assert(Gestures.finish_click_binding_change(change, false))
+			assert(Click.force_cleanup("gestures"))
+		end)
+	end)
+
 	for _, parent in ipairs({ "gestures", "shortcut_bindings" }) do
 		for _, position in ipairs({ 1, 2 }) do
 			helpers.it("rolls back a " .. parent .. " acquisition when tap "

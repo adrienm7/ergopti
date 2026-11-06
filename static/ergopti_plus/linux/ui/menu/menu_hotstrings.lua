@@ -517,7 +517,7 @@ local function _manifest_hotstring_rows(ctx, config)
 		-- Refused rather than clamped: a negative or fractional millisecond is a
 		-- typo, and silently rounding it would store a number the user never chose
 		-- and cannot see is different from what they typed.
-		if not value or value < 0 or value ~= math.floor(value) then
+		if not require("number_policy").is_finite(value) or value < 0 or value ~= math.floor(value) then
 			show_error(i18n_safe("menu.hotstrings.delay_invalid_body"))
 			return nil
 		end
@@ -820,7 +820,18 @@ local function _manifest_hotstring_rows(ctx, config)
 					if consume == nil then return false end
 
 					local saved = snapshot()
-					if Terminators.add_custom_terminator("custom_" .. char, char, char, consume) ~= true then return false end
+					if Terminators.add_custom_terminator("custom_" .. char, char, char, consume) ~= true then
+						local _, reason = Terminators.validate_custom_terminator("custom_" .. char, char, char, consume)
+						if reason == "character_collision" or reason == "key_collision" then
+							local message = string.format(i18n_safe("editor.hotstrings.err_id_exists"), char)
+							show_error(require("ui.native_dialog").plain_markup(message), i18n_safe("dialog.hotstrings.invalid_title"))
+						elseif reason == "invalid_character" then
+							show_error(i18n_safe("dialog.hotstrings.invalid_body"), i18n_safe("dialog.hotstrings.invalid_title"))
+						else
+							SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
+						end
+						return false
+					end
 					return commit(saved) == true
 				end,
 			}, { ["word_expanders_ready"] = word_expanders_ready })
@@ -871,7 +882,10 @@ local function _manifest_hotstring_rows(ctx, config)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				end
 			local reset = function()
-						MagicKey.reset()
+						if not MagicKey.reset() then
+							show_error(i18n_safe("dialog.magic_key.error_persist"))
+							return
+						end
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					end
 			local rows = ManifestMenu.template_rows("hotstrings_magic_trigger_frame", { magic_key_change = change, magic_key_reset = reset },
@@ -1116,6 +1130,16 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			local ok_editor, Editor = pcall(require, "ui.hotstring_editor.bridge")
 			if ok_editor and type(Editor.get_pref) == "function" then
+				local function save_editor_pref(key, value)
+					local saved = Editor.set_pref(key, value)
+					if saved ~= true then
+						Logger.error(LOG, "Hotstring editor preference could not be saved.")
+						show_error(i18n_safe("dialog.personal_info.save_failed_title"), i18n_safe("common.error_title"))
+						return false
+					end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end
 				-- Which section a new entry lands in. Built from the personal pack's
 				-- own section order so the list is what the user actually has, and
 				-- "none" is offered because leaving it unset is a real choice.
@@ -1123,8 +1147,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				local personal = type(config.get_category) == "function"
 					and config.get_category(PERSONAL_CATEGORY) or nil
 				local none_action = function()
-						Editor.set_pref("default_section", "")
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						return save_editor_pref("default_section", "")
 					end
 				local choices = {}
 
@@ -1132,8 +1155,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					local selected = (current == name)
 					local choice = ManifestMenu.check_row("hotstring_personal_default_choice", require("config_keys").COMMAND.PERSONAL_DEFAULT_SECTION, {
 						[require("config_keys").COMMAND.PERSONAL_DEFAULT_SECTION] = function()
-							Editor.set_pref("default_section", name)
-							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+							return save_editor_pref("default_section", name)
 						end,
 					}, {
 						personal_default_section_label = function() return name end,
@@ -1162,8 +1184,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				preferences_present = true
 				close_on_add = Editor.get_pref("auto_close") == true
 				close_action = function()
-						Editor.set_pref("auto_close", not close_on_add)
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						return save_editor_pref("auto_close", not close_on_add)
 					end
 
 			else
@@ -1411,10 +1432,17 @@ local function _manifest_hotstring_rows(ctx, config)
 		-- Provider DATA since 2026-08-07: `{label, checked, action}` rows the
 		-- renderer materialises, rather than a menu tree this driver assembled.
 		["preview_bubbles"] = function()
+			local function toggle_preview(name)
+				local saved, noticed = PreviewSettings.toggle_with_notice(name)
+				if saved == true then return true end
+				Logger.error(LOG, "Preview setting could not be saved.")
+				if noticed ~= true then show_error(i18n_safe("dialog.personal_info.save_failed_title"), i18n_safe("common.error_title")) end
+				return false
+			end
 			local choices = {}
 			local row = ManifestMenu.check_row("preview_magic_control", require("config_keys").LEAF.PREVIEW_STAR_ENABLED, {
 				[require("config_keys").LEAF.PREVIEW_STAR_ENABLED] = function()
-					if PreviewSettings.toggle("star") ~= true then return false end
+					if not toggle_preview("star") then return false end
 					require("ui.menu.feature_notice").feature(i18n_safe("menu.hotstrings.notify_bubble_star"), PreviewSettings.get("star") == true)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
@@ -1434,7 +1462,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			}
 			for key, name in pairs({ [COMMAND.PREVIEW_AUTOCORRECT_ENABLED] = "autocorrect", [COMMAND.PREVIEW_AI_ENABLED] = "ai" }) do
 				presence_commands[key] = function()
-					if PreviewSettings.toggle(name) ~= true then return false end
+					if not toggle_preview(name) then return false end
 					require("ui.menu.feature_notice").feature(i18n_safe(bubble_notice_keys[name]), PreviewSettings.get(name) == true)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
@@ -1449,7 +1477,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			choices = {}
 			local row = ManifestMenu.check_row("preview_colored_control", require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS, {
 				[require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS] = function()
-					if PreviewSettings.toggle("colored") ~= true then return false end
+					if not toggle_preview("colored") then return false end
 					require("ui.menu.feature_notice").feature(i18n_safe("menu.hotstrings.notify_bubble_colored"), PreviewSettings.get("colored") == true)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
@@ -1486,8 +1514,14 @@ local function _manifest_hotstring_rows(ctx, config)
 			params_ctx.commands = {}
 			for key, value in pairs(c.commands or {}) do params_ctx.commands[key] = value end
 			params_ctx.commands[require("config_keys").COMMAND.REPEAT_KEY] = function()
-				RepeatKey.toggle()
+				local committed, noticed = RepeatKey.toggle_with_notice()
+				if committed ~= true then
+					Logger.error(LOG, "Repeat setting could not be saved.")
+					if noticed ~= true then show_error(i18n_safe("dialog.personal_info.save_failed_title"), i18n_safe("common.error_title")) end
+					return false
+				end
 				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return true
 			end
 			params_ctx.state_getters = {}
 			for key, value in pairs(c.state_getters or {}) do params_ctx.state_getters[key] = value end

@@ -1297,11 +1297,11 @@ function render_sfb_kpi() {
 		// build BOTH the full map and the same-key-only delta so the
 		// heatmap-only toggle can switch view without re-running this loop.
 		sfb_by_kc[kc_a] = (sfb_by_kc[kc_a] || 0) + count;
-		sfb_by_kc[kc_b] = (sfb_by_kc[kc_b] || 0) + count;
+		if (!is_same_key) sfb_by_kc[kc_b] = (sfb_by_kc[kc_b] || 0) + count;
 		if (!sfb_pairs_by_kc[kc_a]) sfb_pairs_by_kc[kc_a] = [];
 		if (!sfb_pairs_by_kc[kc_b]) sfb_pairs_by_kc[kc_b] = [];
 		sfb_pairs_by_kc[kc_a].push({ partner_kc: kc_b, pair_label: k, count });
-		sfb_pairs_by_kc[kc_b].push({ partner_kc: kc_a, pair_label: k, count });
+		if (!is_same_key) sfb_pairs_by_kc[kc_b].push({ partner_kc: kc_a, pair_label: k, count });
 		if (is_same_key) {
 			// Heatmap delta — subtracted at render time when the heatmap
 			// toggle is "doublons exclus".
@@ -1313,10 +1313,39 @@ function render_sfb_kpi() {
 		if (!_sfb_include_same_key && is_same_key) return;
 
 		sfb_total += count;
-		const finger_fr = FINGER_LABELS_FR[col_a] || col_a;
-		const fp = finger_fr.split(' ');
-		const hand = fp[fp.length - 1];
-		const finger = fp.slice(0, -1).join(' ');
+		// Some languages join finger and hand without a space. Only expose a
+		// side when both translations prove the same finger stem with opposite,
+		// unambiguous hand suffixes; otherwise retain the full name and no side.
+		const finger = FINGER_LABELS_FR[col_a] || col_a;
+		const strings = window._i18n_strings || {};
+		const left = strings['ui_typing.finger.hand_l'];
+		const right = strings['ui_typing.finger.hand_r'];
+		const otherKey = col_a.startsWith('l_')
+			? `r_${col_a.slice(2)}`
+			: col_a.startsWith('r_')
+				? `l_${col_a.slice(2)}`
+				: null;
+		const other = otherKey && FINGER_LABELS_FR[otherKey];
+		let hand = '—';
+		if (
+			typeof left === 'string' &&
+			left &&
+			typeof right === 'string' &&
+			right &&
+			typeof other === 'string'
+		) {
+			const lm = finger.endsWith(left),
+				rm = finger.endsWith(right);
+			const olm = other.endsWith(left),
+				orm = other.endsWith(right);
+			if (lm !== rm && olm !== orm && lm !== olm) {
+				const suffix = lm ? left : right,
+					otherSuffix = olm ? left : right;
+				const stem = finger.slice(0, -suffix.length).trim();
+				const otherStem = other.slice(0, -otherSuffix.length).trim();
+				if (stem && stem === otherStem) hand = suffix;
+			}
+		}
 		sfb_list.push({ pair: k, count, kc_a, kc_b, finger, hand });
 	});
 
@@ -1418,13 +1447,12 @@ function _render_sfb_heatmap_with_toggle() {
 		render_sfb_heatmap(full.sfb_by_kc, full.sfb_pairs_by_kc, app_state.data.kc || {});
 		return;
 	}
-	// Subtract same-key deltas from the full map (each side of the pair was
-	// the same key so we credit twice — count is doubled in sfb_by_kc).
+	// Subtract each same-key pair once from the full per-key totals.
 	const adjusted = {};
 	const same = (_sfb_heatmap_same_only && _sfb_heatmap_same_only.sfb_by_kc) || {};
 	Object.entries(full.sfb_by_kc).forEach(([kc_str, n]) => {
 		const dup = same[kc_str] || 0;
-		const v = n - dup * 2;
+		const v = n - dup;
 		if (v > 0) adjusted[kc_str] = v;
 	});
 	// Filter pair lists too — drop any entry where partner_kc === kc itself
@@ -1483,11 +1511,8 @@ function render_sfb_table() {
 		rows_html = sorted
 			.slice(0, 200)
 			.map((d) => {
-				// finger and hand are pre-computed in render_sfb_kpi() for sortability
-				// "doigt" / "main" share the same FINGER_LABELS_FR convention as the
-				// distance card; strip the trailing G/D from the finger label since the
-				// hand is already shown in its own column.
-				const doigt_str = (d.finger || '').replace(/\s+[GD]$/, '');
+				// The finger label is intentionally kept whole in every language.
+				const doigt_str = d.finger || '';
 				const main_str = d.hand || '';
 				const pair_html = `<span class="seq-chips">${format_seq_chips(d.pair)}</span>`;
 				return `<tr>
@@ -2598,10 +2623,13 @@ function render_lexical_kpi() {
 		const el = document.getElementById(id);
 		if (el) el.innerHTML = html;
 	};
-	set('lexical_val', `${richness.toFixed(1)}<span class="stat-unit">% richesse</span>`);
+	set(
+		'lexical_val',
+		`${richness.toFixed(1)}<span class="stat-unit">${escape_html(_t('ui_typing.unit_richness'))}</span>`
+	);
 	set('lexical_unique', format_number(unique_words));
 	set('lexical_total', format_number(total_words));
-	set('lexical_avg_len', `${avg_len.toFixed(2)} car.`);
+	set('lexical_avg_len', `${avg_len.toFixed(2)} ${escape_html(_t('ui_typing.col_chars'))}`);
 	set('lexical_top', top_word ? `${escape_html(top_word)} (${format_number(top_count)})` : '—');
 
 	const loading = document.getElementById('lexical_loading');
@@ -2629,7 +2657,7 @@ function render_lexical_kpi() {
 		const label = l === 15 ? '15+' : String(l);
 		bars_html.push(
 			`<tr>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:42px;">${label} car.</td>` +
+				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:42px;">${label} ${escape_html(_t('ui_typing.col_chars'))}</td>` +
 				`<td style="padding:2px 6px;">` +
 				`<div style="height:10px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden;">` +
 				`<div style="height:100%;width:${pct}%;background:rgb(251, 191, 36);"></div>` +
@@ -2733,9 +2761,12 @@ function render_rhythm_kpi() {
 		'rhythm_val',
 		`${format_number(max_cpm.toFixed(0))}<span class="stat-unit">${_t('ui_typing.unit_cpm_burst')}</span>`
 	);
-	set('rhythm_max_chars', max_chars > 0 ? `${format_number(max_chars)} car.` : '—');
+	set(
+		'rhythm_max_chars',
+		max_chars > 0 ? `${format_number(max_chars)} ${escape_html(_t('ui_typing.col_chars'))}` : '—'
+	);
 	set('rhythm_count', format_number(total_bursts));
-	set('rhythm_mean_delay', mean_delay > 0 ? `${mean_delay.toFixed(0)} ms` : '—');
+	set('rhythm_mean_delay', inter_count > 0 ? `${mean_delay.toFixed(0)} ms` : '—');
 	set('rhythm_cv', inter_count > 0 ? cv.toFixed(2) : '—');
 
 	const loading = document.getElementById('rhythm_loading');
@@ -2761,7 +2792,7 @@ function render_rhythm_kpi() {
 		.map((k) => {
 			const n = length_buckets[k] || 0;
 			const pct = max_bucket > 0 ? (n / max_bucket) * 100 : 0;
-			const label = k === '500+' ? '500+ car.' : `≤ ${k} car.`;
+			const label = `${k === '500+' ? '> 500' : `≤ ${k}`} ${escape_html(_t('ui_typing.col_chars'))}`;
 			return (
 				`<tr>` +
 				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:78px;">${label}</td>` +
@@ -2825,7 +2856,12 @@ function render_sessions_kpi() {
 	);
 	set('sessions_total_time', count > 0 ? _fmt_duration_ms(total_active_ms) : '—');
 	set('sessions_longest_time', longest_ms > 0 ? _fmt_duration_ms(longest_ms) : '—');
-	set('sessions_longest_chars', longest_chars > 0 ? `${format_number(longest_chars)} car.` : '—');
+	set(
+		'sessions_longest_chars',
+		longest_chars > 0
+			? `${format_number(longest_chars)} ${escape_html(_t('ui_typing.col_chars'))}`
+			: '—'
+	);
 	set('sessions_avg_time', avg_ms > 0 ? _fmt_duration_ms(avg_ms) : '—');
 
 	const loading = document.getElementById('sessions_loading');
@@ -2917,10 +2953,10 @@ function render_records_kpi() {
 		prev = ordinal;
 	});
 
-	const fr_short = (date_str) => {
+	const localized_short_date = (date_str) => {
 		if (!date_str) return '—';
 		const d = new Date(parseDateKey(date_str));
-		return d.toLocaleDateString('fr-FR', {
+		return d.toLocaleDateString(window._i18n_locale || 'fr', {
 			day: 'numeric',
 			month: 'short',
 			year: '2-digit',
@@ -2938,17 +2974,26 @@ function render_records_kpi() {
 	);
 	set(
 		'records_burst_chars',
-		max_burst > 0 ? `${format_number(max_burst)} car. (${escape_html(max_burst_app)})` : '—'
+		max_burst > 0
+			? `${format_number(max_burst)} ${escape_html(_t('ui_typing.col_chars'))} (${escape_html(max_burst_app)})`
+			: '—'
 	);
 	set(
 		'records_session',
-		max_session_ms > 0 ? `${_fmt_duration_ms(max_session_ms)} (${fr_short(max_session_date)})` : '—'
+		max_session_ms > 0
+			? `${_fmt_duration_ms(max_session_ms)} (${localized_short_date(max_session_date)})`
+			: '—'
 	);
 	set(
 		'records_best_day',
-		best_day_chars > 0 ? `${format_number(best_day_chars)} car. (${fr_short(best_day)})` : '—'
+		best_day_chars > 0
+			? `${format_number(best_day_chars)} ${escape_html(_t('ui_typing.col_chars'))} (${localized_short_date(best_day)})`
+			: '—'
 	);
-	set('records_streak', streak_max > 0 ? `${streak_max} jour${streak_max > 1 ? 's' : ''}` : '—');
+	set(
+		'records_streak',
+		streak_max > 0 ? `${escape_html(_t('ui_apps.label_days'))} ${streak_max}` : '—'
+	);
 
 	const has_data = max_burst > 0 || max_session_ms > 0 || best_day_chars > 0;
 	const loading = document.getElementById('records_loading');
@@ -3034,7 +3079,7 @@ function render_charmix_kpi() {
 	set(
 		'charmix_val',
 		dominant && grand > 0
-			? `${((dom_n / grand) * 100).toFixed(0)}<span class="stat-unit">% ${_t(dominant.labelKey).toLowerCase()}</span>`
+			? `${((dom_n / grand) * 100).toFixed(0)}<span class="stat-unit">% ${escape_html(_t(dominant.labelKey).toLowerCase())}</span>`
 			: `—`
 	);
 
@@ -3059,13 +3104,15 @@ function render_charmix_kpi() {
 	const segments = CHARMIX_CATEGORIES.map((c) => {
 		const n = totals[c.key] || 0;
 		const pct = (n / grand) * 100;
-		const label = pct >= 6 ? `${_t(c.labelKey)} ${pct.toFixed(0)}%` : '';
-		return { ...c, n, pct, label };
+		const category = escape_html(_t(c.labelKey));
+		const label = pct >= 6 ? `${category} ${pct.toFixed(0)}%` : '';
+		const tooltip = `${category} ${pct.toFixed(2)}%`;
+		return { ...c, n, pct, label, tooltip };
 	}).filter((s) => s.pct > 0);
 	const bar_html = segments
 		.map(
 			(s) =>
-				`<div title="${s.label || (s.label || '') + ' ' + s.pct.toFixed(2) + '%'}" ` +
+				`<div title="${s.tooltip}" ` +
 				`style="flex-basis:${s.pct}%;background:${s.color};display:flex;align-items:center;justify-content:center;` +
 				`color:${ThemeTokens.color('hue-0f172a')};font-size:11px;font-weight:600;overflow:hidden;white-space:nowrap;">${s.label}</div>`
 		)
@@ -3167,7 +3214,9 @@ function render_apps_kpi() {
 	const top_vol = _apps_data.slice().sort((a, b) => b.chars - a.chars)[0];
 	set(
 		'apps_top_volume',
-		top_vol ? `${escape_html(top_vol.name)} (${format_number(top_vol.chars)} car.)` : '—'
+		top_vol
+			? `${escape_html(top_vol.name)} (${format_number(top_vol.chars)} ${escape_html(_t('ui_typing.col_chars'))})`
+			: '—'
 	);
 
 	// Build symmetric app-pair affinity: both directions of switching count.

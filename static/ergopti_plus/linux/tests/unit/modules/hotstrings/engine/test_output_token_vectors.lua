@@ -144,6 +144,13 @@ helpers.describe("the shared engine and output tokens", function()
 		return result
 	end
 
+	helpers.it("keeps unknown brace content as literal text", function()
+		local output = "x {a&b} {x<😀} {foo}"
+		local result, has_keys = OutputTokens.resolve(output)
+		helpers.assert_eq(result, output)
+		helpers.assert_eq(has_keys, false)
+	end)
+
 	helpers.it("output token: the result says it presses a key", function()
 		local replacement, has_keys = OutputTokens.resolve("ab{left}")
 		local engine = engine_with({ { trigger = "qq", replacement = replacement, auto_expand = true,

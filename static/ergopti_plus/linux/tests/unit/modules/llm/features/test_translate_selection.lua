@@ -206,6 +206,16 @@ end
 -- ==============================================
 
 helpers.describe("llm_translate_selection: the selection translated and offered", function()
+	helpers.it("preserves Markdown and code in the accepted translation", function()
+		scenario({ selection = "**Hello** `x**2`", locale = "fr" }, function(world)
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "ui"))
+			world.wait_for(1)
+			world.respond(1, "**TRANSLATION:** **Bonjour** `x**2`")
+			helpers.assert_eq(table.concat(offered(world), "|"), "**Bonjour** `x**2`")
+			helpers.assert_true(world.engine.handle_shortcut({ key = "1", mods = {} }))
+			helpers.assert_eq(table.concat(world.replaced, "|"), "**Bonjour** `x**2`")
+		end)
+	end)
 
 	helpers.it("registers the action", function()
 		scenario({}, function(world)

@@ -88,6 +88,7 @@ local UNGOVERNED_CHORDS = { backspace = true, delete = true, home = true, ["end"
 -- editor submits on Enter and ignores a Backspace at the start of the prompt.
 local TERMINAL_APPS = {
 	terminal = true, ["gnome-terminal"] = true, ["gnome-terminal-server"] = true,
+	["gnome-terminal-"] = true, -- Linux /proc/<pid>/comm truncates at 15 bytes.
 	console = true, kgx = true, ptyxis = true, konsole = true, yakuake = true,
 	kitty = true, alacritty = true, foot = true, footclient = true, wezterm = true,
 	["wezterm-gui"] = true, ghostty = true, tilix = true, terminator = true,
@@ -101,7 +102,7 @@ local TERMINAL_APPS = {
 -- Browsers, whose Ctrl+L selects the whole address of the address bar.
 local BROWSER_APPS = {
 	firefox = true, ["firefox-esr"] = true, librewolf = true, waterfox = true,
-	chromium = true, ["chromium-browser"] = true, ["google-chrome"] = true,
+	chromium = true, ["chromium-browser"] = true, ["chromium-browse"] = true, ["google-chrome"] = true,
 	chrome = true, brave = true, ["brave-browser"] = true, vivaldi = true,
 	["vivaldi-stable"] = true, opera = true, ["microsoft-edge"] = true,
 	epiphany = true, falkon = true, floorp = true, zen = true,
@@ -299,8 +300,10 @@ local function persist(path, key, value)
 		Logger.error(LOG, "Word-reset change refused: a hotstring configuration scope is still pending.")
 		return false
 	end
+	local owner, staged = _settings, nil
 	local called, committed, detail = pcall(function()
-		local _, source = read_settings()
+		local source
+		staged, source = read_settings()
 		return Writer.batch_write(Paths.config("config.toml"),
 			{ Manifest.sparse_operation(path, value) }, nil, source)
 	end)
@@ -308,9 +311,12 @@ local function persist(path, key, value)
 		Logger.error(LOG, "Word-reset change was not persisted: %s.", tostring(called and detail or committed))
 		return false
 	end
-	local updated = M.snapshot()
-	updated[key] = value
-	_settings = updated
+	-- Publish the complete image used for the write, unless a re-entrant
+	-- configuration owner already replaced the runtime cache.
+	if _settings == owner then
+		staged[key] = value
+		_settings = staged
+	end
 	Logger.info(LOG, "%s set to %s.", path, tostring(value))
 	return true
 end
@@ -473,6 +479,7 @@ local function selects_whole_field(detail, app_id)
 	if type(detail) ~= "table" or type(detail.key) ~= "string" or not M.deletes_previous_word(detail) then
 		return false
 	end
+	if detail.mods.shift == true then return false end
 	local key = detail.key:lower()
 	if key == "a" then return not M.is_terminal_app(app_id) end
 	return key == "l" and BROWSER_APPS[app_key(app_id)] == true

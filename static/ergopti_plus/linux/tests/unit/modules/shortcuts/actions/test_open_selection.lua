@@ -28,14 +28,108 @@ local function read_corpus()
 	return assert(json.decode(raw), "the open-target corpus is not valid JSON")
 end
 
---- Runs body with xclip answering `selection`.
-local function with_selection(selection, body)
-	local real_popen = io.popen
-	io.popen = function()
-		return { read = function() return selection end, close = function() return true end }
+helpers.describe("opening selected content privacy", function()
+	for _, failure in ipairs({ false, true }) do
+		helpers.it("does not log selected search text on " .. (failure and "failure" or "success"), function()
+			local old_logger, old_subject = package.loaded["logger.shim"], package.loaded["modules.shortcuts.open_selection"]
+			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			local logs, opened = {}, nil
+			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
+			package.loaded["logger.shim"] = logger
+			package.loaded["modules.shortcuts.open_selection"] = nil
+			local ok, err = xpcall(function()
+				local subject = require("modules.shortcuts.open_selection")
+				subject._set_deps_for_test({
+					open = function(target, done)
+						opened = target
+						done(failure and { ok = false, error = "secretmarker" } or { ok = true })
+						return {}
+					end,
+					notify = function() return true end, message = function() return "%s" end,
+					getenv = function() return "/tmp" end,
+				})
+				helpers.assert_true(subject.open("secretmarker"))
+				helpers.assert_true(opened:find("secretmarker", 1, true) ~= nil)
+				helpers.assert_true(not table.concat(logs, "\n"):find("secretmarker", 1, true),
+					"the selected query and native error details must not enter logs")
+			end, debug.traceback)
+			package.loaded["logger.shim"], package.loaded["modules.shortcuts.open_selection"] = old_logger, old_subject
+			if not ok then error(err, 0) end
+		end)
 	end
+end)
+
+helpers.describe("opening selected content notifier privacy", function()
+	for _, mode in ipairs({ "unavailable", "refused" }) do
+		helpers.it("keeps the selected path out of the real notifier fallback when " .. mode, function()
+			local names = { "logger.shim", "modules.shortcuts.open_selection", "adapters.notifier", "adapters.shell_runner" }
+			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local logs = {}
+			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
+			package.loaded["logger.shim"] = logger
+			package.loaded["adapters.shell_runner"] = {
+				has_command = function() return mode ~= "unavailable" end,
+				quote = function(value) return "'" .. value .. "'" end,
+				run = function() return false end,
+			}
+			package.loaded["adapters.notifier"] = nil
+			package.loaded["modules.shortcuts.open_selection"] = nil
+			local ok, err = xpcall(function()
+				local subject = require("modules.shortcuts.open_selection")
+				subject._set_deps_for_test({ exists = function() return false end,
+					message = function() return "Cannot open %s" end, getenv = function() return "/tmp" end })
+				helpers.assert_eq(subject.open("/tmp/secretmarker"), false)
+				local output = table.concat(logs, "\n")
+				helpers.assert_true(not output:find("secretmarker", 1, true), "notifier fallback must not expose the path")
+				helpers.assert_true(output:find("Cannot open", 1, true) ~= nil, "the fallback still reports the failure")
+			end, debug.traceback)
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
+
+helpers.describe("copied path notifier privacy", function()
+	for _, mode in ipairs({ "unavailable", "refused" }) do
+		helpers.it("keeps copied file paths out of the real notifier fallback when " .. mode, function()
+			local names = { "logger.shim", "modules.shortcuts.open_selection", "adapters.notifier", "adapters.shell_runner" }
+			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local logs, written = {}, nil
+			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
+			package.loaded["logger.shim"] = logger
+			package.loaded["adapters.shell_runner"] = {
+				has_command = function() return mode ~= "unavailable" end,
+				quote = function(value) return "'" .. value .. "'" end,
+				run = function() return false end,
+			}
+			package.loaded["adapters.notifier"] = nil
+			package.loaded["modules.shortcuts.open_selection"] = nil
+			local ok, err = xpcall(function()
+				local subject = require("modules.shortcuts.open_selection")
+				subject._set_deps_for_test({ focused_context = function() return "nautilus", "window:one" end,
+					read_uri_list = function() return true, "file:///tmp/secretmarker\n" end,
+					write_clipboard = function(text) written = text; return true end,
+					message = function() return "Copied %s" end })
+				helpers.assert_true(subject.copy_selected_path(function() return "" end))
+				helpers.assert_eq(written, "/tmp/secretmarker")
+				local output = table.concat(logs, "\n")
+				helpers.assert_true(not output:find("secretmarker", 1, true), "notifier fallback must not expose the path")
+				helpers.assert_true(output:find("Copied", 1, true) ~= nil)
+			end, debug.traceback)
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
+
+--- Runs body with the session PRIMARY reader answering `selection`.
+local function with_selection(selection, body)
+	local previous = package.loaded["adapters.clipboard"]
+	package.loaded["adapters.clipboard"] = { read_primary = function() return true, selection end }
 	local ok, err = pcall(body)
-	io.popen = real_popen
+	package.loaded["adapters.clipboard"] = previous
 	if not ok then error(err, 0) end
 end
 
@@ -52,9 +146,11 @@ local function record(existing)
 			return {}
 		end,
 		exists = function(path) return (existing or {})[path] == true end,
+		path_status = function(path) return (existing or {})[path] and "present" or "absent" end,
 		notify = function(message) world.notices[#world.notices + 1] = message; return true end,
 		getenv = function(name) return ({ HOME = "/home/ada" })[name] end,
 		focused_app = function() return "" end,
+		focused_context = function() return "", nil end,
 		active_frame_app = function() return nil end,
 	})
 	return world, Subject
@@ -81,6 +177,10 @@ local function record_in(app, read, frame_app)
 		message = function(key) return key == "shortcuts.copy_path_notif" and "Path copied: %s" or key end,
 		getenv = function(name) return ({ HOME = "/home/ada" })[name] end,
 		focused_app = function() return app end,
+		focused_context = function()
+			if app == "" then world.frame_queries = world.frame_queries + 1; return frame_app, "test:file-manager-window" end
+			return app, "test:file-manager-window"
+		end,
 		active_frame_app = function()
 			world.frame_queries = world.frame_queries + 1
 			return frame_app
@@ -161,8 +261,8 @@ helpers.describe("copy_selected_path opens the primary selection (open-target-ip
 		Subject._set_deps_for_test(nil)
 		helpers.assert_eq(world.opened, { "/home/ada/Documents" })
 		helpers.assert_eq(#world.notices, 1, "the missing path must be reported, not searched")
-		helpers.assert_true(world.notices[1]:find("/home/ada/nowhere", 1, true) ~= nil,
-			"the notice names the path")
+		helpers.assert_true(world.notices[1]:find("/home/ada/nowhere", 1, true) == nil,
+			"the notice must not carry the private path to fallback logs")
 	end)
 
 	helpers.it("open-target: reports a registry key and a bare file name instead of searching them", function()
@@ -185,13 +285,126 @@ end)
 helpers.describe("copy_selected_path copies the selected files' paths in a file manager (linux-copy-path-file-manager)", function()
 	local NAUTILUS_COPY = "file:///home/ada/Docs/r%C3%A9sum%C3%A9.pdf\r\nfile:///home/ada/My%20Folder\r\n"
 
+	helpers.it("captures app and native window together before copy (copy-focus-snapshot)", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local window, presses = "x11:first", 0
+		Subject._set_deps_for_test({
+			focused_app = function() window = "x11:second"; return "nautilus" end,
+			focused_identity = function() return window end,
+			focused_context = function()
+				local captured = window; window = "x11:second"; return "nautilus", captured
+			end,
+			read_uri_list = function(admitted)
+				if admitted() then presses = presses + 1 end
+				return false, "", "copy_chord_failed"
+			end,
+		})
+		local result = Subject.copy_selected_path(function() return "" end)
+		Subject._set_deps_for_test(nil)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(presses, 0, "a window changed during acquisition must not receive Ctrl+C")
+	end)
+
+	for _, mode in ipairs({ "x11", "wayland", "missing_identity" }) do
+		helpers.it("uses one native " .. mode .. " focus snapshot for file copy (copy-focus-snapshot)", function()
+			local Subject = require("modules.shortcuts.open_selection")
+			local previous_window, previous_atspi = package.loaded["adapters.window_info"], package.loaded["adapters.atspi_focus"]
+			local copied, queries = {}, 0
+			package.loaded["adapters.window_info"] = {
+				focused_snapshot = function()
+					if mode == "x11" then return { appId = "nautilus" }, "x11:one" end
+					if mode == "missing_identity" then return { appId = "nautilus" }, nil end
+					return { appId = "" }, nil
+				end,
+			}
+			package.loaded["adapters.atspi_focus"] = { get_context_snapshot = function()
+				queries = queries + 1
+				return { app_id = "nautilus", window_bus_name = ":1.42", window_object_path = "/window/1" }, true
+			end }
+			Subject._set_deps_for_test({ read_uri_list = function(admitted)
+				assert(admitted()); return true, "file:///tmp/a\n"
+			end, write_clipboard = function(text) copied[#copied + 1] = text; return true end,
+				message = function() return "%s" end, notify_success = function() return true end })
+			local called, result = pcall(Subject.copy_selected_path, function() return "" end)
+			Subject._set_deps_for_test(nil)
+			package.loaded["adapters.window_info"], package.loaded["adapters.atspi_focus"] = previous_window, previous_atspi
+			helpers.assert_true(called and result)
+			helpers.assert_eq(copied, { "/tmp/a" })
+			helpers.assert_eq(queries, mode ~= "x11" and 3 or 0, "one observation per boundary")
+		end)
+	end
+
+	helpers.it("refuses an AT-SPI fallback from another application (copy-focus-snapshot)", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local previous_window, previous_atspi = package.loaded["adapters.window_info"], package.loaded["adapters.atspi_focus"]
+		local reads = 0
+		package.loaded["adapters.window_info"] = { focused_snapshot = function() return { appId = "nautilus" }, nil end }
+		package.loaded["adapters.atspi_focus"] = { get_context_snapshot = function()
+			return { app_id = "dolphin", window_bus_name = ":1.42", window_object_path = "/window/1" }, true
+		end }
+		Subject._set_deps_for_test({ read_uri_list = function() reads = reads + 1; return false end })
+		local called, result = pcall(Subject.copy_selected_path, function() error("unexpected fallback") end)
+		Subject._set_deps_for_test(nil)
+		package.loaded["adapters.window_info"], package.loaded["adapters.atspi_focus"] = previous_window, previous_atspi
+		helpers.assert_true(called)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(reads, 0)
+	end)
+
+	helpers.it("refuses to copy after focus moves to another window of the same manager (copy-same-app-window)", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local window, presses = "x11:first", 0
+		Subject._set_deps_for_test({ focused_app = function() return "nautilus" end,
+			focused_context = function() return "nautilus", window end,
+			read_uri_list = function(admitted)
+				window = "x11:second"
+				if admitted() then presses = presses + 1 end
+				return false, "", "copy_chord_failed"
+			end })
+		local retained = assert(Subject.capture_file_manager())
+		local result = Subject.copy_selected_path(function() return "" end)
+		local still_current = retained()
+		Subject._set_deps_for_test(nil)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(presses, 0, "the second window did not authorize Ctrl+C")
+		helpers.assert_eq(still_current, false, "deferred file actions must also lose authority")
+	end)
+
+	helpers.it("does not publish a file selection after the manager window changes (copy-same-app-window)", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local window, written = "x11:first", 0
+		Subject._set_deps_for_test({ focused_app = function() return "nautilus" end,
+			focused_context = function() return "nautilus", window end,
+			read_uri_list = function(admitted)
+				assert(admitted()); window = "x11:second"
+				return true, "file:///tmp/a\n"
+			end,
+			write_clipboard = function() written = written + 1; return true end })
+		local result = Subject.copy_selected_path(function() return "" end)
+		Subject._set_deps_for_test(nil)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(written, 0)
+	end)
+
+	helpers.it("refuses a file-manager copy without a native window identity (copy-same-app-window)", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local reads = 0
+		Subject._set_deps_for_test({ focused_app = function() return "nautilus" end,
+			focused_context = function() return "nautilus", nil end,
+			read_uri_list = function() reads = reads + 1; return false end })
+		local result = Subject.copy_selected_path(function() error("must not fall back to another selection") end)
+		Subject._set_deps_for_test(nil)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(reads, 0)
+	end)
+
 	helpers.it("(linux-copy-path-file-manager) copies the decoded paths, one per line, and opens nothing", function()
 		local world, Subject, primary = record_in("nautilus", { ok = true, uri_list = NAUTILUS_COPY })
 		local done = Subject.copy_selected_path(primary)
 		Subject._set_deps_for_test(nil)
 		helpers.assert_true(done)
 		helpers.assert_eq(world.written, { "/home/ada/Docs/résumé.pdf\n/home/ada/My Folder" })
-		helpers.assert_eq(world.successes, { "Path copied: /home/ada/Docs/résumé.pdf\n/home/ada/My Folder" })
+		helpers.assert_eq(world.successes, { "Path copied: …" }, "the notice must not leak paths through fallback logs")
 		helpers.assert_eq(world.opened, {}, "a file manager's selection is copied, never opened or searched")
 		helpers.assert_eq(world.primary_reads, 0)
 	end)
@@ -204,6 +417,49 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 			helpers.assert_eq(world.written, { "/tmp/a" })
 		end)
 	end
+
+	helpers.it("refuses the copy chord if focus leaves the file manager during preparation", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local app, emitted, written = "nautilus", 0, 0
+		Subject._set_deps_for_test({
+			focused_app = function() return app end,
+			focused_context = function() return app, "test:file-manager-window" end,
+			read_uri_list = function(admitted)
+				app = "gnome-terminal-server"
+				helpers.assert_type(admitted, "function")
+				if admitted() then emitted = emitted + 1 end
+				return false, "", "copy_chord_failed"
+			end,
+			write_clipboard = function() written = written + 1; return true end,
+		})
+		local ran = Subject.copy_selected_path(function() return "" end)
+		Subject._set_deps_for_test(nil)
+		helpers.assert_eq(ran, false)
+		helpers.assert_eq(emitted, 0)
+		helpers.assert_eq(written, 0)
+	end)
+
+	helpers.it("the real URI adapter guards the actual Ctrl+C emitter", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local names = { "adapters.clipboard", "modules.gestures.combo_emitter", "adapters.event_loop" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local app, emitted = "nautilus", 0
+		package.loaded[names[1]] = { read_selection_uri_list = function(press)
+			app = "gnome-terminal-server"
+			helpers.assert_eq(press("ctrl+c"), false)
+			return false, "", "copy_chord_failed"
+		end }
+		package.loaded[names[2]] = { press = function() emitted = emitted + 1; return true end }
+		package.loaded[names[3]] = { sleep_ms = function() return true end }
+		Subject._set_deps_for_test({ focused_app = function() return app end,
+			focused_context = function() return app, "test:file-manager-window" end })
+		local ok, err = pcall(function() helpers.assert_eq(Subject.copy_selected_path(function() return "" end), false) end)
+		Subject._set_deps_for_test(nil)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(err, 0) end
+		helpers.assert_eq(emitted, 0)
+	end)
 
 	helpers.it("(linux-copy-path-file-manager) sends no Ctrl+C outside a file manager", function()
 		for _, app in ipairs({ "gnome-terminal-server", "firefox", "" }) do
@@ -221,10 +477,23 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 			local done = Subject.copy_selected_path(primary)
 			Subject._set_deps_for_test(nil)
 			helpers.assert_true(done)
-			helpers.assert_eq(world.frame_queries, 1)
+			helpers.assert_eq(world.frame_queries, 2, "the active frame is checked again before publication")
 			helpers.assert_eq(world.written, { "/tmp/a b" }, frame .. " selection is copied, not opened")
 			helpers.assert_eq(world.opened, {})
 		end
+	end)
+
+	helpers.it("retains the active Wayland file manager and revokes it on focus change", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local frame = "nautilus"
+		Subject._set_deps_for_test({ focused_app = function() return "" end, active_frame_app = function() return frame end,
+			focused_context = function() return frame, "test:file-manager-window" end })
+		local admitted = Subject.capture_file_manager()
+		helpers.assert_type(admitted, "function")
+		helpers.assert_eq(admitted(), true)
+		frame = "gnome-terminal-server"
+		helpers.assert_eq(admitted(), false)
+		Subject._set_deps_for_test(nil)
 	end)
 
 	helpers.it("(linux-copy-path-wayland-frame) keeps opening when the frame is unknown or not a file manager", function()
@@ -277,4 +546,57 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 		helpers.assert_eq(world.written, { "/home/ada/notes.txt" })
 		helpers.assert_eq(world.opened, {})
 	end)
+end)
+
+helpers.describe('open selected paths ending in punctuation', function()
+  for _, item in ipairs({
+    { '/tmp/report.', '/tmp/report.' },
+    { '"/tmp/report."', '/tmp/report.' },
+    { 'file:///tmp/report.', '/tmp/report.' },
+    { '$HOME/report.', '/home/ada/report.' },
+  }) do
+    helpers.it('prefers the exact existing selection '..item[1], function()
+      local original = item[2]
+      local cleaned = original:sub(1, -2)
+      local world, subject = record({ [original]=true, [cleaned]=true })
+      local ok, err = pcall(function()
+        helpers.assert_true(subject.open(item[1]))
+        helpers.assert_eq(world.opened, { original })
+      end)
+      subject._set_deps_for_test(nil)
+      if not ok then error(err, 0) end
+    end)
+  end
+  helpers.it('still strips prose punctuation when only the cleaned path exists', function()
+    local world, subject = record({ ['/tmp/report']=true })
+    local ok, err = pcall(function()
+      helpers.assert_true(subject.open('/tmp/report.'))
+      helpers.assert_eq(world.opened, { '/tmp/report' })
+    end)
+    subject._set_deps_for_test(nil)
+    if not ok then error(err, 0) end
+  end)
+end)
+
+helpers.describe('exact path metadata refusal', function()
+  for _, failure in ipairs({'error', 'raise'}) do
+    helpers.it('does not open the cleaned path on metadata '..failure, function()
+      local subject = require('modules.shortcuts.open_selection')
+      local opened, notices = {}, {}
+      subject._set_deps_for_test({
+        exists = function() return true end,
+        path_status = function() if failure == 'raise' then error('native refusal') end; return 'error' end,
+        open = function(path) opened[#opened + 1] = path; return {} end,
+        message = function() return 'Cannot open %s' end,
+        notify = function(text) notices[#notices + 1] = text; return true end,
+      })
+      local ok, err = pcall(function()
+        helpers.assert_eq(subject.open('/tmp/report.'), false)
+        helpers.assert_eq(opened, {})
+        helpers.assert_eq(notices, { 'Cannot open …' })
+      end)
+      subject._set_deps_for_test(nil)
+      if not ok then error(err, 0) end
+    end)
+  end
 end)

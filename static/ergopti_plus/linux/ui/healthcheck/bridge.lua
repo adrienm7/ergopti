@@ -110,11 +110,7 @@ end
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	local fh = io.open(path, "rb")
-	if not fh then return nil end
-	local content = fh:read("*a")
-	fh:close()
-	return content
+	return require("infra.regular_file_reader").read_source(path)
 end
 
 --- The folder part of a path.
@@ -354,21 +350,24 @@ local function collect_ai(state)
 	}
 end
 
---- Whether the daemon may open a device, without keeping it open.
---- @param path string
---- @param mode string io.open mode.
+--- Whether a character device is readable without opening the device itself.
+--- @param path string Candidate event node.
 --- @return string "granted", "missing" or "unknown"
-local function device_access(path, mode)
-	local fh, err, code = io.open(path, mode)
-	if fh then
-		fh:close()
-		return "granted"
+local function device_access(path)
+	local uv = require("luv")
+	local inspected, attrs, _, code = pcall(uv.fs_stat, path)
+	if not inspected or type(attrs) ~= "table" then
+		if code == "EACCES" or code == "EPERM" or code == 13 or code == 1 then return "missing" end
+		return "unknown"
 	end
-	-- EACCES and EPERM: the file exists and this user may not open it
-	if code == 13 or code == 1 then return "missing" end
-	Logger.warn(LOG, "Diagnostics could not check %s: %s.", path, tostring(err))
+	if attrs.type ~= "char" then return "unknown" end
+	local checked, allowed, _, access_code = pcall(uv.fs_access, path, "R")
+	if checked and allowed == true then return "granted" end
+	if checked and (allowed == false or access_code == "EACCES" or access_code == "EPERM"
+		or access_code == 13 or access_code == 1) then return "missing" end
 	return "unknown"
 end
+M._device_access_for_test = device_access
 
 --- Whether the daemon may write a device node, asked through access(2).
 --- Opening for writing from Lua means O_CREAT: with the uinput module absent, a
@@ -417,7 +416,7 @@ local function collect_permissions(ids)
 		end
 	end
 	local readers = {
-		input_devices = function() return event and device_access(event, "rb") or "unknown" end,
+		input_devices = function() return event and device_access(event) or "unknown" end,
 		uinput        = function() return device_writable(require("adapters.uinput_writer").UINPUT_PATH) end,
 	}
 	local items = {}
@@ -646,10 +645,12 @@ end
 --- Cancels the probes of a session.
 --- @param session table|nil
 local function cancel_probes(session)
-	if session and session.probes then
-		session.probes.cancel()
-		session.probes = nil
-	end
+	if not session then return nil end
+	session.probe_revision = (session.probe_revision or 0) + 1
+	local revision, previous = session.probe_revision, session.probes
+	session.probes = nil
+	if previous then previous.cancel() end
+	return revision
 end
 
 --- Archives only reported cleanup metadata; no native owner is adopted or released.
@@ -676,18 +677,24 @@ end
 --- @param session table
 --- @param state table Daemon state.
 local function start_probes(session, state)
-	cancel_probes(session)
+	local revision = cancel_probes(session)
+	local snapshot = session.snapshot
+	local function current()
+		return _session == session and session.probe_revision == revision and session.snapshot == snapshot
+	end
+	if not current() then return end
 	-- Without the extensive opt-in only the local probes run (the configuration)
-	session.probes = require("ui.healthcheck.probes").start(M.config().schema, session.snapshot.sections.paths, state,
+	local probes = require("ui.healthcheck.probes").start(M.config().schema, snapshot.sections.paths, state,
 		function(id, result, sections)
-			if _session ~= session then return end
-			session.snapshot.probes[id] = result
+			if not current() then return end
+			snapshot.probes[id] = result
 			for section_id, values in pairs(sections or {}) do
-				local target = session.snapshot.sections[section_id]
+				local target = snapshot.sections[section_id]
 				for key, value in pairs(values) do target[key] = value end
 			end
 			push(session, { type = "probe", id = id, result = result, sections = sections })
-		end, { local_only = session.snapshot.extensive ~= true })
+		end, { local_only = snapshot.extensive ~= true, current = current })
+	if current() then session.probes = probes else probes.cancel() end
 end
 
 --- The first message of a page: its configuration and the first snapshot.
@@ -838,13 +845,17 @@ function M.on_message(payload, state, context)
 		if _session ~= previous or revision ~= _action_revision then return nil end
 		cancel_probes(previous)
 		if _session ~= previous or revision ~= _action_revision then return nil end
-		_session = {
+		local session = {
 			epoch    = epoch,
 			detailed = false,
 		}
-		_session.snapshot = M.build_snapshot(state, false)
-		local message = init_message(_session)
-		start_probes(_session, state)
+		_session = session
+		session.snapshot = M.build_snapshot(state, false)
+		if _session ~= session or require("ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
+		local message = init_message(session)
+		if _session ~= session or require("ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
+		start_probes(session, state)
+		if _session ~= session or require("ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
 		return message
 	end
 	if not _session or _session.epoch ~= epoch then

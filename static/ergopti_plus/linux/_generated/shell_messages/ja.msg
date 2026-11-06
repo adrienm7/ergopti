@@ -79,6 +79,7 @@ install.xdg_autostart=XDG 自動起動: {1}
 launch.already_running=Ergopti+ はこのセッションですでに実行中です ({1} が使用中)。この起動は拒否されました。
 launch.authorization_failed=入力アクセスの承認がキャンセルされたか、失敗しました。
 launch.groups_unavailable=セッションは設定された入力グループを取得できませんでした。
+launch.session_lock_invalid=セッションロックのフォルダーには絶対パスを指定してください。
 launcher.dependencies_installed=依存関係をインストールしました。
 launcher.driver_missing=エラー: Linux ドライバーのディレクトリが見つかりません: {1}
 launcher.install_deps_hint=実行: ergopti-hotstrings --install-deps

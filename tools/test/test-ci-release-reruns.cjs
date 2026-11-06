@@ -51,6 +51,7 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { createHash } = require('node:crypto');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
@@ -339,11 +340,9 @@ fs.writeFileSync(
 		'#!/usr/bin/env bash',
 		'printf \'%s\\n\' "$*" >> "$GH_STUB_LOG"',
 		'if [ -z "${GH_TOKEN:-}" ]; then echo "gh stub: GH_TOKEN is not set" >&2; exit 98; fi',
+		'if [ "$1" = api ]; then node "$GH_STUB_PUBLISH_RESPONDER" "$@"; exit $?; fi',
 		'case "$1 $2" in',
 		'    "release view")',
-		'        if [ "$*" = "release view ${GH_STUB_TAG:-} --repo ${GH_STUB_REPO:-} --json isDraft,assets" ]; then',
-		'            node "$GH_STUB_PUBLISH_RESPONDER" "$@"; exit $?;',
-		'        fi',
 		'        if [ "$*" != "release view $GH_STUB_TAG --repo $GH_STUB_REPO --json isDraft --jq .isDraft" ]; then',
 		'            echo "gh stub: unexpected call: $*" >&2; exit 99',
 		'        fi',
@@ -427,19 +426,31 @@ fs.writeFileSync(
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const args = process.argv.slice(2);
 const file = process.env.GH_STUB_PUBLISH_STATE;
 const state = JSON.parse(fs.readFileSync(file, 'utf8'));
+if (args[0] === 'api') {
+    if (state.mode === 'lookup-refusal') throw new Error('native inventory lookup refused');
+    if (state.mode === 'malformed') { process.stdout.write('{invalid'); process.exit(0); }
+    if (args[1].includes('/releases/tags/')) {
+        assert.equal(args[1], 'repos/' + process.env.GH_STUB_REPO + '/releases/tags/' + process.env.GH_STUB_TAG);
+        if (state.mode === 'unexpected-published') state.isDraft = false;
+        process.stdout.write(JSON.stringify({ id: 17, tag_name: process.env.GH_STUB_TAG, draft: state.isDraft }));
+    } else {
+        const prefix = 'repos/' + process.env.GH_STUB_REPO + '/releases/17/assets?per_page=100&page=';
+        assert.ok(args[1].startsWith(prefix));
+        const page = Number(args[1].slice(prefix.length));
+        assert.ok(Number.isInteger(page) && page > 0);
+        process.stdout.write(JSON.stringify(state.assets.slice((page - 1) * 100, page * 100)));
+    }
+    fs.writeFileSync(file, JSON.stringify(state));
+    process.exit(0);
+}
 assert.equal(args[0], 'release');
 assert.equal(args[2], process.env.GH_STUB_TAG);
 if (args[1] === 'create') {
     state.isDraft = args.includes('--draft');
-} else if (args[1] === 'view') {
-    assert.deepEqual(args.slice(3), ['--repo', process.env.GH_STUB_REPO, '--json', 'isDraft,assets']);
-    if (state.mode === 'lookup-refusal') throw new Error('native inventory lookup refused');
-    if (state.mode === 'malformed') { process.stdout.write('{invalid'); process.exit(0); }
-    if (state.mode === 'unexpected-published') state.isDraft = false;
-    process.stdout.write(JSON.stringify({ isDraft: state.isDraft, assets: state.assets }));
 } else if (args[1] === 'upload') {
     assert.equal(state.isDraft, true, 'an immutable publication cannot be repaired');
     const repo = args.indexOf('--repo');
@@ -449,7 +460,8 @@ if (args[1] === 'create') {
         const name = path.basename(local);
         if (state.mode === 'permanent-loss') continue;
         state.assets = state.assets.filter(asset => asset.name !== name);
-        state.assets.push({ name, size: fs.statSync(local).size, state: 'uploaded' });
+        const digest = state.mode === 'missing-digest' ? null : 'sha256:' + createHash('sha256').update(fs.readFileSync(local)).digest('hex');
+        state.assets.push({ name, size: fs.statSync(local).size, state: 'uploaded', digest });
     }
 } else if (args[1] === 'edit') {
     assert.deepEqual(args.slice(3), ['--repo', process.env.GH_STUB_REPO, '--draft=false']);
@@ -1505,10 +1517,23 @@ function createRelease(
 		.map((name) => ({
 			name,
 			size: fs.statSync(path.join(assets, name)).size,
+			digest:
+				'sha256:' +
+				createHash('sha256')
+					.update(fs.readFileSync(path.join(assets, name)))
+					.digest('hex'),
 			state: name === incomplete ? 'starter' : 'uploaded'
 		}));
 	if (mode === 'duplicate') receipts.push({ ...receipts[0] });
 	if (mode === 'wrong-size') receipts[0].size += 1;
+	if (mode === 'wrong-digest' || mode === 'pagination-wrong-digest')
+		receipts[0].digest =
+			'sha256:' + createHash('sha256').update(Buffer.alloc(receipts[0].size, 'x')).digest('hex');
+	if (mode === 'missing-digest') receipts[0].digest = null;
+	if (mode === 'pagination' || mode === 'pagination-wrong-digest') {
+		for (let index = 0; index < 100; index++)
+			receipts.unshift({ name: `other-${index}`, size: 1, state: 'uploaded', digest: null });
+	}
 	if (mode === 'invalid-size') receipts[0].size = '1';
 	if (mode === 'missing-size') delete receipts[0].size;
 	if (mode === 'missing-state') delete receipts[0].state;
@@ -1658,7 +1683,9 @@ check('release assets are verified while draft before publication can make them 
 		true,
 		'a successful upload command cannot prove GitHub retained every asset'
 	);
-	const read = result.calls.findIndex((call) => call.includes('--json isDraft,assets'));
+	const read = result.calls.findIndex((call) =>
+		call.includes('/releases/17/assets?per_page=100&page=1')
+	);
 	const publish = result.calls.findIndex((call) => call.includes('--draft=false'));
 	assert.ok(read > 0, 'the actual GitHub draft inventory must be read after creation');
 	assert.ok(publish > read, 'publication must follow the successful draft inventory gate');
@@ -1676,7 +1703,7 @@ check('a silently lost RPM is reuploaded by name before publication', () => {
 	const last = result.calls.at(-1);
 	assert.match(
 		last,
-		/release view .* --json isDraft,assets$/,
+		/api .*\/releases\/17\/assets\?per_page=100&page=1$/,
 		'the published state and inventory must be read back too'
 	);
 });
@@ -1706,6 +1733,73 @@ check('a wrong-size uploaded file must be replaced and read back before publicat
 		fs.statSync(path.join(runner, 'release-assets', name)).size
 	);
 	assert.equal(result.state.isDraft, false);
+});
+
+check('a same-size asset with different bytes is reuploaded before publication', () => {
+	const result = createRelease('true', { mode: 'wrong-digest' });
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.equal(result.calls.filter((call) => call.startsWith('release upload ')).length, 1);
+	assert.equal(result.state.isDraft, false);
+});
+
+check('a release artifact replaced by a FIFO before open is refused without blocking', () => {
+	if (process.platform !== 'linux') return;
+	const artifact = path.join(scratch, 'fifo-race-artifact');
+	fs.writeFileSync(artifact, 'release bytes');
+	const source = `
+const fs = require('node:fs');
+const cp = require('node:child_process');
+const target = process.argv[1];
+const original = fs.openSync;
+let swapped = false;
+fs.openSync = function(name, ...args) {
+  if (name === target && !swapped) {
+    swapped = true;
+    fs.unlinkSync(target);
+    cp.execFileSync('mkfifo', [target]);
+  }
+  return original.call(this, name, ...args);
+};
+try {
+  require(process.argv[2]).publishVerifiedRelease('v1.0.0', 'owner/repo', [target], () => { throw Error('unexpected GitHub call'); });
+  process.exit(2);
+} catch (error) {
+  if (!swapped || !/changed before hashing/.test(error.message)) throw error;
+}
+`;
+	try {
+		const result = spawnSync(
+			process.execPath,
+			['-e', source, artifact, path.join(ROOT, 'tools/build/publish-verified-release.cjs')],
+			{ encoding: 'utf8', timeout: 3000 }
+		);
+		assert.equal(result.error, undefined, String(result.error));
+		assert.equal(result.status, 0, result.stderr);
+	} finally {
+		fs.rmSync(artifact, { force: true });
+	}
+});
+
+check('release assets on later REST pages are all verified before publication', () => {
+	const result = createRelease('true', { mode: 'pagination' });
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.ok(result.calls.some((call) => call.includes('/assets?per_page=100&page=2')));
+	assert.equal(result.calls.filter((call) => call.startsWith('release upload ')).length, 0);
+});
+
+check('a different same-size asset on a later REST page is repaired', () => {
+	const result = createRelease('true', { mode: 'pagination-wrong-digest' });
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.ok(result.calls.some((call) => call.includes('/assets?per_page=100&page=2')));
+	assert.equal(result.calls.filter((call) => call.startsWith('release upload ')).length, 1);
+});
+
+check('an asset with no digest remains a draft after bounded repair', () => {
+	const result = createRelease('true', { mode: 'missing-digest' });
+	assert.equal(result.status, 1);
+	assert.equal(result.state.isDraft, true);
+	assert.equal(result.calls.filter((call) => call.startsWith('release upload ')).length, 2);
+	assert.equal(result.calls.filter((call) => call.startsWith('release edit ')).length, 0);
 });
 
 check('a permanently lost RPM stays a draft after the bounded repair attempts', () => {

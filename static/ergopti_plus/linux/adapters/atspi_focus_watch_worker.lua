@@ -1,4 +1,11 @@
 --- adapters/atspi_focus_watch_worker.lua
+-- The application-owned child is invoked directly, without a global Lua init.
+local literal_driver = os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT")
+if literal_driver and literal_driver ~= "" then
+	local literal_shared = assert(os.getenv("ERGOPTI_LITERAL_SHARED_ROOT"), "literal shared root unavailable")
+	assert(loadfile(literal_driver .. "/infra/literal_module_loader.lua"))().install(literal_driver, literal_shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), os.getenv("ERGOPTI_LITERAL_DIRECT") == "1" and "child-direct" or (os.getenv("ERGOPTI_LITERAL_DAEMON") == "1" and "daemon" or nil))
+end
+
 
 --- ==============================================================================
 --- MODULE: Resident Accessibility Focus Worker (Linux)
@@ -248,7 +255,13 @@ if type(arg) == "table" and type(arg[0]) == "string"
 	and arg[0]:match("/atspi_focus_watch_worker%.lua$") then
 	local shared_lua = arg[5]
 	assert(type(shared_lua) == "string" and shared_lua ~= "", "canonical shared Lua directory unavailable")
-	package.path = "./?.lua;./?/init.lua;" .. shared_lua .. "/?.lua;" .. shared_lua .. "/?/init.lua;" .. package.path
+	if literal_driver then
+		local resolver = assert(package.loaded["infra.literal_module_loader"])
+		resolver.prepend({ { ".", ".lua" }, { ".", "/init.lua" },
+			{ shared_lua, ".lua" }, { shared_lua, "/init.lua" } })
+	else
+		package.path = "./?.lua;./?/init.lua;" .. shared_lua .. "/?.lua;" .. shared_lua .. "/?/init.lua;" .. package.path
+	end
 	local ok, completed = pcall(M.run, arg[1], tonumber(arg[2]), tonumber(arg[3]), arg[4])
 	if not ok or completed ~= true then
 		io.stderr:write("Native accessibility focus worker stopped without authority.\n")

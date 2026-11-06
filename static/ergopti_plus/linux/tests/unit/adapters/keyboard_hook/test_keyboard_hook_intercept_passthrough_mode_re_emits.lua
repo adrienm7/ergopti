@@ -176,6 +176,13 @@ helpers.describe("keyboard_hook: intercept mode re-emits every consumed event", 
 			"observe-mode dispatch includes the same textual Enter terminator")
 	end)
 
+	helpers.it("observes a repeat whose press preceded capture", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local chars = {}
+		kh._test_drive({ ev(EV_KEY, 30, 2) }, { onChar = function(char) chars[#chars + 1] = char end }, false)
+		helpers.assert_eq(chars, { "a" }, "the desktop has already received this repeat")
+	end)
+
 end)
 
 
@@ -506,6 +513,21 @@ end)
 -- ================================================
 
 helpers.describe("keyboard_hook: a failing callback still forwards the grabbed event", function()
+	helpers.it("forward-on-fail: does not salvage if emergency cleanup raises", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local emitted = {}
+		local emergency = kh.emergency_stop
+		kh.emergency_stop = function() error("controlled cleanup failure") end
+		local ok, err = pcall(function()
+			kh._test_drive({ ev(EV_KEY, 30, 1) }, {
+				onPhysical = function() error("controlled callback failure") end,
+				onEmitRaw = function(code, value) emitted[#emitted + 1] = { code, value }; return true end,
+			}, true)
+		end)
+		kh.emergency_stop = emergency
+		if not ok then error(err, 0) end
+		helpers.assert_eq(emitted, {}, "an unacknowledged cleanup cannot authorize a new output")
+	end)
 
 	helpers.it("forward-on-fail: a raising onPhysical still delivers the press", function()
 		-- Regression: _on_physical ran before _forward_raw, so a throwing
@@ -520,8 +542,8 @@ helpers.describe("keyboard_hook: a failing callback still forwards the grabbed e
 				return true
 			end,
 		}, true)
-		helpers.assert_eq(emitted, { "30:1" },
-			"the grabbed press must reach the application even as capture stops")
+		helpers.assert_eq(emitted, { "30:1", "30:0" },
+			"the grabbed press reaches the application without leaving a virtual key held")
 		helpers.assert_true(not kh.isRunning(),
 			"the failure must still release capture ownership")
 	end)
@@ -538,8 +560,8 @@ helpers.describe("keyboard_hook: a failing callback still forwards the grabbed e
 				return true
 			end,
 		}, true)
-		helpers.assert_eq(emitted, { "30:1" },
-			"a missing verdict is not a suppression — the press must be forwarded")
+		helpers.assert_eq(emitted, { "30:1", "30:0" },
+			"a missing verdict is forwarded as a balanced press")
 		helpers.assert_true(not kh.isRunning(),
 			"the failure must still release capture ownership")
 	end)

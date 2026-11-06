@@ -134,13 +134,29 @@ function M.build(ctx)
 			return false
 		end
 
-		local apply_ok, apply_result = xpcall(setter, debug.traceback, slot, value)
-		if not apply_ok or apply_result ~= true then
-			local rollback_ok, rollback_result = xpcall(setter, debug.traceback, slot, previous)
-			if not rollback_ok or rollback_result ~= true then
+		local click_change
+		if setter_name == "set_action" and previous ~= value then
+			if type(gestures.begin_click_binding_change) ~= "function"
+				or type(gestures.finish_click_binding_change) ~= "function" then return false end
+			click_change = gestures.begin_click_binding_change(slot, previous)
+			if not click_change then return false end
+		end
+		local function restore_previous()
+			local rollback_ok, rollback_result = xpcall(setter, debug.traceback, slot, previous, click_change ~= nil)
+			-- A setter can throw after changing its state (for example while logging).
+			-- Release the binding only after observing restoration, before logging.
+			local observed, current = xpcall(getter, debug.traceback, slot)
+			if click_change and observed and current == previous then
+				gestures.finish_click_binding_change(click_change, false)
+			end
+			if not rollback_ok or rollback_result ~= true or not observed or current ~= previous then
 				Logger.error(LOG, "Gesture %s rollback did not commit for '%s': %s.",
 					tostring(label), tostring(slot), tostring(rollback_result))
 			end
+		end
+		local apply_ok, apply_result = xpcall(setter, debug.traceback, slot, value, click_change ~= nil)
+		if not apply_ok or apply_result ~= true then
+			restore_previous()
 			Logger.error(LOG, "Gesture %s mutation did not commit for '%s': %s.",
 				tostring(label), tostring(slot), tostring(apply_result))
 			return false
@@ -148,16 +164,15 @@ function M.build(ctx)
 
 		local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
 		if not save_ok or save_result ~= true then
-			local rollback_ok, rollback_result = xpcall(setter, debug.traceback, slot, previous)
-			if not rollback_ok or rollback_result ~= true then
-				Logger.error(LOG, "Gesture %s rollback did not commit for '%s': %s.",
-					tostring(label), tostring(slot), tostring(rollback_result))
-			end
+			restore_previous()
 			Logger.error(LOG, "Gesture %s preference publication did not commit for '%s': %s.",
 				tostring(label), tostring(slot), tostring(save_result))
 			return false
 		end
 
+		if click_change and gestures.finish_click_binding_change(click_change, true) ~= true then
+			Logger.error(LOG, "Gesture click cleanup remains pending for %s.", slot)
+		end
 		ctx.updateMenu()
 		return true
 	end
@@ -272,13 +287,35 @@ function M.build(ctx)
 			local spec = type(gestures.get_action_parameter_spec) == "function" and gestures.get_action_parameter_spec(a) or nil
 			if spec then
 				return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
-					local committed = shortcut_utils.prompt_action_parameter(gestures, slot, a, spec, picked, {
+					local click_change
+					local called, committed = xpcall(shortcut_utils.prompt_action_parameter, debug.traceback,
+						gestures, slot, a, spec, picked, {
 						section = "gestures", key = slot,
 						read = function() return gestures.get_action(slot) end,
-						apply = function() return gestures.set_action(slot, a) == true end,
-						restore = function(previous) return gestures.set_action(slot, previous) == true end,
+						apply = function()
+							local previous = gestures.get_action(slot)
+							if previous ~= a then
+								click_change = gestures.begin_click_binding_change(slot, previous)
+								if not click_change then return false end
+							end
+							return gestures.set_action(slot, a, click_change ~= nil) == true
+						end,
+						restore = function(previous) return gestures.set_action(slot, previous, click_change ~= nil) == true end,
+						recovery_settled = function()
+							if not click_change then return true end
+							if gestures.finish_click_binding_change(click_change, false) ~= true then return false end
+							click_change = nil
+							return true
+						end,
 					}, ctx.commit_program_parameter)
-					if committed then
+					if click_change and called and committed == true then
+						if gestures.finish_click_binding_change(click_change, true) ~= true then
+							Logger.error(LOG, "Gesture click cleanup remains pending for %s.", slot)
+						end
+						click_change = nil
+					end
+					if not called then Logger.error(LOG, "Gesture parameter transaction raised: %s.", tostring(committed)) end
+					if called and committed then
 						local conflict = type(gestures.on_action_changed) == "function" and gestures.on_action_changed(slot, a) or nil
 						ctx.updateMenu()
 						show_conflict(conflict)

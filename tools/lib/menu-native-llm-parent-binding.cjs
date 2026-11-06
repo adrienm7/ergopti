@@ -709,6 +709,7 @@ function closedModuleExport(unit, lex, rootPositions) {
 		VersionLabel: 'updater.version_label',
 		Schedule: 'updater.schedule',
 		AgentSettings: 'modules.llm.agent_settings',
+		AppIdentity: 'llm.app_identity',
 		TextUtils: 'text_utils',
 		SaveFailure: 'config_save_failure',
 		LabelValue: 'locale.label_value',
@@ -2319,7 +2320,7 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 		!closedModuleExport(builder, lex, rootPositions) ||
 		!closedModuleExport(agent, lex, rootPositions) ||
 		!closedSiblingRendererBindings(builder) ||
-		!closedOwnerReferences(agent, ['ManifestMenu', 'AgentSettings']) ||
+		!closedOwnerReferences(agent, ['ManifestMenu', 'AgentSettings', 'AppIdentity']) ||
 		!closedHelperReferences(builder, [
 			'_build_llm',
 			'_build_agent',

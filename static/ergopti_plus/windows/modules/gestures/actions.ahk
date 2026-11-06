@@ -25,10 +25,10 @@ global GESTURE_ACTIONS := Map(
 		},
 		; --- Mouse ---
 		"left_click_toggle", {
-				Fn: (*) => GestureToggleLeftClick(),
+				Fn: (BindingId := "") => GestureToggleLeftClick(BindingId),
 		},
 		"right_click_toggle", {
-				Fn: (*) => GestureToggleRightClick(),
+				Fn: (BindingId := "") => GestureToggleRightClick(BindingId),
 		},
 		; --- Editing ---
 		; --- Keys ---

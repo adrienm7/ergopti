@@ -26,8 +26,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if ! "$SKIP_RPM" && ! command -v rpmbuild >/dev/null 2>&1; then
+  echo "[ERR] rpmbuild is required to build an .rpm; use --skip-rpm for staging only." >&2
+  exit 69
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+IFS= read -r -d '' PROJECT_ROOT < <(cd -- "$SCRIPT_DIR/../.." && printf '%s\0' "$PWD")
 # The external hosts are declared once in _shared/data/identifiers.json.
 # shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
 . "$PROJECT_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
@@ -294,15 +299,6 @@ if [ "$SKIP_RPM" = true ]; then
   echo "=== Structure complete (--skip-rpm) ==="
   echo "RPM root: $RPM_ROOT"
   echo "To package on Fedora/RHEL:"
-  print_packaging_command
-  exit 0
-fi
-
-if ! command -v rpmbuild &>/dev/null; then
-  echo ""
-  echo "=== Structure complete (rpmbuild not available) ==="
-  echo "RPM root: $RPM_ROOT"
-  echo "Run on Fedora/RHEL to package:"
   print_packaging_command
   exit 0
 fi

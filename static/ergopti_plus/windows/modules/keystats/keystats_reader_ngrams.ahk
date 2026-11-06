@@ -55,12 +55,14 @@ global KLR_NGRAM_LIVE_TABLE := Map(
 		"w_bg", "ngram_word_bigrams"
 )
 
-KLR_BuildNgramFilter(start_date, end_date, selected_apps := unset) {
+KLR_BuildNgramFilter(start_date, end_date, selected_apps := unset, exclude_date := "") {
 		clauses := []
 		if (start_date != "")
 				clauses.Push("date >= " . SQLite_Q(start_date))
 		if (end_date != "")
 				clauses.Push("date <= " . SQLite_Q(end_date))
+		if (exclude_date != "")
+				clauses.Push("date <> " . SQLite_Q(exclude_date))
 		if IsSet(selected_apps) {
 				app_predicate := KLR_BuildNgramAppPredicate(selected_apps)
 				if (app_predicate != "")
@@ -136,10 +138,10 @@ KLR_NewNgramItem(c, t, e, hs := 0, llm := 0, other := 0) {
 
 ; Both serializers consume these exact grouped rows: limits apply only to the
 ; nine text tables, never to shortcuts or the keyboard heatmaps.
-KLR_NgramProjectionQueries(start_date, end_date, selected_apps := unset) {
+KLR_NgramProjectionQueries(start_date, end_date, selected_apps := unset, exclude_date := "") {
 		where := IsSet(selected_apps)
-				? KLR_BuildNgramFilter(start_date, end_date, selected_apps)
-				: KLR_BuildNgramFilter(start_date, end_date)
+				? KLR_BuildNgramFilter(start_date, end_date, selected_apps, exclude_date)
+				: KLR_BuildNgramFilter(start_date, end_date, , exclude_date)
 		queries := Map()
 		for code, tbl in KLR_NGRAM_TYPE_TABLE {
 				queries[code] := "SELECT token,"
@@ -160,13 +162,13 @@ KLR_NgramProjectionQueries(start_date, end_date, selected_apps := unset) {
 		return queries
 }
 
-KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset) {
+KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset, exclude_date := "") {
 		out := KLR_NewTodayBucket()
 		if !db
 				return out
 		queries := IsSet(selected_apps)
-				? KLR_NgramProjectionQueries(start_date, end_date, selected_apps)
-				: KLR_NgramProjectionQueries(start_date, end_date)
+				? KLR_NgramProjectionQueries(start_date, end_date, selected_apps, exclude_date)
+				: KLR_NgramProjectionQueries(start_date, end_date, , exclude_date)
 		for code, sql in queries {
 				for r in KLR_ProjectionQuery(db, sql, "range", "historical " . code)
 						out[code][r["token"]] := KLR_NewNgramItem(r["c"], r["t"], r["e"],
@@ -183,10 +185,10 @@ KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset) {
  * @param selected_apps Optional application selection, including the Unknown bucket.
  * @returns {String} Complete JSON object with the same shape as KLR_ReadNgrams.
  */
-KLR_BuildNgramsJson(db, start_date := "", end_date := "", selected_apps := unset) {
+KLR_BuildNgramsJson(db, start_date := "", end_date := "", selected_apps := unset, exclude_date := "") {
 		queries := db ? (IsSet(selected_apps)
-				? KLR_NgramProjectionQueries(start_date, end_date, selected_apps)
-				: KLR_NgramProjectionQueries(start_date, end_date)) : Map()
+				? KLR_NgramProjectionQueries(start_date, end_date, selected_apps, exclude_date)
+				: KLR_NgramProjectionQueries(start_date, end_date, , exclude_date)) : Map()
 		out := "{"
 		for code, _ in KLR_NewTodayBucket() {
 				fragment := "{}"
@@ -326,7 +328,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset, Complete := false, SnapshotDay
  * Serializes a complete range snapshot using one captured calendar boundary.
  * @param db Open SQLite handle, or zero for empty historical and today buckets.
  * @param start_date Inclusive historical lower date bound, or an empty string.
- * @param end_date Historical upper bound, capped before the snapshot day.
+ * @param end_date Inclusive upper bound; explicit later days exclude the snapshot day.
  * @param selected_apps Optional application selection, including Unknown.
  * @param SnapshotDay Optional captured date in yyyy-MM-dd format.
  * @returns {String} Historical type index and complete per-app today index as JSON.
@@ -335,10 +337,13 @@ KLR_BuildRangeSplitTodayJson(db, start_date := "", end_date := "", selected_apps
 		SnapshotDay := "") {
 		today := SnapshotDay != "" ? SnapshotDay : FormatTime(A_Now, "yyyy-MM-dd")
 		yesterday := KLR_PrevDay(today)
-		hist_end := (end_date != "" && StrCompare(end_date, today) < 0) ? end_date : yesterday
+		future := (end_date != "" && StrCompare(end_date, today) > 0)
+				|| (start_date != "" && StrCompare(start_date, today) > 0 && end_date = "")
+		hist_end := future ? end_date : ((end_date != "" && StrCompare(end_date, today) < 0) ? end_date : yesterday)
+		exclude_date := future ? today : ""
 		historical := IsSet(selected_apps)
-				? KLR_BuildNgramsJson(db, start_date, hist_end, selected_apps)
-				: KLR_BuildNgramsJson(db, start_date, hist_end)
+				? KLR_BuildNgramsJson(db, start_date, hist_end, selected_apps, exclude_date)
+				: KLR_BuildNgramsJson(db, start_date, hist_end, , exclude_date)
 		today_json := IsSet(selected_apps)
 				? KLR_BuildTodayIdxJson(db, selected_apps, true, today)
 				: KLR_BuildTodayIdxJson(db, , true, today)
@@ -455,14 +460,18 @@ KLR__FillTodayAuxTables(db, today, app_clause, today_idx) {
 KLR_ReadRangeSplitToday(db, start_date := "", end_date := "", selected_apps := unset, SnapshotDay := "") {
 		today := SnapshotDay != "" ? SnapshotDay : FormatTime(A_Now, "yyyy-MM-dd")
 
-		; Historical: everything strictly before today.
+		; A requested later day can already hold events after a clock rollback.
+		; Keep today's per-app projection separate from the other selected days.
 		yesterday := KLR_PrevDay(today)
 		; AHK v2 throws « Expected a Number but got a String » when comparing
 		; two strings with `<`. Use StrCompare for the lexicographic test.
-		hist_end := (end_date != "" && StrCompare(end_date, today) < 0) ? end_date : yesterday
+		future := (end_date != "" && StrCompare(end_date, today) > 0)
+				|| (start_date != "" && StrCompare(start_date, today) > 0 && end_date = "")
+		hist_end := future ? end_date : ((end_date != "" && StrCompare(end_date, today) < 0) ? end_date : yesterday)
+		exclude_date := future ? today : ""
 		historical := IsSet(selected_apps)
-				? KLR_ReadNgrams(db, start_date, hist_end, selected_apps)
-				: KLR_ReadNgrams(db, start_date, hist_end)
+				? KLR_ReadNgrams(db, start_date, hist_end, selected_apps, exclude_date)
+				: KLR_ReadNgrams(db, start_date, hist_end, , exclude_date)
 
 		; Today: per-app n-gram dict for each app touched today.
 		today_idx := Map()

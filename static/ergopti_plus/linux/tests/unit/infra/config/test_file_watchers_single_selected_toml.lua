@@ -411,6 +411,48 @@ helpers.describe("file watchers single selected TOML", function()
 			"the fixture cleanup never changes the link target")
 	end)
 
+	helpers.it("(linux-watch-selected-file) native ENOENT is reported as absence", function()
+		selected_file_session("native", function(s)
+			local logger = require("logger.shim")
+			local original, absent = logger.info, 0
+			logger.info = function(tag, format, ...)
+				if type(format) == "string" and format:find("is absent", 1, true) then absent = absent + 1 end
+				return original(tag, format, ...)
+			end
+			local ok, detail = pcall(s.start)
+			logger.info = original
+			if not ok then error(detail, 0) end
+			helpers.assert_eq(absent, 1, "native ENOENT must remain an explicit absence")
+		end, { absent = true })
+	end)
+
+	if native_luv.getuid() ~= 0 then
+		helpers.it("(linux-watch-selected-file) denied metadata is not reported as absence", function()
+			selected_file_session("native", function(s)
+				local logger = require("logger.shim")
+				local old_info, old_warn = logger.info, logger.warn
+				local absent, unreadable = 0, 0
+				logger.info = function(tag, format, ...)
+					if type(format) == "string" and format:find("is absent", 1, true) then absent = absent + 1 end
+					return old_info(tag, format, ...)
+				end
+				logger.warn = function(tag, format, ...)
+					if type(format) == "string" and format:find("metadata is unavailable", 1, true) then unreadable = unreadable + 1 end
+					return old_warn(tag, format, ...)
+				end
+				assert(native_luv.fs_chmod(s.parent, 0))
+				local ok, detail = xpcall(function() s.start(); s.drain() end, debug.traceback)
+				assert(native_luv.fs_chmod(s.parent, 448))
+				logger.info, logger.warn = old_info, old_warn
+				if not ok then error(detail, 0) end
+				helpers.assert_eq(absent, 0, "EACCES must not be called ENOENT")
+				helpers.assert_true(unreadable > 0, "the native refusal must be visible")
+				s.now = s.now + 1100; s.settle(1)
+				helpers.assert_eq(#s.active(s.path), 1, "repaired permissions restore coverage")
+			end, { nested = 1 })
+		end)
+	end
+
 	if native_luv.getuid() ~= 0 then
 		helpers.it("(linux-watch-selected-file) native actual EACCES admission remains repairable", function()
 			selected_file_session("native", function(s)

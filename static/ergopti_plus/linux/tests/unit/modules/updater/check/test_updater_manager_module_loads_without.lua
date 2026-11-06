@@ -151,6 +151,36 @@ helpers.describe("modules.updater.manager", function()
 		helpers.assert_nil(M.get_cached_release())
 	end)
 
+	helpers.it("does not offer a source checkout an install when the checksum is missing", function()
+		local previous = M.current_version
+		M.current_version = function() return "local" end
+		M.clear_cached_release()
+		local body = '{"tag_name":"v4.0.0","assets":[{"name":"' .. M.LINUX_ASSET_NAME
+			.. '","browser_download_url":"https://example.invalid/archive"}]}'
+		local available, reason = M._process_release_response("[" .. body .. "]", "main")
+		M.current_version = previous
+		helpers.assert_eq(available, false)
+		helpers.assert_eq(reason, "no_asset")
+		helpers.assert_nil(M.get_cached_release())
+	end)
+
+	helpers.it("keeps source check-only offers and complete installable releases", function()
+		local previous = M.current_version
+		M.current_version = function() return "local" end
+		M.clear_cached_release()
+		local offer = M._process_release_response('[{"tag_name":"v4.0.0"}]', "main", true)
+		local feed = M.get_cached_release()
+		helpers.assert_eq(offer, true)
+		helpers.assert_eq(feed.check_only, true)
+		helpers.assert_eq(feed.download_url, "")
+		local complete = M._process_release_response("[" .. release("v4.0.0", false) .. "]", "main")
+		local record = M.get_cached_release()
+		M.current_version = previous
+		helpers.assert_eq(complete, true)
+		helpers.assert_true(record.download_url ~= "")
+		helpers.assert_true(record.checksum_url ~= "")
+	end)
+
 	-- The stable channel asked /releases/latest, which ignores prereleases and
 	-- answers 404 while no stable release exists; the check then reported
 	-- "not available" for what was a missing channel.

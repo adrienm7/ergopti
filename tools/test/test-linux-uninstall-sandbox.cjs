@@ -50,6 +50,28 @@ try {
 	const stubs = path.join(sandbox, 'stubs');
 	let configHome = null;
 	fs.mkdirSync(stubs);
+	if (process.platform === 'linux') {
+		const waitStubs = path.join(sandbox, 'owner-wait-stubs');
+		const sleeps = path.join(sandbox, 'owner-wait-sleeps');
+		fs.mkdirSync(waitStubs);
+		fs.writeFileSync(path.join(waitStubs, 'cat'), '#!/bin/bash\nexit 1\n', { mode: 0o755 });
+		fs.writeFileSync(
+			path.join(waitStubs, 'sleep'),
+			`#!/bin/bash\nprintf . >> ${JSON.stringify(sleeps)}\n`,
+			{ mode: 0o755 }
+		);
+		const failedReads = spawnSync(
+			bashExecutable(),
+			[bashPath(script), '--wait-owner', `${process.pid}:1`, '--check'],
+			{
+				encoding: 'utf8',
+				timeout: 15000,
+				env: { HOME: home, PATH: `${waitStubs}:/usr/bin:/bin`, LANG: 'C' }
+			}
+		);
+		assert.equal(failedReads.status, 1, failedReads.stderr);
+		assert.equal(fs.readFileSync(sleeps, 'utf8').length, 300, 'each refused read waits');
+	}
 	fs.writeFileSync(path.join(stubs, 'systemctl'), '#!/bin/bash\nexit 0\n', { mode: 0o755 });
 	const run = (...args) =>
 		spawnSync(bashExecutable(), [bashPath(script), '--prefix', bashPath(prefix), ...args], {
@@ -62,6 +84,60 @@ try {
 				...(configHome ? { XDG_CONFIG_HOME: bashPath(configHome) } : {})
 			}
 		});
+	if (process.platform === 'linux') {
+		// The selected XDG root itself may be a deliberate link. The receipt
+		// still admits each startup file and the personal configuration stays.
+		const other = path.join(sandbox, 'linked-config-prefix');
+		const otherLibrary = path.join(other, 'lib/ergopti');
+		const otherWrapper = path.join(other, 'bin/ergopti-hotstrings');
+		const configTarget = path.join(sandbox, 'physical-config');
+		const configAlias = path.join(sandbox, 'selected-config');
+		const driver = path.join(otherLibrary, 'linux/ergopti_hotstrings.lua');
+		const locale = path.join(otherLibrary, '_shared/data/locales/en.json');
+		const startup = path.join(configTarget, 'autostart/ergopti-hotstrings.desktop');
+		const unit = path.join(configTarget, 'systemd/user/ergopti-hotstrings.service');
+		const personal = path.join(configTarget, 'ergopti/personal.toml');
+		for (const file of [driver, locale, otherWrapper, startup, unit, personal])
+			fs.mkdirSync(path.dirname(file), { recursive: true });
+		fs.writeFileSync(driver, 'driver');
+		fs.writeFileSync(locale, 'locale');
+		fs.writeFileSync(
+			otherWrapper,
+			`DRIVER_ROOT="${otherLibrary}/linux"\nexec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"\n`
+		);
+		fs.writeFileSync(startup, `Exec=${otherWrapper} --tray\n`);
+		fs.writeFileSync(unit, `ExecStart=${otherWrapper} --tray\n`);
+		fs.writeFileSync(personal, 'personal data\n');
+		fs.symlinkSync(configTarget, configAlias);
+		const row = (file, relative) =>
+			`${createHash('sha256').update(fs.readFileSync(file)).digest('hex')}\t${relative}\n`;
+		fs.writeFileSync(
+			path.join(otherLibrary, '.ergopti-owned-files'),
+			row(driver, 'linux/ergopti_hotstrings.lua') +
+				row(locale, '_shared/data/locales/en.json') +
+				row(otherWrapper, '@wrapper') +
+				row(startup, '@autostart') +
+				row(unit, '@unit')
+		);
+		const result = spawnSync(
+			bashExecutable(),
+			[bashPath(script), '--prefix', bashPath(other), '--yes'],
+			{
+				encoding: 'utf8',
+				timeout: 15000,
+				env: {
+					HOME: bashPath(home),
+					XDG_CONFIG_HOME: bashPath(configAlias),
+					PATH: `${bashPath(stubs)}:/usr/bin:/bin`
+				}
+			}
+		);
+		assert.equal(result.status, 0, `linked XDG root: ${result.stderr}`);
+		assert.equal(fs.existsSync(startup), false);
+		assert.equal(fs.existsSync(unit), false);
+		assert.equal(fs.readFileSync(personal, 'utf8'), 'personal data\n');
+		assert.equal(fs.lstatSync(configAlias).isSymbolicLink(), true);
+	}
 	assert.notEqual(run('--yes').status, 0, 'an unrelated wrapper must prevent removal');
 	assert.ok(fs.existsSync(library), 'refusal preserves the installation');
 	// The failure is shown in Ergopti's own dialog host, run by the source
@@ -114,6 +190,84 @@ try {
 	);
 	const ownershipPath = path.join(library, '.ergopti-owned-files');
 	const validOwnership = fs.readFileSync(ownershipPath, 'utf8');
+	if (process.platform === 'linux') {
+		const alias = path.join(sandbox, 'missing-config-alias');
+		fs.symlinkSync(path.join(home, '.config'), alias);
+		configHome = path.join(alias, 'missing', 'nested');
+		const checked = run('--check');
+		assert.equal(checked.status, 0, `missing linked XDG root: ${checked.stderr}`);
+		assert.equal(fs.existsSync(path.join(home, '.config/missing')), false);
+		configHome = null;
+	}
+	{
+		const noHome = spawnSync(
+			bashExecutable(),
+			[bashPath(script), '--prefix', bashPath(prefix), '--check'],
+			{
+				encoding: 'utf8',
+				timeout: 15000,
+				env: {
+					PATH: `${bashPath(stubs)}:/usr/bin:/bin`,
+					XDG_CONFIG_HOME: bashPath(path.join(home, '.config'))
+				}
+			}
+		);
+		assert.equal(noHome.status, 0, `explicit prefix without HOME: ${noHome.stderr}`);
+		if (process.platform === 'linux') {
+			const otherPrefix = path.join(sandbox, 'no-home-prefix');
+			const otherLibrary = path.join(otherPrefix, 'lib/ergopti');
+			const otherWrapper = path.join(otherPrefix, 'bin/ergopti-hotstrings');
+			const driver = path.join(otherLibrary, 'linux/ergopti_hotstrings.lua');
+			const locale = path.join(otherLibrary, '_shared/data/locales/en.json');
+			for (const file of [driver, locale, otherWrapper])
+				fs.mkdirSync(path.dirname(file), { recursive: true });
+			fs.writeFileSync(driver, 'driver');
+			fs.writeFileSync(locale, 'locale');
+			fs.writeFileSync(
+				otherWrapper,
+				`DRIVER_ROOT="${otherLibrary}/linux"\nexec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"\n`
+			);
+			const row = (file, relative) =>
+				`${createHash('sha256').update(fs.readFileSync(file)).digest('hex')}\t${relative}\n`;
+			fs.writeFileSync(
+				path.join(otherLibrary, '.ergopti-owned-files'),
+				row(driver, 'linux/ergopti_hotstrings.lua') +
+					row(locale, '_shared/data/locales/en.json') +
+					row(otherWrapper, '@wrapper')
+			);
+			const runtime = path.join(sandbox, 'no-home-runtime');
+			fs.mkdirSync(runtime);
+			const noRuntime = spawnSync(
+				bashExecutable(),
+				[bashPath(script), '--prefix', bashPath(otherPrefix), '--yes'],
+				{
+					encoding: 'utf8',
+					timeout: 15000,
+					env: {
+						PATH: `${bashPath(stubs)}:/usr/bin:/bin`,
+						XDG_CONFIG_HOME: bashPath(path.join(home, '.config'))
+					}
+				}
+			);
+			assert.notEqual(noRuntime.status, 0, 'removal without a lock root must fail');
+			assert.ok(fs.existsSync(otherWrapper), 'failed lock admission preserves the installation');
+			const removed = spawnSync(
+				bashExecutable(),
+				[bashPath(script), '--prefix', bashPath(otherPrefix), '--yes'],
+				{
+					encoding: 'utf8',
+					timeout: 15000,
+					env: {
+						PATH: `${bashPath(stubs)}:/usr/bin:/bin`,
+						XDG_CONFIG_HOME: bashPath(path.join(home, '.config')),
+						XDG_RUNTIME_DIR: bashPath(runtime)
+					}
+				}
+			);
+			assert.equal(removed.status, 0, `explicit removal without HOME: ${removed.stderr}`);
+			assert.equal(fs.existsSync(otherWrapper), false);
+		}
+	}
 	fs.writeFileSync(ownershipPath, validOwnership.slice(0, -1));
 	assert.equal(run('--check').status, 0, 'a complete final record is valid without a newline');
 	fs.writeFileSync(ownershipPath, '');
@@ -132,6 +286,29 @@ try {
 	);
 	assert.ok(fs.existsSync(wrapper), 'empty receipt refusal preserves the launcher');
 	fs.writeFileSync(ownershipPath, validOwnership);
+	if (process.platform === 'linux') {
+		const lockDir = path.join(home, '.cache/ergopti');
+		fs.mkdirSync(lockDir, { recursive: true });
+		const lockedRemoval = spawnSync(
+			pythonExecutable(),
+			[
+				'-c',
+				'import fcntl, os, subprocess, sys\n' +
+					'with open(sys.argv[1], "w") as lock:\n' +
+					' fcntl.flock(lock, fcntl.LOCK_EX)\n' +
+					' result = subprocess.run(["/bin/bash", sys.argv[2], "--prefix", sys.argv[3], "--yes"], env=os.environ.copy())\n' +
+					' sys.exit(result.returncode)\n',
+				path.join(lockDir, 'ergopti.lock'),
+				script,
+				prefix
+			],
+			{ encoding: 'utf8', timeout: 15000, env: { ...process.env, HOME: home, XDG_RUNTIME_DIR: '' } }
+		);
+		assert.equal(lockedRemoval.status, 75, lockedRemoval.stderr);
+		assert.match(lockedRemoval.stderr, /code=busy role=lock/);
+		assert.ok(fs.existsSync(wrapper), 'a running daemon keeps its installed files');
+		assert.equal(fs.readFileSync(ownershipPath, 'utf8'), validOwnership);
+	}
 	for (const invalidPath of ['linux/../../another-app/keep', 'linux//file', '@unknown']) {
 		for (const terminator of ['\n', '']) {
 			fs.writeFileSync(
@@ -152,6 +329,43 @@ try {
 	assert.notEqual(run('--yes').status, 0, 'a registered checkout ancestor prevents removal');
 	assert.ok(fs.existsSync(wrapper));
 	fs.unlinkSync(gitMarker);
+	if (process.platform === 'linux') {
+		fs.symlinkSync(path.join(sandbox, 'missing-git-dir'), gitMarker);
+		const refused = run('--check');
+		assert.notEqual(refused.status, 0, 'a dangling checkout marker prevents removal');
+		assert.ok(fs.existsSync(wrapper));
+		fs.unlinkSync(gitMarker);
+	}
+	{
+		const checkout = path.join(sandbox, 'checkout\n');
+		const nestedPrefix = path.join(checkout, 'prefix');
+		const nestedLibrary = path.join(nestedPrefix, 'lib/ergopti');
+		const nestedWrapper = path.join(nestedPrefix, 'bin/ergopti-hotstrings');
+		fs.cpSync(prefix, nestedPrefix, { recursive: true });
+		fs.writeFileSync(path.join(checkout, '.git'), 'gitdir: elsewhere');
+		const quoted = spawnSync(
+			bashExecutable(),
+			['-c', 'printf %q "$1"', 'quote', bashPath(`${nestedLibrary}/linux`)],
+			{ encoding: 'utf8' }
+		);
+		assert.equal(quoted.status, 0, quoted.stderr);
+		fs.writeFileSync(
+			nestedWrapper,
+			`#!/bin/bash\nDRIVER_ROOT=${quoted.stdout}\nexec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"\n`
+		);
+		const nested = spawnSync(
+			bashExecutable(),
+			[bashPath(script), '--prefix', bashPath(nestedPrefix), '--check'],
+			{
+				encoding: 'utf8',
+				timeout: 15000,
+				env: { HOME: bashPath(home), PATH: `${bashPath(stubs)}:/usr/bin:/bin` }
+			}
+		);
+		assert.notEqual(nested.status, 0, 'a checkout ancestor ending in newline prevents removal');
+		assert.match(nested.stderr, /checkout/i);
+		assert.ok(fs.existsSync(nestedWrapper));
+	}
 	const unit = path.join(home, '.config/systemd/user/ergopti-hotstrings.service');
 	fs.mkdirSync(path.dirname(unit), { recursive: true });
 	fs.writeFileSync(unit, `[Service]\nExecStart=${bashPath(wrapper)} --tray\n`);
@@ -325,7 +539,7 @@ try {
 				`'ergopti: ${bashPath(packaged)}/uninstall.sh'`
 			)
 	);
-	for (const name of ['dirname', 'grep', 'cat', 'rm', 'sleep']) {
+	for (const name of ['dirname', 'grep', 'cat', 'rm', 'sleep', 'sha256sum']) {
 		fs.symlinkSync(
 			['/usr/bin', '/bin'].map((d) => path.join(d, name)).find(fs.existsSync),
 			path.join(bare, name)
@@ -838,7 +1052,7 @@ assert results[2].get('status') == 0, 'a reused PID cannot retain a previous own
 	const nativeStartup = path.join(home, '.config/autostart/ergopti.desktop');
 	fs.mkdirSync(path.dirname(nativeStartup), { recursive: true });
 	const ownedStartup =
-		'[Desktop Entry]\nExec=/bin/bash "/usr/bin/ergopti" --session-start --tray\n';
+		'[Desktop Entry]\nType=Application\nName=Ergopti\nExec=/bin/bash "/usr/bin/ergopti" --session-start --tray\nTerminal=false\nHidden=false\nX-Ergopti-Startup=true\n';
 	fs.writeFileSync(nativeStartup, ownedStartup);
 	nativeQueryStatus = '23';
 	assert.notEqual(
@@ -875,6 +1089,14 @@ assert results[2].get('status') == 0, 'a reused PID cannot retain a previous own
 	assert.ok(
 		!fs.existsSync(nativeStartup),
 		'confirmed package removal retires its own user startup entry'
+	);
+	const customizedNativeStartup = `${ownedStartup}# personal startup setting\n[Desktop Action Example]\nExec=/other/application\n`;
+	fs.writeFileSync(nativeStartup, customizedNativeStartup);
+	assert.equal(packagedRun('--yes').status, 0);
+	assert.equal(
+		fs.readFileSync(nativeStartup, 'utf8'),
+		customizedNativeStartup,
+		'package removal preserves a customized owned entry'
 	);
 	fs.writeFileSync(nativeStartup, '[Desktop Entry]\nExec=/other/application\n');
 	assert.equal(packagedRun('--yes').status, 0);

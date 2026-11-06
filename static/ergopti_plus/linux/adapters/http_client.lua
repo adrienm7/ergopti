@@ -316,18 +316,27 @@ end
 --- @param destination string
 --- @param options table|nil
 --- @param callback function
---- @return boolean
+--- @return boolean dispatched Existing logical dispatch acceptance.
+--- @return table operation Exact physical settlement and result receipt.
 function M.download(url, headers, destination, options, callback)
-	if stopping then return false end
+	if stopping then
+		local operation = rejected("HTTP client stopped", nil)
+		return false, operation
+	end
 	if type(destination) ~= "string" or destination:sub(1, 1) ~= "/" then
-		return rejected("invalid download path", callback).started
+		local operation = rejected("invalid download path", callback)
+		return operation.started, operation
 	end
 	local request = {}
 	for key, value in pairs(type(options) == "table" and options or {}) do request[key] = value end
-	if stopping then return false end
+	if stopping then
+		local operation = rejected("HTTP client stopped", nil)
+		return false, operation
+	end
 	request.output_path, request.follow_redirects = destination, true
-	return dispatch(url, type(headers) == "table" and headers or {}, nil,
-		request, "GET", true, false, nil, callback).started
+	local operation = dispatch(url, type(headers) == "table" and headers or {}, nil,
+		request, "GET", true, false, nil, callback)
+	return operation.started, operation
 end
 
 --- Sends streaming POST through the same actual managed admission owner.

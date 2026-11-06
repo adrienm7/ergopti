@@ -120,7 +120,10 @@ function parseVersionNeeds(output) {
 function exceedsCeiling(name, ceiling = GLIBC_CEILING) {
 	if (name === 'GLIBC_PRIVATE') return true;
 	const match = name.match(/^GLIBC_(\d+)\.(\d+)(?:\.(\d+))?$/);
-	if (!match) return false;
+	// Named glibc ABI requirements have their own introduction versions. An
+	// unrecognised one cannot be proved available on the oldest supported host
+	// (in particular GLIBC_ABI_DT_RELR needs glibc 2.36).
+	if (!match) return name.startsWith('GLIBC_');
 	const limit = ceiling.split('.').map(Number);
 	const version = [Number(match[1]), Number(match[2]), Number(match[3] || 0)];
 	for (let index = 0; index < 3; index++) {
@@ -140,8 +143,8 @@ function isElf(file) {
 	}
 }
 
-/** Lists regular files under each root without following symbolic links. */
-function regularFiles(roots) {
+/** Lists regular files and optionally symlinks, without following symbolic links. */
+function regularFiles(roots, includeSymlinks = false) {
 	const files = [];
 	const pending = [...roots];
 	while (pending.length > 0) {
@@ -149,7 +152,7 @@ function regularFiles(roots) {
 		const stat = fs.lstatSync(current);
 		if (stat.isDirectory()) {
 			for (const entry of fs.readdirSync(current)) pending.push(path.join(current, entry));
-		} else if (stat.isFile()) {
+		} else if (stat.isFile() || (includeSymlinks && stat.isSymbolicLink())) {
 			files.push(current);
 		}
 	}
@@ -162,7 +165,10 @@ function regularFiles(roots) {
  * @returns {string|null} The interpreter path, or null for a file without one.
  */
 function parseInterpreter(output) {
-	const match = output.match(/Requesting program interpreter: ([^\]\s]+)/);
+	const match = output.match(/^\s*\[Requesting program interpreter: (.*)\]\s*$/m);
+	if (!match && output.includes('Requesting program interpreter:')) {
+		throw new Error('readelf returned an unreadable program interpreter');
+	}
 	return match ? match[1] : null;
 }
 
@@ -180,8 +186,11 @@ function checkTree(roots, readVersions, readInterpreter) {
 	const violations = [];
 	const loaders = [];
 	const bundledLibc = [];
-	for (const file of regularFiles(roots)) {
+	for (const file of regularFiles(roots, true)) {
 		if (isHostLibcFile(path.basename(file))) bundledLibc.push(file);
+		// A recipient-library name remains forbidden when it is an alias. Do not
+		// follow aliases here: targets may leave the package or form cycles.
+		if (fs.lstatSync(file).isSymbolicLink()) continue;
 		if (!isElf(file)) continue;
 		checked.push(file);
 		for (const need of parseVersionNeeds(readVersions(file))) {
@@ -242,7 +251,7 @@ function main(roots) {
 	}
 	for (const file of bundledLibc) {
 		console.error(
-			`[ERR] ${file} is a copy of the C library or its loader: the image uses the recipient's own, ` +
+			`[ERR] ${file} uses a reserved C library or loader name: the image uses the recipient's own, ` +
 				'because a second glibc breaks the host GTK, GL and NSS modules.'
 		);
 	}

@@ -127,9 +127,31 @@ function publishRpmPackage({
 			throw new Error('copied RPM identity does not match the admitted main package');
 		const architectureRoot = path.join(published, expected.arch);
 		fs.mkdirSync(architectureRoot);
+		const createdDirectory = fs.lstatSync(architectureRoot);
 		const artifact = path.join(architectureRoot, path.basename(staged));
 		// A no-replace hard link makes the complete admitted file appear at once.
-		fs.linkSync(staged, artifact);
+		try {
+			fs.linkSync(staged, artifact);
+		} catch (error) {
+			// Only an empty directory created by this attempt can be retired. A
+			// foreign entry must remain intact and its cleanup failure visible.
+			try {
+				const currentDirectory = fs.lstatSync(architectureRoot);
+				if (
+					!currentDirectory.isDirectory() ||
+					currentDirectory.dev !== createdDirectory.dev ||
+					currentDirectory.ino !== createdDirectory.ino
+				)
+					throw new Error('publication directory was replaced');
+				fs.rmdirSync(architectureRoot);
+			} catch (cleanup) {
+				throw new AggregateError(
+					[error, cleanup],
+					`RPM publication and cleanup failed: ${architectureRoot}`
+				);
+			}
+			throw error;
+		}
 		return { artifact, retained: files.length };
 	} finally {
 		fs.rmSync(staging, { recursive: true, force: true });

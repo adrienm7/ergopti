@@ -553,6 +553,20 @@ def destination_directory(path):
     return Path(path)
 
 
+def copy_signature(info):
+    """Identity and change evidence for one already acquired regular file."""
+    return (
+        info.st_dev,
+        info.st_ino,
+        info.st_mode,
+        info.st_uid,
+        info.st_gid,
+        info.st_size,
+        info.st_mtime_ns,
+        info.st_ctime_ns,
+    )
+
+
 def copy_unique(source, destination, owners):
     source = regular_source(source)
     destination = Path(destination)
@@ -562,8 +576,8 @@ def copy_unique(source, destination, owners):
         if (
             not old["complete"]
             or not stat.S_ISREG(observed.st_mode)
-            or (observed.st_dev, observed.st_ino) != old["identity"]
-            or not os.path.samefile(old["source"], source)
+            or copy_signature(observed) != old["output_signature"]
+            or copy_signature(os.stat(source, follow_symlinks=False)) != old["source_signature"]
         ):
             raise RuntimeRefused("Conflicting native packaging identity.")
         return
@@ -603,12 +617,7 @@ def copy_unique(source, destination, owners):
                 offset += count
             copied += len(block)
         after = os.fstat(source_fd)
-        if copied != before.st_size or (
-            before.st_dev,
-            before.st_ino,
-            before.st_size,
-            before.st_mtime_ns,
-        ) != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
+        if copied != before.st_size or copy_signature(before) != copy_signature(after):
             raise RuntimeRefused("Native packaging source changed during acquisition.")
         os.fchmod(output_fd, stat.S_IMODE(before.st_mode))
         os.fsync(output_fd)
@@ -622,6 +631,8 @@ def copy_unique(source, destination, owners):
             or (leaf.st_dev, leaf.st_ino) != owners[destination]["identity"]
         ):
             raise RuntimeRefused("Native packaging destination changed during acquisition.")
+        owners[destination]["source_signature"] = copy_signature(after)
+        owners[destination]["output_signature"] = copy_signature(os.fstat(output_fd))
         owners[destination]["complete"] = True
     except BaseException as error:
         primary = error

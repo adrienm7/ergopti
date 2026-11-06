@@ -466,8 +466,12 @@ OpenTarget_Classify(Text, EnvFn := EnvGet) {
 	Cleaned := _OpenTarget_StripTrailing(Candidate)
 	if (Cleaned !== Candidate && Cleaned != "") {
 		Retry := _OpenTarget_Token(Cleaned, EnvFn)
-		if (Retry is Map) && (!(Found is Map) || Retry["kind"] == Found["kind"])
+		if (Retry is Map) && (!(Found is Map) || Retry["kind"] == Found["kind"]) {
+			; Preserve the decoded and expanded spelling for the filesystem owner.
+			if (Found is Map) && Found["kind"] == "path" && Found["target"] !== Retry["target"]
+				Retry["exact_path"] := Found["target"]
 			Found := Retry
+		}
 	}
 	return (Found is Map) ? Found : _OpenTarget_Result("search", Trimmed)
 }

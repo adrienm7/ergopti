@@ -46,6 +46,291 @@ function nativeEnvironment(extra) {
 
 /** Tests actual generated installer decisions with private package/runtime witnesses. */
 function portable() {
+	check('private runtime staging refuses an incomplete symlink inventory', () => {
+		if (process.platform !== 'linux') return;
+		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-runtime-inventory-'));
+		try {
+			const app = path.join(scratch, 'AppDir'),
+				usr = path.join(app, 'usr');
+			for (const name of ['bin', 'lib/ergopti', 'share'])
+				fs.mkdirSync(path.join(usr, name), { recursive: true });
+			fs.writeFileSync(path.join(usr, 'bin/luajit'), '#!/bin/sh\n', { mode: 0o755 });
+			fs.writeFileSync(path.join(usr, 'lib/ergopti/network-runtime-env.sh'), ':\n');
+			fs.writeFileSync(path.join(usr, 'share/internal.lua'), 'return {}\n');
+			fs.symlinkSync('internal.lua', path.join(usr, 'share/module.lua'));
+			const bin = path.join(scratch, 'commands');
+			fs.mkdirSync(bin);
+			fs.writeFileSync(
+				path.join(bin, 'find'),
+				'#!/bin/sh\nif [ "$INVENTORY_PARTIAL" = 1 ]; then printf "%s\\0" "$1/share/module.lua"; fi\nexit 73\n',
+				{ mode: 0o755 }
+			);
+			for (const partial of ['0', '1']) {
+				const result = spawnSync(
+					bashExecutable(),
+					[
+						path.join(ROOT, 'tools/build/stage-linux-private-runtime.sh'),
+						app,
+						path.join(scratch, `runtime-${partial}`),
+						'/usr/lib/ergopti'
+					],
+					{
+						encoding: 'utf8',
+						timeout: 10000,
+						env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, INVENTORY_PARTIAL: partial }
+					}
+				);
+				assert.notEqual(result.status, 0, 'an inventory refusal cannot certify a package');
+				assert.match(result.stderr, /runtime link inventory/);
+			}
+		} finally {
+			fs.rmSync(scratch, { recursive: true, force: true });
+		}
+	});
+	check('private runtime staging admits only links resolving inside the copied prefix', () => {
+		if (process.platform !== 'linux') return;
+		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-runtime-link-target-'));
+		try {
+			for (const kind of ['inside', 'outside', 'absolute-inside', 'dangling']) {
+				const root = path.join(scratch, kind),
+					app = path.join(root, 'AppDir'),
+					usr = path.join(app, 'usr');
+				for (const name of ['bin', 'lib/ergopti', 'share'])
+					fs.mkdirSync(path.join(usr, name), { recursive: true });
+				fs.writeFileSync(path.join(usr, 'bin/luajit'), '#!/bin/sh\n', { mode: 0o755 });
+				fs.writeFileSync(path.join(usr, 'lib/ergopti/network-runtime-env.sh'), ':\n');
+				fs.writeFileSync(path.join(usr, 'share/internal.lua'), 'return {}\n');
+				const external = path.join(root, 'external.lua');
+				fs.writeFileSync(external, 'return {}\n');
+				const destination = path.join(root, 'runtime');
+				const target =
+					kind === 'inside'
+						? 'internal.lua'
+						: kind === 'outside'
+							? external
+							: kind === 'absolute-inside'
+								? path.join(destination, 'share/internal.lua')
+								: 'missing.lua';
+				fs.symlinkSync(target, path.join(usr, 'share/module.lua'));
+				const result = spawnSync(
+					bashExecutable(),
+					[
+						path.join(ROOT, 'tools/build/stage-linux-private-runtime.sh'),
+						app,
+						destination,
+						'/usr/lib/ergopti'
+					],
+					{ encoding: 'utf8', timeout: 10000 }
+				);
+				if (kind === 'inside') {
+					assert.equal(result.status, 0, result.stderr);
+					assert.equal(
+						fs.readFileSync(path.join(destination, 'share/module.lua'), 'utf8'),
+						'return {}\n'
+					);
+				} else {
+					assert.notEqual(result.status, 0, kind);
+					assert.match(
+						result.stderr,
+						/link (leaves|contains)|contains an unresolved link|nonrelocatable absolute link/
+					);
+				}
+			}
+		} finally {
+			fs.rmSync(scratch, { recursive: true, force: true });
+		}
+	});
+	check(
+		'private runtime staging refuses linked source directories before removing a launcher',
+		() => {
+			if (process.platform !== 'linux') return;
+			const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-runtime-linked-source-'));
+			try {
+				for (const linked of ['bin', 'lib', 'share']) {
+					const root = path.join(scratch, linked);
+					const app = path.join(root, 'AppDir');
+					const usr = path.join(app, 'usr');
+					for (const name of ['bin', 'lib/ergopti', 'share'])
+						fs.mkdirSync(path.join(usr, name), { recursive: true });
+					fs.writeFileSync(path.join(usr, 'bin/luajit'), '#!/bin/sh\n', { mode: 0o755 });
+					fs.writeFileSync(path.join(usr, 'bin/ergopti'), 'owned source launcher\n');
+					fs.writeFileSync(path.join(usr, 'lib/ergopti/network-runtime-env.sh'), ':\n');
+					const external = path.join(root, 'external');
+					fs.renameSync(path.join(usr, linked), external);
+					fs.symlinkSync(external, path.join(usr, linked));
+					const destination = path.join(root, 'runtime');
+					const result = spawnSync(
+						bashExecutable(),
+						[
+							path.join(ROOT, 'tools/build/stage-linux-private-runtime.sh'),
+							app,
+							destination,
+							'/usr/lib/ergopti'
+						],
+						{ encoding: 'utf8', timeout: 10000 }
+					);
+					assert.notEqual(result.status, 0, linked);
+					assert.match(result.stderr, /not a direct directory/);
+					assert.equal(
+						fs.readFileSync(path.join(usr, 'bin/ergopti'), 'utf8'),
+						'owned source launcher\n'
+					);
+					assert.equal(fs.existsSync(destination), false);
+				}
+			} finally {
+				fs.rmSync(scratch, { recursive: true, force: true });
+			}
+		}
+	);
+	check('private runtime staging copies double-dot hidden library entries', () => {
+		if (process.platform !== 'linux') return;
+		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-runtime-hidden-'));
+		try {
+			const app = path.join(scratch, 'AppDir');
+			const lib = path.join(app, 'usr/lib');
+			const bin = path.join(app, 'usr/bin');
+			fs.mkdirSync(path.join(lib, 'ergopti'), { recursive: true });
+			fs.mkdirSync(bin, { recursive: true });
+			fs.mkdirSync(path.join(app, 'usr/share'));
+			fs.writeFileSync(path.join(bin, 'luajit'), '#!/bin/sh\n', { mode: 0o755 });
+			fs.writeFileSync(path.join(lib, 'ergopti/network-runtime-env.sh'), ':\n');
+			fs.writeFileSync(path.join(lib, '..hidden-runtime'), 'runtime bytes\n');
+			const destination = path.join(scratch, 'runtime');
+			const result = spawnSync(
+				bashExecutable(),
+				[
+					path.join(ROOT, 'tools/build/stage-linux-private-runtime.sh'),
+					app,
+					destination,
+					'/usr/lib/ergopti'
+				],
+				{ encoding: 'utf8', timeout: 10000 }
+			);
+			assert.equal(result.status, 0, result.stderr);
+			assert.equal(
+				fs.readFileSync(path.join(destination, 'lib/..hidden-runtime'), 'utf8'),
+				'runtime bytes\n'
+			);
+		} finally {
+			fs.rmSync(scratch, { recursive: true, force: true });
+		}
+	});
+	check('failed native luv publication retires its private temporary file', () => {
+		if (process.platform !== 'linux') return;
+		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-luv-publication-'));
+		try {
+			const installer = outputs[`${DRIVER}/install.sh`];
+			const start = installer.indexOf('\tNATIVE_LUV_PUBLICATION="$(mktemp');
+			const end = installer.indexOf('\nfi\ncp -r', start);
+			assert.ok(start >= 0 && end > start, 'actual publication block');
+			const block = installer.slice(start, end);
+			const stage = path.join(scratch, 'stage');
+			const library = path.join(scratch, 'lib');
+			const modules = path.join(library, 'linux/native_modules');
+			fs.mkdirSync(stage);
+			fs.mkdirSync(modules, { recursive: true });
+			fs.writeFileSync(path.join(stage, 'luv.so'), 'new bytes');
+			fs.writeFileSync(path.join(modules, 'luv.so'), 'existing bytes');
+			for (const failure of ['install', 'mv']) {
+				const script = `set -euo pipefail\n${failure}() { return 71; }\n${block}`;
+				const result = spawnSync(bashExecutable(), ['-c', script], {
+					encoding: 'utf8',
+					timeout: 10000,
+					env: { ...process.env, LIB_DIR: library, NATIVE_LUV_STAGE: stage }
+				});
+				assert.notEqual(result.status, 0, `${failure} must fail publication`);
+				assert.deepEqual(fs.readdirSync(modules), ['luv.so']);
+				assert.equal(fs.readFileSync(path.join(modules, 'luv.so'), 'utf8'), 'existing bytes');
+			}
+		} finally {
+			fs.rmSync(scratch, { recursive: true, force: true });
+		}
+	});
+	check('failed native ownership receipt publication retires its temporary file', () => {
+		if (process.platform !== 'linux') return;
+		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-native-receipt-'));
+		try {
+			const installer = outputs[`${DRIVER}/install.sh`];
+			const start = installer.indexOf(
+				'if [ -n "$NATIVE_OUTPUT_STAGE" ] || [ -n "$NATIVE_LUV_RETAINED_DIGEST" ]; then'
+			);
+			const end = installer.indexOf('\nif [ -n "$NATIVE_LUV_STAGE" ]; then', start);
+			assert.ok(start >= 0 && end > start, 'actual receipt publication block');
+			const block = installer.slice(start, end);
+			const library = path.join(scratch, 'lib');
+			fs.mkdirSync(path.join(library, 'linux/bin'), { recursive: true });
+			fs.writeFileSync(path.join(library, 'linux/bin/libergopti_archive_publication.so'), 'binary');
+			const receipt = path.join(library, '.ergopti-owned-files');
+			fs.writeFileSync(receipt, 'abc\tlinux/sentinel\n');
+			for (const failure of ['write', 'mv']) {
+				const stub = failure === 'write' ? 'printf() { return 71; }' : 'mv() { return 71; }';
+				const result = spawnSync(bashExecutable(), ['-c', `set -euo pipefail\n${stub}\n${block}`], {
+					encoding: 'utf8',
+					timeout: 10000,
+					env: {
+						...process.env,
+						LIB_DIR: library,
+						NATIVE_OUTPUT_STAGE: '/unused-stage',
+						NATIVE_LUV_STAGE: '',
+						NATIVE_LUV_RETAINED_DIGEST: ''
+					}
+				});
+				assert.notEqual(result.status, 0, `${failure} must fail publication`);
+				assert.deepEqual(fs.readdirSync(library).sort(), ['.ergopti-owned-files', 'linux']);
+				assert.equal(fs.readFileSync(receipt, 'utf8'), 'abc\tlinux/sentinel\n');
+			}
+			const stage = path.join(scratch, 'native-stage');
+			fs.mkdirSync(stage);
+			fs.writeFileSync(path.join(stage, 'libergopti_archive_publication.so'), 'built binary');
+			fs.mkdirSync(path.join(library, 'linux/native_modules'));
+			fs.writeFileSync(path.join(library, 'linux/native_modules/luv.so'), 'luv module');
+			const success = spawnSync(bashExecutable(), ['-c', `set -euo pipefail\n${block}`], {
+				encoding: 'utf8',
+				timeout: 10000,
+				env: {
+					...process.env,
+					LIB_DIR: library,
+					NATIVE_OUTPUT_STAGE: stage,
+					NATIVE_LUV_STAGE: '/luv-stage',
+					NATIVE_LUV_RETAINED_DIGEST: ''
+				}
+			});
+			assert.equal(success.status, 0, success.stderr);
+			const rows = fs.readFileSync(receipt, 'utf8');
+			assert.match(rows, /^abc\tlinux\/sentinel$/m);
+			assert.match(rows, /^[0-9a-f]{64}\tlinux\/bin\/libergopti_archive_publication\.so$/m);
+			assert.match(rows, /^[0-9a-f]{64}\tlinux\/native_modules\/luv\.so$/m);
+			assert.equal(fs.existsSync(stage), false);
+		} finally {
+			fs.rmSync(scratch, { recursive: true, force: true });
+		}
+	});
+	check('native luv build stage is representable in Lua paths', () => {
+		if (process.platform !== 'linux') return;
+		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-luv-stage-'));
+		const helper = shellFunction(outputs[`${DRIVER}/install.sh`], '_native_luv_stage_create');
+		try {
+			for (const suffix of ['ordinary', 'with;separator', 'with?substitution', 'relative']) {
+				const temporary = suffix === 'relative' ? 'relative' : path.join(scratch, suffix);
+				if (suffix !== 'relative') fs.mkdirSync(temporary);
+				const result = spawnSync(bashExecutable(), ['-c', `${helper}\n_native_luv_stage_create`], {
+					encoding: 'utf8',
+					env: { ...process.env, TMPDIR: temporary }
+				});
+				assert.equal(result.status, 0, result.stderr);
+				const stage = result.stdout.trim();
+				try {
+					assert.ok(path.isAbsolute(stage));
+					assert.doesNotMatch(stage, /[;?]/);
+					assert.equal(path.dirname(stage), suffix === 'ordinary' ? temporary : '/tmp');
+				} finally {
+					fs.rmSync(stage, { recursive: true, force: true });
+				}
+			}
+		} finally {
+			fs.rmSync(scratch, { recursive: true, force: true });
+		}
+	});
 	check(
 		'native module parents refuse source and installation symlink aliases without writes',
 		() => {
@@ -171,7 +456,7 @@ function portable() {
 			const prepare = shellFunction(installer, '_prepare_source_network_runtime');
 			assert.ok(
 				prepare.indexOf('_native_output_bin_parents || return 1') <
-					prepare.indexOf('NATIVE_LUV_STAGE="$(mktemp -d)"')
+					prepare.indexOf('NATIVE_LUV_STAGE="$(_native_luv_stage_create)"')
 			);
 			assert.match(prepare, /_network_runtime_available; then return 0; fi/);
 			assert.match(
@@ -274,7 +559,7 @@ function portable() {
 				}
 			}
 			const sourceBranch = installer.slice(
-				installer.indexOf('NATIVE_OUTPUT_REPO='),
+				installer.indexOf("IFS= read -r -d '' NATIVE_OUTPUT_REPO"),
 				installer.indexOf('# Create destination directories.')
 			);
 			assert.match(
@@ -501,6 +786,11 @@ function native() {
 		const shared = path.join(root, 'installed driver/_shared');
 		const cwd = path.join(root, 'unrelated cwd');
 		fs.mkdirSync(path.join(driver, 'platform/network'), { recursive: true });
+		fs.mkdirSync(path.join(driver, 'infra'), { recursive: true });
+		fs.copyFileSync(
+			path.join(ROOT, DRIVER, 'infra/regular_file_reader.lua'),
+			path.join(driver, 'infra/regular_file_reader.lua')
+		);
 		fs.mkdirSync(path.join(driver, '_generated'), { recursive: true });
 		fs.mkdirSync(path.join(shared, 'lua'), { recursive: true });
 		fs.mkdirSync(cwd);

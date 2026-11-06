@@ -237,6 +237,14 @@ local function with_write_receipts(channel, refusal, body)
 end
 
 helpers.describe("linux-logger-write-receipts", function()
+	helpers.it("linux-logger-write-receipts: closed stdout cannot starve durable channels", function()
+		with_write_receipts("none", {}, function(_, state)
+			io.stdout = { write = function() error("attempt to use a closed file") end }
+			state.emit("stdout closed", "warn")
+			helpers.assert_eq(state.files.main.writes, 1)
+			helpers.assert_eq(state.files.errors.writes, 1)
+		end)
+	end)
 	for _, channel in ipairs({ "main", "errors" }) do
 		for _, refusal in ipairs({
 			{ name = "nil write", stage = "write" }, { name = "nil flush", stage = "flush" },
@@ -363,6 +371,13 @@ local function with_repoint_receipts(case, body)
 end
 
 helpers.describe("linux-logger-repoint-owner", function()
+	helpers.it("linux-logger-repoint-owner: closed stderr cannot abort stdout-only installation", function()
+		with_repoint_receipts({ mode = "stdout", stderr_throws = true }, function(Sink, state)
+			helpers.assert_true(not Sink.is_file_sink_active())
+			state.emit("still available on stdout", "info")
+			helpers.assert_eq(#state.console, 1)
+		end)
+	end)
 	local failure = setmetatable({}, { __tostring = function() error("foreign error formatting must not execute") end })
 	for _, case in ipairs({
 		{ name = "nil main", channel = "main" },
@@ -1063,6 +1078,22 @@ helpers.describe("linux-logger-topical-fan-out", function()
 			local main = read_file(dir .. "/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log")
 			helpers.assert_contains(main, "marker-menu-refused")
 			helpers.assert_contains(read_file(dir .. "/ErgoptiPlus_llm.log"), "marker-llm-after")
+		end)
+	end)
+
+	helpers.it("linux-logger-topical-fan-out: closed stderr cannot block later topics", function()
+		with_sink("closed-stderr", function(_, Logger, dir)
+			os.execute("mkdir '" .. dir .. "/ErgoptiPlus_gestures.log'")
+			local stderr = io.stderr
+			io.stderr = { write = function() error("attempt to use a closed file") end }
+			local ok, err = pcall(function()
+				Logger.info("modules.llm.inference", "gesture marker-both-topics")
+			end)
+			io.stderr = stderr
+			if not ok then error(err) end
+			local llm = read_file(dir .. "/ErgoptiPlus_llm.log")
+			helpers.assert_not_nil(llm, "a refused earlier topic must not starve the next")
+			helpers.assert_contains(llm, "marker-both-topics")
 		end)
 	end)
 

@@ -537,6 +537,7 @@ document.addEventListener('click', function (e) {
 // ==============================
 
 var activePromptContext = Object.freeze({ edit_id: '', epoch: 0 });
+var promptInitialized = false;
 
 /**
  * Reads an immutable host context while preserving legacy macOS payloads.
@@ -561,6 +562,7 @@ function readPromptContext(data) {
  */
 function init(data) {
 	var nextContext = readPromptContext(data);
+	if (promptInitialized && nextContext.epoch === activePromptContext.epoch) return;
 	if (
 		(activePromptContext.epoch > 0 && nextContext.epoch === 0) ||
 		(nextContext.epoch > 0 && nextContext.epoch <= activePromptContext.epoch)
@@ -581,6 +583,7 @@ function init(data) {
 	});
 
 	checkPlaceholder();
+	promptInitialized = true;
 
 	setTimeout(function () {
 		document.getElementById('p-name').focus();

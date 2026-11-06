@@ -42,6 +42,8 @@ local _generation = 0
 local _timer = nil
 -- The load request in flight, kept until its transport physically settled.
 local _request = nil
+-- A request constructor can reenter stop before returning its owned handle.
+local _acquiring = false
 -- The origin and model Ollama confirmed loaded since the last stop.
 local _ready_key = nil
 -- The origin and model the running chain is loading.
@@ -171,13 +173,19 @@ fire = function(generation, interval_ms)
 		arm(generation, interval_ms, interval_ms)
 		return
 	end
+	_acquiring = true
 	local called, operation = pcall(_ports.request, target, function(loaded, failure)
 		on_result(generation, key, next_interval, loaded == true, failure)
 	end)
+	_acquiring = false
 	-- Start refusal is not physical retirement: an owned deadline can still
 	-- be closing. Keep that operation reachable by stop() until its ACK.
 	if called and type(operation) == "table" and type(operation.cancel) == "function"
 		and type(operation.is_settled) == "function" then _request = operation end
+	if generation ~= _generation then
+		if _request then pcall(_request.cancel, _request); request_settled() end
+		return
+	end
 	if not called or type(operation) ~= "table" or operation.started ~= true then
 		Logger.warn(LOG, "The warmup request was refused before it was sent: %s.",
 			tostring(called and operation or "request raised"))
@@ -246,6 +254,7 @@ function M.stop()
 	_generation = _generation + 1
 	_ready_key, _chain_key, _failed = nil, nil, false
 	if not _ports then return true end
+	if _acquiring then return false end
 	if _timer then
 		if _ports.scheduler.cancel(_timer) ~= true then
 			Logger.error(LOG, "The warmup timer could not be cancelled — its ownership is retained.")
@@ -263,7 +272,7 @@ end
 --- Whether a timer or a request of a chain is still owned.
 --- @return boolean
 function M.pending()
-	return _timer ~= nil or not request_settled()
+	return _acquiring or _timer ~= nil or not request_settled()
 end
 
 --- The health of the current warmup target, for the AI title dot.

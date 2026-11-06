@@ -12,6 +12,7 @@
 
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
+local unpack_values = table.unpack or unpack
 local EvdevCodes = require("infra.evdev_codes")
 local InputEvent = require("infra.input_event")
 local PointerMetrics = require("modules.keystats.pointer_metrics")
@@ -29,6 +30,15 @@ local function move(observe, dx, dy)
 end
 
 helpers.describe("pointer metrics: what one evdev report adds", function()
+	helpers.it("drops only empty committed distance remainders", function()
+		local tracker = PointerMetrics.new()
+		tracker.commit_fractions({ old = { zero = 0, partial = 0.25 }, empty = { only = 0 } })
+		local saved = tracker.snapshot_fractions()
+		helpers.assert_eq(saved.old.partial, 0.25, "older dates can receive delayed events")
+		helpers.assert_nil(saved.old.zero)
+		helpers.assert_nil(saved.empty)
+	end)
+
 	helpers.it("counts a left or right press as a click, no other button", function()
 		local tracker = PointerMetrics.new()
 		helpers.assert_eq(tracker.observe("press", EvdevCodes.BTN_LEFT, 1).clicks, 1)
@@ -86,7 +96,7 @@ local function recorded(script)
 		keystats.init({ sqlite_path = "/tmp/ergopti_keystats_pointer_mock.sqlite" })
 		require("tests.support.metrics_consent_fixture").enable(keystats)
 		keystats.reset_session()
-		script(keystats)
+		script(keystats, fake_writer)
 		keystats.flush()
 		for _, entry in ipairs(fake_writer.typing) do rows[#rows + 1] = entry.row end
 		keystats.flush()
@@ -98,6 +108,199 @@ local function recorded(script)
 end
 
 helpers.describe("pointer metrics: the recorder writes them with the typing row", function()
+	helpers.it("retains diagonal distance fractions across committed flushes", function()
+		local rows = recorded(function(keystats)
+			keystats.on_app_focus("owned-app", 1000)
+			for _ = 1, 3 do
+				move(keystats.record_pointer, 1, 1)
+				keystats.flush()
+			end
+		end)
+		local total = 0
+		for _, row in ipairs(rows) do total = total + row.mouse_distance_px end
+		helpers.assert_eq(total, math.floor(3 * math.sqrt(2)), "flush boundaries must not discard each fraction")
+	end)
+
+	helpers.it("keeps fractional distance separate for each application", function()
+		local rows = recorded(function(keystats)
+			for _ = 1, 2 do
+				for _, app in ipairs({ "first", "second" }) do
+					keystats.on_app_focus(app, 1000)
+					move(keystats.record_pointer, 1, 1)
+					helpers.assert_true(keystats.flush())
+				end
+			end
+		end)
+		local totals = {}
+		for _, row in ipairs(rows) do totals[row.app] = (totals[row.app] or 0) + row.mouse_distance_px end
+		helpers.assert_eq(totals.first, 2)
+		helpers.assert_eq(totals.second, 2)
+	end)
+
+	helpers.it("does not carry fractional distance into another database", function()
+		local rows = recorded(function(keystats)
+			keystats.on_app_focus("owned-app", 1000)
+			move(keystats.record_pointer, 1, 1); helpers.assert_true(keystats.flush())
+			helpers.assert_true(keystats.init({ sqlite_path = "/tmp/ergopti_other_pointer_mock.sqlite" }))
+			require("tests.support.metrics_consent_fixture").enable(keystats)
+			keystats.on_app_focus("owned-app", 1000)
+			for _ = 1, 2 do move(keystats.record_pointer, 1, 1); helpers.assert_true(keystats.flush()) end
+		end)
+		local total = 0
+		for _, row in ipairs(rows) do total = total + row.mouse_distance_px end
+		helpers.assert_eq(total, 3, "the second database starts without the first's remainder")
+	end)
+
+	helpers.it("does not publish fractional distance on refused flush admission", function()
+		local rows = recorded(function(keystats, writer)
+			keystats.on_app_focus("owned-app", 1000)
+			local original = writer.start_flush
+			move(keystats.record_pointer, 1, 1)
+			writer.start_flush = function() return nil end
+			helpers.assert_eq(keystats.flush(), false)
+			writer.start_flush = original
+			helpers.assert_true(keystats.flush())
+			for _ = 1, 2 do move(keystats.record_pointer, 1, 1); helpers.assert_true(keystats.flush()) end
+		end)
+		local total = 0
+		for _, row in ipairs(rows) do total = total + row.mouse_distance_px end
+		helpers.assert_eq(total, math.floor(3 * math.sqrt(2)))
+	end)
+
+	helpers.it("publishes the distance fraction only after a failed transaction retries", function()
+		local rows = recorded(function(keystats, writer)
+			keystats.on_app_focus("owned-app", 1000)
+			local original = writer.start_flush
+			writer.start_flush = function(...)
+				writer.start_flush = original
+				local args = { ... }
+				local operation = { result = { committed = false } }
+				function operation:pump() return true end
+				function operation:is_read_safe() return true end
+				function operation:phase() return "done" end
+				function operation:is_retryable() return self.result.committed == false end
+				function operation:retry() self.result = original(unpack_values(args)).result; return true end
+				return operation
+			end
+			move(keystats.record_pointer, 1, 1)
+			helpers.assert_eq(keystats.flush(), false)
+			move(keystats.record_pointer, 1, 1)
+			helpers.assert_true(keystats.flush(), "the original snapshot commits on retry")
+			helpers.assert_true(keystats.flush(), "newer motion follows the original snapshot")
+			move(keystats.record_pointer, 1, 1); helpers.assert_true(keystats.flush())
+		end)
+		local total = 0
+		for _, row in ipairs(rows) do total = total + row.mouse_distance_px end
+		helpers.assert_eq(total, math.floor(3 * math.sqrt(2)))
+	end)
+
+	helpers.it("keeps reentrant motion behind the committed distance fraction", function()
+		local rows = recorded(function(keystats, writer)
+			keystats.on_app_focus("owned-app", 1000)
+			local original = writer.start_flush
+			writer.start_flush = function(...)
+				writer.start_flush = original
+				move(keystats.record_pointer, 1, 1)
+				return original(...)
+			end
+			move(keystats.record_pointer, 1, 1)
+			helpers.assert_true(keystats.flush())
+			helpers.assert_true(keystats.flush())
+			move(keystats.record_pointer, 1, 1); helpers.assert_true(keystats.flush())
+		end)
+		local total = 0
+		for _, row in ipairs(rows) do total = total + row.mouse_distance_px end
+		helpers.assert_eq(total, math.floor(3 * math.sqrt(2)))
+	end)
+
+	helpers.it("forgets partial pointer frames across a collection pause", function()
+		local rows = recorded(function(keystats)
+			keystats.on_app_focus("owned-app", 1000)
+			keystats.record_pointer("motion", InputEvent.REL_X, 3, "mouse-a")
+			keystats.suppress()
+			keystats.unsuppress()
+			keystats.on_app_focus("owned-app", 2000)
+			keystats.record_pointer("motion", InputEvent.REL_Y, 4, "mouse-a")
+			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-a")
+		end)
+		helpers.assert_eq(#rows, 1)
+		helpers.assert_eq(rows[1].mouse_distance_px, 4)
+	end)
+
+	helpers.it("does not attribute a prior application's partial movement to the next", function()
+		local rows = recorded(function(keystats)
+			keystats.on_app_focus("first-app", 1000)
+			keystats.record_pointer("motion", InputEvent.REL_X, 3, "mouse-a")
+			keystats.on_app_focus("second-app", 2000)
+			keystats.record_pointer("motion", InputEvent.REL_Y, 4, "mouse-a")
+			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-a")
+		end)
+		helpers.assert_eq(#rows, 1)
+		helpers.assert_eq(rows[1].mouse_distance_px, 4)
+	end)
+
+	helpers.it("keeps queue-loss protection across collection resumption", function()
+		local rows = recorded(function(keystats)
+			keystats.on_app_focus("owned-app", 1000)
+			keystats.suppress()
+			keystats.record_pointer("dropped", 3, 0, "mouse-a")
+			keystats.unsuppress()
+			keystats.on_app_focus("owned-app", 2000)
+			keystats.record_pointer("motion", InputEvent.REL_X, 9, "mouse-a")
+			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-a")
+			keystats.record_pointer("motion", InputEvent.REL_Y, 2, "mouse-a")
+			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-a")
+		end)
+		helpers.assert_eq(#rows, 1)
+		helpers.assert_eq(rows[1].mouse_distance_px, 2)
+	end)
+
+	helpers.it("keeps interleaved device frames independent through the recorder", function()
+		local rows = recorded(function(keystats)
+			keystats.on_app_focus("owned-app", 1000)
+			keystats.record_pointer("motion", InputEvent.REL_X, 3, "mouse-a")
+			keystats.record_pointer("motion", InputEvent.REL_Y, 4, "mouse-b")
+			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-a")
+			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-b")
+		end)
+		helpers.assert_eq(#rows, 1)
+		helpers.assert_eq(rows[1].mouse_distance_px, 7)
+	end)
+
+	helpers.it("discards a departed pointer's incomplete frame before reconnection", function()
+		local rows = recorded(function(keystats)
+			keystats.on_app_focus("owned-app", 1000)
+			keystats.record_pointer("motion", InputEvent.REL_X, 3, "mouse-a")
+			keystats.record_pointer("motion", InputEvent.REL_X, 3, "mouse-b")
+			keystats.record_pointer("dropped", 3, 0, "mouse-a")
+			keystats.record_pointer("reset", nil, nil, "mouse-a")
+			keystats.record_pointer("reset", nil, nil, "mouse-b")
+			keystats.record_pointer("motion", InputEvent.REL_Y, 4, "mouse-a")
+			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-a")
+			keystats.record_pointer("motion", InputEvent.REL_Y, 4, "mouse-b")
+			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-b")
+		end)
+		helpers.assert_eq(#rows, 1)
+		helpers.assert_eq(rows[1].mouse_distance_px, 8)
+	end)
+
+	helpers.it("discards a dropped pointer packet without affecting another device", function()
+		local rows = recorded(function(keystats)
+			keystats.on_app_focus("owned-app", 1000)
+			keystats.record_pointer("motion", InputEvent.REL_X, 3, "mouse-a")
+			keystats.record_pointer("dropped", 3, 0, "mouse-a")
+			keystats.record_pointer("motion", InputEvent.REL_Y, 4, "mouse-a")
+			keystats.record_pointer("press", EvdevCodes.BTN_LEFT, 1, "mouse-a")
+			keystats.record_pointer("motion", InputEvent.REL_X, 6, "mouse-b")
+			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-b")
+			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-a")
+			keystats.record_pointer("motion", InputEvent.REL_Y, 2, "mouse-a")
+			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-a")
+		end)
+		helpers.assert_eq(#rows, 1)
+		helpers.assert_eq(rows[1].mouse_distance_px, 8)
+		helpers.assert_eq(rows[1].mouse_clicks, 0)
+	end)
 	helpers.it("carries clicks, scrolls and distance to the focused application's row", function()
 		local rows = recorded(function(keystats)
 			keystats.on_app_focus("org.mozilla.firefox", 1000)

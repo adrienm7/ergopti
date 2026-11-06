@@ -13,6 +13,7 @@ local M = {}
 local HttpBridge = require("infra.llm_bridge")
 local HttpClient = require("adapters.http_client")
 local Json = require("json")
+local NumberPolicy = require("number_policy")
 local Logger = require("logger.shim")
 local DownloadWindow = require("ui.download_window.bridge")
 local WindowSessionId, RetireWindow, CompleteWindow = DownloadWindow.session_id, DownloadWindow.retire, DownloadWindow.complete
@@ -20,6 +21,8 @@ local WindowSessionId, RetireWindow, CompleteWindow = DownloadWindow.session_id,
 local LOG = "modules.llm.model_download"
 local OWNER = "ollama_model_pull"
 local MODEL_PULL_TIMEOUT_MS = 24 * 60 * 60 * 1000
+-- Ollama emits short status/byte counters, not model data, on this NDJSON stream.
+local MAX_PROGRESS_FRAME_BYTES = 1024 * 1024
 
 local _active = nil
 -- The one observer of pull percentages (the model selector page) and the
@@ -131,7 +134,10 @@ local function consume_line(request, line)
 	local completed = tonumber(message.completed)
 	local total = tonumber(message.total)
 	local percentage = nil
-	if completed and total and total > 0 then percentage = completed * 100 / total end
+	if NumberPolicy.is_finite(completed) and NumberPolicy.is_finite(total)
+		and completed >= 0 and total > 0 then
+		percentage = math.min(completed / total, 1) * 100
+	end
 	if not current(request, request.attempt) or _active ~= request then return end
 	if percentage then tell(request, percentage) end
 	DownloadWindow.update(request.session_id, percentage,
@@ -139,17 +145,45 @@ local function consume_line(request, line)
 end
 
 local function consume_chunk(request, chunk, flush)
-	request.pending = request.pending .. (type(chunk) == "string" and chunk or "")
-	while true do
+	chunk = type(chunk) == "string" and chunk or ""
+	local offset = 1
+	while offset <= #chunk do
 		if request.cancelled or _active ~= request then return end
-		local line, rest = request.pending:match("^([^\r\n]*)\r?\n(.*)$")
-		if not line then break end
-		request.pending = rest
-		consume_line(request, line)
+		local newline = chunk:find("\n", offset, true)
+		local last = newline and newline - 1 or #chunk
+		local length = last - offset + 1
+		if not request.discarding then
+			local size = #request.pending + length
+			local last_byte = length > 0 and chunk:sub(last, last) or request.pending:sub(-1)
+			if size > MAX_PROGRESS_FRAME_BYTES and not (size == MAX_PROGRESS_FRAME_BYTES + 1 and last_byte == "\r") then
+				request.pending = ""
+				request.discarding, request.lost_frame = true, true
+				if not request.oversize_logged then
+					request.oversize_logged = true
+					Logger.warn(LOG, "Ignored oversized Ollama pull progress frame.")
+				end
+			else
+				request.pending = request.pending .. chunk:sub(offset, last)
+			end
+		end
+		if not newline then break end
+		if not request.discarding then
+			local line = request.pending:gsub("\r$", "")
+			request.pending = ""
+			consume_line(request, line)
+		end
+		request.discarding = false
+		offset = newline + 1
 	end
-	if flush and request.pending ~= "" then
-		consume_line(request, request.pending)
-		request.pending = ""
+	if flush then
+		if #request.pending > MAX_PROGRESS_FRAME_BYTES then
+			request.lost_frame = true
+			if not request.oversize_logged then
+				request.oversize_logged = true
+				Logger.warn(LOG, "Ignored oversized Ollama pull progress frame.")
+			end
+		elseif not request.discarding and request.pending ~= "" then consume_line(request, request.pending) end
+		request.pending, request.discarding = "", false
 	end
 end
 
@@ -198,7 +232,7 @@ local function dispatch(request)
 			if not current(request, attempt) or _active ~= request or request.terminal then return end
 			consume_chunk(request, "", true)
 			local succeeded = type(result) == "table" and result.ok == true
-				and request.saw_success == true and request.remote_error == nil
+				and request.saw_success == true and request.remote_error == nil and not request.lost_frame
 			finish(request, attempt, succeeded, succeeded and translated("download_window.done_success")
 				or failure_message(request),
 				type(result) == "table" and result.ok ~= true and result.failure_receipt or nil)
@@ -389,7 +423,7 @@ function M.retry(expected)
 	-- Admission can retire this failed request or start a different operation.
 	if _active or _retry_request ~= request or request.cancelled
 		or request.session_id ~= DownloadWindow.session_id() then return false end
-	request.pending = ""
+	request.pending, request.discarding, request.lost_frame = "", false, false
 	request.remote_error = nil
 	request.saw_success = false
 	request.terminal = false

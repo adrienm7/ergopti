@@ -37,9 +37,12 @@ local SCROLL_AXES = { [InputEvent.REL_WHEEL] = true, [InputEvent.REL_HWHEEL] = t
 M.KIND_PRESS  = "press"
 M.KIND_MOTION = "motion"
 M.KIND_FRAME  = "frame"
+M.KIND_RESET  = "reset"
+M.KIND_DROPPED = "dropped"
 
 -- The kinds above, for validation
-local KINDS = { [M.KIND_PRESS] = true, [M.KIND_MOTION] = true, [M.KIND_FRAME] = true }
+local KINDS = { [M.KIND_PRESS] = true, [M.KIND_MOTION] = true, [M.KIND_FRAME] = true,
+	[M.KIND_RESET] = true, [M.KIND_DROPPED] = true }
 
 
 
@@ -50,20 +53,70 @@ local KINDS = { [M.KIND_PRESS] = true, [M.KIND_MOTION] = true, [M.KIND_FRAME] = 
 -- ===============================
 -- ===============================
 
---- Creates a tracker of one pointer stream. It keeps the open frame's movement
---- until the frame's SYN_REPORT, so a movement is measured once, whole.
+--- Creates a tracker of pointer streams. Each device keeps its own open frame
+--- until SYN_REPORT; queue loss discards the frame through the next SYN_REPORT.
 --- @return table tracker { observe(kind, code, value) }
 function M.new()
 	local tracker = {}
-	local dx, dy = 0, 0
+	local frames, dropping, default_source = {}, {}, {}
+	local fractions, fraction_database, fraction_device = {}, nil, nil
+
+	--- A new storage owner must not inherit another database's remainder.
+	function tracker.bind_fractions(database, device)
+		if database ~= fraction_database or device ~= fraction_device then
+			fractions = {}
+			fraction_database, fraction_device = database, device
+		end
+	end
+
+	--- Copies committed sub-unit distance by day and application. The flush
+	--- owner publishes a successor only after the matching SQLite COMMIT.
+	function tracker.snapshot_fractions()
+		local copy = {}
+		for date, apps in pairs(fractions) do
+			copy[date] = {}
+			for app, value in pairs(apps) do copy[date][app] = value end
+		end
+		return copy
+	end
+
+	--- Discard empty entries without losing a remainder for a delayed old day.
+	function tracker.commit_fractions(value)
+		for date, apps in pairs(value) do
+			for app, remainder in pairs(apps) do
+				if remainder == 0 then apps[app] = nil end
+			end
+			if next(apps) == nil then value[date] = nil end
+		end
+		fractions = value
+	end
+
+	--- Forgets uncommitted movement without admitting a dropped packet.
+	function tracker.discard_frames()
+		frames = {}
+	end
 
 	--- Observes one pointer report and returns what it adds to the metrics.
-	--- @param kind string "press" (a button pressed), "motion" (an EV_REL report) or "frame" (SYN_REPORT).
+	--- @param kind string "press", "motion", "frame", "dropped" or "reset".
 	--- @param code integer evdev code of the report.
 	--- @param value integer evdev value of the report.
+	--- @param source any|nil Identity of the pointer producing this frame.
 	--- @return table|nil delta { clicks, scrolls, distance } or nil when it adds nothing.
-	function tracker.observe(kind, code, value)
+	function tracker.observe(kind, code, value, source)
 		assert(KINDS[kind], "unknown pointer event kind: " .. tostring(kind))
+		local key = source or default_source
+		if kind == M.KIND_RESET then
+			frames[key], dropping[key] = nil, nil
+			return nil
+		end
+		if kind == M.KIND_DROPPED then
+			frames[key], dropping[key] = nil, true
+			return nil
+		end
+		if dropping[key] then
+			if kind == M.KIND_FRAME then dropping[key] = nil end
+			return nil
+		end
 		if kind == M.KIND_PRESS then
 			if CLICK_BUTTONS[code] then return { clicks = 1, scrolls = 0, distance = 0 } end
 			return nil
@@ -71,12 +124,17 @@ function M.new()
 		if kind == M.KIND_MOTION then
 			if SCROLL_AXES[code] then return { clicks = 0, scrolls = 1, distance = 0 } end
 			assert(type(value) == "number", "a pointer motion report needs its evdev value")
-			if code == InputEvent.REL_X then dx = dx + value elseif code == InputEvent.REL_Y then dy = dy + value end
+			if code == InputEvent.REL_X or code == InputEvent.REL_Y then
+				local frame = frames[key] or { dx = 0, dy = 0 }
+				frames[key] = frame
+				if code == InputEvent.REL_X then frame.dx = frame.dx + value else frame.dy = frame.dy + value end
+			end
 			return nil
 		end
-		if dx == 0 and dy == 0 then return nil end
-		local distance = math.sqrt(dx * dx + dy * dy)
-		dx, dy = 0, 0
+		local frame = frames[key]
+		frames[key] = nil
+		if not frame or (frame.dx == 0 and frame.dy == 0) then return nil end
+		local distance = math.sqrt(frame.dx * frame.dx + frame.dy * frame.dy)
 		return { clicks = 0, scrolls = 0, distance = distance }
 	end
 

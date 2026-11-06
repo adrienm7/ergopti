@@ -79,8 +79,17 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if ! "$SKIP_FLATPAK"; then
+  for producer in flatpak-builder flatpak; do
+    if ! command -v "$producer" >/dev/null 2>&1; then
+      echo "[ERR] $producer is required to build a Flatpak; use --skip-flatpak for staging only." >&2
+      exit 69
+    fi
+  done
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
+IFS= read -r -d '' PROJECT_ROOT < <(CDPATH= cd -Pe -- "${SCRIPT_DIR}/../.." && printf '%s\0' "$PWD")
 # The external hosts are declared once in _shared/data/identifiers.json.
 # shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
 . "$PROJECT_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
@@ -426,14 +435,6 @@ if [ "$SKIP_FLATPAK" = true ]; then
   exit 0
 fi
 
-if ! command -v flatpak-builder &>/dev/null || ! command -v flatpak &>/dev/null; then
-  echo ""
-  echo "=== Structure complete (flatpak toolchain not available) ==="
-  print_manual_commands
-  print_host_permission_warning
-  exit 0
-fi
-
 echo ""
 echo "Building the Flatpak..."
 # --disable-rofiles-fuse: CI containers and many sandboxes have no FUSE, and
@@ -441,13 +442,24 @@ echo "Building the Flatpak..."
 flatpak-builder --force-clean --disable-rofiles-fuse \
   --repo="$REPO_DIR" "$BUILDER_DIR" "$MANIFEST_FILE"
 
-rm -f "$FLATPAK_FILE"
-flatpak build-bundle "$REPO_DIR" "$FLATPAK_FILE" "$APP_ID" "$BRANCH"
+# Preserve an existing bundle until the producer has completed a fresh one.
+FLATPAK_STAGE="$(mktemp -d "$BUILD_DIR/.ergopti-flatpak.XXXXXX")"
+FLATPAK_STAGE_FILE="$FLATPAK_STAGE/bundle.flatpak"
+cleanup_flatpak_stage() {
+  status=$?
+  trap - EXIT
+  rm -f -- "$FLATPAK_STAGE_FILE" || status=1
+  rmdir -- "$FLATPAK_STAGE" || status=1
+  exit "$status"
+}
+trap cleanup_flatpak_stage EXIT
+flatpak build-bundle "$REPO_DIR" "$FLATPAK_STAGE_FILE" "$APP_ID" "$BRANCH"
 
-if [ ! -f "$FLATPAK_FILE" ]; then
-  echo "[ERR] flatpak build-bundle did not produce a bundle file."
+if [ ! -f "$FLATPAK_STAGE_FILE" ] || [ -L "$FLATPAK_STAGE_FILE" ] || [ ! -s "$FLATPAK_STAGE_FILE" ]; then
+  echo "[ERR] flatpak build-bundle did not produce a nonempty direct bundle file." >&2
   exit 1
 fi
+mv -T -- "$FLATPAK_STAGE_FILE" "$FLATPAK_FILE"
 
 bundle_size=$(du -h "$FLATPAK_FILE" | cut -f1)
 echo ""
