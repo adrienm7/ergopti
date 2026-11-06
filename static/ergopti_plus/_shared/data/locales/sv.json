@@ -3845,7 +3845,7 @@
 	"platform_reason.proxy_override_is_native_settings": "På macOS och Linux sparas den här inställningen i drivrutinens eget inställningslager, inte i config.toml.",
 	"platform_reason.chord_families_are_each_platforms": "De ackordfamiljer en drivrutin binder hör till dess plattform: Windows grupperar sina AltGr- och CapsLock-kombinationer och håller en fil med personliga genvägar, macOS grupperar sina Ctrl- och Cmd-genvägar. Varje drivrutin listar bara den familj den binder.",
 	"platform_reason.touchpad_stack_is_per_driver": "Varje drivrutin läser styrplattan genom en annan stack — Windows via sitt API för precisionsstyrplatta, macOS via Hammerspoons gesthändelser, Linux via evdev — så de platser var och en kan erbjuda, och den uppsättning var och en kräver, är dess egna.",
-	"platform_reason.tray_top_level_rows_are_each_drivers": "Varje drivrutins fält bär de toppnivårader som dess plattform har: applikationsverktygen på macOS, den inbyggda uppdateraren på Linux, pausreglaget på Windows. De andra når samma sak någon annanstans, eller inte alls.",
+	"platform_reason.tray_top_level_rows_are_each_drivers": "Varje drivrutins fält bär de toppnivårader som dess plattform har: den inbyggda uppdateraren på Linux, pausreglaget på Windows. De andra når samma sak någon annanstans, eller inte alls.",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Inte på Windows: den drivrutinen ritar en flaggikon på varje språkrad, och en delad menyrad bär en etikett, en bock, en åtgärd och en undermeny — inte en ikon. Att deklarera raden där vore att byta bort flaggorna mot en delad beskrivning.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Endast Linux: den här drivrutinen läser råa tangentkoder från kärnan och måste veta vilken fysisk layout som skapade dem, så den väljer tabellen den avkodar med. macOS frågar systemet om sina inmatningskällor och Windows installerar en tangentbordslayout; ingen av dem har en avkodningstabell att välja.",
 	"platform_reason.shortcuts_restore_is_composed_on_macos": "Ännu inte på macOS: där sparas tangentkombinationerna i Karabiners inställningar, och bara återställningen i menyn Konfiguration återställer dem tillsammans med övriga genvägsinställningar.",
@@ -4131,5 +4131,7 @@
 	"apps.cloner.msg_icon_style_portable": "Behålla programmets egen ikon eller välja en bild för klonen?",
 	"apps.cloner.btn_original_icon": "Originalikon",
 	"apps.cloner.msg_created": "”{1}” finns nu i programmenyn. Den har en egen profil i {2}.",
-	"apps.cloner.err_source_unreadable": "Programmet kan inte klonas: dess startare anger inget program."
+	"apps.cloner.err_source_unreadable": "Programmet kan inte klonas: dess startare anger inget program.",
+	"apps.encryptor.drop_hint": "Släpp filer här för att kryptera dem, eller .enc-filer för att dekryptera dem.",
+	"apps.cloner.msg_no_isolation": "Programmet har inget alternativ för en separat profil: på Windows är klonen en andra genväg som startar samma program med samma inställningar."
 }

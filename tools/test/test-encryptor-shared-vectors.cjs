@@ -184,6 +184,31 @@ scenario(
 	}
 );
 
+scenario(
+	'(encryptor-windows-reads-format) the Windows Encryptor reads every constant from the format',
+	() => {
+		const code = fs.readFileSync(path.join(plus, 'windows/apps/encryptor_core.ahk'), 'utf8');
+		assert.ok(
+			code.includes('\\data\\encryptor\\format.json'),
+			'Windows no longer reads the format'
+		);
+		for (const key of [
+			'iterations',
+			'salt_bytes',
+			'key_bytes',
+			'iv_bytes',
+			'magic',
+			'encrypted_extension'
+		])
+			assert.ok(code.includes(`Envelope["${key}"]`), 'Windows no longer reads ' + key);
+		assert.ok(!code.includes(String(format.iterations)), 'Windows repeats the iteration count');
+		assert.ok(
+			!/DllCall\(/.test(code),
+			'the Windows Encryptor core calls the OS outside its adapter'
+		);
+	}
+);
+
 const openssl = spawnSync('/bin/sh', ['-c', 'command -v openssl'], { encoding: 'utf8' });
 if (process.platform !== 'win32' && openssl.status === 0) {
 	const work = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-encryptor-vectors-'));

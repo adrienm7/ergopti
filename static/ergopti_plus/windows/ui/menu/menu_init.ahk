@@ -145,6 +145,7 @@ _MI_TopLevelBuilders() {
 		"shortcuts",       _MI_StageShortcuts,
 		ConfigLeaf.TAP_HOLDS,       _MI_StageTapHolds,
 		"gestures",        _MI_StageGestures,
+		"apps",            _MI_StageApps,
 		"configuration",   _MI_StageConfiguration,
 		"language",        _MI_StageLanguage,
 		"about",           _MI_StageAbout,

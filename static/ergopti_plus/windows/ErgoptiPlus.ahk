@@ -17,15 +17,17 @@
 #NoTrayIcon
 
 ; The driver re-runs this entry (or its compiled executable) with a worker flag
-; for the detached keystats-prefetch and UIA-selection workers. AutoHotkey
+; for the detached keystats-prefetch and UIA-selection workers and for the
+; bundled apps (App Cloner, Encryptor). AutoHotkey
 ; creates a script's tray icon, main window and load-time hotkeys BEFORE its
 ; first statement runs, so each worker looked like a second driver: an
 ; "ErgoptiPlus" tray icon (the default green H in source mode), the driver's
 ; exact window title, which Reload and #SingleInstance search to find the
 ; instance they close, and every static hotkey armed in a second keyboard hook.
 ; Before any other statement a worker therefore releases those hotkeys and takes
-; a title of its own. Both predicates read only A_Args and are hoisted.
+; a title of its own. Every predicate reads only A_Args and is hoisted.
 global _DriverIsDetachedWorker := KLPF_IsWorkerInvocation() || UIASW_IsWorkerInvocation()
+	|| BundledApp_IsInvocation()
 if _DriverIsDetachedWorker {
 	Suspend(true)
 	; A pure HWND reaches the hidden main window whatever DetectHiddenWindows
@@ -633,6 +635,17 @@ BootProfile_Stamp("Keystats modules initialised")
 ; generation before atomically making that file visible to a dashboard.
 if KLPF_IsWorkerInvocation()
 		KLPF_WorkerMain()
+
+; A bundled app (App Cloner, Encryptor, windows/apps/) reuses this executable in
+; a compiled release, as the workers above do; a source run starts
+; apps/bundled_app_entry.ahk instead. It never returns into the driver's boot.
+#Include adapters/bundled_apps_native.ahk
+#Include apps/app_strings.ahk
+#Include apps/encryptor_core.ahk
+#Include apps/app_cloner_core.ahk
+#Include apps/bundled_apps.ahk
+if BundledApp_IsInvocation()
+	BundledApp_Main(_SharedDir)
 KLPF_InitializeCleanup()
 
 #Include _generated/prompt_builder.ahk

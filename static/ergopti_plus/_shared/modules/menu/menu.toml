@@ -305,8 +305,9 @@ reason_key = "menu.agent.not_ready"
 [[menu.top_level]]
 id = "---"
 
-# The bundled App Cloner and Encryptor: macOS bundles and linux/apps/*.lua,
-# each run as a process of its own (Windows follows, decided 2026-11-06). Linux once held a config-folder row here; it lives under
+# The bundled App Cloner and Encryptor, on every driver since 2026-11-06:
+# macOS bundles, linux/apps/*.lua, windows/apps/*.ahk, each run as a process of
+# its own. Linux once held a config-folder row here; it lives under
 # Configuration with the other two drivers' copy of it.
 [[menu.top_level]]
 type = "group"
@@ -314,14 +315,12 @@ id = "apps"
 i18n = "menu.apps.title"
 rows = []
 greyed_when_paused = true
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
+platforms = ["ahk", "hs", "linux"]
 
 # The separator that closes the group of that row belongs to it.
 [[menu.top_level]]
 id = "---"
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
+platforms = ["ahk", "hs", "linux"]
 
 # Versions, Configuration, then Language (the maintainer's order of
 # 2026-10-02): what runs, how it is set up, how it speaks.
@@ -895,14 +894,13 @@ caption_format = "numbered"
 disabled_when = ["agent_system_model_ready"]
 
 # The Applications submenu: one row per bundled app, each launching it. macOS
-# lists the bundles found on disk; Linux lists its two apps. A row
+# lists the bundles found on disk; Linux and Windows list their two apps. A row
 # promising per-app settings must not return here until it can carry an
 # application identity through persistence and focus changes.
 [[menu.apps_menu]]
 type = "list"
 id = "apps_installed"
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
+platforms = ["ahk", "hs", "linux"]
 
 # The language selector. It had no declaration of any kind: three drivers each
 # listed the same twenty-one locales from the same shared catalogue, and nothing

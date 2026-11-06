@@ -106,6 +106,23 @@ parameter passed through a helper. `(window-title-brand-once)` builds every
 manifest window in all 21 locales on each driver; open a new window by its app
 identity rather than a translated title.
 
+### project-bundled-apps-are-separate-processes-on-one-container
+
+App Cloner and Encryptor exist on the three drivers and always run as a process
+of their own: macOS bundles, Linux `linux/apps/*.lua` under the daemon's
+interpreter, Windows `--bundled-app` (`apps/bundled_app_entry.ahk` from source,
+the main executable when compiled, dispatched in `ErgoptiPlus.ahk` before the
+driver boots, so `BundledApp_Main` must never return). A 600000-iteration key
+derivation or a modal dialog inside a driver stalls its keyboard hook. The
+Encryptor file is OpenSSL's `enc` envelope declared in
+`_shared/data/encryptor/format.json`; change it only together with
+`_shared/tests/corpus/encryptor/vectors.json`, which every driver decrypts and
+re-creates byte for byte. App Cloner isolation is
+`_shared/data/app_cloner/families.json`; macOS's hand-written detection is held
+to it by `test-app-cloner-families.cjs`. A Windows program of no family cannot
+get its own profile (a shortcut cannot redirect `%APPDATA%`), so its clone is
+labelled a second shortcut, never presented as isolated.
+
 ### project-a-cloud-provider-is-catalogue-data
 
 A cloud provider is a row of `_shared/modules/llm/api_providers.json`; the three

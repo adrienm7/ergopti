@@ -371,6 +371,12 @@ InstallHotstringHooks()
 #Include ../adapters/keyboard_layout_switch.ahk
 #Include ../adapters/app_launcher.ahk
 #Include ../adapters/crypto.ahk
+; The bundled App Cloner and Encryptor: definitions only (their entry runs nothing at load).
+#Include ../adapters/bundled_apps_native.ahk
+#Include ../apps/app_strings.ahk
+#Include ../apps/encryptor_core.ahk
+#Include ../apps/app_cloner_core.ahk
+#Include ../apps/bundled_apps.ahk
 #Include ../adapters/network_info.ahk
 #Include ../adapters/window_manager.ahk
 #Include ../adapters/system_control.ahk
@@ -1610,7 +1616,10 @@ _LogBootProgress("keystats modules + tests included")
 ; The tray root builder: its top-level dispatcher and the id → builder table.
 ; Function definitions only, and the table names only its own _MI_ builders,
 ; so pulling it in stages nothing and resolves no menu dependency at load.
+; The Applications stage the root builder table names.
+#Include ../ui/menu/menu_apps.ahk
 #Include ../ui/menu/menu_init.ahk
+#Include unit/ui/bundled_apps/test_bundled_apps.ahk
 ; Drift gate: the staged tray root follows the manifest's top level, separators included.
 #Include meta/ui/menu/test_menu_top_level_drift_gate.ahk
 ; Regression: no separator doubles up in any manifest menu.

@@ -3845,7 +3845,7 @@
 	"platform_reason.proxy_override_is_native_settings": "Unter macOS und Linux liegt diese Einstellung im Einstellungsspeicher des Treibers, nicht in config.toml.",
 	"platform_reason.chord_families_are_each_platforms": "Die Tastenfamilien, die ein Treiber belegt, gehören seiner Plattform: Windows bündelt seine AltGr- und CapsLock-Kombinationen und führt eine Datei persönlicher Kürzel, macOS bündelt seine Strg- und Cmd-Kürzel. Jeder Treiber listet nur die Familie, die er belegt.",
 	"platform_reason.touchpad_stack_is_per_driver": "Jeder Treiber liest das Touchpad über einen anderen Stapel — Windows über seine Precision-Touchpad-API, macOS über Hammerspoons Gestenereignisse, Linux über evdev — also sind die Plätze, die jeder anbieten kann, und die Einrichtung, die jeder braucht, seine eigenen.",
-	"platform_reason.tray_top_level_rows_are_each_drivers": "Der Infobereich jedes Treibers trägt die obersten Zeilen, die seine Plattform hat: die Anwendungswerkzeuge auf macOS, den eingebauten Updater auf Linux, den Pausenschalter auf Windows. Die anderen erreichen dasselbe anderswo oder gar nicht.",
+	"platform_reason.tray_top_level_rows_are_each_drivers": "Der Infobereich jedes Treibers trägt die obersten Zeilen, die seine Plattform hat: den eingebauten Updater auf Linux, den Pausenschalter auf Windows. Die anderen erreichen dasselbe anderswo oder gar nicht.",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Nicht unter Windows: dieser Treiber zeichnet auf jeder Sprachzeile ein Flaggensymbol, und eine gemeinsame Menüzeile trägt eine Beschriftung, ein Häkchen, eine Aktion und ein Untermenü — kein Symbol. Die Zeile dort zu deklarieren hieße, die Flaggen gegen eine gemeinsame Beschreibung einzutauschen.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Nur Linux: dieser Treiber liest rohe Tastencodes vom Kernel und muss wissen, welches physische Layout sie erzeugt hat, also wählt er die Tabelle, mit der er dekodiert. macOS fragt das System nach seinen Eingabequellen und Windows installiert ein Tastaturlayout; keines von beiden hat eine Dekodiertabelle zur Auswahl.",
 	"platform_reason.shortcuts_restore_is_composed_on_macos": "Noch nicht unter macOS: Dort liegen die Tastenkombinationen in den Karabiner-Einstellungen, und nur die Wiederherstellung im Menü Konfiguration stellt sie zusammen mit den übrigen Kürzel-Einstellungen wieder her.",
@@ -4131,5 +4131,7 @@
 	"apps.cloner.msg_icon_style_portable": "Das eigene Symbol der Anwendung behalten oder ein Bild für den Klon wählen?",
 	"apps.cloner.btn_original_icon": "Originalsymbol",
 	"apps.cloner.msg_created": "„{1}“ ist in Ihrem Anwendungsmenü bereit. Es behält sein eigenes Profil in {2}.",
-	"apps.cloner.err_source_unreadable": "Diese Anwendung kann nicht geklont werden: Ihr Starter nennt kein Programm."
+	"apps.cloner.err_source_unreadable": "Diese Anwendung kann nicht geklont werden: Ihr Starter nennt kein Programm.",
+	"apps.encryptor.drop_hint": "Legen Sie hier Dateien ab, um sie zu verschlüsseln, oder .enc-Dateien, um sie zu entschlüsseln.",
+	"apps.cloner.msg_no_isolation": "Dieses Programm hat keine Option für ein eigenes Profil: Unter Windows ist sein Klon eine zweite Verknüpfung, die dasselbe Programm mit denselben Einstellungen startet."
 }

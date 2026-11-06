@@ -394,7 +394,7 @@ for (const [driver, spec] of Object.entries(DRIVER_ROOTS)) {
 // held to the decision rather than silently shipped. Changing the order means
 // changing this list, in the same commit and on purpose.
 // The drivers that ship the bundled apps (App Cloner, Encryptor).
-const APPS_DRIVERS = ['hs', 'linux'];
+const APPS_DRIVERS = ['ahk', 'hs', 'linux'];
 
 const APPROVED_TOP_LEVEL = [
 	'tap_holds',
@@ -448,7 +448,7 @@ for (const [driver, ids] of Object.entries(projections)) {
 }
 
 // Applications lists the bundled App Cloner and Encryptor: macOS ships them as
-// bundles, Linux as apps/*.lua (decided 2026-11-06: Windows and Linux follow).
+// bundles, Linux as apps/*.lua and Windows as apps/*.ahk (decided 2026-11-06).
 const appsRow = (topLevel || []).find((row) => row.id === 'apps');
 if (!appsRow || JSON.stringify(appsRow.platforms) !== JSON.stringify(APPS_DRIVERS)) {
 	errors.push(
