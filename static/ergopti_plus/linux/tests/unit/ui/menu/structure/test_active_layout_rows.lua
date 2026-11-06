@@ -6,7 +6,8 @@
 --- Layout > « Input sources » on Linux: the desktop's layouts with the active
 --- one ticked, a choice switching the desktop, the declared status line on a
 --- desktop with no backend and the settings row on an empty list. The manifest
---- now declares the list for every driver, and the layout menu owner provides it.
+--- now declares the list for every driver, and the layout menu owner provides it;
+--- the install rows stay macOS-only with a reason naming the other routes.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -105,6 +106,16 @@ helpers.describe("active layout rows", function()
 		end
 		helpers.assert_eq(type(found), "table", "the list is declared")
 		helpers.assert_eq(found.platforms, nil, "the list is no longer macOS-only")
+		-- The install rows stay macOS-only and say where Windows and Linux install from.
+		local bundle
+		for _, row in ipairs(manifest.layout_menu) do
+			if row.id == "layout_bundle" then bundle = row end
+		end
+		helpers.assert_eq(bundle.reason_key, "platform_reason.layout_install_is_the_macos_bundle")
+		local english = Json.decode(read(helpers.driver_root() .. "/../_shared/data/locales/en.json"))
+		local reason = english[bundle.reason_key]
+		helpers.assert_true(type(reason) == "string" and reason:find("Ergopti_windows.exe", 1, true) ~= nil
+			and reason:find(english["menu.layout.manage"], 1, true) ~= nil, "the reason names both install routes")
 		local owner = read(helpers.driver_root() .. "/ui/menu/menu_layouts.lua")
 		helpers.assert_true(owner:find('providers["active_layouts"]', 1, true) ~= nil, "the provider exists")
 		helpers.assert_true(owner:find('require("ui.menu.active_layout_rows").rows(', 1, true) ~= nil)

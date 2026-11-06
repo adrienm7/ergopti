@@ -3835,6 +3835,7 @@
 	"platform_reason.llm_lists_are_inline_on_linux": "仅限 Linux：此驱动把模型和生成设置直接列在菜单中。macOS 和 Windows 把同样的选项放在子菜单行之后，由它们上面各自的行声明。",
 	"platform_reason.selection_operations_are_a_block_on_linux": "仅限 Linux：该驱动把针对选区的操作——CapsWord、大小写转换、选中单词或整行、无格式粘贴——放在一个区块里。macOS 通过 Ctrl 快捷键、Windows 通过自己的组合键到达同样的操作，共用的菜单项会在那两边重复列出。",
 	"platform_reason.layout_bundle_and_menubar_are_macos": "仅限 macOS：这些项通过系统自身的输入源机制安装 .bundle 键盘布局，分用户范围和系统范围，并选择菜单栏图标。Windows 用自己的安装程序安装 .klc，Linux 生成 XKB 布局，两者都没有菜单栏。",
+	"platform_reason.layout_install_is_the_macos_bundle": "仅限 macOS：此行安装 .bundle 布局。在 Windows 上，布局安装程序是一个单独的、未签名的下载，必须以管理员身份运行，驱动程序从不启动它：请从发布页面运行 Ergopti_windows.exe。在 Linux 上，请通过“管理布局…”（Wayland）或 install.sh（X11）安装 Ergopti。",
 	"platform_reason.virtual_keyboard_is_karabiner": "仅限 macOS：Ergopti 在 macOS 上用来重新映射按键的 Karabiner-Elements 带有一个虚拟键盘，其类型决定了 ISO 独有的两个按键到达哪些键码。Windows 和 Linux 按位置称呼这两个按键，没有虚拟键盘。",
 	"platform_reason.layout_emulation_is_windows_only": "仅限 Windows：此驱动程序自行模拟 Ergopti 布局，因此有可以关闭的模拟。macOS 将布局安装为系统输入源，Linux 将其安装为系统键盘布局（XKB），因此那里没有可关闭的内容。",
 	"platform_reason.remap_engine_is_per_driver": "每个驱动用不同的引擎重映射键盘——Windows 用自己的点按长按层，macOS 用 Karabiner-Elements，Linux 用自身守护进程中的点按长按引擎——所以各自只带自己所运行引擎的菜单，谁也配置不了别人的。",

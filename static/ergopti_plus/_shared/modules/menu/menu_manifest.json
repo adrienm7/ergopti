@@ -2355,7 +2355,7 @@
 			"platforms": [
 				"hs"
 			],
-			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos"
+			"reason_key": "platform_reason.layout_install_is_the_macos_bundle"
 		},
 		{
 			"type": "section_header",
