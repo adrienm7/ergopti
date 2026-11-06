@@ -63,7 +63,7 @@ const inventoryModel = inventory.withSectionReasons(
 );
 assert.strictEqual(
 	inventoryModel.find((row) => row.path === 'gestures.modes.swipe_2_left').reason_key,
-	'platform_reason.gesture_modes_and_steps_are_macos'
+	'platform_reason.gesture_modes_and_steps_need_finger_travel'
 );
 const inheritedFixture = inventory.withSectionReasons(
 	[{ section: 'one', platforms: ['hs', 'linux'] }],

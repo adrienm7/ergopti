@@ -2886,7 +2886,7 @@ type = "check"
 id = "gesture_mode_single"
 i18n = "menu.gestures.mode_single"
 checked_when = ["gesture_mode_is_single"]
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 [[menu.gesture_slot_mode_commands]]
@@ -2894,26 +2894,26 @@ type = "check"
 id = "gesture_mode_incremental"
 i18n = "menu.gestures.mode_incremental"
 checked_when = ["gesture_mode_is_incremental"]
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 [[menu.gesture_sensitivity_head]]
 type = "section_header"
 id = "gesture_sensitivity_heading"
 i18n = "menu.gestures.sensitivity_label"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 [[menu.gesture_sensitivity_head]]
 type = "label"
 id = "gesture_sensitivity_hint"
 i18n = "menu.gestures.sensitivity_hint"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 [[menu.gesture_sensitivity_head]]
 type = "---"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 [[menu.gesture_change_action]]

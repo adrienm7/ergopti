@@ -6,19 +6,19 @@
 				"type": "section_header",
 				"id": "gesture_sensitivity_heading",
 				"i18n": "menu.gestures.sensitivity_label",
-				"platforms": ["hs"],
+				"platforms": ["hs", "linux"],
 				"unavailable": "hide"
 			},
 			{
 				"type": "label",
 				"id": "gesture_sensitivity_hint",
 				"i18n": "menu.gestures.sensitivity_hint",
-				"platforms": ["hs"],
+				"platforms": ["hs", "linux"],
 				"unavailable": "hide"
 			},
 			{
 				"type": "---",
-				"platforms": ["hs"],
+				"platforms": ["hs", "linux"],
 				"unavailable": "hide"
 			}
 		],
@@ -53,7 +53,7 @@
 			"change_action": 1
 		},
 		"linux": {
-			"sensitivity_head": 0,
+			"sensitivity_head": 3,
 			"change_action": 0
 		}
 	},

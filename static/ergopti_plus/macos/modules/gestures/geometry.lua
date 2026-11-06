@@ -26,6 +26,7 @@
 
 local M = {}
 local Direction = require("gestures.direction")
+local Incremental = require("gestures.incremental")
 
 
 
@@ -45,17 +46,10 @@ M.SWIPE_MIN   = 1.5    -- 3/4/5 fingers: minimum distance to validate a swipe
 M.SWIPE_MIN_2 = 3.0    -- 2 fingers horiz/vert (left to macOS, diagonal only)
 M.DIAG_MIN_2  = 5.0    -- 2 fingers: minimum total distance to validate a diagonal
 
--- Incremental mode: the first action fires once the swipe has travelled this
--- far, and each further action needs one more `sensitivity` (the slot's
--- distance per action). A short deliberate swipe therefore still fires once,
--- while a large step keeps a normal swipe to exactly one action. A slot whose
--- step is smaller than this fires its first action after one step, as before.
-M.INCREMENTAL_FIRST_STEP = 4.0
-
--- Bound synchronous work on a single touch frame. A normal full swipe travels
--- about 15–45 units, so even at the smallest supported step of 1 it remains
--- well below this guard. An implausible sensor jump is rejected, not truncated.
-M.MAX_INCREMENTAL_ACTIONS_PER_FRAME = 100
+-- Incremental mode: the shared step rule (_shared/lua/gestures/incremental.lua),
+-- the same one the Linux gesture manager counts with.
+M.INCREMENTAL_FIRST_STEP = Incremental.FIRST_STEP
+M.MAX_INCREMENTAL_ACTIONS_PER_FRAME = Incremental.MAX_ACTIONS_PER_FRAME
 
 -- Least share of the centroid's travel along the swipe axis that EVERY contact
 -- of a three-or-more-finger gesture must cover itself, in the same direction.
@@ -180,36 +174,8 @@ function M.movedTogether(origin, current, axis)
 	return share >= M.COHESION_MIN_SHARE, share
 end
 
---- Counts the incremental actions a swipe has earned over a distance.
---- The count only ever grows within one swipe: the engine holds the actions
---- already fired when the distance shrinks, so drift never takes one back or
---- earns it twice.
---- @param distance number Absolute travel along the swipe axis.
---- @param step number Distance per action after the first (the sensitivity).
---- @return integer steps
-function M.incrementalSteps(distance, step)
-	if type(distance) ~= "number" or distance ~= distance or distance < 0 or distance == math.huge then
-		error("incremental distance must be a finite non-negative number")
-	end
-	if type(step) ~= "number" or step ~= step or step <= 0 or step == math.huge then
-		error("incremental step must be a finite positive number")
-	end
-	local first = math.min(M.INCREMENTAL_FIRST_STEP, step)
-	if distance < first then return 0 end
-	local count = (distance - first) / step
-	if count == math.huge then error("incremental action count is not finite") end
-	return 1 + math.floor(count)
-end
-
---- Distance a swipe must come back from its last action before it counts as a
---- reversal: half the first step, so lift-off drift neither reverses a swipe
---- nor, through the rebase, fires the opposite action.
---- @param step number Distance per action after the first (the sensitivity).
---- @param floor number Smallest reversal distance the engine accepts.
---- @return number distance
-function M.incrementalReverseMin(step, floor)
-	return math.max(floor, math.min(M.INCREMENTAL_FIRST_STEP, step) / 2)
-end
+M.incrementalSteps = Incremental.steps
+M.incrementalReverseMin = Incremental.reverse_min
 
 --- Infers the action configuration slot ID given fingers count and direction.
 --- @param mf number Number of fingers.

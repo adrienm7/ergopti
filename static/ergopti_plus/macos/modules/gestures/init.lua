@@ -45,7 +45,7 @@ local touchdevice = load_touchdevice_module()
 local Engine    = require("modules.gestures.engine")
 local Actions   = require("modules.gestures.actions")
 local Conflicts = require("modules.gestures.conflicts")
-local Sensitivity = require("modules.gestures.sensitivity")
+local Sensitivity = require("gestures.sensitivity")
 local TableUtil = require("table_util")
 local ConfigKeys = require("config_keys")
 

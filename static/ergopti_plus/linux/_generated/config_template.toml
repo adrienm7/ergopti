@@ -640,6 +640,84 @@ tap_5 = "none"
 
 
 
+[gestures.modes]
+swipe_2_left = "x1"
+swipe_2_right = "x1"
+swipe_2_up = "x1"
+swipe_2_down = "x1"
+swipe_2_left_down = "x1"
+swipe_2_left_up = "x1"
+swipe_2_right_down = "x1"
+swipe_2_right_up = "x1"
+swipe_3_left = "incremental"
+swipe_3_right = "incremental"
+swipe_3_up = "x1"
+swipe_3_down = "x1"
+swipe_3_left_down = "incremental"
+swipe_3_left_up = "incremental"
+swipe_3_right_down = "incremental"
+swipe_3_right_up = "incremental"
+swipe_4_left = "x1"
+swipe_4_right = "x1"
+swipe_4_up = "x1"
+swipe_4_down = "x1"
+swipe_4_left_down = "x1"
+swipe_4_left_up = "x1"
+swipe_4_right_down = "x1"
+swipe_4_right_up = "x1"
+swipe_5_left = "incremental"
+swipe_5_right = "incremental"
+swipe_5_up = "x1"
+swipe_5_down = "x1"
+swipe_5_left_down = "incremental"
+swipe_5_left_up = "incremental"
+swipe_5_right_down = "incremental"
+swipe_5_right_up = "incremental"
+swipe_3_horiz = "x1"
+swipe_4_horiz = "x1"
+swipe_5_horiz = "x1"
+
+
+
+[gestures.sensitivities]
+swipe_2_left = 3.5
+swipe_2_right = 3.5
+swipe_2_up = 3.5
+swipe_2_down = 3.5
+swipe_2_left_down = 3.5
+swipe_2_left_up = 3.5
+swipe_2_right_down = 3.5
+swipe_2_right_up = 3.5
+swipe_3_left = 3.5
+swipe_3_right = 3.5
+swipe_3_up = 25
+swipe_3_down = 25
+swipe_3_left_down = 3.5
+swipe_3_left_up = 3.5
+swipe_3_right_down = 3.5
+swipe_3_right_up = 3.5
+swipe_4_left = 3.5
+swipe_4_right = 3.5
+swipe_4_up = 3.5
+swipe_4_down = 3.5
+swipe_4_left_down = 3.5
+swipe_4_left_up = 3.5
+swipe_4_right_down = 3.5
+swipe_4_right_up = 3.5
+swipe_5_left = 3.5
+swipe_5_right = 3.5
+swipe_5_up = 3.5
+swipe_5_down = 3.5
+swipe_5_left_down = 3.5
+swipe_5_left_up = 3.5
+swipe_5_right_down = 3.5
+swipe_5_right_up = 3.5
+swipe_3_horiz = 3.5
+swipe_4_horiz = 3.5
+swipe_5_horiz = 3.5
+
+
+
 
 
 [layout]

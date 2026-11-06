@@ -4092,7 +4092,7 @@
 	"menu.caps_word.pointer.middle_click": "Orta tık",
 	"menu.caps_word.pointer.other_buttons": "Diğer fare düğmeleri",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Windows'ta yok: sistem dokunmatik yüzey hareketlerini kendine saklar ve Ergopti'ye hiçbir dokunuş iletmez. İki parmakla kaydırma yine kaydırma sayılır.",
-	"platform_reason.gesture_modes_and_steps_are_macos": "Yalnızca macOS: bu sürücü parmakları kendisi izler; bu yüzden kaydırma, parmaklar hareket ettiği sürece adım adım tekrarlanabilir ve adım boyutu ayarlanabilir. Windows her hareketi dokunmatik yüzey ayarlarından hazır alır, Linux sürücüsü ise hareket tamamlandığında yalnızca bir kez işlem yapar.",
+	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Windows'ta yok: Windows her hareketi sürücüye dokunmatik yüzey ayarlarından, ancak tamamlandığında hazır olarak verir; bu yüzden parmaklar hareket ederken bir kaydırma adım adım yinelenemez. macOS ve Linux parmakları kendileri izler.",
 	"platform_reason.hotstring_menu_order_is_macos": "Yalnızca macOS: Hotstrings menüsü her kategorinin öğelerini yeniden sıralamanıza izin verir ve bu sırayı hatırlar. Windows ve Linux’ta yeniden sıralama denetimi yoktur.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Bu adla yalnızca macOS: sürücünün başlatıp durdurduğu macOS yazma motorunun ana anahtarıdır. Windows ana anahtarını category_enabled içindeki hotstrings geçidi olarak tutar, Linux ise hotstring gruplarını tek tek açar.",
 	"platform_reason.category_gates_are_windows": "Yalnızca Windows: Windows her kategori için, kategorinin kendi anahtarlarının önünde bir ana geçit tutar. macOS hotstrings ana anahtarını hotstrings.enabled olarak tutar, Linux ise hotstring gruplarını tek tek açar.",

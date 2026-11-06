@@ -96,6 +96,48 @@ local function _build_gestures(ctx)
 		return true
 	end
 	gesture_commands[require("config_keys").COMMAND.SYSTEM_GESTURE_SETTINGS] = function() return require("ui.gesture_conflicts").open_settings() end
+	--- The mode and step rows of a swipe slot, from the templates macOS renders
+	--- too: x1 or incremental, and the distance per action of an incremental
+	--- slot (modules/gestures/incremental_tracker.lua).
+	--- @param slot string
+	--- @return table rows Provider rows to append to the slot's submenu.
+	local function slot_mode_rows(slot)
+		if not ManifestMenu or type(ge.get_mode) ~= "function" or ge.DEFAULT_MODES[slot] == nil then return {} end
+		local mode, step = ge.get_mode(slot), ge.get_sensitivity(slot)
+		local incremental = mode == ge.MODE_INCREMENTAL
+		local function commit(setter, value)
+			local committed = ge[setter](slot, value)
+			if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return committed
+		end
+		local COMMAND = require("config_keys").COMMAND
+		local mode_rows = ManifestMenu.template_rows("gesture_slot_mode_commands", {
+			[COMMAND.GESTURE_MODE_SINGLE] = function() return commit("set_mode", ge.MODE_SINGLE) end,
+			[COMMAND.GESTURE_MODE_INCREMENTAL] = function() return commit("set_mode", ge.MODE_INCREMENTAL) end,
+		}, {
+			gesture_mode_is_single = function() return not incremental end,
+			gesture_mode_is_incremental = function() return incremental end,
+		})
+		local step_rows = ManifestMenu.template_rows("gesture_sensitivity_head")
+		if not mode_rows or not step_rows then return {} end
+		for _, value in ipairs(require("gestures.sensitivity").options()) do
+			local label = string.format("%.1f", value)
+			if value == ge.DEFAULT_SENSITIVITIES[slot] then label = label .. " " .. i18n_safe("menu.gestures.default_sensitivity") end
+			step_rows[#step_rows + 1] = {
+				label = label,
+				checked = (step == value) or nil,
+				action = function() return commit("set_sensitivity", value) end,
+			}
+		end
+		local mode_label = i18n_safe(incremental and "menu.gestures.mode_incremental" or "menu.gestures.mode_single")
+		return {
+			{ label = string.format(i18n_safe("menu.gestures.mode_current"), mode_label), items = mode_rows },
+			-- The step only matters to an incremental slot.
+			{ label = string.format(i18n_safe("menu.gestures.sensitivity_current"), string.format("%.1f", step)),
+				items = step_rows, disabled = not incremental },
+		}
+	end
+
 	providers["gesture_slots_linux"] = function()
 		local out = {}
 		-- Every known slot is configurable here. A partial quick list made
@@ -173,6 +215,7 @@ local function _build_gestures(ctx)
 				end
 				return assigned
 			end)
+			for _, row in ipairs(slot_mode_rows(slot)) do choices[#choices + 1] = row end
 			out[#out + 1] = {
 				label = slot_label .. " → " .. label,
 				items = choices,

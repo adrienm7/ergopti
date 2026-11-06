@@ -15,7 +15,7 @@
 local M = {}
 
 local gestures_mod  = require("modules.gestures")
-local Sensitivity = require("modules.gestures.sensitivity")
+local Sensitivity = require("gestures.sensitivity")
 local MenuUtils = require("ui.menu.menu_utils")
 local dialog        = require("infra.dialog_util")
 local i18n          = require("infra.i18n")

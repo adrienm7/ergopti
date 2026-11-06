@@ -4092,7 +4092,7 @@
 	"menu.caps_word.pointer.middle_click": "中クリック",
 	"menu.caps_word.pointer.other_buttons": "その他のマウスボタン",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Windows では非対応：システムがタッチパッドのジェスチャーを自ら処理し、Ergopti にタッチを渡しません。2 本指スクロールは引き続きスクロールとして扱われます。",
-	"platform_reason.gesture_modes_and_steps_are_macos": "macOS のみ：このドライバーは指の動きを自分で追うため、指が動いている間はスワイプをステップごとに繰り返せ、ステップの大きさも調整できます。Windows はタッチパッドの設定から完成したジェスチャーを受け取り、Linux ドライバーはジェスチャーが完了した時点で一度だけ動作します。",
+	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Windows では使えません: Windows はタッチパッドの設定から、ジェスチャーが終わってから完成した形でドライバーに渡すため、指が動いている間にスワイプを一歩ずつ繰り返すことはできません。macOS と Linux は自分で指を追跡します。",
 	"platform_reason.hotstring_menu_order_is_macos": "macOS のみ：Hotstrings メニューで各カテゴリの項目を並べ替えられ、その順序が保存されます。Windows と Linux には並べ替えの操作がありません。",
 	"platform_reason.hotstrings_master_is_macos_engine": "この名前では macOS のみ：ドライバーが起動・停止する macOS の入力エンジンのマスタースイッチです。Windows はマスターを category_enabled の hotstrings ゲートとして持ち、Linux は hotstring グループを一つずつ切り替えます。",
 	"platform_reason.category_gates_are_windows": "Windows のみ：Windows はカテゴリごとに、そのカテゴリ自身のスイッチの手前にマスターゲートを一つ持ちます。macOS は hotstrings のマスターを hotstrings.enabled に持ち、Linux は hotstring グループを一つずつ切り替えます。",

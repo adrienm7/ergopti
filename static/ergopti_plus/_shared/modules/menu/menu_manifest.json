@@ -3255,7 +3255,8 @@
 				"gesture_mode_is_single"
 			],
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"unavailable": "hide"
 		},
@@ -3267,7 +3268,8 @@
 				"gesture_mode_is_incremental"
 			],
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"unavailable": "hide"
 		}
@@ -3278,7 +3280,8 @@
 			"id": "gesture_sensitivity_heading",
 			"i18n": "menu.gestures.sensitivity_label",
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"unavailable": "hide"
 		},
@@ -3287,14 +3290,16 @@
 			"id": "gesture_sensitivity_hint",
 			"i18n": "menu.gestures.sensitivity_hint",
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"unavailable": "hide"
 		},
 		{
 			"type": "---",
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"unavailable": "hide"
 		}

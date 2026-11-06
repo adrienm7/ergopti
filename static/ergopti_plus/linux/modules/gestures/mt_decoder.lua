@@ -468,6 +468,29 @@ function M.new(opts)
 		return { fingers = fingers, direction = nil, tap = true }
 	end
 
+	--- The swipe in progress, for a slot that acts while the fingers move
+	--- (incremental mode). Only the held peak count travels, as for a completed
+	--- swipe, and the same refusals apply: a pair that scrolled on, a backwards
+	--- clock, and three or more fingers landing to stop a scroll's momentum.
+	--- @return table|nil { fingers, dx, dy } in device units, nil when no swipe moves.
+	function decoder:live()
+		if not _touching or _aborted or _clock_invalid or _peak_fingers < 2 or _count ~= _peak_fingers then
+			return nil
+		end
+		if _peak_fingers >= 3 and _last_scroll_end_at and _started_at
+			and _started_at - _last_scroll_end_at < scroll_guard_sec then
+			return nil
+		end
+		return { fingers = _peak_fingers, dx = _travel_x, dy = _travel_y }
+	end
+
+	--- Whether a touch is in progress (BTN_TOUCH held), however many fingers
+	--- the kernel counts in this frame.
+	--- @return boolean
+	function decoder:touching()
+		return _touching
+	end
+
 	--- Throws away any partial gesture.
 	function decoder:reset()
 		reset()

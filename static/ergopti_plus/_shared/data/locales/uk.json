@@ -4092,7 +4092,7 @@
 	"menu.caps_word.pointer.middle_click": "Середній клік",
 	"menu.caps_word.pointer.other_buttons": "Інші кнопки миші",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Не в Windows: система залишає жести тачпада собі й не передає Ergopti жодного дотику. Прокручування двома пальцями й далі вважається прокручуванням.",
-	"platform_reason.gesture_modes_and_steps_are_macos": "Лише macOS: цей драйвер сам стежить за пальцями, тому свайп може повторюватися крок за кроком, поки вони рухаються, а розмір кроку можна налаштувати. Windows отримує кожен жест готовим із налаштувань сенсорної панелі, а драйвер Linux спрацьовує один раз, коли жест завершено.",
+	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Не у Windows: Windows передає драйверу кожен жест готовим, лише після його завершення, з налаштувань тачпада, тому свайп не може повторюватися крок за кроком, поки пальці рухаються. macOS і Linux самі відстежують пальці.",
 	"platform_reason.hotstring_menu_order_is_macos": "Лише macOS: меню Hotstrings дає змогу змінювати порядок елементів у кожній категорії та запам’ятовує його. У Windows і Linux немає елемента для зміни порядку.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Лише macOS під цією назвою: це головний перемикач рушія набору macOS, який драйвер запускає й зупиняє. У Windows головний перемикач зберігається як шлюз hotstrings у category_enabled, а Linux вмикає групи hotstrings по одній.",
 	"platform_reason.category_gates_are_windows": "Лише Windows: Windows має по одному головному шлюзу на категорію перед власними перемикачами категорії. macOS зберігає головний перемикач hotstrings як hotstrings.enabled, а Linux вмикає групи hotstrings по одній.",

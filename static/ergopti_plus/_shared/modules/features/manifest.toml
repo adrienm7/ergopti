@@ -353,13 +353,13 @@ subsections = ["modes", "sensitivities"]
 
 [sections.gestures.modes]
 description_key = "menu.gestures.modes"
-platforms = ["hs"]
-reason_key = "platform_reason.gesture_modes_and_steps_are_macos"
+platforms = ["hs", "linux"]
+reason_key = "platform_reason.gesture_modes_and_steps_need_finger_travel"
 
 [sections.gestures.sensitivities]
 description_key = "menu.gestures.sensitivities"
-platforms = ["hs"]
-reason_key = "platform_reason.gesture_modes_and_steps_are_macos"
+platforms = ["hs", "linux"]
+reason_key = "platform_reason.gesture_modes_and_steps_need_finger_travel"
 
 
 
@@ -3443,8 +3443,8 @@ description_key = "menu.gestures.tap_5"
 # --- 2-finger (all x1) ---
 [[features.gestures.modes]]
 id = "swipe_2_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3454,8 +3454,8 @@ description_key = "menu.gestures.modes.swipe_2_left"
 
 [[features.gestures.modes]]
 id = "swipe_2_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3465,8 +3465,8 @@ description_key = "menu.gestures.modes.swipe_2_right"
 
 [[features.gestures.modes]]
 id = "swipe_2_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3476,8 +3476,8 @@ description_key = "menu.gestures.modes.swipe_2_up"
 
 [[features.gestures.modes]]
 id = "swipe_2_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3487,8 +3487,8 @@ description_key = "menu.gestures.modes.swipe_2_down"
 
 [[features.gestures.modes]]
 id = "swipe_2_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3498,8 +3498,8 @@ description_key = "menu.gestures.modes.swipe_2_left_down"
 
 [[features.gestures.modes]]
 id = "swipe_2_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3509,8 +3509,8 @@ description_key = "menu.gestures.modes.swipe_2_left_up"
 
 [[features.gestures.modes]]
 id = "swipe_2_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3520,8 +3520,8 @@ description_key = "menu.gestures.modes.swipe_2_right_down"
 
 [[features.gestures.modes]]
 id = "swipe_2_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3533,8 +3533,8 @@ description_key = "menu.gestures.modes.swipe_2_right_up"
 # swipe opens or closes one tab, decision of 2026-11-04) ---
 [[features.gestures.modes]]
 id = "swipe_3_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3544,8 +3544,8 @@ description_key = "menu.gestures.modes.swipe_3_left"
 
 [[features.gestures.modes]]
 id = "swipe_3_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3555,8 +3555,8 @@ description_key = "menu.gestures.modes.swipe_3_right"
 
 [[features.gestures.modes]]
 id = "swipe_3_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3566,8 +3566,8 @@ description_key = "menu.gestures.modes.swipe_3_up"
 
 [[features.gestures.modes]]
 id = "swipe_3_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3577,8 +3577,8 @@ description_key = "menu.gestures.modes.swipe_3_down"
 
 [[features.gestures.modes]]
 id = "swipe_3_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3588,8 +3588,8 @@ description_key = "menu.gestures.modes.swipe_3_left_down"
 
 [[features.gestures.modes]]
 id = "swipe_3_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3599,8 +3599,8 @@ description_key = "menu.gestures.modes.swipe_3_left_up"
 
 [[features.gestures.modes]]
 id = "swipe_3_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3610,8 +3610,8 @@ description_key = "menu.gestures.modes.swipe_3_right_down"
 
 [[features.gestures.modes]]
 id = "swipe_3_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3622,8 +3622,8 @@ description_key = "menu.gestures.modes.swipe_3_right_up"
 # --- 4-finger (all x1) ---
 [[features.gestures.modes]]
 id = "swipe_4_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3633,8 +3633,8 @@ description_key = "menu.gestures.modes.swipe_4_left"
 
 [[features.gestures.modes]]
 id = "swipe_4_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3644,8 +3644,8 @@ description_key = "menu.gestures.modes.swipe_4_right"
 
 [[features.gestures.modes]]
 id = "swipe_4_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3655,8 +3655,8 @@ description_key = "menu.gestures.modes.swipe_4_up"
 
 [[features.gestures.modes]]
 id = "swipe_4_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3666,8 +3666,8 @@ description_key = "menu.gestures.modes.swipe_4_down"
 
 [[features.gestures.modes]]
 id = "swipe_4_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3677,8 +3677,8 @@ description_key = "menu.gestures.modes.swipe_4_left_down"
 
 [[features.gestures.modes]]
 id = "swipe_4_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3688,8 +3688,8 @@ description_key = "menu.gestures.modes.swipe_4_left_up"
 
 [[features.gestures.modes]]
 id = "swipe_4_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3699,8 +3699,8 @@ description_key = "menu.gestures.modes.swipe_4_right_down"
 
 [[features.gestures.modes]]
 id = "swipe_4_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3711,8 +3711,8 @@ description_key = "menu.gestures.modes.swipe_4_right_up"
 # --- 5-finger (horiz incremental, vert x1) ---
 [[features.gestures.modes]]
 id = "swipe_5_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3722,8 +3722,8 @@ description_key = "menu.gestures.modes.swipe_5_left"
 
 [[features.gestures.modes]]
 id = "swipe_5_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3733,8 +3733,8 @@ description_key = "menu.gestures.modes.swipe_5_right"
 
 [[features.gestures.modes]]
 id = "swipe_5_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3744,8 +3744,8 @@ description_key = "menu.gestures.modes.swipe_5_up"
 
 [[features.gestures.modes]]
 id = "swipe_5_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -3755,8 +3755,8 @@ description_key = "menu.gestures.modes.swipe_5_down"
 
 [[features.gestures.modes]]
 id = "swipe_5_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3766,8 +3766,8 @@ description_key = "menu.gestures.modes.swipe_5_left_down"
 
 [[features.gestures.modes]]
 id = "swipe_5_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3777,8 +3777,8 @@ description_key = "menu.gestures.modes.swipe_5_left_up"
 
 [[features.gestures.modes]]
 id = "swipe_5_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3788,8 +3788,8 @@ description_key = "menu.gestures.modes.swipe_5_right_down"
 
 [[features.gestures.modes]]
 id = "swipe_5_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "incremental"
 recommended = "incremental"
 family = "setting"
@@ -3803,10 +3803,12 @@ description_key = "menu.gestures.modes.swipe_5_right_up"
 # ===== 3.6.2 gestures.sensitivities =====
 # ========================================
 
-# Distance per action of an incremental swipe, in touch-device units (the `sd`
-# the gesture log prints; a deliberate three-finger swipe on the built-in
-# trackpad travels about 15 to 45). The first action fires after
-# Geometry.INCREMENTAL_FIRST_STEP (4) or one step if that is shorter, and each
+# Distance per action of an incremental swipe, in millimetres of travel on the
+# pad (the `sd` the macOS gesture log prints; a deliberate three-finger swipe on
+# the built-in trackpad travels about 15 to 45). Linux converts its evdev units
+# with the resolution the touchpad reports, so one value means the same travel
+# there. The first action fires after the shared FIRST_STEP (4,
+# _shared/lua/gestures/incremental.lua) or one step if that is shorter, and each
 # further action after one more step; an x1 slot ignores it.
 
 # Directions default to 3.5, one action per short stretch (words, spaces),
@@ -3815,8 +3817,8 @@ description_key = "menu.gestures.modes.swipe_5_right_up"
 # 25: up to 29 is one tab (a short 4.9 included), 29 to 54 two, 54 and more three.
 [[features.gestures.sensitivities]]
 id = "swipe_2_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3825,8 +3827,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_left"
 
 [[features.gestures.sensitivities]]
 id = "swipe_2_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3835,8 +3837,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_right"
 
 [[features.gestures.sensitivities]]
 id = "swipe_2_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3845,8 +3847,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_2_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3855,8 +3857,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_2_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3865,8 +3867,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_left_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_2_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3875,8 +3877,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_left_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_2_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3885,8 +3887,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_right_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_2_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3895,8 +3897,8 @@ description_key = "menu.gestures.sensitivities.swipe_2_right_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3905,8 +3907,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_left"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3915,8 +3917,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_right"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 25
 recommended = 25
 family = "setting"
@@ -3925,8 +3927,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 25
 recommended = 25
 family = "setting"
@@ -3935,8 +3937,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3945,8 +3947,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_left_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3955,8 +3957,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_left_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3965,8 +3967,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_right_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3975,8 +3977,8 @@ description_key = "menu.gestures.sensitivities.swipe_3_right_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3985,8 +3987,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_left"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -3995,8 +3997,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_right"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4005,8 +4007,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4015,8 +4017,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4025,8 +4027,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_left_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4035,8 +4037,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_left_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4045,8 +4047,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_right_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4055,8 +4057,8 @@ description_key = "menu.gestures.sensitivities.swipe_4_right_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_left"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4065,8 +4067,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_left"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_right"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4075,8 +4077,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_right"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4085,8 +4087,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4095,8 +4097,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_left_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4105,8 +4107,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_left_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_left_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4115,8 +4117,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_left_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_right_down"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4125,8 +4127,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_right_down"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_right_up"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4146,8 +4148,8 @@ description_key = "menu.gestures.sensitivities.swipe_5_right_up"
 # and the menu greys its row with this reason.
 [[features.gestures.modes]]
 id = "swipe_3_horiz"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -4157,8 +4159,8 @@ description_key = "menu.gestures.modes"
 
 [[features.gestures.modes]]
 id = "swipe_4_horiz"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -4168,8 +4170,8 @@ description_key = "menu.gestures.modes"
 
 [[features.gestures.modes]]
 id = "swipe_5_horiz"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = "x1"
 recommended = "x1"
 family = "setting"
@@ -4179,8 +4181,8 @@ description_key = "menu.gestures.modes"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_horiz"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4189,8 +4191,8 @@ description_key = "menu.gestures.sensitivities"
 
 [[features.gestures.sensitivities]]
 id = "swipe_4_horiz"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"
@@ -4199,8 +4201,8 @@ description_key = "menu.gestures.sensitivities"
 
 [[features.gestures.sensitivities]]
 id = "swipe_5_horiz"
-platforms = ["hs"]
-requires = { macos = [] }
+platforms = ["hs", "linux"]
+requires = { macos = [], linux = ["evdev", "uinput"] }
 default = 3.5
 recommended = 3.5
 family = "setting"

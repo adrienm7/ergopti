@@ -2857,7 +2857,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	assert.deepEqual(corpus.platform_rows, {
 		ahk: [],
 		hs: ['gesture_mode_single', 'gesture_mode_incremental'],
-		linux: []
+		linux: ['gesture_mode_single', 'gesture_mode_incremental']
 	});
 	assert.deepEqual(corpus.states, [
 		{ mode: 'x1', checked: [true, false] },

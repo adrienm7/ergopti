@@ -88,8 +88,9 @@ local function start_with(max_fingers, bindings)
 	}
 	package.loaded["logger.shim"] = logger
 	package.loaded["adapters.evdev_reader"] = Fakes.evdev_reader({ events = {} })
-	-- Only find(), as the other gesture tests fake it: the report must not need the finder.
-	package.loaded["modules.gestures.touchpad_finder"] = { find = function()
+	-- Only find() and a pad with no resolution, as the other gesture tests fake
+	-- it: the report must not need the finder.
+	package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, find = function()
 		return { path = "/dev/input/event-fake", name = "Fake Pad", max_fingers = max_fingers, semi_mt = false }
 	end }
 	local ok, err = pcall(function()

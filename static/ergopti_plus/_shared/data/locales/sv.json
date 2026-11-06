@@ -4092,7 +4092,7 @@
 	"menu.caps_word.pointer.middle_click": "Mittenklick",
 	"menu.caps_word.pointer.other_buttons": "Andra musknappar",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Inte på Windows: systemet behåller styrplattans gester själv och skickar ingen beröring vidare till Ergopti. Rullning med två fingrar räknas fortfarande som rullning.",
-	"platform_reason.gesture_modes_and_steps_are_macos": "Endast macOS: den här drivrutinen följer fingrarna själv, så en svepning kan upprepas steg för steg medan de rör sig, och stegstorleken kan ställas in. Windows får varje gest färdig från sina pekplatteinställningar, och Linux-drivrutinen agerar en gång, när gesten är klar.",
+	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Inte på Windows: Windows lämnar varje gest färdig till drivrutinen, först när den är klar, från sina styrplatteinställningar, så ett svep kan inte upprepas steg för steg medan fingrarna rör sig. macOS och Linux följer fingrarna själva.",
 	"platform_reason.hotstring_menu_order_is_macos": "Endast macOS: menyn Hotstrings låter dig ändra ordningen på posterna i varje kategori och minns den. Windows och Linux har ingen kontroll för att ändra ordningen.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Endast macOS under detta namn: det är huvudbrytaren för macOS skrivmotor, som drivrutinen startar och stoppar. Windows har sin huvudbrytare som hotstrings-grind i category_enabled, och Linux slår på sina hotstring-grupper en i taget.",
 	"platform_reason.category_gates_are_windows": "Endast Windows: Windows har en huvudgrind per kategori framför kategorins egna brytare. macOS har sin hotstrings-huvudbrytare som hotstrings.enabled, och Linux slår på sina hotstring-grupper en i taget.",

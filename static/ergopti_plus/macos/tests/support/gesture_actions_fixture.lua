@@ -93,7 +93,7 @@ local OWNERS = {
 	"infra.gesture_frame_evidence",
 	"modules.gestures.sticky_modifiers",
 	-- The engine bounds incremental tab steps through the sensitivity owner.
-	"modules.gestures.sensitivity",
+	"gestures.sensitivity",
 	"modules.shortcuts",
 	"modules.shortcuts.actions.apps",
 	"modules.shortcuts.actions.screenshot_save",

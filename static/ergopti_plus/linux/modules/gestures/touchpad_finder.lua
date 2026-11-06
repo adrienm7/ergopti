@@ -65,6 +65,7 @@ local Decoder = require("modules.gestures.mt_decoder")
 -- The multitouch slot axis. A device without it cannot report per-finger
 -- positions and is not a touchpad for our purposes, whatever it is called.
 local ABS_MT_SLOT = Decoder.ABS_MT_SLOT
+local ABS_MT_POSITION_X, ABS_MT_POSITION_Y = Decoder.ABS_MT_POSITION_X, Decoder.ABS_MT_POSITION_Y
 
 -- Device properties, from include/uapi/linux/input-event-codes.h.
 local INPUT_PROP_POINTER   = 0x00
@@ -364,5 +365,40 @@ end
 
 --- Whether a gesture slot can ever fire on this hardware (gestures/slot_report.lua).
 M.slot_is_reachable = require("modules.gestures.slot_report").slot_is_reachable
+
+--- Reads how many device units make a millimetre on the touchpad's MT axes.
+---
+--- EVIOCGABS answers the kernel's struct input_absinfo (value, minimum,
+--- maximum, fuzz, flat, resolution as six int32); the resolution is in units
+--- per millimetre for ABS_MT_POSITION_*. Incremental swipes count their steps
+--- in millimetres, as the macOS trackpad reports them, so one sensitivity means
+--- the same travel on both systems. A pad that reports 0 has no scale: nil.
+--- @param path string The touchpad's event node.
+--- @return number|nil units_x Units per millimetre along x.
+--- @return number|nil units_y Units per millimetre along y.
+function M.read_resolution(path)
+	local available, ffi = pcall(require, "ffi")
+	if not available or type(ffi) ~= "table" or ffi.os ~= "Linux" or type(path) ~= "string" then return nil end
+	local declared, detail = pcall(ffi.cdef, [[
+		int open(const char *path, int flags);
+		int close(int fd);
+		int ioctl(int fd, unsigned long request, ...);
+	]])
+	if not declared and not tostring(detail):find("redefin", 1, true) then return nil end
+	local fd = ffi.C.open(path, 0x80800) -- O_NONBLOCK | O_CLOEXEC
+	if fd == nil or fd < 0 then return nil end
+	local function resolution(code)
+		local info = ffi.new("int32_t[6]")
+		-- _IOR('E', 0x40 + code, struct input_absinfo): 24 bytes.
+		local request = 0x80184540 + code
+		if ffi.C.ioctl(fd, request, info) ~= 0 then return nil end
+		local units = tonumber(info[5])
+		return units > 0 and units or nil
+	end
+	local ok, x, y = pcall(function() return resolution(ABS_MT_POSITION_X), resolution(ABS_MT_POSITION_Y) end)
+	ffi.C.close(fd)
+	if not ok then return nil end
+	return x, y
+end
 
 return M

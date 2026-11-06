@@ -4092,7 +4092,7 @@
 	"menu.caps_word.pointer.middle_click": "가운데 클릭",
 	"menu.caps_word.pointer.other_buttons": "기타 마우스 버튼",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Windows 제외: 시스템이 터치패드 제스처를 직접 처리하고 Ergopti에 터치를 전달하지 않습니다. 두 손가락 스크롤은 여전히 스크롤로 간주됩니다.",
-	"platform_reason.gesture_modes_and_steps_are_macos": "macOS 전용: 이 드라이버는 손가락을 직접 추적하므로 손가락이 움직이는 동안 스와이프를 단계별로 반복할 수 있고 단계 크기를 조절할 수 있습니다. Windows는 터치패드 설정에서 완성된 제스처를 받고, Linux 드라이버는 제스처가 끝났을 때 한 번만 동작합니다.",
+	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Windows에서는 지원되지 않음: Windows는 터치패드 설정에서 제스처가 끝난 뒤에야 완성된 형태로 드라이버에 넘겨주므로, 손가락이 움직이는 동안 스와이프를 한 단계씩 반복할 수 없습니다. macOS와 Linux는 손가락을 직접 추적합니다.",
 	"platform_reason.hotstring_menu_order_is_macos": "macOS 전용: Hotstrings 메뉴에서 각 카테고리의 항목 순서를 바꿀 수 있고 그 순서가 기억됩니다. Windows와 Linux에는 순서를 바꾸는 기능이 없습니다.",
 	"platform_reason.hotstrings_master_is_macos_engine": "이 이름으로는 macOS 전용: 드라이버가 시작하고 중지하는 macOS 입력 엔진의 마스터 스위치입니다. Windows는 마스터를 category_enabled의 hotstrings 게이트로 두고, Linux는 hotstring 그룹을 하나씩 켭니다.",
 	"platform_reason.category_gates_are_windows": "Windows 전용: Windows는 카테고리 자체의 스위치 앞에 카테고리마다 하나의 마스터 게이트를 둡니다. macOS는 hotstrings 마스터를 hotstrings.enabled로 두고, Linux는 hotstring 그룹을 하나씩 켭니다.",
