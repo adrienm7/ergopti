@@ -968,13 +968,9 @@
 		"path": "gesture_slot_mode_commands.gesture_mode_single",
 		"visibility": "hide",
 		"labels": { "fr": "Action unique (x1)", "en": "Single action (x1)" },
-		"platforms": { "windows": false, "macos": true, "linux": false },
+		"platforms": { "windows": false, "macos": true, "linux": true },
 		"reasons": {
 			"windows": {
-				"en": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.",
-				"fr": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own."
-			},
-			"linux": {
 				"en": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.",
 				"fr": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own."
 			}
@@ -984,13 +980,9 @@
 		"path": "gesture_slot_mode_commands.gesture_mode_incremental",
 		"visibility": "hide",
 		"labels": { "fr": "Envoi incrémental (distance)", "en": "Incremental send (distance)" },
-		"platforms": { "windows": false, "macos": true, "linux": false },
+		"platforms": { "windows": false, "macos": true, "linux": true },
 		"reasons": {
 			"windows": {
-				"en": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.",
-				"fr": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own."
-			},
-			"linux": {
 				"en": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.",
 				"fr": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own."
 			}

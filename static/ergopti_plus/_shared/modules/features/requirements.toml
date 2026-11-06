@@ -203,7 +203,7 @@ content = ['/dev/uinput', 'UI_DEV_CREATE', '"adapters\.uinput_writer"', '"module
 "modules/dynamic_hotstrings/" = ["hotstrings.dynamic.*"]
 "modules/shortcuts/manager.lua" = ["shortcuts.**"]
 "platform/remap/tap_hold_manager.lua" = ["tap_holds.*", "mod_combos.*", "shortcuts.key_combination_taps.*", "category_enabled.key_combinations"]
-"modules/gestures/combo_emitter.lua" = ["gestures.*"]
+"modules/gestures/combo_emitter.lua" = ["gestures.**"]
 
 [detection.linux.uinput.plumbing]
 "adapters/" = "the evdev and uinput adapters the owners call"
