@@ -673,6 +673,7 @@ return {
 	"tests.unit.modules.keystats.privacy.test_window_titles",
 	"tests.unit.modules.keymap.test_layout_catalogue",
 	"tests.unit.modules.keymap.test_layout_registry",
+	"tests.unit.modules.keymap.test_keylayout_emulation",
 	"tests.unit.modules.keymap.test_keylayout_parser",
 	"tests.unit.modules.keymap.test_xkb_converter",
 	"tests.unit.modules.keymap.test_layout_registry_store",
