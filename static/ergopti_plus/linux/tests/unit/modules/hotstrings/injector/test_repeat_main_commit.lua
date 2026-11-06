@@ -33,7 +33,8 @@ end
 --- Types text through Main and records what the injector and telemetry saw.
 --- @param mappings table Mappings loaded into the real engine.
 --- @param body function Receives type(text), the observations and the engine.
-local function with_main(mappings, body)
+--- @param overrides table|nil Environment entries replacing the defaults.
+local function with_main(mappings, body, overrides)
 	Fixture.with(function(guard, state)
 		local observations = { injected = {}, recorded = {} }
 		local RepeatKey = helpers.load_module("modules.hotstrings.repeat_key")
@@ -66,6 +67,7 @@ local function with_main(mappings, body)
 				end },
 			engine = engine, Logger = require("logger.shim"),
 		}, { __index = _G })
+		for name, value in pairs(overrides or {}) do environment[name] = value end
 		local character = main_character(environment)
 		local function type_text(text)
 			for ch in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do character(ch, 30) end
@@ -118,5 +120,49 @@ helpers.describe("Linux Main: the commit after an acknowledged repeat", function
 			helpers.assert_eq(repeat_call.text, "b")
 			helpers.assert_eq(repeat_call.private, false)
 		end)
+	end)
+end)
+
+-- The repeat answers the magic key within the magic category's window, as on
+-- macOS (decision of 2026-11-06); before it, Linux repeated after any pause.
+helpers.describe("Linux Main: the repeat activation window (repeat-window)", function()
+	local function timed(delay_sec, gaps)
+		local clock, step = 1000, 1
+		return {
+			Monotonic = {
+				now_ms = function()
+					clock = clock + (gaps[step] or 10)
+					step = step + 1
+					return clock
+				end,
+				resolution_ms = function() return 0 end,
+			},
+			hotstrings_config = { resolve = function(category)
+				helpers.assert_eq(category, "magickey", "the window is the magic key category's delay")
+				return { delay = delay_sec }
+			end },
+			ExpansionDelay = require("modules.hotstrings.expansion_delay"),
+			RepeatKey = { is_enabled = function() return true end,
+				resolve = helpers.load_module("modules.hotstrings.repeat_key").resolve,
+				WINDOW_CATEGORY = "magickey" },
+		}
+	end
+
+	helpers.it("refuses a magic key typed after the window (repeat-window)", function()
+		with_main({}, function(type_text, observations)
+			type_text("po" .. STAR)
+			helpers.assert_eq(#observations.injected, 0, "3 s after the letter, 2 s allowed: no repeat")
+		end, timed(2, { 10, 10, 3000 }))
+	end)
+
+	helpers.it("repeats within the window, and always at 0 (repeat-window)", function()
+		with_main({}, function(type_text, observations)
+			type_text("po" .. STAR)
+			helpers.assert_eq(#observations.injected, 1, "control: 1 s after the letter, 2 s allowed")
+		end, timed(2, { 10, 10, 1000 }))
+		with_main({}, function(type_text, observations)
+			type_text("po" .. STAR)
+			helpers.assert_eq(#observations.injected, 1, "a 0 window always repeats")
+		end, timed(0, { 10, 10, 60000 }))
 	end)
 end)

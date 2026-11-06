@@ -1532,6 +1532,14 @@ local function main()
 		-- rather than run before the engine.
 		if not result and RepeatKey.is_enabled() then
 			local repeated = RepeatKey.resolve(engine:current_buffer(), MagicKey.get(), engine:buffer_starts_at_word_boundary())
+			-- The repeat answers the magic key within its category's window, the
+			-- complex-key widening included, as on macOS (decision of 2026-11-06):
+			-- a magic key typed long after the letter is no repeat; 0 is always.
+			if repeated and not within_delay(
+				{ trigger = MagicKey.get(), expander_gap_ms = (engine:tail_timing_receipt(2) or {}).expander_gap_ms,
+					group = RepeatKey.WINDOW_CATEGORY }) then
+				repeated = nil
+			end
 			if repeated then
 				result = {
 					trigger         = MagicKey.get(),

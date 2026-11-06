@@ -2381,6 +2381,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/hotstrings/personal/test_priority_missing_defaults_to_common.ahk
 #Include unit/modules/hotstrings/preview/test_preview_uses_by_trigger_index.ahk
 #Include unit/modules/hotstrings/engine/test_repeat_key_honours_rebuild_fence.ahk
+#Include unit/modules/hotstrings/engine/test_repeat_activation_window.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_legacy_state_machine.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_multiline_arg.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_tree_owned.ahk

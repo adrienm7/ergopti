@@ -578,3 +578,12 @@ CapsWord, as macOS's fixed Karabiner exits do: one list,
 `FIXED_EXIT_KEYS` in `_shared/lua/caps_word/auto_off.lua`, pinned by
 `test-capsword-fixed-exits-single-source.cjs`. A modifier pressed alone is no
 keystroke for the idle delay (macOS and Linux; Windows follows).
+
+## The magic-key repeat has the magic key's activation window (6 November 2026)
+
+Aligned on macOS: the repeat fallback fires only within the magic key
+category's delay (`magickey`, 0 = always) measured from the repeated letter,
+complex-key widening included, on every OS. Linux gates it in Main's
+character callback (`RepeatKey.WINDOW_CATEGORY`), Windows through the
+dispatcher's time gate (`HSE_RepeatWindowSeconds`). An expired registered
+candidate must not mask the repeat (macOS and Linux); Windows still lets it.
