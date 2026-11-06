@@ -441,6 +441,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-typing-metrics-partial-live.cjs"],
 			"repro": "node tools/test/test-typing-metrics-partial-live.cjs"
+		},
+		{
+			"id": "js-crash-worker-partial-write",
+			"ordinal": 592,
+			"name": "Windows crash workers publish only complete reports after a refused write",
+			"cmd": "node",
+			"args": ["tools/test/test-crash-worker-partial-write.cjs"],
+			"repro": "node tools/test/test-crash-worker-partial-write.cjs"
 		}
 	]
 }
