@@ -79,6 +79,27 @@
 			"file": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
 			"symbol": "local function _dispatch_post_remap(ev, source)",
 			"sha256": "3fcda4f946961e756489c0a22875cfa96059771ac3e5bb4f575fca8978e62f0a"
+		},
+		{
+			"id": "windows-layout-emulation",
+			"platform": "windows",
+			"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
+			"symbol": "KeylayoutEmulation_Press(Sc, Shift, Caps, Option)",
+			"sha256": "218eed54b84581e8276ab42fa7f050f260102ee16c08485249d2f24630271535"
+		},
+		{
+			"id": "macos-layout-emulation",
+			"platform": "macos",
+			"file": "static/ergopti_plus/macos/modules/keymap/layout_emulation.lua",
+			"symbol": "function M.key_down(e, key_code)",
+			"sha256": "787fce71958f6929dc9370de59baa59eb91ef18b715b975d394aa30cca85d40e"
+		},
+		{
+			"id": "linux-layout-emulation",
+			"platform": "linux",
+			"file": "static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
+			"symbol": "function M.on_key(detail)",
+			"sha256": "406486c88b049f2eaedef58efbf6a1a7145ef3ce9e91a57a17ac22aca8e5606a"
 		}
 	],
 	"behaviors": [
@@ -205,6 +226,27 @@
 					"declared": true,
 					"note_key": "inventory.behavior.dead_native_lifetime",
 					"owners": ["linux-dead-capture", "linux-dead-consume"]
+				}
+			}
+		},
+		{
+			"id": "layout.emulation",
+			"label_key": "menu.layout.emulated_layout",
+			"platforms": {
+				"windows": {
+					"declared": true,
+					"note_key": "inventory.behavior.layout_emulation",
+					"owners": ["windows-layout-emulation"]
+				},
+				"macos": {
+					"declared": true,
+					"note_key": "inventory.behavior.layout_emulation",
+					"owners": ["macos-layout-emulation", "macos-dead-native"]
+				},
+				"linux": {
+					"declared": true,
+					"note_key": "inventory.behavior.layout_emulation",
+					"owners": ["linux-layout-emulation", "linux-control"]
 				}
 			}
 		}

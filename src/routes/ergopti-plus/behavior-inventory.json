@@ -302,5 +302,57 @@
 				}
 			]
 		}
+	},
+	{
+		"path": "layout.emulation",
+		"labels": { "fr": "Disposition à émuler", "en": "Layout to emulate" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"notes": {
+			"windows": {
+				"fr": "Tape le .keylayout choisi par-dessus la disposition du système ; les trois pilotes rejouent un même corpus de frappes.",
+				"en": "Types the chosen .keylayout over the system layout; the three drivers replay one keystroke corpus."
+			},
+			"macos": {
+				"fr": "Tape le .keylayout choisi par-dessus la disposition du système ; les trois pilotes rejouent un même corpus de frappes.",
+				"en": "Types the chosen .keylayout over the system layout; the three drivers replay one keystroke corpus."
+			},
+			"linux": {
+				"fr": "Tape le .keylayout choisi par-dessus la disposition du système ; les trois pilotes rejouent un même corpus de frappes.",
+				"en": "Types the chosen .keylayout over the system layout; the three drivers replay one keystroke corpus."
+			}
+		},
+		"evidence": {
+			"windows": [
+				{
+					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
+					"symbol": "KeylayoutEmulation_Press(Sc, Shift, Caps, Option)",
+					"sha256": "218eed54b84581e8276ab42fa7f050f260102ee16c08485249d2f24630271535"
+				}
+			],
+			"macos": [
+				{
+					"file": "static/ergopti_plus/macos/modules/keymap/layout_emulation.lua",
+					"symbol": "function M.key_down(e, key_code)",
+					"sha256": "787fce71958f6929dc9370de59baa59eb91ef18b715b975d394aa30cca85d40e"
+				},
+				{
+					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
+					"symbol": "local chars = e:getCharacters(false)",
+					"sha256": "ed280563dbe333fca89abfc4baeb6b8525e97be212bc4e7e91340797f1864aed"
+				}
+			],
+			"linux": [
+				{
+					"file": "static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
+					"symbol": "function M.on_key(detail)",
+					"sha256": "406486c88b049f2eaedef58efbf6a1a7145ef3ce9e91a57a17ac22aca8e5606a"
+				},
+				{
+					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+					"symbol": "local undo = _undoable",
+					"sha256": "89c2fcfa3eb5f9959f20bf7cf269805796a5e85cde7d69677bb7b2ce31c58141"
+				}
+			]
+		}
 	}
 ]
