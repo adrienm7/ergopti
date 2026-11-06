@@ -1798,8 +1798,23 @@ function M.get_dashboard_payload(opts)
 		app_icons        = {},
 		_prefetch_data   = prefetch,
 		metrics_manifest_incomplete = not manifest_complete or nil,
-		driver_meta      = { os = "linux", heatmap_id = "sc_kb" },
+		driver_meta      = { os = "linux", heatmap_id = "sc_kb", unmeasured = M.unmeasured_kpis() },
 	}
+end
+
+--- The dashboard KPIs this session cannot measure, each with the i18n key of
+--- its reason, so the page shows « — » and why instead of a zero that reads as
+--- measured. The Metrics menu names the same ones.
+--- @return table { [kpi] = reason_key }
+function M.unmeasured_kpis()
+	local out = {}
+	if SystemMetrics and type(SystemMetrics.space_change_availability) == "function" then
+		local availability = SystemMetrics.space_change_availability()
+		if type(availability) == "table" and availability.measured == false then
+			out.space_switches = assert(availability.reason, "an unmeasured metric names its reason")
+		end
+	end
+	return out
 end
 
 --- Returns n-grams for one UI-selected range without rebuilding the manifest.

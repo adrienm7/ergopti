@@ -1015,11 +1015,13 @@ function renderDashboard() {
 		);
 		setText('kpi-sys-mute-detail', (sys.audio_muted_ms || 0) > 0 ? '' : _t('ui_apps.kpi_no_mute'));
 
-		setText('kpi-sys-spaces', String(sys.space_switches || 0));
-		setText(
-			'kpi-sys-spaces-detail',
-			(sys.space_switches || 0) > 0 ? _t('ui_apps.kpi_space_switches') : '—'
+		const spaces = systemKpiReading(
+			sys.space_switches || 0,
+			(window.metricsUnmeasured || {}).space_switches,
+			'ui_apps.kpi_space_switches'
 		);
+		setText('kpi-sys-spaces', spaces.value);
+		setText('kpi-sys-spaces-detail', spaces.detail);
 
 		setText('kpi-sys-night', String(sys.night_wake_count || 0));
 		setText(

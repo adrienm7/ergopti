@@ -161,6 +161,31 @@ for (const vector of manifestKeyVectors) {
 require('./support/theme-tokens.cjs').installThemeTokens(appsContext);
 vm.runInContext(read('static/ergopti_plus/_shared/ui/metrics_apps/helpers.js'), appsContext);
 vm.runInContext(appsSource, appsContext);
+
+// A system KPI this host cannot measure reads « — » and its reason; a count
+// from any device (an imported ledger) still shows, and a measured zero stays 0.
+appsContext.window._i18n_strings = {
+	'platform_reason.desktop_changes_need_x11': 'X11 only',
+	'ui_apps.kpi_space_switches': 'switches'
+};
+const unmeasuredReading = (count, reason) =>
+	JSON.stringify(appsContext.systemKpiReading(count, reason, 'ui_apps.kpi_space_switches'));
+assert.strictEqual(
+	unmeasuredReading(0, 'platform_reason.desktop_changes_need_x11'),
+	JSON.stringify({ value: '—', detail: 'X11 only' })
+);
+assert.strictEqual(
+	unmeasuredReading(3, 'platform_reason.desktop_changes_need_x11'),
+	JSON.stringify({ value: '3', detail: 'switches' })
+);
+assert.strictEqual(unmeasuredReading(0, undefined), JSON.stringify({ value: '0', detail: '—' }));
+assert.ok(
+	/systemKpiReading\(\s*sys\.space_switches \|\| 0,\s*\(window\.metricsUnmeasured \|\| \{\}\)\.space_switches/.test(
+		read('static/ergopti_plus/_shared/ui/metrics_apps/main.js')
+	),
+	'the desktop-change card must read through systemKpiReading and the host unmeasured map'
+);
+delete appsContext.window._i18n_strings;
 vm.runInContext(
 	"currentSelectedDate = '2025-05-01'; currentPeriod = 'all'; currentCountAwake = true;",
 	appsContext

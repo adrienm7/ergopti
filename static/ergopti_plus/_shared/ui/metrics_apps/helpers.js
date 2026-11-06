@@ -20,6 +20,21 @@ function _t(key) {
 }
 
 /**
+ * Reads a system KPI the host may be unable to measure. A count from any device
+ * shows as is; a zero this host cannot measure shows « — » and the reason the
+ * host gave (driver_meta.unmeasured), never a zero that reads as measured.
+ * @param {number} count Aggregated count across devices.
+ * @param {string|undefined} reason i18n key naming why this host cannot measure it.
+ * @param {string} measuredDetail i18n key shown under a nonzero count.
+ * @returns {{value: string, detail: string}} The card's value and detail lines.
+ */
+function systemKpiReading(count, reason, measuredDetail) {
+	if (count > 0) return { value: String(count), detail: _t(measuredDetail) };
+	if (reason) return { value: '—', detail: _t(reason) };
+	return { value: '0', detail: '—' };
+}
+
+/**
  * Resolves labels on each render so a language change reaches the charts.
  * @returns {string[]} Weekday labels, starting with Monday.
  */

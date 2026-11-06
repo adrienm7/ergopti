@@ -498,6 +498,20 @@ helpers.describe("keystats", function()
       helpers.assert_true(type(payload.app_icons) == "table")
     end)
 
+    it("linux-unmeasured-kpis: the dashboard payload names each unmeasured KPI with its reason", function()
+      keystats.init({ sqlite_path = fresh_db() })
+      local SystemMetrics = require("modules.keystats.system_metrics")
+      local availability = SystemMetrics.space_change_availability()
+      local unmeasured = keystats.get_dashboard_payload({ include_prefetch = false }).driver_meta.unmeasured
+      helpers.assert_true(type(unmeasured) == "table", "the payload carries the unmeasured map")
+      if availability.measured == false then
+        helpers.assert_eq(unmeasured.space_switches, availability.reason,
+          "a zero this session cannot measure must reach the page with its reason")
+      else
+        helpers.assert_eq(unmeasured.space_switches, nil)
+      end
+    end)
+
     it("records hotstring output and its physical trigger separately", function()
       keystats.init({ sqlite_path = fresh_db() })
       require("tests.support.metrics_consent_fixture").enable(keystats)
