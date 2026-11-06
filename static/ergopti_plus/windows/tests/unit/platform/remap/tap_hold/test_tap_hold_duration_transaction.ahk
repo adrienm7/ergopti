@@ -690,7 +690,9 @@ _THD_PersistedEmptyDurationReset(TargetPath) {
 	AssertEqual(0.42, Before["tap_hold"]["keys"]["left_ctrl"][ConfigLeaf.TIME_ACTIVATION_SECONDS],
 		"the independent file read proves the key existed before reset")
 	AssertEqual(1, WriteTapHoldDurationReset("left_ctrl"), "the actual reset persists the empty-key removal")
-	AssertFalse(TapHold["keys"].Has("left_ctrl"), "a reset removes a truly empty modeled key")
+	; The live model projects the file through the shipped defaults, so the key
+	; stays modeled with its default mapping but no longer owns a delay.
+	AssertFalse(TapHoldHasOwnDuration(TapHold, "left_ctrl"), "a reset removes the key's own delay from the model")
 	After := TOML_ParseDocument(FSReadUtf8Exact(TargetPath))
 	AssertFalse(After["tap_hold"]["keys"].Has("left_ctrl"), "the formerly persisted empty key is removed")
 	AssertEqual("copy", After["tap_hold"]["keys"]["tab"]["tap_action"], "the mapped neighbor remains persisted")

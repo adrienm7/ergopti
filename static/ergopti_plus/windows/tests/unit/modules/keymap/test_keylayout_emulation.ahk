@@ -158,7 +158,9 @@ _KLT_VectorsCase() {
 				Failures.Push(Vector["id"] . " sent [" . Sent . "] instead of [" . Vector["sends"] . "]")
 		}
 	}
-	AssertEqual(2, Layouts.Count, "the vectors must cover both the ansi (Ergo-L) and the iso (Ergopti) conventions")
+	; Further layouts (Ergopti+) may join; both conventions must stay covered.
+	Assert(Layouts.Has("ergol") && Layouts.Has("ergopti"),
+		"the vectors must cover both the ansi (Ergo-L) and the iso (Ergopti) conventions")
 	Assert(Presses >= 25 && Shortcuts >= 4, "both vector kinds must be replayed")
 	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
 }

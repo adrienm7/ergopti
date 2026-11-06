@@ -286,7 +286,8 @@ _GSQ_Receive(Mode) {
 			AssertTrue(InStr(State.ErrorText, "clipboard content changed") > 0,
 				"the refusal must report its actual custody failure: " . State.ErrorText)
 			AssertEqual(0, Probe.Phases.Length, "refused custody must never borrow the clipboard bitmap")
-			AssertFalse(FileExist(Stage), "refused custody must never create a staged image")
+			; The capture wrapper pins an empty leased stage before custody is checked.
+			AssertTrue(!FileExist(Stage) || FileGetSize(Stage) == 0, "refused custody must never create a staged image")
 		} else {
 			AssertEqual(0, State.Code, "the native worker must succeed: " . State.ErrorText)
 			AssertEqual("", State.ErrorText)
@@ -330,6 +331,12 @@ _GSQ_Receive(Mode) {
 					AssertFalse(CB_HasRestoreDebtForOwner(Token), "the native fixture must settle its restore debt")
 				} else
 					CB_EndOwnedTransaction(Token)
+			}
+			; The test drives the native worker itself, bypassing the job's cleanup:
+			; it retires the stage lease the capture wrapper took, as that cleanup does.
+			if IsSet(Job) && Job is Map && Job.Get("stage_lease", 0) {
+				_GestureScreenshotCloseStageLease(Job["stage_lease"])
+				Job["stage_lease"] := 0
 			}
 			for Path in [RedPath, BluePath, Stage]
 				if Path != "" && FileExist(Path)

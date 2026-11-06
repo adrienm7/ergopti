@@ -637,8 +637,8 @@ TestHotstringsConfig_SaveOverridesRequiresDurableExactStage() {
 	ExactPos := InStr(Body, "FSUtf8ExactMatches(StagePath, Out)")
 	CreatePos := InStr(Body, "FSConfigAtomicMoveCreate(StagePath, Path, FinalAdmission)")
 	ReplacePos := InStr(Body, "FSConfigAtomicMoveReplace(StagePath, Path, &MoveError, FinalAdmission)")
-	PublishedReadbackPos := InStr(Body, "FSUtf8ExactMatches(Path, Out)")
-	LivePos := InStr(Body, "LivePublished := PublishFn.Call()")
+	PublishedReadbackPos := InStr(Body, "FSUtf8ExactMatches(NativeAdapters ? PhysicalPath : Path, Out)")
+	LivePos := InStr(Body, "LivePublished := MemoryAdmission.Call() ? PublishFn.Call() : false")
 	Assert(DurablePos > 0,
 		"the default override writer must count bytes and flush its stage to stable storage")
 	Assert(ExactPos > DurablePos,

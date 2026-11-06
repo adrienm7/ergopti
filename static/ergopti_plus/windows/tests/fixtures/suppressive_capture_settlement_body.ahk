@@ -138,8 +138,7 @@ _SIC_Run() {
 		Expected := Owner == "one-shot" ? ["{Enter}"] : ["¨", "", "{Enter}"]
 	else if _SIC_Mode == "named-insert"
 		Expected := ["¨", "", "{Insert}"]
-	else if (_SIC_Mode == "timeout" || _SIC_Mode == "partial-timeout") && Owner == "dead-key"
-		Expected := ["¨"]
+	; A dead key's expiry cancels it, like a pause: nothing is typed (dead-key lifecycle).
 	_SIC_Require(_SIC_Emits.Length == Expected.Length, "only a settled current capture may emit, including an empty send")
 	for Index, Text in Expected
 		_SIC_Require(_SIC_Emits[Index] == Text, "the genuine capture result must remain exact at " . Index)

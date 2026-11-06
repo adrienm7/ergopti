@@ -577,7 +577,9 @@ _PTIOCR_AllEditorsUseTheDurableLiveGateway() {
 		"a WebView save received under Suspend must surface its refusal")
 	ShowFailureBody := _DriverFuncBody("_HsEdWeb_ShowSaveFailure")
 	Assert(ShowFailureBody != "")
-	Assert(InStr(ShowFailureBody, "save-toast") > 0,
+	; The failure script is built by one owner the reporter delegates to.
+	FailureJsBody := _DriverFuncBody("_HsEdWeb_SaveFailureJs")
+	Assert(InStr(ShowFailureBody, "_HsEdWeb_SaveFailureJs(") > 0 && InStr(FailureJsBody, "save-toast") > 0,
 		"the suspended refusal must replace the page's optimistic saved toast")
 	for FunctionName in ["_PersonalTomlQueueLiveRequest",
 			"_PersonalTomlTryPublishRequest",

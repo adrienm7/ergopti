@@ -258,8 +258,10 @@ TestHotstringsConfig_ColorWriterUsesTomlStringCodec() {
 				"the public writer must reject invalid CSS colors")
 		}
 		AssertFalse(FileExist(Path), "invalid CSS colors must not publish a file")
+		; A detached candidate carries the receipt of the source it was built from.
+		Origin := _HotstringsOverrideSourceFor(_HotstringsOverrides, Path)
 		Candidate := Map("rolls", { Delay: "", Color: InjectedColor, ShowTooltip: "", Priority: "", Sections: Map() })
-		AssertTrue(_SaveOverrides(Candidate),
+		AssertTrue(_SaveOverrides(Candidate, 0, 0, Path, 0, 0, 0, Origin),
 			"the low-level TOML codec must still escape even hostile internal data")
 		Reparsed := _ParseOverrides(Path)
 		AssertEqual(InjectedColor, Reparsed["rolls"].Color,
