@@ -225,8 +225,8 @@ function M.counts(info)
 	return Engine.compute_prefix_counts(
 		field(info, "phone_number"),
 		field(info, "phone_number_clean"),
-		(field(info, "social_security_number"):gsub("%s+", "")),
-		(field(info, "iban"):gsub("%s+", ""))
+		field(info, "social_security_number"),
+		field(info, "iban")
 	)
 end
 

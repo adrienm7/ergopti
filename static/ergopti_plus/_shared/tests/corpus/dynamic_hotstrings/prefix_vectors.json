@@ -8,8 +8,8 @@
 			"description": "No personal data at all — every prefix count is 0.",
 			"phone": "",
 			"fphone": "",
-			"ssn_raw": "",
-			"iban_raw": "",
+			"ssn": "",
+			"iban": "",
 			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 0 }
 		},
 		{
@@ -17,8 +17,8 @@
 			"description": "Three characters including a narrow nonbreaking space do not meet the five-character threshold.",
 			"phone": "",
 			"fphone": "06 ",
-			"ssn_raw": "",
-			"iban_raw": "",
+			"ssn": "",
+			"iban": "",
 			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 0 }
 		},
 		{
@@ -26,8 +26,8 @@
 			"description": "Five formatted characters with a narrow nonbreaking space meet the threshold.",
 			"phone": "",
 			"fphone": "06 12",
-			"ssn_raw": "",
-			"iban_raw": "",
+			"ssn": "",
+			"iban": "",
 			"expected": { "phoneprefixes": 1, "ssnprefixes": 0, "ibanprefixes": 0 }
 		},
 		{
@@ -35,8 +35,8 @@
 			"description": "Phone below the 2-digit threshold — no phone prefixes yet.",
 			"phone": "1",
 			"fphone": "1",
-			"ssn_raw": "",
-			"iban_raw": "",
+			"ssn": "",
+			"iban": "",
 			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 0 }
 		},
 		{
@@ -44,8 +44,8 @@
 			"description": "Phone at the 2-digit threshold — first tier fires (+2).",
 			"phone": "12",
 			"fphone": "1 2",
-			"ssn_raw": "",
-			"iban_raw": "",
+			"ssn": "",
+			"iban": "",
 			"expected": { "phoneprefixes": 2, "ssnprefixes": 0, "ibanprefixes": 0 }
 		},
 		{
@@ -53,8 +53,8 @@
 			"description": "3 digits — still only the 2-digit tier (formatted phone too short for the 5-char fphone tier).",
 			"phone": "123",
 			"fphone": "1 23",
-			"ssn_raw": "",
-			"iban_raw": "",
+			"ssn": "",
+			"iban": "",
 			"expected": { "phoneprefixes": 2, "ssnprefixes": 0, "ibanprefixes": 0 }
 		},
 		{
@@ -62,8 +62,8 @@
 			"description": "4 raw digits crosses BOTH the 4-digit tier AND the 5-char formatted-phone tier (2+2+1=5).",
 			"phone": "1234",
 			"fphone": "12 34",
-			"ssn_raw": "",
-			"iban_raw": "",
+			"ssn": "",
+			"iban": "",
 			"expected": { "phoneprefixes": 5, "ssnprefixes": 0, "ibanprefixes": 0 }
 		},
 		{
@@ -71,8 +71,8 @@
 			"description": "5 raw digits — still below the 6-digit tier; fphone tier already counted.",
 			"phone": "12345",
 			"fphone": "1 23 45",
-			"ssn_raw": "",
-			"iban_raw": "",
+			"ssn": "",
+			"iban": "",
 			"expected": { "phoneprefixes": 5, "ssnprefixes": 0, "ibanprefixes": 0 }
 		},
 		{
@@ -80,8 +80,8 @@
 			"description": "6 raw digits crosses the final phone tier — all four phone tiers now fire (2+2+1+1=6).",
 			"phone": "123456",
 			"fphone": "12 34 56",
-			"ssn_raw": "",
-			"iban_raw": "",
+			"ssn": "",
+			"iban": "",
 			"expected": { "phoneprefixes": 6, "ssnprefixes": 0, "ibanprefixes": 0 }
 		},
 		{
@@ -89,8 +89,8 @@
 			"description": "A full 10-digit French phone number — the count is capped at 6 by the fixed tiers, not proportional to length.",
 			"phone": "0612345678",
 			"fphone": "06 12 34 56 78",
-			"ssn_raw": "",
-			"iban_raw": "",
+			"ssn": "",
+			"iban": "",
 			"expected": { "phoneprefixes": 6, "ssnprefixes": 0, "ibanprefixes": 0 }
 		},
 		{
@@ -98,17 +98,17 @@
 			"description": "SSN below the 5-digit threshold — no SSN prefixes.",
 			"phone": "",
 			"fphone": "",
-			"ssn_raw": "1234",
-			"iban_raw": "",
+			"ssn": "1 234",
+			"iban": "",
 			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 0 }
 		},
 		{
 			"id": "ssn_5_digits_at_threshold",
-			"description": "SSN at the 5-digit threshold — both the no-space and spaced triggers fire.",
+			"description": "SSN at the 5-digit threshold — both the no-space and spaced triggers fire (the stored value carries a grouping space).",
 			"phone": "",
 			"fphone": "",
-			"ssn_raw": "12345",
-			"iban_raw": "",
+			"ssn": "1 2345",
+			"iban": "",
 			"expected": { "phoneprefixes": 0, "ssnprefixes": 2, "ibanprefixes": 0 }
 		},
 		{
@@ -116,8 +116,8 @@
 			"description": "A full 15-digit French SSN — still only 2 prefixes (the threshold is a gate, not a per-digit count).",
 			"phone": "",
 			"fphone": "",
-			"ssn_raw": "123456789012345",
-			"iban_raw": "",
+			"ssn": "1 23456789012345",
+			"iban": "",
 			"expected": { "phoneprefixes": 0, "ssnprefixes": 2, "ibanprefixes": 0 }
 		},
 		{
@@ -125,8 +125,8 @@
 			"description": "IBAN below the 6-char threshold — no IBAN prefixes.",
 			"phone": "",
 			"fphone": "",
-			"ssn_raw": "",
-			"iban_raw": "12345",
+			"ssn": "",
+			"iban": "1 2345",
 			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 0 }
 		},
 		{
@@ -134,8 +134,8 @@
 			"description": "IBAN at the 6-char threshold — both the no-space and 7-char spaced triggers fire.",
 			"phone": "",
 			"fphone": "",
-			"ssn_raw": "",
-			"iban_raw": "123456",
+			"ssn": "",
+			"iban": "1 23456",
 			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 2 }
 		},
 		{
@@ -143,8 +143,8 @@
 			"description": "A full 27-char French IBAN — still only 2 prefixes (threshold gate, not per-char count).",
 			"phone": "",
 			"fphone": "",
-			"ssn_raw": "",
-			"iban_raw": "FR7630006000011234567890189",
+			"ssn": "",
+			"iban": "F R7630006000011234567890189",
 			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 2 }
 		},
 		{
@@ -152,9 +152,36 @@
 			"description": "Phone + SSN + IBAN all present — each field's count is independent of the others.",
 			"phone": "0612345678",
 			"fphone": "06 12 34 56 78",
-			"ssn_raw": "123456789012345",
-			"iban_raw": "FR7630006000011234567890189",
+			"ssn": "1 23456789012345",
+			"iban": "F R7630006000011234567890189",
 			"expected": { "phoneprefixes": 6, "ssnprefixes": 2, "ibanprefixes": 2 }
+		},
+		{
+			"id": "ssn_unspaced_one_trigger",
+			"description": "An SSN stored without spaces has one trigger: the spaced trigger equals the raw one and is not registered twice.",
+			"phone": "",
+			"fphone": "",
+			"ssn": "123456789012345",
+			"iban": "",
+			"expected": { "phoneprefixes": 0, "ssnprefixes": 1, "ibanprefixes": 0 }
+		},
+		{
+			"id": "iban_unspaced_one_trigger",
+			"description": "An IBAN stored without spaces has one trigger, exactly as the producers register it.",
+			"phone": "",
+			"fphone": "",
+			"ssn": "",
+			"iban": "FR7630006000011234567890189",
+			"expected": { "phoneprefixes": 0, "ssnprefixes": 0, "ibanprefixes": 1 }
+		},
+		{
+			"id": "ssn_iban_grouped_two_triggers",
+			"description": "Values stored with their usual grouping spaces expose both triggers.",
+			"phone": "",
+			"fphone": "",
+			"ssn": "1 23 45 67 890 123 45",
+			"iban": "FR76 3000 6000 0112 3456 7890 189",
+			"expected": { "phoneprefixes": 0, "ssnprefixes": 2, "ibanprefixes": 2 }
 		}
 	],
 	"spaced_prefix_vectors": [

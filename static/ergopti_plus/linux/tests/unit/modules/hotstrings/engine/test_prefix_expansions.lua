@@ -175,6 +175,25 @@ helpers.describe("prefix expansions: what is built", function()
 		end
 	end)
 
+	helpers.it("counts one trigger per family for values stored without spaces (PIS-001)", function()
+		local compact = {
+			phone_number           = "0750399576",
+			phone_number_clean     = "07 50 39 95 76",
+			social_security_number = "199999999999999",
+			iban                   = "FR0000000000000000000000000",
+		}
+		local counts = Prefix.counts(compact)
+		for _, section in ipairs({ "ssnprefixes", "ibanprefixes" }) do
+			helpers.assert_eq(#for_section(section, compact), 1,
+				section .. ": an unspaced value registers a single trigger")
+			helpers.assert_eq(counts[section], 1,
+				section .. ": the menu must announce exactly the triggers that exist")
+		end
+		local spaced = Prefix.counts(INFO)
+		helpers.assert_eq(spaced.ssnprefixes, 2)
+		helpers.assert_eq(spaced.ibanprefixes, 2)
+	end)
+
 	helpers.it("builds nothing at all from an empty personal_info", function()
 		helpers.assert_eq(#Prefix.build({}, nil), 0,
 			"a user who has filled in nothing gets no mappings, not mappings that "
