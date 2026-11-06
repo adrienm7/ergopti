@@ -631,11 +631,19 @@ local function restore(id)
 		return { action = "restore_progress", phase = "failed", reason_key = key,
 			backup_path = pre and pre.path or nil }
 	end
+	local backup_path = pre and pre.path or nil
 	local restart = type(_daemon_state) == "table" and _daemon_state.restart or nil
-	if type(restart) ~= "function" or restart("configuration restored") ~= true then
-		Logger.error(LOG, "The configuration is restored but the daemon could not restart on it.")
+	local called, accepted = false, nil
+	if type(restart) == "function" then called, accepted = pcall(restart, "configuration restored") end
+	if not called or accepted ~= true then
+		-- The disk stays restored, but the old daemon keeps running: only an
+		-- accepted restart may promise one. Same failure report as Windows/macOS.
+		Logger.error(LOG, "The configuration is restored but the daemon could not restart on it: %s.",
+			tostring(accepted))
+		return { action = "restore_progress", phase = "failed", backup_path = backup_path,
+			reason_key = "changelog_window.restore_error_unexpected" }
 	end
-	return { action = "restore_progress", phase = "restored", backup_path = pre and pre.path or nil }
+	return { action = "restore_progress", phase = "restored", backup_path = backup_path }
 end
 
 --- Clears cached state; used by tests.

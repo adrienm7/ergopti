@@ -311,7 +311,11 @@ local function harness(opts)
 	}
 	ctx.state = {
 		restart_after_update = function() event("restart"); return true end,
-		restart = function(reason) event("restart:" .. reason); return true end,
+		restart = function(reason)
+			event("restart:" .. reason)
+			if opts.restart == "throw" then error("restart raised") end
+			return opts.restart ~= false
+		end,
 	}
 	ctx.bridge = bridge
 	function ctx.restore_modules()
@@ -474,6 +478,19 @@ helpers.describe("changelog_bridge: one-click release install", function()
 		helpers.assert_eq(answer.backup_path, "/cfg/backups/pre-restore-y")
 		helpers.assert_nil(index_of(ctx.events, "restart"), "a failed restore restarts nothing")
 	end)
+
+	-- (restore-restart-refused) The disk is restored but the daemon did not take
+	-- the restart: the page must not promise one (Linux LC-001).
+	for _, mode in ipairs({ false, "throw" }) do
+		helpers.it("reports a refused restore restart as failed (" .. tostring(mode) .. ")", function()
+			local ctx = harness({ restart = mode })
+			local answer = ctx.bridge.on_message({ action = "restore_backup", id = "pre-install-x" }, ctx.state)
+			ctx.restore_modules()
+			helpers.assert_eq(answer.phase, "failed")
+			helpers.assert_eq(answer.reason_key, "changelog_window.restore_error_unexpected")
+			helpers.assert_eq(answer.backup_path, "/cfg/backups/pre-restore-y")
+		end)
+	end
 end)
 
 helpers.describe("updater: nothing installs without a click (Linux)", function()
