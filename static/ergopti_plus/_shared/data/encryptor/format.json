@@ -1,0 +1,15 @@
+{
+	"$description": "The Encryptor file container, the one every driver reads and writes so a file encrypted on one OS decrypts on the other two. It is OpenSSL's `enc` envelope: the 8 ASCII bytes `Salted__`, an 8-byte random salt, then AES-256-CBC with PKCS#7 padding. Key (32 bytes) and IV (16 bytes) are the first 48 bytes of PBKDF2-HMAC-SHA256 over the UTF-8 password and the salt. macOS runs `openssl enc` (Encryptor.app/Contents/Resources/encryptor_convert.sh), Linux the private runtime's openssl, Windows the CNG primitives (windows/apps/encryptor). Vectors: _shared/tests/corpus/encryptor/vectors.json.",
+	"magic": "Salted__",
+	"salt_bytes": 8,
+	"cipher": "aes-256-cbc",
+	"padding": "pkcs7",
+	"kdf": "pbkdf2",
+	"kdf_digest": "sha256",
+	"iterations": 600000,
+	"key_bytes": 32,
+	"iv_bytes": 16,
+	"password_encoding": "utf-8",
+	"encrypted_extension": ".enc",
+	"decrypted_fallback_suffix": "_decrypted"
+}
