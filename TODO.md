@@ -456,7 +456,11 @@ three-OS CI is green on the final source. See the handoff above for the current 
 - [ ] **Generation parameters submenu.** Predictions count, min and max words with no separator; one separator; all the
       context rows at the bottom (two separators become one).
 - [ ] **Prediction indentation default -3**, recommended -3, all drivers.
-- [ ] **French punctuation.** Space before `:` in composed `label: value` rows and about 21 strings, with a gate.
+- [x] **French punctuation.** Space before `:` in composed `label: value` rows and about 21 strings, with a gate.
+      Done before 6 November: `common.label_value` (French « {1} : {2} ») through `LabelValue` / `locale.label_value`,
+      fr.json clean, gate `test-french-punctuation.cjs` (no glued high punctuation, no hardcoded `" : "` join), and the
+      rendered rows walked in French by `test-ahk-tray-rows-read-as-text.cjs` and both Lua tray walks
+      (`_shared/lua/test/menu_row_text.lua`). Rechecked green on 6 November.
 - [ ] **Multi-prediction tooltip.** The number is right-aligned in the tooltip, not stuck to the text.
 - [x] **macOS one-shot Shift is not one-shot.** Tap it then type « abc » quickly: « ABc » or « ABC ». It must be spent
       by the first key; today it seems to end only on its timeout (configurable in the menu, can be infinite). Check
@@ -470,6 +474,16 @@ three-OS CI is green on the final source. See the handoff above for the current 
       `[[features.*]]` row, one shared tap-hold file for the keys), move each driver's reader and writer to it,
       with one migration of the old files, and a cross-driver test that writes a file on one driver and reads it on
       the other two.
+      Not started (survey of 6 November). Readers and writers today: macOS `platform/remap/config.lua`
+      (`load_user_config` / `save_user_config` of `config_karabiner.toml`, plus the integration section and the
+      Karabiner generator reading it), Linux `platform/remap/tap_hold_loader.lua` / `tap_hold_writer.lua` (sections
+      `[tap_hold]` and `[tap_hold.keys.<id>]`, switch and lone tap window there, `mod_combos` in `config.toml`),
+      Windows `platform/remap/tap_hold_loader.ahk` / `tap_hold_writer.ahk` / `tap_hold_migration.ahk` plus
+      `config.toml`. The shared pieces to build on: `_shared/tap_hold/defaults.toml` (key ids already shared),
+      `_shared/lua/tap_hold/migrate.lua` with `_shared/tap_hold/migrations.toml` (versioned, Lua only; Windows has its
+      own port). Needs a decision on the shared file name and on what stays macOS-only (Karabiner integration
+      section), then one owner per path, the Windows reader/writer moved (AHK, not runnable in the container), and the
+      cross-driver write-on-one/read-on-the-other-two test.
 - [x] **Metrics and gestures section titles.** The metrics section « Mots par minute » becomes « Vitesse de frappe »;
       the gestures menu gets one section title per finger count (« Gestes à 2 doigts », « à 3 doigts », …) and no
       « Gestes Ergopti » title; « Gestes du système » gets a clearer title saying the system gestures are handed to
@@ -483,19 +497,33 @@ three-OS CI is green on the final source. See the handoff above for the current 
       hotstring rows and the prediction in one stack (Windows one surface, Linux one window, macOS the prediction
       canvas under the rows). Live mode always waits; a prompt asked for by name is never held. Field check left:
       "both" on a real desktop, and the Windows header rows stay until the next render after their own expiry.
-- [ ] **Key names, what lot CH left.** Menus now name keys from `_shared/data/keycodes/key_names.json` in the 21
+- [x] **Key names, what lot CH left.** Menus now name keys from `_shared/data/keycodes/key_names.json` in the 21
       locales. Still raw or French: the shared modifier-chord action labels (« Cmd + Option + Shift + Enter » in the
       action pickers, all drivers; tests pin this label family, so it needs its own change); the macOS sticky holds
       and `layer` hold labels; the tooltip footer hints in `_shared/modules/tooltip/constants.toml`; the physical
       shortcuts and metrics web pages. Arabic `gesture.slots.swipe_5_horiz` says four fingers.
+      Done. Already on dev before 6 November: chord labels (`key_names.chord_label`, AHK twin), macOS sticky and
+      layer holds, the tooltip footer, Arabic five fingers. 6 November: the physical shortcuts page names its
+      modifiers and positions (ea56e5eb; the Windows page is not built yet, its README carries the rule); the
+      metrics heatmap names its special keys for the recording OS through `_shared/ui/_generated/key_names.js`
+      (e1f0fbca); the macOS remap picker headings come from `remap.category.*` in 21 locales and AltGr from the key
+      table (fbf75123). Left, not key names: the metrics sequence chips (`CONTROL_KEY_SYMBOLS`) keep English names
+      on purpose, so a typed dead-key glyph is never mistaken for a control key.
 - [ ] **Model selection page.** Install Ollama and Install MLX buttons act or say why, disabled when installed; a whole
       section header opens its list; header on two lines (install, port, status; then add a model by hand); Ollama and MLX
       models grouped in collapsible sections per provider, alphabetical; search crosses sections; gate for page actions
       with no host handler.
 - [ ] **Options greyed.** Disable in browser address bars and in password fields can be changed, or say why not.
-- [ ] **Defaults and recommended.** Each manifest row declares feature or setting, CI gate, empty config boots neutral,
+- [x] **Defaults and recommended.** Each manifest row declares feature or setting, CI gate, empty config boots neutral,
       missing option takes its manifest default, Restore recommended restores adjusted settings too (see
       docs/memory/maintainer-decisions.md).
+      Done before 6 November, rechecked green then: every row declares `family`, enforced by the generator and
+      `test-feature-family-rule.cjs` (361 rows, 6 declared exceptions, seeded violations refused; JS suite
+      integration-packaging-and-boot), which also proves a feature defaults neutral, a setting recommends its default
+      and the global restore reaches every row; absence reads the manifest default through
+      `_shared/lua/config_defaults.lua`; empty-config boots pinned by Linux `test_empty_config_neutral.lua`, macOS
+      `test_empty_config_defaults.lua` and Windows `test_features_manifest.ahk`. Not a single every-row reader-level
+      proof per driver: those tests sample the readers.
 - [ ] **Keep Ollama behind a proxy.** 0.40.4 downloads blobs outside the proxy; 0.40.6 fixes it, shared pin needs a Mac rebuild.
 - [ ] **Before publishing.** Whole AHK suite on a quiet machine with no resident driver, `npm run test:ahk-tray-rows-read-as-text`,
       all live checks including `quit-over-a-log-flush`, JS, macOS and Linux suites, Windows field report with a driver.
