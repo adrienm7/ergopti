@@ -138,3 +138,46 @@ helpers.describe("remap action labels: localisation", function()
 			"so writing it through would put 'sg_actions." .. UNKEYED_ID .. "' in the menu")
 	end)
 end)
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 4/ Headings And Key Actions ==========
+-- ==============================================
+-- ==============================================
+
+helpers.describe("remap action labels: picker headings and key actions", function()
+	helpers.it("every heading comes from remap.category.*, in every locale", function()
+		-- The headings read « Modificateurs », « Touches » or « Keyboard shortcuts »
+		-- whatever the user's language: the catalogue held the French text.
+		local config = fresh()
+		local i18n = require("infra.i18n")
+		i18n.get = function(key) return key:find("^remap%.category%.") and "<" .. key .. ">" or key end
+		local actions = config.load_available_actions(ACTIONS_JSON)
+		helpers.assert_eq(type(actions), "table", "the catalogue must load")
+		local fh = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
+		local english = json.decode(fh:read("*a"))
+		fh:close()
+		local seen = 0
+		for _, action in ipairs(actions) do
+			local key = action.category:match("^<(remap%.category%.[a-z_]+)>$")
+			helpers.assert_true(key ~= nil, "'" .. action.id .. "' heading must be a locale key: " .. action.category)
+			helpers.assert_eq(type(english[key]), "string", key .. " must exist in the locale catalogue")
+			seen = seen + 1
+		end
+		helpers.assert_true(seen > 600, "the shared modifier chords must be named too, " .. seen .. " seen")
+	end)
+
+	helpers.it("AltGr is named from the key name table", function()
+		local config = fresh()
+		local i18n = require("infra.i18n")
+		i18n.get = function(key) return key == "key_name.right_option" and "RIGHT-OPTION" or key end
+		local altgr = find(config.load_available_actions(ACTIONS_JSON), "altgr")
+		helpers.assert_true(altgr ~= nil, "'altgr' must be in the catalogue")
+		-- The right Option key has no glyph of its own in the table.
+		helpers.assert_eq(altgr.label, "RIGHT-OPTION", "the long label is the key's name")
+		helpers.assert_eq(altgr.short_label, "RIGHT-OPTION", "and so is the short one")
+	end)
+end)

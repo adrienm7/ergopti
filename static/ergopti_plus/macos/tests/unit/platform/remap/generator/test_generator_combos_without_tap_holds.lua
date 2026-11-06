@@ -52,7 +52,9 @@ local TAP_HOLDS_ON_PINS = {
 	-- the hold labels named from the key name table, which the rule descriptions
 	-- carry (« ⇧ Maj »). Then for the navigation-layer hold named as the hold
 	-- picker names the layer, which the left Command rule's description carries.
-	recommended = { rules = 27, digest = "2aeebd435b52486e" },
+	-- Then for the AltGr hold named from the key name table (it read « ⌥ AltGr
+	-- (option droite — interne) »), which the right Command rule's description carries.
+	recommended = { rules = 27, digest = "ea777838a743caa6" },
 }
 
 --- Returns the key codes an engine posted at key_down, in order, with the
