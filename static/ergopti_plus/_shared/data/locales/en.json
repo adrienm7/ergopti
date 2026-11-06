@@ -2033,6 +2033,7 @@
 	"menu.llm.profile_recommended_title": "Recommended prompt",
 	"menu.llm.profile_change_msg": "Model: %s\n%s\n\nCurrent prompt:\n%s\n\nRecommended prompt:\n%s\n\nConfirm to apply the recommended prompt.",
 	"menu.llm.profile_power_warning": "⚠️  Powerful profile\n\nRecommended:  %s\nSelected:  %s\n\nThe model may not be powerful enough.",
+	"menu.llm.profiles": "Profiles",
 	"menu.llm.remove_model_body": "Do you want to remove the custom model \"%s\" from your list? The model will not be uninstalled from the system.",
 	"menu.llm.remove_model_title": "Remove this model?",
 	"menu.llm.remove_user_model": "🗑️ Remove from my models",

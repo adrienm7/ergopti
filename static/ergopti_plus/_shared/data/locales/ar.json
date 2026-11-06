@@ -1977,6 +1977,7 @@
 	"menu.llm.profile_recommended_title": "الموجّه الموصى به",
 	"menu.llm.profile_change_msg": "النموذج: %s\n%s\n\nالموجّه الحالي:\n%s\n\nالموجّه الموصى به:\n%s\n\nأكّد لتطبيق الموجّه الموصى به.",
 	"menu.llm.profile_power_warning": "⚠️  ملف تعريف قوي\n\nموصى به:  %s\nمحدد:  %s\n\nقد لا يكون النموذج قوياً بما يكفي.",
+	"menu.llm.profiles": "الملفات الشخصية",
 	"menu.llm.remove_model_body": "هل تريد إزالة النموذج المخصص \"%s\" من قائمتك؟ لن يُحذف النموذج من النظام.",
 	"menu.llm.remove_model_title": "إزالة هذا النموذج؟",
 	"menu.llm.remove_user_model": "🗑️ إزالة من نماذجي",

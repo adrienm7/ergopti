@@ -1977,6 +1977,7 @@
 	"menu.llm.profile_recommended_title": "Aanbevolen prompt",
 	"menu.llm.profile_change_msg": "Model: %s\n%s\n\nHuidig prompt:\n%s\n\nAanbevolen prompt:\n%s\n\nBevestig om het aanbevolen prompt toe te passen.",
 	"menu.llm.profile_power_warning": "⚠️  Krachtig profiel\n\nAanbevolen:  %s\nGeselecteerd:  %s\n\nHet model is mogelijk niet krachtig genoeg.",
+	"menu.llm.profiles": "Profielen",
 	"menu.llm.remove_model_body": "Wilt u het aangepaste model \"%s\" uit uw lijst verwijderen? Het model wordt niet van het systeem verwijderd.",
 	"menu.llm.remove_model_title": "Dit model verwijderen?",
 	"menu.llm.remove_user_model": "🗑️ Uit mijn modellen verwijderen",

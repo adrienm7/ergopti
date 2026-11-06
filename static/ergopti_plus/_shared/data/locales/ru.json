@@ -1977,6 +1977,7 @@
 	"menu.llm.profile_recommended_title": "Рекомендуемый промпт",
 	"menu.llm.profile_change_msg": "Модель: %s\n%s\n\nТекущий промпт:\n%s\n\nРекомендуемый промпт:\n%s\n\nПодтвердите для применения рекомендуемого промпта.",
 	"menu.llm.profile_power_warning": "⚠️  Мощный профиль\n\nРекомендуется:  %s\nВыбрано:  %s\n\nМодель может быть недостаточно мощной.",
+	"menu.llm.profiles": "Профили",
 	"menu.llm.remove_model_body": "Удалить пользовательскую модель \"%s\" из списка? Модель не будет удалена из системы.",
 	"menu.llm.remove_model_title": "Удалить эту модель?",
 	"menu.llm.remove_user_model": "🗑️ Удалить из моих моделей",

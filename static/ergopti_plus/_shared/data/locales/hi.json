@@ -1977,6 +1977,7 @@
 	"menu.llm.profile_recommended_title": "अनुशंसित प्रॉम्प्ट",
 	"menu.llm.profile_change_msg": "मॉडल: %s\n%s\n\nवर्तमान प्रॉम्प्ट:\n%s\n\nअनुशंसित प्रॉम्प्ट:\n%s\n\nअनुशंसित प्रॉम्प्ट लागू करने के लिए पुष्टि करें।",
 	"menu.llm.profile_power_warning": "⚠️  शक्तिशाली प्रोफ़ाइल\n\nअनुशंसित: %s\nचयनित: %s\n\nमॉडल पर्याप्त शक्तिशाली नहीं हो सकता।",
+	"menu.llm.profiles": "प्रोफ़ाइल",
 	"menu.llm.remove_model_body": "क्या आप कस्टम मॉडल \"%s\" को अपनी सूची से हटाना चाहते हैं? मॉडल सिस्टम से अनइंस्टॉल नहीं होगा।",
 	"menu.llm.remove_model_title": "यह मॉडल हटाएं?",
 	"menu.llm.remove_user_model": "🗑️ मेरे मॉडल से हटाएं",

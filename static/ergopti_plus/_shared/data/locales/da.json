@@ -1977,6 +1977,7 @@
 	"menu.llm.profile_recommended_title": "Anbefalet prompt",
 	"menu.llm.profile_change_msg": "Model: %s\n%s\n\nAktuelt prompt:\n%s\n\nAnbefalet prompt:\n%s\n\nBekræft for at anvende det anbefalede prompt.",
 	"menu.llm.profile_power_warning": "⚠️  Kraftig profil\n\nAnbefalet:  %s\nValgt:  %s\n\nModellen er muligvis ikke kraftig nok.",
+	"menu.llm.profiles": "Profiler",
 	"menu.llm.remove_model_body": "Vil du fjerne det brugerdefinerede model \"%s\" fra din liste? Modellen vil ikke blive afinstalleret fra systemet.",
 	"menu.llm.remove_model_title": "Fjern dette model?",
 	"menu.llm.remove_user_model": "🗑️ Fjern fra mine modeller",

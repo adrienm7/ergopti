@@ -1428,8 +1428,8 @@
 		"path": "llm.user_profiles",
 		"family": "setting",
 		"labels": {
-			"fr": "llm.user_profiles",
-			"en": "llm.user_profiles"
+			"fr": "Profils",
+			"en": "Profiles"
 		},
 		"platforms": {
 			"windows": true,

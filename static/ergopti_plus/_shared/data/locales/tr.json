@@ -1977,6 +1977,7 @@
 	"menu.llm.profile_recommended_title": "Önerilen istem",
 	"menu.llm.profile_change_msg": "Model: %s\n%s\n\nMevcut istem:\n%s\n\nÖnerilen istem:\n%s\n\nÖnerilen istemi uygulamak için onaylayın.",
 	"menu.llm.profile_power_warning": "⚠️  Güçlü profil\n\nÖnerilen:  %s\nSeçilen:  %s\n\nModel yeterince güçlü olmayabilir.",
+	"menu.llm.profiles": "Profiller",
 	"menu.llm.remove_model_body": "\"%s\" özel modelini listenizden kaldırmak istiyor musunuz? Model sistemden kaldırılmayacak.",
 	"menu.llm.remove_model_title": "Bu model kaldırılsın mı?",
 	"menu.llm.remove_user_model": "🗑️ Modellerimden kaldır",

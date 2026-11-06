@@ -1977,6 +1977,7 @@
 	"menu.llm.profile_recommended_title": "推奨プロンプト",
 	"menu.llm.profile_change_msg": "モデル: %s\n%s\n\n現在のプロンプト:\n%s\n\n推奨プロンプト:\n%s\n\n確認して推奨プロンプトを適用します。",
 	"menu.llm.profile_power_warning": "⚠️  高負荷プロファイル\n\n推奨:  %s\n選択中:  %s\n\nモデルの性能が不足している可能性があります。",
+	"menu.llm.profiles": "プロファイル",
 	"menu.llm.remove_model_body": "カスタムモデル\"%s\"をリストから削除しますか？モデルはシステムからアンインストールされません。",
 	"menu.llm.remove_model_title": "このモデルを削除しますか？",
 	"menu.llm.remove_user_model": "🗑️ マイモデルから削除",

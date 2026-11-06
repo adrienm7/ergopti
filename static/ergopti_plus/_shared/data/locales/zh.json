@@ -1977,6 +1977,7 @@
 	"menu.llm.profile_recommended_title": "推荐提示词",
 	"menu.llm.profile_change_msg": "模型：%s\n%s\n\n当前prompt：\n%s\n\n推荐prompt：\n%s\n\n确认应用推荐prompt。",
 	"menu.llm.profile_power_warning": "⚠️  高性能配置\n\n推荐：  %s\n已选：  %s\n\n模型性能可能不足。",
+	"menu.llm.profiles": "配置文件",
 	"menu.llm.remove_model_body": "您确定要从列表中移除自定义模型«%s»？该模型不会从系统中卸载。",
 	"menu.llm.remove_model_title": "移除此模型?",
 	"menu.llm.remove_user_model": "🗑️ 从我的模型中移除",
