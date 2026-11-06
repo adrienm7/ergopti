@@ -430,7 +430,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		local saved = { download = Http.download, run = Process.run, settled = Process.is_settled,
 			shell = Shell.run, exists = Files.exists, data = Paths.data }
 		local root = assert(require("luv").fs_mkdtemp("/tmp/ergopti-python-registry-XXXXXX"))
-		assert(os.execute("mkdir -p '" .. root .. "/runtime/python'" ) == 0)
+		local executed = os.execute("mkdir -p '" .. root .. "/runtime/python'"); assert(executed == true or executed == 0)
 		local calls = 0
 		local operation = { started = false }
 		function operation:is_settled() return true end
