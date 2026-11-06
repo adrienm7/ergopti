@@ -1679,7 +1679,10 @@ local function main()
 				-- is the family about to validate; "autocorrect" otherwise. The kind
 				-- decides which of the four toggles gates the bubble.
 				local kind = (ch == MagicKey.get()) and "star" or "autocorrect"
-				tooltip_preview.show(candidates, kind)
+				-- `show` answers false when a toggle, the category or the renderer
+				-- refused the bubble: that offer was never seen, so it is neither
+				-- counted nor allowed to deduplicate the next, visible one.
+				if tooltip_preview.show(candidates, kind) ~= true then return end
 
 				-- Counted once per DISTINCT offer, not once per keystroke. The bubble
 				-- redraws on every character while the same candidate stays on top,
