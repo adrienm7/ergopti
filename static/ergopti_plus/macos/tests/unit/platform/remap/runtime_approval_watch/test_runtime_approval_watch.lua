@@ -21,7 +21,7 @@ local function line(state)
 end
 
 --- @param listings table Successive listing texts; the last one repeats.
---- @param options table|nil listing_sec: clock cost of each listing; opened: opener result.
+--- @param options table|nil listing_sec: clock cost of each listing; opener: pane opener.
 local function fake(listings, options)
 	options = options or {}
 	package.loaded["platform.remap.runtime_approval_watch"] = nil
@@ -39,7 +39,11 @@ local function fake(listings, options)
 			return "handle", true
 		end,
 		cancel = function() end,
-		open_settings = function(url) world.opened[#world.opened + 1] = url end,
+		open_settings = function(url)
+			world.opened[#world.opened + 1] = url
+			if options.opener then return options.opener(url) end
+			return true
+		end,
 		reload = function() world.reloads = world.reloads + 1 end,
 		version = function() return "8.5.0" end,
 	})
@@ -70,6 +74,32 @@ helpers.describe("owned runtime driver approval watch", function()
 		end
 		helpers.assert_eq(world.reloads, 0)
 		helpers.assert_eq(watch.active(), false)
+	end)
+
+	-- MRT-006: hs.urlevent.openURL answers false when the pane did not open; only
+	-- a thrown error was reported, so a refused pane passed for an opened one.
+	helpers.it("reports a refused or unknown native pane opening (mrt-006)", function()
+		local Logger = require("infra.logger")
+		local original = Logger.error
+		local cases = {
+			{ name = "true", opener = function() return true end, errors = 0 },
+			{ name = "false", opener = function() return false end, errors = 1 },
+			{ name = "nil", opener = function() return nil end, errors = 1 },
+			{ name = "throw", opener = function() error("opener crashed") end, errors = 1 },
+		}
+		for _, case in ipairs(cases) do
+			local errors = 0
+			Logger.error = function() errors = errors + 1 end
+			local ok, failure = pcall(function()
+				local watch, world = fake({ line("activated waiting for user") }, { opener = case.opener })
+				helpers.assert_eq(watch.start(), true)
+				helpers.assert_eq(#world.opened, 1, case.name .. ": the pane is asked once")
+				helpers.assert_eq(watch.active(), true, case.name .. ": the listing watch goes on")
+			end)
+			Logger.error = original
+			helpers.assert_true(ok, tostring(failure))
+			helpers.assert_eq(errors, case.errors, case.name .. ": opener result must be reported truthfully")
+		end
 	end)
 
 	-- MRT-001: the deadline counted poll intervals only, so four-second listings

@@ -34,7 +34,7 @@ M.APPROVAL_TIMEOUT_SEC = 900
 ---   listing(fn(text|nil)) is `systemextensionsctl list`;
 ---   now() -> monotonic seconds, so slow listings and late timers spend the budget;
 ---   after(seconds, fn) -> handle, committed; cancel(handle);
----   open_settings(url) opens a System Settings pane; reload() reloads the driver;
+---   open_settings(url) -> true when the System Settings pane opened; reload() reloads the driver;
 ---   version() -> the pinned driver version or nil.
 --- @param ports table listing, now, after, cancel, open_settings, reload, version.
 --- @return table watch { start, active }.
@@ -82,8 +82,13 @@ function M.new(ports)
 		if started then return false end
 		started, running, deadline = true, true, ports.now() + M.APPROVAL_TIMEOUT_SEC
 		Logger.start(LOG, "Opening the driver approval pane and watching for the approval…")
-		local opened, failure = pcall(ports.open_settings, require("platform.remap.ke_paths").EXTENSIONS_SETTINGS_URL)
-		if not opened then Logger.error(LOG, "The driver approval pane could not be opened: %s.", tostring(failure)) end
+		-- The native opener answers a boolean: false is a refusal, not a success.
+		local called, opened = pcall(ports.open_settings, require("platform.remap.ke_paths").EXTENSIONS_SETTINGS_URL)
+		if not called then
+			Logger.error(LOG, "The driver approval pane could not be opened: %s.", tostring(opened))
+		elseif opened ~= true then
+			Logger.error(LOG, "macOS refused to open the driver approval pane (%s); the watch goes on.", tostring(opened))
+		end
 		poll()
 		return true
 	end
