@@ -207,6 +207,10 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 	function unique(unit, statement) {
 		return matches(unit, statement, 0).length === 1;
 	}
+	/** True when the statement occurs once at any depth, e.g. inside the render closure. */
+	function once(unit, statement) {
+		return matches(unit, statement).length === 1;
+	}
 	function writes(unit, name) {
 		if (!unit) return [];
 		const found = new Set();
@@ -359,6 +363,7 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 	const rebuild = body(start.source, 'local function rebuild_menu_cache()');
 	const generate = body(builder, 'function M.generate(ctx, menu_mods, actions)');
 	const prepend = body(badge, 'function M.prepend_to(items, ctx, on_click)');
+	const release = body(badge, 'local function release_canvas()');
 	const publish = body(start.source, 'push_static_menu = function(items)');
 	const loadRoot = body(builder, 'local function load_manifest()');
 	const loadTop = body(builder, 'local function load_top_level()');
@@ -446,10 +451,7 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		writes(prepend, 'on_click').length ||
 		!soleLocal(prepend, 'paused', 'local paused = ctx and ctx.paused') ||
 		!soleLocal(prepend, 'canvas_obj', 'local canvas_obj = hs.canvas.new({') ||
-		!unique(
-			prepend,
-			'canvas_obj:appendElements(rect_elem, { type = "text", text = display_text,'
-		) ||
+		!once(prepend, 'canvas_obj:appendElements(rect_elem, { type = "text", text = display_text,') ||
 		!soleLocal(
 			prepend,
 			'frame',
@@ -473,9 +475,22 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 			prepend,
 			'if type(compose) ~= "function" then Logger.error(LOG, "Declared canvas badge root composition refused.") return false end'
 		) ||
-		!unique(prepend, 'text = display_text') ||
-		!soleLocal(prepend, 'img', 'local img = canvas_obj:imageFromCanvas()') ||
-		!unique(prepend, 'canvas_obj:delete()') ||
+		!once(prepend, 'text = display_text') ||
+		// The capture runs inside one protected closure; the exact canvas is then released
+		// through the module-level owner, which also runs when rendering failed.
+		!soleLocal(prepend, 'rendered', 'local rendered, img = xpcall(function()') ||
+		!soleLocal(prepend, 'img', 'local rendered, img = xpcall(function()') ||
+		!once(prepend, 'return canvas_obj:imageFromCanvas() end, debug.traceback)') ||
+		!unique(prepend, 'pending_canvas = canvas_obj') ||
+		matches(prepend, 'if not release_canvas() then return false end', 0).length !== 2 ||
+		!release ||
+		!unique(lex(badge), 'local pending_canvas = nil') ||
+		!unique(lex(badge), 'local canvas_busy = false') ||
+		!unique(release, 'if canvas_busy then return false end') ||
+		!unique(release, 'if not pending_canvas then return true end') ||
+		!unique(release, 'local canvas = pending_canvas') ||
+		!once(release, 'local ok = pcall(function() canvas:delete() end)') ||
+		!unique(release, 'if pending_canvas == canvas then pending_canvas = nil end') ||
 		!soleLocal(prepend, 'badge', 'local badge = { title = "", image = img, fn = on_click, }') ||
 		!soleLocal(prepend, 'boundary', 'local boundary = { title = frame[2].separator and "-" }') ||
 		!unique(
@@ -571,6 +586,7 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 	// Ordering is part of this physical route: admission precedes native work;
 	// capture precedes deletion, which precedes publication into the returned list.
 	const position = (unit, statement) => matches(unit, statement, 0)[0];
+	const releaseCalls = matches(prepend, 'if not release_canvas() then return false end', 0);
 	return (
 		position(prepend, 'return false') < position(prepend, 'local display_text = frame[1].label') &&
 		position(prepend, 'local display_text = frame[1].label') <
@@ -578,14 +594,17 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		position(prepend, 'for _, item in ipairs(items) do') <
 			position(prepend, 'local canvas_obj = hs.canvas.new({') &&
 		position(prepend, 'local canvas_obj = hs.canvas.new({') <
-			position(prepend, 'canvas_obj:appendElements(') &&
-		position(prepend, 'canvas_obj:appendElements(') <
-			position(prepend, 'local img = canvas_obj:imageFromCanvas()') &&
-		position(prepend, 'local img = canvas_obj:imageFromCanvas()') <
-			position(prepend, 'canvas_obj:delete()') &&
+			position(prepend, 'pending_canvas = canvas_obj') &&
+		position(prepend, 'pending_canvas = canvas_obj') <
+			position(prepend, 'local rendered, img = xpcall(function()') &&
+		position(prepend, 'local rendered, img = xpcall(function()') <
+			matches(prepend, 'canvas_obj:appendElements(')[0] &&
+		matches(prepend, 'canvas_obj:appendElements(')[0] <
+			matches(prepend, 'return canvas_obj:imageFromCanvas()')[0] &&
+		matches(prepend, 'return canvas_obj:imageFromCanvas()')[0] < releaseCalls[1] &&
 		position(prepend, 'local compose = ManifestMenu.native_composition(') <
 			position(prepend, 'local canvas_obj = hs.canvas.new({') &&
-		position(prepend, 'canvas_obj:delete()') < position(prepend, 'local badge = {') &&
+		releaseCalls[1] < position(prepend, 'local badge = {') &&
 		position(prepend, 'local badge = {') < position(prepend, 'local boundary = {') &&
 		position(prepend, 'local boundary = {') <
 			position(
