@@ -2151,8 +2151,8 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	local function on_fail()
 		run_async_callback("failure callback", on_fail_cb)
 	end
-	local on_partial = on_partial_cb and function(partial_raw)
-		run_async_callback("partial callback", on_partial_cb, partial_raw)
+	local on_partial = on_partial_cb and function(partial_raw, stream_identity)
+		run_async_callback("partial callback", on_partial_cb, partial_raw, stream_identity)
 	end or nil
 
 	-- A request without a live watchdog can strand the loading surface forever.
