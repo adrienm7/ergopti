@@ -551,6 +551,7 @@ helpers.describe("canonical hotstring cache projection", function()
 			boot_saved_prefs = require("infra.preferences").load("config"),
 			keymap = {
 				apply_hotstring_preferences = registry.apply_hotstring_preferences,
+				start_layout_emulation = function() end,
 				start = function()
 					helpers.assert_eq(registry.is_group_enabled("rolls"), false)
 					helpers.assert_eq(registry.is_section_enabled("rolls", "hc"), false)

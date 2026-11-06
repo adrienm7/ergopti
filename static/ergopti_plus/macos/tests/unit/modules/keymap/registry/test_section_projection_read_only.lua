@@ -69,6 +69,7 @@ helpers.describe("section projection backup admission", function()
 				local run = assert(load(boundary, "hotstring boot boundary", "t", setmetatable({
 					boot_saved_prefs = saved,
 					keymap = { apply_hotstring_preferences = registry.apply_hotstring_preferences,
+						start_layout_emulation = function() end,
 						start = function() starts = starts + 1; return true end },
 				}, { __index = _G })))
 				local started, failure = pcall(run)
