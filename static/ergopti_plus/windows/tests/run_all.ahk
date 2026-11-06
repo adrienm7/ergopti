@@ -1533,6 +1533,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/infra/lifecycle/test_boot_paths_fail_soft.ahk
 #Include meta/ui/wpm/test_wpm_widget_native_render.ahk
 #Include meta/ui/wpm/test_wpm_widget_hidden_until_typed.ahk
+#Include meta/ui/wpm/test_wpm_boot_show_respects_disable.ahk
 #Include meta/modules/hotstrings/catalogue/test_text_expansion_critical_path.ahk
 #Include meta/adapters/input/test_text_sender_clipboard_failure.ahk
 #Include meta/adapters/input/test_text_sender_clipboard_sequence_ownership.ahk

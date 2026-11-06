@@ -71,7 +71,7 @@ _MetaCheckBootDeferredTasks() {
 	; marker. InStr returns the FIRST occurrence, so Pos > ReadyPos proves NO
 	; occurrence sits before ready — exactly the regression we must prevent.
 	for _, Probe in [
-		"SetTimer(WPMWidget_Show",
+		"SetTimer(WPMWidget_BootShow",
 		"SetTimer(BuildLanguageMenuDeferred",
 		"SetTimer(I18nWarmFallbacks" ] {
 		Pos := InStr(Body, Probe)

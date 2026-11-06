@@ -584,6 +584,19 @@ WPMWidget_Show(ExpectedRevision := unset) {
         WPMWidget.pos_x, WPMWidget.pos_y, WPMWidget.show_graph ? "graph" : "compact")
 }
 
+; Deferred boot Show, armed once the tray is ready. WPMWidget_Show forces
+; WPMWidget.visible := true, which is right for a user activation but wrong for
+; this timer: the user can disable the widget during the post-ready delay, and a
+; stale Show would then restore it and re-arm both display timers against the
+; committed preference. The preference is read when the timer fires.
+WPMWidget_BootShow() {
+    if !WPMWidget.visible {
+        LoggerDebug("WPMWidget", "Boot Show skipped: the widget was disabled before it ran.")
+        return
+    }
+    WPMWidget_Show()
+}
+
 WPMWidget_Hide() {
     PreviousCritical := Critical("On")
     try {

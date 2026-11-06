@@ -1702,7 +1702,7 @@ if (MetricsShortcuts.enabled and WPMWidget.visible) {
 	; path rather than as a ~110 ms tooltip blip when the widget first appears.
 	if WPMWidget.show_graph
 		SetTimer(WPMWidget_PrewarmGraph, -WPMWidgetConst.PREWARM_DELAY_MS)
-	SetTimer(WPMWidget_Show, -WPMWidgetConst.BOOT_SHOW_DELAY_MS)
+	SetTimer(WPMWidget_BootShow, -WPMWidgetConst.BOOT_SHOW_DELAY_MS)
 }
 ; Publish the metrics dashboards' sidecars in a background worker once boot has
 ; settled, so the first open paints from disk at once instead of waiting for a
