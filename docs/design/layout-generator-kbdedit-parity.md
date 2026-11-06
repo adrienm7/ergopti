@@ -8,9 +8,12 @@ release 26.10.0), or better, in a modern, free, online interface that also runs 
 
 ## How Ergopti goes further
 
-- **Every OS, not only Windows.** One ISO `.keylayout` source generates macOS (bundle ISO + ANSI by default, or one
-  variant), Linux XKB, Windows (`.klc`, DLL, unsigned installer for x86, x64 and ARM64) and the emulation tables of
-  the three drivers and the web. KbdEdit has no Linux output and a lossy macOS conversion.
+- **One complete source.** The layout lives in an Ergopti TOML file, a superset of every target (decided
+  2026-11-06), because a `.keylayout` cannot hold Kana, Roya, Loya, physical remapping or alternative-key
+  shortcuts. A `.keylayout` imports without loss and exports.
+- **Every OS, not only Windows.** The TOML generates macOS (bundle ISO + ANSI by default, or one variant), Linux
+  XKB, Windows (`.klc`, DLL, unsigned installer for x86, x64 and ARM64) and the emulation tables of the three
+  drivers and the web. KbdEdit has no Linux output and a lossy macOS conversion.
 - **Emulation where the OS cannot.** When a target format cannot express a feature (more than 15 Windows modifier
   positions, ligatures from dead keys, non-BMP dead-key results, left/right Shift distinction, togglable extra
   levels), the ErgoptiPlus driver emulates it, as the AutoHotkey driver already does. The export never drops a
