@@ -4123,5 +4123,13 @@
 	"inventory.behavior.dead_windows_lifetime": "As tabelas integradas esperam até 2 segundos; o estado de tecla morta do registro não tem limite. A expiração e a pausa cancelam uma tecla morta pendente.",
 	"inventory.behavior.dead_native_lifetime": "O sistema nativo gere a composição pendente; captura e reposição são independentes de um prazo comum do controlador.",
 	"platform_reason.menu_container_rows_are_built_per_driver": "Cada controlador constrói esta parte do menu com as suas próprias linhas pai, moldura e filhas, porque os kits de menus nativos diferem (menus do AutoHotkey, tabelas da barra de menus do Hammerspoon, tabuleiro do Linux). Os outros controladores têm os mesmos controlos em linhas próprias: é uma diferença de estrutura do menu, não um controlo em falta.",
-	"platform_reason.menu_control_rows_are_laid_out_per_driver": "Os outros controladores têm este controlo como linha própria: cada controlador apresenta o valor, a reposição ou as variantes de uma definição na sua própria linha, porque os kits de menus nativos diferem. É uma diferença de apresentação, não um controlo em falta."
+	"platform_reason.menu_control_rows_are_laid_out_per_driver": "Os outros controladores têm este controlo como linha própria: cada controlador apresenta o valor, a reposição ou as variantes de uma definição na sua própria linha, porque os kits de menus nativos diferem. É uma diferença de apresentação, não um controlo em falta.",
+	"apps.encryptor.btn_reveal_folder": "Mostrar na pasta",
+	"apps.encryptor.err_cipher_unavailable": "O componente de criptografia está ausente. Reinstale o Ergopti.",
+	"apps.cloner.msg_clone_name_launcher": "Nome exibido no menu de aplicativos e na barra de tarefas.",
+	"apps.cloner.msg_open_optional_portable": "Opcional: um URL, arquivo ou pasta que o clone abre ao iniciar. Deixe vazio para simplesmente iniciar o aplicativo. Com um navegador, um endereço web abre em sua própria janela de aplicativo.",
+	"apps.cloner.msg_icon_style_portable": "Manter o ícone do aplicativo ou escolher uma imagem para o clone?",
+	"apps.cloner.btn_original_icon": "Ícone original",
+	"apps.cloner.msg_created": "“{1}” está pronto no menu de aplicativos. Ele mantém seu próprio perfil em {2}.",
+	"apps.cloner.err_source_unreadable": "Este aplicativo não pode ser clonado: seu inicializador não indica nenhum programa."
 }

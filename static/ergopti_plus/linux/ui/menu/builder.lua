@@ -237,6 +237,7 @@ local _build_gestures = require("ui.menu.menu_gestures").build
 local _build_configuration = require("ui.menu.menu_configuration").build
 
 local _build_language = require("ui.menu.menu_language").build
+local _build_apps = require("ui.menu.menu_apps").build
 
 local _about_update_rows = require("ui.menu.menu_about")._about_update_rows
 local _build_about = require("ui.menu.menu_about").build
@@ -344,6 +345,7 @@ function M.build(ctx)
 		["shortcuts"]       = _build_shortcuts,
 		["tap_holds"]       = _build_tap_holds,
 		["gestures"]        = _build_gestures,
+		["apps"]            = _build_apps,
 		["configuration"]   = _build_configuration,
 		["language"]        = _build_language,
 		["about"]           = _build_about,

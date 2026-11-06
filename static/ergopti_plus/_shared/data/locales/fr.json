@@ -4123,5 +4123,13 @@
 	"inventory.behavior.dead_windows_lifetime": "Les tables intégrées attendent au plus 2 secondes ; l’état mort du registre n’a pas de délai maximal. L’expiration et la pause annulent une touche morte en attente.",
 	"inventory.behavior.dead_native_lifetime": "Le système natif gère la composition en attente ; les règles de capture et de réinitialisation sont distinctes d’un délai commun au pilote.",
 	"platform_reason.menu_container_rows_are_built_per_driver": "Chaque pilote construit cette partie du menu à partir de ses propres lignes parent, cadre et enfants, car les boîtes à outils de menus natives diffèrent (menus AutoHotkey, tables de barre de menus Hammerspoon, zone de notification Linux). Les autres pilotes portent les mêmes commandes sous des lignes qui leur sont propres : c’est une différence de structure de menu, pas une commande manquante.",
-	"platform_reason.menu_control_rows_are_laid_out_per_driver": "Les autres pilotes portent cette commande sous une ligne qui leur est propre : chaque pilote présente la valeur, la réinitialisation ou les variantes d’un réglage dans sa propre ligne, car les boîtes à outils de menus natives diffèrent. C’est une différence de présentation, pas une commande manquante."
+	"platform_reason.menu_control_rows_are_laid_out_per_driver": "Les autres pilotes portent cette commande sous une ligne qui leur est propre : chaque pilote présente la valeur, la réinitialisation ou les variantes d’un réglage dans sa propre ligne, car les boîtes à outils de menus natives diffèrent. C’est une différence de présentation, pas une commande manquante.",
+	"apps.encryptor.btn_reveal_folder": "Afficher dans le dossier",
+	"apps.encryptor.err_cipher_unavailable": "Le composant de chiffrement est absent. Réinstallez Ergopti.",
+	"apps.cloner.msg_clone_name_launcher": "Nom affiché dans le menu des applications et dans la barre des tâches.",
+	"apps.cloner.msg_open_optional_portable": "Facultatif : une URL, un fichier ou un dossier que le clone ouvre au lancement. Laissez vide pour simplement démarrer l'application. Avec un navigateur web, une adresse web s'ouvre dans sa propre fenêtre d'application.",
+	"apps.cloner.msg_icon_style_portable": "Garder l'icône de l'application, ou choisir une image pour le clone ?",
+	"apps.cloner.btn_original_icon": "Icône d'origine",
+	"apps.cloner.msg_created": "« {1} » est prêt dans votre menu des applications. Il garde son propre profil dans {2}.",
+	"apps.cloner.err_source_unreadable": "Cette application ne peut pas être clonée : son lanceur ne désigne aucun programme."
 }

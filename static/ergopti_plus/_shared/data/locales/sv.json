@@ -4123,5 +4123,13 @@
 	"inventory.behavior.dead_windows_lifetime": "De inbyggda tabellerna väntar högst 2 sekunder; registrets dödtangentläge har ingen tidsgräns. Utgång och paus avbryter en väntande dödtangent.",
 	"inventory.behavior.dead_native_lifetime": "Det inbyggda systemet styr väntande komposition; registrering och återställning är skilda från en gemensam tidsgräns i drivrutinen.",
 	"platform_reason.menu_container_rows_are_built_per_driver": "Varje drivrutin bygger den här delen av menyn av sina egna föräldra-, ram- och barnrader, eftersom de inbyggda menyverktygen skiljer sig (AutoHotkey-menyer, Hammerspoons menyradstabeller, Linux-systemfältet). De andra drivrutinerna har samma kontroller under egna rader: en skillnad i menystruktur, inte en saknad kontroll.",
-	"platform_reason.menu_control_rows_are_laid_out_per_driver": "De andra drivrutinerna har den här kontrollen som en egen rad: varje drivrutin visar värde, återställning eller varianter av en inställning i sin egen rad, eftersom de inbyggda menyverktygen skiljer sig. En skillnad i presentation, inte en saknad kontroll."
+	"platform_reason.menu_control_rows_are_laid_out_per_driver": "De andra drivrutinerna har den här kontrollen som en egen rad: varje drivrutin visar värde, återställning eller varianter av en inställning i sin egen rad, eftersom de inbyggda menyverktygen skiljer sig. En skillnad i presentation, inte en saknad kontroll.",
+	"apps.encryptor.btn_reveal_folder": "Visa i mappen",
+	"apps.encryptor.err_cipher_unavailable": "Krypteringskomponenten saknas. Installera om Ergopti.",
+	"apps.cloner.msg_clone_name_launcher": "Namn som visas i programmenyn och i aktivitetsfältet.",
+	"apps.cloner.msg_open_optional_portable": "Valfritt: en URL, fil eller mapp som klonen öppnar vid start. Lämna tomt för att bara starta programmet. Med en webbläsare öppnas en webbadress i ett eget programfönster.",
+	"apps.cloner.msg_icon_style_portable": "Behålla programmets egen ikon eller välja en bild för klonen?",
+	"apps.cloner.btn_original_icon": "Originalikon",
+	"apps.cloner.msg_created": "”{1}” finns nu i programmenyn. Den har en egen profil i {2}.",
+	"apps.cloner.err_source_unreadable": "Programmet kan inte klonas: dess startare anger inget program."
 }

@@ -15,13 +15,9 @@
 		"path": "top_level.apps",
 		"visibility": "hide",
 		"labels": { "fr": "🛠️ Applications", "en": "🛠️ Applications" },
-		"platforms": { "windows": false, "macos": true, "linux": false },
+		"platforms": { "windows": false, "macos": true, "linux": true },
 		"reasons": {
 			"windows": {
-				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
-				"fr": "La zone de notification de chaque pilote porte les lignes de premier niveau que sa plateforme possède : les outils d'application sur macOS, le programme de mise à jour intégré sur Linux, l'interrupteur de suspension sur Windows. Les autres atteignent le même terrain ailleurs, ou pas du tout."
-			},
-			"linux": {
 				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
 				"fr": "La zone de notification de chaque pilote porte les lignes de premier niveau que sa plateforme possède : les outils d'application sur macOS, le programme de mise à jour intégré sur Linux, l'interrupteur de suspension sur Windows. Les autres atteignent le même terrain ailleurs, ou pas du tout."
 			}
@@ -179,13 +175,9 @@
 		"path": "apps_menu.apps_installed",
 		"visibility": "hide",
 		"labels": { "fr": "apps_installed", "en": "apps_installed" },
-		"platforms": { "windows": false, "macos": true, "linux": false },
+		"platforms": { "windows": false, "macos": true, "linux": true },
 		"reasons": {
 			"windows": {
-				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
-				"fr": "La zone de notification de chaque pilote porte les lignes de premier niveau que sa plateforme possède : les outils d'application sur macOS, le programme de mise à jour intégré sur Linux, l'interrupteur de suspension sur Windows. Les autres atteignent le même terrain ailleurs, ou pas du tout."
-			},
-			"linux": {
 				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
 				"fr": "La zone de notification de chaque pilote porte les lignes de premier niveau que sa plateforme possède : les outils d'application sur macOS, le programme de mise à jour intégré sur Linux, l'interrupteur de suspension sur Windows. Les autres atteignent le même terrain ailleurs, ou pas du tout."
 			}

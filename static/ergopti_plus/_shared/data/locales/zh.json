@@ -4123,5 +4123,13 @@
 	"inventory.behavior.dead_windows_lifetime": "内置表最多等待 2 秒；注册表的死键状态没有超时。超时和暂停会取消待处理的死键。",
 	"inventory.behavior.dead_native_lifetime": "原生操作系统管理待定组合；捕获和重置规则与驱动程序共用超时不同。",
 	"platform_reason.menu_container_rows_are_built_per_driver": "由于原生菜单工具包不同（AutoHotkey 菜单、Hammerspoon 菜单栏表、Linux 托盘），每个驱动都用自己的父行、框架行和子行构建菜单的这一部分。其他驱动在各自的行下提供相同的控件：这是菜单结构的差异，不是缺少控件。",
-	"platform_reason.menu_control_rows_are_laid_out_per_driver": "其他驱动以各自的行提供此控件：由于原生菜单工具包不同，每个驱动在自己的行中显示设置的值、重置或变体。这是呈现方式的差异，不是缺少控件。"
+	"platform_reason.menu_control_rows_are_laid_out_per_driver": "其他驱动以各自的行提供此控件：由于原生菜单工具包不同，每个驱动在自己的行中显示设置的值、重置或变体。这是呈现方式的差异，不是缺少控件。",
+	"apps.encryptor.btn_reveal_folder": "在文件夹中显示",
+	"apps.encryptor.err_cipher_unavailable": "缺少加密组件。请重新安装 Ergopti。",
+	"apps.cloner.msg_clone_name_launcher": "在应用程序菜单和任务栏中显示的名称。",
+	"apps.cloner.msg_open_optional_portable": "可选：克隆启动时打开的 URL、文件或文件夹。留空则仅启动应用程序。对于网页浏览器，网址会在其独立的应用程序窗口中打开。",
+	"apps.cloner.msg_icon_style_portable": "保留应用程序自身的图标，还是为克隆选择一张图片？",
+	"apps.cloner.btn_original_icon": "原始图标",
+	"apps.cloner.msg_created": "“{1}”已出现在应用程序菜单中。它在 {2} 中保留自己的配置文件。",
+	"apps.cloner.err_source_unreadable": "无法克隆此应用程序：其启动器未指定任何程序。"
 }

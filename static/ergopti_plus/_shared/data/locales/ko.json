@@ -4123,5 +4123,13 @@
 	"inventory.behavior.dead_windows_lifetime": "기본 제공 표는 최대 2초 동안 기다리며, 레지스트리의 데드 키 상태에는 제한 시간이 없습니다. 만료와 일시 정지는 대기 중인 데드 키를 취소합니다.",
 	"inventory.behavior.dead_native_lifetime": "기본 운영 체제가 대기 중인 조합을 관리합니다. 캡처 및 초기화 규칙은 드라이버 공통 시간 제한과 별개입니다.",
 	"platform_reason.menu_container_rows_are_built_per_driver": "각 드라이버는 네이티브 메뉴 도구 키트가 다르므로(AutoHotkey 메뉴, Hammerspoon 메뉴 막대 표, Linux 트레이) 메뉴의 이 부분을 자체 상위·프레임·하위 행으로 구성합니다. 다른 드라이버는 같은 컨트롤을 자체 행 아래에 둡니다. 메뉴 구조의 차이이며 빠진 컨트롤이 아닙니다.",
-	"platform_reason.menu_control_rows_are_laid_out_per_driver": "다른 드라이버는 이 컨트롤을 자체 행으로 둡니다. 네이티브 메뉴 도구 키트가 다르므로 각 드라이버는 설정의 값, 초기화, 변형을 자체 행에 표시합니다. 표시 방식의 차이이며 빠진 컨트롤이 아닙니다."
+	"platform_reason.menu_control_rows_are_laid_out_per_driver": "다른 드라이버는 이 컨트롤을 자체 행으로 둡니다. 네이티브 메뉴 도구 키트가 다르므로 각 드라이버는 설정의 값, 초기화, 변형을 자체 행에 표시합니다. 표시 방식의 차이이며 빠진 컨트롤이 아닙니다.",
+	"apps.encryptor.btn_reveal_folder": "폴더에서 보기",
+	"apps.encryptor.err_cipher_unavailable": "암호화 구성 요소가 없습니다. Ergopti를 다시 설치하세요.",
+	"apps.cloner.msg_clone_name_launcher": "응용 프로그램 메뉴와 작업 표시줄에 표시되는 이름입니다.",
+	"apps.cloner.msg_open_optional_portable": "선택 사항: 클론이 시작할 때 여는 URL, 파일 또는 폴더입니다. 응용 프로그램만 시작하려면 비워 두세요. 웹 브라우저에서는 웹 주소가 별도의 응용 프로그램 창에서 열립니다.",
+	"apps.cloner.msg_icon_style_portable": "응용 프로그램 고유의 아이콘을 유지할까요, 아니면 클론용 이미지를 선택할까요?",
+	"apps.cloner.btn_original_icon": "원본 아이콘",
+	"apps.cloner.msg_created": "“{1}”이(가) 응용 프로그램 메뉴에 준비되었습니다. 자체 프로필을 {2}에 보관합니다.",
+	"apps.cloner.err_source_unreadable": "이 응용 프로그램은 복제할 수 없습니다. 실행기에 프로그램이 지정되어 있지 않습니다."
 }

@@ -4123,5 +4123,13 @@
 	"inventory.behavior.dead_windows_lifetime": "Le tabelle integrate attendono al massimo 2 secondi; lo stato morto del registro non ha limite di tempo. Scadenza e pausa annullano un tasto morto in attesa.",
 	"inventory.behavior.dead_native_lifetime": "Il sistema nativo gestisce la composizione in attesa; acquisizione e ripristino sono distinti da un limite comune del driver.",
 	"platform_reason.menu_container_rows_are_built_per_driver": "Ogni driver costruisce questa parte del menu con le proprie righe genitore, cornice e figlie, perché i toolkit di menu nativi differiscono (menu AutoHotkey, tabelle della barra dei menu di Hammerspoon, area di notifica di Linux). Gli altri driver portano gli stessi controlli sotto righe proprie: è una differenza di struttura del menu, non un controllo mancante.",
-	"platform_reason.menu_control_rows_are_laid_out_per_driver": "Gli altri driver portano questo controllo come riga propria: ogni driver presenta valore, ripristino o varianti di un’impostazione in una riga propria, perché i toolkit di menu nativi differiscono. È una differenza di presentazione, non un controllo mancante."
+	"platform_reason.menu_control_rows_are_laid_out_per_driver": "Gli altri driver portano questo controllo come riga propria: ogni driver presenta valore, ripristino o varianti di un’impostazione in una riga propria, perché i toolkit di menu nativi differiscono. È una differenza di presentazione, non un controllo mancante.",
+	"apps.encryptor.btn_reveal_folder": "Mostra nella cartella",
+	"apps.encryptor.err_cipher_unavailable": "Il componente di cifratura è assente. Reinstalla Ergopti.",
+	"apps.cloner.msg_clone_name_launcher": "Nome mostrato nel menu delle applicazioni e nella barra delle applicazioni.",
+	"apps.cloner.msg_open_optional_portable": "Facoltativo: un URL, un file o una cartella che il clone apre all'avvio. Lascia vuoto per avviare semplicemente l'applicazione. Con un browser web, un indirizzo web si apre in una propria finestra di applicazione.",
+	"apps.cloner.msg_icon_style_portable": "Mantenere l'icona dell'applicazione o scegliere un'immagine per il clone?",
+	"apps.cloner.btn_original_icon": "Icona originale",
+	"apps.cloner.msg_created": "«{1}» è pronto nel menu delle applicazioni. Mantiene il proprio profilo in {2}.",
+	"apps.cloner.err_source_unreadable": "Questa applicazione non può essere clonata: il suo avviatore non indica alcun programma."
 }

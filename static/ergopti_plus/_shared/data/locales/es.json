@@ -4123,5 +4123,13 @@
 	"inventory.behavior.dead_windows_lifetime": "Las tablas integradas esperan hasta 2 segundos; el estado de tecla muerta del registro no tiene límite. La expiración y la pausa cancelan una tecla muerta pendiente.",
 	"inventory.behavior.dead_native_lifetime": "El sistema nativo gestiona la composición pendiente; las reglas de captura y reinicio son independientes de un plazo común del controlador.",
 	"platform_reason.menu_container_rows_are_built_per_driver": "Cada controlador construye esta parte del menú con sus propias filas padre, marco e hijas, porque las herramientas de menú nativas difieren (menús de AutoHotkey, tablas de la barra de menús de Hammerspoon, bandeja de Linux). Los demás controladores llevan los mismos controles bajo filas propias: es una diferencia de estructura del menú, no un control ausente.",
-	"platform_reason.menu_control_rows_are_laid_out_per_driver": "Los demás controladores llevan este control como una fila propia: cada controlador presenta el valor, el restablecimiento o las variantes de un ajuste en su propia fila, porque las herramientas de menú nativas difieren. Es una diferencia de presentación, no un control ausente."
+	"platform_reason.menu_control_rows_are_laid_out_per_driver": "Los demás controladores llevan este control como una fila propia: cada controlador presenta el valor, el restablecimiento o las variantes de un ajuste en su propia fila, porque las herramientas de menú nativas difieren. Es una diferencia de presentación, no un control ausente.",
+	"apps.encryptor.btn_reveal_folder": "Mostrar en la carpeta",
+	"apps.encryptor.err_cipher_unavailable": "Falta el componente de cifrado. Reinstale Ergopti.",
+	"apps.cloner.msg_clone_name_launcher": "Nombre que se muestra en el menú de aplicaciones y en la barra de tareas.",
+	"apps.cloner.msg_open_optional_portable": "Opcional: una URL, un archivo o una carpeta que el clon abre al iniciarse. Déjelo vacío para iniciar simplemente la aplicación. Con un navegador web, una dirección web se abre en su propia ventana de aplicación.",
+	"apps.cloner.msg_icon_style_portable": "¿Conservar el icono propio de la aplicación o elegir una imagen para el clon?",
+	"apps.cloner.btn_original_icon": "Icono original",
+	"apps.cloner.msg_created": "«{1}» está listo en su menú de aplicaciones. Conserva su propio perfil en {2}.",
+	"apps.cloner.err_source_unreadable": "Esta aplicación no se puede clonar: su lanzador no indica ningún programa."
 }
