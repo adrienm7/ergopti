@@ -179,7 +179,7 @@ BundledAppsNative_ReadShortcut(Path) {
  * @returns {Boolean}
  */
 BundledAppsNative_Junction(Link, Target) {
-	Exit := RunWait(A_ComSpec . ' /c mklink /J ' . BundledAppsNative_QuoteArg(Link) . " "
+	ExitCode := RunWait(A_ComSpec . ' /c mklink /J ' . BundledAppsNative_QuoteArg(Link) . " "
 		. BundledAppsNative_QuoteArg(Target) . " >NUL", , "Hide")
-	return Exit == 0
+	return ExitCode == 0
 }

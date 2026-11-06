@@ -183,11 +183,11 @@ Encryptor_ConvertFile(Envelope, Mode, Input, Output, Password) {
 	SplitPath(Output, &Name, &Folder)
 	Stage := (Folder == "" ? "" : Folder . "\") . "." . Name . "." . A_TickCount . ".tmp"
 	try {
-		File := FileOpen(Stage, "w-")
-		if !IsObject(File)
+		Handle := FileOpen(Stage, "w-")
+		if !IsObject(Handle)
 			throw OSError(A_LastError, -1, "Cannot create the stage next to the output.")
-		try File.RawWrite(Result, Result.Size)
-		finally File.Close()
+		try Handle.RawWrite(Result, Result.Size)
+		finally Handle.Close()
 		if !BundledAppsNative_ReplaceFile(Stage, Output)
 			throw OSError(A_LastError, -1, "Cannot publish the converted file.")
 	} catch as Err {
