@@ -490,10 +490,28 @@ local function start_capsword_idle_clock(watcher_gen)
 	-- It must not throttle the first click of this new activation.
 	_capsword_last_check_ns = -math.huge
 	cancel_capsword_idle_timer()
+	-- Stamped even without a delay: a later 0 -> positive change measures from
+	-- this activation, not from a previous session's last keystroke.
+	_capsword_last_activity_ns = TimerScheduler.now_ns()
 	local delay_ms = AutoOffPolicy.idle_delay_ms(CapsWordAutoOff.policy())
 	if not delay_ms then return end
-	_capsword_last_activity_ns = TimerScheduler.now_ns()
 	schedule_capsword_idle_check(watcher_gen, delay_ms / MILLISECONDS_PER_SECOND)
+end
+
+--- Re-times the running session after an accepted live delay change: the
+--- deadline is the new delay counted from the last activity, an expired one
+--- ends CapsWord now, and a delay of 0 retires the pending check.
+--- @param watcher_gen number Watcher lifecycle generation.
+local function rearm_capsword_idle_clock(watcher_gen)
+	if watcher_gen ~= _capsword_watcher_gen or not KeVariables.capsword_known_active() then return end
+	local delay_ms = AutoOffPolicy.idle_delay_ms(CapsWordAutoOff.policy())
+	if not delay_ms then
+		cancel_capsword_idle_timer()
+		return
+	end
+	local elapsed_ms = (TimerScheduler.now_ns() - _capsword_last_activity_ns) / NANOSECONDS_PER_MILLISECOND
+	local remaining_ms = math.max(0, delay_ms - elapsed_ms)
+	schedule_capsword_idle_check(watcher_gen, remaining_ms / MILLISECONDS_PER_SECOND)
 end
 
 --- Names the declared pointer kind of one pointer event.
@@ -693,6 +711,9 @@ function M.start_gesture_watcher(gestures_engine, lease_token)
 	CapsWordOutput.set_observer(function(text)
 		return handle_capsword_output(watcher_gen, text)
 	end)
+	CapsWordAutoOff.set_observer(function()
+		rearm_capsword_idle_clock(watcher_gen)
+	end)
 	return watcher
 end
 
@@ -713,6 +734,7 @@ function M.stop_gesture_watcher(watcher)
 	_capsword_check_pending = nil
 	_capsword_last_check_ns = 0
 	CapsWordOutput.set_observer(nil)
+	CapsWordAutoOff.set_observer(nil)
 	local all_stopped = true
 	if _capsword_listener_owned then
 		local removed, remove_err = pcall(ControlSentinels.set_listener, "karabiner.capsword", nil)
