@@ -329,7 +329,8 @@ helpers.describe("canonical no-bundle status reaches the actual native layout me
 		with_no_bundle_status(function(session)
 			helpers.assert_eq(session.owner.status_rows.no_bundle, {{type = "label", i18n = "menu.layout.no_bundle"}})
 			helpers.assert_eq(session.owner.platforms, {"hs"})
-			helpers.assert_eq(session.owner.reason_key, "platform_reason.layout_bundle_and_menubar_are_macos")
+			-- The install rows name where Windows and Linux install instead (db0cb571).
+			helpers.assert_eq(session.owner.reason_key, "platform_reason.layout_install_is_the_macos_bundle")
 			local rows = session.build()
 			local status, position = find_bundle_status(rows, "menu.layout.no_bundle")
 			local unchanged, neighbor = find_bundle_status(rows, "menu.layout.install_first")
