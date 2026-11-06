@@ -54,6 +54,25 @@ helpers.describe("rules_engine: prefixes register at start() without enable_grou
 		helpers.assert_eq(options["06*"].is_magic_trigger, true,
 			"an already-substituted dynamic trigger must carry explicit magic ownership")
 	end)
+	helpers.it("drops the national trunk zero from international phone output", function()
+		local RE = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
+		local added = {}
+		local km = {
+			add = function(trigger, repl) added[trigger] = repl end,
+			is_section_enabled = function() return true end,
+			set_group_context = function() end, sort_mappings = function() end,
+			register_lua_group = function() end, set_post_load_hook = function() end,
+			register_interceptor = function() end, register_preview_provider = function() end,
+			registry_transaction = function(_, mutation) return mutation() == true end,
+		}
+		RE.inject_data({ phone_number = "0612345678" }, "*")
+		RE.start(km)
+		-- Windows and Linux dial +33 followed by the national number without its zero.
+		helpers.assert_eq(added["+3306"], "+33612345678")
+		helpers.assert_eq(added["+33612"], "+33612345678")
+		helpers.assert_eq(added["0612"], "0612345678")
+	end)
+
 	helpers.it("registers compact and formatted IBAN prefixes with nonbreaking spaces", function()
 		local RE = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
 		local added = {}

@@ -421,7 +421,9 @@ helpers.describe("preview masking: display only", function()
 
 		RE.inject_data({
 			phone_number           = "0612345678",
-			phone_number_clean     = "+33612345678",
+			-- Distinct from the international raw-phone output, so the replacement
+			-- below identifies the spaced variant alone.
+			phone_number_clean     = "06 12 34 56 78",
 			social_security_number = "1 85 05 78 006 084 36",
 			iban                   = "FR76 3000 6000 0112 3456 7890 189",
 		}, "★")
@@ -447,7 +449,7 @@ helpers.describe("preview masking: display only", function()
 		local seen = {}
 		for _, call in ipairs(added) do
 			seen[call.opts.field] = (seen[call.opts.field] or 0) + 1
-			if call.replacement == "+33612345678" then
+			if call.replacement == "06 12 34 56 78" then
 				helpers.assert_eq(call.opts.field, "phone_number_clean",
 					"the spaced phone variant is its own declared field")
 			end
