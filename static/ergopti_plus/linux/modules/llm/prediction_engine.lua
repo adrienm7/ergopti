@@ -2255,8 +2255,23 @@ function M.translate_selection(value)
 				return
 			end
 			_inflight_backend = backend
-			backend.chat(backend_target, model, messages, offer_request_opts(config.max_tokens, nil, runtime_response), nil,
-				function(full_text, err) finish_translation(epoch, meta, config, full_text, err, focus) end)
+			local terminal_seen = false
+			local dispatched = backend.chat(backend_target, model, messages,
+				offer_request_opts(config.max_tokens, nil, runtime_response), nil,
+				function(full_text, err)
+					terminal_seen = true
+					finish_translation(epoch, meta, config, full_text, err, focus)
+				end)
+			-- A backend refuses admission while its earlier transport still settles;
+			-- nothing will then answer this offer, so it retires its own loading state.
+			if dispatched == false and not terminal_seen and epoch == _request_epoch
+				and not _runtime_closed and not _scope_owner then
+				_inflight_backend = nil
+				_predicting = false
+				meta.loading = false
+				Logger.warn(LOG, "Translation could not be dispatched: backend unavailable.")
+				clear_offer()
+			end
 		end)
 		return true
 	end
