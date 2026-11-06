@@ -405,9 +405,11 @@ function M.build(ctx)
 
 		local slot_commands = {
 			[require("config_keys").COMMAND.GESTURE_SLOT_CHANGE_ACTION] = function()
-				return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
+				-- A refused schedule is reported; an accepted one only opens the
+				-- picker later, so it is not a publication receipt.
+				if DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
 					function() open_action_chooser(slot, names, current) end,
-					"menu_gestures.action_chooser")
+					"menu_gestures.action_chooser") ~= true then return false end
 			end,
 		}
 		local slot_getters = {
