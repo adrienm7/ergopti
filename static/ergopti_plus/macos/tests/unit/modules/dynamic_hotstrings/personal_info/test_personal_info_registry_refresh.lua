@@ -289,7 +289,7 @@ helpers.describe("personal-info save refreshes literal prefix mappings", functio
 	end)
 end)
 
-helpers.describe("personal-info added aliases (PIM-001)", function()
+helpers.describe("personal-info aliases and literal prefix output (PIM-001, PIM-002)", function()
 	helpers.it("keeps a user-added lowercase alias through load and an unrelated save (PIM-001)", function()
 		local source = table.concat({
 			"[info]",
@@ -307,6 +307,24 @@ helpers.describe("personal-info added aliases (PIM-001)", function()
 			helpers.assert_true(fixture.PersonalInfo.save_info({ last_name = "Durand" }))
 			helpers.assert_contains(fixture.read_file(), 'x = "city"')
 			helpers.assert_contains(fixture.read_file(), 'p = "first_name"')
+		end, source)
+	end)
+
+	helpers.it("types personal prefix values verbatim, never as key commands (PIM-002)", function()
+		local source = table.concat({
+			"[info]",
+			'phone_number = "0123{Tab}45"',
+			"",
+			"[letters]",
+			'p = "phone_number"',
+			"",
+		}, "\n")
+		with_fixture(function(fixture)
+			local mapping = fixture.mapping_for("0123")
+			helpers.assert_not_nil(mapping, "the phone prefix must be registered")
+			helpers.assert_eq(mapping.repl, "0123{Tab}45")
+			helpers.assert_eq(mapping.plain_repl, mapping.repl,
+				"a personal value is literal text, so no {Tab} token may be sent as a key")
 		end, source)
 	end)
 end)
