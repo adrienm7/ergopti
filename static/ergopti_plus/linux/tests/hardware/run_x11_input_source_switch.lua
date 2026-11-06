@@ -34,7 +34,7 @@ local function wait_for(done)
 	assert(done(), "owned switch did not settle before its deadline")
 end
 local ok, err = xpcall(function()
-	assert(os.execute("setxkbmap -layout us,fr -variant ,oss -option ctrl:nocaps") == 0)
+	local executed = os.execute("setxkbmap -layout us,fr -variant ,oss -option ctrl:nocaps"); assert(executed == true or executed == 0)
 	assert(x.XkbLockGroup(display, 0x100, 1) ~= 0)
 	x.XSync(display, 0)
 	assert(state() == 1, "precondition requires the second group")

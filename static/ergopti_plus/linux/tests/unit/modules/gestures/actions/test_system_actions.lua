@@ -594,7 +594,7 @@ helpers.describe("Linux system actions", function()
 	helpers.it("two saved window captures in the same second retain both images", function()
 		local target = os.tmpname()
 		os.remove(target)
-		assert(os.execute("mkdir '" .. target .. "'") == 0)
+		local executed = os.execute("mkdir '" .. target .. "'"); assert(executed == true or executed == 0)
 		local old_getenv, old_date = os.getenv, os.date
 		os.getenv = function(key) if key == "XDG_PICTURES_DIR" then return target end; return old_getenv(key) end
 		os.date = function() return "2026-11-04_16-00-00" end
@@ -616,7 +616,7 @@ helpers.describe("Linux system actions", function()
 	helpers.it("removes an incomplete reserved screenshot after all capture tools fail", function()
 		local target = os.tmpname()
 		os.remove(target)
-		assert(os.execute("mkdir '" .. target .. "'") == 0)
+		local executed = os.execute("mkdir '" .. target .. "'"); assert(executed == true or executed == 0)
 		local old_getenv = os.getenv
 		os.getenv = function(key) if key == "XDG_PICTURES_DIR" then return target end; return old_getenv(key) end
 		local ok, err = pcall(function()
@@ -638,7 +638,7 @@ helpers.describe("Linux system actions", function()
 		helpers.it("saved screenshots continue after " .. variant .. " from the first tool", function()
 			local target = os.tmpname()
 			os.remove(target)
-			assert(os.execute("mkdir '" .. target .. "'") == 0)
+			local executed = os.execute("mkdir '" .. target .. "'"); assert(executed == true or executed == 0)
 			local old_getenv = os.getenv
 			os.getenv = function(key) if key == "XDG_PICTURES_DIR" then return target end; return old_getenv(key) end
 			local ok, err = pcall(function()
@@ -661,7 +661,7 @@ helpers.describe("Linux system actions", function()
 	helpers.it("does not retain an earlier failed tool's partial screenshot", function()
 		local target = os.tmpname()
 		os.remove(target)
-		assert(os.execute("mkdir '" .. target .. "'") == 0)
+		local executed = os.execute("mkdir '" .. target .. "'"); assert(executed == true or executed == 0)
 		local old_getenv = os.getenv
 		os.getenv = function(key) if key == "XDG_PICTURES_DIR" then return target end; return old_getenv(key) end
 		local ok, err = pcall(function()

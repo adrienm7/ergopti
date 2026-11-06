@@ -399,7 +399,7 @@ helpers.describe("healthcheck checked save receipts (linux)", function()
 	for _, kind in ipairs({ "symlink", "hardlink", "fifo" }) do
 		helpers.it("diagnostic save does not open a colliding " .. kind, function()
 			local Report = helpers.load_module("ui.healthcheck.report")
-			local dir = os.tmpname(); os.remove(dir); assert(os.execute("mkdir -p '" .. dir .. "'") == 0)
+			local dir = os.tmpname(); os.remove(dir); local executed = os.execute("mkdir -p '" .. dir .. "'"); assert(executed == true or executed == 0)
 			local calls, overrides = {}, nil; overrides = recording(calls); overrides.save = nil
 			local snapshot, config = host_snapshot(false), documents()
 			local document = Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key))
@@ -408,7 +408,7 @@ helpers.describe("healthcheck checked save receipts (linux)", function()
 			local command = kind == "symlink" and ("ln -s '" .. target .. "' '" .. collision .. "'")
 				or kind == "hardlink" and ("ln '" .. target .. "' '" .. collision .. "'")
 				or ("mkfifo '" .. collision .. "'")
-			assert(os.execute(command) == 0)
+			local executed = os.execute(command); assert(executed == true or executed == 0)
 			local answer = completed(Report, { action = "save", text = document.text, name = document.name },
 				{ diagnostics_dir = dir, logs_dir = dir }, config, Report.redaction_context(overrides), overrides, snapshot)
 			local check = assert(io.open(target, "rb")); local bytes = check:read("*a"); check:close()
