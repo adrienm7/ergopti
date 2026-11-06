@@ -104,3 +104,27 @@ direct-registered tags (`@iban★`, `@cb★`, `@ss★`) carry their field names 
 
 A missing localization key that exists only in metadata is audited separately
 from the working, translated tray caption; it does not affect the mask.
+
+---
+
+## Alias alphabets differ per system
+
+The `[letters]` table maps one alias key to an `[info]` field. What a key may
+be, and so what a combo such as `@np` can name, is not yet the same everywhere:
+
+| Driver  | Accepted alias key                                          | Owner                                                   |
+| ------- | ----------------------------------------------------------- | ------------------------------------------------------- |
+| macOS   | one lowercase ASCII letter, `[a-z]`; anything else is refused at load | `parse_toml_section` in `dynamic_hotstrings/personal_info.lua` |
+| Linux   | exactly one valid UTF-8 code point (a precomposed `é` is accepted, a decomposed spelling is refused, no normalisation) | `strict_codepoint_length` in `dynamic_hotstrings/manager.lua` |
+| Windows | one cased letter, ASCII or accented (`@tél` ships), tested by distinct upper and lower forms | `_PIPreviewIsTagChar` in `infra/personal_info_preview.ahk` |
+
+The three agree on the shipped thirteen aliases and on every lowercase ASCII key,
+so a file that sticks to `[a-z]` behaves identically. An accented or non-Latin
+alias works on Linux and Windows and is refused at load on macOS; widening macOS
+is tracked as its own item. Windows also registers eager combos up to the
+configured pattern length at boot (the macOS and Linux engines resolve a combo
+when it is typed); its cost at the highest accepted setting is a measurement
+for a physical Windows machine, not a claim made here.
+
+The first-boot file is written from `lua/personal_info/defaults.lua` on macOS and
+Linux, so the editor opens on the same placeholder fields on both.
