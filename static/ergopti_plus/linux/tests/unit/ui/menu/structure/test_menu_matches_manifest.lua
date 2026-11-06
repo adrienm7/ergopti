@@ -1066,7 +1066,8 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 					helpers.assert_eq(row.menu[3].disabled, true); helpers.assert_nil(row.menu[3].fn)
 					helpers.assert_eq(changes, 0); helpers.assert_eq(Sandbox.read_bytes(path), before)
 					local preset = assert(find_item(row.menu[1].menu, "50 ms"))
-					helpers.assert_type(preset.fn, "function"); helpers.assert_nil(preset.fn())
+					helpers.assert_type(preset.fn, "function")
+					helpers.assert_eq(preset.fn(), true, "the preset reports its committed write")
 					helpers.assert_eq(settings.get("debounce_ms"), 50); helpers.assert_eq(changes, 1)
 					helpers.assert_eq(Sandbox.read_bytes(path), before:gsub("debounce_ms = 500", "debounce_ms = 50"))
 					root[boundary.section] = nil
