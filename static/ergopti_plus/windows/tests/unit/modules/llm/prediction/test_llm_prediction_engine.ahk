@@ -512,6 +512,46 @@ _EngineFinalize_ReadyFlagBelongsToOllama() {
 Test("LLM finalizer: Ollama readiness remains backend-owned (ahk2-13-backend-readiness-owner)",
 	_EngineFinalize_ReadyFlagBelongsToOllama)
 
+; A refused credential is not retried and spends no further variant; any other
+; failure keeps the shared retry policy (a next variant is dispatched).
+_EngineVariantFail_RefusedKeyIsNeverRetried() {
+	global _LLM_Engine, _Stub_LlmTooltipCalls
+	SavedEngine := _LLM_Engine
+	SavedCalls := _Stub_LlmTooltipCalls
+	try {
+		_LLM_Engine := SavedEngine.Clone()
+		_LLM_Engine["request_id"] := 7331
+		_LLM_Engine["active_request_signature"] := "auth-no-retry"
+		_LLM_Engine["inline_autotype"] := false
+		_Stub_LlmTooltipCalls := []
+		for Case in [
+			Map("failure", Map("reason", "http_401", "status", 401, "message", ""), "dispatches", 0),
+			Map("failure", Map("reason", "http_403", "status", 403, "message", ""), "dispatches", 0),
+			Map("failure", Map("reason", "http_400", "status", 400, "message", "API key not valid."), "dispatches", 0),
+			Map("failure", Map("reason", "http_500", "status", 500, "message", ""), "dispatches", 1)
+		] {
+			Dispatches := 0
+			State := _EngineFinalize_ReadinessState("api", 7331, "auth-no-retry")
+			State["requested"] := 3
+			State["attempt_index"] := 2
+			State["max_attempts"] := 6
+			State["base_temp"] := 0.4
+			State["streaming"] := false
+			State["show_all_at_once"] := true
+			State["dispatch_stream_fn"] := ""
+			State["dispatch_fn"] := (Temp, OnSuccess, OnFail, Tokens := 0) => Dispatches += 1
+			_LLM_Engine_OnVariantFail(State, Case["failure"])
+			AssertEqual(Case["dispatches"], Dispatches,
+				"authentication failures send no retry, other failures keep the retry policy: " . Case["failure"]["reason"])
+		}
+	} finally {
+		_LLM_Engine := SavedEngine
+		_Stub_LlmTooltipCalls := SavedCalls
+	}
+}
+Test("LLM engine: a refused credential is never retried, other failures are",
+	_EngineVariantFail_RefusedKeyIsNeverRetried)
+
 _EngineTypedRestoreFeedsValidatedAppFilter() {
 	global _LLM_Menu, _LLM_Menu_Loaded, _LLM_Engine
 	SavedMenu := _LLM_Menu

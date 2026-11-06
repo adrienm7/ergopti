@@ -1153,6 +1153,14 @@ _LLM_Engine_OnVariantFail(state, failure := "") {
 		Reason := failure
 	try LoggerWarn("LLM", "Variant {1}/{2} failed (model {3}): {4}.",
 		state["attempt_index"] - 1, state["max_attempts"], state["model"], Reason)
+	; A refused key is refused again: neither a retry nor another variant. The
+	; attempt budget is spent so the dispatch below finalizes the request.
+	if LLM_ApiCommon_IsAuthenticationFailure(failure) {
+		try LoggerWarn("LLM", "Prediction stopped: the credential was refused (no retry).")
+		state["attempt_index"] := state["max_attempts"] + 1
+		_LLM_Engine_DispatchVariant(state)
+		return
+	}
 	; The variant didn't yield a usable result. ``attempt_index`` already
 	; advanced for the next attempt; the retry budget (max_attempts) caps
 	; how often we keep trying.

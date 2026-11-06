@@ -562,6 +562,18 @@ helpers.describe("prompt prediction: sequential variants follow the shared retry
 		end)
 	end)
 
+	helpers.it("never retries a refused credential (HTTP 401 or 403)", function()
+		for _, status in ipairs({ 401, 403 }) do
+			scenario({ buffer = "Bonjour Marc, je voulais te dire" }, function(world)
+				helpers.assert_eq(world.handlers.llm_generate_prediction("keyboard__meta_space", nil), true)
+				world.posts[1].callback({ ok = false, status = status, body = "{}" })
+				world.wait_for(2)
+				helpers.assert_eq(#world.posts, 1, "HTTP " .. status .. " sends no second attempt")
+				helpers.assert_eq(#world.engine.get_suggestions(), 0)
+			end)
+		end
+	end)
+
 	helpers.it("stops at max_multiplier attempts per requested prediction", function()
 		scenario({ buffer = "Bonjour Marc, je voulais te dire" }, function(world)
 			local budget = 3 * retry_policy().max_multiplier

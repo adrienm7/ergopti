@@ -472,3 +472,13 @@ The international phone hotstring (`+33` followed by the first digits) types
 `+33` plus the stored number with a leading national `0` removed, on every OS.
 A number that does not start with `0` keeps all its digits; Windows no longer
 cuts whatever digit comes first (`_DynHS_InternationalPhone`).
+
+## A refused credential is never retried (6 November 2026)
+
+A failed AI prediction call is not retried when the credential was refused:
+HTTP 401/403, a missing key, or a provider "invalid key" message (Gemini
+answers 400 "API key not valid"). The request also sends no further variant;
+it ends. Every other failure keeps the shared retry policy (extra tokens,
+higher temperature). One verdict serves the drivers: `llm/failure_class.lua`
+for macOS and Linux, `LLM_ApiCommon_IsAuthenticationFailure` for Windows, both
+replaying `_shared/tests/corpus/llm/auth_failure_vectors.json`.

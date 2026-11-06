@@ -32,6 +32,9 @@ local api_common = {
 		return true
 	end,
 	log_prediction_summary = function() end,
+	is_authentication_failure = function(failure)
+		return require("llm.failure_class").is_authentication_failure(failure)
+	end,
 	protected_call = function(callback, _label, ...)
 		if type(callback) == "function" then return callback(...) end
 	end,
@@ -143,6 +146,36 @@ helpers.describe("sequential callbacks revalidate request ownership", function()
 				failure_callbacks[2]()
 				helpers.assert_eq(dispatches, 3,
 					"a still-current request must retain its bounded retry")
+			end)
+		end)
+
+		helpers.it(case.name .. " never retries a refused credential (HTTP 401) but still retries other failures", function()
+			helpers.with_stub_scope({
+				case.module_name, "modules.llm.api_common", "modules.llm.profiles",
+				"modules.llm.progressive_reveal", "adapters.http_client",
+				"adapters.timer_scheduler", "adapters.shell_runner",
+			}, function()
+				local module = helpers.load_with_stubs(case.module_name)
+				local fetch = module.fetch_sequential
+				helpers.assert_true(set_upvalue(fetch, "ApiCommon", api_common))
+				helpers.assert_true(set_upvalue(fetch, "Profiles", profiles))
+				helpers.assert_true(set_upvalue(fetch, "TimerScheduler", scheduler))
+				local dispatches, failures, callbacks = 0, 0, {}
+				case.configure(module, function(...)
+					dispatches = dispatches + 1
+					callbacks[#callbacks + 1] = select(10, ...)
+				end)
+				local function start()
+					module.fetch_sequential("full", "tail", "fixture-model", 0.5, 8, 1, {},
+						function() end, function() failures = failures + 1 end, function() return 7 end, false, nil)
+				end
+				start()
+				callbacks[1]({ reason = "http_401", status = 401, message = "" })
+				helpers.assert_eq(dispatches, 1, "a refused key sends no retry and no further variant")
+				helpers.assert_eq(failures, 1, "the request fails once")
+				start()
+				callbacks[2]({ reason = "http_500", status = 500, message = "" })
+				helpers.assert_eq(dispatches, 3, "any other failure keeps the shared retry policy")
 			end)
 		end)
 

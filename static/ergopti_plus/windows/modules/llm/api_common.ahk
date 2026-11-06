@@ -253,6 +253,66 @@ LLM_ApiCommon_GetRetryPolicy() {
 }
 
 
+; Statuses, local reasons and provider phrases of a refused credential. The
+; Lua twin is _shared/lua/llm/failure_class.lua; both replay
+; _shared/tests/corpus/llm/auth_failure_vectors.json.
+global LLM_AUTH_STATUSES := [401, 403]
+global LLM_AUTH_REASONS := ["no_credential", "missing_credential", "invalid_credential"]
+global LLM_AUTH_PHRASES := [
+	"invalid api key", "invalid_api_key", "incorrect api key", "api key not valid",
+	"api key is invalid", "api key is missing", "invalid x-api-key", "invalid authentication",
+	"authentication_error", "authentication failed", "unauthorized", "missing api key",
+	"no api key", "api key is missing or invalid", "invalid token", "permission_denied"
+]
+
+/**
+ * Whether a failed prediction call was refused for its credential. Such a call
+ * is never retried: the same key is refused again, so the retry policy's extra
+ * tokens and temperature cannot help.
+ * @param {Map|String|Any} Failure A failure Map {status, reason, message} or text.
+ * @returns {Boolean}
+ */
+LLM_ApiCommon_IsAuthenticationFailure(Failure) {
+	global LLM_AUTH_STATUSES, LLM_AUTH_REASONS
+	if (Failure is String) {
+		if RegExMatch(Failure, "^HTTP (\d{3})", &Hit) && _LLM_Common_IsAuthStatus(Integer(Hit[1]))
+			return true
+		return _LLM_Common_HasAuthPhrase(Failure)
+	}
+	if !(Failure is Map)
+		return false
+	Status := Failure.Get("status", 0)
+	if (Status is Number || (Status is String && IsInteger(Status))) && _LLM_Common_IsAuthStatus(Integer(Status))
+		return true
+	Reason := Failure.Get("reason", "")
+	if (Reason is String) {
+		for Known in LLM_AUTH_REASONS
+			if (Reason == Known)
+				return true
+		if RegExMatch(Reason, "^http_(\d{3})$", &Hit) && _LLM_Common_IsAuthStatus(Integer(Hit[1]))
+			return true
+	}
+	return _LLM_Common_HasAuthPhrase(Failure.Get("message", ""))
+}
+
+_LLM_Common_IsAuthStatus(Status) {
+	global LLM_AUTH_STATUSES
+	for Known in LLM_AUTH_STATUSES
+		if (Status == Known)
+			return true
+	return false
+}
+
+_LLM_Common_HasAuthPhrase(Text) {
+	global LLM_AUTH_PHRASES
+	if !(Text is String) || Text == ""
+		return false
+	for Phrase in LLM_AUTH_PHRASES
+		if InStr(Text, Phrase)
+			return true
+	return false
+}
+
 
 
 ; =========================================

@@ -1148,7 +1148,12 @@ function M.predict(context, output_context, override, automatic)
 					Logger.warn(LOG, "Prediction variant %d/%d failed: %s", request_index, max_attempts,
 						require("modules.llm.error_log").describe(err))
 				end
-				if err ~= "cancelled" and attempts_remain() then
+				-- A refused key is refused again: no retry, no further variant.
+				local refused_key = require("llm.failure_class").is_authentication_failure(err)
+				if refused_key then
+					Logger.warn(LOG, "Prediction stopped: the credential was refused (no retry).")
+				end
+				if err ~= "cancelled" and not refused_key and attempts_remain() then
 					arm_retry()
 					dispatch()
 					return
