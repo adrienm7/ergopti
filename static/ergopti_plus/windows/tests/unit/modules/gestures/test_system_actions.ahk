@@ -352,10 +352,10 @@ Test("system actions: quit and force quit act on the active app, never the shell
 ; WM_CLOSE refused for every window (an elevated application, a window gone
 ; meanwhile) was summed into a zero count and logged as INFO: the errors-only
 ; diagnostic channel never saw the failed quit (WDS-001).
-_SysActions_QuitRefusedCloses(Case) {
+_SysActions_QuitRefusedCloses(Scenario) {
 	Fake := _SysActionsFake()
 	Fake.Active := { Hwnd: 0x100, Pid: 812, Class: "Notepad" }
-	switch Case {
+	switch Scenario {
 	case "all-refused":
 		Fake.Windows := [0x100, 0x200]
 		Fake.RefusedCloses := Map(0x100, true, 0x200, true)
@@ -371,7 +371,7 @@ _SysActions_QuitRefusedCloses(Case) {
 		Fake.Windows := [0x100, 0x200]
 		Expected := ""
 	default:
-		throw ValueError("Unknown quit receipt case: " . Case)
+		throw ValueError("Unknown quit receipt case: " . Scenario)
 	}
 	Lines := []
 	LoggerSetTestSink((Line) => Lines.Push(Line))
@@ -395,7 +395,7 @@ _SysActions_QuitRefusedCloses(Case) {
 		AssertFalse(InStr(Line, "close its"), "a refused close is not reported as an ordinary request")
 	}
 	if Expected != ""
-		AssertTrue(Reported, "the quit outcome is logged at " . Expected . " for " . Case)
+		AssertTrue(Reported, "the quit outcome is logged at " . Expected . " for " . Scenario)
 }
 for _SysActionsQuitCase in ["all-refused", "partial", "no-window", "all-accepted"]
 	Test("system actions: quit_frontmost_app reports refused close receipts: " . _SysActionsQuitCase . " (wds-001)",
@@ -439,17 +439,17 @@ class _SysActionsThrowingSpawnFake extends _SysActionsFake {
 		throw OSError(5)
 	}
 }
-_SysActions_EmptyTrashOutcome(Case) {
-	Fake := Case == "start-throws" ? _SysActionsThrowingSpawnFake() : _SysActionsFake()
-	if Case == "start-refused"
+_SysActions_EmptyTrashOutcome(Scenario) {
+	Fake := Scenario == "start-throws" ? _SysActionsThrowingSpawnFake() : _SysActionsFake()
+	if Scenario == "start-refused"
 		Fake.SpawnStarts := false
 	Lines := []
 	LoggerSetTestSink((Line) => Lines.Push(Line))
 	try {
 		GestureSysEmptyTrash(Fake)
-		if Case == "exit-failure" || Case == "exit-success" {
+		if Scenario == "exit-failure" || Scenario == "exit-success" {
 			AssertEqual(1, Fake.SpawnObservers.Length, "the started worker has exactly one completion observer")
-			if Case == "exit-failure"
+			if Scenario == "exit-failure"
 				Fake.SpawnObservers[1].Call(1, "Clear-RecycleBin : Access is denied.`r`n", "")
 			else
 				Fake.SpawnObservers[1].Call(0, "", "")
@@ -464,14 +464,14 @@ _SysActions_EmptyTrashOutcome(Case) {
 		if InStr(Line, "Recycle Bin emptied.")
 			Emptied := true
 	}
-	if Case == "exit-success" {
+	if Scenario == "exit-success" {
 		AssertEqual(0, Errors.Length, "a zero exit raises no error")
 		AssertTrue(Emptied, "a zero exit reports the completed deletion")
 		return
 	}
-	AssertEqual(1, Errors.Length, "the worker failure is reported once as an error: " . Case)
+	AssertEqual(1, Errors.Length, "the worker failure is reported once as an error: " . Scenario)
 	AssertFalse(Emptied, "a failed worker is never reported as an emptied bin")
-	if Case == "exit-failure"
+	if Scenario == "exit-failure"
 		AssertTrue(InStr(Errors[1], "Access is denied."), "the worker's own diagnostic reaches the error line")
 }
 for _SysActionsTrashCase in ["start-refused", "start-throws", "exit-failure", "exit-success"]
