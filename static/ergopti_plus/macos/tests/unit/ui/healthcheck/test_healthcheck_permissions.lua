@@ -27,12 +27,18 @@ local function with_permissions(states, body)
 		-- Phase A reads the cached answers only: a live query fails the case
 		package.loaded["adapters.accessibility_permission"] = {
 			is_trusted = function() error("phase A must not query Accessibility live") end,
-			last_known = function() return table.unpack(states.accessibility, 1, 2) end,
+			last_known = function()
+				local answer = states.accessibility
+				return answer[1], answer[2], answer[3] ~= false
+			end,
 			request_prompt = function() prompts[#prompts + 1] = "accessibility" return true end,
 		}
 		package.loaded["adapters.screen_capture"] = {
 			permission_state = function() error("phase A must not query Screen Recording live") end,
-			last_known_permission = function() return table.unpack(states.screen_recording, 1, 2) end,
+			last_known_permission = function()
+				local answer = states.screen_recording
+				return answer[1], answer[2], answer[3] ~= false
+			end,
 			request_permission = function() prompts[#prompts + 1] = "screen" return true end,
 		}
 		package.loaded["platform.remap.lease_controller"] = {
@@ -104,7 +110,7 @@ helpers.describe("healthcheck: macOS privacy permissions", function()
 	end)
 
 	helpers.it("reports a permission no live read answered yet as unknown", function()
-		with_permissions({ accessibility = { nil, "not read yet" }, screen_recording = { nil, "not read yet" },
+		with_permissions({ accessibility = { nil, nil, false }, screen_recording = { nil, nil, false },
 			guardian = "ready" }, function(H)
 			local states = states_of(H.collect_permissions(IDS))
 			helpers.assert_eq(states.accessibility, "unknown")
@@ -138,7 +144,7 @@ helpers.describe("healthcheck: permission answers are cached by their live reads
 		local Permission, restore = fresh("adapters.accessibility_permission",
 			{ accessibilityState = function() return answer end })
 		local ok, err = pcall(function()
-			helpers.assert_eq(select(2, Permission.last_known()), "not read yet")
+			helpers.assert_eq(select(3, Permission.last_known()), false)
 			helpers.assert_eq(Permission.is_trusted(), true)
 			answer = false
 			helpers.assert_eq(Permission.last_known(), true, "no live read happens on last_known")
@@ -153,7 +159,7 @@ helpers.describe("healthcheck: permission answers are cached by their live reads
 		local Capture, restore = fresh("adapters.screen_capture",
 			{ screenRecordingState = function() error("tcc down") end })
 		local ok, err = pcall(function()
-			helpers.assert_eq(select(2, Capture.last_known_permission()), "not read yet")
+			helpers.assert_eq(select(3, Capture.last_known_permission()), false)
 			helpers.assert_nil(Capture.permission_state())
 			local granted, detail = Capture.last_known_permission()
 			helpers.assert_nil(granted)

@@ -439,10 +439,15 @@ end
 function H.collect_permissions(ids)
 	local states = {
 		accessibility    = function()
-			return permission_state("accessibility", require("adapters.accessibility_permission").last_known())
+			local trusted, detail, read = require("adapters.accessibility_permission").last_known()
+			if read == false then return "unknown" end
+			return permission_state("accessibility", trusted, detail)
 		end,
+		-- Unknown until the first capture asked, which is no failure to log
 		screen_recording = function()
-			return permission_state("screen_recording", require("adapters.screen_capture").last_known_permission())
+			local granted, detail, read = require("adapters.screen_capture").last_known_permission()
+			if read == false then return "unknown" end
+			return permission_state("screen_recording", granted, detail)
 		end,
 		-- Hammerspoon has no query for Input Monitoring that does not prompt, and
 		-- the grant belongs to the Karabiner grabber rather than to this process
