@@ -1600,6 +1600,14 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 				_PrefixAppendTypedChar(Char)
 				return
 			}
+			; A registered winner whose time gate has expired is no match: the
+			; magic-key fallbacks below answer instead, as on macOS and Linux
+			; (decision of 2026-11-06). Dispatching it only to be refused on time
+			; masked the repeat behind a hotstring the user was too slow for.
+			if (HSEMatch != "" and HSE_TimeGateExpired(HSEMatch, HSE_Buffer, HSE_LastEndChar, HSE_TypoNbspStripped)) {
+				_PrefixRecordMagicOutcome(Char, "expired_winner")
+				HSEMatch := ""
+			}
 			; When no registered hotstring matched, try the engine-level repeat
 			; fallback: <x><MagicKey> repeats <x> when x is at least the 2nd
 			; letter of the current word. This replaces the now-removed [[repeat]]
