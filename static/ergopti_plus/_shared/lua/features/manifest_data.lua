@@ -504,28 +504,28 @@ M.features = {
 		path = "shortcuts.take_note.destination_folder", section = "shortcuts.take_note", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.a_grave.enabled", section = "shortcuts.a_grave", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.a_grave.enabled", id = "enabled", section = "shortcuts.a_grave", default = false, type = "boolean", description_key = "menu.shortcuts.a_grave", platforms = { "ahk", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
-		path = "shortcuts.a_grave.letter", section = "shortcuts.a_grave", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.a_grave.letter", id = "letter", section = "shortcuts.a_grave", default = "v", type = "string", description_key = "menu.shortcuts.a_grave.letter", platforms = { "ahk", "linux" }, recommended = "v", family = "setting", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
-		path = "shortcuts.e_acute.enabled", section = "shortcuts.e_acute", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.e_acute.enabled", id = "enabled", section = "shortcuts.e_acute", default = false, type = "boolean", description_key = "menu.shortcuts.e_acute", platforms = { "ahk", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
-		path = "shortcuts.e_acute.letter", section = "shortcuts.e_acute", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.e_acute.letter", id = "letter", section = "shortcuts.e_acute", default = "c", type = "string", description_key = "menu.shortcuts.e_acute.letter", platforms = { "ahk", "linux" }, recommended = "c", family = "setting", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
-		path = "shortcuts.e_circ.enabled", section = "shortcuts.e_circ", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.e_circ.enabled", id = "enabled", section = "shortcuts.e_circ", default = false, type = "boolean", description_key = "menu.shortcuts.e_circ", platforms = { "ahk", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
-		path = "shortcuts.e_circ.letter", section = "shortcuts.e_circ", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.e_circ.letter", id = "letter", section = "shortcuts.e_circ", default = "x", type = "string", description_key = "menu.shortcuts.e_circ.letter", platforms = { "ahk", "linux" }, recommended = "x", family = "setting", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
-		path = "shortcuts.e_grave.enabled", section = "shortcuts.e_grave", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.e_grave.enabled", id = "enabled", section = "shortcuts.e_grave", default = false, type = "boolean", description_key = "menu.shortcuts.e_grave", platforms = { "ahk", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
-		path = "shortcuts.e_grave.letter", section = "shortcuts.e_grave", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
+		path = "shortcuts.e_grave.letter", id = "letter", section = "shortcuts.e_grave", default = "z", type = "string", description_key = "menu.shortcuts.e_grave.letter", platforms = { "ahk", "linux" }, recommended = "z", family = "setting", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
 		path = "shortcuts.key_combination_taps.alt_gr_then_left_alt", id = "alt_gr_then_left_alt", section = "shortcuts.key_combination_taps", default = "none", type = "action", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, recommended = "ctrl_backspace", family = "feature",

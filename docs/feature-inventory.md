@@ -150,14 +150,14 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.search.search_engine_url_query` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.take_note.dated_notes` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.take_note.destination_folder` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
-- [ ] `shortcuts.a_grave.enabled` (feature; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
-- [ ] `shortcuts.a_grave.letter` (setting; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
-- [ ] `shortcuts.e_acute.enabled` (feature; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
-- [ ] `shortcuts.e_acute.letter` (setting; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
-- [ ] `shortcuts.e_circ.enabled` (feature; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
-- [ ] `shortcuts.e_circ.letter` (setting; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
-- [ ] `shortcuts.e_grave.enabled` (feature; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
-- [ ] `shortcuts.e_grave.letter` (setting; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
+- [ ] `shortcuts.a_grave.enabled` (feature; declared: windows, linux; reason: `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`)
+- [ ] `shortcuts.a_grave.letter` (setting; declared: windows, linux; reason: `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`)
+- [ ] `shortcuts.e_acute.enabled` (feature; declared: windows, linux; reason: `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`)
+- [ ] `shortcuts.e_acute.letter` (setting; declared: windows, linux; reason: `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`)
+- [ ] `shortcuts.e_circ.enabled` (feature; declared: windows, linux; reason: `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`)
+- [ ] `shortcuts.e_circ.letter` (setting; declared: windows, linux; reason: `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`)
+- [ ] `shortcuts.e_grave.enabled` (feature; declared: windows, linux; reason: `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`)
+- [ ] `shortcuts.e_grave.letter` (setting; declared: windows, linux; reason: `platform_reason.accented_shortcuts_need_a_layout_file_on_macos`)
 - [ ] `shortcuts.key_combination_taps.alt_gr_then_left_alt` (feature; declared: windows, linux; reason: `platform_reason.key_combinations_are_karabiner_settings_on_macos`)
 - [ ] `shortcuts.key_combination_taps.alt_gr_then_caps_lock` (feature; declared: windows, linux; reason: `platform_reason.key_combinations_are_karabiner_settings_on_macos`)
 - [ ] `shortcuts.key_combination_taps.left_alt_then_caps_lock` (feature; declared: windows, linux; reason: `platform_reason.key_combinations_are_karabiner_settings_on_macos`)
@@ -197,7 +197,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `category_enabled.rolls` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.magic_key` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 
-## linux — 145 paths not declared
+## linux — 137 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `hotstrings.enabled` (feature; declared: macos; reason: `platform_reason.hotstrings_master_is_macos_engine`)
@@ -210,14 +210,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.search.search_engine_url_query` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.take_note.dated_notes` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.take_note.destination_folder` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
-- [ ] `shortcuts.a_grave.enabled` (feature; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
-- [ ] `shortcuts.a_grave.letter` (setting; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
-- [ ] `shortcuts.e_acute.enabled` (feature; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
-- [ ] `shortcuts.e_acute.letter` (setting; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
-- [ ] `shortcuts.e_circ.enabled` (feature; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
-- [ ] `shortcuts.e_circ.letter` (setting; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
-- [ ] `shortcuts.e_grave.enabled` (feature; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
-- [ ] `shortcuts.e_grave.letter` (setting; declared: windows; reason: `platform_reason.accented_shortcuts_are_windows`)
 - [ ] `shortcuts.personal.laptop_broken_key` (feature; declared: windows; reason: `platform_reason.personal_shortcut_switches_are_windows`)
 - [ ] `shortcuts.personal.mouse_drag_window` (feature; declared: windows; reason: `platform_reason.personal_shortcut_switches_are_windows`)
 - [ ] `shortcuts.personal.mouse_tab_switching` (feature; declared: windows; reason: `platform_reason.personal_shortcut_switches_are_windows`)
@@ -669,12 +661,12 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `metrics_menu.metrics_migration` (hide): Linux only: this driver converts the stored metrics to encrypted form in the background and shows the progress here, with a way to stop. Windows and macOS convert on the next launch, so they have no progress to show.
 - [ ] `layout_menu.layout_toggle` (hide): Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.
 - [ ] `layout_menu.base_layouts` (hide): Linux only: this driver reads raw keycodes from the kernel and needs to know which physical layout produced them, so it picks the table it decodes with. macOS asks the system for its input sources and Windows installs a keyboard layout; neither has a decode table to choose.
-- [ ] `layout_menu.accented_letters` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.
+- [ ] `layout_menu.accented_letters` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C.
 - [ ] `layout_menu.layout.ctrl_magic_save` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.
-- [ ] `accented_letters_group.e_grave` (hide): Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.
-- [ ] `accented_letters_group.e_circ` (hide): Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.
-- [ ] `accented_letters_group.e_acute` (hide): Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.
-- [ ] `accented_letters_group.a_grave` (hide): Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.
+- [ ] `accented_letters_group.e_grave` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C.
+- [ ] `accented_letters_group.e_circ` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C.
+- [ ] `accented_letters_group.e_acute` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C.
+- [ ] `accented_letters_group.a_grave` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C.
 - [ ] `hotstrings_menu.hotstrings_reload` (hide): Linux only: its daemon watches the hotstring files, so they can change while it runs, and this row reloads the catalogue from disk. Windows and macOS load the catalogue at launch and reload it with the Reload row.
 - [ ] `hotstrings_params_group.tap_hold_resets_word` (grey): Not on macOS: Karabiner-Elements runs the tap-holds there, and what they send arrives like keys typed on the keyboard, so a shortcut sent by a tap-hold follows the shortcut option.
 - [ ] `gestures_menu.auto_configure` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.
@@ -770,12 +762,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `layout_menu.layout_bundle` (hide): macOS only: this row installs the .bundle layout. On Windows the layout installer is a separate, unsigned download that must run as administrator, which the driver never starts: run Ergopti_windows.exe from the release page. On Linux, install Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).
 - [ ] `layout_menu.virtual_keyboard` (hide): macOS only: Karabiner-Elements, which Ergopti uses on macOS to remap keys, has a virtual keyboard whose type decides which keycodes the two ISO-only keys reach. Windows and Linux name these keys by position and have no virtual keyboard.
 - [ ] `layout_menu.menubar_icon` (hide): macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.
-- [ ] `layout_menu.accented_letters` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.
 - [ ] `layout_menu.layout.ctrl_magic_save` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.
-- [ ] `accented_letters_group.e_grave` (hide): Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.
-- [ ] `accented_letters_group.e_circ` (hide): Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.
-- [ ] `accented_letters_group.e_acute` (hide): Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.
-- [ ] `accented_letters_group.a_grave` (hide): Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.
 - [ ] `gestures_menu.auto_configure` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.
 - [ ] `gestures_menu.manual_tutorial` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.
 - [ ] `gestures_menu.gesture_slots_2` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.

@@ -2473,9 +2473,10 @@
 			"id": "accented_letters",
 			"i18n": "menu.shortcuts.group_accented",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"linux"
 			],
-			"reason_key": "platform_reason.lists_windows_only_settings"
+			"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 		},
 		{
 			"type": "list",
@@ -2529,33 +2530,37 @@
 			"type": "letter_picker",
 			"id": "e_grave",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"linux"
 			],
-			"reason_key": "platform_reason.accented_shortcuts_are_windows"
+			"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 		},
 		{
 			"type": "letter_picker",
 			"id": "e_circ",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"linux"
 			],
-			"reason_key": "platform_reason.accented_shortcuts_are_windows"
+			"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 		},
 		{
 			"type": "letter_picker",
 			"id": "e_acute",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"linux"
 			],
-			"reason_key": "platform_reason.accented_shortcuts_are_windows"
+			"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 		},
 		{
 			"type": "letter_picker",
 			"id": "a_grave",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"linux"
 			],
-			"reason_key": "platform_reason.accented_shortcuts_are_windows"
+			"reason_key": "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 		}
 	],
 	"hotstrings_menu": [

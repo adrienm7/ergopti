@@ -2510,6 +2510,16 @@ local function main()
 			return true
 		end
 		if script_chords.on_key(detail) then return true end
+		-- Ctrl+é as Ctrl+C on a layout whose accents are not shortcut letters,
+		-- under the Shortcuts master like the keyboard slots.
+		if require("modules.shortcuts.accented_shortcuts").on_key(detail, {
+			active = function()
+				return not opts.dry_run and not script_actions.is_paused() and shortcuts ~= nil
+					and shortcuts.is_enabled() == true and input_capture_gate.blocks_text() ~= true
+			end,
+			defer = function(fn) return event_loop.defer(fn) end,
+			press = function(combo) return (require("modules.gestures.combo_emitter").press(combo)) end,
+		}) then return true end
 		if tap_keys.on_key(detail) then
 			-- This consumed press never reaches the ordinary selection consumer.
 			-- Retire its old PRIMARY window before the deferred action can run.

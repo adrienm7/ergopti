@@ -303,8 +303,40 @@ local function _build_layouts(ctx)
 			switch = ctx.pause_layout,
 		})
 	end
+	-- « Raccourcis sur les lettres accentuées », the Windows letter pickers:
+	-- one submenu per letter, « Désactivé » then the 26 target letters.
+	local group_builders = {}
+	group_builders["accented_letters"] = function()
+		local Accented = require("modules.shortcuts.accented_shortcuts")
+		local settings = Accented.settings()
+		if not settings then
+			Logger.error(LOG, "The accented shortcuts cannot be read — their submenu is empty.")
+			return nil
+		end
+		local function choose(id, letter)
+			if not Accented.set(id, letter) then
+				require("config_save_failure").present(i18n_safe, function(message)
+					show_error(message, i18n_safe("common.error_title"))
+				end)
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end
+		local items = {}
+		for _, id in ipairs(Accented.IDS) do
+			local entry = settings[id]
+			local letters = { { label = i18n_safe("common.disabled"), checked = not entry.enabled,
+				action = function() choose(id, nil) end }, { separator = true } }
+			for code = string.byte("a"), string.byte("z") do
+				local letter = string.char(code)
+				letters[#letters + 1] = { label = letter:upper(), checked = entry.enabled and entry.letter == letter,
+					action = function() choose(id, letter) end }
+			end
+			items[#items + 1] = { label = i18n_safe("menu.shortcuts." .. id), checked = entry.enabled, items = letters }
+		end
+		return { items = items }
+	end
 	local rows = ManifestMenu
-		and ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, providers)
+		and ManifestMenu.build("layout_menu", "Layout", nil, group_builders, render_ctx, providers)
 		or {}
 	return receive(rows, { layout_enabled = function() return nil end })
 end

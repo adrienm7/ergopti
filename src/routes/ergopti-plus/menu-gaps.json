@@ -701,15 +701,11 @@
 			"fr": "Raccourcis sur é è ê à (en accès direct)",
 			"en": "Shortcuts on é è ê à (when typed directly)"
 		},
-		"platforms": { "windows": true, "macos": false, "linux": false },
+		"platforms": { "windows": true, "macos": false, "linux": true },
 		"reasons": {
 			"macos": {
-				"en": "Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.",
-				"fr": "Windows uniquement : tout ce que cette ligne listerait est lui-même propre à Windows, donc sur macOS et Linux elle n'affiche qu'une liste vide."
-			},
-			"linux": {
-				"en": "Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.",
-				"fr": "Windows uniquement : tout ce que cette ligne listerait est lui-même propre à Windows, donc sur macOS et Linux elle n'affiche qu'une liste vide."
+				"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C.",
+				"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C."
 			}
 		}
 	},
@@ -733,15 +729,11 @@
 		"path": "accented_letters_group.e_grave",
 		"visibility": "hide",
 		"labels": { "fr": "e_grave", "en": "e_grave" },
-		"platforms": { "windows": true, "macos": false, "linux": false },
+		"platforms": { "windows": true, "macos": false, "linux": true },
 		"reasons": {
 			"macos": {
-				"en": "Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.",
-				"fr": "Windows uniquement : sur les dispositions dont les touches accentuées ne sont pas des lettres de raccourci (AZERTY, BÉPO, une disposition Ergopti installée), Ctrl+é arriverait à l’application comme une combinaison à laquelle rien n’est lié. Ceci remappe les combinaisons Ctrl, Alt et Win de ces touches vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Un fichier de disposition macOS porte sa propre couche Commande et Contrôle, et le pilote Linux n’a pas d’équivalent."
-			},
-			"linux": {
-				"en": "Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.",
-				"fr": "Windows uniquement : sur les dispositions dont les touches accentuées ne sont pas des lettres de raccourci (AZERTY, BÉPO, une disposition Ergopti installée), Ctrl+é arriverait à l’application comme une combinaison à laquelle rien n’est lié. Ceci remappe les combinaisons Ctrl, Alt et Win de ces touches vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Un fichier de disposition macOS porte sa propre couche Commande et Contrôle, et le pilote Linux n’a pas d’équivalent."
+				"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C.",
+				"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C."
 			}
 		}
 	},
@@ -749,15 +741,11 @@
 		"path": "accented_letters_group.e_circ",
 		"visibility": "hide",
 		"labels": { "fr": "e_circ", "en": "e_circ" },
-		"platforms": { "windows": true, "macos": false, "linux": false },
+		"platforms": { "windows": true, "macos": false, "linux": true },
 		"reasons": {
 			"macos": {
-				"en": "Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.",
-				"fr": "Windows uniquement : sur les dispositions dont les touches accentuées ne sont pas des lettres de raccourci (AZERTY, BÉPO, une disposition Ergopti installée), Ctrl+é arriverait à l’application comme une combinaison à laquelle rien n’est lié. Ceci remappe les combinaisons Ctrl, Alt et Win de ces touches vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Un fichier de disposition macOS porte sa propre couche Commande et Contrôle, et le pilote Linux n’a pas d’équivalent."
-			},
-			"linux": {
-				"en": "Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.",
-				"fr": "Windows uniquement : sur les dispositions dont les touches accentuées ne sont pas des lettres de raccourci (AZERTY, BÉPO, une disposition Ergopti installée), Ctrl+é arriverait à l’application comme une combinaison à laquelle rien n’est lié. Ceci remappe les combinaisons Ctrl, Alt et Win de ces touches vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Un fichier de disposition macOS porte sa propre couche Commande et Contrôle, et le pilote Linux n’a pas d’équivalent."
+				"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C.",
+				"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C."
 			}
 		}
 	},
@@ -765,15 +753,11 @@
 		"path": "accented_letters_group.e_acute",
 		"visibility": "hide",
 		"labels": { "fr": "e_acute", "en": "e_acute" },
-		"platforms": { "windows": true, "macos": false, "linux": false },
+		"platforms": { "windows": true, "macos": false, "linux": true },
 		"reasons": {
 			"macos": {
-				"en": "Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.",
-				"fr": "Windows uniquement : sur les dispositions dont les touches accentuées ne sont pas des lettres de raccourci (AZERTY, BÉPO, une disposition Ergopti installée), Ctrl+é arriverait à l’application comme une combinaison à laquelle rien n’est lié. Ceci remappe les combinaisons Ctrl, Alt et Win de ces touches vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Un fichier de disposition macOS porte sa propre couche Commande et Contrôle, et le pilote Linux n’a pas d’équivalent."
-			},
-			"linux": {
-				"en": "Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.",
-				"fr": "Windows uniquement : sur les dispositions dont les touches accentuées ne sont pas des lettres de raccourci (AZERTY, BÉPO, une disposition Ergopti installée), Ctrl+é arriverait à l’application comme une combinaison à laquelle rien n’est lié. Ceci remappe les combinaisons Ctrl, Alt et Win de ces touches vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Un fichier de disposition macOS porte sa propre couche Commande et Contrôle, et le pilote Linux n’a pas d’équivalent."
+				"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C.",
+				"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C."
 			}
 		}
 	},
@@ -781,15 +765,11 @@
 		"path": "accented_letters_group.a_grave",
 		"visibility": "hide",
 		"labels": { "fr": "a_grave", "en": "a_grave" },
-		"platforms": { "windows": true, "macos": false, "linux": false },
+		"platforms": { "windows": true, "macos": false, "linux": true },
 		"reasons": {
 			"macos": {
-				"en": "Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.",
-				"fr": "Windows uniquement : sur les dispositions dont les touches accentuées ne sont pas des lettres de raccourci (AZERTY, BÉPO, une disposition Ergopti installée), Ctrl+é arriverait à l’application comme une combinaison à laquelle rien n’est lié. Ceci remappe les combinaisons Ctrl, Alt et Win de ces touches vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Un fichier de disposition macOS porte sa propre couche Commande et Contrôle, et le pilote Linux n’a pas d’équivalent."
-			},
-			"linux": {
-				"en": "Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.",
-				"fr": "Windows uniquement : sur les dispositions dont les touches accentuées ne sont pas des lettres de raccourci (AZERTY, BÉPO, une disposition Ergopti installée), Ctrl+é arriverait à l’application comme une combinaison à laquelle rien n’est lié. Ceci remappe les combinaisons Ctrl, Alt et Win de ces touches vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C. Un fichier de disposition macOS porte sa propre couche Commande et Contrôle, et le pilote Linux n’a pas d’équivalent."
+				"en": "Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C.",
+				"fr": "Pas sous macOS : un fichier de disposition macOS porte sa propre couche Commande et Contrôle, si bien que Cmd+é agit déjà comme le raccourci que ce fichier lui donne. Sous Windows et Linux, ceci remappe les combinaisons Ctrl, Alt et Super d’une touche qui tape directement une lettre accentuée vers le raccourci habituel de la lettre, si bien que Ctrl+é agit comme Ctrl+C."
 			}
 		}
 	},
