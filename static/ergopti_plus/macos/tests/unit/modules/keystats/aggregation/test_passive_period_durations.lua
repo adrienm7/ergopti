@@ -7,7 +7,8 @@
 --- as `passive_period{kind, duration_ms}` (LogManager.log_passive_period); its
 --- `wake`/`unlock` edges carry no duration. The walker credited durations only on
 --- those edges, so the dashboard showed a nonzero passive count beside zero sleep
---- and lock time (audit HS-005 / MM-002).
+--- and lock time (audit HS-005 / MM-002). A finished keep-awake session has the
+--- same shape with kind "awake" and was never aggregated either (HS-006 / MM-003).
 ---
 --- WHAT THIS PINS:
 --- Each measured interval is credited once to its category, a legacy edge that
@@ -89,3 +90,18 @@ helpers.describe("keystats aggregator: measured passive intervals (HS-005)", fun
 		helpers.assert_eq(row.passive_count, 0)
 	end)
 end)
+
+helpers.describe("keystats aggregator: keep-awake accounting (HS-006)", function()
+	helpers.it("credits a finished keep-awake session once to awake_ms", function()
+		-- The exact pair shortcuts/actions/system.lua appends on keep-awake stop.
+		local row = walk({
+			{ action = "passive_period", kind = "awake", duration_ms = 120000 },
+			{ action = "awake_focus", app = "Editor", duration_ms = 120000 },
+		})
+		helpers.assert_eq(row.awake_ms, 120000,
+			"the awake_focus companion must not count the interval a second time")
+		helpers.assert_eq(row.sleep_ms, 0)
+		helpers.assert_eq(row.locked_ms, 0)
+	end)
+end)
+
