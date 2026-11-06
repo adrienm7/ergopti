@@ -1129,22 +1129,22 @@ HSE_ComplexDelayMultiplier(ExpanderComplex, ReferenceComplex, GapMs, Widenable) 
 		return 1
 }
 
-; Resolve every dispatch gate into one immutable decision shared by the preview
-; and the fire path. Keeping time, casing and callable resolution below in one
-; owner prevents a tooltip from advertising a matcher winner that dispatch will
-; subsequently refuse — or from showing one dynamic value and resolving another
-; after the user presses the completion key.
-; @param FrozenResolvedBase Optional value captured by a decision that is still
-;   visibly presented. When supplied, the callable is not invoked a second time.
-; @return Canonical decision object, or "" when dispatch must decline.
-_HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
-		TypoNbspStripped := false, FrozenResolvedBase := unset, NowTick := unset) {
+; The time-activation gate of one matched Spec, raw callbacks included: whether
+; its reference character was typed within the Spec's delay at NowTick. One
+; owner for the dispatcher's decision and the keystroke preflight, so an expired
+; winner is known before dispatch and the magic-key fallbacks can still answer.
+; @param Spec {Object} The matched Spec; no delay means no gate.
+; @param BufferAfterCompletion {String} The engine buffer with the completing char.
+; @param EndChar {String} The end character, "" on the auto path.
+; @param TypoNbspStripped {Boolean} Whether a no-break space preceded it.
+; @param GateOriginTick {Integer} Output: the reference character's tick, 0 without a gate.
+; @param GateDurationMs {Integer} Output: the widened delay, 0 without a gate.
+; @param RemainingMs {Integer} Output: what is left of it at NowTick.
+; @param NowTick {Integer} The instant measured; now when unset.
+; @returns {Boolean} False when the gate refuses (expired or unprovable).
+_HSE_EvaluateTimeGate(Spec, BufferAfterCompletion, EndChar, TypoNbspStripped,
+		&GateOriginTick, &GateDurationMs, &RemainingMs, NowTick := unset) {
 		global LastSentCharacterKeyTime, LastSentCharacterKeyComplex
-		if !IsObject(Spec) or !Spec.HasOwnProp("Replacement")
-				return ""
-		if (Spec.HasOwnProp("RawCallback") and Spec.RawCallback)
-				return ""
-
 		GateOriginTick := 0
 		GateDurationMs := 0
 		RemainingMs := 0
@@ -1152,10 +1152,10 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 				and Spec.TimeActivationSeconds > 0 {
 				if !TickTryDurationMsFromSeconds(
 						Spec.TimeActivationSeconds, &GateDurationMs)
-						return ""
+						return false
 				if !Spec.HasOwnProp("PrevCharKey") or !IsSet(LastSentCharacterKeyTime)
 						or !(LastSentCharacterKeyTime is Map)
-						return ""
+						return false
 				PrevKey := Spec.PrevCharKey
 				if (Spec.HasOwnProp("CaseConform") and Spec.CaseConform) {
 						CompletionStripLen := StrLen(EndChar) + (TypoNbspStripped ? 1 : 0)
@@ -1169,7 +1169,7 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 								PrevKey := TypedPrev
 				}
 				if !LastSentCharacterKeyTime.Has(PrevKey)
-						return ""
+						return false
 				GateOriginTick := LastSentCharacterKeyTime[PrevKey]
 				ElapsedMs := TickElapsed64(GateOriginTick, NowTick?)
 				; A complex keystroke widens the allowed delay, never the measured gap.
@@ -1182,9 +1182,41 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 				; fireable instant. The renderer separately refuses RemainingMs == 0 so
 				; it never paints a promise with no usable interaction window.
 				if (ElapsedMs > GateDurationMs)
-						return ""
+						return false
 				RemainingMs := Max(0, GateDurationMs - ElapsedMs)
 		}
+		return true
+}
+
+; Whether the dispatcher would refuse Spec on its time gate alone. The keystroke
+; path asks before dispatch, so an expired registered winner falls through to the
+; magic-key fallbacks, as on macOS and Linux (decision of 2026-11-06).
+; @returns {Boolean}
+HSE_TimeGateExpired(Spec, BufferAfterCompletion, EndChar, TypoNbspStripped := false, NowTick := unset) {
+		if !IsObject(Spec)
+				return false
+		return !_HSE_EvaluateTimeGate(Spec, BufferAfterCompletion, EndChar, TypoNbspStripped,
+				&OriginTick, &DurationMs, &RemainingMs, NowTick?)
+}
+
+; Resolve every dispatch gate into one immutable decision shared by the preview
+; and the fire path. Keeping time, casing and callable resolution below in one
+; owner prevents a tooltip from advertising a matcher winner that dispatch will
+; subsequently refuse — or from showing one dynamic value and resolving another
+; after the user presses the completion key.
+; @param FrozenResolvedBase Optional value captured by a decision that is still
+;   visibly presented. When supplied, the callable is not invoked a second time.
+; @return Canonical decision object, or "" when dispatch must decline.
+_HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
+		TypoNbspStripped := false, FrozenResolvedBase := unset, NowTick := unset) {
+		if !IsObject(Spec) or !Spec.HasOwnProp("Replacement")
+				return ""
+		if (Spec.HasOwnProp("RawCallback") and Spec.RawCallback)
+				return ""
+
+		if !_HSE_EvaluateTimeGate(Spec, BufferAfterCompletion, EndChar, TypoNbspStripped,
+				&GateOriginTick, &GateDurationMs, &RemainingMs, NowTick?)
+				return ""
 
 		if IsSet(FrozenResolvedBase) {
 				ResolvedBase := FrozenResolvedBase

@@ -59,3 +59,45 @@ _RAW_ExpiredRepeatIsRefused() {
 }
 Test("hotstrings: a repeat typed after its window is refused by the time gate (repeat-window)",
 	_RAW_ExpiredRepeatIsRefused)
+
+; An expired registered winner no longer masks the repeat, as on macOS and
+; Linux (decision of 2026-11-06, expired-winner-repeat): the keystroke asks the
+; dispatcher's own time gate before dispatch, raw callbacks included. Before,
+; _OnPrefixChar dispatched the expired winner, which was refused on time, and
+; returned before HSE_TryRepeatKey.
+_RAW_ExpiredWinnerIsKnownBeforeDispatch() {
+	global LastSentCharacterKeyTime, LastSentCharacterKeyComplex
+	SavedTimes := IsSet(LastSentCharacterKeyTime) ? LastSentCharacterKeyTime : ""
+	SavedComplex := IsSet(LastSentCharacterKeyComplex) ? LastSentCharacterKeyComplex : ""
+	try {
+		LastSentCharacterKeyComplex := Map()
+		Timed := {Trigger: "o★", Length: 2, Star: true, Replacement: "ou",
+			TimeActivationSeconds: 0.5, PrevCharKey: "o"}
+		Raw := {Trigger: "o★", Length: 2, Star: true, RawCallback: true,
+			TimeActivationSeconds: 0.5, PrevCharKey: "o"}
+		Untimed := {Trigger: "o★", Length: 2, Star: true, Replacement: "ou"}
+		LastSentCharacterKeyTime := Map("o", Max(0, A_TickCount - 60000))
+		AssertTrue(HSE_TimeGateExpired(Timed, "po★", ""), "a winner typed long after its letter is expired")
+		AssertTrue(HSE_TimeGateExpired(Raw, "po★", ""), "a raw callback's declared gate is measured the same way")
+		AssertFalse(HSE_TimeGateExpired(Untimed, "po★", ""), "control: a winner without a delay never expires")
+		AssertEqual("", _HSE_PrepareDispatchDecision(Timed, "po★", ""),
+			"the dispatcher refuses the same expired winner")
+		LastSentCharacterKeyTime := Map("o", A_TickCount)
+		AssertFalse(HSE_TimeGateExpired(Timed, "po★", ""), "control: a winner within its delay is no expired one")
+		AssertTrue(IsObject(_HSE_PrepareDispatchDecision(Timed, "po★", "")),
+			"control: the dispatcher accepts the same winner")
+	} finally {
+		if (SavedTimes != "")
+			LastSentCharacterKeyTime := SavedTimes
+		if (SavedComplex != "")
+			LastSentCharacterKeyComplex := SavedComplex
+	}
+	Body := _DriverFuncBody("_OnPrefixChar")
+	Assert(Body != "", "_OnPrefixChar must be found")
+	Gate := InStr(Body, "HSE_TimeGateExpired(HSEMatch")
+	Assert(Gate > 0, "the keystroke path asks the time gate of its winner")
+	Assert(Gate < InStr(Body, "HSE_TryPersonalInfoCombo(") && Gate < InStr(Body, "HSE_TryRepeatKey("),
+		"the expired winner is dropped before the magic-key fallbacks run")
+}
+Test("hotstrings: an expired winner falls through to the repeat (expired-winner-repeat)",
+	_RAW_ExpiredWinnerIsKnownBeforeDispatch)
