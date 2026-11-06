@@ -724,19 +724,23 @@ end
 --- first). Returns nil if no bundle is installed. The bundle itself says what it
 --- installs, so no list of variants is written here.
 --- Example: { ["Ergopti_v2_2_2_plus"] = "com.apple.keyboardlayout.ergopti.plus", ... }
---- @return table|nil
-function build_kl_name_to_tis_id()
-	local sb_sys  = highest_installed(SYSTEM_LAYOUTS_DIR)
-	local sb_user = highest_installed(USER_LAYOUTS_DIR)
+--- @param installed table|nil { system, user } highest_installed() of both scopes, read once
+---        by a caller that needs them several times (the menu build); read here when nil.
+--- @return table|nil map
+--- @return table|nil variants The bundle_variants() list the map was built from.
+function build_kl_name_to_tis_id(installed)
+	local sb_sys  = installed and installed.system or not installed and highest_installed(SYSTEM_LAYOUTS_DIR) or nil
+	local sb_user = installed and installed.user or not installed and highest_installed(USER_LAYOUTS_DIR) or nil
 	local sb      = sb_sys or sb_user
 	local sb_dir  = sb_sys and SYSTEM_LAYOUTS_DIR or (sb_user and USER_LAYOUTS_DIR) or nil
 	if not sb or not sb_dir then return nil end
 	local bundle_path = NativePath.without_trailing_separators(sb_dir) .. "/" .. sb.name
 	local map = {}
-	for _, variant in ipairs(install.bundle_variants(bundle_path)) do
+	local variants = install.bundle_variants(bundle_path)
+	for _, variant in ipairs(variants) do
 		map[variant.name] = variant.tis_id
 	end
-	return map
+	return map, variants
 end
 
 
@@ -1413,10 +1417,11 @@ end
 
 --- Returns the highest Ergopti version installed across the user and system
 --- keyboard-layout directories, or nil when none is present.
+--- @param installed table|nil { system, user } both scopes already read; read here when nil.
 --- @return table|nil Numeric version components, e.g. {2,2,1}.
-local function resolve_installed_ergopti_version()
-	local user_best   = highest_installed(USER_LAYOUTS_DIR)
-	local system_best = highest_installed(SYSTEM_LAYOUTS_DIR)
+local function resolve_installed_ergopti_version(installed)
+	local user_best   = installed and installed.user or not installed and highest_installed(USER_LAYOUTS_DIR) or nil
+	local system_best = installed and installed.system or not installed and highest_installed(SYSTEM_LAYOUTS_DIR) or nil
 	if user_best and system_best then
 		return version_gt(user_best.version, system_best.version)
 			and user_best.version or system_best.version
@@ -1434,8 +1439,9 @@ end
 --- never has to display ``v0.0.0`` for an entry that the user is happily
 --- running.
 --- @param records table List of records from :func:`list_active_keyboard_layouts`.
+--- @param installed table|nil { system, user } both scopes already read; read here when nil.
 --- @return table { present = boolean, name = string|nil, id = string|nil, version = table|nil }
-local function ergopti_in_active_layouts(records)
+local function ergopti_in_active_layouts(records, installed)
 	for _, r in ipairs(records) do
 		local id = (r and r.id) or ""
 		if type(id) == "string" and id:lower():find("ergopti", 1, true) then
@@ -1443,7 +1449,7 @@ local function ergopti_in_active_layouts(records)
 			-- Stable-id entries (no version embedded): substitute the version
 			-- of whatever bundle is installed locally.
 			if v and v[1] == 0 and v[2] == 0 and v[3] == 0 then
-				v = resolve_installed_ergopti_version() or v
+				v = resolve_installed_ergopti_version(installed) or v
 			end
 			return { present = true, name = r.name, id = id, version = v }
 		end
