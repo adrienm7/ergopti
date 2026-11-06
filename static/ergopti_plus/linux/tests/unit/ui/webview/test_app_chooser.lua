@@ -218,7 +218,8 @@ helpers.describe("application chooser follows the actual XDG resolution owner", 
 			.. "tostring(after==" .. string.format("%q", user .. "/applications/" .. name) .. "), '|', "
 			.. "tostring(pick(" .. string.format("%q", system .. "/applications/" .. name) .. ")), '|', "
 			.. "tostring(pick(" .. string.format("%q", user .. "/applications/" .. name) .. ")), '|')\n"
-			.. "assert(os.execute(" .. string.format("%q", "mkdir -p " .. Shell.quote(user .. "/applications/vendor")) .. ")==0)\n"
+			-- A LuaJIT built with LUA52COMPAT (Fedora, Alpine) answers true, not 0.
+			.. "local made=os.execute(" .. string.format("%q", "mkdir -p " .. Shell.quote(user .. "/applications/vendor")) .. "); assert(made==true or made==0)\n"
 			.. "local f=assert(io.open(" .. string.format("%q", user .. "/applications/vendor/editor.desktop") .. ", 'wb')); "
 			.. "assert(f:write('[Desktop Entry]\\nType=Application\\nName=Nested\\nExec=/bin/true\\n')); assert(f:close())\n"
 			.. "local f=assert(io.open(" .. string.format("%q", user .. "/applications/" .. name .. ".desktop") .. ", 'wb')); "
