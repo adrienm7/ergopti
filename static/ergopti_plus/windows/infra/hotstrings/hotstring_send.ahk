@@ -471,7 +471,7 @@ SendFinalResult(Text, OnlyText := False, DeclareBufferEffect := false) {
 _SendInstant_RestoreClipboard(OldClip, OwnedSequence, OwnerToken) {
 	; A delayed restore owns exactly the payload sequence it wrote. The adapter
 	; retains both snapshot and owner if Windows temporarily locks the clipboard.
-	return CB_RestoreOwnedAllEventually(OldClip, OwnedSequence, OwnerToken,
+	return CB_RestorePlainSnapshotEventually(OldClip, OwnedSequence, OwnerToken,
 		"hotstring_send_instant")
 }
 
@@ -483,7 +483,35 @@ _SendInstantReport(Text) {
 		CapsWordAutoOffObserveOutput(Text)
 }
 
-SendInstant(Text, Prefix := "") {
+; Native focus observations never retain document or clipboard contents.
+_SendInstantCaptureTarget() {
+	PreviousCritical := Critical("On")
+	try {
+		Window := WIGetForegroundHwnd()
+		Control := WIGetFocusedControlToken()
+		Pid := Window ? WinGetPID("ahk_id " . Window) : 0
+		if !Window || !Control || !Pid || WIGetForegroundHwnd() != Window
+			return 0
+		return Map("hwnd", Window, "control", Control, "pid", Pid)
+	} catch {
+		return 0
+	} finally Critical(PreviousCritical)
+}
+
+_SendInstantTargetCurrent(Target) {
+	if !(Target is Map)
+		return false
+	Current := _SendInstantCaptureTarget()
+	return Current is Map && Current["hwnd"] == Target["hwnd"]
+		&& Current["control"] == Target["control"] && Current["pid"] == Target["pid"]
+		&& (!Target.Has("admission") || (HasMethod(Target["admission"], "Call") && Target["admission"].Call()))
+}
+
+SendInstant(Text, Prefix := "", ExpectedTarget := unset) {
+	; A deferred caller may narrow output to a target captured before its work.
+	; Never replace that older receipt with whatever became foreground later.
+	if IsSet(ExpectedTarget) && !_SendInstantTargetCurrent(ExpectedTarget)
+		return false
 	; Sends a large text through the clipboard while keeping Prefix (typically the
 	; hotstring erase sequence) in the SAME SendInput burst as Ctrl+V. Splitting
 	; these two injections lets a physical key land between erase and paste.
@@ -500,6 +528,9 @@ SendInstant(Text, Prefix := "") {
 			return false
 		}
 	}
+	Target := IsSet(ExpectedTarget) ? ExpectedTarget : _SendInstantCaptureTarget()
+	if !(Target is Map)
+		return false
 	; Reentrancy guard: a previous SendInstant's deferred restore has not run
 	; yet, so the clipboard still holds its payload. Touching A_Clipboard now
 	; would race the in-flight paste/restore — fall back to the clipboard-free
@@ -510,7 +541,12 @@ SendInstant(Text, Prefix := "") {
 	if !OwnerToken {
 		try LoggerDebug("Hotstrings", "SendInstant: a restore is still in flight; routing through the clipboard-free path.")
 		try {
-			SendInput(Prefix . "{Text}" . Text)
+			SendCritical := Critical("On")
+			try {
+				if !_SendInstantTargetCurrent(Target)
+					return false
+				SendInput(Prefix . "{Text}" . Text)
+			} finally Critical(SendCritical)
 			_SendInstantReport(Text)
 			return true
 		} catch as Err {
@@ -531,7 +567,12 @@ SendInstant(Text, Prefix := "") {
 		CB_EndOwnedTransaction(OwnerToken)
 		try LoggerDebug("Hotstrings", "SendInstant: clipboard is contended or holds a bitmap; routing through the clipboard-free path.")
 		try {
-			SendInput(Prefix . "{Text}" . Text)
+			SendCritical := Critical("On")
+			try {
+				if !_SendInstantTargetCurrent(Target)
+					return false
+				SendInput(Prefix . "{Text}" . Text)
+			} finally Critical(SendCritical)
 			_SendInstantReport(Text)
 			return true
 		} catch as Err {
@@ -539,17 +580,34 @@ SendInstant(Text, Prefix := "") {
 			return false
 		}
 	}
-	OldClipboard := CB_SaveAll()
-	if (Type(OldClipboard) == "String" && OldClipboard == "__CB_SAVE_ERROR__") {
+	; Resolve a delayed text renderer before binding the opaque snapshot's
+	; generation. Its value is ignored: only Text is ever emitted.
+	CB_Read()
+	if !_SendInstantTargetCurrent(Target) {
 		CB_EndOwnedTransaction(OwnerToken)
-		try LoggerWarn("Hotstrings", "SendInstant: clipboard snapshot failed; expansion was not injected.")
+		return false
+	}
+	Captured := 0
+	if !CB_SavePlainSnapshot(OwnerToken, &Captured) {
+		CB_EndOwnedTransaction(OwnerToken)
+		try LoggerWarn("Hotstrings", "SendInstant: clipboard snapshot changed or was unavailable; expansion was not injected.")
+		return false
+	}
+	OldClipboard := Captured["saved"]
+	; ClipboardAll can synchronously render a foreign format and change focus.
+	; Refuse before replacing its clipboard when that target is already gone.
+	if !_SendInstantTargetCurrent(Target) {
+		CB_EndOwnedTransaction(OwnerToken)
 		return false
 	}
 	RestoreCallback := false
 	RestoreTimerArmed := false
+	OwnedSequence := 0
 	try {
-		if !CB_WriteTextWithReceipt(Text, &OwnedSequence)
-			throw Error("clipboard write failed")
+		; This native CAS owns the complete old snapshot before EmptyClipboard.
+		; A later copy wins without any publication, paste or stale rollback.
+		if !CB_WritePlainSnapshot(Captured, Text, &OwnedSequence)
+			return false
 		if !OwnedSequence
 			throw Error("clipboard sequence unavailable")
 		; Arm every fallible post-paste stage before the irreversible injection. If
@@ -560,22 +618,34 @@ SendInstant(Text, Prefix := "") {
 		RestoreTimerArmed := true
 		; Prefix and Ctrl+V are one kernel injection transaction. Critical callers
 		; therefore cannot be interrupted after the erase but before the paste.
-		SendInput(Prefix . "^v")
+		SendCritical := Critical("On")
+		try {
+			if !_SendInstantTargetCurrent(Target)
+				throw Error("input target changed before paste")
+			; The publication receipt never adopts a copy made after its return.
+			if CB_GetSequenceNumber() != OwnedSequence
+				throw Error("clipboard ownership changed before paste")
+			SendInput(Prefix . "^v")
+		} finally Critical(SendCritical)
 		_SendInstantReport(Text)
 		return true
 	} catch as err {
 		; SendInput can fail after the restore timer was armed. Cancel that exact
 		; callback before doing the cleanup inline so ownership is ended once.
-		if RestoreTimerArmed
+		if RestoreTimerArmed {
 			try SetTimer(RestoreCallback, 0)
-		if IsSet(OwnedSequence) && OwnedSequence {
-			try CB_RestoreOwnedAllEventually(OldClipboard, OwnedSequence, OwnerToken,
-				"hotstring_send_instant_rollback")
-		} else {
-			CB_EndOwnedTransaction(OwnerToken)
+			RestoreTimerArmed := false
 		}
+		if OwnedSequence
+			try CB_RestorePlainSnapshotEventually(OldClipboard, OwnedSequence, OwnerToken,
+				"hotstring_send_instant_rollback")
 		try LoggerError("Hotstrings", "SendInstant: clipboard injection failed: {1}", err.Message)
 		return false
+	} finally {
+		; Unknown mutation/Close failures retain their exact native retry record.
+		; Only an owner with no armed restore and no debt can retire here.
+		if !RestoreTimerArmed && !CB_HasRestoreDebtForOwner(OwnerToken)
+			CB_EndOwnedTransaction(OwnerToken)
 	}
 }
 
@@ -731,6 +801,11 @@ GetSelectionAsync(OnReady, Ports := 0) {
 				return false
 		if !IsObject(OnReady)
 				throw TypeError("GetSelectionAsync requires a callback object")
+		if !(Ports is Map)
+				Ports := Map()
+		OnEmpty := Ports.Get("on_empty", 0)
+		if !((OnEmpty is Integer) && OnEmpty == 0) && !HasMethod(OnEmpty, "Call")
+				throw TypeError("The private selection on_empty option must be callable or zero")
 		CaptureId := ++_SelectionCaptureNextId
 
 		; The newest user command owns the clipboard capture. Finishing the prior
@@ -745,14 +820,13 @@ GetSelectionAsync(OnReady, Ports := 0) {
 		}
 		if A_IsSuspended or _SelectionCaptureNextId != CaptureId
 				return false
-		if !(Ports is Map)
-				Ports := Map()
 		SaveFn := Ports.Get("save", CB_SaveAll)
 		ClearFn := Ports.Get("clear", CB_ClearWithReceipt)
 		SendFn := Ports.Get("send", _SelectionSendCopy)
 		SequenceFn := Ports.Get("sequence", _SelectionClipboardSequence)
 		RestoreFn := Ports.Get("restore", CB_RestoreAll)
 		ForegroundFn := Ports.Get("foreground", _SelectionCaptureForeground)
+		ControlFn := Ports.Get("control", WIGetFocusedControlToken)
 		GenerationFn := Ports.Get("physical_generation", KS_GetPhysicalInputGeneration)
 		BusyFn := Ports.Get("report_busy", _SelectionReportClipboardBusy)
 
@@ -762,10 +836,13 @@ GetSelectionAsync(OnReady, Ports := 0) {
 		Job := Map(
 				"id", CaptureId,
 				"callback", OnReady,
+				"on_empty", OnEmpty,
 				"started", A_TickCount,
 				"physical_generation", GenerationFn.Call(),
 				"generation_fn", GenerationFn,
 				"foreground", 0,
+				"control", 0,
+				"control_fn", ControlFn,
 				"clipboard", "",
 				"clear_sequence", 0,
 				"owned_sequence", 0,
@@ -784,6 +861,10 @@ GetSelectionAsync(OnReady, Ports := 0) {
 		Started := false
 		try {
 				Job["foreground"] := ForegroundFn.Call()
+				Control := ControlFn.Call()
+				if !(Control is Integer) || Control == 0
+						throw Error("selection capture focus unavailable")
+				Job["control"] := Control
 				if !_SelectionCaptureStartCurrent(Job)
 						return false
 				Job["owner_token"] := CB_TryBeginOwnedTransaction("selection_capture")
@@ -870,6 +951,14 @@ _SelectionForegroundProcess() {
 
 _SelectionCaptureStartCurrent(Job) {
 		global _SelectionCaptureJob, _SelectionCaptureNextId
+		if A_IsSuspended or _SelectionCaptureJob != Job
+				or _SelectionCaptureNextId != Job["id"]
+				return false
+		; Legacy manually assembled jobs have no control observer. Every job
+		; created by GetSelectionAsync captures one before its first clipboard call.
+		if Job.Has("control") && Job["control_fn"].Call() != Job["control"]
+				return false
+		; A supplied observation port may itself cancel or replace the capture.
 		return !A_IsSuspended and _SelectionCaptureJob == Job
 				and _SelectionCaptureNextId == Job["id"]
 }
@@ -923,6 +1012,10 @@ _SelectionCapturePoll(Job) {
 		}
 		if (WinExist("A") != Job["foreground"]) {
 				_SelectionCaptureFinish(Job, "", false, "foreground changed")
+				return
+		}
+		if !_SelectionCaptureStartCurrent(Job) {
+				_SelectionCaptureFinish(Job, "", false, "focused control changed")
 				return
 		}
 		; Zero timeout is a probe, never a blocking wait. Accept every clipboard
@@ -1021,13 +1114,19 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason, RestoreFn := 0,
 		if Job["expected_change"]
 				CB_CancelExpectedChange(Job["expected_change"])
 		OwnedSequence := Job["owned_sequence"]
-		if !CB_RestoreOwnedAllEventually(Job["clipboard"], OwnedSequence,
+		RestoreSettled := CB_RestoreOwnedAllEventually(Job["clipboard"], OwnedSequence,
 				Job["owner_token"], "selection_capture_" . Reason, true,
 				!OwnedSequence, RestoreFn, SequenceFn)
+		if !RestoreSettled
 				try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed ({1}).", Reason)
 		Job["clipboard"] := ""
 
-		if !Deliver || A_IsSuspended
+		; A timeout may spend its original key only after acknowledged cleanup.
+		; Cancellation and errors never become a late bare-symbol continuation.
+		OnEmpty := Job.Get("on_empty", 0)
+		DeliverEmpty := !Deliver && Reason == "timeout" && RestoreSettled
+				&& HasMethod(OnEmpty, "Call")
+		if (!Deliver && !DeliverEmpty) || A_IsSuspended
 				return
 		; Restoring ClipboardAll can yield after the job was retired. Reacquire
 		; its input context, then fence revocations which happened during either
@@ -1040,6 +1139,11 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason, RestoreFn := 0,
 						_SelectionForegroundProcess())
 				return
 		}
+		if Job.Has("control") && Context.Get("control", 0) != Job["control"] {
+				try LoggerInfo("hotstring_engine",
+						"Selection read but not delivered: the focused control changed.")
+				return
+		}
 		if (Context["physical_generation"] != Job["physical_generation"]) {
 				try LoggerInfo("hotstring_engine",
 						"Selection read but not delivered: a newer physical action superseded it.")
@@ -1047,8 +1151,12 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason, RestoreFn := 0,
 		}
 		if A_IsSuspended or _SelectionCaptureNextId != Job["id"]
 				return
-		try Job["callback"].Call(Text)
-		catch as Err {
+		try {
+				if Deliver
+						Job["callback"].Call(Text)
+				else
+						OnEmpty.Call()
+		} catch as Err {
 				try LoggerError("hotstring_engine", "GetSelectionAsync callback failed: {1}", Err.Message)
 		}
 }
@@ -1071,6 +1179,7 @@ GetSelectionCancel(*) {
 
 _SelectionCaptureCurrentContext(Job) {
 		return Map("foreground", WinExist("A"),
+				"control", Job.Has("control") ? Job["control_fn"].Call() : 0,
 				"physical_generation", Job["generation_fn"].Call())
 }
 
@@ -1184,7 +1293,7 @@ AppState_TouchLastSentKey(Character, NowTick := unset) {
 		if LastSentCharacterKeyTime.Count > LAST_SENT_KEY_TIME_PRUNE_AT {
 				Now := NowTick
 				for k, ts in LastSentCharacterKeyTime.Clone() {
-						if TickExpired(ts, LAST_SENT_KEY_TIME_MAX_AGE_MS, Now) {
+						if TickExpired64(ts, LAST_SENT_KEY_TIME_MAX_AGE_MS, Now) {
 								LastSentCharacterKeyTime.Delete(k)
 								if LastSentCharacterKeyComplex.Has(k)
 										LastSentCharacterKeyComplex.Delete(k)

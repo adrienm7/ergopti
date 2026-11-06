@@ -189,7 +189,7 @@ _HealthCheck_Hardware() {
 	Cores := EnvGet("NUMBER_OF_PROCESSORS")
 	if IsInteger(Cores)
 		Hardware["cpu_cores"] := Integer(Cores)
-	Hardware["arch"] := A_Is64bitOS ? "x64" : "x86"
+	_HealthCheck_Put(Hardware, "arch", _HealthCheck_Read("the native architecture", DiagSnapshot_NativeArchitecture))
 	Memory := _HealthCheck_Read("the memory", _HealthCheck_Memory)
 	if (Memory is Map)
 		Hardware["ram_total"] := Memory["total"]

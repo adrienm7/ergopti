@@ -51,6 +51,8 @@ global _ProxyOverrideStored := ""
 global _ProxyOverridePublished := ""
 ; Whether the value published last came from a DPAPI envelope
 global _ProxyOverrideSealed := false
+; Exact admitted source behind this boot's optional plaintext credential sealing.
+global _ProxyOverrideBootSealSource := 0
 
 
 
@@ -207,14 +209,29 @@ ProxyOverride_Unseal(Stored) {
  * @returns {Boolean} False when the value is refused.
  */
 ProxyOverride_Publish(Stored) {
-	global PROXY_OVERRIDE_REFUSED_TOKEN, _ProxyOverrideStored, _ProxyOverridePublished, _ProxyOverrideSealed
-	_ProxyOverrideSealed := ProxyOverride_IsSealed(Stored)
+	return _ProxyOverride_ApplyPublication(_ProxyOverride_PreparePublication(Stored))
+}
+
+; Resolve DPAPI and normalize the route before entering a durable publisher.
+_ProxyOverride_PreparePublication(Stored) {
+	global PROXY_OVERRIDE_REFUSED_TOKEN
+	Sealed := ProxyOverride_IsSealed(Stored)
 	Value := ProxyOverride_Unseal(Stored)
-	_ProxyOverrideStored := Value is String ? Value : Stored is String ? Stored : String(Stored)
+	RuntimeStored := Value is String ? Value : Stored is String ? Stored : String(Stored)
 	Choice := ProxyOverride_Parse(Value)
 	Usable := Choice is Map
-	_ProxyOverridePublished := Usable ? ProxyOverride_Canonical(Choice) : PROXY_OVERRIDE_REFUSED_TOKEN
-	return Usable
+	Published := Usable ? ProxyOverride_Canonical(Choice) : PROXY_OVERRIDE_REFUSED_TOKEN
+	return {config: Stored, stored: RuntimeStored, published: Published, sealed: Sealed, usable: Usable}
+}
+
+; Primitive swaps only: durable publishers call this under the gateway Critical.
+_ProxyOverride_ApplyPublication(Publication) {
+	global _ProxyOverrideStored, _ProxyOverridePublished, _ProxyOverrideSealed, _ProxyOverrideBootSealSource
+	_ProxyOverrideBootSealSource := 0
+	_ProxyOverrideSealed := Publication.sealed
+	_ProxyOverrideStored := Publication.stored
+	_ProxyOverridePublished := Publication.published
+	return Publication.usable
 }
 
 /**
@@ -257,18 +274,43 @@ ProxyOverride_SpawnWorker(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdopt
  * @returns {Boolean} False when the stored value is refused.
  */
 ProxyOverride_Init(Cache) {
-	global _ProxyOverrideInitialized, PROXY_OVERRIDE_ENVIRONMENT
+	global _ProxyOverrideInitialized, PROXY_OVERRIDE_ENVIRONMENT, ConfigurationFile
+	global _ProxyOverrideBootSealSource, _ProxyOverrideStored, _ProxyOverrideSealed
 	if _ProxyOverrideInitialized
 		throw Error("The proxy override was initialized twice.")
 	_ProxyOverrideInitialized := true
 	; A value something exported for this driver must not reach what it starts.
 	EnvSet(PROXY_OVERRIDE_ENVIRONMENT)
 	Declaration := ProxyOverride_Declaration()
-	if !ConfigTomlTryReadBootValue(Cache, Declaration["section"], Declaration["key"], &Stored)
+	; Capture A from the authenticated bootstrap snapshot before publishing its
+	; RAM value. A later automatic seal cannot borrow a freshly edited file B.
+	Path := IsSet(ConfigurationFile) ? ConfigurationFile : ""
+	Snapshot := ConfigTomlBootSnapshot(Cache)
+	BootSource := 0
+	if IsObject(Snapshot) {
+		ConfigTomlBootSnapshotValue(Snapshot, Declaration["section"], Declaration["key"], &Stored)
+		if StrCompare(Path, ConfigurationFile, true) != 0
+			throw Error("The proxy bootstrap source changed its configuration path.")
+		; The ordinary bootstrap reader consumes one UTF-8 BOM. Retain an exact
+		; native image only if that reader's projection is still the original A.
+		ExactContent := false
+		try ExactContent := Snapshot.Present ? FSConfigReadUtf8Exact(Path) : ""
+		if ExactContent is String {
+			ProjectedContent := SubStr(ExactContent, 1, 1) == Chr(0xFEFF) ? SubStr(ExactContent, 2) : ExactContent
+			if StrCompare(ProjectedContent, Snapshot.Source, true) == 0
+				BootSource := {Path: Path, Content: ExactContent, Present: Snapshot.Present, Stored: Stored}
+		}
+	} else
 		Stored := IniCacheGet(Cache, Declaration["section"], Declaration["key"])
 	if Stored == "_"
 		Stored := Declaration["default"]
 	if ProxyOverride_Publish(Stored) {
+		PreviousCritical := Critical("On")
+		try {
+			if IsObject(BootSource) && Stored is String && !_ProxyOverrideSealed
+					&& StrCompare(Stored, _ProxyOverrideStored, true) == 0
+				_ProxyOverrideBootSealSource := BootSource
+		} finally Critical(PreviousCritical)
 		LoggerInfo("ProxyOverride", "Proxy override in force: {1}.", ProxyOverride_Current()["mode"])
 		return true
 	}

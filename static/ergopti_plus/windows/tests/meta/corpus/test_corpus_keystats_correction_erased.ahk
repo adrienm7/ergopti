@@ -23,7 +23,7 @@
 ; ====================================
 
 ; The vector count the contract was written for, as its Lua replays pin it.
-global _KCE_VECTOR_COUNT := 6
+global _KCE_VECTOR_COUNT := 11
 
 _KCE_Corpus() {
 	static Corpus := JsonParse(FileRead(A_ScriptDir . "\..\..\_shared\tests\corpus\keystats\correction_erased_vectors.json", "UTF-8"))
@@ -93,6 +93,14 @@ _KCE_ReplayVector(Vector) {
 			AssertTrue(Seen.Has(Token), Vector["id"] . ": " . Family . " misses " . Token)
 	}
 	AssertTrue(Rows > 0, Vector["id"] . ": the walker must count n-grams")
+	if Vector.Has("expected_bs_total") {
+		AssertEqual(Vector["expected_bs_total"], KLW_GetErrorRow(Corpus["date"], Corpus["app"])["bs_total"], Vector["id"] . ": every correction key must still count")
+		Context := KLW_GetAppCtx(Corpus["app"])
+		AssertEqual(Vector["expected_cur_word"], Context["cur_word"], Vector["id"] . ": erasure must match admitted word history")
+		AssertEqual(Vector["expected_word_error"], Context["word_err"], Vector["id"] . ": an unrecorded unit cannot mark the public prefix as erroneous")
+		if Vector.Has("expected_hs_input_chars")
+			AssertEqual(Vector["expected_hs_input_chars"], KLW.batch["app_day"][KLW_Key(Corpus["date"], Corpus["app"])].Get("hs_input_chars", 0))
+	}
 }
 
 _KCE_CountIsPinned() {

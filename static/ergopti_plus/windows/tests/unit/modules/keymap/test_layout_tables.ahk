@@ -647,7 +647,11 @@ _WHR_Script() {
 	Code .= 'global _WH_Output := "", _WH_Stamped := "", _WH_SendOk := true' . "`n"
 	Code .= 'WrapSymbols_IsEnabled(*) => true`nGetUIASelection() => "selected"`n'
 	Code .= 'AppState_TouchLastSentKey(Text) {`nglobal _WH_Stamped`n_WH_Stamped := Text`n}' . "`n"
-	Code .= 'SendInstant(Text) {`nglobal _WH_Output, _WH_SendOk`nif !_WH_SendOk`nreturn false`n_WH_Output := Text`nreturn true`n}' . "`n"
+	; This existing logical suffix/ring fixture models one stable input target.
+	; Real target changes are qualified by the separate native renderer probes.
+	Code .= '_SendInstantCaptureTarget() => Map("hwnd", 1, "control", 2, "pid", 3)' . "`n"
+	Code .= '_SendInstantTargetCurrent(Target) => Target is Map && Target["hwnd"] == 1 && Target["control"] == 2 && Target["pid"] == 3' . "`n"
+	Code .= 'SendInstant(Text, Prefix := "", ExpectedTarget := unset) {`nglobal _WH_Output, _WH_SendOk`nif !_WH_SendOk`nreturn false`n_WH_Output := Text`nreturn true`n}' . "`n"
 	Code .= 'SendNewResult(Text) {`nglobal _WH_Output`n_WH_Output := Text`nUpdateLastSentCharacter(Text)`n}' . "`n"
 	Rows := [["(", "(", ")", ")", true], [")", "(", ")", ")", true],
 		["[", "[", "]", "]", true], ["*", "*", "*", "*", true],

@@ -6,8 +6,8 @@
 --- Independent expected replies and refusals for the canonical strict JSON owner.
 --- Registered provider tests and real public HTTP receipts share these values.
 --- Duplicate keys, lone surrogates and non-finite decoded numbers are explicit
---- strict-owner refusals, separate from malformed JSON grammar. This contract does
---- not broaden the universal provider corpus or change first-part selection.
+--- strict-owner refusals, separate from malformed JSON grammar. A decoded null
+--- content chunk cannot authorize a partial completion from its later siblings.
 --- ==============================================================================
 
 local M = {}
@@ -235,11 +235,10 @@ M.vectors = {
 		expected = "line\nnext\ttab\"quote",
 	},
 	{
-		name = "anthropic first selection with retained array shape",
+		name = "anthropic null chunk refuses partial completion",
 		format = "anthropic",
 		body = "{\"content\":[null,{\"type\":\"text\",\"text\":\"first\"},{\"type\":\"text\",\"text\":\"second\"}]}",
 		admission = "healthy",
-		expected = "first",
 	},
 	{
 		name = "gemini malformed unknown escape",
@@ -349,11 +348,10 @@ M.vectors = {
 		expected = "line\nnext\ttab\"quote",
 	},
 	{
-		name = "gemini first selection with retained array shape",
+		name = "gemini null chunk refuses partial completion",
 		format = "gemini",
 		body = "{\"candidates\":[{\"content\":{\"parts\":[null,{\"thought\":true,\"text\":\"private\"},{\"text\":\"first\"},{\"text\":\"second\"}]}},{\"content\":{\"parts\":[{\"text\":\"other candidate\"}]}}]}",
 		admission = "healthy",
-		expected = "first",
 	},
 }
 

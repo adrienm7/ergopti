@@ -27,6 +27,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\infra\number.ahk
 
 
 
@@ -83,11 +84,12 @@ Keylayout_DecodeEntities(Value) {
 	while (Found := RegExMatch(Value, _KEYLAYOUT_ENTITY_RE, &M, Pos)) {
 		Out .= SubStr(Value, Pos, Found - Pos)
 		Token := M[1]
-		if (SubStr(Token, 1, 2) == "#x")
-			Out .= Chr(Integer("0x" . SubStr(Token, 3)))
-		else if (SubStr(Token, 1, 1) == "#")
-			Out .= Chr(Integer(SubStr(Token, 2)))
-		else
+		if SubStr(Token, 1, 1) == "#" {
+			Raw := SubStr(Token, 1, 2) == "#x" ? "0x" . SubStr(Token, 3) : SubStr(Token, 2)
+			if !NumberTryParseInputInteger(Raw, &Code) || Code < 0 || Code > 0x10FFFF || (Code >= 0xD800 && Code <= 0xDFFF)
+				throw ValueError("A .keylayout numeric character reference is outside the supported Unicode scalar domain.", -1, Token)
+			Out .= Chr(Code)
+		} else
 			Out .= Map("lt", "<", "gt", ">", "amp", "&", "quot", '"', "apos", "'")[Token]
 		Pos := Found + M.Len
 	}
@@ -159,9 +161,9 @@ _Keylayout_ParseModifierKeys(Keys) {
 ; A required integer attribute, or a refusal naming the element that lacks it.
 _Keylayout_IntegerAttribute(Attrs, Name, Element) {
 	Value := Attrs.Get(Name, "")
-	if !IsInteger(Value)
+	if !NumberTryParseInputInteger(Value, &Parsed)
 		throw ValueError("A .keylayout " . Element . " has no valid " . Name . ".", -1, Value)
-	return Integer(Value)
+	return Parsed
 }
 
 ; A required text attribute, or a refusal naming the element that lacks it.

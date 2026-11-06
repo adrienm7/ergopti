@@ -73,7 +73,7 @@ _LTI_WriteTapHoldTomlIsAtomic() {
 		"_TH_WriteTapHoldToml must NOT delete the live tap_hold.toml first — a crash before FileAppend truncates it (loader-toml-injection-readfile-hotpath)")
 	Assert(InStr(Seg, "FSWriteDurable(StagePath, Content)") > 0,
 		"_TH_WriteTapHoldToml must flush the complete private stage before publication")
-	Assert(InStr(Seg, "FSAtomicMoveReplace(StagePath, BoundPath)") > 0,
+	Assert(InStr(Seg, "FSConfigAtomicMoveReplace(StagePath, BoundPath,") > 0,
 		"_TH_WriteTapHoldToml must publish the complete stage with a write-through atomic replacement")
 }
 Test("tap_hold_writer: _TH_WriteTapHoldToml uses durable atomic replacement (loader-toml-injection-readfile-hotpath)", _LTI_WriteTapHoldTomlIsAtomic)
@@ -103,7 +103,7 @@ Test("tap_hold_writer: _TH_WriteTapHoldDisabled uses durable atomic replacement 
 
 _LTI_LoaderWarnsOnTruncatedConfig() {
 	Src := _LTI_ReadSource("tap_hold_loader.ahk")
-	Seg := _LTI_FuncBody(Src, "LoadTapHoldToml(FilePath, DefaultsFilePath := " . Chr(34) . Chr(34) . ") {")
+	Seg := _DriverFuncBody("LoadTapHoldToml")
 	Assert(Seg != "", "LoadTapHoldToml declaration must exist in tap_hold_loader.ahk")
 	; The sentinel fires only when the parsed config has 0 keys and the user did
 	; not explicitly opt out (InheritDefaults still true). Both conditions plus a

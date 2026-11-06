@@ -431,3 +431,54 @@ _KLRFI_IndexHeartbeat() {
 }
 Test("KLR trusted framing: worker heartbeat during indexing (klr-trusted-frame-progress)",
 	_KLRDC_CheckTeardown.Bind(_KLRFI_IndexHeartbeat))
+
+
+; Joint physical-hole and Unicode framing coverage. The real reader deliberately
+; blanks crash NUL padding before lexical indexing; quoted payload stays exact.
+_KLRFH_Case(ChunkBytes) {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	SavedObserver := KLRRebuild.index_observer
+	Observed := {Calls: 0}
+	Observe(Progress) {
+		AssertEqual("indexing", Progress["phase"])
+		Observed.Calls += 1
+	}
+	try {
+		Payload := "é漢😀'first`nCOMMIT;`nlast é"
+		Parts := [_KLRNF_ThreeDayLedger(), Buffer(5, 0), _KLRFI_Batch(Payload, 91),
+			Buffer(4, 0), _KLRFI_Batch("after physical hole", 92)]
+		LedgerStream := FileOpen(_KLRDC_LedgerPath(), "w", "UTF-8-RAW")
+		try {
+			for Part in Parts {
+				if Part is Buffer {
+					AssertEqual(Part.Size, LedgerStream.RawWrite(Part, Part.Size))
+				} else {
+					Count := StrPut(Part, "UTF-8") - 1
+					Bytes := Buffer(Count + 1)
+					StrPut(Part, Bytes, "UTF-8")
+					AssertEqual(Count, LedgerStream.RawWrite(Bytes, Count))
+				}
+			}
+		} finally LedgerStream.Close()
+		ExpectedSize := FileGetSize(_KLRDC_LedgerPath())
+		Reference := _KLRNF_Build(false)
+		AssertTrue(Reference != 0, "The real one-pass compatibility reader must accept physical holes between canonical transactions")
+		Fingerprint := _KLRDC_DerivedFingerprint(Reference)
+		KLRRebuild.index_observer := Observe
+		Actual := _KLRNF_Build(true, 0, 0, ChunkBytes)
+		AssertTrue(Actual != 0 && Observed.Calls > 0, "The genuine newest-first index, rather than an attached cache, must process these physical bytes")
+		Rows := SQLite_Query(Actual, "SELECT id,replacement FROM events_hotstring ORDER BY id;")
+		AssertEqual(2, Rows.Length, "Both actual serializer rows around the two physical holes must survive")
+		AssertEqual(91, Rows[1]["id"]), AssertEqual(Payload, Rows[1]["replacement"])
+		AssertEqual(92, Rows[2]["id"]), AssertEqual("after physical hole", Rows[2]["replacement"])
+		AssertEqual(Fingerprint, _KLRDC_DerivedFingerprint(Actual), "Physical-byte framing must preserve the independently rebuilt aggregate result")
+		AssertEqual(ExpectedSize, KLRCache.last_sizes[_KLRDC_LedgerPath()], "Consumed byte offsets must include all nine skipped NUL bytes")
+	} finally {
+		KLRRebuild.index_observer := SavedObserver
+		_KLRDC_Cleanup()
+	}
+}
+for _KLRFH_Chunk in [1, 31]
+	Test("KLR trusted frames: physical NUL holes plus Unicode in " . _KLRFH_Chunk . " byte reads preserve canonical rows (klr-frame-hole-unicode)",
+		_KLRDC_CheckTeardown.Bind(_KLRFH_Case.Bind(_KLRFH_Chunk)))

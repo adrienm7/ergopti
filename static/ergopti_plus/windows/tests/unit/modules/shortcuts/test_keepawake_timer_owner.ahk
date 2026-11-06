@@ -71,8 +71,9 @@ _KATO_Source(Receipt) {
 	RegExReplace(DeclarationsCode, "m)^\s*global\b", "", &DeclarationCount)
 	AssertTrue(DeclarationCount >= 6, "all original session defaults must be present")
 	Bound := Original
-	MouseBindings := _KATO_Bind(&Bound, "StartActivitySimulation", "MouseGetPos(", "_KATO_MouseGetPos(", 1)
-	MouseBindings += _KATO_Bind(&Bound, "AwakeCheckMouseMoved", "MouseGetPos(", "_KATO_MouseGetPos(", 1)
+	MouseBindings := _KATO_Bind(&Bound, "StartActivitySimulation", "MCGetPos(", "_KATO_GetPos(", 1)
+	MouseBindings += _KATO_Bind(&Bound, "AwakeCheckMouseMoved", "MCGetPos(", "_KATO_GetPos(", 1)
+	MouseBindings += _KATO_Bind(&Bound, "SimulateActivity", "MCGetPos(", "_KATO_GetPos(", 1)
 	; Every SetTimer call in this whole subject owner uses one identity-preserving
 	; arm/cancel proxy. A future cancel-only repair must cancel the same wrapper.
 	BoundCode := _DriverMaskNonCode(&Bound)
@@ -168,7 +169,8 @@ _KATO_Case(Mode) {
 		AssertEqual("", State.ErrorText)
 		AssertTrue(Receipt is Map)
 		for Pair in [["pid", Pid], ["mode", Mode], ["source_sha256", Hash], ["runtime_sha256", RuntimeHash],
-			["owner_sha256", Owners["owner_sha256"]], ["subject_arms", 1],
+			["owner_sha256", Owners["owner_sha256"]], ["subject_arms", Mode == "retired-keyboard" ? 0 : 1],
+			["controlled_keyboard_deliveries", Mode == "retired-keyboard" ? 2 : 0],
 			["hooks_retired", 1], ["mouse_injected", 0], ["suspended", 0]]
 			AssertEqual(Pair[2], Receipt[Pair[1]], "the terminal receipt must bind actual native cleanup: " . Pair[1])
 	} catch Any as Failure {
@@ -217,6 +219,6 @@ _KATO_Case(Mode) {
 
 }
 
-for _KATO_Mode in ["retired-session", "current-session"]
+for _KATO_Mode in ["retired-session", "current-session", "retired-keyboard"]
 	Test("Keep-awake timer ownership: " . _KATO_Mode . " preserves exact session cancellation (keepawake-timer-owner)",
 		_KATO_Case.Bind(_KATO_Mode))

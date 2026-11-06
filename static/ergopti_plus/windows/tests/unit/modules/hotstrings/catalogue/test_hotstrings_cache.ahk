@@ -178,12 +178,21 @@ TestHsCache_IndexChangeInvalidatesCache() {
 		_SharedDir := Directory
 		DirCreate(Directory . "\modules\hotstrings")
 		IndexPath := Directory . "\modules\hotstrings\_index.toml"
-		FileAppend('[menu]`ncategories_order = ["autocorrection", "magickey"]`n', IndexPath, "UTF-8")
+		FileAppend('[menu]`ncategories_order = ["magickey"]`n[languages]`norder = []`n', IndexPath, "UTF-8")
+		SourcePath := Directory . "\modules\hotstrings\magickey.toml"
+		AssertTrue(FSWriteCreateDurable(SourcePath,
+			'[[ct]]`n"indexprobe" = { output = "Index", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = true }`n'))
 		TsvPath := Directory . "\cache.tsv"
-		FileAppend("old cache", TsvPath, "UTF-8")
+		_HotstringsCacheWriteTsv(TsvPath, _HotstringsCacheBuildRows())
+		AssertTrue(_HotstringsCacheIsFresh(TsvPath), "the genuine initial cache must actually be eligible")
+		AssertTrue(FSWriteDurable(IndexPath,
+			'[menu]`ncategories_order = ["autocorrection", "magickey"]`n[languages]`norder = []`n'))
 		FileSetTime("20000102000000", TsvPath, "M")
 		FileSetTime("20000103000000", IndexPath, "M")
 		Assert(!_HotstringsCacheIsFresh(TsvPath), "a changed shared index must invalidate an existing cache")
+		; Native freshness is a witness, not permission to replace the canonical
+		; process snapshot. Explicit invalidation owns the following re-read.
+		_ParseTomlGroupConfig_InvalidatePath(IndexPath)
 		Common := HotstringsCommonCategories()
 		AssertEqual(2, Common.Length)
 		AssertEqual("autocorrection", Common[1])
@@ -684,3 +693,432 @@ TestHsCache_SharedSourceCustody() {
 	}
 }
 Test("hotstrings cache: callbacks preserve the admitted shared logger source", TestHsCache_SharedSourceCustody)
+
+; Canonical cache source-inventory regressions.
+; Production sources only. The test controls physical files and cold-load module
+; state, never replaces the cache parser, writer, freshness owner or registrar.
+_HSCI_Source(Trigger, Output) {
+	return '[[names]]`n"' . Trigger . '" = { output = "' . Output . '", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }`n'
+}
+
+_HSCI_ContainsNative(Trigger) {
+	global HSE_RegistryByGroup
+	for Key, Entries in HSE_RegistryByGroup
+		for Spec in Entries
+			if Spec.Trigger == Trigger
+				return true
+	return false
+}
+
+_HSCI_CurrentOwner(Mode) {
+	global _SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS
+	global _HotstringsOverrides, HotstringGroupConfig, _HotstringBoundSources
+	global _TomlFileCache, _TomlFileSectionCounts, _TomlCountCache
+	Saved := [_SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS,
+		_HotstringsOverrides, HotstringGroupConfig, _HotstringBoundSources,
+		_TomlFileCache, _TomlFileSectionCounts, _TomlCountCache]
+	Root := A_Temp . "\ergopti_cache_inventory_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	try {
+		DirCreate(Root . "\modules\hotstrings")
+		Index := Root . "\modules\hotstrings\_index.toml"
+		FileCopy(_HsCacheTestSharedDir() . "\modules\hotstrings\_index.toml", Index)
+		_SharedDir := Root
+		; Retain original memo contents independently; fixture reads still enter
+		; the genuine ReadTomlFile owner and generate their own native receipts.
+		_TomlFileCache := _TomlFileCache.Clone()
+		_TomlFileSectionCounts := _TomlFileSectionCounts.Clone()
+		_TomlCountCache := _TomlCountCache.Clone()
+		_HotstringsOverrides := Map(), HotstringGroupConfig := Map(), _HotstringBoundSources := Map()
+		HotstringsResolveBumpGen()
+		Paths := []
+		for Category in HotstringsBundledCategories() {
+			Path := _HotstringsCacheTomlPath(Category)
+			SplitPath(Path, , &Parent)
+			DirCreate(Parent)
+			if Category == "autocorrection"
+				AssertTrue(FSWriteCreateDurable(Path, Mode == "unbound-extension"
+					? _HSCI_Source("newcacheprobe", "New") : _HSCI_Source("oldcacheprobe", "Old")))
+			else
+				AssertTrue(FSWriteCreateDurable(Path, "# genuine empty declared source`n"))
+			Paths.Push(Path)
+			FileSetTime("20000101000000", Path, "M")
+		}
+		FileSetTime("20000101000000", Index, "M")
+		AssertTrue(_TomlFileCache.Has(Index), "the ordinary canonical index read must really populate its memo")
+		Source := _HotstringsCacheTomlPath("autocorrection")
+		Tsv := _HotstringsCacheTsvPath()
+		if Mode == "unbound-extension" {
+			ExtensionRoot := Root . "\extensions"
+			PackDir := ExtensionRoot . "\cacheprobe"
+			DirCreate(PackDir . "\hotstrings")
+			Manifest := '[extension]`nid = "cacheprobe"`nname = "Cache Probe"`nversion = "1.0.0"`n'
+				. '[extension.hotstring_bindings.words]`ncategory = "autocorrection"`nfeature_section = "hotstrings.autocorrection"`nsource = "common"`n'
+			AssertTrue(FSWriteCreateDurable(PackDir . "\manifest.toml", Manifest))
+			BoundPath := PackDir . "\hotstrings\words.toml"
+			AssertTrue(FSWriteCreateDurable(BoundPath, _HSCI_Source("oldcacheprobe", "Old")))
+			FileSetTime("20000101000000", BoundPath, "M")
+			; These are the genuine scanner and route producer used by Prepare.
+			; No binding receipt is manufactured by the fixture.
+			Packs := HotstringExtensions_Scan([ExtensionRoot])
+			AssertEqual(1, Packs.Length)
+			_HotstringBoundSources := HotstringExtensions_RouteBound(Packs)
+			AssertEqual(BoundPath, HotstringsBoundTomlPath("autocorrection"))
+		}
+		if Mode == "edited-during-build" {
+			; These are the exact production build and publish owners used by
+			; Ensure. The ordinary edit occupies their interruptible boundary.
+			Rows := _HotstringsCacheBuildRows()
+			AssertEqual("oldcacheprobe", Rows["autocorrection.names"][1][2])
+			AssertTrue(FSWriteDurable(Source, _HSCI_Source("newcacheprobe", "New")))
+			FileSetTime("20000102000000", Source, "M")
+			_HotstringsCacheWriteTsv(Tsv, Rows)
+		} else {
+			; First load follows the entire real Ensure production pipeline.
+			_HS_CACHE_ROWS := Map(), _HS_CACHE_LOADED := false, _GENERATED_HOTSTRINGS := Map()
+			HotstringsCacheEnsure()
+			AssertTrue(_HS_CACHE_ROWS.Has("autocorrection.names"))
+			if Mode != "unbound-extension"
+				AssertEqual("oldcacheprobe", _HS_CACHE_ROWS["autocorrection.names"][1][2])
+			if Mode == "deleted-source"
+				FileDelete(Source)
+			else if Mode == "unbound-extension" {
+				DirDelete(PackDir, true)
+				Packs := HotstringExtensions_Scan([ExtensionRoot])
+				AssertEqual(0, Packs.Length)
+				_HotstringBoundSources := HotstringExtensions_RouteBound(Packs)
+				AssertEqual("", HotstringsBoundTomlPath("autocorrection"))
+			}
+		}
+		AssertTrue(FileExist(Tsv) != "", "the real durable cache writer must have published a cache")
+		; Model an ordinary completed publication in a later clock second.
+		; No sleep or scheduler timing is used as evidence.
+		FileSetTime("20000103000000", Tsv, "M")
+		Fresh := _HotstringsCacheIsFresh(Tsv)
+		; Cold-load state is isolated exactly as on initial boot. This is an
+		; in-process production reload test, not a claim of OS-process restart.
+		_HS_CACHE_ROWS := Map(), _HS_CACHE_LOADED := false, _GENERATED_HOTSTRINGS := Map()
+		HotstringGroupConfig := Map()
+		HotstringsResolveBumpGen()
+		HSE_TestReset()
+		LoadHotstringsCategory("autocorrection", Map("names", Map("enabled", true)), Map("IsPrivate", true))
+		OldRegistered := _HSCI_ContainsNative("oldcacheprobe")
+		NewRegistered := _HSCI_ContainsNative("newcacheprobe")
+		DiskRows := _HotstringsCacheReadTsv(FileRead(Tsv, "UTF-8"))
+		if Mode == "live" {
+			AssertTrue(Fresh, "an unchanged complete source inventory retains the cache path")
+			AssertTrue(OldRegistered)
+			AssertFalse(NewRegistered)
+		} else {
+			AssertFalse(OldRegistered, "the actual production category owner must never register a removed/replaced rule")
+			if Mode != "unbound-extension"
+				AssertFalse(Fresh, "late TSV mtime cannot establish source-inventory identity")
+			if Mode == "edited-during-build" || Mode == "unbound-extension" {
+				AssertTrue(NewRegistered, "the actual rebuilt native registration must use authoritative edited content")
+				AssertEqual("newcacheprobe", DiskRows["autocorrection.names"][1][2])
+			} else {
+				AssertFalse(NewRegistered)
+				AssertFalse(DiskRows.Has("autocorrection.names"))
+			}
+		}
+	} finally {
+		HSE_TestReset()
+		_SharedDir := Saved[1], _HS_CACHE_ROWS := Saved[2], _HS_CACHE_LOADED := Saved[3]
+		_GENERATED_HOTSTRINGS := Saved[4], _HotstringsOverrides := Saved[5], HotstringGroupConfig := Saved[6]
+		_HotstringBoundSources := Saved[7], _TomlFileCache := Saved[8]
+		_TomlFileSectionCounts := Saved[9], _TomlCountCache := Saved[10]
+		HotstringsResolveBumpGen()
+		HotstringsCommonCategories()
+		DirDelete(Root, true)
+	}
+}
+for _HSCI_Mode in ["live", "deleted-source", "edited-during-build", "unbound-extension"]
+	Test("hotstrings cache source inventory: " . _HSCI_Mode, _HSCI_CurrentOwner.Bind(_HSCI_Mode))
+
+; Additional genuine INITIAL Ensure regression. A real exclusive stage handle
+; makes the real writer issue its real diagnostic. The existing logger observer
+; edits the authoritative input after BuildRows; neither producer is replaced.
+_HSCI_EnsureWriteCallout(Mode) {
+	global _SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS
+	global _HotstringsOverrides, HotstringGroupConfig, _HotstringBoundSources
+	global _TomlFileCache, _TomlFileSectionCounts, _TomlCountCache
+	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_PATH_DATE, _HealthCheckWarnCount
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
+	AssertEqual(0, _LOGGER_TEST_SINK, "a foreign log observer cannot be detached")
+	LoggerState := _TLOG_CaptureLoggerState()
+	AssertFalse(LoggerState.FlushActive)
+	Saved := [_SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS,
+		_HotstringsOverrides, HotstringGroupConfig, _HotstringBoundSources,
+		_TomlFileCache, _TomlFileSectionCounts, _TomlCountCache]
+	SavedRepeat := _LOGGER_REPEAT_ENABLED, SavedDate := _LOGGER_PATH_DATE
+	HadWarnings := IsSet(_HealthCheckWarnCount)
+	SavedWarnings := HadWarnings ? _HealthCheckWarnCount : 0
+	Root := A_Temp . "\ergopti_initial_cache_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Created := false, RegistryScope := 0
+	Lock := 0, Failure := 0, PreviousCritical := A_IsCritical
+	Facts := {logs: 0, critical: false, changed: false, failure: 0, ownedCalls: 0, ownedReturns: 0, collisions: []}
+	OwnedWriter := FSWriteReplaceOwned, HadOwnedCall := OwnedWriter.HasOwnProp("Call"), InstalledOwned := false
+	if HadOwnedCall
+		SavedOwnedCall := OwnedWriter.GetOwnPropDesc("Call")
+	ObserveOwned(This, Target, Content, Suffix, &Detail := "", StageFn := 0,
+			BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true,
+			&Publication := 0, FlushFn := 0) {
+		Mine := (Target is String) && StrCompare(Target, Tsv, true) == 0
+		CreateOriginal(Folder, Name, Attributes) {
+			ForeignPath := Tsv . Suffix
+			AssertEqual(1, FSWriteCreateDurable(ForeignPath, "Independent cache collision"))
+			Facts.collisions.Push(ForeignPath)
+			return StageFn.Call(Folder, Name, Attributes)
+		}
+		if Mine
+			Facts.ownedCalls += 1
+		Result := Func.Prototype.Call.Call(This, Target, Content, Suffix, &Detail,
+			Mine ? CreateOriginal : StageFn, BeforePublishFn, AdmissionFn, ReplaceExisting, &Publication, FlushFn)
+		if Mine
+			Facts.ownedReturns += 1
+		return Result
+	}
+	OnLog(Line) {
+		if !InStr(Line, "Could not write hotstring cache", true)
+			return
+		Facts.logs += 1
+		if Facts.logs != 1
+			return
+		Facts.critical := A_IsCritical
+		try {
+			if Mode == "index" {
+				NewIndex := StrReplace(IndexImage,
+					'categories_order = ["autocorrection", "magickey"]', 'categories_order = ["magickey"]', , &Replacements, 1)
+				if Replacements != 1
+					throw Error("the independent index fixture must remove precisely its common source")
+				Facts.changed := FSWriteDurable(Index, NewIndex)
+			} else
+				Facts.changed := FSWriteDurable(Source, _HSCI_Source("newcacheprobe", "New"))
+		} catch as Err
+			Facts.failure := Err
+	}
+	try {
+		Critical("Off")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		RegistryScope := _PECASE_RegistryScope()
+		DirCreate(Root . "\modules\hotstrings")
+		Index := Root . "\modules\hotstrings\_index.toml"
+		FileCopy(_HsCacheTestSharedDir() . "\modules\hotstrings\_index.toml", Index)
+		_SharedDir := Root
+		_TomlFileCache := _TomlFileCache.Clone()
+		_TomlFileSectionCounts := _TomlFileSectionCounts.Clone()
+		_TomlCountCache := _TomlCountCache.Clone()
+		_HotstringsOverrides := Map(), HotstringGroupConfig := Map(), _HotstringBoundSources := Map()
+		HotstringsResolveBumpGen()
+		for Category in HotstringsBundledCategories() {
+			Path := _HotstringsCacheTomlPath(Category)
+			SplitPath(Path, , &Parent)
+			DirCreate(Parent)
+			AssertTrue(FSWriteCreateDurable(Path, Category == "autocorrection"
+				? _HSCI_Source("oldcacheprobe", "Old") : "# empty canonical source`n"))
+		}
+		IndexImage := ReadTomlFile(Index)
+		AssertEqual(FSReadStrict(Index), IndexImage, "the initial canonical memo must be the actual index A")
+		Source := _HotstringsCacheTomlPath("autocorrection")
+		Tsv := _HotstringsCacheTsvPath()
+		AssertFalse(FileExist(Tsv), "this must exercise the first production build, not a disk cache hit")
+		OwnedWriter.DefineProp("Call", {Call: ObserveOwned})
+		InstalledOwned := true
+		_ResetLogger()
+		LOGGER_SUB_FILES := Map(), _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
+		_LOGGER_REPEAT_ENABLED := false, _LOGGER_PATH_DATE := ""
+		LoggerSetTestSink(OnLog)
+		_HS_CACHE_ROWS := Map(), _HS_CACHE_LOADED := false, _GENERATED_HOTSTRINGS := Map()
+		HSE_TestReset()
+		try LoadHotstringsCategory("autocorrection", Map("names", Map("enabled", true)), Map("IsPrivate", true))
+		catch as Err
+			Failure := Err
+		LoggerClearTestSink()
+		if Facts.failure is Error
+			throw Facts.failure
+		_TestPrint("# initial-cache-owned-diagnostic mode=" . Mode . " owned_calls=" . Facts.ownedCalls
+			. " owned_returns=" . Facts.ownedReturns . " collisions=" . Facts.collisions.Length . " logs=" . Facts.logs)
+		AssertTrue(Facts.ownedCalls >= 1)
+		AssertEqual(Facts.ownedCalls, Facts.ownedReturns)
+		AssertEqual(Facts.ownedCalls, Facts.collisions.Length)
+		for ForeignPath in Facts.collisions
+			AssertEqual("Independent cache collision", FSReadUtf8Exact(ForeignPath), "the real refused cache owner cannot retire the foreign stage")
+		AssertTrue(Facts.logs >= 1, "the actual writer must really reach its post-build diagnostic")
+		AssertFalse(Facts.critical, "the genuine yielding diagnostic must stay interruptible")
+		AssertTrue(Facts.changed is Integer && Facts.changed == 1, "the observer must physically change its authoritative input")
+		AssertFalse(_HSCI_ContainsNative("oldcacheprobe"), "initial Ensure must never publish the pre-diagnostic rule")
+		AssertFalse(FileExist(Tsv), "a valid TOML load cannot depend on successful disk cache publication")
+		if Mode == "category" {
+			AssertFalse(Failure is Error)
+			AssertTrue(_HS_CACHE_LOADED)
+			AssertTrue(_HSCI_ContainsNative("newcacheprobe"), "the bounded retry must load the genuinely edited source")
+			AssertEqual("newcacheprobe", _HS_CACHE_ROWS["autocorrection.names"][1][2])
+		} else {
+			AssertTrue(Failure is Error, "stale canonical index A cannot authorize a memory projection against actual index B")
+			AssertContains(Failure.Message, "no cache projection was published")
+			AssertFalse(_HS_CACHE_LOADED)
+			AssertEqual(0, _HS_CACHE_ROWS.Count)
+			AssertEqual(0, _GENERATED_HOTSTRINGS.Count)
+			AssertEqual(IndexImage, ReadTomlFile(Index), "verification must not silently bless or replace the canonical memo A")
+			AssertTrue(StrCompare(IndexImage, FSReadStrict(Index), true) != 0, "the actual disk index B must remain changed")
+		}
+		AssertTrue(Facts.logs <= 2, "source movement must settle or refuse within the bounded producer attempts")
+	} finally {
+		if InstalledOwned {
+			if HadOwnedCall
+				OwnedWriter.DefineProp("Call", SavedOwnedCall)
+			else
+				OwnedWriter.DeleteProp("Call")
+		}
+		LoggerClearTestSink()
+		_LOGGER_REPEAT_ENABLED := SavedRepeat, _LOGGER_PATH_DATE := SavedDate
+		_TLOG_RestoreLoggerState(LoggerState)
+		_HealthCheckWarnCount := HadWarnings ? SavedWarnings : unset
+		CloseFailure := 0
+		try {
+			if IsObject(Lock)
+				Lock.Close()
+		} catch as Err
+			CloseFailure := Err
+		if IsObject(RegistryScope) {
+			HSE_TestReset()
+			_PECASE_RegistryScope(RegistryScope)
+		}
+		_SharedDir := Saved[1], _HS_CACHE_ROWS := Saved[2], _HS_CACHE_LOADED := Saved[3]
+		_GENERATED_HOTSTRINGS := Saved[4], _HotstringsOverrides := Saved[5], HotstringGroupConfig := Saved[6]
+		_HotstringBoundSources := Saved[7], _TomlFileCache := Saved[8]
+		_TomlFileSectionCounts := Saved[9], _TomlCountCache := Saved[10]
+		HotstringsResolveBumpGen()
+		HotstringsCommonCategories()
+		try {
+			if CloseFailure is Error
+				throw CloseFailure
+			if Created
+				DirDelete(Root, true)
+		} finally Critical(PreviousCritical)
+	}
+}
+Test("hotstrings cache initial publication: real writer diagnostic edits category", _HSCI_EnsureWriteCallout.Bind("category"))
+Test("hotstrings cache initial publication: canonical memo A cannot bless actual index B", _HSCI_EnsureWriteCallout.Bind("index"))
+
+_HCOW_PublicEnsure(Collision, TruncateStage := false) {
+	global _SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS
+	global _TomlFileCache, _TomlFileSectionCounts, _TomlCountCache, HS_BUNDLED_CATEGORIES, _HotstringBoundSources
+	Saved := [_SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS,
+		_TomlFileCache, _TomlFileSectionCounts, _TomlCountCache, HS_BUNDLED_CATEGORIES, _HotstringBoundSources]
+	Root := A_Temp . "\ergopti_cache_stage_owner_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Created := false
+	OwnedWriter := FSWriteReplaceOwned, HadOwnedCall := OwnedWriter.HasOwnProp("Call"), InstalledOwned := false
+	if HadOwnedCall
+		SavedOwnedCall := OwnedWriter.GetOwnPropDesc("Call")
+	Fault := {calls: 0, handle: -1, truncated: 0, observedBytes: -1, nativeAck: -1, stagePath: ""}
+	ObserveOwned(This, Target, Content, Suffix, &Detail := "", StageFn := 0,
+			BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true,
+			&Publication := 0, FlushFn := 0) {
+		Mine := (Target is String) && StrCompare(Target, Tsv, true) == 0
+		CreateOriginal(Folder, Name, Attributes) {
+			Fault.handle := StageFn.Call(Folder, Name, Attributes)
+			Fault.stagePath := Tsv . Suffix
+			return Fault.handle
+		}
+		TruncateThenVerify() {
+			_FSRewind(Fault.handle)
+			Prefix := Buffer(1, 0x23)
+			if !_FSNativeWrite(Fault.handle, Prefix.Ptr, 1, &Written := 0) || Written != 1
+				throw Error("the genuine private stage prefix could not be written")
+			if !DllCall("kernel32\SetEndOfFile", "Ptr", Fault.handle, "Int")
+				throw OSError(A_LastError, "private held cache stage truncation")
+			if !DllCall("kernel32\FlushFileBuffers", "Ptr", Fault.handle, "Int")
+				throw OSError(A_LastError, "private truncated cache flush")
+			if !DllCall("kernel32\GetFileSizeEx", "Ptr", Fault.handle, "Int64*", &Bytes := 0, "Int")
+				throw OSError(A_LastError, "private truncated cache size")
+			Fault.observedBytes := Bytes
+			Fault.truncated += 1
+			return BeforePublishFn.Call()
+		}
+		if Mine
+			Fault.calls += 1
+		Result := Func.Prototype.Call.Call(This, Target, Content, Suffix, &Detail,
+			Mine ? CreateOriginal : StageFn, Mine ? TruncateThenVerify : BeforePublishFn,
+			AdmissionFn, ReplaceExisting, &Publication, FlushFn)
+		if Mine
+			Fault.nativeAck := Result
+		return Result
+	}
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		DirCreate(Root . "\modules\hotstrings")
+		FileCopy(_HsCacheTestSharedDir() . "\modules\hotstrings\_index.toml", Root . "\modules\hotstrings\_index.toml")
+		_SharedDir := Root
+		_TomlFileCache := _TomlFileCache.Clone()
+		_TomlFileSectionCounts := _TomlFileSectionCounts.Clone()
+		_TomlCountCache := _TomlCountCache.Clone()
+		_HotstringBoundSources := Map()
+		for Category in HotstringsBundledCategories() {
+			Path := _HotstringsCacheTomlPath(Category)
+			SplitPath(Path, , &Parent)
+			DirCreate(Parent)
+			AssertEqual(1, FSWriteCreateDurable(Path, Category == "autocorrection"
+				? _HSCI_Source("cacheownerprobe", "Owned output") : "# genuine empty source`n"))
+		}
+		Tsv := _HotstringsCacheTsvPath(), Foreign := Tsv . ".tmp"
+		Sentinel := "Independent cache stage é😀"
+		if Collision {
+			AssertEqual(1, FSWriteCreateDurable(Foreign, Sentinel))
+			Before := FSReadBytesStrict(Foreign)
+		}
+		_HS_CACHE_ROWS := Map(), _GENERATED_HOTSTRINGS := Map(), _HS_CACHE_LOADED := false
+		if TruncateStage {
+			OwnedWriter.DefineProp("Call", {Call: ObserveOwned})
+			InstalledOwned := true
+		}
+		HotstringsCacheEnsure()
+		Present := FSStrictExists(Foreign), CachePresent := FSStrictExists(Tsv)
+		After := Present ? FSReadBytesStrict(Foreign) : Buffer(0)
+		_TestPrint("# hotstrings-cache-stage collision=" . Collision . " foreign_present=" . Present
+			. " cache_present=" . CachePresent . " loaded=" . _HS_CACHE_LOADED
+			. " has_rows=" . _HS_CACHE_ROWS.Has("autocorrection.names") . " foreign_bytes=" . After.Size
+			. " truncated=" . Fault.truncated . " observed_stage_bytes=" . Fault.observedBytes . " native_ack=" . Fault.nativeAck)
+		AssertTrue(_HS_CACHE_LOADED, "valid TOML remains loadable even if the best-effort cache cannot publish")
+		AssertEqual("cacheownerprobe", _HS_CACHE_ROWS["autocorrection.names"][1][2])
+		AssertEqual("Owned output", _HS_CACHE_ROWS["autocorrection.names"][1][3])
+		if Collision {
+			AssertTrue(Present, "public Ensure cannot consume an independently created cache stage")
+			AssertEqual(Before.Size, After.Size)
+			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+				"Ptr", After, "UPtr", Before.Size, "UPtr"), "foreign cache bytes remain exact")
+		} else if TruncateStage {
+			AssertEqual(1, Fault.calls)
+			AssertEqual(1, Fault.truncated, "the actual owned native stage must be physically truncated after its first flush")
+			AssertEqual(1, Fault.observedBytes)
+			AssertEqual(0, Fault.nativeAck, "the genuine helper must refuse the corrupt held stage")
+			AssertFalse(CachePresent, "a complete-looking prefix cannot receive a reusable cache publication")
+			AssertFalse(FSStrictExists(Fault.stagePath), "only the owned rejected stage is retired")
+		} else {
+			AssertTrue(CachePresent, "the default native writer still produces a reusable verified cache")
+			Disk := _HotstringsCacheReadTsv(FSReadUtf8Exact(Tsv))
+			AssertTrue(_HotstringsCacheInventoryMatches(Disk))
+			AssertEqual("cacheownerprobe", Disk["autocorrection.names"][1][2])
+		}
+	} finally {
+		if InstalledOwned {
+			if HadOwnedCall
+				OwnedWriter.DefineProp("Call", SavedOwnedCall)
+			else
+				OwnedWriter.DeleteProp("Call")
+		}
+		_SharedDir := Saved[1], _HS_CACHE_ROWS := Saved[2], _HS_CACHE_LOADED := Saved[3]
+		_GENERATED_HOTSTRINGS := Saved[4], _TomlFileCache := Saved[5]
+		_TomlFileSectionCounts := Saved[6], _TomlCountCache := Saved[7]
+		HS_BUNDLED_CATEGORIES := Saved[8], _HotstringBoundSources := Saved[9]
+		if Created
+			DirDelete(Root, true)
+	}
+}
+for _HCOW_Collision in [true, false]
+	Test("hotstrings cache stage: public Ensure collision=" . _HCOW_Collision
+		. " (hotstrings-cache-stage-ownership)", _HCOW_PublicEnsure.Bind(_HCOW_Collision))

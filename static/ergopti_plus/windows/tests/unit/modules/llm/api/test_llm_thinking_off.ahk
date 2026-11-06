@@ -406,10 +406,115 @@ Test("LLM thinking off: models that accept only the default sampling get no temp
 	_LTO_WithoutListingFetch.Bind(_LTO_DefaultSamplingOnly))
 
 _LTO_RetryCancelReachesTheRetry() {
-	global _LLM_Remote_RetryOf
-	AssertEqual(42, _LLMRemoteRetryOf(7, 42), "the retry's id passes through")
-	AssertEqual(42, _LLM_Remote_RetryOf.Get(7, 0), "the original id names its retry")
-	LLM_RemoteCancelAsync(7)
-	AssertFalse(_LLM_Remote_RetryOf.Has(7), "cancelling the original id reaches the retry")
+	global _LLM_Remote_RetryOf, _LLM_Remote_Async, _LLM_Remote_AsyncCounter
+	AssertEqual(0, _LLM_Remote_Async.Count, "the live cancellation control requires an idle registry")
+	Original := ++_LLM_Remote_AsyncCounter, Retry := ++_LLM_Remote_AsyncCounter
+	Entry := _LLMRemote_ReserveRequest(Retry, (*) => 0, (*) => 0, 10000, A_TickCount)
+	try {
+		AssertEqual(Retry, _LLMRemoteRetryOf(Original, Retry), "the retry's id passes through")
+		AssertEqual(Retry, _LLM_Remote_RetryOf.Get(Original, 0), "the original id names its live retry")
+		LLM_RemoteCancelAsync(Original)
+		AssertTrue(Entry["cancelled"], "the original public handle cancels its exact live child")
+		AssertFalse(_LLM_Remote_RetryOf.Has(Original), "cancelling the original id reaches the retry")
+	} finally {
+		LLM_RemoteCancelAsync(Original)
+		_LLMRemote_DeleteOwned(Retry, Entry)
+	}
 }
 Test("LLM thinking off: cancelling a prediction cancels its retry", _LTO_RetryCancelReachesTheRetry)
+
+
+; A synchronous terminal child must not acquire an alias after its callbacks
+; already retired it. The first ordinary refusal also controls the no-alias path.
+_LATRA_CancelAtFactory(State) {
+	global _LLM_Remote_AsyncCounter
+	State.FactoryCalls += 1
+	State.FactoryChild := _LLM_Remote_AsyncCounter
+	LLM_RemoteCancelAsync(State.FactoryChild)
+	State.Http := CurlAsyncRequest()
+	return State.Http
+}
+
+_LATRA_SynchronousChild(FactoryCancel) {
+	global _LLM_Remote_RetryOf, _LLM_Remote_Async
+	AssertEqual(0, _LLM_Remote_Async.Count, "the public synchronous boundary requires an idle registry")
+	Before := _LLM_Remote_RetryOf.Count
+	State := {Success: 0, Failure: 0, FactoryCalls: 0, FactoryChild: 0, Http: 0}
+	Success := (*) => State.Success += 1
+	Failure := (*) => State.Failure += 1
+	Resolved := Map("Provider", "openai_compat", "Format", "openai", "Model", "owned-alias-test", "Token", "owned-fixture-token")
+	InvalidUrl := "http://127.0.0.1/owned" . Chr(0)
+	Original := LLM_RemotePostBody_Async(Resolved, InvalidUrl, "{}", Success, Failure, 10000)
+	Child := 0
+	try {
+		AssertTrue(Original is Integer && Original > 0)
+		AssertFalse(_LLM_Remote_Async.Has(Original), "real URL validation must synchronously retire the ordinary reservation")
+		AssertEqual(1, State.Failure)
+		AssertEqual(0, State.Success)
+		AssertEqual(Before, _LLM_Remote_RetryOf.Count, "an ordinary request creates no cancellation alias")
+		Port := FactoryCancel ? Map("managed_settings", (*) => 0, "create_http", _LATRA_CancelAtFactory.Bind(State)) : 0
+		Url := FactoryCancel ? "http://127.0.0.1:0/owned" : InvalidUrl
+		Child := _LLMRemoteRetryOf(Original, LLM_RemotePostBody_Async(Resolved, Url, "{}", Success, Failure, 10000, "", 0, 0, Port))
+		AssertTrue(Child is Integer && Child > Original)
+		AssertFalse(_LLM_Remote_Async.Has(Child), "the child must already be physically retired before alias publication")
+		AssertEqual(FactoryCancel ? 1 : 2, State.Failure)
+		AssertEqual(0, State.Success)
+		if FactoryCancel {
+			AssertEqual(1, State.FactoryCalls)
+			AssertEqual(Child, State.FactoryChild)
+			AssertTrue(State.Http is CurlAsyncRequest && State.Http.Aborted && State.Http.Completed)
+			AssertFalse(State.Http.SendStarted, "factory cancellation must precede managed staging or any network request")
+			AssertFalse(IsObject(State.Http.Handle))
+			AssertFalse(State.Http.CleanupPending)
+		}
+		_TestPrint("# RETRY_ALIAS_SYNC factory_cancel=" . FactoryCancel . " failures=" . State.Failure
+			. " ordinary=" . Original . " child=" . Child . " child_live=" . _LLM_Remote_Async.Has(Child)
+			. " alias_before=" . Before . " alias_after=" . _LLM_Remote_RetryOf.Count)
+		AssertFalse(_LLM_Remote_RetryOf.Has(Original), "a completed child cannot gain a post-completion cancellation alias")
+		AssertEqual(Before, _LLM_Remote_RetryOf.Count)
+	} finally {
+		LLM_RemoteCancelAsync(Original)
+		if Child && _LLM_Remote_Async.Has(Child)
+			LLM_RemoteCancelAsync(Child)
+	}
+}
+Test("LLM retry alias: synchronous public refusal leaves no alias (remote-retry-alias-companion)", _LATRA_SynchronousChild.Bind(false))
+Test("LLM retry alias: factory cancellation leaves no alias (remote-retry-alias-companion)", _LATRA_SynchronousChild.Bind(true))
+
+_LATRA_ExactRetirement(Trim := false) {
+	global _LLM_Remote_RetryOf, _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LLM_REMOTE_MAX_INFLIGHT
+	AssertEqual(0, _LLM_Remote_Async.Count, "the exact-custody control requires an idle registry")
+	Before := _LLM_Remote_RetryOf.Count, PreviousLimit := LLM_REMOTE_MAX_INFLIGHT
+	Failures := {Count: 0}
+	OriginalA := ++_LLM_Remote_AsyncCounter, ChildA := ++_LLM_Remote_AsyncCounter
+	OriginalB := ++_LLM_Remote_AsyncCounter, ChildB := ++_LLM_Remote_AsyncCounter
+	EntryA := _LLMRemote_ReserveRequest(ChildA, (*) => 0, (*) => Failures.Count += 1, 10000, A_TickCount)
+	EntryB := _LLMRemote_ReserveRequest(ChildB, (*) => 0, (*) => 0, 10000, A_TickCount)
+	try {
+		AssertEqual(ChildA, _LLMRemoteRetryOf(OriginalA, ChildA))
+		AssertEqual(ChildB, _LLMRemoteRetryOf(OriginalB, ChildB))
+		AssertEqual(Before + 2, _LLM_Remote_RetryOf.Count)
+		if Trim {
+			LLM_REMOTE_MAX_INFLIGHT := 2
+			_LLMRemote_TrimAsyncRegistry()
+		} else
+			AssertTrue(_LLMRemote_DeleteOwned(ChildA, EntryA), "only exact reservation A is retired")
+		AssertEqual(Trim ? 1 : 0, Failures.Count, "a live capacity eviction still reports its failure exactly once")
+		AssertFalse(_LLM_Remote_RetryOf.Has(OriginalA), "retired child A must release its own alias")
+		AssertEqual(ChildB, _LLM_Remote_RetryOf.Get(OriginalB, 0), "another active alias must remain cancellable")
+		AssertTrue(_LLM_Remote_Async.Has(ChildB) && _LLM_Remote_Async[ChildB] == EntryB)
+		LLM_RemoteCancelAsync(OriginalB)
+		AssertTrue(EntryB["cancelled"], "the preserved alias still reaches exact child B")
+		AssertFalse(_LLM_Remote_RetryOf.Has(OriginalB))
+		AssertTrue(_LLMRemote_DeleteOwned(ChildB, EntryB))
+		AssertEqual(Before, _LLM_Remote_RetryOf.Count)
+	} finally {
+		LLM_REMOTE_MAX_INFLIGHT := PreviousLimit
+		LLM_RemoteCancelAsync(OriginalA)
+		LLM_RemoteCancelAsync(OriginalB)
+		_LLMRemote_DeleteOwned(ChildA, EntryA)
+		_LLMRemote_DeleteOwned(ChildB, EntryB)
+	}
+}
+Test("LLM retry alias: exact retirement preserves another active alias (remote-retry-alias-companion)", _LATRA_ExactRetirement.Bind(false))
+Test("LLM retry alias: capacity trim preserves another active alias (remote-retry-alias-companion)", _LATRA_ExactRetirement.Bind(true))

@@ -1,0 +1,60 @@
+{
+	"provider": "mistral",
+	"sdk_version": "v1.9.11",
+	"status": "Native fail-before demonstrated; Windows implementation admits ordered ordinary text chunks. Post-fix qualification pending.",
+	"schema_chain": [
+		"ChatCompletionResponse.choices",
+		"ChatCompletionChoice.message",
+		"AssistantMessage.content: String | Array[ContentChunk]"
+	],
+	"sources": [
+		{
+			"file": "assistantmessage.py",
+			"url": "https://raw.githubusercontent.com/mistralai/client-python/v1.9.11/src/mistralai/models/assistantmessage.py",
+			"sha256": "dea6c2ada6698d7fdc9578d3d7080e05e42e4018d7db65cb40c225477bf97d9c"
+		},
+		{
+			"file": "chatcompletionchoice.py",
+			"url": "https://raw.githubusercontent.com/mistralai/client-python/v1.9.11/src/mistralai/models/chatcompletionchoice.py",
+			"sha256": "ea22052d98f6298c741c57f34b7f84dec3571ba98f100943c97c4803989923f5"
+		},
+		{
+			"file": "chatcompletionresponse.py",
+			"url": "https://raw.githubusercontent.com/mistralai/client-python/v1.9.11/src/mistralai/models/chatcompletionresponse.py",
+			"sha256": "a71d218c26a902d4cfe74bb7ea189074f702f57e8b53cd4dab9689dc09687e33"
+		},
+		{
+			"file": "contentchunk.py",
+			"url": "https://raw.githubusercontent.com/mistralai/client-python/v1.9.11/src/mistralai/models/contentchunk.py",
+			"sha256": "15d2c09dd792b8d5cf4891948a961912869e8c52b1b28aac43f2abbcdbb69867"
+		},
+		{
+			"file": "textchunk.py",
+			"url": "https://raw.githubusercontent.com/mistralai/client-python/v1.9.11/src/mistralai/models/textchunk.py",
+			"sha256": "d950fe4d1dcd38e589f49cdcc3f137af2ab4196cfa6f95d23f7939a3ba159677"
+		},
+		{
+			"file": "thinkchunk.py",
+			"url": "https://raw.githubusercontent.com/mistralai/client-python/v1.9.11/src/mistralai/models/thinkchunk.py",
+			"sha256": "1e90f6dcb940cc84d1b53408da7696629e270c34a7cd5ed4f7b4285d26f2d858"
+		}
+	],
+	"multipart_semantics": {
+		"url": "https://docs.mistral.ai/capabilities/reasoning/",
+		"sha256": "be59091d392eadca8f7b8e40faaebbdb12aee97514a1e9d9b4a66bd78092ad24",
+		"excerpts": [
+			{
+				"section": "Handling thinking chunks",
+				"text": "When reasoning_effort is set to \"high\", the response message.content is a list of chunks instead of a plain string. ThinkChunk (type: \"thinking\") contains the reasoning trace; TextChunk (type: \"text\") contains the final answer."
+			},
+			{
+				"section": "Multi-turn conversations / final-answer display",
+				"python": "answer = \"\".join(\n    c.text for c in (content or []) if isinstance(c, TextChunk)\n)\nprint(answer)"
+			},
+			{
+				"section": "zai-glm-5-3",
+				"text": "message.content is always returned as a list of chunks (thinking + text) regardless of the reasoning_effort value; there is no plain-string mode."
+			}
+		]
+	}
+}

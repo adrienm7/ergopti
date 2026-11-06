@@ -1981,7 +1981,7 @@ _PrefixWordTail(Buf) {
 	while Position > 0 {
 		Start := _TextCodepointStart(Buf, Position)
 		Ch := SubStr(Buf, Start, Position - Start + 1)
-		if _TextCompleteTailScalar(Ch) != "" && InStr(Boundaries, Ch)
+		if _TextCompleteTailScalar(Ch) != "" && InStr(Boundaries, Ch, true)
 			break
 		Tail := Ch . Tail
 		Position := Start - 1
@@ -2123,7 +2123,7 @@ _PrefixAppendTypedChar(Char) {
 	; live trigger prefix. HSE_Buffer deliberately keeps the terminator (triggers
 	; may contain one as a non-final char); the preview only tracks the current
 	; word, so it starts fresh here.
-	if CompletedScalar != "" && InStr(_PrefixWordBoundaries(), CompletedScalar) {
+	if CompletedScalar != "" && InStr(_PrefixWordBoundaries(), CompletedScalar, true) {
 		_ResetPrefixBuffer(false)
 		; The boundary itself may be the body of a boundary-leading star trigger
 		; (for example " ★"). HSE_Buffer retains it, so ask the canonical oracle

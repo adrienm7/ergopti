@@ -78,9 +78,22 @@ _KL_RolloverPrepare(Token, Date) {
 	}
 }
 
+; FSDeleteVerified pins Candidate against replacement while this adapter read
+; compares its complete identity with the original consumed receipt.
+_KL_RolloverSnapshotMatches(Expected, Candidate) {
+	Observed := FSReadRange(Candidate, 0, 0)
+	Snapshot := Observed.Get("snapshot", Map("ok", false))
+	if !Observed.Get("ok", false) || !Snapshot.Get("ok", false)
+		return false
+	for Name in ["volume", "index_high", "index_low", "write_high", "write_low", "size"]
+		if Snapshot[Name] != Expected[Name]
+			return false
+	return true
+}
+
 ; Called under journal ownership at startup and before a new writer is admitted.
 ; A missing file is recoverable only after a durable pending receipt exists.
-_KL_RolloverResume(Token) {
+_KL_RolloverResume(Token, BeforeDeleteFn := 0) {
 	_KL_JournalOwnerFor().Require(Token)
 	Receipt := _KL_RolloverPending()
 	if !Receipt
@@ -94,15 +107,19 @@ _KL_RolloverResume(Token) {
 		if FileExist(Keystats.today_log_path) {
 			Reader := FileOpen(Keystats.today_log_path, "r-w", "UTF-8")
 			Current := FSHandleSnapshot(Reader.Handle)
-			Expected := Receipt["snapshot"]
+			Expected := Receipt["snapshot"].Clone()
 			if !Expected["present"] || !Current.Get("ok", false)
 				throw Error("Pending rollover journal identity changed.")
 			for Name in ["volume", "index_high", "index_low", "write_high", "write_low", "size"]
 				if Current[Name] != Expected[Name]
 					throw Error("Pending rollover journal identity changed.")
-			FileDelete(Keystats.today_log_path)
+			; Optional native-I/O cutpoint; production performs no callback.
+			if HasMethod(BeforeDeleteFn, "Call")
+				BeforeDeleteFn.Call()
 			Reader.Close()
 			Reader := 0
+			if !FSDeleteVerified(Keystats.today_log_path, _KL_RolloverSnapshotMatches.Bind(Expected))
+				throw Error("Consumed rollover journal changed before deletion.")
 		}
 		OldDate := Keystats.today_log_date
 		OldOffset := Keystats.today_log_offset
@@ -169,11 +186,16 @@ KL_DayRollover(Token := 0) {
 	        ; The delete is unreachable until the reader reports EOF from a
 	        ; successful ingest; a failed append/read/save leaves today.log intact.
 	        loop {
+	            BeforeOffset := Keystats.today_log_offset
 	            ingest_result := KL_IngestOnce(true, true, Scope.Token)
 	            if !ingest_result["ok"]
 	                return Map("ok", false, "reason", ingest_result["reason"])
 	            if ingest_result["eof"]
 	                break
+	            ; An unterminated final record is deliberately retained. It cannot
+	            ; be completed by the resident writer before this owner yields.
+	            if Keystats.today_log_offset <= BeforeOffset
+	                return Map("ok", false, "reason", "journal_no_progress")
 	        }
 
 	        ; The marker joins the acknowledged ledger through the same receipt, so

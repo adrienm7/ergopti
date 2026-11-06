@@ -348,3 +348,155 @@ _CPT_FirstBootFailureSchedulesNoElevatedWork() {
 }
 Test("AHK-15-persistence: first-boot marker failure schedules no side effect",
 	_CPT_FirstBootFailureSchedulesNoElevatedWork)
+
+; A delegated data-clone observation models one ordinary AHK interruption after
+; the real clone is complete. Ownership, codecs, writers and dispatcher gates
+; are never replaced. The same second menu action must survive either ordering.
+_GCPO_Arm(State, Callback, DelayMs) {
+	State.Timers.Push(Callback)
+	State.Arms += 1
+	return TimerArmOneShotMs(Callback, DelayMs)
+}
+
+_GCPO_B(State, *) {
+	global GestureAssignments, GestureActionParameters
+	if !State.Active
+		return false
+	State.BCalls += 1
+	if State.Mode == "parameter"
+		State.BResult := GestureSetActionParameter("gesture__tap_4", "open_url", "https://new-b.example/")
+	else if State.Mode == "assignment"
+		State.BResult := _GestureCommitAssignment(&GestureAssignments, &GestureActionParameters,
+			"gestures", "tap_4", "open_url", Map("has_value", true,
+				"key", "gesture__tap_4__open_url", "value", "https://new-b.example/"))
+	else
+		State.BResult := CapsWordAutoOffStore("shortcuts.caps_word.pointer.left_click", true)
+	return State.BResult
+}
+
+_GCPO_ObserveClone(State, This, Args*) {
+	State.Depth += 1
+	try Copy := Func.Prototype.Call.Call(This, Args*)
+	finally State.Depth -= 1
+	if State.Active && !State.Fired && State.Depth == 0 {
+		State.Fired := true
+		State.BusyAtClone := MenuCommandConfigBusy()
+		; Real menu admission executes B now outside a lease, or schedules the
+		; same B on its genuine native timer while an owned builder is active.
+		State.DispatchResult := MenuCommandRun(_GCPO_B.Bind(State), [], 0, 0, _GCPO_Arm.Bind(State))
+		State.BCallsAtClone := State.BCalls
+	}
+	return Copy
+}
+
+_GCPO_Run(Mode) {
+	global ConfigurationFile, GestureAssignments, GestureActionParameters, _MenuStartupCommands
+	global _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache
+	AssertTrue((_MenuStartupCommands is Integer) && _MenuStartupCommands == 0,
+		"This command fixture cannot adopt another startup's pending menu intentions")
+	AssertFalse(_ConfigWriteTerminalIsActive())
+	AssertFalse(MenuCommandConfigBusy(), "The actual dispatcher must begin without an inherited writer or reader")
+	Saved := {Path: ConfigurationFile, Assignments: GestureAssignments, Parameters: GestureActionParameters,
+		CapsValues: CapsWordAutoOff.Values, CapsPolicy: CapsWordAutoOff.Configured,
+		Critical: A_IsCritical, Suspended: A_IsSuspended}
+	Fixture := _ScopeOwnerFixture('[gestures]`ntap_3 = "copy"`ntap_4 = "paste"`n'
+		. '[action_parameters]`ngesture__tap_3__open_url = "https://old-a.example/"`n'
+		. 'gesture__tap_4__open_url = "https://old-b.example/"`n'
+		. '[shortcuts.caps_word]`nidle_timeout_seconds = 2`n'
+		. '[shortcuts.caps_word.pointer]`nleft_click = false`n')
+	; The generic ManifestCloneValue belongs to the native schema owner's
+	; integrity graph. Observe only the actual CapsWord value-clone API so
+	; schema admission and its canonical clone remain untouched.
+	Owner := Mode == "capsword" ? CapsWordAutoOffValues : _GestureCloneActionParameters
+	HadCall := Object.Prototype.HasOwnProp.Call(Owner, "Call")
+	SavedCall := HadCall ? Object.Prototype.GetOwnPropDesc.Call(Owner, "Call") : false
+	State := {Mode: Mode, Active: true, Fired: false, Depth: 0, Timers: [], Arms: 0,
+		BusyAtClone: false, BCalls: 0, BCallsAtClone: 0, BResult: false, DispatchResult: ""}
+	try {
+		Critical("Off"), Suspend(false)
+		ConfigurationFile := Fixture.path
+		GestureAssignments := Map("tap_3", "copy", "tap_4", "paste")
+		GestureActionParameters := Map()
+		GestureActionParameters.CaseSense := "On"
+		GestureActionParameters["gesture__tap_3__open_url"] := "https://old-a.example/"
+		GestureActionParameters["gesture__tap_4__open_url"] := "https://old-b.example/"
+		if Mode == "capsword" {
+			CapsWordAutoOffReadConfig(ParseTomlFile(Fixture.path))
+			AssertEqual(2, CapsWordAutoOffValues()["idle_timeout_seconds"])
+		}
+		Object.Prototype.DefineProp.Call(Owner, "Call", {Call: _GCPO_ObserveClone.Bind(State)})
+		if Mode == "parameter"
+			AResult := GestureSetActionParameter("gesture__tap_3", "open_url", "https://new-a.example/")
+		else if Mode == "assignment"
+			AResult := _GestureCommitAssignment(&GestureAssignments, &GestureActionParameters,
+				"gestures", "tap_3", "open_url", Map("has_value", true,
+					"key", "gesture__tap_3__open_url", "value", "https://new-a.example/"))
+		else
+			AResult := CapsWordAutoOffStore(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS, 3)
+		_TestPrint("# cached-candidate-entry mode=" . Mode . " a_result=" . AResult
+			. " observed=" . State.Fired . " busy_at_clone=" . State.BusyAtClone
+			. " b_calls_at_clone=" . State.BCallsAtClone . " b_result=" . State.BResult)
+		AssertTrue(AResult, "The actual first writer must acknowledge its private durable mutation")
+		AssertTrue(State.Fired, "The real candidate clone must pass through its delegated observation")
+		Started := A_TickCount
+		while State.BCalls == 0 && TickElapsed(Started) < 3000
+			Sleep(5)
+		AssertEqual(1, State.BCalls, "The genuine admitted/deferred second menu command must run exactly once")
+		AssertTrue(State.BResult, "The second actual default writer must also acknowledge durability")
+		Parsed := ParseTomlFile(Fixture.path)
+		if Mode == "capsword" {
+			Durable := CapsWordAutoOffReadValues(Parsed)
+			Runtime := CapsWordAutoOffValues()
+			_TestPrint("# cached-candidate-owner mode=" . Mode . " busy_at_clone=" . State.BusyAtClone
+				. " b_calls_at_clone=" . State.BCallsAtClone . " native_timer_arms=" . State.Arms
+				. " durable_idle=" . Durable["idle_timeout_seconds"] . " ram_idle=" . Runtime["idle_timeout_seconds"]
+				. " durable_left=" . Durable["pointer"]["left_click"] . " ram_left=" . Runtime["pointer"]["left_click"])
+			AssertEqual(3, Durable["idle_timeout_seconds"])
+			AssertTrue(Durable["pointer"]["left_click"])
+			AssertEqual(3, Runtime["idle_timeout_seconds"])
+			AssertTrue(Runtime["pointer"]["left_click"], "Publishing A's stale candidate cannot discard B's acknowledged CapsWord preference")
+			AssertEqual(3000, CapsWordAutoOff.Configured["idle_ms"])
+			AssertTrue(CapsWordAutoOff.Configured["pointer"]["left_click"])
+		} else {
+			DurableA := IniCacheGet(Parsed, "action_parameters", "gesture__tap_3__open_url")
+			DurableB := IniCacheGet(Parsed, "action_parameters", "gesture__tap_4__open_url")
+			_TestPrint("# cached-candidate-owner mode=" . Mode . " busy_at_clone=" . State.BusyAtClone
+				. " b_calls_at_clone=" . State.BCallsAtClone . " native_timer_arms=" . State.Arms
+				. " disk_b_new=" . (DurableB == "https://new-b.example/")
+				. " ram_b_new=" . (GestureActionParameters["gesture__tap_4__open_url"] == "https://new-b.example/"))
+			AssertEqual("https://new-a.example/", DurableA)
+			AssertEqual("https://new-b.example/", DurableB)
+			AssertEqual(DurableA, GestureActionParameters["gesture__tap_3__open_url"])
+			AssertEqual(DurableB, GestureActionParameters["gesture__tap_4__open_url"],
+				"Publishing A's cached clone cannot erase B's separately acknowledged live parameter")
+			if Mode == "assignment" {
+				AssertEqual("open_url", IniCacheGet(Parsed, "gestures", "tap_3"))
+				AssertEqual("open_url", IniCacheGet(Parsed, "gestures", "tap_4"))
+				AssertEqual("open_url", GestureAssignments["tap_3"])
+				AssertEqual("open_url", GestureAssignments["tap_4"])
+			}
+		}
+		AssertFalse(MenuCommandConfigBusy())
+		AssertFalse(_ConfigWriteTerminalIsActive())
+	} finally {
+		State.Active := false
+		for Callback in State.Timers
+			SetTimer(Callback, 0)
+		State.Timers := []
+		if HadCall
+			Object.Prototype.DefineProp.Call(Owner, "Call", SavedCall)
+		else if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+			Object.Prototype.DeleteProp.Call(Owner, "Call")
+		GestureAssignments := Saved.Assignments, GestureActionParameters := Saved.Parameters
+		CapsWordAutoOff.Values := Saved.CapsValues, CapsWordAutoOff.Configured := Saved.CapsPolicy
+		ConfigurationFile := Saved.Path
+		for Store in [_ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache]
+			if Store.Has(Fixture.path)
+				Store.Delete(Fixture.path)
+		_ScopeOwnerCleanup(Fixture)
+		Suspend(Saved.Suspended), Critical(Saved.Critical)
+	}
+}
+for _GCPO_Mode in ["parameter", "assignment", "capsword"]
+	Test("Cached configuration candidate keeps concurrent menu publication: " . _GCPO_Mode . " (config-candidate-publication-owner)",
+		_GCPO_Run.Bind(_GCPO_Mode))

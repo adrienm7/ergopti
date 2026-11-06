@@ -105,8 +105,24 @@ LLM_Menu_PromptChoicesText() {
  * @returns {string} A label unique within that menu.
  */
 _LLM_Menu_UniqueMenuLabel(Seen, Label) {
-	Seen[Label] := (Seen.Has(Label) ? Seen[Label] : 0) + 1
-	return (Seen[Label] > 1) ? (Label . " #" . Seen[Label]) : Label
+	; Reserve actual outputs too: a free-text name may already equal a suffix.
+	static UsedKey := {}
+	if !Seen.Has(UsedKey) {
+		Used := Map()
+		; AHK Menu.Add matches labels without regard to case.
+		Used.CaseSense := false
+		Seen[UsedKey] := Used
+	}
+	Used := Seen[UsedKey]
+	Ordinal := (Seen.Has(Label) ? Seen[Label] : 0) + 1
+	Candidate := Ordinal > 1 ? Label . " #" . Ordinal : Label
+	while Used.Has(Candidate) {
+		Ordinal := Max(2, Ordinal + 1)
+		Candidate := Label . " #" . Ordinal
+	}
+	Seen[Label] := Ordinal
+	Used[Candidate] := true
+	return Candidate
 }
 
 /**
@@ -311,40 +327,280 @@ _LLM_Menu_ProfilePorts(Port) {
 	return Port is Map ? Port : Map()
 }
 
-_LLM_Menu_ProfileSourceBound(Source) {
-	global ConfigurationFile, _LLM_Menu
+_LLM_Menu_ProfileSourceIdentity(Source) {
+	global ConfigurationFile, _LLM_Menu, Features
 	return Source is Map && Source.Get("path", 0) is String
 		&& Source.Get("content", 0) is String && Source.Get("present", -1) is Integer
 		&& (Source["present"] == 0 || Source["present"] == 1)
-		&& Source.Get("menu", 0) is Map
-		&& ConfigurationFile == Source["path"] && _LLM_Menu == Source["menu"]
+		&& Source.Get("menu", 0) is Map && Source.Get("features", 0) is Map
+		&& ConfigurationFile == Source["path"] && _LLM_Menu == Source["menu"] && Features == Source["features"]
 }
 
 _LLM_Menu_CaptureProfileSource() {
-	global ConfigurationFile, _LLM_Menu
+	global ConfigurationFile, _LLM_Menu, Features
 	if !IsSet(ConfigurationFile) || !(ConfigurationFile is String) || ConfigurationFile == ""
-			|| !IsSet(_LLM_Menu) || !(_LLM_Menu is Map)
+			|| !IsSet(_LLM_Menu) || !(_LLM_Menu is Map) || !IsSet(Features) || !(Features is Map)
 		return false
-	Source := Map("path", ConfigurationFile, "menu", _LLM_Menu, "present", 0, "content", "")
-	if !ConfigFullStateCanPersist() || !_LLM_Menu_ProfileSourceBound(Source)
+	Source := Map("path", ConfigurationFile, "menu", _LLM_Menu, "features", Features, "present", 0, "content", "")
+	if !ConfigFullStateCanPersist() || !_LLM_Menu_ProfileSourceIdentity(Source)
 		return false
 	try {
 		Source["present"] := FSStrictExists(Source["path"])
-		if !_LLM_Menu_ProfileSourceBound(Source)
+		if !_LLM_Menu_ProfileSourceIdentity(Source)
 			return false
 		Source["content"] := Source["present"] ? FSConfigReadUtf8Exact(Source["path"]) : ""
 	} catch
 		return false
+	if !_LLM_Menu_ProfileClaimSnapshot(Source)
+		return false
+	return _LLM_Menu_ProfileSourceProjectionMatches(Source) ? Source : false
+}
+
+; Freeze only persisted RAM while claiming the source. No parser, file reader,
+; logger or native UI call runs under this bounded memory-only transaction.
+_LLM_Menu_ProfileClaimSnapshot(Source) {
+	global _LLM_Menu_ApiPrivateAuthorityGeneration
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_Menu_ProfileSourceIdentity(Source) || !Source["features"].Has("llm")
+			return false
+		Keys := [], MenuSnapshot := Map()
+		for Group in _LLM_Menu_PersistedFieldGroups()
+			for Key in Group {
+				Keys.Push(Key)
+				if Source["menu"].Has(Key)
+					MenuSnapshot[Key] := _HSDeepCloneMap(Source["menu"][Key])
+			}
+		MenuSnapshot["api_entries"] := _HSDeepCloneMap(Source["menu"].Get("api_entries", []))
+		Source["menu_keys"] := Keys
+		Source["menu_snapshot"] := MenuSnapshot
+		Source["features_snapshot"] := Map("llm", _HSDeepCloneMap(Source["features"]["llm"]))
+		Source["api_authority"] := _LLM_Menu_ApiPrivateAuthorityGeneration
+		Source["snapshot_ready"] := 1
+		return true
+	} catch
+		return false
+	finally Critical(PreviousCritical)
+}
+
+; Runtime dependency failure mutates enabled in place; API restore mutates id
+; in place. Compare the frozen persisted values and existing API authority,
+; rather than accepting their unchanged enclosing Map identities.
+_LLM_Menu_ProfileSourceBound(Source) {
+	global _LLM_Menu_ApiPrivateAuthorityGeneration
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_Menu_ProfileSourceIdentity(Source) || Source.Get("snapshot_ready", 0) != 1
+				|| _LLM_Menu_ApiPrivateAuthorityGeneration != Source["api_authority"]
+				|| !Source["features"].Has("llm")
+				|| !ManifestValuesEqual(Source["features"]["llm"], Source["features_snapshot"]["llm"])
+			return false
+		for Key in Source["menu_keys"] {
+			if Source["menu"].Has(Key) != Source["menu_snapshot"].Has(Key)
+				return false
+			if Source["menu_snapshot"].Has(Key)
+					&& !ManifestValuesEqual(Source["menu"][Key], Source["menu_snapshot"][Key])
+				return false
+		}
+		return true
+	} catch
+		return false
+	finally Critical(PreviousCritical)
+}
+
+_LLM_Menu_ProfilePreparePublication(Source, CandidateMenu) {
 	return _LLM_Menu_ProfileSourceBound(Source) ? Source : false
 }
 
-_LLM_Menu_WriteProfileSource(Source, Path, Updates) {
-	if !_LLM_Menu_ProfileSourceBound(Source) || !(Path == Source["path"])
+; The existing publication port rechecks the same memory receipt after native
+; durability, so a later in-place runtime failure is never overwritten either.
+_LLM_Menu_ProfilePublishCandidate(Source, CandidateFeatures, CandidateMenu, PreparedSource) {
+	global Features
+	if PreparedSource != Source || !_LLM_Menu_ProfileSourceBound(Source) {
+		_LLM_Menu_ProfileRetainPublication(Source)
 		return false
+	}
+	; The profile owns only the LLM subtree. Rebase its acknowledged result
+	; over the current other roots instead of publishing their older clone.
+	PublishedFeatures := Features.Clone()
+	PublishedFeatures["llm"] := CandidateFeatures["llm"]
+	Published := _LLM_Menu_PublishCandidate(PublishedFeatures, CandidateMenu)
+	if Published is Integer && Published == 1
+		Source["published"] := 1
+	return Published
+}
+
+_LLM_Menu_ProfileRetainPublication(Source) {
+	; Called only after this source's genuine native ACK. Existing terminal
+	; ownership remains held through failure reporting and this session seal.
+	TOML_RefuseWrites(Source["path"], "durable LLM profile publication was retired; restart required")
+	Source["publication_withdrawn"] := 1
+}
+
+_LLM_Menu_ProfileNotifyFailure(Source, NotifyFn, Message, Options) {
+	if Source.Get("native_ack", 0) == 1 {
+		; Also cover a native profile-owner commit refusal before our publisher
+		; is invoked. This records actual durability, never a fabricated ACK.
+		if Source.Get("published", 0) != 1
+			_LLM_Menu_ProfileRetainPublication(Source)
+		Message := t("onboarding.done.restart_required")
+		Options := Options.Clone()
+		Options["title"] := t("menu.llm.profiles")
+		Options["level"] := "warning"
+	}
+	return HasMethod(NotifyFn, "Call") ? NotifyFn.Call(Message, Options) : NotifierSend(Message, Options)
+}
+
+; Collect exactly the LLM projection the full-save owner would persist. Keeping
+; its feature walk and private menu collector avoids a second setting list.
+_LLM_Menu_ProfileProjectionUpdates(FeatureState, MenuState) {
+	if !(FeatureState is Map) || !FeatureState.Has("llm") || !(FeatureState["llm"] is Map)
+		throw Error("The LLM profile source requires its persisted feature state.")
+	; Master gates project layout/shortcuts/hotstrings only; the full-save
+	; owner retains this same LLM subtree without a gate transformation.
+	Snapshot := Map("llm", _HSDeepCloneMap(FeatureState["llm"]))
+	if !_LLM_Menu_SyncToFeatures(Snapshot, MenuState)
+		throw Error("The LLM profile source cannot project an incomplete menu state.")
+	Updates := []
+	_CollectFeatureUpdates(Updates, "llm", Snapshot["llm"])
+	_LLM_Menu_AppendOwnedPersistedUpdates(Updates, MenuState)
+	return _ConfigKeepOutdatedEntries(_ConfigLastRowWins(_ConfigSparseUpdates(Updates)))
+}
+
+; A fresh physical receipt cannot authorize replacing any persisted LLM leaf
+; from stale RAM. Defaults resolve absent leaves without blessing a new file.
+_LLM_Menu_ProfileSourceProjectionMatches(Source) {
+	if !_LLM_Menu_ProfileSourceBound(Source)
+		return false
+	try {
+		Snapshot := ConfigTomlDecodeSnapshot(Source["content"])
+		Document := Snapshot.Document
+		RawRows := Map()
+		RawRows.CaseSense := "On"
+		for Row in Snapshot.Rows
+			RawRows[_TOML_ConfigPathName(_TOML_ConfigPath(Row.Section, Row.Key))] := Row
+		Updates := _ConfigPrepareTypedUpdates(_LLM_Menu_ProfileProjectionUpdates(Source["features_snapshot"], Source["menu_snapshot"]))
+		for Update in Updates {
+			Parts := _TOML_ConfigPath(Update.Section, Update.Key)
+			Path := _TOML_ConfigPathName(Parts)
+			Read := _TOML_DocumentLookup(Document, Parts)
+			if Read["blocked"]
+				return false
+			Deleting := Update.HasOwnProp("Delete") && Update.Delete == 1
+			if !Read["found"] || Deleting
+				Default := _ConfigPrepareTypedUpdates([{Section: Update.Section, Key: Update.Key,
+					Value: _LLM_Menu_ProfileProjectionDefault(Path)}])[1].Value
+			Physical := Read["found"] ? Read["value"] : Default
+			Live := Deleting ? Default : Update.Value
+			if Read["found"] && Live is TOML_Bool && Physical is Integer {
+				if !RawRows.Has(Path)
+					return false
+				Raw := RawRows[Path]
+				; Only the canonical loader's exact bare 0/1 compatibility is
+				; admitted. Quoted, signed and floating spellings stay distinct.
+				if !TomlConfigValueMatchesManifest(Update.Section, Update.Key, Raw.Value,
+						&ExpectedType, TOML_StripInlineComment(Raw.Raw)) || ExpectedType != "boolean"
+					return false
+				Physical := TOML_Bool(Raw.Value)
+			}
+			if !_LLM_Menu_ProfileProjectionValueMatches(Path, Physical, Live, Document, Source["menu_snapshot"])
+				return false
+		}
+		return _LLM_Menu_ProfileSourceBound(Source)
+	} catch
+		return false
+}
+
+_LLM_Menu_ProfileProjectionValueMatches(Path, Physical, Live, Document, MenuState) {
+	if Path == "llm.api_entry_id" && Physical is String && Physical == _LLM_Menu_DefaultApiEntryId() {
+		if !(Live is String) || !(MenuState.Get("api_entries", 0) is Array)
+			return false
+		return _LLM_Menu_ResolveApiEntryId(MenuState["api_entries"], Physical) == Live
+	}
+	if Path == ConfigKey.LLM_DISPLAY_STREAMING {
+		if !(Physical is TOML_Bool) || !(Live is TOML_Bool)
+			return false
+		Backend := _TOML_DocumentLookup(Document, ["llm", "models", "selected"])
+		if Backend["blocked"]
+			return false
+		BackendValue := Backend["found"] ? Backend["value"] : ManifestDefaultFor(ConfigKey.LLM_MODELS_SELECTED)
+		return BackendValue is String && !!LLM_EffectiveStreaming(BackendValue, Physical.Value) == !!Live.Value
+	}
+	if Path == "llm.ollama_port" && LLM_Option_IsStockOllamaPort(Physical)
+		Physical := _LLM_Menu_ProfileProjectionDefault(Path)
+	if Path == ConfigKey.LLM_TRIGGER_DISABLED_APPS || Path == ConfigKey.LLM_AGENT_DISABLED_APPS {
+		PhysicalApps := LLM_Option_NormalizeStringArray(Physical, true)
+		LiveApps := LLM_Option_NormalizeStringArray(Live, true)
+		return PhysicalApps is Array && LiveApps is Array && TOML_SameValue(PhysicalApps, LiveApps)
+	}
+	if Path == ConfigKey.LLM_USER_PROFILES {
+		PhysicalProfiles := _LLM_Menu_DeserializeUserProfiles(Physical)
+		LiveProfiles := _LLM_Menu_DeserializeUserProfiles(Live)
+		if !(PhysicalProfiles is Array) || !(LiveProfiles is Array)
+			return false
+		return _LLM_Menu_SerializeUserProfiles(PhysicalProfiles) == _LLM_Menu_SerializeUserProfiles(LiveProfiles)
+	}
+	if Path == ConfigKey.LLM_NAVIGATION_NAV_MODIFIERS || Path == ConfigKey.LLM_NAVIGATION_VAL_MODIFIERS {
+		PhysicalModifiers := _LLM_Menu_ModifiersArrayToString(Physical)
+		LiveModifiers := _LLM_Menu_ModifiersArrayToString(Live)
+		return PhysicalModifiers is String && LiveModifiers is String && PhysicalModifiers == LiveModifiers
+	}
+	if Path == "llm.app_profile_overrides" {
+		; Compare the complete JSON, retaining unknown fields which the runtime
+		; app-map decoder intentionally cannot carry into its reduced Map.
+		PhysicalRows := _LLM_Menu_ProfileOverrideEnvelope(Physical)
+		LiveRows := _LLM_Menu_ProfileOverrideEnvelope(Live)
+		return PhysicalRows is Array && LiveRows is Array && TOML_SameValue(PhysicalRows, LiveRows)
+	}
+	return TOML_SameValue(Physical, Live)
+}
+
+_LLM_Menu_ProfileOverrideEnvelope(Payload) {
+	if !(Payload is String)
+		return false
+	if Payload == "" || Payload == "_"
+		return []
+	if SubStr(Payload, 1, 3) !== "v1:"
+		return false
+	try {
+		Bytes := CryptoBase64Decode(SubStr(Payload, 4))
+		Rows := JsonParse(StrGet(Bytes, Bytes.Size, "UTF-8"))
+		return Rows is Array ? Rows : false
+	} catch
+		return false
+}
+
+; Foreign-owner leaves use their own canonical initial values; only manifest
+; leaves have a ManifestDefaultFor contract. Resolve these only when needed.
+_LLM_Menu_ProfileProjectionDefault(Path) {
+	global LLM_Defaults
+	if Path == "llm.api_entry_id"
+		return _LLM_Menu_DefaultApiEntryId()
+	if Path == "llm.ollama_port" {
+		if !IsSet(LLM_Defaults) || !(LLM_Defaults is Map) || !LLM_Defaults.Has("llm_ollama_owned_port")
+			throw Error("The owned Ollama port default is unavailable.")
+		return LLM_Defaults["llm_ollama_owned_port"]
+	}
+	return ManifestDefaultFor(Path)
+}
+
+_LLM_Menu_WriteProfileSource(Source, Path, Updates) {
+	if !_LLM_Menu_ProfileSourceBound(Source) || !_LLM_Menu_ProfileSourceProjectionMatches(Source) || !(Path == Source["path"])
+		return false
+	; Even an injected collector cannot grant the profile ownership of other
+	; preferences. Canonical paths reject quoted/dotted aliases outside llm.
+	for Update in Updates {
+		Parts := _TOML_ConfigPath(Update.Section, Update.Key)
+		if Parts.Length < 2 || Parts[1] !== "llm"
+			return false
+	}
 	; The native writer retains this exact pre-dialog image through stage and
 	; replacement; a fresh schema admission must not adopt later external edits.
-	return TOML_ConfigBatchWrite(Path, Updates, [],
+	Committed := TOML_ConfigBatchWrite(Path, Updates, [],
 		_LLM_Menu_ProfileSourceBound.Bind(Source), Source["content"], Source["present"])
+	if Committed is Integer && Committed == 1
+		Source["native_ack"] := 1
+	return Committed
 }
 
 /**
@@ -382,8 +638,9 @@ LLM_Menu_OnUserProfileClick(profile, Port := 0) {
 		LLM_Menu_CommitMutation("the LLM profile selection",
 			(Candidate) => _LLM_Menu_SetProfileCandidate(Candidate, pid),
 			Options.Get("apply", _LLM_Menu_ApplyManualProfileCommitted),
-			_LLM_Menu_WriteProfileSource.Bind(Source), Options.Get("notify", 0),
-			Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0))
+			_LLM_Menu_WriteProfileSource.Bind(Source), _LLM_Menu_ProfileNotifyFailure.Bind(Source, Options.Get("notify", 0)),
+			Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", _LLM_Menu_ProfileProjectionUpdates),
+		_LLM_Menu_ProfilePreparePublication.Bind(Source), _LLM_Menu_ProfilePublishCandidate.Bind(Source))
 	} else if (choice == "No") {
 		; Edit this profile
 		LLM_Menu_PromptEditProfile(profile, Port, Source)
@@ -393,8 +650,9 @@ LLM_Menu_OnUserProfileClick(profile, Port := 0) {
 			return LLM_Menu_CommitMutation("the custom LLM profile removal",
 				(Candidate) => _LLM_Menu_DeleteProfileCandidate(Candidate, pid),
 				Options.Get("apply", _LLM_Menu_ApplyProfileCommitted),
-				_LLM_Menu_WriteProfileSource.Bind(Source), Options.Get("notify", 0),
-				Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0))
+				_LLM_Menu_WriteProfileSource.Bind(Source), _LLM_Menu_ProfileNotifyFailure.Bind(Source, Options.Get("notify", 0)),
+				Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", _LLM_Menu_ProfileProjectionUpdates),
+		_LLM_Menu_ProfilePreparePublication.Bind(Source), _LLM_Menu_ProfilePublishCandidate.Bind(Source))
 		}
 	}
 	return true
@@ -656,6 +914,60 @@ _LLM_Menu_CloneProfileRow(OpenFn, PausedFn := 0) {
 }
 
 /**
+ * Opens the native multiline profile fallback and retains explicit cancellation.
+ * InputBox creates a single-line Edit even when its dialog is tall.
+ * @param {string} Prompt - Already translated body above the native Edit.
+ * @param {string} Title - Brandless caption passed through WindowTitle.
+ * @param {string} Options - Width, height and optional timeout, as w520 h320 T5.
+ * @param {string} Default - Exact initial prompt text, including line breaks.
+ * @returns {object} Result (OK, Cancel or Timeout) and entered Value.
+ */
+_LLM_Menu_ProfilePromptInput(Prompt, Title, Options := "", Default := "") {
+	if Trim(RegExReplace(Options, "i)(?:^|\s)(?:[wh]\d+|t(?:\d+(?:\.\d*)?|\.\d+))(?=\s|$)", "")) != ""
+		throw ValueError("The native profile prompt requires only width, height and timeout options.")
+	Width := RegExMatch(Options, "i)(?:^|\s)w(\d+)(?=\s|$)", &Match) ? Integer(Match[1]) : 520
+	Height := RegExMatch(Options, "i)(?:^|\s)h(\d+)(?=\s|$)", &Match) ? Integer(Match[1]) : 320
+	Timeout := RegExMatch(Options, "i)(?:^|\s)t(\d+(?:\.\d*)?|\.\d+)(?=\s|$)", &Match) ? Number(Match[1]) : 0
+	if Width < 240 || Height < 180 || Timeout < 0 || Timeout > 2147483
+		throw ValueError("The native profile prompt dimensions or timeout are outside their supported bounds.")
+	Dialog := Gui("", WindowTitle(Title))
+	Receipt := {Result: "Cancel", Value: Default}
+	Finished := false
+	TimeoutFn := Finish.Bind("Timeout")
+	try {
+		Dialog.SetFont("s10", "Segoe UI")
+		Dialog.AddText("x12 y12 w" . (Width - 24) . " h36", Prompt)
+		Editor := Dialog.AddEdit("x12 y54 w" . (Width - 24) . " h" . (Height - 106)
+			. " Multi WantReturn VScroll Limit0", Default)
+		Dialog.AddButton("x" . (Width - 204) . " y" . (Height - 40) . " w90 Default", t("button.ok"))
+			.OnEvent("Click", Finish.Bind("OK"))
+		Dialog.AddButton("x+12 yp w90", t("button.cancel")).OnEvent("Click", Finish.Bind("Cancel"))
+		Dialog.OnEvent("Close", Finish.Bind("Cancel"))
+		Dialog.OnEvent("Escape", Finish.Bind("Cancel"))
+		Hwnd := Dialog.Hwnd
+		Dialog.Show("w" . Width . " h" . Height)
+		if !Finished {
+			if Timeout > 0
+				SetTimer(TimeoutFn, -Max(1, Round(Timeout * 1000)))
+			WinWaitClose("ahk_id " . Hwnd)
+		}
+		return Receipt
+	} finally {
+		SetTimer(TimeoutFn, 0)
+		try Dialog.Destroy()
+	}
+
+	Finish(Status, *) {
+		if Finished
+			return
+		Receipt.Value := Editor.Value
+		Receipt.Result := Status
+		Finished := true
+		Dialog.Destroy()
+	}
+}
+
+/**
  * Opens InputBox dialogs to create a new user profile (label + prompt).
  */
 LLM_Menu_PromptCreateProfile(Port := 0) {
@@ -676,6 +988,7 @@ LLM_Menu_PromptCreateProfile(Port := 0) {
 	if A_IsSuspended
 		return false
 	InputFn := Options.Get("input", Ui_InputBox)
+	PromptInputFn := Options.Get("prompt_input", Options.Has("input") ? InputFn : _LLM_Menu_ProfilePromptInput)
 
 	; Prefer the shared WebView2 editor (identical rich UI to macOS). Falls back
 	; to the native InputBox wizard below when the WebView2 runtime is absent.
@@ -690,8 +1003,8 @@ LLM_Menu_PromptCreateProfile(Port := 0) {
 	if A_IsSuspended
 		return false
 
-	; Step 2: system prompt (multi-line via Edit control)
-	ib_prompt := InputFn.Call(t("menu.profiles.prompt_system_single"), t("menu.profiles.create_profile"), "w520 h320")
+	; Step 2: system prompt, including native pasted line breaks
+	ib_prompt := PromptInputFn.Call(t("menu.profiles.prompt_system_single"), t("menu.profiles.create_profile"), "w520 h320")
 	if (ib_prompt.Result != "OK")
 		return
 	system_single := ib_prompt.Value
@@ -713,8 +1026,9 @@ LLM_Menu_PromptCreateProfile(Port := 0) {
 	return LLM_Menu_CommitMutation("the custom LLM profile creation",
 		(Candidate) => _LLM_Menu_AddProfileCandidate(Candidate, new_profile),
 		Options.Get("apply", _LLM_Menu_ApplyProfileCommitted),
-		_LLM_Menu_WriteProfileSource.Bind(Source), Options.Get("notify", 0),
-		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0))
+		_LLM_Menu_WriteProfileSource.Bind(Source), _LLM_Menu_ProfileNotifyFailure.Bind(Source, Options.Get("notify", 0)),
+		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", _LLM_Menu_ProfileProjectionUpdates),
+		_LLM_Menu_ProfilePreparePublication.Bind(Source), _LLM_Menu_ProfilePublishCandidate.Bind(Source))
 }
 
 _LLM_Menu_AddProfileCandidate(Candidate, Profile) {
@@ -743,6 +1057,7 @@ LLM_Menu_PromptEditProfile(profile, Port := 0, OpeningSource := 0) {
 		return ConfigReportPersistenceFailure("the custom LLM profile edit", Options.Get("notify", 0),
 			"the opening configuration source is unavailable")
 	InputFn := Options.Get("input", Ui_InputBox)
+	PromptInputFn := Options.Get("prompt_input", Options.Has("input") ? InputFn : _LLM_Menu_ProfilePromptInput)
 	pid := profile.Has("id") ? profile["id"] : ""
 
 	; Prefer the shared WebView2 editor (identical rich UI to macOS). Falls back
@@ -755,7 +1070,7 @@ LLM_Menu_PromptEditProfile(profile, Port := 0, OpeningSource := 0) {
 	if !_LLM_Menu_TryRequiredPrompt(ib_label.Result, ib_label.Value, &new_label)
 		return
 
-	ib_prompt := InputFn.Call(t("menu.profiles.prompt_system_single"), t("menu.profiles.edit_profile"), "w520 h320",
+	ib_prompt := PromptInputFn.Call(t("menu.profiles.prompt_system_single"), t("menu.profiles.edit_profile"), "w520 h320",
 		profile.Has("system_single") ? profile["system_single"] : "")
 	if (ib_prompt.Result != "OK")
 		return
@@ -763,8 +1078,9 @@ LLM_Menu_PromptEditProfile(profile, Port := 0, OpeningSource := 0) {
 	return LLM_Menu_CommitMutation("the custom LLM profile edit",
 		(Candidate) => _LLM_Menu_EditProfileCandidate(Candidate, pid,
 			new_label, ib_prompt.Value), Options.Get("apply", _LLM_Menu_ApplyProfileCommitted),
-		_LLM_Menu_WriteProfileSource.Bind(Source), Options.Get("notify", 0),
-		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0))
+		_LLM_Menu_WriteProfileSource.Bind(Source), _LLM_Menu_ProfileNotifyFailure.Bind(Source, Options.Get("notify", 0)),
+		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", _LLM_Menu_ProfileProjectionUpdates),
+		_LLM_Menu_ProfilePreparePublication.Bind(Source), _LLM_Menu_ProfilePublishCandidate.Bind(Source))
 }
 
 _LLM_Menu_EditProfileCandidate(Candidate, ProfileId, Label, Prompt) {

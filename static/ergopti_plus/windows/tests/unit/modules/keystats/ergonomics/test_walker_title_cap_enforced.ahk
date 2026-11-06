@@ -24,6 +24,24 @@
 
 #Requires AutoHotkey v2.0
 
+
+_WTC_InsertTitleTyping(Db, Device, Id, Day, App, Title, Events, Text := "a") {
+	return SQLite_Exec(Db, "INSERT INTO events_typing "
+		. "(device_id,id,ts,date,app,title,is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,text,events_json) VALUES ("
+		. SQLite_Q(Device) . "," . Id . "," . SQLite_Q(Day . "T09:00:00") . "," . SQLite_Q(Day) . ","
+		. SQLite_Q(App) . "," . SQLite_Q(Title) . ",0,0,0,0,0," . SQLite_Q(Text) . "," . SQLite_Q(KL_JsonEncode(Events)) . ");")
+}
+
+_WTC_TitleManualEvents(Count) {
+	Events := []
+	Loop Count
+		Events.Push([A_Index == Count ? "[BS]" : "a", 10, Map("kc", 65, "sk", 30)])
+	; Synthetic output has a real event but must not increase the page's
+	; manual character counter; committed Text deliberately has length one.
+	Events.Push(["synthetic", 10, Map("s", 1, "st", "hotstring")])
+	return Events
+}
+
 _WTC_ReplayPreservesRetainedTitleCount(SplitFlushes := false, Scoped := false) {
 	Db := _WJFM_OpenMemory()
 	SavedFlushSize := KLReadConst.REPLAY_FLUSH_ENTRIES
@@ -47,6 +65,9 @@ _WTC_ReplayPreservesRetainedTitleCount(SplitFlushes := false, Scoped := false) {
 		AssertTrue(SQLite_Exec(Db, Sql . ";"))
 		AssertTrue(SQLite_Exec(Db, "INSERT INTO agg_app_day_titles VALUES "
 			. "('cap-device','2025-12-31','cap.exe','untouched',7,9);"))
+		AssertTrue(_WTC_InsertTitleTyping(Db, "cap-device", 1, "2026-01-01", "cap.exe", "retained", _WTC_TitleManualEvents(1)))
+		Loop KLWConst.TITLE_CAP_PER_APP_DAY
+			AssertTrue(_WTC_InsertTitleTyping(Db, "cap-device", A_Index + 1, "2026-01-01", "cap.exe", "frequent-" . A_Index, _WTC_TitleManualEvents(2)))
 		Dates := Scoped ? ["2026-01-01"] : 0
 		AssertTrue(KLR_PrepareTypingProjection(Db))
 		AssertTrue(KLR_RebuildAggregates(Db, Dates))
@@ -56,7 +77,7 @@ _WTC_ReplayPreservesRetainedTitleCount(SplitFlushes := false, Scoped := false) {
 		AssertEqual(1, Rows.Length, "long focus must retain the title under the cap")
 		AssertEqual(SplitFlushes ? 60001 : 60000, Rows[1]["ms"],
 			"the real window replay must retain focus time across flush boundaries")
-		AssertEqual(1, Rows[1]["c"], "a retained title must keep its raw switch count")
+		AssertEqual(1, Rows[1]["c"], "a retained title must keep its independently observed manual keystroke count")
 		AssertEqual(KLWConst.TITLE_CAP_PER_APP_DAY,
 			SQLite_Query(Db, "SELECT COUNT(*) AS n FROM agg_app_day_titles WHERE date='2026-01-01';")[1]["n"],
 			"the final projection must still enforce the title cap")
@@ -109,6 +130,8 @@ _WTC_ReplayRefusesTitleFailure(Action, Stage) {
 		AssertTrue(KLR_PrepareTypingProjection(Db))
 		AssertTrue(SQLite_Exec(Db, "INSERT INTO events_window_switch VALUES "
 			. "('failure-device',1,'2026-01-01T10:00:00','2026-01-01','fixture.exe','title','title',23);"))
+		AssertTrue(_WTC_InsertTitleTyping(Db, "failure-device", 1, "2026-01-01", "fixture.exe", "title", _WTC_TitleManualEvents(1)))
+		AssertTrue(KLR_PrepareTypingProjection(Db))
 		AssertEqual(0, DllCall(SQLiteConst.DLL . "\sqlite3_set_authorizer",
 			"Ptr", Db, "Ptr", Callback, "Ptr", 0, "Int"))
 		AssertEqual(-1, KLR_RebuildWalkerAggregates(Db, true),
@@ -225,9 +248,9 @@ Test("walker: no title cleanup when the batch has no titles (walker-title-cap-de
 ; =====================================================================
 ; =====================================================================
 
-; KLR_RebuildAggregates replays the entire events_window_switch history with a
-; GROUP BY. Without its own bound, one cold rebuild undoes every cleanup the
-; live walker ever emitted.
+; KLR_RebuildAggregates groups accepted manual typing counts by source title.
+; Without its own bound, one cold rebuild undoes every cleanup the live
+; walker ever emitted; the later window replay restores focus time separately.
 _WTC_ColdRebuildIsBounded() {
 	Body := _DriverFuncBody("KLR_RebuildAggregates")
 	Assert(Body != "", "KLR_RebuildAggregates must exist in the driver source")
@@ -273,3 +296,61 @@ _WTC_CapMatchesSharedContract() {
 }
 Test("walker: the title cap matches the shared cross-driver contract (walker-title-cap-declared-but-dead)",
 	_WTC_CapMatchesSharedContract)
+
+
+; These are the exact outgoing-app window rows emitted by the genuine focus
+; refresh on a captured A -> B -> A transition. Native acquisition itself is
+; already isolated by switch-destination-privacy-owner; this fixture qualifies
+; the actual SQLite rebuild and public manifest projection of those rows.
+_WTC_WindowTitleAppAttribution(CrossApp) {
+	global KLRLastReplayFailure
+	SavedFailure := KLRLastReplayFailure
+	Db := _WJFM_OpenMemory()
+	try {
+		AssertTrue(KLR_LoadSchema(Db))
+		SecondApp := CrossApp ? "app-b.exe" : "app-a.exe"
+		AssertTrue(SQLite_Exec(Db, "INSERT INTO events_window_switch "
+			. "(device_id,id,ts,date,app,prev_title,next_title,duration_ms) VALUES "
+			. "('title-owner',1,'2026-01-01T10:00:00','2026-01-01','app-a.exe','Title A','Title B',2500),"
+			. "('title-owner',2,'2026-01-01T10:00:03','2026-01-01'," . SQLite_Q(SecondApp)
+			. ",'Title B','Title A',3500);"))
+		AssertTrue(_WTC_InsertTitleTyping(Db, "title-owner", 11, "2026-01-01", "app-a.exe", "Title A", _WTC_TitleManualEvents(3)))
+		AssertTrue(_WTC_InsertTitleTyping(Db, "title-owner", 12, "2026-01-01", SecondApp, "Title B", _WTC_TitleManualEvents(4)))
+		AssertTrue(_WTC_InsertTitleTyping(Db, "title-owner", 13, "2026-01-01", "app-a.exe", "", _WTC_TitleManualEvents(2)))
+		AssertTrue(_WTC_InsertTitleTyping(Db, "title-owner", 14, "2026-01-01", "app-a.exe", "synthetic only",
+			[["synthetic", 10, Map("s", 1, "st", "llm")]]))
+		AssertTrue(KLR_PrepareTypingProjection(Db))
+		AssertTrue(KLR_RebuildAggregates(Db))
+		AssertTrue(KLR_RebuildWalkerAggregates(Db, true) >= 0)
+		Manifest := KLR_ReadManifestBase(Db, "2026-01-01", "2026-01-01")
+		Apps := Manifest["2026-01-01"]
+		First := Apps["app-a.exe"]["win_titles"]
+		Second := Apps[SecondApp]["win_titles"]
+		_TestPrint("# title-app-attribution cross_app=" . CrossApp
+			. " a_foreign_title=" . (First.Has("Title B") ? First["Title B"]["c"] : 0)
+			. " b_foreign_title=" . (Second.Has("Title A") ? Second["Title A"]["c"] : 0))
+		AssertTrue(First.Has("Title A"))
+		AssertEqual(2500, First["Title A"]["ms"])
+		AssertTrue(Second.Has("Title B"))
+		AssertEqual(3500, Second["Title B"]["ms"])
+		AssertEqual(3, First["Title A"]["c"], "Title A counts three manual keystrokes including backspace, not one switch or text length")
+		AssertEqual(4, Second["Title B"]["c"], "Title B keeps its own four manual keystrokes and excludes synthetic output")
+		AssertFalse(First.Has(""), "An empty typing title cannot invent a dashboard window")
+		if First.Has("synthetic only")
+			AssertEqual(0, First["synthetic only"]["c"], "Synthetic-only output cannot become manual title activity")
+		if CrossApp {
+			AssertFalse(First.Has("Title B"), "App A must never display app B's independently owned window title")
+			AssertFalse(Second.Has("Title A"), "App B must never display app A's independently owned window title")
+		} else {
+			AssertTrue(First["Title A"]["c"] > 0)
+			AssertTrue(First["Title B"]["c"] > 0,
+				"A same-application title round-trip must keep both legitimate manual keystroke counters")
+		}
+	} finally {
+		SQLite_Close(Db)
+		KLRLastReplayFailure := SavedFailure
+	}
+}
+for _WTC_CrossApp in [false, true]
+	Test("Reader window title app owner: " . (_WTC_CrossApp ? "cross-app" : "same-app control") . " (window-title-app-attribution)",
+		_WTC_WindowTitleAppAttribution.Bind(_WTC_CrossApp))

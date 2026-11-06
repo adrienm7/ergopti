@@ -563,3 +563,210 @@ for ProviderId in ["autohotkey", "python", "powershell"]
 		_RPA_WithFixture.Bind(_RPA_WithCapturedProgramLogs.Bind(_RPP_NativeVariants.Bind(ProviderId))))
 
 #Include test_program_picker_modal_owner.ahk
+
+
+; Exercise the real route for each independent corpus entry; no SMB is opened.
+_RPP_UncRouteCase(Input, Expected, Accepted) {
+	global _ConfigDir
+	AssertTrue(IsSet(_ConfigDir), "SETUP: the runner owns the normal configuration directory")
+	Saved := _ConfigDir
+	try {
+		_ConfigDir := Input
+		Actual := ProgramProviders_ConfigRoute()
+		_TestPrint("# program-provider-config-route input=" . Input . " result=" . Actual)
+		AssertEqual(Expected, Actual, "the actual route owner must preserve the qualified root")
+		AssertEqual(Accepted, !!ProgramProviderAbsolute(Input), "the provider policy must agree")
+	} finally _ConfigDir := Saved
+}
+for Row in [
+	["drive-root", "C:\", "C:\scripts", true],
+	["unc-root-no-slash", "\\server\share", "\\server\share\scripts", true],
+	["unc-root-slash", "\\server\share\", "\\server\share\scripts", true],
+	["unc-descendant", "\\server\share\folder\", "\\server\share\folder\scripts", true],
+	["missing-share", "\\server", false, false],
+	["empty-share", "\\server\", false, false],
+	["double-empty-share", "\\server\\", false, false],
+	["device-question", "\\?\C:\folder", false, false],
+	["device-dot", "\\.\C:\folder", false, false]
+] {
+	Test("program providers: " . Row[1] . " configuration route (program-provider-unc-root)",
+		_RPP_UncRouteCase.Bind(Row[2], Row[3], Row[4]))
+}
+
+; A directory-local capability is a setup receipt, never an inferred Windows
+; default. Both exact scripts must also run before discovery can be blamed.
+_RPPCS_RunExact(Context, Record, Script, Marker, Index) {
+	global GestureActionParameters, ConfigurationFile, _UserProgramEntries, _SR_TreeOwnedTasks
+	Output := Context["directory"] . "\case-receipt-" . Index
+	Gate := Context["directory"] . "\case-gate-" . Index
+	Scalar := '{"version":1,"executable":' . JsonStringLiteral(A_AhkPath)
+		. ',"arguments":["/ErrorStdOut=UTF-8",' . JsonStringLiteral(Script)
+		. ',' . JsonStringLiteral(Output) . ',' . JsonStringLiteral(Gate) . ']}'
+	GestureActionParameters := Map("gesture__tap_3__run_program", Scalar)
+	FileDelete(ConfigurationFile)
+	FileAppend('[gestures]`ntap_3 = "run_program"`n[action_parameters]`n"gesture__tap_3__run_program" = '
+		. JsonStringLiteral(Scalar) . '`n', ConfigurationFile, "UTF-8")
+	Record["program"] := true
+	AssertTrue(ProgramActions_Run("gesture__tap_3"), "SETUP: actual canonical execution starts the exact private script")
+	Entry := _UserProgramEntries["gesture__tap_3"]
+	State := 0
+	PreviousCritical := Critical("On")
+	try {
+		Pid := Entry["handle"].processId()
+		for _, Candidate in _SR_TreeOwnedTasks
+			if Candidate["Pid"] == Pid {
+				State := Candidate
+				break
+			}
+		Assert(State is Map, "SETUP: the running script has an actual tree-owned native task")
+		Record["process"] := _SRTOW_OpenExactProcess(Pid)
+		Record["job"] := _SRTOW_DuplicateNativeHandle(State["JobHandle"])
+	} finally Critical(PreviousCritical)
+	Assert(Record["process"] && Record["job"], "SETUP: process and Job observers are retained before opening the gate")
+	Deadline := A_TickCount + 5000
+	while !FileExist(Output) && A_TickCount < Deadline
+		Sleep(10)
+	Assert(FileExist(Output) != "", "SETUP: the actual private script publishes its own receipt")
+	AssertEqual(Marker, FSReadUtf8Exact(Output), "SETUP: final canonical execution distinguishes the exact case-sensitive script")
+	AssertEqual(SRTOW_WAIT_TIMEOUT, _SRTOW_ExactProcessWait(Record["process"]), "SETUP: the exact process remains gated before retirement")
+	AssertTrue(FSWriteCreateDurable(Gate, "release"), "SETUP: release is created only in the owned private fixture")
+	_RPA_WaitSettled()
+	Assert(_SRTOW_WaitForExactProcessExit(Record["process"]), "SETUP: original process HANDLE signals before observer retirement")
+	AssertEqual(0, _SRTOW_ExactJobActiveProcessCount(Record["job"]), "SETUP: the original actual process group is quiescent")
+	Assert(DllCall("kernel32\CloseHandle", "Ptr", Record["process"], "Int"), "SETUP: exact process observer retires")
+	Record["process"] := 0
+	Assert(DllCall("kernel32\CloseHandle", "Ptr", Record["job"], "Int"), "SETUP: exact Job observer retires")
+	Record["job"] := 0
+	Record["program"] := false
+}
+
+_RPPCS_WithFixture(Body) {
+	global ConfigurationFile, GestureAssignments, GestureActionParameters
+	global _UserProgramEntries, _UserProgramAcquiring, _UserProgramPaused
+	AssertEqual(0, _UserProgramEntries.Count, "SETUP: the case-sensitive fixture cannot borrow live program owners")
+	AssertFalse(IsObject(_UserProgramAcquiring), "SETUP: no native program acquisition may be displaced")
+	SavedFile := ConfigurationFile, SavedGestures := GestureAssignments
+	SavedParameters := GestureActionParameters, SavedPaused := _UserProgramPaused
+	Directory := A_Temp . "\program_case_" . A_TickCount . "_" . Random(1000, 9999)
+	Created := false
+	Context := Map("directory", Directory, "preserve_directory", false)
+	try {
+		Created := FSCreateDirectoryExclusiveStrict(Directory)
+		AssertTrue(Created, "SETUP: the entire native fixture directory is exclusively created")
+		ConfigurationFile := Directory . "\configuration.toml"
+		AssertTrue(FSWriteCreateDurable(ConfigurationFile, ""), "SETUP: the fixture owns its private configuration source")
+		GestureAssignments := Map("tap_3", "run_program")
+		GestureActionParameters := Map()
+		_UserProgramPaused := false
+		Body.Call(Context)
+	} finally {
+		try {
+			Deadline := A_TickCount + 5000
+			while !ProgramActions_Stop(true) && A_TickCount < Deadline
+				Sleep(10)
+			AssertEqual(0, _UserProgramEntries.Count, "exact private program owners retire before directory cleanup")
+			SetTimer(ProgramActions_Poll, 0)
+			if Created && !Context["preserve_directory"]
+				DirDelete(Directory, true)
+		} finally {
+			ConfigurationFile := SavedFile, GestureAssignments := SavedGestures
+			GestureActionParameters := SavedParameters, _UserProgramPaused := SavedPaused
+		}
+	}
+}
+
+_RPPCS_Case(CaseSensitive, Context) {
+	AssertFalse(A_IsCompiled, "SETUP: case-sensitive provider requires the real interpreted runtime")
+	Directory := Context["directory"] . "\case-private"
+	Created := false, Record := 0, Native := 0
+	try {
+		Created := FSCreateDirectoryExclusiveStrict(Directory)
+		AssertTrue(Created, "SETUP: case-sensitive attributes belong only to a newly created private directory")
+		Record := _RPP_TestReserve(Context)
+		Native := ProgramProvidersNative((*) => Directory, (*) => "")
+		Record["native"] := Native
+		if CaseSensitive {
+			Handle := DllCall("kernel32\CreateFileW", "Str", Directory, "UInt", 0x180,
+				"UInt", 7, "Ptr", 0, "UInt", 3, "UInt", 0x02000000, "Ptr", 0, "Ptr")
+			Assert(Handle != -1, "SETUP: native handle owns only the newly created private directory")
+			Native.Debts.Push(Map("kind", "file", "handle", Handle))
+			Flags := Buffer(4, 0), Observed := Buffer(4, 0)
+			NumPut("UInt", 1, Flags)
+			Enabled := DllCall("kernel32\SetFileInformationByHandle", "Ptr", Handle, "Int", 23,
+				"Ptr", Flags, "UInt", 4, "Int")
+			EnableError := A_LastError
+			Queried := DllCall("kernel32\GetFileInformationByHandleEx", "Ptr", Handle, "Int", 23,
+				"Ptr", Observed, "UInt", 4, "Int")
+			_TestPrint("# provider-case-capability enabled=" . Enabled . " error=" . EnableError
+				. " queried=" . Queried . " flags=" . NumGet(Observed, 0, "UInt"))
+			Assert(Enabled && Queried && (NumGet(Observed, 0, "UInt") & 1),
+				"SETUP: kernel must actually grant private FileCaseSensitiveInfo; refusal is not a discovery verdict")
+			AssertTrue(Native.Retire(), "SETUP: exact attribute handle retires before file creation")
+		}
+		Names := CaseSensitive ? ["Case.ahk", "case.ahk"] : ["Case.ahk", "other.ahk"]
+		for Index, Name in Names {
+			Source := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n"
+				. 'FileAppend("marker-' . Index . '", A_Args[1] . ".part", "UTF-8-RAW")`n'
+				. 'FileMove(A_Args[1] . ".part", A_Args[1])`n'
+				. 'while !FileExist(A_Args[2])`n Sleep(10)`nExitApp(0)`n'
+			AssertTrue(FSWriteCreateDurable(Directory . "\" . Name, Source),
+				"SETUP: each distinct physical script must be created exclusively without aliasing")
+		}
+		First := Native.Identity(Directory . "\" . Names[1])
+		Second := Native.Identity(Directory . "\" . Names[2])
+		Assert(First["kind"] == "file" && Second["kind"] == "file" && First["token"] != Second["token"],
+			"SETUP: the actual provider adapter must distinguish both physical file identities")
+		for Index, Name in Names
+			_RPPCS_RunExact(Context, Record, Directory . "\" . Name, "marker-" . Index, Index)
+		Owner := ProgramProviderSession(_RPP_Catalogue(), Native.Ports())
+		Record["owner"] := Owner
+		Packet := Owner.Discover()
+		_TestPrint("# provider-case-inventory sensitive=" . CaseSensitive . " distinct_physical=1 distinct_execution=1 packet="
+			. (Packet is Map) . " choices=" . (Packet is Map ? Packet["choices"].Length : -1))
+		Assert(Packet is Map, "actual inventory must admit ordinary absolute routes with independently executable script names")
+		AssertEqual(2, Packet["choices"].Length, "both actual script identities remain separate discoverable choices")
+		Seen := Map()
+		for Choice in Packet["choices"] {
+			Seen[Choice["label"]] := true
+			Parsed := ProgramParameterParse(Owner.Resolve(Choice["key"], []))
+			Assert(Parsed is Map, "each separate native inventory choice resolves through the actual decoder")
+			AssertEqual(Directory . "\" . Choice["label"], Parsed["arguments"][2],
+				"resolved interpreter argv preserves the complete exact-case script pathname")
+		}
+		for Name in Names
+			AssertTrue(Seen.Has(Name), "both exact basename identities appear without case folding")
+	} finally {
+		if IsObject(Record)
+			AssertTrue(_RPP_TestRetire(Record), "all exact native inventory/process/Job capabilities retire before parent cleanup")
+	}
+}
+for Sensitive in [true, false]
+	Test("program providers: " . (Sensitive ? "case-sensitive directory" : "ordinary distinct names")
+		. " actual inventory and execution (program-provider-case-sensitive)",
+		_RPPCS_WithFixture.Bind(_RPPCS_Case.Bind(Sensitive)))
+
+; Exact duplicate inventory names are not two physical case-sensitive entries.
+_RPPCS_ExactDuplicateRefusal() {
+	State := _RPP_ControlledOwner(), Owner := State["owner"]
+	OriginalList := Owner.Ports["list"]
+	Packet := Owner.Discover()
+	Assert(Packet is Map, "SETUP: the real provider policy admits the unchanged controlled native receipts")
+	AssertEqual(1, Packet["choices"].Length, "SETUP: the independently owned original script is discoverable")
+	OldKey := Packet["choices"][1]["key"]
+	try {
+		Owner.Ports["list"] := (*) => Map("names", ["été 日本.py", "été 日本.py"], "truncated", false)
+		DuplicatePacket := Owner.Discover()
+		_TestPrint("# provider-case-exact-duplicate result=" . (DuplicatePacket is Map)
+			. " current=" . IsObject(Owner.Current))
+		AssertFalse(DuplicatePacket, "an exact repeated name remains a refused inventory, not two public choices")
+		AssertFalse(IsObject(Owner.Current), "duplicate refusal cannot leave an admitted candidate packet")
+		AssertFalse(Owner.Resolve(OldKey, []), "the preceding generation cannot survive a refused duplicate discovery")
+	} finally Owner.Ports["list"] := OriginalList
+	Fresh := Owner.Discover()
+	Assert(Fresh is Map, "restored original inventory can admit its own fresh generation")
+	AssertEqual(1, Fresh["choices"].Length, "ordinary one-name inventory behavior is unchanged")
+	Assert(Owner.Resolve(Fresh["choices"][1]["key"], []) is String,
+		"the fresh exact physical receipt still resolves through the canonical program decoder")
+	AssertTrue(Owner.Invalidate(), "the isolated controlled inventory owner retires explicitly")
+}
+Test("program providers: exact duplicate names still refuse (program-provider-exact-duplicate)", _RPPCS_ExactDuplicateRefusal)

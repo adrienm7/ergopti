@@ -58,6 +58,8 @@ global _PromptEdWeb_NavSub     := unset
 ; intercept (see personal_toml_editor_webview.ahk _HsEdWeb_ResetDone for the
 ; crash this mirrors). The flag makes the second call a true no-op instead.
 global _PromptEdWeb_ResetDone  := false
+global _PromptEdWeb_SubscriptionOwner := 0
+global _PromptEdWeb_RetiredHosts := []
 
 ; Open context captured at TryOpen time and consumed by the init push / save.
 global _PromptEdWeb_IsEdit     := false
@@ -138,6 +140,9 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 	global _PromptEdWeb_ContextEpoch, _PromptEdWeb_EpochSerial
 
 	ExpectedContext := { Serial: _PromptEdWeb_EpochSerial, Epoch: _PromptEdWeb_ContextEpoch }
+	_PromptEdWeb_RetryRetiredHosts()
+	if ExpectedContext.Serial != _PromptEdWeb_EpochSerial || ExpectedContext.Epoch != _PromptEdWeb_ContextEpoch
+		return true
 	if !_PromptEdWeb_Available()
 		return false
 	Source := OpeningSource is Map ? OpeningSource : _LLM_Menu_CaptureProfileSource()
@@ -177,7 +182,7 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 	} finally Critical(PreviousCritical)
 
 	g := Gui_Create("+Resize +MinSize480x360", _PromptEdWeb_IsEdit ? t("prompt_editor.title_edit") : t("prompt_editor.title_new"))
-	Installed := false, FactoryFailed := false, ResetForFallback := false
+	Installed := false, FactoryFailed := false, ResetForFallback := false, Host := 0
 	try {
 		if !_PromptEdWeb_OpeningCurrent(Context)
 			return true
@@ -221,6 +226,9 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 			View := Controller.CoreWebView2
 			if !_PromptEdWeb_StartupCurrent(g)
 				return true
+			Host := _PromptEdWeb_BeginSubscriptions(g, Controller, View)
+			if !IsObject(Host)
+				return true
 			try {
 				Settings := View.Settings
 				if !_PromptEdWeb_StartupCurrent(g)
@@ -241,10 +249,12 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 			}
 			if !_PromptEdWeb_StartupCurrent(g)
 				return true
-			MsgSub := View.WebMessageReceived(_PromptEdWeb_OnWebMessage)
+			if !_PromptEdWeb_Subscribe(Host, "message", _PromptEdWeb_OnWebMessage)
+				return true
 			if !_PromptEdWeb_StartupCurrent(g)
 				return true
-			NavSub := View.NavigationCompleted(_PromptEdWeb_OnNavigationCompleted.Bind(g))
+			if !_PromptEdWeb_Subscribe(Host, "navigation", _PromptEdWeb_OnNavigationCompleted.Bind(g))
+				return true
 			if !_PromptEdWeb_StartupCurrent(g)
 				return true
 			try View.SetVirtualHostNameToFolderMapping(PROMPTED_VHOST, _SharedDir, PROMPTED_HOST_ACCESS_ALLOW)
@@ -259,11 +269,8 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 				if _PromptEdWeb_StartupCurrent(g) {
 					_PromptEdWeb_Controller := Controller
 					_PromptEdWeb_WebView := View
-					_PromptEdWeb_MsgSub := MsgSub
-					_PromptEdWeb_NavSub := NavSub
-					; Globals retain the subscriptions before their local aliases go.
-					MsgSub := unset
-					NavSub := unset
+					_PromptEdWeb_MsgSub := Host.message
+					_PromptEdWeb_NavSub := Host.navigation
 					Installed := true
 				}
 			} finally Critical(PreviousCritical)
@@ -283,14 +290,16 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 	} finally {
 		if !Installed {
 			ResetForFallback := _PromptEdWeb_Reset(g)
-			try MsgSub := unset
-			try NavSub := unset
-			if IsSet(Controller) {
-				try Controller.Close()
-				catch as Err
-					try LoggerError("PromptEditor", "Retired browser cleanup failed: {1}.", Err.Message)
+			if IsObject(Host) {
+				_PromptEdWeb_RetireSubscriptionHost(Host)
+			} else {
+				if IsSet(Controller) {
+					try Controller.Close()
+					catch as Err
+						try LoggerError("PromptEditor", "Retired browser cleanup failed: {1}.", Err.Message)
+				}
+				try g.Destroy()
 			}
-			try g.Destroy()
 		}
 	}
 	; A failed old profile cannot borrow a later context's fallback authority.
@@ -298,6 +307,120 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 }
 
 
+
+
+; A subscription is returned after add_Event has pumped native messages. The
+; exact host retains its HWND/controller until that returned handle is released.
+_PromptEdWeb_BeginSubscriptions(Window, Controller, View) {
+	global _PromptEdWeb_SubscriptionOwner
+	Host := {gui: Window, controller: Controller, view: View, message: 0,
+		navigation: 0, in_flight: false, retired: false, closing: false, closed: false}
+	PreviousCritical := Critical("On")
+	try {
+		if !_PromptEdWeb_StartupCurrent(Window) || IsObject(_PromptEdWeb_SubscriptionOwner)
+			return 0
+		_PromptEdWeb_SubscriptionOwner := Host
+		return Host
+	} finally Critical(PreviousCritical)
+}
+
+_PromptEdWeb_Subscribe(Host, Kind, Handler) {
+	global _PromptEdWeb_SubscriptionOwner
+	PreviousCritical := Critical("On")
+	try {
+		if Host.retired || _PromptEdWeb_SubscriptionOwner != Host
+				|| !_PromptEdWeb_StartupCurrent(Host.gui)
+			return false
+		Host.in_flight := true
+	} finally Critical(PreviousCritical)
+	Subscription := 0, Failed := false, FailureType := "", FailureValue := 0
+	try {
+		Subscription := Kind == "message" ? Host.view.WebMessageReceived(Handler)
+			: Host.view.NavigationCompleted(Handler)
+	} catch Any as Failure {
+		Failed := true, FailureType := Type(Failure), FailureValue := Failure
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			Host.%Kind% := Subscription
+			Subscription := 0
+			Host.in_flight := false
+			Current := !Host.retired && _PromptEdWeb_SubscriptionOwner == Host
+				&& _PromptEdWeb_StartupCurrent(Host.gui)
+		} finally Critical(PreviousCritical)
+	}
+	; Preserve the original caller's current-startup error policy (including
+	; the public model browser's native fallback). A retired constructor must
+	; consume its late failure instead of reopening a canceled or newer UI.
+	if Failed && Current && !Host.retired
+		throw FailureValue
+	if Host.retired
+		_PromptEdWeb_RetryRetiredHosts()
+	if Failed
+		try LoggerError("PromptEditor", "Browser subscription failed (error_type={1}).", FailureType)
+	return !Failed && Current && !Host.retired
+}
+
+_PromptEdWeb_RetireSubscriptionHost(Host) {
+	global _PromptEdWeb_RetiredHosts
+	PreviousCritical := Critical("On")
+	try {
+		if !IsObject(Host.gui)
+			return
+		Host.retired := true
+		Found := false
+		for Pending in _PromptEdWeb_RetiredHosts
+			if Pending == Host
+				Found := true
+		if !Found
+			_PromptEdWeb_RetiredHosts.Push(Host)
+	} finally Critical(PreviousCritical)
+	; Hide can pump a replacement; all subsequent operations use this old record.
+	try Host.gui.Hide()
+	_PromptEdWeb_RetryRetiredHosts()
+}
+
+_PromptEdWeb_RetryRetiredHosts() {
+	global _PromptEdWeb_RetiredHosts
+	PreviousCritical := Critical("On")
+	try Pending := _PromptEdWeb_RetiredHosts.Clone()
+	finally Critical(PreviousCritical)
+	for Host in Pending {
+		PreviousCritical := Critical("On")
+		try {
+			if Host.in_flight || Host.closing
+				continue
+			Host.closing := true
+		} finally Critical(PreviousCritical)
+		Settled := false
+		try {
+			Host.message := 0
+			Host.navigation := 0
+			if !Host.closed {
+				Host.controller.Close()
+				Host.closed := true
+			}
+			Host.gui.Destroy()
+			Host.gui := 0, Host.controller := 0, Host.view := 0
+			Settled := true
+		} catch Any as Failure {
+			try LoggerWarn("PromptEditor", "Browser retirement remains pending (error_type={1}).", Type(Failure))
+		} finally {
+			PreviousCritical := Critical("On")
+			try {
+				Host.closing := false
+				if Settled {
+					Count := _PromptEdWeb_RetiredHosts.Length
+					Loop Count {
+						Index := Count - A_Index + 1
+						if _PromptEdWeb_RetiredHosts[Index] == Host
+							_PromptEdWeb_RetiredHosts.RemoveAt(Index)
+					}
+				}
+			} finally Critical(PreviousCritical)
+		}
+	}
+}
 
 ; Native host custody is distinct from the scalar profile/page consent epoch.
 ; A profile repoint may keep this same GUI while its browser is still awaiting.
@@ -524,8 +647,9 @@ _PromptEdWeb_PersistProfile(EditId, Epoch, Name, Batch, Prompt, Port := 0) {
 	return LLM_Menu_CommitMutation("the LLM prompt-editor profile save",
 		(Candidate) => _PromptEdWeb_ApplyProfileForContext(Candidate,
 			EditId, Epoch, Name, Batch, Prompt), Options.Get("apply", _PromptEdWeb_ApplyCommitted),
-		_LLM_Menu_WriteProfileSource.Bind(Source), Options.Get("notify", 0),
-		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0))
+		_LLM_Menu_WriteProfileSource.Bind(Source), _LLM_Menu_ProfileNotifyFailure.Bind(Source, Options.Get("notify", 0)),
+		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", _LLM_Menu_ProfileProjectionUpdates),
+		_LLM_Menu_ProfilePreparePublication.Bind(Source), _LLM_Menu_ProfilePublishCandidate.Bind(Source))
 }
 
 
@@ -667,27 +791,30 @@ _PromptEdWeb_CloseForContext(EditId, Epoch) {
 }
 
 _PromptEdWeb_Close(ExpectedWindow := unset) {
-	global _PromptEdWeb_Gui
+	global _PromptEdWeb_Gui, _PromptEdWeb_SubscriptionOwner
 	PreviousCritical := Critical("On")
 	try {
+		Host := _PromptEdWeb_SubscriptionOwner
 		Window := IsSet(ExpectedWindow) ? ExpectedWindow : _PromptEdWeb_Gui
 		if !IsObject(Window) || _PromptEdWeb_Gui != Window
 			return false
 	} finally Critical(PreviousCritical)
 	if !_PromptEdWeb_Reset(Window)
 		return false
-	try Window.Destroy()
+	if !IsObject(Host)
+		try Window.Destroy()
 	return true
 }
 
-; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
-; whether to destroy the window). Idempotent: a second call (e.g. the native
+; Retires browser custody and destroys a managed host only after subscription
+; calls return and controller Close succeeds. Idempotent: a second call (e.g. the native
 ; Close event firing after "save"/"cancel" already tore the same window down)
 ; is a true no-op instead of touching the globals again.
 _PromptEdWeb_Reset(ExpectedWindow := unset) {
 	global _PromptEdWeb_Gui, _PromptEdWeb_Controller, _PromptEdWeb_WebView
 	global _PromptEdWeb_MsgSub, _PromptEdWeb_NavSub, _PromptEdWeb_ResetDone
 	global _PromptEdWeb_EditId, _PromptEdWeb_ContextEpoch, _PromptEdWeb_OpeningSource
+	global _PromptEdWeb_SubscriptionOwner
 
 	PreviousCritical := Critical("On")
 	try {
@@ -697,6 +824,10 @@ _PromptEdWeb_Reset(ExpectedWindow := unset) {
 			return false
 		; Retain every old reference before detaching its globals. Last-reference
 		; release and native destruction happen after the RAM transaction.
+		Host := _PromptEdWeb_SubscriptionOwner
+		if IsObject(Host)
+			Host.retired := true
+		_PromptEdWeb_SubscriptionOwner := 0
 		RetiredWindow := _PromptEdWeb_Gui
 		RetiredSource := _PromptEdWeb_OpeningSource
 		if IsSet(_PromptEdWeb_Controller)
@@ -720,7 +851,9 @@ _PromptEdWeb_Reset(ExpectedWindow := unset) {
 	; These callouts may open a successor; only captured old objects are touched.
 	try RetiredMsgSub := unset
 	try RetiredNavSub := unset
-	if IsSet(RetiredController)
+	if IsObject(Host) {
+		_PromptEdWeb_RetireSubscriptionHost(Host)
+	} else if IsSet(RetiredController)
 		try RetiredController.Close()
 	return true
 }

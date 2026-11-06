@@ -49,7 +49,7 @@ _PRBD_ReloadBakesTheResolvedDelay() {
 	; Use a private writable target: a setter now publishes memory only after the
 	; durable write succeeds, and the test must never touch the developer's file.
 	_HotstringsOverridesPath := OverridesPath
-	_HotstringsOverrides := Map()
+	_HotstringsOverrides := _ParseOverrides(OverridesPath)
 	Features := Map("hotstrings", Map("personal", Map(Section, Map("enabled", true))))
 	HotstringsResolveBumpGen()
 	try {

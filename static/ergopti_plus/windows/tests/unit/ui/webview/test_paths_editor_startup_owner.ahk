@@ -39,13 +39,15 @@ _PWST_Case(Mode) {
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "An unsettled earlier editor child must retire first")
 	Directory := A_Temp . "\ergopti_paths_editor_startup_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
-	FSCreateDirectoryExclusiveStrict(Directory)
+	Created := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue((Created is Integer) && Created == 1, "The private root requires its exact creation receipt")
 	Script := Directory . "\subject.ahk"
 	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }, Handle := 0, Primary := 0, Retired := false
 	AtDeadline := 0, ExportFailure := 0
 	PreviousCritical := Critical("Off")
 	try {
-		FSCreateDirectoryExclusiveStrict(Directory . "\64bit")
+		CreatedLoader := FSCreateDirectoryExclusiveStrict(Directory . "\64bit")
+		AssertTrue((CreatedLoader is Integer) && CreatedLoader == 1, "The private loader directory must be newly owned")
 		; Availability must take its genuine filesystem branch. This inert marker
 		; is never loaded: the browser factory is explicitly passive in the child.
 		AssertTrue(FSWriteCreateDurable(Directory . "\64bit\WebView2Loader.dll", "private availability marker") != 0)
@@ -118,3 +120,15 @@ _PWST_Case(Mode) {
 for _PWST_Mode in ["current", "close-create", "close-create-reject", "reopen-create", "reopen-create-reject"]
 	Test("Paths editor startup: " . _PWST_Mode . " retains only its current owner (paths-editor-startup-owner)",
 		_PWST_Case.Bind(_PWST_Mode))
+
+for _PWST_SubscriptionMode in ["subscription-current", "subscription-close"]
+	Test("Paths editor add-event retirement: " . _PWST_SubscriptionMode . " owns the actual HWND (paths-editor-native-subscription-retirement-owner)",
+		_PWST_Case.Bind(_PWST_SubscriptionMode))
+
+for _PWST_ExtraMode in ["subscription-reset-retain", "subscription-error-current", "subscription-error-reopen", "factory-error-current", "factory-error-reopen", "factory-error-destroy-refuse"]
+	Test("Paths editor subscription compatibility: " . _PWST_ExtraMode . " retains its exact owner (paths-editor-subscription-compat)",
+		_PWST_Case.Bind(_PWST_ExtraMode))
+
+for _PWST_BareMode in ["factory-error-destroy-after", "factory-error-retry-current", "factory-error-retry-reentry"]
+	Test("Paths bare host retirement: " . _PWST_BareMode . " retains exact native ownership (paths-bare-retirement-owner)",
+		_PWST_Case.Bind(_PWST_BareMode))

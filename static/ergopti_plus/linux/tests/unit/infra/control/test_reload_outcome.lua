@@ -55,6 +55,15 @@ helpers.describe("hotstring reload outcome", function()
 		local ports = {
 			read = function(path) return files[path] end,
 			write = function(path, text) files[path] = text; return true end,
+			-- Publication stages each file exclusively before renaming it.
+			stage = function(path, text)
+				if files[path] ~= nil then return nil, "stage already exists" end
+				files[path] = text
+				return {
+					current = function(expected) return files[path] == expected end,
+					discard = function() files[path] = nil; return true end,
+				}
+			end,
 			remove = function(path) files[path] = nil; return true end,
 			rename = function(from, to) files[to] = files[from]; files[from] = nil; return true end,
 			exists = function(path) return files[path] ~= nil end,

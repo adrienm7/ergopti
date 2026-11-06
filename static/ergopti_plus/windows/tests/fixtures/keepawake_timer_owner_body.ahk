@@ -1,10 +1,10 @@
 ﻿; tests/fixtures/keepawake_timer_owner_body.ahk
 
-; Native session hooks and Start/Stop are real. Only the two position samples
+; Native session hooks and Start/Stop are real. Only the physical position samples
 ; and all subject timer calls are bound with consistent callback identity. Delivery is a real SetTimer,
 ; with controlled coordinates and no physical mouse displacement.
 global _KATO := {Mode: A_Args[1], X: 100, Y: 200, Samples: 0, Timers: Map(), Hooks: [],
-	Capturing: false, Subject: 0, SubjectArms: 0, Failure: 0, A: 0, B: 0, Logs: []}
+	Capturing: false, Subject: 0, SubjectArms: 0, KeyboardDeliveries: 0, Failure: 0, A: 0, B: 0, Logs: []}
 global ActivitySimulation := false
 
 _KATO_Require(Condition, Message) {
@@ -18,10 +18,10 @@ _KATO_Log(Line) {
 		_KATO.Logs.Push(Line)
 }
 
-_KATO_MouseGetPos(&X, &Y) {
+_KATO_GetPos() {
 	global _KATO
 	_KATO.Samples += 1
-	X := _KATO.X, Y := _KATO.Y
+	return Map("x", _KATO.X, "y", _KATO.Y)
 }
 
 _KATO_Timer(Callback, Period, Priority := unset) {
@@ -111,6 +111,20 @@ _KATO_Exercise() {
 	global _KATO, AwakeInputHook, ActivitySimulation, AWAKE_JITTER_PX
 	Started := A_TickCount
 	_KATO.A := _KATO_Start()
+	if _KATO.Mode == "retired-keyboard" {
+		_KATO_Require(StopActivitySimulation(false), "A's native key observer must acknowledge retirement")
+		_KATO.B := _KATO_Start()
+		AwakeCancelOnKeypress(_KATO.A, 0x41, 0x1E)
+		_KATO.KeyboardDeliveries += 1
+		_KATO_Require(ActivitySimulation && AwakeInputHook == _KATO.B && _KATO.B.InProgress,
+			"a controlled queued callback from retired A must preserve B")
+		AwakeCancelOnKeypress(_KATO.B, 0x41, 0x1E)
+		_KATO.KeyboardDeliveries += 1
+		_KATO_Require(!ActivitySimulation && !IsObject(AwakeInputHook) && !_KATO.B.InProgress,
+			"the current native key observer must still cancel its own session")
+		return
+	}
+
 	_KATO.X += AWAKE_JITTER_PX + 1
 	_KATO.Capturing := true
 	try AwakeCheckMouseMoved()
@@ -202,10 +216,20 @@ _KATO_Main() {
 		throw Cleanup
 	if IsObject(DiagnosticFailure)
 		throw DiagnosticFailure
+	KeyboardOnly := _KATO.Mode == "retired-keyboard"
+	if KeyboardOnly
+		_KATO_Require(_KATO.SubjectArms == 0 && !IsObject(_KATO.Subject) && _KATO.KeyboardDeliveries == 2,
+			"The keyboard-only case must deliver both controlled callbacks and must never arm a displacement timer.")
+	else
+		_KATO_Require(IsObject(_KATO.Subject) && _KATO.KeyboardDeliveries == 0,
+			"A movement cancellation case must retain its real timer receipt.")
+
 	FileAppend("RECEIPT " . KL_JsonEncode(Map("pid", DllCall("GetCurrentProcessId", "UInt"), "mode", _KATO.Mode,
 		"source_sha256", A_Args[3], "runtime_sha256", A_Args[4], "owner_sha256", _KATO_ActualOwnerHash,
-		"subject_arms", _KATO.SubjectArms, "timer_deliveries", _KATO.Subject.Deliveries,
-		"timer_settled", _KATO.Subject.Settled, "timer_cancelled", _KATO.Subject.Cancelled,
+		"subject_arms", _KATO.SubjectArms, "controlled_keyboard_deliveries", _KATO.KeyboardDeliveries,
+		"timer_deliveries", KeyboardOnly ? 0 : _KATO.Subject.Deliveries,
+		"timer_settled", KeyboardOnly ? 0 : _KATO.Subject.Settled,
+		"timer_cancelled", KeyboardOnly ? 0 : _KATO.Subject.Cancelled,
 		"hooks_retired", 1, "mouse_injected", 0, "suspended", A_IsSuspended)) . "`n", "*")
 }
 

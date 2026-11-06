@@ -43,7 +43,8 @@ _ESOT_Case(Owner, Mode) {
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "An unsettled earlier editor child must retire first")
 	Directory := A_Temp . "\ergopti_editor_early_show_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
-	FSCreateDirectoryExclusiveStrict(Directory)
+	Creation := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue((Creation is Integer) && Creation == 1, "Only an exclusively acquired private root may be recursively removed")
 	Script := Directory . "\subject.ahk"
 	Owners := Map()
 	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }, Handle := 0, Primary := 0, Retired := false
@@ -54,7 +55,7 @@ _ESOT_Case(Owner, Mode) {
 		; Availability must take its genuine filesystem branch. This inert marker
 		; is never loaded: the browser factory is explicitly passive in the child.
 		AssertTrue(FSWriteCreateDurable(Directory . "\64bit\WebView2Loader.dll", "private availability marker") != 0)
-		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _ESOT_ChildSource(Owners)) != 0)
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . (Owner == "personal-info" ? _PINS_ChildSource(Owners) : _ESOT_ChildSource(Owners))) != 0)
 		SourceHash := CryptoSha256Bytes(FSReadBytesStrict(Script))
 		RuntimeHash := CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
 		_TestPrint("# editor-early-show source-built " . KL_JsonEncode(Map("owner", Owner, "mode", Mode,
@@ -128,3 +129,36 @@ for _ESOT_Owner in ["action-picker", "paths"]
 	for _ESOT_Mode in ["current", "close", "reopen", "close-after-return"]
 		Test("Native editor Show: " . _ESOT_Owner . " " . _ESOT_Mode . " preserves its owner (editor-early-show-owner)",
 			_ESOT_Case.Bind(_ESOT_Owner, _ESOT_Mode))
+
+_PINS_ChildSource(Owners) {
+	global _DriverDir
+	Seen := Map(), Includes := ""
+	for Symbol in ["JsonStringLiteral", "TickElapsed64", "PersonalInformationEditor",
+		"_PiEdWeb_TryOpen", "PersonalInfoTomlPath", "FSReadBytesStrict", "_ConfigWriteLeaseKey", "WMPresentWindow"] {
+		Owner := _DriverProductionFileForSymbol(Symbol)
+		AssertTrue(Owner != "", "The native personal-info child needs its genuine whole owner: " . Symbol)
+		Source := FSReadStrict(Owner)
+		AssertTrue(_DriverExtractFunctionBody(&Source, Symbol) != "")
+		Owners[Symbol] := Map("path", Owner, "sha256", CryptoSha256Bytes(FSReadBytesStrict(Owner)))
+		if !Seen.Has(Owner) {
+			Seen[Owner] := true
+			Includes .= "#Include " . Owner . "`n"
+		}
+	}
+	Fixture := _DriverDir . "\tests\fixtures\personal_info_native_close_owner_body.ahk"
+	AssertTrue(FileExist(Fixture))
+	Owners["fixture"] := Map("path", Fixture, "sha256", CryptoSha256Bytes(FSReadBytesStrict(Fixture)))
+	return "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
+		. Includes . "#Include " . Fixture . "`n"
+}
+for _PINS_Mode in ["current", "destroy-reopen", "reset-close"]
+	Test("Personal information native close: " . _PINS_Mode . " retains its admitted owner (personal-info-native-close)",
+		_ESOT_Case.Bind("personal-info", _PINS_Mode))
+
+for _PINS_Mode in ["subscription-current", "subscription-close", "subscription-reset-close", "subscription-error-current", "subscription-error-reopen", "subscription-reset-retain"]
+	Test("Personal information subscription: " . _PINS_Mode . " retires before its native host (personal-info-subscription-owner)",
+		_ESOT_Case.Bind("personal-info", _PINS_Mode))
+
+for _PINS_RetryMode in ["retry-current", "retry-reentry"]
+	Test("Personal information initial retirement: " . _PINS_RetryMode . " preserves native cancellation (personal-info-native-initial-retirement-reentry)",
+		_ESOT_Case.Bind("personal-info", _PINS_RetryMode))

@@ -33,6 +33,7 @@ _PBSF_Sequence(Mode, State, Schedule, Focus) {
 		_PrefixModifierIsDown := (Name) => Modifiers.Get(Name, false)
 		_ALTGR_KANA_FIXUP := false
 		_ALTGR_LAYOUT_PROBE := Map("altgr_level", true)
+		AssertTrue(IsObject(_LLM_Bridge_BindTypingSource(Focus(), true)))
 		_LLM_Bridge_Buffer := "word"
 		if Mode != "complete-context" {
 			LLM_Bridge_OnChar(High)

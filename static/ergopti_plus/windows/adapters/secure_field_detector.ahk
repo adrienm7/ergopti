@@ -98,27 +98,31 @@ global SFD_UIA_CONTEXT_MATCH_FN := 0
 ; Returns true if the focused control is secure OR cannot yet be classified.
 ; The cheap native path is synchronous; an inconclusive browser/Electron/WPF
 ; control is denied once and confirmed with UIA on a deferred callback.
-SFD_IsSecureField() {
-	Hwnd := SFD_FocusedHwnd()
-	if !Hwnd
+SFD_IsSecureField(KnownFocusedHwnd := unset) {
+	Hwnd := IsSet(KnownFocusedHwnd) ? KnownFocusedHwnd : SFD_FocusedHwnd()
+	if !(Hwnd is Integer) || Hwnd <= 0
 		return true
 	SFD_EnsureFocusTracking()
 	Focus := SFD_FocusSnapshot()
-	CachedSecure := true
-	if SFD_TryGetCachedVerdict(Hwnd, Focus.Generation, Focus.ElementId,
-			&CachedSecure)
-		return CachedSecure
-
+	; ES_PASSWORD can change without changing HWND, focus or RuntimeId. Native
+	; Edit/RichEdit classification is bounded and authoritative on every read;
+	; only inconclusive provider fields may reuse their exact UIA receipt.
+	NativeElement := "hwnd:" . Hwnd
 	Conclusive := false
 	Secure := SFD_DetectNative(Hwnd, &Conclusive)
-	if !Conclusive {
-		; Unknown is fail-closed until the asynchronous UIA probe establishes a
-		; normal field. This protects browser password boxes and UAC-restricted UI.
-		Secure := true
-		SFD_ScheduleUiaProbe(Hwnd, Focus.Generation)
+	if Conclusive {
+		SFD_CommitFieldVerdict(Hwnd, Secure, Focus.Generation, NativeElement)
+		return Secure
 	}
-	SFD_CommitFieldVerdict(Hwnd, Secure, Focus.Generation,
-		Conclusive ? "hwnd:" . Hwnd : "")
+	CachedSecure := true
+	if SFD_TryGetCachedVerdict(Hwnd, Focus.Generation, Focus.ElementId,
+			&CachedSecure, , false)
+		return CachedSecure
+	; A failed native read cannot reuse an old native negative verdict. Unknown
+	; remains fail-closed until the asynchronous UIA owner confirms its field.
+	Secure := true
+	SFD_ScheduleUiaProbe(Hwnd, Focus.Generation)
+	SFD_CommitFieldVerdict(Hwnd, Secure, Focus.Generation, "")
 	return Secure
 }
 
@@ -141,7 +145,7 @@ SFD_ConfigureUiaWorker(RequestFn, StartFn, ContextMatchFn) {
 ; Positive verdicts may be conservatively reused for the same HWND, but a
 ; negative verdict requires both a live focus invalidator and the UIA RuntimeId
 ; that produced it. Unknown always leaves Secure=true.
-SFD_TryGetCachedVerdict(Hwnd, FocusGeneration, ElementId, &Secure, NowTick?) {
+SFD_TryGetCachedVerdict(Hwnd, FocusGeneration, ElementId, &Secure, NowTick?, AllowNativeNegative := true) {
 	global SFD_FIELD_CACHE, SFD_FIELD_CACHE_TTL_MS
 	Secure := true
 	; This map is updated in place. Copy the verdict and identity before sampling
@@ -168,6 +172,10 @@ SFD_TryGetCachedVerdict(Hwnd, FocusGeneration, ElementId, &Secure, NowTick?) {
 			or VerdictGeneration != FocusGeneration
 			or ElementId == ""
 			or CachedElementId != ElementId)
+		return false
+	; A caller which just obtained an inconclusive native read may still use
+	; an exact UIA verdict, but cannot revive an earlier native style receipt.
+	if !AllowNativeNegative && CachedElementId == "hwnd:" . Hwnd
 		return false
 	Secure := false
 	return true

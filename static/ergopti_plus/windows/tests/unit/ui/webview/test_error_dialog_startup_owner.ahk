@@ -35,7 +35,7 @@ _EDOT_Generated(Symbol) {
 	return Found
 }
 
-_EDOT_Source(Root) {
+_EDOT_Source(Root, LogOpeners := false) {
 	global _DriverDir, _SharedDir
 	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 		. "OnError(_EDOS_BootError)`n" . '_EDOS_Phase("autoexecute-entry")' . "`n"
@@ -78,7 +78,13 @@ _EDOT_Source(Root) {
 	}
 	Source .= "#Include " . _DriverDir . "\infra\bundle.ahk`n"
 	Source .= '_EDOS_Phase("included bundle; before fixture body")' . "`n"
-	return Chr(0xFEFF) . Source . "#Include " . _DriverDir . "\tests\fixtures\error_dialog_startup_owner_body.ahk`n"
+	if LogOpeners {
+		Owner := _DriverProductionFileForSymbol("LogOpeners_OpenTodayErrors", _DriverDir)
+		AssertTrue(Owner != "", "The log reader child must use the real UI action owner")
+		Source .= "#Include " . Owner . "`n"
+	}
+	return Chr(0xFEFF) . Source . "#Include " . _DriverDir . "\tests\fixtures\"
+		. (LogOpeners ? "log_openers_buffered_owner_body.ahk" : "error_dialog_startup_owner_body.ahk") . "`n"
 }
 
 _EDOT_Assets(Root) {
@@ -102,7 +108,7 @@ _EDOT_Done(State, Code, Output, ErrorText) {
 	State.Calls += 1, State.Code := Code, State.Output := Output, State.ErrorText := ErrorText
 }
 
-_EDOT_Case(Mode) {
+_EDOT_Case(Mode, LogOpeners := false) {
 	static Serial := 0, Debt := 0
 	AssertFalse(IsObject(Debt), "A previous unretired child prevents another component")
 	Root := A_Temp . "\ergopti_error_startup_" . A_ScriptHwnd . "_" . ++Serial
@@ -112,7 +118,7 @@ _EDOT_Case(Mode) {
 	try {
 		_EDOT_Assets(Root)
 		Script := Root . "\subject.ahk"
-		AssertTrue(FSWriteCreateDurable(Script, _EDOT_Source(Root)))
+		AssertTrue(FSWriteCreateDurable(Script, _EDOT_Source(Root, LogOpeners)))
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut=UTF-8", Script, Mode, Root], _EDOT_Done.Bind(State))
 		AssertTrue(Handle.start(), "The exact error component must start")
 		Started := A_TickCount
@@ -162,10 +168,16 @@ _EDOT_Case(Mode) {
 	AssertEqual(1, AtDeadline.Calls, "The component must settle once: " . State.Output)
 	AssertEqual("", AtDeadline.ErrorText, "The completion diagnostic must be empty: " . State.Output)
 	AssertEqual(0, AtDeadline.Code, "The error dialog violated startup ownership: " . State.Output)
-	AssertContains(AtDeadline.Output, "PASS error-dialog-startup " . Mode)
+	AssertContains(AtDeadline.Output, (LogOpeners ? "PASS log-openers-buffered " : "PASS error-dialog-startup ") . Mode)
 	if IsObject(ExportFailure)
 		throw ExportFailure
 }
 
-for _EDOT_Mode in ["current", "close-resolve", "reopen-resolve", "close-reject", "reopen-reject"]
+for _EDOT_Mode in ["current", "close-resolve", "reopen-resolve", "close-reject", "reopen-reject",
+	"current-refusal", "reopen-resolve-refusal"]
 	Test("Error dialog startup: " . _EDOT_Mode . " retains its current owner (error-dialog-startup-owner)", _EDOT_Case.Bind(_EDOT_Mode))
+
+for _LOB_Mode in ["errors", "main", "errors-denied", "main-denied", "errors-busy", "main-busy",
+	"daylog", "daylog-denied", "daylog-busy"]
+	Test("Log openers: " . _LOB_Mode . " reads the settled native buffered sink (log-openers-buffered-owner)",
+		_EDOT_Case.Bind(_LOB_Mode, true))

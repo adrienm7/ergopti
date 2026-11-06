@@ -136,14 +136,19 @@ _Onboarding_TryWeb() {
 	}
 	; A duplicate request must leave the live session's callbacks and teardown
 	; owner untouched. Allocate a fresh epoch only when constructing a new host.
-	_OnbWeb_SessionEpoch += 1
-	SessionEpoch := _OnbWeb_SessionEpoch
-	_OnbWeb_ResetDone := false
+	PreviousCritical := Critical("On")
+	try {
+		if _ob_gui != 0
+			return true
+		_OnbWeb_SessionEpoch += 1
+		SessionEpoch := _OnbWeb_SessionEpoch
+		_OnbWeb_ResetDone := false
+		_OnbWeb_Ready := false
+		SavedQueue := _OnbWeb_Queue
+		_OnbWeb_Queue := []
+	} finally Critical(PreviousCritical)
 
 	try LoggerStart("Onboarding", "Launching wizard via WebView2 (shared frontend)…")
-
-	_OnbWeb_Ready := false
-	_OnbWeb_Queue := []
 
 	try Geo := _OnbWeb_Geometry()
 	catch as Err {
@@ -164,19 +169,43 @@ _Onboarding_TryWeb() {
 	; zero/placeholder client rect, so it paints the empty gray default and never
 	; lays out the navigated page — the model_browser host shows first for exactly
 	; this reason.
-	g.Show("w" . Geo.w . " h" . Geo.h . " Center")
-	_ob_gui := g
+	; Native Show can deliver Close before returning. Its real host must already
+	; be owned, and an old constructor must never publish over a replacement.
+	Published := false
+	PreviousCritical := Critical("On")
+	try {
+		if _OnbWeb_SessionCurrent(SessionEpoch) && _ob_gui == 0 {
+			_ob_gui := g
+			Published := true
+		}
+	} finally Critical(PreviousCritical)
+	if !Published {
+		try g.Destroy()
+		return false
+	}
+	try g.Show("w" . Geo.w . " h" . Geo.h . " Center")
+	catch as Err {
+		if !_OnbWeb_SessionCurrent(SessionEpoch) || _ob_gui != g
+			return false
+		SavedGui := _OnbWeb_Reset(g, SessionEpoch)
+		try {
+			if SavedGui
+				SavedGui.Destroy()
+		}
+		throw Err
+	}
+	if !_OnbWeb_SessionCurrent(SessionEpoch) || _ob_gui != g
+		return false
 
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 	try {
 		CreatedController := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
 	} catch as Err {
 		try LoggerError("Onboarding", "WebView2 create failed: {1} — the wizard cannot be shown.", Err.Message)
-		if _OnbWeb_SessionCurrent(SessionEpoch) && _ob_gui == g {
-			try g.Destroy()
-			_OnbWeb_Reset()
-			; Clear only this opening's sentinel; a replacement owns its own state.
-			_ob_gui := 0
+		SavedGui := _OnbWeb_Reset(g, SessionEpoch)
+		try {
+			if SavedGui
+				SavedGui.Destroy()
 		}
 		return false
 	}
@@ -835,54 +864,63 @@ _OnbWeb_OnResize(GuiObj, MinMax, Width, Height) {
 ; Window-close (X / Alt+F4) without committing: restore AltGr, drop the WebView2
 ; controller, clear the _ob_gui sentinel so Onboarding_Run's park-loop ends and
 ; the caller exits (first launch) or returns (menu re-run).
-_OnbWeb_OnClose(*) {
-	global _ob_gui, _OB_ALTGR_PASSTHROUGH
-	_OB_ALTGR_PASSTHROUGH := false
-	saved := (_ob_gui != 0) ? _ob_gui : 0
-	_OnbWeb_Reset()
+_OnbWeb_OnClose(GuiObj := unset, *) {
+	global _ob_gui
+	ExpectedGui := IsSet(GuiObj) ? GuiObj : _ob_gui
+	SavedGui := _OnbWeb_Reset(ExpectedGui)
 	try {
-		if saved
-			saved.Destroy()
+		if SavedGui
+			SavedGui.Destroy()
 	}
-	_ob_gui := 0
 }
 
 ; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
 ; whether to destroy the window). Idempotent: a second call (e.g. _OnbWeb_Finish
 ; and _OnbWeb_OnClose both firing for the same teardown) is a true no-op instead
 ; of touching the globals again.
-_OnbWeb_Reset() {
+_OnbWeb_Reset(ExpectedGui := unset, ExpectedEpoch := unset) {
 	global _OnbWeb_Controller, _OnbWeb_WebView, _OnbWeb_Ready, _OnbWeb_Queue, _OnbWeb_MsgSub
-	global _OnbWeb_ResetDone, _OnbWeb_SessionEpoch
-
-	; A prior Reset() already released remove_WebMessageReceived against this
-	; controller. Re-running the unset line below would call __Delete's bound
-	; ComCall a SECOND time against a COM pointer WebView2 has already torn down
-	; (Controller.Close() releases CoreWebView2's underlying interfaces) — a
-	; genuine SEH access violation that no try/catch can intercept.
-	if _OnbWeb_ResetDone
-		return
-	_OnbWeb_ResetDone := true
-	_OnbWeb_SessionEpoch += 1
-
-	; The whole teardown runs under one try: a hard COM access violation can
-	; occur mid-sequence (e.g. if the controller was invalidated by the host Gui
-	; already being destroyed), and a bare per-line `try` only catches ordinary
-	; AHK exceptions — it does NOT catch that class of failure, but wrapping the
-	; sequence still protects the *other* lines from a preceding non-fatal COM
-	; error so the globals below are always cleared even when the unsubscribe
-	; itself fails.
+	global _OnbWeb_ResetDone, _OnbWeb_SessionEpoch, _ob_gui, _OB_ALTGR_PASSTHROUGH
+	PreviousCritical := Critical("On")
 	try {
-		; Release the subscription handle FIRST, while the controller is still alive.
-		; Its __Delete unsubscribes via remove_WebMessageReceived on the live controller;
-		; doing it AFTER Controller.Close() raises a COM error that — uncaught in the
-		; window's Close-event thread — terminates the entire AHK script.
+		if IsSet(ExpectedGui) && _ob_gui != ExpectedGui
+			return 0
+		if IsSet(ExpectedEpoch) && !_OnbWeb_SessionCurrent(ExpectedEpoch)
+			return 0
+		if _OnbWeb_ResetDone {
+			; BeforeReload may already have retired the plumbing while retaining
+			; this exact native host. Closing that host must remain possible.
+			if IsSet(ExpectedGui) {
+				SavedGui := _ob_gui
+				_ob_gui := 0
+				_OB_ALTGR_PASSTHROUGH := false
+				return SavedGui
+			}
+			return 0
+		}
+		SavedGui := _ob_gui
+		SavedController := IsSet(_OnbWeb_Controller) ? _OnbWeb_Controller : 0
+		SavedWebView := IsSet(_OnbWeb_WebView) ? _OnbWeb_WebView : 0
+		SavedSubscription := IsSet(_OnbWeb_MsgSub) ? _OnbWeb_MsgSub : 0
+		SavedQueue := _OnbWeb_Queue
+		_OnbWeb_ResetDone := true
+		_OnbWeb_SessionEpoch += 1
+		_OnbWeb_Controller := unset
+		_OnbWeb_WebView := unset
 		_OnbWeb_MsgSub := unset
-		if IsSet(_OnbWeb_Controller)
-			_OnbWeb_Controller.Close()
-	}
-	_OnbWeb_Controller := unset
-	_OnbWeb_WebView    := unset
-	_OnbWeb_Ready      := false
-	_OnbWeb_Queue      := []
+		_OnbWeb_Ready := false
+		_OnbWeb_Queue := []
+		; Finish's BeforeReload callback only retires WebView plumbing. Exact host
+		; close paths additionally detach their sentinel before native callouts.
+		if IsSet(ExpectedGui) {
+			_ob_gui := 0
+			_OB_ALTGR_PASSTHROUGH := false
+		}
+	} finally Critical(PreviousCritical)
+	; Keep old strong references through detach; unsubscribe only outside Critical
+	; and before closing the exact controller whose subscription was captured.
+	try SavedSubscription := unset
+	if SavedController
+		try SavedController.Close()
+	return SavedGui
 }

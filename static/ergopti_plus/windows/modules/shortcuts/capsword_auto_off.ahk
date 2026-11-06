@@ -83,15 +83,50 @@ CapsWordAutoOffPointerKinds() {
 	return Kinds
 }
 
-; The stored delay, or its default when absent or not a number of seconds.
-_CapsWordAutoOffReadIdle(Cache) {
+; The shared policy admits finite seconds; Windows can arm only its native
+; timer domain. Zero alone disables the timer; a smaller positive duration
+; still receives the native minimum one millisecond.
+_CapsWordAutoOffNativeIdleMs(Seconds, &Reason := "") {
+	if !CapsWordAutoOffValidateIdleTimeout(Seconds, &Reason)
+		return ""
+	if Seconds == 0
+		return 0
+	Milliseconds := TimerDelayMsFromSeconds(Seconds)
+	if Milliseconds is Number {
+		try {
+			TimerRequireDelayMs(Milliseconds, "CapsWord auto-off")
+			return Max(1, Round(Milliseconds))
+		} catch ValueError {
+			; An unsupported native period is refused before publication.
+		}
+	}
+	Reason := "invalid_idle_timeout"
+	return ""
+}
+
+; Validates the Windows period before the shared compiler's arithmetic, then
+; retains the portable delimiter/pointer policy with the admitted native delay.
+_CapsWordAutoOffCompileNativePolicy(Values, &Reason := "") {
+	Delay := _CapsWordAutoOffNativeIdleMs(Values.Get("idle_timeout_seconds", ""), &Reason)
+	if !(Delay is Number)
+		return ""
+	Policy := CapsWordAutoOffCompile(Values, CapsWordAutoOffPointerKinds(), &Reason)
+	if Policy is Map
+		Policy["idle_ms"] := Delay
+	return Policy
+}
+
+; The stored delay, or its default when absent or not a native timer duration.
+_CapsWordAutoOffReadIdle(Cache, Snapshot := 0) {
 	Default := ManifestDefaultFor(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS)
 	Raw := IniCacheGet(Cache, ConfigKey.SHORTCUTS_CAPS_WORD, ConfigLeaf.IDLE_TIMEOUT_SECONDS)
+	if IsObject(Snapshot)
+		ConfigTomlBootSnapshotValue(Snapshot, ConfigKey.SHORTCUTS_CAPS_WORD, ConfigLeaf.IDLE_TIMEOUT_SECONDS, &Raw)
 	if Raw == "_"
 		return Default
-	if CapsWordAutoOffValidateIdleTimeout(Raw)
+	if _CapsWordAutoOffNativeIdleMs(Raw) is Number
 		return Raw
-	LoggerWarn("CapsWord", "shortcuts.caps_word.idle_timeout_seconds '{1}' is not a number of seconds, 0 or more — using {2} s.",
+	LoggerWarn("CapsWord", "shortcuts.caps_word.idle_timeout_seconds '{1}' is not a supported native inactivity delay — using {2} s.",
 		Raw is Object ? Type(Raw) : String(Raw), Default)
 	return Default
 }
@@ -126,11 +161,13 @@ _CapsWordAutoOffReadTerminators(Cache) {
 }
 
 ; The stored pointer switches, each its default when absent or no boolean.
-_CapsWordAutoOffReadPointer(Cache, Kinds) {
+_CapsWordAutoOffReadPointer(Cache, Kinds, Snapshot := 0) {
 	Values := Map()
 	for Kind in Kinds {
 		Path := "shortcuts.caps_word.pointer." . Kind
 		Raw := IniCacheGet(Cache, "shortcuts.caps_word.pointer", Kind)
+		if IsObject(Snapshot)
+			ConfigTomlBootSnapshotValue(Snapshot, "shortcuts.caps_word.pointer", Kind, &Raw)
 		if Raw == "_" {
 			Values[Kind] := ManifestDefaultFor(Path) ? 1 : 0
 		} else if Type(Raw) == "Integer" && (Raw == 0 || Raw == 1) {
@@ -149,15 +186,18 @@ _CapsWordAutoOffReadPointer(Cache, Kinds) {
 ; @param Cache {Map} The parsed configuration cache (Map() for the defaults).
 ; @returns {Map} "idle_timeout_seconds", "terminators", "pointer".
 CapsWordAutoOffReadValues(Cache) {
+	; Read the admitted source once for all leaves: native booleans have lost
+	; their type distinction from integers in the compatibility cache.
+	Snapshot := ConfigTomlBootSnapshot(Cache)
 	return Map(
-		ConfigLeaf.IDLE_TIMEOUT_SECONDS, _CapsWordAutoOffReadIdle(Cache),
+		ConfigLeaf.IDLE_TIMEOUT_SECONDS, _CapsWordAutoOffReadIdle(Cache, Snapshot),
 		"terminators", _CapsWordAutoOffReadTerminators(Cache),
-		"pointer", _CapsWordAutoOffReadPointer(Cache, CapsWordAutoOffPointerKinds()))
+		"pointer", _CapsWordAutoOffReadPointer(Cache, CapsWordAutoOffPointerKinds(), Snapshot))
 }
 
 ; Compiles settings that passed the reader. A refusal is a driver defect.
 _CapsWordAutoOffCompileValues(Values) {
-	Policy := CapsWordAutoOffCompile(Values, CapsWordAutoOffPointerKinds(), &Reason)
+	Policy := _CapsWordAutoOffCompileNativePolicy(Values, &Reason)
 	if !(Policy is Map)
 		throw Error("CapsWord auto-off settings refused after validation: " . Reason)
 	return Policy
@@ -174,6 +214,10 @@ CapsWordAutoOffCompileConfig(Cache) {
 _CapsWordAutoOffPublish(Values, Policy, Verb) {
 	CapsWordAutoOff.Values := Values
 	CapsWordAutoOff.Configured := Policy
+	_CapsWordAutoOffLog(Values, Policy, Verb)
+}
+
+_CapsWordAutoOffLog(Values, Policy, Verb) {
 	Delimiters := ""
 	for Key in Values["terminators"]
 		Delimiters .= (Delimiters == "" ? "" : ",") . Key
@@ -217,7 +261,32 @@ CapsWordAutoOffValues() {
 ; @returns {Boolean} False when the write was refused (already reported).
 CapsWordAutoOffStore(Path, Value, ConfigPath := "") {
 	global ConfigurationFile
-	Values := CapsWordAutoOffValues()
+	; Validate only the requested setting against defaults before entering the
+	; gateway, preserving invalid-input exceptions without capturing live state.
+	_CapsWordAutoOffPrepareStore(Path, Value, CapsWordAutoOffReadValues(Map()))
+	Outcome := {candidate: 0}
+	Saved := ConfigCommitBuilt(ConfigPath != "" ? ConfigPath : ConfigurationFile,
+		"the CapsWord auto-off settings", _CapsWordAutoOffBuildStore.Bind(Path, Value, Outcome))
+	if Saved {
+		; Logging describes this acknowledged commit after its owner has retired;
+		; failure to log cannot turn a durable memory publication into a refusal.
+		try _CapsWordAutoOffLog(Outcome.candidate.values, Outcome.candidate.policy, "changed (" . Path . ")")
+	}
+	return Saved
+}
+
+; The detached next-activation policy is captured and published while the same
+; configuration owner retains the path, so another menu commit cannot be lost.
+_CapsWordAutoOffBuildStore(Path, Value, Outcome) {
+	Candidate := _CapsWordAutoOffPrepareStore(Path, Value, CapsWordAutoOffValues())
+	Outcome.candidate := Candidate
+	return {
+		updates: [ManifestSparseOperation(Path, Candidate.value)],
+		publish: _CapsWordAutoOffPublishStore.Bind(Candidate.values, Candidate.policy),
+	}
+}
+
+_CapsWordAutoOffPrepareStore(Path, Value, Values) {
 	if Path == ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS || Path == "shortcuts.caps_word.terminators" {
 		Values[SubStr(Path, StrLen("shortcuts.caps_word.") + 1)] := ManifestCloneValue(Value)
 	} else if InStr(Path, "shortcuts.caps_word.pointer.") == 1 {
@@ -229,13 +298,15 @@ CapsWordAutoOffStore(Path, Value, ConfigPath := "") {
 	} else {
 		throw ValueError("No CapsWord auto-off setting at '" . Path . "'.")
 	}
-	Policy := CapsWordAutoOffCompile(Values, CapsWordAutoOffPointerKinds(), &Reason)
+	Policy := _CapsWordAutoOffCompileNativePolicy(Values, &Reason)
 	if !(Policy is Map)
 		throw ValueError("CapsWord auto-off: '" . Path . "' refused (" . Reason . ").")
-	if !ConfigCommitUpdates(ConfigPath != "" ? ConfigPath : ConfigurationFile,
-			[ManifestSparseOperation(Path, Value)], "the CapsWord auto-off settings")
-		return false
-	_CapsWordAutoOffPublish(Values, Policy, "changed (" . Path . ")")
+	return {values: Values, policy: Policy, value: Value}
+}
+
+_CapsWordAutoOffPublishStore(Values, Policy) {
+	CapsWordAutoOff.Values := Values
+	CapsWordAutoOff.Configured := Policy
 	return true
 }
 

@@ -31,6 +31,9 @@ _KCT_WithKeystats(Body) {
 	PrevInit    := Keystats.initialized
 	PrevEvents  := Keystats.buffer_events
 	PrevText    := Keystats.buffer_text
+	PrevScalarFragment := Keystats.scalar_fragment
+	PrevScalarHistory := Keystats.scalar_history
+	PrevScalarEpoch := Keystats.scalar_epoch
 	PrevFocus   := MetricsFocusCache.state
 	PrevDisabledApps := MetricsFilters.disabled_apps
 	PrevPrivateBrowsing := MetricsFilters.private_browsing
@@ -41,6 +44,9 @@ _KCT_WithKeystats(Body) {
 	Keystats.initialized   := true
 	Keystats.buffer_events := []
 	Keystats.buffer_text   := ""
+	Keystats.scalar_fragment := false
+	Keystats.scalar_history := false
+	Keystats.scalar_epoch += 1
 	MetricsFocusCache.state := {
 		valid: true,
 		last_at: A_TickCount,
@@ -63,6 +69,9 @@ _KCT_WithKeystats(Body) {
 		Keystats.initialized   := PrevInit
 		Keystats.buffer_events := PrevEvents
 		Keystats.buffer_text   := PrevText
+		Keystats.scalar_fragment := PrevScalarFragment
+		Keystats.scalar_history := PrevScalarHistory
+		Keystats.scalar_epoch := PrevScalarEpoch
 		MetricsFocusCache.state := PrevFocus
 		MetricsFilters.disabled_apps := PrevDisabledApps
 		MetricsFilters.private_browsing := PrevPrivateBrowsing
@@ -219,17 +228,20 @@ _KCT_ResetClosesAnActiveSessionAfterFlushing() {
 	Body() {
 		PrevActive := KLWatch.is_session_active
 		PrevTick := KLHook.last_tick
+		PrevAuthorized := KLWatch.last_authorized_tick
 		Order := []
 		Seen := []
 		try {
 			KLWatch.is_session_active := true
 			KLHook.last_tick := 1234
+			KLWatch.last_authorized_tick := 1000
 			Applied := KL_ResetSession(() => (Order.Push("flush"), true),
 				(Last, Now) => (Order.Push("close"), Seen.Push(Last), true),
 				() => Order.Push("wpm"))
 		} finally {
 			KLWatch.is_session_active := PrevActive
 			KLHook.last_tick := PrevTick
+			KLWatch.last_authorized_tick := PrevAuthorized
 		}
 		Assert(Applied, "the reset is applied")
 		AssertEqual("flush,close,wpm", _KCT_Join(Order), "the text is stored, then the session closes, then the figures restart")
@@ -434,3 +446,6 @@ _KCSP_Case(Mode) {
 for _KCSP_Mode in ["collection", "driver"]
 	Test("keystats sensors: actual " . _KCSP_Mode . " pause silences native publication (sensor-collection-pause)",
 		_KCSP_Case.Bind(_KCSP_Mode))
+
+for _KCSP_PowerMode in ["power-unknown", "power-ac", "power-dc", "power-battery-unknown"]
+	Test("keystats sensor power: " . _KCSP_PowerMode . " preserves unknown status (sensor-power-unknown)", _KCSP_Case.Bind(_KCSP_PowerMode))

@@ -124,6 +124,8 @@ _PCSF_Sequence(Mode, State, Schedule, Focus) {
 		_HSE_FireLogQueue := [], _HSE_FireLogScheduled := false
 		_HSE_FireLogScheduledGeneration := -1, _HSE_FireLogTimer := 0
 		_LLM_Bridge_Active := Mode != "agent-pair" && Mode != "timed-astral-body"
+		TypingSource := _LLM_Bridge_BindTypingSource(Focus(), _LLM_Bridge_Active)
+		AssertTrue(IsObject(TypingSource))
 		_LLM_Bridge_Buffer := Initial
 		_LLM_Bridge_AgentBuffer := Mode == "agent-pair" ? Initial : ""
 		_LLM_Bridge_AgentFeeding := Mode == "agent-pair"
@@ -133,7 +135,7 @@ _PCSF_Sequence(Mode, State, Schedule, Focus) {
 		}
 		; A genuine preceding observer is invalidated by the raw physical edge;
 		; no observer may then notify against a high-only replacement context.
-		_LLM_Bridge_SchedulePrefixObserver("d", Schedule, Focus)
+		_LLM_Bridge_SchedulePrefixObserver("d", Schedule, Focus, TypingSource)
 		State.OldObserver := _LLM_Bridge_PrefixObserver
 		Facts.ObserverBaseline := State.Scheduled.Length
 		_PrefixScheduleRender()

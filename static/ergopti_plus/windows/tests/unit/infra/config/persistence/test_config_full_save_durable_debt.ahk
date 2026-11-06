@@ -471,3 +471,108 @@ _CFGFS_TraceActualBootRefusal(Boot) {
 	; Missing observation never replaces the original native outcome/assertion.
 	try _TestResultsWrite(TEST_RESULTS_FILE, Line)
 }
+
+_CFGOPT_MaxWords(Source) {
+	Document := TOML_ParseDocument(Source)
+	Leaf := _TOML_DocumentLookup(Document, ["llm", "generation", "max_words"])
+	return Leaf["found"] ? Leaf["value"] : ManifestDefaultFor("llm.generation.max_words")
+}
+_CFGOPT_RealOptionalBoot(Mode) {
+	global Features, _IniCache, _LLM_Menu_Loaded, _BootConfigSnapshot
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
+	global ConfigurationFile, CONFIG_FULL_SAVE_BOOT_DELAY_MS, CONFIG_SAVE_OK
+	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
+	SavedFeatures := Features, SavedCache := _IniCache
+	HadMenuLoaded := IsSet(_LLM_Menu_Loaded), SavedMenuLoaded := HadMenuLoaded ? _LLM_Menu_Loaded : false
+	HadSnapshot := IsSet(_BootConfigSnapshot), SavedSnapshot := HadSnapshot ? _BootConfigSnapshot : 0
+	SavedRejected := _ConfigBootRejectedOverrides, SavedOutdated := _ConfigBootOutdatedEntries
+	Root := A_Temp . "\ergopti_optional_fullsave_source_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\config.toml", Created := false
+	State := {timerCalls: 0, wakeup: 0, delay: 0, notices: 0}
+	Timer(Callback, DelayMs) {
+		State.timerCalls += 1
+		State.wakeup := Callback
+		State.delay := DelayMs
+		return true
+	}
+	Notify(*) {
+		State.notices += 1
+	}
+	try {
+		AssertFalse(_ConfigFullSaveHasPending(), "the isolated boot subject cannot discard another accepted full-save request")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		SourceA := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion()
+			. '`n[llm.generation]`nmax_words = 15`n[private]`nmarker = "keep"`n'
+		SourceB := StrReplace(SourceA, "max_words = 15", "max_words = 21", true)
+		AssertTrue(FSWriteCreateDurable(Path, SourceA))
+		_CFGFS_Prepare(Path)
+		_LLM_Menu_Loaded := false
+		_ConfigBootRejectedOverrides := 0, _ConfigBootOutdatedEntries := Map()
+		_IniCache := ParseConfigTomlFile(Path)
+		Features := ManifestBuildFeaturesMap()
+		AssertTrue(ApplyBootConfigToml(Features, Path, &_BootConfigSnapshot) >= 0)
+		AssertEqual(SourceA, _BootConfigSnapshot.Source)
+		AssertTrue(_IniCache == _BootConfigSnapshot.Cache)
+		AssertEqual(15, Features["llm"]["generation"]["max_words"])
+		AssertEqual(0, _ConfigBootRejectedOverrides)
+		AssertEqual(0, _ConfigBootOutdatedEntries.Count)
+		if Mode == "external-before-queue" || Mode == "reload-B-control"
+			AssertTrue(FSWriteDurable(Path, SourceB))
+		if Mode == "reload-B-control" {
+			_TOML_InvalidateParseCache(Path)
+			_IniCache := ParseConfigTomlFile(Path)
+			Features := ManifestBuildFeaturesMap()
+			AssertTrue(ApplyBootConfigToml(Features, Path, &_BootConfigSnapshot) >= 0)
+			AssertEqual(SourceB, _BootConfigSnapshot.Source)
+			AssertEqual(21, Features["llm"]["generation"]["max_words"])
+		}
+		AssertTrue(_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS, Timer, false),
+			"the actual boot producer must admit its optional canonicalization request")
+		AssertEqual("_SaveFullConfigDeferred", State.wakeup.Name)
+		AssertEqual(-Abs(CONFIG_FULL_SAVE_BOOT_DELAY_MS), State.delay)
+		AssertEqual(0, _ConfigFullSaveCoordinator().terminal_required_generation,
+			"the source subject is the genuine optional boot intent, not an explicit mandatory full-state save")
+		if Mode == "external-after-queue"
+			AssertTrue(FSWriteDurable(Path, SourceB))
+		Before := FSReadUtf8Exact(Path)
+		Wakeup := State.wakeup
+		Result := Wakeup.Call(0, Timer, Notify, 0)
+		After := FSReadUtf8Exact(Path)
+		BeforeValue := _CFGOPT_MaxWords(Before), AfterValue := _CFGOPT_MaxWords(After)
+		_TestPrint("# optional-fullsave mode=" . Mode . " timer_calls=" . State.timerCalls
+			. " notices=" . State.notices . " result=" . Result . " before_max_words=" . BeforeValue
+			. " after_max_words=" . AfterValue . " runtime_max_words=" . Features["llm"]["generation"]["max_words"])
+		Expected := Mode == "unchanged-A-control" ? 15 : 21
+		AssertEqual(Expected, AfterValue, "an optional boot canonicalizer cannot replace a newer valid file choice with its older runtime default")
+		AssertEqual("keep", TOML_ParseDocument(After)["private"]["marker"])
+		if InStr(Mode, "external-") == 1 {
+			AssertEqual(Before, After, "obsolete optional canonicalization preserves the external source exactly")
+			AssertEqual(CONFIG_SAVE_OK, Result, "dispensable boot work settles without claiming a user-facing persistence failure")
+			AssertEqual(0, _ConfigFullSaveCoordinator().committed_generation,
+				"abandoning stale optional work must never be advertised as a durable commit")
+			AssertEqual(_ConfigFullSaveCoordinator().requested_generation, _ConfigFullSaveCoordinator().settled_generation)
+			AssertFalse(_ConfigFullSaveHasPending())
+			AssertEqual(0, State.notices, "the obsolete automatic task must not tell the user their change was reverted")
+			AssertEqual(1, State.timerCalls, "abandoned optional work does not retry a stale mirror indefinitely")
+		} else {
+			AssertEqual(CONFIG_SAVE_OK, Result, "the actual unchanged or reloaded source admits the default collector/native writer")
+			AssertEqual(_ConfigFullSaveCoordinator().requested_generation, _ConfigFullSaveCoordinator().committed_generation,
+				"the real unchanged/reloaded controls must still acknowledge their actual native write")
+		}
+	} finally {
+		Features := SavedFeatures, _IniCache := SavedCache
+		_LLM_Menu_Loaded := HadMenuLoaded ? SavedMenuLoaded : unset
+		_BootConfigSnapshot := HadSnapshot ? SavedSnapshot : unset
+		_ConfigBootRejectedOverrides := SavedRejected, _ConfigBootOutdatedEntries := SavedOutdated
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+		if Created {
+			try _TOML_InvalidateParseCache(Path)
+			finally DirDelete(Root, true)
+		}
+	}
+}
+for _CFGOPT_Mode in ["external-before-queue", "external-after-queue", "reload-B-control", "unchanged-A-control"]
+	Test("optional boot full-save source ownership: " . _CFGOPT_Mode, _CFGOPT_RealOptionalBoot.Bind(_CFGOPT_Mode))

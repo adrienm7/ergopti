@@ -367,3 +367,52 @@ Test("navigation indicator: recovers a throwing publication", _NL_IndicatorRecov
 Test("navigation indicator: retries a false restoration", _NL_IndicatorRecoversRefusal.Bind("false", true))
 Test("navigation indicator: retries an empty restoration", _NL_IndicatorRecoversRefusal.Bind("empty", true))
 Test("navigation indicator: retries a throwing restoration", _NL_IndicatorRecoversRefusal.Bind("throws", true))
+
+_NL_RetiredOwnerPreservesNewLayer(BeforeActivation) {
+	global LayerEnabled, _TH_LayerOwner, NumberOfRepetitions
+	AssertFalse(IsObject(_TH_LayerOwner), "A foreign active layer owner cannot be parked")
+	Saved := {Enabled: LayerEnabled, Repetitions: NumberOfRepetitions, Paused: A_IsSuspended}
+	_TSUH_Begin(Map(), Map())
+	B := 0, Clock := 900, Waits := 0
+	Replace() {
+		Suspend(true)
+		try {
+			AssertTrue(TapHoldReleaseSyntheticKeys())
+			AssertFalse(LayerEnabled, "The actual teardown must retire the layer before resume")
+		} finally Suspend(false)
+		B := TapHoldNewOwner()
+		AssertTrue(ActivateLayer(B), "B must activate the actual layer through its own current owner")
+	}
+	Now() {
+		Clock += 100
+		if BeforeActivation && Clock == 1000
+			Replace()
+		return Clock
+	}
+	Wait(*) {
+		Waits += 1
+		AssertTrue(LayerEnabled)
+		Replace()
+		return true
+	}
+	try {
+		Suspend(false)
+		Result := TapHoldOwnImmediateLayer("left_alt", "SC038", 0.2, Wait, (*) => false, Now)
+		AssertFalse(Result["tap"])
+		AssertTrue(LayerEnabled && _TH_LayerOwner == B, "The retired activation/finalizer must leave B's actual layer enabled")
+		AssertEqual(BeforeActivation ? 0 : 1, Waits)
+		if BeforeActivation
+			AssertFalse(Result["activated"], "A frame revoked in its clock port must not activate or wait")
+		AssertTrue(DisableLayer(B), "B must retain its own independent acknowledged deactivation")
+		AssertFalse(LayerEnabled)
+	} finally {
+		if IsObject(B)
+			DisableLayer(B)
+		LayerEnabled := Saved.Enabled, _TH_LayerOwner := 0, NumberOfRepetitions := Saved.Repetitions
+		Suspend(Saved.Paused)
+		_TSUH_End()
+	}
+}
+for _NL_OwnerBefore in [false, true]
+	Test("Layer owner: revocation before activation=" . _NL_OwnerBefore . " preserves a resumed successor (synthetic-owner-layer)",
+		_NL_RetiredOwnerPreservesNewLayer.Bind(_NL_OwnerBefore))

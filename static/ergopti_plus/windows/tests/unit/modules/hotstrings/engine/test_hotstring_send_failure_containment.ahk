@@ -250,7 +250,7 @@ _SCSC_Startup(Boundary, Action) {
 		"restores", 0, "job", 0, "deliveries", 0, "nested", true)
 	Ports := Map("save", _SCSC_Save.Bind(State), "clear", _SCSC_Clear.Bind(State),
 		"sequence", _SCSC_Sequence.Bind(State), "send", _SCSC_Send.Bind(State),
-		"restore", _SCSC_Restore.Bind(State), "foreground", (*) => 101)
+		"restore", _SCSC_Restore.Bind(State), "control", (*) => 201, "foreground", (*) => 101)
 	State["ports"] := Ports
 	try {
 		CBClipboardOwner.settle_hook := 0
@@ -264,7 +264,7 @@ _SCSC_Startup(Boundary, Action) {
 			AssertEqual(1, CBClipboardOwner.active.Count)
 			_SelectionCaptureFinish(_SelectionCaptureJob, "captured selection", true, "ready",
 				Ports["restore"], Ports["sequence"],
-				(J) => Map("foreground", 101, "physical_generation", J["physical_generation"]))
+				(J) => Map("foreground", 101, "control", J["control"], "physical_generation", J["physical_generation"]))
 		} else {
 			AssertFalse(Accepted, "a revoked startup cannot report accepted")
 			AssertTrue(State["revoked"], "the requested boundary must be reached")
@@ -347,7 +347,7 @@ _SCL_TimerLifetime(Reason) {
 		"deliveries", 0, "text", "", "deleted", 0, "throw", Reason == "callback error")
 	Ports := Map("save", _SCSC_Save.Bind(State), "clear", _SCSC_Clear.Bind(State),
 		"sequence", _SCSC_Sequence.Bind(State), "send", _SCSC_Send.Bind(State),
-		"restore", _SCSC_Restore.Bind(State), "foreground", (*) => 101)
+		"restore", _SCSC_Restore.Bind(State), "control", (*) => 201, "foreground", (*) => 101)
 	Job := 0
 	RetiredTimer := 0
 	OnReady := _SCL_Callback(State)
@@ -364,7 +364,7 @@ _SCL_TimerLifetime(Reason) {
 		} else {
 			_SelectionCaptureFinish(Job, "captured selection", true, "ready",
 				Ports["restore"], Ports["sequence"],
-				(J) => Map("foreground", 101, "physical_generation", J["physical_generation"]))
+				(J) => Map("foreground", 101, "control", J["control"], "physical_generation", J["physical_generation"]))
 		}
 		AssertFalse(IsObject(_SelectionCaptureJob))
 		AssertEqual(0, Job["timer"], "retirement must detach the exact bound callback")
@@ -435,7 +435,7 @@ _SCO_StartupSettlement(ExternalCopy) {
 		"job", 0, "successor", 0, "successor_started", false, "external", ExternalCopy)
 	Ports := Map("save", _SCSC_Save.Bind(State), "clear", _SCSC_Clear.Bind(State),
 		"sequence", _SCO_Sequence.Bind(State), "send", _SCSC_Send.Bind(State),
-		"restore", _SCSC_Restore.Bind(State), "foreground", (*) => 101)
+		"restore", _SCSC_Restore.Bind(State), "control", (*) => 201, "foreground", (*) => 101)
 	try {
 		Suspend(false)
 		CBClipboardOwner.settle_hook := ExternalCopy ? 0 : _SCO_Settle.Bind(State, Ports)
@@ -512,7 +512,7 @@ _SCCR_PollReason(Mode) {
 		"saves", 0, "clears", 0, "sequences", 0, "sends", 0, "restores", 0, "deliveries", 0)
 	Ports := Map("save", _SCSC_Save.Bind(State), "clear", _SCSC_Clear.Bind(State),
 		"sequence", _SCSC_Sequence.Bind(State), "send", _SCSC_Send.Bind(State),
-		"restore", _SCSC_Restore.Bind(State), "foreground", (*) => -1)
+		"restore", _SCSC_Restore.Bind(State), "control", (*) => 201, "foreground", (*) => -1)
 	Job := 0
 	try {
 		CBClipboardOwner.settle_hook := 0
@@ -603,7 +603,7 @@ _SCBusy_Run() {
 		"clear", (*) => (State["clears"] += 1, true),
 		"send", (*) => State["sends"] += 1,
 		"restore", (Saved) => (State["restores"] += 1, true),
-		"sequence", (*) => 42, "foreground", (*) => 101,
+		"sequence", (*) => 42, "control", (*) => 201, "foreground", (*) => 101,
 		"report_busy", (*) => State["busy"] += 1)
 	try {
 		AssertFalse(GetSelectionAsync((*) => 0, Ports), "a busy clipboard cannot start a capture")

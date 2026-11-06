@@ -941,6 +941,7 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 		return false
 	}
 	Progress := _LLM_Menu_ApiTestProgress
+	RequestCurrent := _LLM_Menu_ApiTestProgressIsCurrent.Bind(Progress)
 	OnSucc := (Text, Usage) => _LLM_Menu_OnApiTestDone(true, Text,
 		EntryId, Name, StartedTick, Owner, NotifyFn)
 	OnFail := (Info := "") => _LLM_Menu_OnApiTestDone(false, "",
@@ -968,12 +969,12 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 			ReqId := LLM_RemoteDecisions_Async(Resolved, LLM_REMOTE_DECISIONS_TEST["state"],
 				LLM_REMOTE_DECISIONS_TEST["questions"],
 				(Answers, Usage := "") => OnSucc(LLM_RemoteFormats_Encode(Answers), Usage),
-				OnFail, LLM_REMOTE_KIND_API_TEST, LLM_API_TEST_TIMEOUT_MS)
+				OnFail, LLM_REMOTE_KIND_API_TEST, LLM_API_TEST_TIMEOUT_MS, RequestCurrent)
 		} else {
 			ReqId := LLM_RemoteGenerate_Async(snapshot, spec["system_prompt"],
 				spec["user_text"], spec["temperature"], OnSucc, OnFail, "",
 				spec["max_tokens"], LLM_REMOTE_KIND_API_TEST,
-				LLM_API_TEST_TIMEOUT_MS)
+				LLM_API_TEST_TIMEOUT_MS, RequestCurrent)
 		}
 		if _LLM_Menu_ApiTestProgressIsCurrent(Progress)
 			Progress["req_id"] := ReqId
@@ -1267,20 +1268,7 @@ _LLM_Menu_LoadApiEntries(ReadFn := 0, ReportFn := 0, DecryptFn := 0,
 	; Re-anchor the active id only if it still exists; otherwise pick the
 	; first entry so a corrupted ``api_entry_id`` does not leave the user
 	; with "no active entry" while entries exist on disk.
-	active := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
-	if (active != "") {
-		found := false
-		for e in entries {
-			if (e["Id"] == active) {
-				found := true
-				break
-			}
-		}
-		if !found
-			active := ""
-	}
-	if (active == "" and entries.Length > 0)
-		active := entries[1]["Id"]
+	active := _LLM_Menu_ResolveApiEntryId(entries, _LLM_Menu.Get("api_entry_id", _LLM_Menu_DefaultApiEntryId()))
 	; Parsing and anchoring precede this bounded native authority publication.
 	; Equal reload remains semantically current for existing general receipts;
 	; only a final transaction claim pins this narrow publication revision.
@@ -1293,6 +1281,27 @@ _LLM_Menu_LoadApiEntries(ReadFn := 0, ReportFn := 0, DecryptFn := 0,
 		_LLM_Menu_ApiPrivateAuthorityGeneration += 1
 	} finally Critical(PreviousCritical)
 	return true
+}
+
+; The loader and opening-source projection resolve a neutral selection alike.
+_LLM_Menu_ResolveApiEntryId(Entries, Requested) {
+	if !(Entries is Array) || !(Requested is String)
+		throw TypeError("API selection requires validated entries and a String id.")
+	Active := Requested
+	if Active != "" {
+		Found := false
+		for Entry in Entries {
+			if Entry["Id"] == Active {
+				Found := true
+				break
+			}
+		}
+		if !Found
+			Active := _LLM_Menu_DefaultApiEntryId()
+	}
+	if Active == _LLM_Menu_DefaultApiEntryId() && Entries.Length > 0
+		Active := Entries[1]["Id"]
+	return Active
 }
 
 ; Unknown entry fields cannot be serialized losslessly by this six-field writer.

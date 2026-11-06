@@ -183,7 +183,7 @@ LLM_TokenExchange_Parse(Raw, &Refusal := "") {
 		Refusal := "auth.default_expires_seconds must be a whole number of seconds in bounds"
 		return ""
 	}
-	if !_LLM_TokenExchange_IsWhole(Margin) || Margin < 0 || Margin * 2 >= Default {
+	if !_LLM_TokenExchange_IsWhole(Margin) || Margin < 0 || Margin >= Default / 2 {
 		Refusal := "auth.refresh_margin_seconds must be a whole number below half the default lifetime"
 		return ""
 	}
@@ -495,6 +495,12 @@ _LLM_TokenExchange_Begin(Slot, ProviderId, Auth, Key) {
 ; Reads the token service's answer into the slot.
 ; @param {Map} Answer "status", "body"[, "network_report"].
 _LLM_TokenExchange_OnAnswer(Slot, ProviderId, Auth, Answer) {
+	if Answer.Get("pause_revoked", false) is Integer && Answer.Get("pause_revoked", false) == true {
+		LoggerInfo("LLM.remote", "Access token of provider '{1}' cancelled because the driver was paused.", ProviderId)
+		_LLM_TokenExchange_Settle(Slot,
+			Map("refusal", "the driver is paused", "status", 0, "key_refused", false), false)
+		return
+	}
 	Status := Answer.Get("status", 0)
 	Decoded := 0
 	try Decoded := JsonParse(Answer.Get("body", ""))
@@ -514,7 +520,9 @@ _LLM_TokenExchange_OnAnswer(Slot, ProviderId, Auth, Answer) {
 		return
 	}
 	LoggerError("LLM.remote", "Access token of provider '{1}' refused: {2}.", ProviderId, Refusal)
-	Failure := Map("refusal", Refusal, "status", Status, "key_refused", Status >= 400 && Status < 500)
+	; OAuth invalid-grant responses use 400; 401/403 also deny credentials.
+	; Other client statuses can describe throttling, timeouts or endpoint faults.
+	Failure := Map("refusal", Refusal, "status", Status, "key_refused", Status == 400 || Status == 401 || Status == 403)
 	if Answer.Has("network_report")
 		Failure["network_report"] := Answer["network_report"]
 	_LLM_TokenExchange_Settle(Slot, Failure)
@@ -541,10 +549,11 @@ _LLM_TokenExchange_Settle(Slot, Failure, Pause := true) {
 
 ; Posts the form through the managed worker and polls it. The exchange has no
 ; requester of its own: it stops only on a pause or at its deadline.
-_LLM_TokenExchange_Post(Request, OnAnswer) {
+_LLM_TokenExchange_Post(Request, OnAnswer, Port := 0) {
 	global LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_CONNECT_TIMEOUT_MS
-	Http := CurlAsyncRequest()
-	Http.SetManagedRouting(0, () => !A_IsSuspended)
+	CreateHttp := _LLM_CurlArtifactPortFn(Port, "create_http", () => CurlAsyncRequest())
+	Http := CreateHttp.Call()
+	Http.SetManagedRouting(Port is Map ? Port.Get("managed_settings", 0) : 0, () => !A_IsSuspended)
 	Http.SetDeadline(A_TickCount, LLM_REMOTE_TIMEOUT_MS)
 	Http.ConnectTimeoutMs := LLM_REMOTE_CONNECT_TIMEOUT_MS
 	Http.RevocationBestEffort := false
@@ -565,6 +574,8 @@ _LLM_TokenExchange_Poll(Http, OnAnswer) {
 		return
 	}
 	Answer := Map("status", Http.Status, "body", Http.ResponseEncodingValid ? Http.ResponseText : "")
+	if Http.ManagedPauseRevoked
+		Answer["pause_revoked"] := true
 	NetworkReport := ManagedNetworkFailureWindows_FromTransport(Http, () => true)
 	if NetworkReport is Map
 		Answer["network_report"] := NetworkReport

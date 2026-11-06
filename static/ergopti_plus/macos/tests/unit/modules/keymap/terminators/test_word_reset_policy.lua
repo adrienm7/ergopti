@@ -359,4 +359,6 @@ helpers.describe("shared idle-reset rule as the macOS driver uses it", function(
 	end)
 end)
 
+require("test.hotstring_idle_clock_contract").register(helpers)
+
 return true

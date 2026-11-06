@@ -310,8 +310,10 @@ _CRE_ProductionBoundariesCarryEpoch() {
 		"accepted page mutations must retain their request epoch through deferral")
 	AssertContains(RunBody, "_CLW_ScriptWorkEpochIsCurrent(Work)",
 		"ExecuteScript must atomically revalidate its epoch after the SetTimer yield")
-	AssertContains(ResetBody, "_CLW_InvalidateWindowSession()",
-		"window teardown must invalidate every old request and queued script")
+	AssertContains(ResetBody, "_CLW_WindowEpoch += 1",
+		"window teardown must invalidate every old window and queued script")
+	AssertContains(ResetBody, "_CLW_RequestEpoch += 1",
+		"window teardown must invalidate every old request")
 }
 
 Test("changelog: all async boundaries carry request/window epochs (AHK-30)",

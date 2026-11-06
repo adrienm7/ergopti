@@ -148,7 +148,7 @@ HSE_FindMatchAtEnd(JustTypedChar, TextIsClaimed := false) {
 		if JustTypedChar == ""
 				return ""
 		BufLen := StrLen(HSE_Buffer)
-		IsTerminator := InStr(HSE_WORD_TERMINATORS, JustTypedChar) > 0
+		IsTerminator := InStr(HSE_WORD_TERMINATORS, JustTypedChar, true) > 0
 
 		; Trigger-body buffer for the end-char path (buffer minus the
 		; just-typed terminator). For the star path, we match against the
@@ -340,7 +340,7 @@ _HSE_IsLiteralNoOp(Spec, Buffer, EndChar, TypoNbspStripped) {
 				or (Spec.HasOwnProp("RawCallback") and Spec.RawCallback)
 				or (Spec.HasOwnProp("OnlyText") and !Spec.OnlyText)
 				return false
-		if TypoNbspStripped or (EndChar != "" and InStr(HSE_CONSUMED_DELIMITERS, EndChar))
+		if TypoNbspStripped or (EndChar != "" and InStr(HSE_CONSUMED_DELIMITERS, EndChar, true))
 				return false
 		TriggerStart := StrLen(Buffer) - StrLen(EndChar) - Spec.Length + 1
 		if TriggerStart < 1
@@ -583,7 +583,8 @@ _HSE_WordBoundaryAllows(Buf, Spec, ObservedLength := 0) {
 ; @param Boundaries {String} The value of _HSE_WordBoundarySet().
 ; @returns {Boolean}
 _HSE_CharOpensWord(Ch, Boundaries) {
-		return Ch != "" && (InStr(Boundaries, Ch) > 0 || !HSE_IsWordChar(Ch))
+		; Case-sensitive: a boundary letter must not also claim its other case.
+		return Ch != "" && (InStr(Boundaries, Ch, true) > 0 || !HSE_IsWordChar(Ch))
 }
 
 ; THE word-boundary set, DERIVED on every read rather than cached.
@@ -606,7 +607,7 @@ _HSE_WordBoundarySet() {
 								continue
 						for Char in Entry["chars"]
 								if Ord(Char) > 127
-										Boundaries := StrReplace(Boundaries, Char)
+										Boundaries := StrReplace(Boundaries, Char, "", true)
 						break
 				}
 		}

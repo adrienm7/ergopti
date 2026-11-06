@@ -31,9 +31,17 @@ _LIWE_AssertWordEndTrigger() {
 	; OnChar must route a word-end trigger to a zero-delay fire, distinct from the debounce.
 	OnChar := _DriverFuncBody("LLM_Bridge_OnChar")
 	Assert(OnChar != "", "LLM_Bridge_OnChar must exist")
+	AssertContains(OnChar, "Generation := _LLM_Bridge_ContentGeneration",
+		"the observer must retain the committed edit's generation")
+	Captured := InStr(OnChar, "Buffer := _LLM_Bridge_Buffer")
+	Released := InStr(OnChar, "Critical(PreviousCritical)")
+	Assert(Captured > 0 && Released > Captured,
+		"the ordinary observer must capture its buffer before releasing the edit claim")
+	AssertContains(OnChar, "Current := _LLM_Bridge_TypingSourceCurrent.Bind(Source, true, Generation)",
+		"the shared observer cannot borrow a later edit's generation")
 	Notify := _DriverFuncBody("_LLM_Bridge_NotifyChar")
 	Assert(Notify != "", "the shared character observer must exist")
-	AssertContains(OnChar, "_LLM_Bridge_NotifyChar(ch, _LLM_Bridge_Buffer)",
+	AssertContains(OnChar, "_LLM_Bridge_NotifyChar(ch, Buffer, Current, Source, Receipt)",
 		"ordinary character admission must reach the shared observer")
 	AssertContains(Notify, "_LLM_Bridge_IsWordEndTrigger(ch)",
 		"the observer must recognize a completed word (llm-instant-word-end-trigger)")

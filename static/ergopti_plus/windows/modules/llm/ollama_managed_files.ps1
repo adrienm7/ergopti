@@ -561,6 +561,7 @@ function Prepare-OllamaManagedStage($Root, $Archive, [string]$Ticket,
 		if ($EmitConstructionReceipt) {
 			$construction = Get-OllamaCreationReceipt $wal
 			$construction.phase = 'creation-owned'
+			# The invoking physical CLI owns the UTF-8 stream and its initial BOM.
 			[Console]::Out.WriteLine(($construction | ConvertTo-Json -Compress))
 		}
 		Add-OllamaCreationRecord $wal 'stage-intent' '' ''
@@ -1051,13 +1052,21 @@ function Remove-OllamaRuntimeReceipt($Root, [string]$ExpectedRoot, [string]$Tick
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
+	# ShellRunner reads the physical stream through FileRead: its first bytes
+	# select decoding for every progressive and final JSON receipt. Emit one
+	# UTF-8 preamble before any operation, then use a no-preamble UTF-8 writer.
+	[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false, $true)
+	$stdout = [Console]::OpenStandardOutput()
+	$preamble = [Text.UTF8Encoding]::new($true).GetPreamble()
+	$stdout.Write($preamble, 0, $preamble.Length)
+	$stdout.Flush()
 	$root = $null; $archive = $null; $stage = $null; $publicationReceipt = $null
 	try {
 		if ($Action -eq '') { throw 'An explicit native file operation is required.' }
 		if ($Action -eq 'inspect') {
 			Initialize-OllamaManagedNative
 			if ([Ergopti.Ollama.ManagedNative]::PathIsAbsent((Assert-OllamaLocalPath $ManagedRoot))) {
-				[ordered]@{ ok = $true; phase = 'missing' } | ConvertTo-Json -Compress
+				[Console]::Out.WriteLine(([ordered]@{ ok = $true; phase = 'missing' } | ConvertTo-Json -Compress))
 				exit 0
 			}
 		}
@@ -1088,7 +1097,7 @@ if ($MyInvocation.InvocationName -ne '.') {
 			$archive = $null
 		}
 		Close-OllamaManagedRoot $root; $root = $null
-		$result | ConvertTo-Json -Depth 12 -Compress
+		[Console]::Out.WriteLine(($result | ConvertTo-Json -Depth 12 -Compress))
 	} catch {
 		$failure = [ordered]@{ ok = $false; phase = 'refused'; cleanup_pending = $true; ticket = $TicketId;
 			error = $_.Exception.Message }
@@ -1096,7 +1105,7 @@ if ($MyInvocation.InvocationName -ne '.') {
 		if ($_.Exception.Data.Contains('ollama_publication_receipt')) { $failure.publication_receipt = $_.Exception.Data['ollama_publication_receipt'] }
 		elseif ($null -ne $publicationReceipt) { $failure.publication_receipt = $publicationReceipt }
 		elseif ($null -ne $stage -and $stage.ContainsKey('publication_receipt')) { $failure.publication_receipt = $stage.publication_receipt }
-		$failure | ConvertTo-Json -Depth 12 -Compress
+		[Console]::Out.WriteLine(($failure | ConvertTo-Json -Depth 12 -Compress))
 		exit 1
 	} finally {
 		if ($null -ne $stage) { Close-OllamaPreparedStage $stage }

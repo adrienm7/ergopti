@@ -22,11 +22,13 @@
 _CTP_WidgetRoundtrip() {
 	global ConfigurationFile
 	OldPath := ConfigurationFile
+	OldAuthority := _WPMWidget_PositionAuthority()
 	OldWidget := [WPMWidget.visible, WPMWidget.use_colors, WPMWidget.show_graph,
 		WPMWidget.pos_x, WPMWidget.pos_y]
 	OldStore := [WPMWidgetConst.STORE_X, WPMWidgetConst.STORE_Y]
 	Path := _CTU_NewPath()
 	try {
+		_WPMWidget_PositionAuthority({active: 0, published: 0})
 		WPMWidgetConst.STORE_X := "test.pos_x"
 		WPMWidgetConst.STORE_Y := "test.pos_y"
 		ConfigurationFile := Path
@@ -49,6 +51,7 @@ _CTP_WidgetRoundtrip() {
 		AssertEqual(1, Stored[WPMWidgetConst.STORE_X])
 		AssertEqual(0, Stored[WPMWidgetConst.STORE_Y])
 	} finally {
+		_WPMWidget_PositionAuthority(OldAuthority)
 		ConfigurationFile := OldPath
 		WPMWidgetConst.STORE_X := OldStore[1]
 		WPMWidgetConst.STORE_Y := OldStore[2]

@@ -48,6 +48,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\adapters\system_time_zone.ahk
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include local_model_offer.ahk
 
@@ -493,6 +494,10 @@ LLM_Agent_Ask(Flow, Text) {
 	; The automatic mode stays discreet: no spinner, only its candidates
 	if !Flow["auto"]
 		_LLM_Agent_ShowLoading(Flow)
+	if Flow.Has("typing_probe") && !Flow["typing_probe"].Call()
+		return false
+	if !Current.Call()
+		return false
 	if !LLM_Agent_System2Request(Flow["backend"], Payload, _LLM_Agent_OnActions.Bind(Flow),
 			_LLM_Agent_OnActionsFail.Bind(Flow), !Flow["auto"], Current) {
 		if !Current.Call()
@@ -695,6 +700,9 @@ _LLM_Agent_IsCurrent(Flow) {
 	global _LLM_Agent_Generation, _LLM_Agent_System1Revision
 	return Flow["generation"] == _LLM_Agent_Generation
 		&& (!Flow.Has("system1_revision") || Flow["system1_revision"] == _LLM_Agent_System1Revision)
+		&& (!Flow.Has("typing_guard") || Flow["typing_guard"].Call())
+		&& Flow["generation"] == _LLM_Agent_Generation
+		&& (!Flow.Has("system1_revision") || Flow["system1_revision"] == _LLM_Agent_System1Revision)
 }
 
 ; Manual flows own only their generation; automatic flows also own System 1.
@@ -737,7 +745,7 @@ _LLM_Agent_Context(Config) {
 
 ; The frontmost application, its window, the local time and the time zone.
 ; @returns {Map}
-_LLM_Agent_SystemContext() {
+_LLM_Agent_SystemContext(ClockProbe := 0, RegistryKey := unset) {
 	global LLM_AGENT_WEEKDAYS
 	Focused := WIGetFocused()
 	Stamp := A_Now
@@ -746,15 +754,24 @@ _LLM_Agent_SystemContext() {
 		"window", Focused.Get("windowTitle", ""),
 		"now", FormatTime(Stamp, "yyyy-MM-dd") . "T" . FormatTime(Stamp, "HH:mm"),
 		"weekday", LLM_AGENT_WEEKDAYS[Integer(FormatTime(Stamp, "WDay"))],
-		"timezone", _LLM_Agent_TimeZone())
+		"timezone", IsSet(RegistryKey) ? _LLM_Agent_TimeZone(ClockProbe, RegistryKey) : _LLM_Agent_TimeZone(ClockProbe))
 }
 
 ; The Windows time zone id ("Romance Standard Time"), else the UTC offset.
-_LLM_Agent_TimeZone() {
+_LLM_Agent_TimeZone(ClockProbe := 0, RegistryKey := unset) {
 	global LLM_AGENT_TIMEZONE_KEY
-	if Reg_TryRead(LLM_AGENT_TIMEZONE_KEY, "TimeZoneKeyName", &Name) && (Name is String) && Name != ""
+	Key := IsSet(RegistryKey) ? RegistryKey : LLM_AGENT_TIMEZONE_KEY
+	if Reg_TryRead(Key, "TimeZoneKeyName", &Name) && (Name is String) && Name != ""
 		return Name
-	Minutes := DateDiff(A_Now, A_NowUTC, "Minutes")
+	; One Windows time-zone observation supplies the active bias. Subtracting
+	; separately sampled local and UTC clock strings can lose a whole minute.
+	Minutes := ""
+	try Minutes := HasMethod(ClockProbe, "OffsetMinutesEast")
+		? ClockProbe.OffsetMinutesEast() : NativeTimeZoneOffsetMinutesEast()
+	if !(Minutes is Integer) {
+		LoggerDebug("LLM", "AI agent: neither a Windows time zone id nor an offset is available.")
+		return ""
+	}
 	LoggerDebug("LLM", "AI agent: no Windows time zone id, the UTC offset stands in.")
 	return Format("UTC{1}{2:02d}:{3:02d}", Minutes < 0 ? "-" : "+", Abs(Minutes) // 60, Mod(Abs(Minutes), 60))
 }
@@ -790,7 +807,7 @@ LLM_Agent_WatchesTyping() {
  * @param {String} Buffer The typed context, most recent character last.
  * @returns {Boolean} True when the pause timer was armed.
  */
-LLM_Agent_OnTyping(Buffer, PublishGuard := unset) {
+LLM_Agent_OnTyping(Buffer, PublishGuard := unset, TypingProbe := unset) {
 	global _LLM_Agent_Generation, _LLM_Agent_Auto
 	if IsSet(PublishGuard) && !PublishGuard.Call()
 		return false
@@ -811,7 +828,12 @@ LLM_Agent_OnTyping(Buffer, PublishGuard := unset) {
 		_LLM_Agent_CancelPause()
 		if !Automatic
 			return false
-		Timer := _LLM_Agent_OnPause.Bind(_LLM_Agent_Generation, Buffer)
+		if IsSet(TypingProbe)
+			Timer := _LLM_Agent_OnPause.Bind(_LLM_Agent_Generation, Buffer,
+				IsSet(PublishGuard) ? PublishGuard : (*) => true, TypingProbe)
+		else
+			Timer := IsSet(PublishGuard) ? _LLM_Agent_OnPause.Bind(_LLM_Agent_Generation, Buffer, PublishGuard)
+				: _LLM_Agent_OnPause.Bind(_LLM_Agent_Generation, Buffer)
 		_LLM_Agent_Auto["timer"] := Timer
 		_LLM_Agent_Schedule(Timer, -PauseMs)
 		return true
@@ -892,7 +914,7 @@ _LLM_Agent_Decide(Backend, State, Config, OnTriage, Current) {
 	OnFail := _LLM_Agent_OnSystem1Fail.Bind(OnTriage, Current)
 	if (Target["format"] == "decisions") {
 		LLM_RemoteDecisions_Async(Target["resolved"], State, Questions,
-			_LLM_Agent_OnJevAnswers.Bind(Config, OnTriage), OnFail)
+			_LLM_Agent_OnJevAnswers.Bind(Config, OnTriage), OnFail, "", 0, Current)
 		return true
 	}
 	LLM_RemoteBackboard_Async(Target["resolved"],
@@ -932,11 +954,26 @@ _LLM_Agent_OnSystem1Fail(OnTriage, Current, Failure := "") {
 }
 
 ; The typing paused: triage the current sentence when everything allows it.
-_LLM_Agent_OnPause(Generation, Buffer) {
+_LLM_Agent_TypingTriageCurrent(Generation, Revision, Guard) {
+	return _LLM_Agent_TriageIsCurrent(Generation, Revision) && Guard.Call()
+		&& _LLM_Agent_TriageIsCurrent(Generation, Revision)
+}
+
+_LLM_Agent_OnPause(Generation, Buffer, TypingGuard := unset, TypingProbe := unset) {
 	global _LLM_Agent_Generation, _LLM_Agent_Auto, _LLM_Agent_System1Revision
 	Revision := _LLM_Agent_System1Revision
-	Current := _LLM_Agent_TriageIsCurrent.Bind(Generation, Revision)
-	_LLM_Agent_Auto["timer"] := 0
+	Current := IsSet(TypingGuard) ? _LLM_Agent_TypingTriageCurrent.Bind(Generation, Revision, TypingGuard)
+		: _LLM_Agent_TriageIsCurrent.Bind(Generation, Revision)
+	; A retained scheduler callback may arrive after a new pause was armed.
+	; Retire only this generation's capability before consulting its policy.
+	PauseCritical := Critical("On")
+	try {
+		if Generation != _LLM_Agent_Generation
+			return false
+		_LLM_Agent_Auto["timer"] := 0
+	} finally Critical(PauseCritical)
+	if !Current.Call()
+		return false
 	if (Generation != _LLM_Agent_Generation) || A_IsSuspended || !LLM_Menu_AiEnabled()
 		return false
 	if (LLM_Agent_Setting(ConfigLeaf.AGENT_MODE) != "auto")
@@ -968,6 +1005,10 @@ _LLM_Agent_OnPause(Generation, Buffer) {
 		LoggerDebug("LLM", "AI agent: no triage, the application is excluded.")
 		return false
 	}
+	; The native origin probe stays outside the transport's RAM-only admission.
+	; A probe can admit another flow, so generation and policy are checked again.
+	if IsSet(TypingProbe) && !TypingProbe.Call()
+		return false
 	; Backend, secure-field and context reads can commit a withdrawal or
 	; admit a newer flow. Retire before caching this sentence or sending it.
 	if !Current.Call()
@@ -975,6 +1016,10 @@ _LLM_Agent_OnPause(Generation, Buffer) {
 	_LLM_Agent_RememberTriaged(Sentence)
 	Flow := Map("generation", Generation, "source", "typing", "backend", System2, "auto", true,
 		"context", Ctx, "sentence", Sentence, "system1_revision", Revision)
+	if IsSet(TypingGuard)
+		Flow["typing_guard"] := TypingGuard
+	if IsSet(TypingProbe)
+		Flow["typing_probe"] := TypingProbe
 	LoggerInfo("LLM", "AI agent #{1}: triage of {2} character(s) by System 1 '{3}'.", Generation,
 		StrLen(Sentence), System1["backend"])
 	if !LLM_Agent_System1Request(System1, Sentence, Ctx, _LLM_Agent_OnTriage.Bind(Flow), Current) {

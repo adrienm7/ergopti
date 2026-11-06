@@ -30,21 +30,28 @@ global _HSOT_WrittenContents := []
 global _HSOT_ParseCalls := 0
 global _HSOT_ParseCritical := []
 
+global _HSOT_FixtureRoot := ""
+
 _HSOT_SaveState() {
-	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen, _HSOT_FixtureRoot
 	return {
 		Path: _HotstringsOverridesPath,
 		Overrides: _HotstringsOverrides,
-		Generation: _HSResolveGen
+		Generation: _HSResolveGen,
+		Root: _HSOT_FixtureRoot
 	}
 }
 
 _HSOT_RestoreState(Saved) {
-	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen, _HSOT_FixtureRoot
+	RetireRoot := _HSOT_FixtureRoot
 	_HotstringsOverridesPath := Saved.Path
 	_HotstringsOverrides := Saved.Overrides
 	_HSResolveGen := Saved.Generation
 	_HSOT_ResetFakes()
+	if RetireRoot != "" && RetireRoot != Saved.Root
+		DirDelete(RetireRoot, true)
+	_HSOT_FixtureRoot := Saved.Root
 }
 
 _HSOT_ResetFakes() {
@@ -63,16 +70,20 @@ _HSOT_ResetFakes() {
 }
 
 _HSOT_Seed(Name) {
-	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
-	_HotstringsOverridesPath := A_Temp . "\ergopti_hotstring_override_"
-		. Name . "_" . A_TickCount . ".toml"
-	_HotstringsOverrides := Map("rolls", {
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen, _HSOT_FixtureRoot
+	AssertEqual("", _HSOT_FixtureRoot, "An unretired private transaction fixture must remain owned for cleanup")
+	CandidateRoot := A_Temp . "\ergopti_hotstring_override_" . Name . "_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(CandidateRoot)
+	_HSOT_FixtureRoot := CandidateRoot
+	_HotstringsOverridesPath := _HSOT_FixtureRoot . "\overrides.toml"
+	_HotstringsOverrides := _ParseOverrides(_HotstringsOverridesPath)
+	_HotstringsOverrides["rolls"] := {
 		Delay: 0.4,
 		Color: "#111111",
 		ShowTooltip: "",
 		Priority: "",
 		Sections: Map()
-	})
+	}
 	_HSResolveGen := 100
 	_HSOT_ResetFakes()
 }
@@ -82,7 +93,7 @@ _HSOT_AcceptWriter(StagePath, Content) {
 	_HSOT_WriteCalls += 1
 	_HSOT_WriterCritical.Push(A_IsCritical)
 	_HSOT_WrittenContents.Push(Content)
-	return 1
+	return FSWriteDurable(StagePath, Content)
 }
 
 _HSOT_FalseWriter(StagePath, Content) {
@@ -123,7 +134,7 @@ _HSOT_RecordReplace() {
 
 _HSOT_AcceptReplace(StagePath, TargetPath) {
 	_HSOT_RecordReplace()
-	return 1
+	return FSAtomicMoveReplace(StagePath, TargetPath)
 }
 
 _HSOT_FalseReplace(StagePath, TargetPath) {
@@ -140,13 +151,11 @@ _HSOT_AcceptParser(Path) {
 	global _HSOT_ParseCalls, _HSOT_ParseCritical
 	_HSOT_ParseCalls += 1
 	_HSOT_ParseCritical.Push(A_IsCritical)
-	return Map("rolls", {
-		Delay: 0.75,
-		Color: "#333333",
-		ShowTooltip: "",
-		Priority: "",
-		Sections: Map()
-	})
+	Source := "[rolls]`ndelay_offset = " . HotstringsSerialiseDelayOffset(0.75 - HotstringsBaseDelay())
+		. '`ncolor = "#333333"`n'
+	AssertTrue(FSWriteDurable(Path, Source))
+	Candidate := _ParseOverrides(Path)
+	return Candidate
 }
 
 _HSOT_RebaseParser(Path) {
@@ -154,14 +163,12 @@ _HSOT_RebaseParser(Path) {
 	global _HotstringsOverridesPath
 	_HSOT_ParseCalls += 1
 	_HSOT_ParseCritical.Push(A_IsCritical)
+	Source := "[rolls]`ndelay_offset = " . HotstringsSerialiseDelayOffset(0.95 - HotstringsBaseDelay())
+		. '`ncolor = "#444444"`n'
+	AssertTrue(FSWriteDurable(Path, Source))
+	Candidate := _ParseOverrides(Path)
 	_HotstringsOverridesPath .= ".rebased"
-	return Map("rolls", {
-		Delay: 0.95,
-		Color: "#444444",
-		ShowTooltip: "",
-		Priority: "",
-		Sections: Map()
-	})
+	return Candidate
 }
 
 _HSOT_ThrowingParser(Path) {
@@ -462,6 +469,8 @@ _HSOT_ReloadRevalidatesAfterNonCriticalParse() {
 		AssertEqual(BeforeGeneration + 1, _HSResolveGen,
 			"the accepted Map and exactly one generation must publish together")
 
+		; Retire the first owned native source before acquiring the second scope.
+		_HSOT_RestoreState(Saved)
 		_HSOT_Seed("reload_rebase")
 		BoundPath := _HotstringsOverridesPath
 		BeforeOverrides := _HotstringsOverrides
@@ -492,20 +501,21 @@ Test("hotstring-override-global-transaction-20260813: reload parses outside "
 	_HSOT_ReloadRevalidatesAfterNonCriticalParse)
 
 _HSOT_DirectSerializerCompatibilityDoesNotImplyLivePublish() {
-	global _HotstringsOverrides, _HSResolveGen, _HSOT_WrittenContents
+	global _HotstringsOverrides, _HotstringsOverridesPath, _HSResolveGen, _HSOT_WrittenContents
 	global _HSOT_WriterCritical, _HSOT_ReplaceCritical
 	Saved := _HSOT_SaveState()
 	try {
 		_HSOT_Seed("direct_compatibility")
 		BeforeOverrides := _HotstringsOverrides
 		BeforeGeneration := _HSResolveGen
+		Origin := _HotstringsOverrideSourceFor(_HotstringsOverrides, _HotstringsOverridesPath)
 		Candidate := _HotstringsOverrides.Clone()
 		CandidateEntry := _HotstringsCloneOverrideCategory(Candidate["rolls"])
 		CandidateEntry.Color := "#222222"
 		Candidate["rolls"] := CandidateEntry
 
 		AssertTrue(_SaveOverrides(Candidate,
-			_HSOT_AcceptWriter, _HSOT_AcceptReplace),
+			_HSOT_AcceptWriter, _HSOT_AcceptReplace, _HotstringsOverridesPath, 0, 0, 0, Origin),
 			"legacy direct serializers must keep their atomic write-only contract")
 		AssertEqual(0, _HSOT_WriterCritical[1])
 		AssertEqual(0, _HSOT_ReplaceCritical[1])
@@ -520,3 +530,331 @@ _HSOT_DirectSerializerCompatibilityDoesNotImplyLivePublish() {
 Test("hotstring-override-global-transaction-20260813: direct _SaveOverrides "
 	. "calls retain atomic write-only compatibility",
 	_HSOT_DirectSerializerCompatibilityDoesNotImplyLivePublish)
+
+_HSTG_ForeignStage(Collision) {
+	Root := A_Temp . "\ergopti_override_stage_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\overrides.toml", Created := false
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
+	SavedPath := _HotstringsOverridesPath, SavedMap := _HotstringsOverrides, SavedGen := _HSResolveGen
+	Owner := FSWriteReplaceOwned, HadOwn := Owner.HasOwnProp("Call")
+	if HadOwn
+		SavedCall := Owner.GetOwnPropDesc("Call")
+	Installed := false
+	State := {hits: 0, stagePath: "", sentinelBytes: 0, createdSentinel: 0, originalEntered: 0, originalCompleted: 0}
+	Source := '[rolls]`ncolor = "#111111"`n'
+	Sentinel := "Foreign override stage: é😀 unchanged"
+	Observe(This, Target, Content, Suffix, &Detail := "", StageFn := 0,
+			BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true,
+			&Publication := 0, FlushFn := 0) {
+		Mine := (Target is String) && StrCompare(Target, Path, true) == 0
+		CreateOriginal(Folder, Name, Attributes) {
+			SplitPath(Path, &Leaf)
+			AssertEqual(Leaf . Suffix, Name, "the observed factory must create the actual target's exact stage leaf")
+			State.hits += 1
+			State.stagePath := Path . Suffix
+			if Collision {
+				State.createdSentinel := FSWriteCreateDurable(State.stagePath, Sentinel)
+				AssertEqual(1, State.createdSentinel, "the foreign stage must actually be acquired by CREATE_NEW")
+				State.sentinelBytes := FSReadBytesStrict(State.stagePath)
+			}
+			return StageFn.Call(Folder, Name, Attributes)
+		}
+		if Mine
+			State.originalEntered += 1
+		NativeResult := Func.Prototype.Call.Call(This, Target, Content, Suffix, &Detail,
+			Mine ? CreateOriginal : StageFn, BeforePublishFn, AdmissionFn, ReplaceExisting, &Publication, FlushFn)
+		if Mine
+			State.originalCompleted += 1
+		return NativeResult
+	}
+	try {
+		AssertFalse(_ConfigFullSaveHasPending(), "a private override target must not detach a foreign full-save obligation")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := _ParseOverrides(Path)
+		AssertEqual("#111111", _HotstringsOverrides["rolls"].Color)
+		OriginalMap := _HotstringsOverrides, OriginalGen := _HSResolveGen
+		Before := FSReadBytesStrict(Path)
+		Owner.DefineProp("Call", {Call: Observe})
+		Installed := true
+		Result := HotstringsSetOverride("rolls", "", "color", "#222222")
+		After := FSReadBytesStrict(Path)
+		StagePresent := State.stagePath != "" && FSStrictExists(State.stagePath)
+		StageBytes := StagePresent ? FSReadBytesStrict(State.stagePath) : Buffer(0)
+		_TestPrint("# override-stage-ownership collision=" . Collision . " calls=" . State.hits
+			. " created_sentinel=" . State.createdSentinel . " original_entered=" . State.originalEntered
+			. " original_completed=" . State.originalCompleted
+			. " result=" . Result . " stage_present=" . StagePresent
+			. " before_bytes=" . Before.Size . " after_bytes=" . After.Size
+			. " live_color=" . _HotstringsOverrides["rolls"].Color . " generation_delta=" . (_HSResolveGen - OriginalGen))
+		AssertEqual(1, State.hits, "the actual default override publisher must reach its real native staging owner")
+		AssertEqual(1, State.originalEntered, "the real staging writer must be delegated exactly once")
+		AssertEqual(1, State.originalCompleted, "the real original writer must return before business assertions")
+		AssertEqual(Collision ? 1 : 0, State.createdSentinel)
+		if Collision {
+			AssertTrue(StagePresent, "an override save cannot rename or delete another owner's stage")
+			AssertEqual(State.sentinelBytes.Size, StageBytes.Size)
+			AssertEqual(StageBytes.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", State.sentinelBytes,
+				"Ptr", StageBytes, "UPtr", StageBytes.Size, "UPtr"), "foreign bytes must remain exact")
+			AssertFalse(Result)
+			AssertTrue(_HotstringsOverrides == OriginalMap, "a rejected durable operation retains the original live Map owner")
+			AssertEqual(OriginalGen, _HSResolveGen)
+			AssertEqual("#111111", _HotstringsOverrides["rolls"].Color)
+			AssertEqual(Before.Size, After.Size)
+			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+				"Ptr", After, "UPtr", Before.Size, "UPtr"), "collision refuses all target publication")
+		} else {
+			AssertTrue(Result)
+			AssertEqual(OriginalGen + 1, _HSResolveGen)
+			AssertEqual("#222222", _HotstringsOverrides["rolls"].Color)
+			AssertFalse(StagePresent)
+			Actual := TOML_ParseDocument(FSReadUtf8Exact(Path))
+			AssertEqual("#222222", Actual["rolls"]["color"])
+		}
+	} finally {
+		if Installed {
+			if HadOwn
+				Owner.DefineProp("Call", SavedCall)
+			else
+				Owner.DeleteProp("Call")
+		}
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedMap
+		_HSResolveGen := SavedGen
+		if Created {
+			_TOML_InvalidateParseCache(Path)
+			Refusals := _TOML_WriteRefusals(), RefusalKey := _TOML_WriteRefusalKey(Path)
+			if Refusals.Has(RefusalKey)
+				Refusals.Delete(RefusalKey)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _HSTG_Collision in [true, false]
+	Test("override stage: foreign collision=" . _HSTG_Collision . " (override-stage-ownership)", _HSTG_ForeignStage.Bind(_HSTG_Collision))
+
+_HSGP_Outcome(Denied) {
+	Root := A_Temp . "\ergopti_override_partial_owner_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\overrides.toml", Created := false
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
+	SavedPath := _HotstringsOverridesPath, SavedMap := _HotstringsOverrides, SavedGen := _HSResolveGen
+	Owner := FSWriteReplaceOwned, HadOwn := Owner.HasOwnProp("Call"), Installed := false
+	if HadOwn
+		SavedCall := Owner.GetOwnPropDesc("Call")
+	State := {calls: 0, completed: 0, publishedFlushes: 0, nativeFlushAck: 0, handle: -1, handleQuery: -1, handleError: 0}
+	Source := '[rolls]`ncolor = "#111111"`n'
+	FlushNative(Handle, Phase) {
+		NativeAck := DllCall("kernel32\FlushFileBuffers", "Ptr", Handle, "Int")
+		if Phase == "published" {
+			State.publishedFlushes += 1
+			State.nativeFlushAck := NativeAck
+			State.handle := Handle
+		}
+		if !NativeAck
+			throw OSError(A_LastError, "fixture actual private override flush")
+		; The native flush happened; only its typed durable acknowledgement is
+		; declined at the published boundary. This is not a claim of OS failure.
+		return Denied && Phase == "published" ? 0 : 1
+	}
+	Observe(This, Target, Content, Suffix, &Detail := "", StageFn := 0,
+			BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true,
+			&Publication := 0, FlushFn := 0) {
+		Mine := (Target is String) && StrCompare(Target, Path, true) == 0
+		if Mine {
+			State.calls += 1
+			AssertTrue((FlushFn is Integer) && FlushFn == 0)
+		}
+		Result := Func.Prototype.Call.Call(This, Target, Content, Suffix, &Detail,
+			StageFn, BeforePublishFn, AdmissionFn, ReplaceExisting, &Publication, Mine ? FlushNative : FlushFn)
+		if Mine {
+			State.completed += 1
+			if State.handle != -1 {
+				Info := Buffer(52, 0)
+				DllCall("kernel32\SetLastError", "UInt", 0)
+				State.handleQuery := DllCall("kernel32\GetFileInformationByHandle", "Ptr", State.handle, "Ptr", Info, "Int")
+				State.handleError := A_LastError
+			}
+		}
+		return Result
+	}
+	try {
+		AssertFalse(_ConfigFullSaveHasPending())
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := _ParseOverrides(Path)
+		AssertEqual("#111111", _HotstringsOverrides["rolls"].Color)
+		BeforeGen := _HSResolveGen
+		Owner.DefineProp("Call", {Call: Observe})
+		Installed := true
+		Result := HotstringsSetOverride("rolls", "", "color", "#222222")
+		Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		Receipt := _HotstringsOverrideSourceFor(_HotstringsOverrides, Path)
+		SourceCurrent := IsObject(Receipt) && _FSSourceIsUnchanged(Path, Receipt.Source)
+		_TestPrint("# hotstrings-override-partial denied_ack=" . Denied . " calls=" . State.calls
+			. " completed=" . State.completed . " native_flush_ack=" . State.nativeFlushAck
+			. " published_flushes=" . State.publishedFlushes . " handle_query=" . State.handleQuery
+			. " handle_error=" . State.handleError . " result=" . Result
+			. " source_current=" . SourceCurrent . " disk_color=" . Disk["rolls"]["color"]
+			. " live_color=" . _HotstringsOverrides["rolls"].Color . " generation_delta=" . (_HSResolveGen - BeforeGen))
+		AssertEqual(1, State.calls)
+		AssertEqual(1, State.completed)
+		AssertEqual(1, State.publishedFlushes)
+		AssertEqual(1, State.nativeFlushAck)
+		AssertEqual(0, State.handleQuery, "the exact stage handle must be retired immediately on helper return, before caller diagnostics")
+		AssertEqual(6, State.handleError)
+		AssertEqual("#222222", Disk["rolls"]["color"])
+		AssertEqual(Denied ? 0 : 1, Result)
+		AssertEqual(!Denied, SourceCurrent)
+		AssertEqual(Denied ? "#111111" : "#222222", _HotstringsOverrides["rolls"].Color)
+		AssertEqual(BeforeGen + (Denied ? 0 : 1), _HSResolveGen)
+		; Remove only the fixture's typed refusal; all retries use real native I/O.
+		if HadOwn
+			Owner.DefineProp("Call", SavedCall)
+		else
+			Owner.DeleteProp("Call")
+		Installed := false
+		if Denied {
+			BeforeRetry := FSReadBytesStrict(Path)
+			AssertFalse(HotstringsSetOverride("rolls", "", "color", "#333333"), "a genuinely changed source cannot be rebased from the old live receipt")
+			AfterRetry := FSReadBytesStrict(Path)
+			AssertEqual(BeforeRetry.Size, AfterRetry.Size)
+			AssertEqual(BeforeRetry.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", BeforeRetry,
+				"Ptr", AfterRetry, "UPtr", BeforeRetry.Size, "UPtr"))
+			AssertTrue(HotstringsConfigReload(), "the actual reload reconciles the complete native image")
+			AssertEqual("#222222", _HotstringsOverrides["rolls"].Color)
+		}
+		AssertTrue(HotstringsSetOverride("rolls", "", "color", "#333333"), "a current source receipt accepts a new fully native durable write")
+		AssertEqual("#333333", _HotstringsOverrides["rolls"].Color)
+		AssertEqual("#333333", TOML_ParseDocument(FSReadUtf8Exact(Path))["rolls"]["color"])
+	} finally {
+		if Installed {
+			if HadOwn
+				Owner.DefineProp("Call", SavedCall)
+			else
+				Owner.DeleteProp("Call")
+		}
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedMap
+		_HSResolveGen := SavedGen
+		if Created {
+			_TOML_InvalidateParseCache(Path)
+			Refusals := _TOML_WriteRefusals(), Key := _TOML_WriteRefusalKey(Path)
+			if Refusals.Has(Key)
+				Refusals.Delete(Key)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _HSGP_Denied in [true, false]
+	Test("hotstring override partial: actual rename declined durable ack=" . _HSGP_Denied
+		. " (hotstring-override-partial-publication)", _HSGP_Outcome.Bind(_HSGP_Denied))
+
+_HSPA_PostAckFailure(Mode) {
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
+	SavedPath := _HotstringsOverridesPath, SavedMap := _HotstringsOverrides, SavedGen := _HSResolveGen
+	Root := A_Temp . "\ergopti_override_post_ack_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\overrides.toml", Created := false
+	Native := FSWriteReplaceOwned, Reporter := ConfigReportPersistenceFailure
+	HadNative := Native.HasOwnProp("Call"), HadReporter := Reporter.HasOwnProp("Call")
+	if HadNative
+		SavedNative := Native.GetOwnPropDesc("Call")
+	if HadReporter
+		SavedReporter := Reporter.GetOwnPropDesc("Call")
+	InstalledNative := false, InstalledReporter := false
+	State := {nativeCalls: 0, nativeAck: 0, lock: 0, reports: 0, unchanged: "unset", publisherCalls: 0}
+	ObserveNative(This, Target, Content, Suffix, &Detail := "", StageFn := 0,
+			BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true,
+			&Publication := 0, FlushFn := 0) {
+		Result := Func.Prototype.Call.Call(This, Target, Content, Suffix, &Detail,
+			StageFn, BeforePublishFn, AdmissionFn, ReplaceExisting, &Publication, FlushFn)
+		if (Target is String) && StrCompare(Target, Path, true) == 0 {
+			State.nativeCalls += 1
+			State.nativeAck := Result
+			if Mode == "readback" && Result == 1 {
+				State.lock := FileOpen(Path, "r-rwd")
+				AssertTrue(IsObject(State.lock), "the real post-ACK readback must be denied by an acquired private native handle")
+			}
+		}
+		return Result
+	}
+	ObserveReport(This, Context, NotifyFn := 0, Detail := "", StateUnchanged := true) {
+		State.reports += 1
+		State.unchanged := StateUnchanged
+		return Func.Prototype.Call.Call(This, Context, NotifyFn, Detail, StateUnchanged)
+	}
+	RefusePublisher() {
+		State.publisherCalls += 1
+		return 0
+	}
+	try {
+		AssertFalse(_ConfigFullSaveHasPending())
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(Path, '[rolls]`ncolor = "#111111"`n'))
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := _ParseOverrides(Path)
+		Origin := _HotstringsOverrideSourceFor(_HotstringsOverrides, Path)
+		OriginalMap := _HotstringsOverrides, BeforeGen := _HSResolveGen
+		Candidate := _HotstringsOverrides.Clone()
+		Candidate["rolls"] := _HotstringsCloneOverrideCategory(Candidate["rolls"])
+		Candidate["rolls"].Color := "#222222"
+		Native.DefineProp("Call", {Call: ObserveNative}), InstalledNative := true
+		Reporter.DefineProp("Call", {Call: ObserveReport}), InstalledReporter := true
+		Result := _SaveOverrides(Candidate, 0, 0, Path, 0, RefusePublisher, 0, Origin)
+		HeldReadback := IsObject(State.lock)
+		if HeldReadback {
+			State.lock.Close()
+			State.lock := 0
+		}
+		Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		_TestPrint("# override-post-ack mode=" . Mode . " native_calls=" . State.nativeCalls
+			. " native_ack=" . State.nativeAck . " readback_lock=" . HeldReadback . " result=" . Result
+			. " reports=" . State.reports . " state_unchanged=" . State.unchanged
+			. " publisher_calls=" . State.publisherCalls . " disk_color=" . Disk["rolls"]["color"])
+		AssertEqual(1, State.nativeCalls)
+		AssertEqual(1, State.nativeAck, "the genuine writer must fully acknowledge its real rename/durability before the later refusal")
+		AssertEqual(Mode == "readback", HeldReadback)
+		AssertEqual(Mode == "publisher" ? 1 : 0, State.publisherCalls)
+		AssertFalse(Result)
+		AssertEqual("#222222", Disk["rolls"]["color"])
+		AssertTrue(_HotstringsOverrides == OriginalMap)
+		AssertEqual("#111111", _HotstringsOverrides["rolls"].Color)
+		AssertEqual(BeforeGen, _HSResolveGen)
+		AssertEqual(1, State.reports)
+		AssertTrue((State.unchanged is Integer) && State.unchanged == 0,
+			"a post-ACK refusal must not report that the durable file was left unchanged")
+	} finally {
+		if IsObject(State.lock)
+			State.lock.Close()
+		if InstalledReporter {
+			if HadReporter
+				Reporter.DefineProp("Call", SavedReporter)
+			else
+				Reporter.DeleteProp("Call")
+		}
+		if InstalledNative {
+			if HadNative
+				Native.DefineProp("Call", SavedNative)
+			else
+				Native.DeleteProp("Call")
+		}
+		_HotstringsOverridesPath := SavedPath, _HotstringsOverrides := SavedMap, _HSResolveGen := SavedGen
+		if Created {
+			_TOML_InvalidateParseCache(Path)
+			Refusals := _TOML_WriteRefusals(), Key := _TOML_WriteRefusalKey(Path)
+			if Refusals.Has(Key)
+				Refusals.Delete(Key)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _HSPA_Mode in ["readback", "publisher"]
+	Test("hotstring override post-ACK failure: " . _HSPA_Mode
+		. " (override-post-ack-truthful-feedback)", _HSPA_PostAckFailure.Bind(_HSPA_Mode))

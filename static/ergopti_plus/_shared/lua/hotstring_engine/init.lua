@@ -505,7 +505,11 @@ function M.idle_resets_word(last_ms, now_ms, idle_seconds, resolution_ms)
 			.. tostring(resolution_ms), 2)
 	end
 	if idle_seconds == 0 or last_ms == nil then return false end
-	return now_ms - last_ms - resolution_ms >= idle_seconds * 1000
+	-- Preserve exact reachable integer deadlines. Beyond this Int64 quotient,
+	-- floating scaling prevents Lua 5.4 integer wrap without capping the setting.
+	local exact_integer = math.type and math.type(idle_seconds) == "integer"
+	local milliseconds = exact_integer and idle_seconds <= 9223372036854775 and idle_seconds * 1000 or idle_seconds * 1000.0
+	return now_ms - last_ms - resolution_ms >= milliseconds
 end
 
 

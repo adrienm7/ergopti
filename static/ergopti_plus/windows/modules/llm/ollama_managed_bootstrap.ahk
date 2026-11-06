@@ -310,7 +310,7 @@ class OllamaManagedBootstrap {
 		this.RuntimeRetired := false
 		this.RuntimeRetiring := false
 		this.Target := 0
-		this.Timer := ObjBindMethod(this, "_Tick")
+		this.Timer := 0
 		this.Sources := Map()
 		if Port is Map {
 			this.Plan := Port["plan"].Clone()
@@ -321,6 +321,7 @@ class OllamaManagedBootstrap {
 				this.MenuIntent := Port["menu_intent"].Call().Clone()
 				this.AuxGeneration := Port["aux_generation"].Call()
 			}
+			this.Timer := ObjBindMethod(this, "_Tick")
 			return
 		}
 		if !RegExMatch(this.Endpoint, "^http://(?:localhost|127\.0\.0\.1):([0-9]+)$", &Match)
@@ -387,7 +388,8 @@ class OllamaManagedBootstrap {
 			"download_helper", Directory . "\ollama_download_archive.ps1",
 			"powershell", A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
 			"capture_bytes", 65536, "spawn", OllamaInstallFiles_Spawn,
-			"on_physical", ObjBindMethod(this, "_Physical"), "on_error", ObjBindMethod(this, "_Error")))
+			"on_physical", OllamaManagedBootstrap._UnstartedObserver,
+			"on_error", OllamaManagedBootstrap._UnstartedObserver))
 		RuntimeProxy := Map("VendorDirectory", Vendor, "VendorSha256", CryptoSha256(RuntimeInventory),
 			"ProxyPolicyPath", Policy, "ProxyPolicySha256", this.Sources[Policy],
 			"UpdaterDefaultsPath", Updater, "UpdaterDefaultsSha256", this.Sources[Updater],
@@ -409,7 +411,33 @@ class OllamaManagedBootstrap {
 			"helper", Helper, "helper_sha256", this.Sources[Helper],
 			"environment", ServeEnvironment, "environment_sha256", this.Sources[ServeEnvironment],
 			"proxy", RuntimeProxy,
-			"on_retired", ObjBindMethod(this, "_RuntimeRetired"), "on_error", ObjBindMethod(this, "_Error")))
+			"on_retired", OllamaManagedBootstrap._UnstartedObserver,
+			"on_error", OllamaManagedBootstrap._UnstartedObserver))
+		this._PublishConstructionObservers()
+	}
+
+	; Before constructor success there is no native task or physical receipt.
+	; An unreachable callback keeps new ports acyclic through fallible capture.
+	static _UnstartedObserver(*) {
+		throw Error("Managed constructor observers cannot run before source capture completes.")
+	}
+
+	_PublishConstructionObservers() {
+		; Prepare every fallible binding before any instance points back to this
+		; flow. Failure releases these local references with the constructor frame.
+		Physical := ObjBindMethod(this, "_Physical")
+		ErrorObserver := ObjBindMethod(this, "_Error")
+		Retired := ObjBindMethod(this, "_RuntimeRetired")
+		Polling := ObjBindMethod(this, "_Tick")
+		PreviousCritical := Critical("On")
+		try {
+			; Existing slots of the freshly constructed native ports, RAM only.
+			this.Files.Options["on_physical"] := Physical
+			this.Files.Options["on_error"] := ErrorObserver
+			this.Runtime.Options["on_retired"] := Retired
+			this.Runtime.Options["on_error"] := ErrorObserver
+			this.Timer := Polling
+		} finally Critical(PreviousCritical)
 	}
 
 	/** Starts a read-only inspection; no missing runtime is installed implicitly. */
@@ -658,8 +686,7 @@ class OllamaManagedBootstrap {
 		Authority := Map("authorize", (*) => this._Current(), "is_current", (*) => this._Current())
 		if !this._True(this.Runtime.Start(Target, Authority, ObjBindMethod(this, "_ServerReady"), ObjBindMethod(this, "_ServerExited")))
 			return this._Fail("runtime_start")
-		SetTimer(this.Timer, 150)
-		return true
+		return this._ArmPolling()
 	}
 
 	_Tick() {
@@ -1002,7 +1029,8 @@ class OllamaManagedBootstrap {
 			return this.Cancel()
 		this.Ready := true
 		this.Silent := false
-		SetTimer(this.Timer, 150)
+		if !this._ArmPolling()
+			return false
 		if !(this.Port is Map) && this.UiShown
 			OllamaWV_Done(true, t("ollama.deps_step_ready"))
 		_LLM_Deps_State := "ready"
@@ -1111,6 +1139,34 @@ class OllamaManagedBootstrap {
 			this._Error("runtime_receipt_cleanup", Error("Exact runtime receipt retirement was refused."))
 	}
 
+	; Native readiness can cancel inline before the original arming caller returns.
+	_ArmPolling() {
+		PreviousCritical := Critical("On")
+		try {
+			if this.Cancelled || this.Failed || !IsObject(this.Timer)
+				return false
+			SetTimer(this.Timer, 150)
+			return true
+		} finally Critical(PreviousCritical)
+	}
+
+	; Keep the existing callback while native/file debt still needs this owner.
+	; CanReplace has already settled the yielding auxiliary cleanup check.
+	_RetirePolling() {
+		PreviousCritical := Critical("On")
+		try {
+			if !this.Cancelled || this.Files.HasOwner() || this.Runtime.HasOwner()
+					|| IsObject(this.PullTask) || this.Debts.Count
+				return false
+			if this.Files is OllamaInstallFilesPort && !this.Files.RetireCallbacks(&FileObservers)
+				return false
+			if this.Runtime is OllamaRuntimeOwner && !this.Runtime.RetireCallbacks(&RuntimeObservers)
+				return false
+			this.Timer := 0
+			return true
+		} finally Critical(PreviousCritical)
+	}
+
 	/** Invalidates logic first; retained native/file owners block all successors. */
 	Cancel(*) {
 		global _LLM_ManagedBootstrap, _LLM_Deps_State
@@ -1121,7 +1177,8 @@ class OllamaManagedBootstrap {
 				&& _LLM_Deps_State == "ready"
 			_LLM_Deps_State := "pending"
 		this.Ready := false
-		SetTimer(this.Timer, 0)
+		if IsObject(this.Timer)
+			SetTimer(this.Timer, 0)
 		AuxStopped := true
 		if !(this.Port is Map) {
 			LLM_AuxRetirePrefix(this.AuxPrefix)
@@ -1146,7 +1203,10 @@ class OllamaManagedBootstrap {
 		RuntimeStopped := this._True(this.Runtime.Stop())
 		if FilesStopped && this.Debts.Count
 			this._Drain(() => true)
-		return AuxStopped && PullStopped && FilesStopped && RuntimeStopped && this.Debts.Count == 0
+		if !(AuxStopped && PullStopped && FilesStopped && RuntimeStopped && this.Debts.Count == 0)
+				|| !this.CanReplace()
+			return false
+		return this._RetirePolling()
 	}
 
 	/** Keeps installed versions and model files; only owned temporary files retire. */
@@ -1227,7 +1287,8 @@ class OllamaManagedBootstrap {
 		if !this.UiShown {
 			OllamaWV_Show("ollama_install", t("ollama.install_subtitle"), (*) => LLM_Deps_Cancel(), ObjBindMethod(this, "_Retry"))
 			this.UiShown := true
-			SetTimer(this.Timer, 150)
+			if !this._ArmPolling()
+				return
 		}
 		OllamaWV_SetStep(this._Message(Key, Model))
 	}

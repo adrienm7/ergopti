@@ -847,7 +847,7 @@ _HSE_TrimBufferToCapacity() {
 		; Completion framing is not trigger text. Retain an in-progress nbsp too,
 		; because its punctuation arrives in a separate character notification.
 		LastChar := _TextCompleteTailScalar(HSE_Buffer)
-		FramingLength := (LastChar != "" && (InStr(HSE_WORD_TERMINATORS, LastChar)
+		FramingLength := (LastChar != "" && (InStr(HSE_WORD_TERMINATORS, LastChar, true)
 				or LastChar == Chr(0xA0) or LastChar == Chr(0x202F))) ? StrLen(LastChar) : 0
 		LastUnit := NumGet(StrPtr(HSE_Buffer), (BufferLength - 1) * 2, "UShort")
 		; Keep the possible completion's high unit outside trigger capacity until
@@ -1050,7 +1050,11 @@ HSE_IdleResetsWord(LastTick, NowTick, IdleSeconds) {
 				throw ValueError("HSE_IdleResetsWord: the idle delay must be a non-negative number of seconds.")
 		if (IdleSeconds == 0 or LastTick == "")
 				return false
-		return NowTick - LastTick >= IdleSeconds * 1000
+		; Keep exact reachable integer deadlines; only wider seconds need a
+		; floating product so native multiplication cannot wrap into immediate reset.
+		Milliseconds := (IdleSeconds is Integer) && IdleSeconds <= (0x7FFFFFFFFFFFFFFF // 1000)
+				? IdleSeconds * 1000 : IdleSeconds * 1000.0
+		return NowTick - LastTick >= Milliseconds
 }
 
 ; The idle delay in force: the published value, or the manifest default before

@@ -1,0 +1,10 @@
+{
+	"sqlite_version": "3.53.1",
+	"schema": "CREATE TABLE events_typing(device_id TEXT,id INTEGER,date TEXT,app TEXT,PRIMARY KEY(device_id,id));CREATE TABLE klr_reader_typing_counts(device_id TEXT,event_id INTEGER);",
+	"trigger": "CREATE TEMP TABLE IF NOT EXISTS klr_rebuild_displaced (date TEXT PRIMARY KEY) WITHOUT ROWID;CREATE TEMP TRIGGER klr_rebuild_first_wins_events_typing BEFORE INSERT ON main.events_typing WHEN EXISTS (SELECT 1 FROM events_typing WHERE device_id=NEW.device_id AND id=NEW.id) BEGIN INSERT OR IGNORE INTO klr_rebuild_displaced(date) SELECT date FROM events_typing WHERE device_id=NEW.device_id AND id=NEW.id;DELETE FROM klr_reader_typing_counts WHERE device_id=NEW.device_id AND event_id=NEW.id;DELETE FROM events_typing WHERE device_id=NEW.device_id AND id=NEW.id; END;",
+	"batches": "INSERT OR IGNORE INTO events_typing VALUES('d',3,'2026-03-02','first.exe');INSERT OR IGNORE INTO events_typing VALUES('d',3,'2026-03-04','later.exe');",
+	"results": {
+		"one_pass": [["d", 3, "2026-03-02", "first.exe"]],
+		"segmented_single_frame": [["d", 3, "2026-03-04", "later.exe"]]
+	}
+}

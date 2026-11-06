@@ -6,6 +6,7 @@
 global _SharedDir := A_Args[3], _TapHoldOneShotCache := 0
 global ScriptInformation := Map("MagicKey", "★")
 global OneShotShiftEnabled := false, InDeadKeySequence := false
+global _TH_SyntheticEpoch := 0
 global _SIC_Mode := A_Args[2], _SIC_Emits := [], _SIC_Activations := 0, _SIC_Warnings := 0
 global _SIC_Hook := 0, _SIC_Successor := 0, _SIC_SuccessorToken := 0
 
@@ -51,6 +52,7 @@ class _SIC_CaptureHook {
 		this.Input := ""
 		this.EndKey := Mode == "end-key" ? "Enter" : (Mode == "timeout" || Mode == "stopped-resumed" ? "" : "a")
 		this.EndReason := Mode == "timeout" ? "Timeout" : "EndKey"
+		this.EndMods := ""
 		if Mode == "stopped-resumed"
 			this.EndReason := ""
 		if Mode == "invalid-low"
@@ -66,7 +68,10 @@ class _SIC_CaptureHook {
 		this.Starts := 0, this.Stops := 0
 	}
 	KeyOpt(Keys, Options) {
-		_SIC_Require(Keys == "{BackSpace}{Enter}{Delete}" && Options == "E", "one-shot keeps its real control end keys")
+		Expected := A_Args[1] == "one-shot" ? "{BackSpace}{Enter}{Delete}{Escape}{Tab}"
+			: "{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Insert}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
+		_SIC_Require(Keys == Expected && Options == (A_Args[1] == "one-shot" ? "ES" : "S"),
+			"The passive port must represent the actual owner's exact ending-control suppression options.")
 	}
 	Start() {
 		this.Starts += 1

@@ -36,7 +36,7 @@ _MetaUpdateCheckWindowPresented() {
 		"a manual check re-opens the window")
 	Result := _DriverFuncBody("UpdateCheck_ShowResult")
 	Assert(Result != "", "UpdateCheck_ShowResult must exist in ui/update_check/init.ahk")
-	Assert(InStr(Result, "_UpdateCheck_Present(State)") > 0,
+	Assert(InStr(Result, "_UpdateCheck_Present(State, false, Current)") > 0,
 		"an answer updates the window where it is, without taking the focus")
 }
 Test("update check: the window is presented, never topmost (ui-focus-not-topmost)",

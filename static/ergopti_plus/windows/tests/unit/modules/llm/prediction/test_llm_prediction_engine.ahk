@@ -615,3 +615,35 @@ _AuditAhk006_DisabledAppPolicyFailsClosedOnUnknownFocus() {
 
 Test("LLM privacy: disabled-app policy rejects uncertain focus (audit-ahk-006)",
 	_AuditAhk006_DisabledAppPolicyFailsClosedOnUnknownFocus)
+
+
+_EngineCapturedSourceAppPrivacy() {
+	global _LLM_Engine
+	Saved := _LLM_Engine
+	try {
+		_LLM_Engine := Map("disabled_apps", ["Notepad.EXE"])
+		Calls := 0
+		AllowedFocus := (*) => (Calls += 1, Map("appId", "allowed.exe"))
+		AssertTrue(_LLM_Engine_ShouldSuppressForDisabledApps(AllowedFocus, "notepad.exe"), "an allowed destination cannot authorize an excluded source")
+		AssertEqual(0, Calls, "excluded source refuses before the native destination lookup")
+		AssertTrue(_LLM_Engine_ShouldSuppressForDisabledApps(AllowedFocus, ""), "unknown source fails closed under an exclusion policy")
+		AssertFalse(_LLM_Engine_ShouldSuppressForDisabledApps(AllowedFocus, "allowed.exe"), "allowed source and allowed destination remain eligible")
+		AssertEqual(1, Calls)
+		AssertTrue(_LLM_Engine_ShouldSuppressForDisabledApps(() => Map("appId", "notepad.exe"), "allowed.exe"), "current native app exclusions remain enforced")
+		_LLM_Engine["disabled_apps"] := []
+		AssertFalse(_LLM_Engine_ShouldSuppressForDisabledApps(AllowedFocus, ""), "empty policy retains the legacy no-probe path")
+		AssertEqual(1, Calls)
+		_LLM_Engine := Map("enabled", true, "request_id", 71, "active_request_signature", "source-policy", "disabled_apps", [])
+		AssertTrue(_LLM_Engine_RequestSourceIsCurrent(71, "source-policy", "source.exe"))
+		_LLM_Engine["disabled_apps"] := ["SOURCE"]
+		AssertTrue(_LLM_Engine_RenderIdentityIsCurrent(71, "source-policy"), "the request identity alone remains current")
+		AssertFalse(_LLM_Engine_RequestSourceIsCurrent(71, "source-policy", "source.exe"), "transport/retry admission rechecks the original source against current policy")
+		_LLM_Engine["disabled_apps"] := [""]
+		AssertFalse(_LLM_Engine_SourceAppAllowed("source.exe"), "corrupt blank policy entries cannot grant transport admission")
+		_LLM_Engine["disabled_apps"] := []
+		AssertFalse(_LLM_Engine_RequestSourceIsCurrent(70, "source-policy", "source.exe"), "source policy cannot replace exact request ownership")
+		_LLM_Engine := 0
+		AssertFalse(_LLM_Engine_RequestSourceIsCurrent(71, "source-policy", "source.exe"), "withdrawn engine state cannot grant or throw during transport admission")
+	} finally _LLM_Engine := Saved
+}
+Test("LLM privacy: captured source app and transport policy are both enforced (llm-captured-source-app-privacy)", _EngineCapturedSourceAppPrivacy)

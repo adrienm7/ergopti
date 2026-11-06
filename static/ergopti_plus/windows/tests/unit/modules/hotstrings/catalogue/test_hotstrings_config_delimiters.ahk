@@ -69,7 +69,7 @@ TestHotstringsConfig_SaveOverridesWritesNoGlobalDelimiters() {
 	SavedOv := _HotstringsOverrides
 	Path := A_Temp . "\hotstrings_config_no_global.toml"
 	try FileDelete(Path)
-	_HotstringsOverrides := Map()
+	_HotstringsOverrides := _ParseOverrides(Path)
 	_HotstringsOverridesPath := Path
 	try {
 		AssertTrue(HotstringsSetOverride("rolls", "", "delay", 1.2))
@@ -245,7 +245,7 @@ TestHotstringsConfig_ColorWriterUsesTomlStringCodec() {
 	try {
 		try FileDelete(Path)
 		_HotstringsOverridesPath := Path
-		_HotstringsOverrides := Map()
+		_HotstringsOverrides := _ParseOverrides(Path)
 		AssertFalse(HotstringsSetOverride("rolls", "", "color", 42),
 			"the public color writer must reject non-string values")
 		AssertFalse(FileExist(Path),
@@ -285,7 +285,7 @@ TestHotstringsConfig_OverrideIdentifiersCannotInjectToml() {
 	try {
 		try FileDelete(Path)
 		_HotstringsOverridesPath := Path
-		_HotstringsOverrides := Map()
+		_HotstringsOverrides := _ParseOverrides(Path)
 
 		AssertFalse(HotstringsSetOverride(InjectedCategory, "", "color", "#112233"),
 			"a category identifier must not be able to inject a TOML header")
@@ -299,11 +299,12 @@ TestHotstringsConfig_OverrideIdentifiersCannotInjectToml() {
 		AssertFalse(HotstringsClearOverride(InjectedCategory, ""),
 			"the clear API must reject the same invalid identifier domain")
 
+		Origin := _HotstringsOverrideSourceFor(_HotstringsOverrides, Path)
 		Candidate := Map(InjectedCategory, {
 			Delay: "", Color: "#112233", ShowTooltip: "", Priority: "",
 			Sections: Map(),
 		})
-		AssertFalse(_SaveOverrides(Candidate),
+		AssertFalse(_SaveOverrides(Candidate, 0, 0, Path, 0, 0, 0, Origin),
 			"the complete serializer must reject invalid identifiers from internal callers")
 		AssertFalse(FileExist(Path),
 			"serializer validation must run before its stage is published")

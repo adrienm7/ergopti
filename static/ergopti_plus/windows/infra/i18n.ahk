@@ -27,6 +27,12 @@
 
 
 
+#Include ../adapters/system_locale.ahk
+
+
+
+
+
 ; =============================================
 ; =============================================
 ; ======= 1/ Constants and module state =======
@@ -73,28 +79,17 @@ global _I18nFlagExistsCache := Map()
 ; ===================================
 ; ===================================
 
-; Detect the Windows UI language via GetLocaleInfoEx(LOCALE_SISO639LANGNAME)
-; and map it to a supported locale code. Falls back to "en" when the detected
-; language is not in the supported list or the API call fails.
-;
-; CRITICAL: LOCALE_NAME_USER_DEFAULT is the NULL pointer, NOT L"". Passing an
-; empty string here would silently switch to LOCALE_NAME_INVARIANT and return
-; "iv" — historical source of "everyone gets English regardless of Windows
-; language" bugs. Pass "Ptr", 0 explicitly.
-;
-; @returns string A supported two-letter locale code (e.g. "fr", "en", "de").
-_I18nDetectSystemLocale() {
-	; LOCALE_SISO639LANGNAME = 0x59 — returns the ISO 639-1 language code.
-	BufSize := 16
-	Buf := Buffer(BufSize * 2, 0)
-	Len := DllCall("GetLocaleInfoEx",
-		"Ptr", 0,           ; LOCALE_NAME_USER_DEFAULT (must be NULL, not L"")
-		"UInt", 0x59,
-		"Ptr", Buf,
-		"Int", BufSize,
-		"Int")
+; Detect the Windows UI language, independently of regional-format settings.
+; Unsupported or unavailable UI languages keep the established English fallback.
+; @returns {String} A supported two-letter locale code.
+_I18nDetectSystemLocale(LocaleProbe := 0) {
+	if HasMethod(LocaleProbe, "Ui")
+		Code := LocaleProbe.Ui()
+	else
+		Code := NativeSystemUiLanguageCode()
+	Len := (Code is String) ? StrLen(Code) + 1 : 0
+
 	if Len > 1 {
-		Code := StrGet(Buf, "UTF-16")
 		Code := StrLower(SubStr(Code, 1, 2))
 		; The shipped Norwegian catalogue uses "no" for both written forms.
 		if Code = "nb" || Code = "nn"
@@ -107,7 +102,7 @@ _I18nDetectSystemLocale() {
 		}
 		try LoggerDebug("i18n", "detect_system_locale: '{1}' not supported — falling back to 'en'.", Code)
 	} else {
-		try LoggerDebug("i18n", "detect_system_locale: GetLocaleInfoEx returned 0 — falling back to 'en'.")
+		try LoggerDebug("i18n", "detect_system_locale: user UI language unavailable — falling back to 'en'.")
 	}
 	return "en"
 }
@@ -126,7 +121,7 @@ _I18nDetectSystemLocale() {
 ; Must be called after ParseTomlFile and ReadScriptConfig so the Locale key
 ; is already available in Cache. Safe to call multiple times — subsequent calls
 ; are ignored if the locale has not changed.
-I18nInit(Cache) {
+I18nInit(Cache, LocaleProbe := 0) {
 	global _I18nLocale, _I18nCacheLoaded, _I18nFlagExistsCache
 	
 	if !IsSet(_I18nFlagExistsCache) || !(_I18nFlagExistsCache is Map)
@@ -150,7 +145,7 @@ I18nInit(Cache) {
 			; Unknown code in config: pick the Windows UI language rather than
 			; silently defaulting to French — the user clearly wanted something
 			; else, and the system locale is the closest reasonable guess.
-			Detected := _I18nDetectSystemLocale()
+			Detected := _I18nDetectSystemLocale(LocaleProbe)
 			try LoggerWarn("i18n", "Unknown locale '{1}' in config — falling back to system locale '{2}'.", NewLocale, Detected)
 			_I18nLocale := Detected
 		}
@@ -158,7 +153,7 @@ I18nInit(Cache) {
 		; No locale persisted yet: detect the Windows UI language so a freshly
 		; installed (or freshly reset) driver starts in the user's actual
 		; language rather than always French.
-		_I18nLocale := _I18nDetectSystemLocale()
+		_I18nLocale := _I18nDetectSystemLocale(LocaleProbe)
 	}
 	if I18nActiveCacheCanReuse() {
 		try LoggerInfo("i18n", "Active locale '{1}' cache retained after configuration initialization.", _I18nLocale)

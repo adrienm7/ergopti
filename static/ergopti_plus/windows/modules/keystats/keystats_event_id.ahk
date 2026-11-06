@@ -143,7 +143,11 @@ KL_ScanMaxJournalEventId(journal_text) {
 ; Selects the larger of the persisted identifier and one past the highest
 ; identifier already stored for this device.
 KL_ResolveStartId(persisted_next_id, max_id_in_sql) {
+	if !(max_id_in_sql is Integer) || max_id_in_sql < 0
+		throw ValueError("A recovered event identity must be a nonnegative signed integer.")
 	candidate := max_id_in_sql + 1
+	if !(candidate is Integer) || candidate <= max_id_in_sql
+		throw ValueError("The recovered event identity capacity is exhausted.")
 	return (persisted_next_id > candidate) ? persisted_next_id : candidate
 }
 

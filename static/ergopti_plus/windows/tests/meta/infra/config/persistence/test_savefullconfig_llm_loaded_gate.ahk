@@ -22,20 +22,24 @@ _SFLG_LlmPersistGatedOnLoaded() {
 
 	First := InStr(Body, "HasMenuCandidate := IsSet(MenuSource)")
 	Second := InStr(Body, "if (MenuReady && (MenuState is Map))")
-	OnbPos := InStr(Body, "onboarding_seen")
-	OvrPos := InStr(Body, "app_profile_overrides")
-	AppendPos := InStr(Body, "_LLM_Menu_AppendPersistedUpdates")
+	Owned := _DriverFuncBody("_LLM_Menu_AppendOwnedPersistedUpdates")
+	Owned := _DriverMaskBlockComments(&Owned)
+	Owned := _StripFullLineComments(Owned)
+	OwnedCall := InStr(Body, "_LLM_Menu_AppendOwnedPersistedUpdates(Updates, MenuState)")
+	OnbPos := InStr(Owned, "ONBOARDING_SEEN")
+	OvrPos := InStr(Owned, "APP_PROFILE_OVERRIDES")
+	AppendPos := InStr(Owned, "_LLM_Menu_AppendPersistedUpdates(Updates, MenuState)")
 
 	Assert(First > 0,
 		"the collector must distinguish an explicit detached menu candidate from the live boot state")
 	Assert(Second > 0,
 		"the flat [llm] persistence needs its own MenuReady gate; without it a boot-timer flush before LLM_Menu_Init clobbers saved LLM values with module defaults")
-	Assert(OnbPos > Second && OvrPos > Second && AppendPos > Second,
-		"onboarding_seen / app_profile_overrides / _LLM_Menu_AppendPersistedUpdates must sit AFTER the dedicated _LLM_Menu_Loaded gate")
+	Assert(OwnedCall > Second && OnbPos > 0 && OvrPos > 0 && AppendPos > 0,
+		"the sole complete private LLM collector must run AFTER MenuReady and retain every canonical owned row")
 
 	Assert(InStr(Body, "IsSet(_LLM_Menu_Loaded) && _LLM_Menu_Loaded") > First,
 		"MenuReady must continue to include the live _LLM_Menu_Loaded gate")
-	Assert(InStr(Body, "MenuState[") > Second,
+	Assert(InStr(Owned, "MenuState[") > 0 && InStr(Owned, "global _LLM_Menu") == 0,
 		"flat LLM keys must read the gated explicit/live MenuState, never the "
 		. "global menu directly")
 }

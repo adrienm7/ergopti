@@ -167,3 +167,21 @@ _TFSP_Admission(Path) {
 }
 Test("file system ports: the final admission gates the commit (file-system-ports)",
 	() => _TFSP_InTemp(_TFSP_Admission))
+
+
+_TFSP_AdmissionChangesSource(Path) {
+	AssertTrue(FSWriteDurable(Path, "old"))
+	Expected := FSReadWithStatus(Path)
+	Admit() {
+		AssertTrue(FSWriteDurable(Path, "concurrent"))
+		return 1
+	}
+	Result := FSWriteIfUnchangedAdmitted(Path, "replacement", Expected, 0, Admit)
+	AssertFalse(Result["committed"], "logical admission must not bypass the source precondition")
+	AssertEqual("concurrent", FSRead(Path), "the concurrent edit must survive")
+	_TFSP_NoStage(Path)
+}
+Test("file system ports: final admission cannot overwrite a concurrent edit (fs-admission-source-change)",
+	() => _TFSP_InTemp(_TFSP_AdmissionChangesSource))
+
+#Include test_classified_publisher_stage_custody.ahk

@@ -3,9 +3,8 @@
 ; ==============================================================================
 ; MODULE: TOML BatchWrite Atomic Meta Test
 ; DESCRIPTION:
-; Protect write-through publication, flush/verification ordering and immediate
-; native refusal diagnostics. Code masks keep comments and data from satisfying
-; the call/branch guards; actual-body mutations prove the oracle refuses regressions.
+; Protect the held publication chain, exact readback, final native admission and
+; structured partial effects. Mutations start from the actual production body.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -16,83 +15,97 @@ _TBA_RequireUnique(Code, Pattern, Message) {
 	Assert(RegExMatch(Code, Pattern, , Position + Found.Len) == 0, Message)
 	return Found
 }
-
+_TBA_HeldCallPattern() {
+	return "i)\bPublished\s*:=\s*FSWriteReplaceOwned\s*\(\s*SourcePath\s*,\s*FinalCandidate\s*,\s*Suffix\s*,\s*&StageDetail\s*,"
+		. "\s*_TOML_CreateHeldStage\.Bind\s*\(\s*Stage\s*\)\s*,"
+		. "\s*_TOML_AdmitHeldStage\.Bind\s*\(\s*Stage\s*,\s*SourcePath\s*,\s*SourcePresent\s*,\s*SourceBytes\s*,\s*FinalCandidate\s*\)\s*,"
+		. "\s*FinalAdmission\s*,\s*SourcePresent\s*,\s*&Publication\s*,\s*HeldFlushFn\s*\)"
+}
 _TBA_AssertPublication(Seg) {
 	Assert(Seg != "", "the shared TOML renderer must be nonempty")
 	Code := _DriverMaskNonCode(&Seg)
-	Move := _TBA_RequireUnique(Code,
-		"i)\bMoved\s*:=\s*DocumentMode\s*\|\|\s*HasMethod\s*\(\s*AdmissionFn\s*,\s*\)"
-		. "\s*\?\s*FSConfigAtomicMoveReplace\s*\(\s*tmp\s*,\s*Path\s*,\s*&MoveError\s*,\s*FinalAdmission\s*\)"
-		. "\s*:\s*FSAtomicMoveReplace\s*\(\s*tmp\s*,\s*Path\s*,\s*&MoveError\s*\)",
-		"TOML_BatchWrite must publish once through the atomic adapter with its native error receipt")
-	RawMove := SubStr(Seg, Move.Pos, Move.Len)
-	Assert(RegExMatch(RawMove, 'i)HasMethod\s*\(\s*AdmissionFn\s*,\s*"Call"\s*\)') > 0,
-		"the actual native branch must include supplied callable admission rather than only document mode")
-	Assert(RegExMatch(SubStr(Code, 1, Move.Pos - 1), "i)\bMoveError\b") == 0,
-		"the native error must not be consumed before publication")
-	AssertEqual(0, RegExMatch(Code, "i)\bFileDelete\s*\(\s*Path\s*\)"),
-		"TOML_BatchWrite must NOT delete the target file first (toml-batchwrite-nonatomic-config-loss)")
-	AssertEqual(0, RegExMatch(Code, "i)\bFileMove\s*\("),
-		"TOML_BatchWrite must not bypass the write-through adapter")
-	Flush := _TBA_RequireUnique(Code, "i)\bFSFlushFileBuffers\s*\(\s*f\s*\)",
-		"the complete stage must have one native flush")
-	Verify := _TBA_RequireUnique(Code, "i)\b_TOML_StageMatches\s*\(\s*tmp\s*,\s*body\s*\)",
-		"the complete stage must have one exact verification")
-	Assert(Verify.Pos > Flush.Pos && Move.Pos > Verify.Pos,
-		"flush and exact stage verification must precede atomic publication")
+	Move := _TBA_RequireUnique(Code, _TBA_HeldCallPattern(),
+		"TOML_BatchWrite must publish once through the held owner with source, admission and effect receipts")
+	Assert(RegExMatch(SubStr(Code, 1, Move.Pos - 1), "i)\bPublication\b") == 0,
+		"the native effect must not be consumed before publication")
+	AssertEqual(0, RegExMatch(Code, "i)\b(FileDelete|FileMove|FileOpen)\s*\("),
+		"the renderer must not acquire or retire publication files through unowned pathnames")
 	Refusal := _TBA_RequireUnique(Code,
-		"i)if\s*!\s*\(\s*\(\s*Moved\s+is\s+Integer\s*\)\s*&&\s*Moved\s*==\s*1\s*\)\s*\{",
-		"the atomic move must retain its strict refusal branch")
-	Assert(Refusal.Pos > Move.Pos, "the refusal branch must inspect the returned native receipt")
-	OpenPos := Refusal.Pos + Refusal.Len - 1
-	Depth := 1, Cursor := OpenPos + 1
-	while Cursor <= StrLen(Code) && Depth {
-		Character := SubStr(Code, Cursor, 1)
-		if Character == "{"
-			Depth += 1
-		else if Character == "}"
-			Depth -= 1
-		Cursor += 1
+		"i)if\s*!\s*\(\s*\(\s*Published\s+is\s+Integer\s*\)\s*&&\s*Published\s*==\s*1\s*\)\s*\{",
+		"the held publication must retain its strict refusal branch")
+	Assert(Refusal.Pos > Move.Pos, "the refusal must inspect the completed held-owner receipt")
+	Partial := _TBA_RequireUnique(Code,
+		"i)\b_TOML_RecordPartialPublication\s*\(\s*Path\s*,\s*Publication\s*\)",
+		"the renderer must retain structured incomplete native effects")
+	Assert(Partial.Pos > Refusal.Pos)
+	_TBA_RequireUnique(Code,
+		"i)if\s+Publication\s+is\s+Object\s*&&\s*Publication\.renamed\s*&&\s*!Publication\.durable",
+		"ordinary stage refusals must not fabricate a partial rename effect")
+	Position := Move.Pos + Move.Len, Diagnostics := 0
+	while RegExMatch(Code, "i)\bLoggerError\s*\(\s*[^,]*,\s*[^,]*,\s*Path\s*,\s*StageDetail\s*\)", &Log, Position) {
+		RawLog := SubStr(Seg, Log.Pos, Log.Len)
+		if InStr(RawLog, "Native publication") && InStr(RawLog, "not fully acknowledged")
+				&& InStr(RawLog, "until restart")
+			Diagnostics += 1
+		Position := Log.Pos + Log.Len
 	}
-	AssertEqual(0, Depth, "the atomic refusal branch must close")
-	Branch := SubStr(Code, OpenPos + 1, Cursor - OpenPos - 2)
-	RawBranch := SubStr(Seg, OpenPos + 1, Cursor - OpenPos - 2)
-	Log := _TBA_RequireUnique(Branch,
-		"i)\bLoggerError\s*\(\s*[^,]*,\s*[^,]*,\s*Path\s*,\s*MoveError\s*\)",
-		"the atomic refusal logger must consume the captured native error")
-	RawLog := SubStr(RawBranch, Log.Pos, Log.Len)
-	Assert(InStr(RawLog, "Write-through atomic replace") && InStr(RawLog, "native error {2}"),
-		"the atomic refusal diagnostic must identify the operation and its native error")
-	Cleanup := _TBA_RequireUnique(Branch, "i)\b_TOML_RemoveOwnedStage\s*\(\s*tmp\s*\)",
-		"the refused publication must clean only its owned stage")
-	Assert(Cleanup.Pos > Log.Pos, "the refusal diagnostic must precede owned-stage cleanup")
-	Occurrences := 0, Position := 1
-	while RegExMatch(Code, "i)\bMoveError\b", &Occurrence, Position) {
-		Occurrences += 1
-		Position := Occurrence.Pos + Occurrence.Len
-	}
-	AssertEqual(3, Occurrences, "the native receipt must reach only the two mutually exclusive output arguments and refusal logger")
+	Assert(Diagnostics == 1, "the actual partial diagnostic must retain incomplete native effects and session recovery")
 }
-
+_TBA_OwnedFlush(Code, Raw, Phase) {
+	Position := 1, Result := 0
+	while RegExMatch(Code, "i)\bFlushed\s*:=\s*Flush\.Call\s*\(\s*StageHandle\s*,\s*\)", &Call, Position) {
+		if InStr(SubStr(Raw, Call.Pos, Call.Len), Chr(34) . Phase . Chr(34)) {
+			AssertEqual(0, Result, "the owned native flush phase must be unique")
+			Result := Call.Pos
+		}
+		Position := Call.Pos + Call.Len
+	}
+	Assert(Result > 0, "the actual owned native flush phase must exist: " . Phase)
+	return Result
+}
 _TBA_AssertNativeDelegation() {
-	Native := _DriverFuncBody("FSConfigAtomicMoveReplace")
-	Assert(Native != "", "the configuration atomic wrapper must be an actual driver function")
+	Create := _DriverFuncBody("_TOML_CreateHeldStage")
+	CreateCode := _DriverMaskNonCode(&Create)
+	_TBA_RequireUnique(CreateCode, "i)\b_FSCreateHeldStage\s*\(\s*Folder\s*,\s*Name\s*,\s*Attributes\s*\)",
+		"the renderer must acquire the real exclusive held stage")
+	NativeCreate := _DriverFuncBody("_FSCreateHeldStage")
+	NativeCreateCode := _DriverMaskNonCode(&NativeCreate)
+	Assert(RegExMatch(NativeCreateCode, "i)\bFILE_CREATE\s*:=\s*2\b") > 0)
+	NativeWriteFlag := _TBA_RequireUnique(NativeCreateCode,
+		"i)\bFILE_WRITE_THROUGH\s*:=\s*(0x[0-9a-f]+|[0-9]+)\b",
+		"the actual held stage must declare its native write-through flag")
+	AssertEqual(2, Integer(NativeWriteFlag[1]), "the native write-through flag must retain its exact Win32 value")
+	Read := _DriverFuncBody("_TOML_ReadHeldStage")
+	ReadCode := _DriverMaskNonCode(&Read)
+	Rewind := _TBA_RequireUnique(ReadCode, "i)\b_FSRewind\s*\(\s*State\.handle\s*\)", "the actual readback must rewind its retained handle")
+	Readback := _TBA_RequireUnique(ReadCode, "i)\b_FSReadUtf8ExactHandle\s*\(\s*State\.handle\s*,\s*0\s*,\s*false\s*\)", "the actual readback must decode the same retained handle")
+	Assert(Readback.Pos > Rewind.Pos)
+	Before := _DriverFuncBody("_TOML_AdmitHeldStage")
+	BeforeCode := _DriverMaskNonCode(&Before)
+	Assert(RegExMatch(BeforeCode, "i)\b_TOML_StageMatches\s*\(\s*Path\s*,\s*Candidate\s*,\s*_TOML_ReadHeldStage\.Bind\s*\(\s*State\s*\)\s*\)\s*&&\s*_TOML_WriteSourceMatches\s*\(\s*Path\s*,\s*SourcePresent\s*,\s*SourceBytes\s*\)") > 0,
+		"exact retained-stage readback and the original source witness must run before publication")
+	Owned := _DriverFuncBody("FSWriteReplaceOwned")
+	OwnedCode := _DriverMaskNonCode(&Owned)
+	StageFlush := _TBA_OwnedFlush(OwnedCode, Owned, "stage")
+	Preflight := _TBA_RequireUnique(OwnedCode, "i)\bBeforePublishFn\.Call\s*\(\s*\)", "the held writer must run the admitted preflight")
+	Rename := _TBA_RequireUnique(OwnedCode, "i)\bFSConfigHeldRename\s*\(\s*StageHandle\s*,\s*FolderHandle\s*,\s*Leaf\s*,\s*ReplaceExisting\s*,\s*AdmissionFn\s*\)", "the held writer must retain the final native admission")
+	Published := _TBA_RequireUnique(OwnedCode, "i)\bPublication\.renamed\s*:=\s*true", "the real rename effect must issue a structured receipt")
+	PublishedFlush := _TBA_OwnedFlush(OwnedCode, Owned, "published")
+	Assert(StageFlush < Preflight.Pos && Preflight.Pos < Rename.Pos
+		&& Rename.Pos < Published.Pos && Published.Pos < PublishedFlush,
+		"stage flush, exact preflight, admitted rename and published flush must remain ordered")
+	_TBA_RequireUnique(OwnedCode, "i)\b_FSDiscardHeldStage\s*\(\s*StageHandle\s*\)", "cleanup must target only the retained stage handle")
+	Assert(RegExMatch(OwnedCode, "i)\b(FileDelete|FileMove)\s*\(") == 0)
+	Native := _DriverFuncBody("FSConfigHeldRename")
 	Code := _DriverMaskNonCode(&Native)
-	_TBA_RequireUnique(Code, "i)\bstatic\s+Move\s*:=\s*FSAtomicMoveReplace\b",
-		"the configuration wrapper must capture the original write-through atomic owner")
-	_TBA_RequireUnique(Code, "i)\breturn\s+Move\.Call\s*\(\s*Source\s*,\s*Destination\s*,\s*&NativeError\s*\)",
-		"the configuration wrapper must forward the same native error receipt to the original atomic owner")
-	Admission := _TBA_RequireUnique(Code, "i)!\s*Accept\.Call\s*\(\s*AdmissionFn\s*\)",
-		"the configuration wrapper must refuse withdrawn admission before physical replacement")
-	Dispatch := InStr(Code, "return Move.Call(Source, Destination, &NativeError)")
-	Assert(Dispatch > Admission.Pos,
-		"actual native admission must precede the original write-through replacement")
+	_TBA_RequireUnique(Code, "i)\bRename\s*:=\s*_FSHeldRename\b", "the final configuration owner must capture the actual retained rename")
+	Admission := _TBA_RequireUnique(Code, "i)!\s*Accept\.Call\s*\(\s*AdmissionFn\s*\)", "final native admission must precede physical replacement")
+	Dispatch := _TBA_RequireUnique(Code, "i)\bRename\.Call\s*\(\s*Stage\s*,\s*Folder\s*,\s*Name\s*,\s*ReplaceExisting\s*\)", "the final owner must invoke that exact native rename")
+	Assert(Dispatch.Pos > Admission.Pos)
 }
-
 _TBA_BatchWriteIsAtomic() {
 	Wrapper := _DriverFuncBody("TOML_BatchWrite")
 	Seg := _DriverFuncBody("_TOML_BatchWriteImpl")
-	Assert(Wrapper != "" && Seg != "", "TOML_BatchWrite and its shared renderer must exist")
 	Assert(InStr(Wrapper,
 		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , false, AdmissionFn)') > 0,
 		"the public writer must select the shared renderer's write mode explicitly")
@@ -104,47 +117,35 @@ Test("toml_helpers: TOML_BatchWrite uses write-through atomic replace "
 
 _TBA_SourceMutant(Mode) {
 	Seg := _DriverFuncBody("_TOML_BatchWriteImpl")
-	Assert(Seg != "", "the mutation must start from the actual complete renderer")
-	Call := 'Moved := DocumentMode || HasMethod(AdmissionFn, "Call")' . "`n"
-		. "		? FSConfigAtomicMoveReplace(tmp, Path, &MoveError, FinalAdmission)`n"
-		. "		: FSAtomicMoveReplace(tmp, Path, &MoveError)"
-	AssertEqual(1, StrSplit(Seg, Call).Length - 1, "the actual mutation seam must be unique")
+	Code := _DriverMaskNonCode(&Seg)
+	Found := _TBA_RequireUnique(Code, _TBA_HeldCallPattern(), "the actual mutation seam must be unique")
+	Call := SubStr(Seg, Found.Pos, Found.Len)
+	Expected := "TOML_BatchWrite must publish once through the held owner with source, admission and effect receipts"
 	switch Mode {
 		case "missing-receipt":
-			Mutant := StrReplace(Seg, Call, StrReplace(Call, "FSAtomicMoveReplace(tmp, Path, &MoveError)", "FSAtomicMoveReplace(tmp, Path)"))
-			Expected := "TOML_BatchWrite must publish once through the atomic adapter with its native error receipt"
+			Mutant := StrReplace(Seg, Call, StrReplace(Call, "&Publication", "Publication"))
 		case "duplicate-publication":
 			Mutant := StrReplace(Seg, Call, Call . "`n" . Call)
-			Expected := "TOML_BatchWrite must publish once through the atomic adapter with its native error receipt"
 		case "early-error":
-			Mutant := StrReplace(Seg, Call, "Premature := MoveError`n" . Call)
-			Expected := "the native error must not be consumed before publication"
+			Mutant := StrReplace(Seg, Call, "Premature := Publication`n" . Call)
+			Expected := "the native effect must not be consumed before publication"
 		case "missing-config-receipt":
-			Mutant := StrReplace(Seg, Call, StrReplace(Call,
-				"FSConfigAtomicMoveReplace(tmp, Path, &MoveError, FinalAdmission)",
-				"FSConfigAtomicMoveReplace(tmp, Path, FinalAdmission)"))
-			Expected := "TOML_BatchWrite must publish once through the atomic adapter with its native error receipt"
+			Mutant := StrReplace(Seg, Call, StrReplace(Call, "&StageDetail", "StageDetail"))
 		case "missing-native-admission":
-			Mutant := StrReplace(Seg, Call, StrReplace(Call,
-				'DocumentMode || HasMethod(AdmissionFn, "Call")', "DocumentMode"))
-			Expected := "TOML_BatchWrite must publish once through the atomic adapter with its native error receipt"
+			Mutant := StrReplace(Seg, Call, StrReplace(Call, "FinalAdmission, SourcePresent", "0, SourcePresent"))
 		case "bypassed-config-native-owner":
-			Mutant := StrReplace(Seg, Call, StrReplace(Call,
-				"FSConfigAtomicMoveReplace(tmp, Path, &MoveError, FinalAdmission)",
-				"FSAtomicMoveReplace(tmp, Path, &MoveError)"))
-			Expected := "TOML_BatchWrite must publish once through the atomic adapter with its native error receipt"
+			Mutant := StrReplace(Seg, Call, StrReplace(Call, "FSWriteReplaceOwned", "FSWriteDurable"))
 		case "missing-diagnostic":
-			AssertEqual(1, StrSplit(Seg, "native error {2}").Length - 1,
-				"the actual native diagnostic mutation seam must be unique")
-			Mutant := StrReplace(Seg, "native error {2}", "unknown native status")
-			Expected := "the atomic refusal diagnostic must identify the operation and its native error"
+			AssertEqual(1, StrSplit(Seg, "not fully acknowledged").Length - 1)
+			Mutant := StrReplace(Seg, "not fully acknowledged", "unknown native status")
+			Expected := "the actual partial diagnostic must retain incomplete native effects and session recovery"
 	}
 	Observed := 0
 	try _TBA_AssertPublication(Mutant)
 	catch as Err
 		Observed := Err
 	Assert(Observed is Error, "the actual source oracle must refuse the named mutation")
-	AssertEqual("Error", Type(Observed), "the source refusal must be a plain assertion error")
+	AssertEqual("Error", Type(Observed))
 	AssertEqual(Expected, Observed.Message, "the source mutation must fail at its intended invariant")
 }
 for Mode in ["missing-receipt", "duplicate-publication", "early-error", "missing-diagnostic",
@@ -154,17 +155,13 @@ for Mode in ["missing-receipt", "duplicate-publication", "early-error", "missing
 
 _TBA_SourceFormattingControl() {
 	Seg := _DriverFuncBody("_TOML_BatchWriteImpl")
-	Assert(Seg != "", "the formatting control must read the actual renderer")
-	Call := 'Moved := DocumentMode || HasMethod(AdmissionFn, "Call")' . "`n"
-		. "		? FSConfigAtomicMoveReplace(tmp, Path, &MoveError, FinalAdmission)`n"
-		. "		: FSAtomicMoveReplace(tmp, Path, &MoveError)"
-	AssertEqual(1, StrSplit(Seg, Call).Length - 1, "the formatting seam must be unique")
-	Seg := StrReplace(Seg, Call,
-		'Moved := DocumentMode || HasMethod( AdmissionFn , "Call" )' . "`n"
-		. "	? FSCONFIGATOMICMOVEREPLACE( tmp , Path , &MoveError , FinalAdmission )`n"
-		. "	: FSATOMICMOVEREPLACE( tmp , Path , &MoveError )")
-	Seg := "; FSAtomicMoveReplace(tmp, Path, &MoveError)`n"
-		. 'Decoy := "FSAtomicMoveReplace(tmp, Path, &MoveError)"' . "`n" . Seg
+	Code := _DriverMaskNonCode(&Seg)
+	Found := _TBA_RequireUnique(Code, _TBA_HeldCallPattern(), "the formatting seam must be unique")
+	Call := SubStr(Seg, Found.Pos, Found.Len)
+	Changed := StrReplace(StrReplace(Call, "FSWriteReplaceOwned(", "FSWRITEREPLACEOWNED( "), ",", " , ")
+	Seg := StrReplace(Seg, Call, Changed)
+	Seg := "; FSWriteReplaceOwned(Path, FinalCandidate)`n"
+		. 'Decoy := "FSWriteReplaceOwned(Path, FinalCandidate)"' . "`n" . Seg
 	_TBA_AssertPublication(Seg)
 }
 Test("toml_helpers: atomic source oracle accepts legal formatting and ignores data (toml-write-through-atomic)",

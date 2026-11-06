@@ -162,7 +162,9 @@ _CRCO_Subject(Root, Mode) {
 		_SICO_Require(CB_Write(_SICO.Seed) && _SICO_Sample(_SICO.Seed).RawMatches, "Private A must really exist before the producer snapshots it.")
 		_SICO_AddOriginalFormat()
 		_SICO_Require(_SICO_MarkerMatches(), "Private A includes a real extra non-text format.")
-		Ports := _CRCO_Ports("send", _CRCO_Send)
+		; This clipboard-custody fixture has passive copy and no target GUI.
+		; Its explicit stable control port makes no native-focus qualification.
+		Ports := _CRCO_Ports("send", _CRCO_Send, "control", (*) => 201)
 		PreviousCritical := Critical("On")
 		try {
 			if _SICO.Family == "selection" {

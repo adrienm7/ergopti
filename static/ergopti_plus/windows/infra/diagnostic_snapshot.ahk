@@ -20,6 +20,9 @@
 ; ==============================================================================
 
 
+#Include ../adapters/diagnostics_control.ahk
+
+
 
 
 
@@ -402,6 +405,27 @@ _DiagSnapshot_CountLeaves(Node, Counts) {
 ; =====================================
 ; =====================================
 
+; Reads native processor architecture rather than the emulated process width.
+; @param QueryFn {Function} Optional GetNativeSystemInfo boundary for tests.
+; @returns {String} The native Windows architecture label.
+DiagSnapshot_NativeArchitecture(QueryFn := unset) {
+	; SYSTEM_INFO is 48 bytes on x64 and 36 on x86; its first WORD is identical.
+	Info := Buffer(48, 0)
+	if IsSet(QueryFn)
+		QueryFn.Call(Info)
+	else
+		HealthCheck_NativeSystemInfo(Info)
+	Architecture := NumGet(Info, 0, "UShort")
+	switch Architecture {
+		case 0: return "x86"
+		case 5: return "arm"
+		case 6: return "ia64"
+		case 9: return "x64"
+		case 12: return "arm64"
+		default: throw ValueError("Unknown native processor architecture: " . Architecture)
+	}
+}
+
 ; Collects every snapshot value from the running driver.
 ; @param BootMs {Integer} Total boot duration.
 ; @returns {Map}
@@ -413,7 +437,7 @@ DiagSnapshot_Collect(BootMs) {
 	OsInfo := DiagSnapshot_OsInfo()
 	Values["os"] := OsInfo["os"]
 	Values["os_version"] := OsInfo["os_version"]
-	Values["arch"] := (A_Is64bitOS ? "x64" : "x86") . (A_PtrSize == 8 ? "" : " (32-bit process)")
+	Values["arch"] := DiagSnapshot_NativeArchitecture() . (A_PtrSize == 8 ? "" : " (32-bit process)")
 	Values["runtime"] := "AutoHotkey " . A_AhkVersion
 	Values["elevated"] := A_IsAdmin ? "true" : "false"
 	Values["locale"] := IsSet(I18nGetLocale) ? I18nGetLocale() : ""

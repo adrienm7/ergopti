@@ -1175,17 +1175,35 @@ KLR_EnsureTypingProjectionTable(db) {
 				try LoggerError("KLReader", "Typing projection storage initialization failed: {1}.", Failure.Message)
 				return false
 		}
-		return SQLite_Exec(db,
+		if !SQLite_Exec(db,
 				"CREATE TEMP TABLE IF NOT EXISTS klr_reader_typing_payload ("
 				. "device_id TEXT NOT NULL, event_id INTEGER NOT NULL, "
 				. "events_json TEXT NOT NULL, "
 				. "PRIMARY KEY (device_id, event_id)) WITHOUT ROWID;"
 				. "CREATE TABLE IF NOT EXISTS klr_reader_typing_counts ("
 				. "device_id TEXT NOT NULL, event_id INTEGER NOT NULL, chars INTEGER NOT NULL, "
+				. "pauses INTEGER, think_time_ms INTEGER, think_pause_ms INTEGER, "
 				. "PRIMARY KEY (device_id, event_id)) WITHOUT ROWID;")
+				return false
+		; Upgrade the same numeric owner in place. Nullable additions identify
+		; old chars-only rows without treating their missing metrics as zero.
+		; ALTER preserves existing refusal triggers and never persists payloads.
+		try {
+				Columns := Map()
+				for Column in SQLite_Query(db, "PRAGMA table_info(klr_reader_typing_counts);")
+						Columns[StrLower(Column["name"])] := true
+				for Name in ["pauses", "think_time_ms", "think_pause_ms"]
+						if !Columns.Has(Name)
+								if !SQLite_Exec(db, "ALTER TABLE klr_reader_typing_counts ADD COLUMN " . Name . " INTEGER;")
+										return false
+		} catch Error as Failure {
+				try LoggerError("KLReader", "Typing numeric projection migration failed.")
+				return false
+		}
+		return true
 }
 
-KLR_NormalizeTypingEventsJson(RawValue, DeviceId, EventId, &ClearJson) {
+KLR_NormalizeTypingEventsJson(RawValue, DeviceId, EventId, &ClearJson, &DecodedEvents := unset) {
 		Encrypted := KL_Enc_IsEncrypted(RawValue)
 		ClearJson := RawValue
 		if Encrypted {
@@ -1206,8 +1224,10 @@ KLR_NormalizeTypingEventsJson(RawValue, DeviceId, EventId, &ClearJson) {
 
 		Decoded := 0
 		try Decoded := KL_JsonDecode(ClearJson)
-		if (Decoded is Array)
+		if (Decoded is Array) {
+				DecodedEvents := Decoded
 				return true
+		}
 		if Encrypted {
 				try LoggerError("KLReader",
 						"Encrypted typing projection decoded to an invalid payload for device={1} id={2}.",
@@ -1218,7 +1238,56 @@ KLR_NormalizeTypingEventsJson(RawValue, DeviceId, EventId, &ClearJson) {
 		; established safe-skip semantics without letting one malformed JSON value
 		; abort every otherwise valid aggregate query.
 		ClearJson := "[]"
+		DecodedEvents := []
 		return true
+}
+
+; Preserve native integer sums exactly and the existing IEEE Float domain.
+; An unrepresentable result rejects the private candidate instead of wrapping
+; a negative metric or serializing an infinity into generated SQL.
+_KLR_AddThinkingTime(Total, Added) {
+		static MaxInteger := 0x7FFFFFFFFFFFFFFF
+		static MaxFinite := 1.7976931348623157e+308
+		Added := Added + 0
+		if !(Added >= 0 && Added <= MaxFinite && Total >= 0 && Total <= MaxFinite)
+				throw ValueError("Thinking-time inputs must be finite and nonnegative.")
+		if Total is Integer && Added is Integer && Total > MaxInteger - Added
+				throw ValueError("Thinking-time integer sum exceeds its native domain.")
+		Sum := Total + Added
+		if !(Sum >= 0 && Sum <= MaxFinite)
+				throw ValueError("Thinking-time sum must remain finite and nonnegative.")
+		return Sum
+}
+
+; Seventeen significant digits preserve the already-computed IEEE Float when
+; SQLite parses the literal. Integers keep their exact native decimal spelling.
+_KLR_ThinkingTimeSql(Value) {
+		return Value is Integer ? String(Value) : Format("{:.17g}", Value)
+}
+
+; Same event-level thinking-pause rules as the walker: manual backspaces
+; count too, whereas synthetic events and shortcut-only entries do not.
+_KLR_TypingPauseCounts(Events, ThinkPause) {
+		Pauses := 0, ThinkTime := 0
+		for Event in Events {
+				if !(Event is Array) || Event.Length < 2
+						continue
+				Meta := Event.Length >= 3 && Event[3] is Map ? Event[3] : Map()
+				if Meta.Get("s", false) || Meta.Get("sc", "") != ""
+						continue
+				if Event[2] > ThinkPause {
+						Pauses += 1
+						ThinkTime := _KLR_AddThinkingTime(ThinkTime, Event[2])
+				}
+		}
+		return [Pauses, ThinkTime]
+}
+
+; A persisted row is reusable only when all numeric metrics belong to the
+; current threshold. Resident refreshes need no clear historical TEMP payload.
+_KLR_TypingCountsMissing(ThinkPause) {
+		return "c.device_id IS NULL OR c.pauses IS NULL OR c.think_time_ms IS NULL"
+				. " OR c.think_pause_ms IS NULL OR c.think_pause_ms!=" . ThinkPause
 }
 
 ; Populate numeric counts and optional clear replay payloads in bounded pages.
@@ -1230,10 +1299,11 @@ KLR_NormalizeTypingEventsJson(RawValue, DeviceId, EventId, &ClearJson) {
 ; @param IncludePayload {Boolean} Whether to retain clear events for the walker.
 ; @returns {Boolean} Whether every requested projection row was prepared.
 KLR_PrepareTypingProjection(db, Dates := 0, IncludePayload := true) {
+		ThinkPause := KLWConst.THINK_PAUSE_MS
 		if !KLR_EnsureTypingProjectionTable(db)
 				return false
 		if !(Dates is Array)
-				return _KLR_PrepareTypingPages(db, Dates, IncludePayload)
+				return _KLR_PrepareTypingPages(db, Dates, IncludePayload, false, ThinkPause)
 		; Select missing scoped keys once: the date index otherwise sorts the
 		; same source rows for every page. TEMP storage stays off the disk image.
 		Created := false
@@ -1249,9 +1319,9 @@ KLR_PrepareTypingProjection(db, Dates := 0, IncludePayload := true) {
 						. "ON p.device_id=t.device_id AND p.event_id=t.id "
 						. "LEFT JOIN klr_reader_typing_counts AS c "
 						. "ON c.device_id=t.device_id AND c.event_id=t.id "
-						. "WHERE (c.device_id IS NULL" . (IncludePayload ? " OR p.device_id IS NULL" : "")
+						. "WHERE (" . _KLR_TypingCountsMissing(ThinkPause) . (IncludePayload ? " OR p.device_id IS NULL" : "")
 						. ")" . _KLR_DateScope(Dates, "t.date") . ";")
-						Success := _KLR_PrepareTypingPages(db, Dates, IncludePayload, true)
+						Success := _KLR_PrepareTypingPages(db, Dates, IncludePayload, true, ThinkPause)
 		} catch {
 				Success := false
 		} finally {
@@ -1271,7 +1341,9 @@ KLR_PrepareTypingProjection(db, Dates := 0, IncludePayload := true) {
 }
 
 ; Page an immutable private source, optionally through owned scoped keys.
-_KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false) {
+_KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false, ThinkPause := unset) {
+		if !IsSet(ThinkPause)
+				ThinkPause := KLWConst.THINK_PAUSE_MS
 		static PAGE_ROWS := 128
 		HaveCursor := false
 		LastDevice := ""
@@ -1295,7 +1367,7 @@ _KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false) {
 						. "ON p.device_id=t.device_id AND p.event_id=t.id "
 						. "LEFT JOIN klr_reader_typing_counts AS c "
 						. "ON c.device_id=t.device_id AND c.event_id=t.id "
-						. "WHERE (c.device_id IS NULL" . (IncludePayload ? " OR p.device_id IS NULL" : "")
+						. "WHERE (" . _KLR_TypingCountsMissing(ThinkPause) . (IncludePayload ? " OR p.device_id IS NULL" : "")
 						. ")" . _KLR_DateScope(Dates, "t.date") . CursorWhere
 						. " ORDER BY t.device_id, t.id LIMIT " . PAGE_ROWS . ";")
 				catch Error as Err {
@@ -1311,12 +1383,20 @@ _KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false) {
 						ClearJson := ""
 						if !KLR_NormalizeTypingEventsJson(
 								KLR_RowValue(Row, "events_json", ""),
-								DeviceId, EventId, &ClearJson)
+								DeviceId, EventId, &ClearJson, &DecodedEvents)
 								return false
-						BatchSql .= "INSERT INTO klr_reader_typing_counts (device_id,event_id,chars) SELECT "
-								. SQLite_Q(DeviceId) . "," . EventId . ",COUNT(*) FROM json_each("
+						try PauseCounts := _KLR_TypingPauseCounts(DecodedEvents, ThinkPause)
+						catch Error as Failure {
+								try LoggerError("KLReader", "Typing pause projection failed for device={1} id={2}.", DeviceId, EventId)
+								return false
+						}
+						BatchSql .= "INSERT INTO klr_reader_typing_counts "
+								. "(device_id,event_id,chars,pauses,think_time_ms,think_pause_ms) SELECT "
+								. SQLite_Q(DeviceId) . "," . EventId . ",COUNT(*),"
+								. PauseCounts[1] . "," . _KLR_ThinkingTimeSql(PauseCounts[2]) . "," . ThinkPause . " FROM json_each("
 								. SQLite_Q(ClearJson) . ") AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1 "
-								. "ON CONFLICT(device_id,event_id) DO UPDATE SET chars=excluded.chars;"
+								. "ON CONFLICT(device_id,event_id) DO UPDATE SET chars=excluded.chars,"
+								. "pauses=excluded.pauses,think_time_ms=excluded.think_time_ms,think_pause_ms=excluded.think_pause_ms;"
 						if IncludePayload
 								BatchSql .= "INSERT INTO temp.klr_reader_typing_payload "
 								. "(device_id,event_id,events_json) VALUES ("
@@ -1333,7 +1413,7 @@ _KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false) {
 				}
 				HaveCursor := true
 		}
-		return true
+		return ThinkPause = KLWConst.THINK_PAUSE_MS
 }
 
 ; Delete all agg_* rows from the in-memory DB so that KLR_RebuildAggregates
@@ -1446,7 +1526,17 @@ KLR_RefreshResidentAggregates(db) {
 }
 
 KLR_RebuildTitleCounts(db, Dates := 0) {
-	return KLR_ExecAggregateStep(db, "window-titles", "INSERT INTO agg_app_day_titles (device_id, date, app, title, c) SELECT device_id, date, app, next_title, COUNT(*) FROM events_window_switch WHERE next_title IS NOT NULL AND next_title != ''" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date, app, next_title ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=excluded.c;")
+	; The shared page labels c as manual keystrokes, not focus visits. The
+	; accepted typing projection already excludes synthetic input and retains
+	; backspaces; group that exact count by the typing row's actual app/title.
+	return KLR_ExecAggregateStep(db, "window-titles",
+		"INSERT INTO agg_app_day_titles (device_id,date,app,title,c) "
+		. "SELECT t.device_id,t.date,t.app,t.title,SUM(p.chars) "
+		. "FROM events_typing AS t JOIN klr_reader_typing_counts AS p "
+		. "ON p.device_id=t.device_id AND p.event_id=t.id "
+		. "WHERE t.title IS NOT NULL AND t.title!=''" . _KLR_DateScope(Dates, "t.date")
+		. " GROUP BY t.device_id,t.date,t.app,t.title ON CONFLICT(device_id,date,app,title) "
+		. "DO UPDATE SET c=excluded.c;")
 }
 
 KLR_TrimTitles(db, Dates := 0) {
@@ -1471,8 +1561,7 @@ KLR_RebuildAggregates(db, Dates := 0) {
 	TypingDailySql := "INSERT INTO agg_app_day (device_id, date, app, chars, pauses, think_time_ms, category) "
 		. "SELECT t.device_id, t.date, t.app, "
 		. "SUM(p.chars), "
-		. "SUM(CASE WHEN t.pause_before_ms > 2000 THEN 1 ELSE 0 END), "
-		. "SUM(CASE WHEN t.pause_before_ms > 2000 THEN COALESCE(t.pause_before_ms,0) ELSE 0 END), "
+		. "SUM(p.pauses), SUM(p.think_time_ms), "
 		. "COALESCE((SELECT latest.app_category FROM events_typing AS latest "
 		. "WHERE latest.device_id=t.device_id AND latest.date=t.date AND latest.app=t.app "
 		. "AND COALESCE(latest.app_category,'')!='' ORDER BY latest.id DESC LIMIT 1),'') "
@@ -1552,6 +1641,33 @@ KLR_RebuildAggregates(db, Dates := 0) {
 		. "wifi_changes=excluded.wifi_changes,locked_ms=excluded.locked_ms,"
 		. "sleep_ms=excluded.sleep_ms,awake_ms=excluded.awake_ms;")
 		return false
+	; The actual Wi-Fi poll emits network_change, including a first baseline
+	; and signal-only rows. Count only known connectivity or SSID identity changes;
+	; prior connectivity is explicit so reconnects count without treating startup
+	; baselines as transitions. Legacy rows retain only provable hash changes.
+	; Retain historical wifi_change system rows from earlier/imported journals.
+	NetworkHash := "json_extract(meta_json,'$.ssid_hash')"
+	PreviousHash := "json_extract(meta_json,'$.prev_ssid_hash')"
+	NetworkState := "json_extract(meta_json,'$.connection_state')"
+	PreviousState := "json_extract(meta_json,'$.prev_connection_state')"
+	if !KLR_ExecAggregateStep(db, "wifi-day",
+		"INSERT INTO agg_system_day(device_id,date,wifi_changes) "
+		. "SELECT device_id,date,COUNT(*) FROM ("
+		. "SELECT device_id,date FROM events_system WHERE action='wifi_change'"
+		. _KLR_DateScope(Dates, "date")
+		. " UNION ALL SELECT device_id,date FROM events_network WHERE kind='network_change'"
+		. " AND ((" . NetworkState . "='connected' AND " . PreviousState . "='disconnected')"
+		. " OR (" . NetworkState . "='disconnected' AND " . PreviousState . "='connected')"
+		. " OR (" . NetworkState . "='connected' AND (" . PreviousState . "='connected' OR " . PreviousState . " IS NULL)"
+		. " AND typeof(" . NetworkHash . ")='text' AND " . NetworkHash . "!=''"
+		. " AND typeof(" . PreviousHash . ")='text' AND " . PreviousHash . "!=''"
+		. " AND " . NetworkHash . "!=" . PreviousHash . ")"
+		. " OR (" . NetworkState . "='disconnected' AND " . PreviousState . " IS NULL"
+		. " AND typeof(" . PreviousHash . ")='text' AND " . PreviousHash . "!=''))"
+		. _KLR_DateScope(Dates, "date")
+		. ") GROUP BY device_id,date ON CONFLICT(device_id,date) DO UPDATE SET wifi_changes=excluded.wifi_changes;")
+		return false
+
 	return true
 }
 
@@ -1643,17 +1759,17 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 				return -1
 		if (Dates is Array) && !Dates.Length
 				return 0
+		if (!TypingProjectionReady && !KLR_PrepareTypingProjection(db, Dates)) {
+				KLR_CaptureReplayFailure("typing-projection", "unknown", 0,
+						"unknown", "unknown",
+						"typing projection preparation failed")
+				return -1
+		}
 		; SQL-only refreshes may have trimmed a title before its focus time was
 		; known. Restore authoritative counts before the first replay flush.
 		if !KLR_RebuildTitleCounts(db, Dates) {
 				KLR_CaptureReplayFailure("title-counts", "unknown", 0,
 						"unknown", "unknown", "title count restoration failed")
-				return -1
-		}
-		if (!TypingProjectionReady && !KLR_PrepareTypingProjection(db, Dates)) {
-				KLR_CaptureReplayFailure("typing-projection", "unknown", 0,
-						"unknown", "unknown",
-						"typing projection preparation failed")
 				return -1
 		}
 

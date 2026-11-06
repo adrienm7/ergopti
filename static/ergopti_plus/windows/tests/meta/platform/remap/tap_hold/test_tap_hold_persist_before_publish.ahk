@@ -13,11 +13,15 @@ _THPPP_CandidateCommitsOnlyAfterWrite() {
 			FnName . " must never mutate the live Map before persistence")
 	}
 	WriterBody := _DriverFuncBody("_TH_WriteTapHoldToml")
-	WritePos := InStr(WriterBody, "FSWriteDurable(StagePath, Content)")
-	ReplacePos := InStr(WriterBody, "FSAtomicMoveReplace(StagePath, BoundPath)")
-	PublishPos := InStr(WriterBody, "_TH_PublishTapHoldCandidate(Data, RuntimeCandidate, EmptyKeys, OwnerToken")
-	Assert(WritePos > 0 && ReplacePos > WritePos && PublishPos > ReplacePos,
-		"the shared writer must durably stage and atomically replace before publishing TapHold")
+	OwnedPos := InStr(WriterBody, "FSWriteReplaceOwned(BoundPath, Content, StageSuffix")
+	LegacyPos := InStr(WriterBody, "FSWriteDurable(StagePath, Content)", true, OwnedPos)
+	ReplacePos := InStr(WriterBody, "FSConfigAtomicMoveReplace(StagePath, BoundPath,", true, LegacyPos)
+	PublishPos := InStr(WriterBody, "_TH_PublishTapHoldCandidate(Data, RuntimeCandidate, EmptyKeys, OwnerToken", true, ReplacePos)
+	Assert(OwnedPos > 0 && LegacyPos > OwnedPos && ReplacePos > LegacyPos && PublishPos > ReplacePos,
+		"both the owned native route and the injected legacy route must complete before publishing TapHold")
+	Assert(InStr(WriterBody, "BeforePublish := _TH_BeforeHeldPublication.Bind(") > 0
+		&& InStr(WriterBody, "FinalAdmission := _TH_FinalHeldAdmission.Bind(") > 0,
+		"the native owner requires preflight and final RAM admission")
 	Publisher := _DriverFuncBody("_TH_PublishTapHoldCandidate")
 	Assert(Publisher != "" && InStr(Publisher, "TapHold := RuntimeCandidate") > 0,
 		"one memory-only helper must own live TapHold publication")

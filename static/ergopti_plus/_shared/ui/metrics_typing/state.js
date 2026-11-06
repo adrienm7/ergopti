@@ -48,7 +48,11 @@ const app_state = {
 	historical_cache: null,
 	// Host serial of historical_cache; the macOS host omits a history it names
 	historical_serial: null,
+	historical_cache_incomplete: false,
 	today_live_data: null,
+	// Explicitly omitted live slots retain their prior same-day data until fetched.
+	today_partial_types: [],
+	today_live_date: '',
 	data: {
 		c: {},
 		bg: {},

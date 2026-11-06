@@ -83,3 +83,47 @@ _MCPC_GetLogicalGone() {
 		'mouse_control.ahk: GetCursorPos (logical) must not be used — replaced by GetPhysicalCursorPos')
 }
 Test("MCGetPos: logical GetCursorPos not used (mouse-control-physical-cursor)", _MCPC_GetLogicalGone)
+
+
+_MCPC_KeepAwakeReadersArePhysical() {
+	for Name in ["StartActivitySimulation", "AwakeCheckMouseMoved", "SimulateActivity"] {
+		Body := _DriverFuncBody(Name)
+		AssertTrue(Body != "", "the keep-awake position reader must exist: " . Name)
+		Code := _DriverMaskNonCode(&Body)
+		RegExReplace(Code, "\bMCGetPos\s*\(", "", &Readers)
+		AssertEqual(1, Readers, "each keep-awake owner must use the physical coordinate port")
+		AssertFalse(RegExMatch(Code, "\bMouseGetPos\s*\("), "thread coordinate mode cannot affect the jitter origin")
+	}
+}
+Test("keep-awake: every position reader shares the physical port (keepawake-physical-coordinates)",
+	_MCPC_KeepAwakeReadersArePhysical)
+
+_MCPC_PhysicalPositionSample() {
+	Point := Buffer(8, 0)
+	if !DllCall("GetPhysicalCursorPos", "Ptr", Point)
+		throw OSError(A_LastError, -1, "GetPhysicalCursorPos")
+	return Map("x", NumGet(Point, 0, "Int"), "y", NumGet(Point, 4, "Int"))
+}
+_MCPC_PositionIgnoresThreadMode() {
+	SavedMode := A_CoordModeMouse
+	try {
+		for Mode in ["Client", "Window", "Screen"] {
+			CoordMode("Mouse", Mode)
+			Stable := false
+			Loop 50 {
+				Before := _MCPC_PhysicalPositionSample()
+				Observed := MCGetPos()
+				After := _MCPC_PhysicalPositionSample()
+				if Before["x"] != After["x"] || Before["y"] != After["y"]
+					continue
+				AssertEqual(Before["x"], Observed["x"], "native physical X must survive mode " . Mode)
+				AssertEqual(Before["y"], Observed["y"], "native physical Y must survive mode " . Mode)
+				Stable := true
+				break
+			}
+			AssertTrue(Stable, "the passive cursor check needs one stable native sample")
+		}
+	} finally CoordMode("Mouse", SavedMode)
+}
+Test("mouse position: physical reads ignore thread modes (keepawake-physical-coordinates)",
+	_MCPC_PositionIgnoresThreadMode)

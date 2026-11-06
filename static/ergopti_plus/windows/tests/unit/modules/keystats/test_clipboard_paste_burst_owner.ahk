@@ -4,13 +4,50 @@
 ; provenance suite. Only its final fixture include is replaced; no copied SUT.
 #Requires AutoHotkey v2.0
 
-_KCPB_ChildSource() {
+; Bind only the unique genuine paste producer clock observation. Native MF,
+; append, privacy and provenance owners stay unchanged; no 49-day uptime claimed.
+_KCPB_BindPasteClock(Source) {
+	global _DriverDir
+	Owner := _DriverProductionFileForSymbol("KL_Clip_OnPaste", _DriverDir)
+	Subject := FileRead(Owner, "UTF-8")
+	Mask := _DriverMaskNonCode(&Subject)
+	Definition := _DriverFindFunctionDefinition(&Mask, "KL_Clip_OnPaste", 1, true)
+	AssertTrue(IsObject(Definition))
+	Position := Definition.OpenPos, Depth := 0, EndPosition := 0
+	while Position <= StrLen(Mask) {
+		Character := SubStr(Mask, Position, 1)
+		if Character == "{"
+			Depth += 1
+		else if Character == "}" {
+			Depth -= 1
+			if Depth == 0 {
+				EndPosition := Position
+				break
+			}
+		}
+		Position += 1
+	}
+	AssertTrue(EndPosition > Definition.OpenPos)
+	Code := SubStr(Mask, Definition.OpenPos, EndPosition - Definition.OpenPos + 1)
+	Pattern := "i)(?<![A-Za-z0-9_.])A_TickCount(?![A-Za-z0-9_])"
+	AssertTrue(RegExMatch(Code, Pattern, &Clock) > 0)
+	AssertEqual(0, RegExMatch(Code, Pattern, , Clock.Pos + Clock.Len), "the genuine paste owner has exactly one native clock")
+	At := Definition.OpenPos + Clock.Pos - 1
+	Subject := SubStr(Subject, 1, At - 1) . "_KCPB_PasteNow()" . SubStr(Subject, At + Clock.Len)
+	Include := "#Include " . Owner . "`n"
+	Source := StrReplace(Source, Include, Subject . "`n", true, &Changed)
+	AssertEqual(1, Changed, "only the actual clipboard owner's include may receive the clock-bound source")
+	return Source
+}
+
+_KCPB_ChildSource(Clocked := false) {
 	global _DriverDir
 	Source := _KCPO_ChildSource()
 	Original := "#Include " . _DriverDir . "\tests\fixtures\clipboard_provenance_owner_body.ahk`n"
 	Parts := StrSplit(Source, Original)
 	AssertEqual(2, Parts.Length, "The original child must contain exactly one fixture include")
-	return Parts[1] . "#Include " . _DriverDir . "\tests\fixtures\clipboard_paste_burst_owner_body.ahk`n" . Parts[2]
+	Source := Parts[1] . "#Include " . _DriverDir . "\tests\fixtures\clipboard_paste_burst_owner_body.ahk`n" . Parts[2]
+	return Clocked ? _KCPB_BindPasteClock(Source) : Source
 }
 
 _KCPB_Complete(State, Code, Output, ErrorText) {
@@ -29,7 +66,7 @@ _KCPB_Case(Mode) {
 	AtDeadline := 0, ExportFailure := 0
 	PreviousCritical := Critical("Off")
 	try {
-		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KCPB_ChildSource()) != 0)
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KCPB_ChildSource(InStr(Mode, "clock-") == 1)) != 0)
 		_TestPrint("# clipboard-paste-burst-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
 			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\clipboard_paste_burst_owner_body.ahk")))
@@ -88,3 +125,7 @@ _KCPB_Case(Mode) {
 Test("Clipboard paste burst: five admitted public pastes reach threshold (clipboard-paste-burst-owner)", _KCPB_Case.Bind("current"))
 Test("Clipboard paste burst: a rejected private paste cannot advance a public burst (clipboard-paste-burst-owner)", _KCPB_Case.Bind("private-lag"))
 Test("Clipboard paste burst: a paste refused during native pause cannot advance a public burst (clipboard-paste-burst-owner)", _KCPB_Case.Bind("pause-probe"))
+
+for _KCPB_ClockMode in ["clock-ordinary", "clock-one-era", "clock-two-era"]
+	Test("Clipboard paste timing: " . _KCPB_ClockMode . " keeps native64 ages (clipboard-paste-native64)",
+		_KCPB_Case.Bind(_KCPB_ClockMode))

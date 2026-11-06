@@ -399,3 +399,158 @@ _OIFP_OldArguments() {
 		AssertEqual(Args[11], "captured", "Old parameter value unchanged.")
 	}
 }
+
+#Include ../../../../support/crash_worker_fixture.ahk
+
+; Native transport-only qualification. Payloads are the existing inert ZIP corpus;
+; no downloaded executable or Ollama runtime is started by this fixture.
+_AP70_Done(State, Code, Stdout, Stderr) {
+	State["code"] := Code, State["stdout"] := Stdout, State["stderr"] := Stderr
+	State["encoding"] := A_FileEncoding, State["done"] := true
+}
+
+_AP70_Adopt(State, Task) {
+	State["task"] := Task
+}
+
+_AP70_Spawn(State, Executable, Args, Done) {
+	return OllamaInstallFiles_Spawn(Executable, Args, Done, _AP70_Adopt.Bind(State), 65536)
+}
+
+_AP70_Launch(Scope, Args) {
+	State := Map("done", false, "task", 0, "code", -1, "stdout", "", "stderr", "", "encoding", "")
+	Task := Scope.Spawn(_AP70_Spawn.Bind(State), ShellRunner_WinPsPath(), Args, _AP70_Done.Bind(State))
+	AssertTrue(Task == State["task"], "the actual file bridge must adopt its exact native owner before start")
+	AssertTrue(Task.start())
+	Started := A_TickCount
+	while !State["done"] && !TickExpired64(Started, 30000)
+		Sleep(10)
+	AssertTrue(State["done"], "the real CLI and canonical ShellRunner owner must finish within the fixture bound")
+	AssertEqual(0, State["code"], "the native file operation must succeed before comparing its receipt")
+	return State
+}
+
+_AP70_RootHelper(Scope, Action, Root, Nonce, ReceiptPath := "", Identity := "") {
+	global _DriverDir
+	Args := ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+		_DriverDir . "\tests\fixtures\worker_unicode_managed_root.ps1",
+		"-FixtureManagedHelper", _DriverDir . "\modules\llm\ollama_managed_files.ps1", "-FixtureAction", Action,
+		"-FixtureRoot", Root, "-FixtureNonce", Nonce]
+	if Action == "acquire"
+		Args.Push("-FixtureReceiptPath", ReceiptPath)
+	else
+		Args.Push("-FixtureExpectedIdentity", Identity)
+	State := _AP70_Launch(Scope, Args)
+	AssertEqual(Action == "acquire" ? "FIXTURE_ROOT_ACQUIRED" : "FIXTURE_ROOT_RETIRED", Trim(State["stdout"]))
+}
+
+_AP70_Run(Scope, Action, Request) {
+	global _DriverDir
+	Args := ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+		FSResolveDirectoryPath(_DriverDir . "\modules\llm") . "\ollama_managed_files.ps1", "-Action", Action]
+	for Name, Value in Request
+		Args.Push("-" . Name, String(Value))
+	State := _AP70_Launch(Scope, Args)
+	Lines := StrSplit(Trim(State["stdout"]), "`n", "`r")
+	Receipt := JsonParse(Lines[Lines.Length])
+	AssertTrue(Receipt is Map && Receipt.Get("ok", false))
+	AssertEqual(Action == "prepare" ? "prepared" : "published", Receipt["phase"])
+	AssertEqual(Action == "prepare" ? 2 : 1, Lines.Length, "Each physical worker keeps its progressive/final JSON framing")
+	if Action == "prepare" {
+		Construction := JsonParse(Lines[1])
+		AssertTrue(Construction is Map)
+		AssertEqual("creation-owned", Construction["phase"])
+		AssertEqual(Request["TicketId"], Construction["ticket"])
+		AssertEqual(Receipt["creation_wal_identity"], Construction["creation_wal_identity"],
+			"The first ASCII receipt and final Unicode receipt must retain the same physical creation owner")
+	}
+	return Map("receipt", Receipt, "encoding", State["encoding"], "lines", Lines.Length)
+}
+
+_AP70_CodeUnits(Expected, Actual) {
+	if StrLen(Expected) != StrLen(Actual)
+		return false
+	Loop StrLen(Expected)
+		if NumGet(StrPtr(Expected), (A_Index - 1) * 2, "UShort") != NumGet(StrPtr(Actual), (A_Index - 1) * 2, "UShort")
+			return false
+	return true
+}
+
+_AP70_ManagedUnicodeReceipt(Unicode) {
+	global _DriverDir
+	Scope := _CRWF_Fixture("managed-receipt")
+	Failure := 0, ManagedRoot := "", Birth := 0, Nonce := ""
+	try {
+		; The managed owner deliberately requires a direct LocalApplicationData
+		; child. Resolve the input before launch to avoid the former 8.3 oracle.
+		Base := FSResolveDirectoryPath(EnvGet("LOCALAPPDATA"))
+		Nonce := StrLower(StrReplace(KLPF_NewOwnerId(), "-"))
+		ManagedRoot := Base . "\ergopti-unicode-receipt-" . Nonce
+			. (Unicode ? "-é-報告" : "-ascii")
+		AssertFalse(DirExist(ManagedRoot))
+		AssertFalse(FileExist(ManagedRoot))
+		BirthPath := Scope.Directory . "\root-birth.json"
+		_AP70_RootHelper(Scope, "acquire", ManagedRoot, Nonce, BirthPath)
+		ObservedBirth := JsonParse(FileRead(BirthPath, "UTF-8"))
+		AssertTrue(ObservedBirth is Map && ObservedBirth.Get("version", 0) == 1
+			&& ObservedBirth.Get("acquired", false) && ObservedBirth.Get("nonce", "") == Nonce
+			&& RegExMatch(ObservedBirth.Get("root_identity", ""), "^[0-9a-f]{8}:[0-9a-f]{16}$"),
+			"Only the actual exclusive native birth receipt grants cleanup authority")
+		Birth := ObservedBirth
+		CorpusDir := FSResolveDirectoryPath(_DriverDir . "\tests\fixtures\ollama-install-files")
+		Corpus := JsonParse(FileRead(CorpusDir . "\receipts.json", "UTF-8"))["portable"]
+		Catalogue := Map("schema_version", 1, "version", "0.24.0", "assets",
+			Map("windows-amd64", Map("filename", "ollama-windows-amd64.zip", "bytes", Corpus["bytes"], "sha256", Corpus["sha256"])))
+		CataloguePath := Scope.Directory . "\catalogue.json"
+		AssertTrue(FSWriteCreateDurable(CataloguePath, KL_JsonEncode(Catalogue)))
+		Ticket := StrLower(StrReplace(KLPF_NewOwnerId(), "-"))
+		Prepare := _AP70_Run(Scope, "prepare", Map("ManagedRoot", ManagedRoot,
+			"CataloguePath", CataloguePath, "CatalogueSha256", CryptoSha256Bytes(FSReadBytesStrict(CataloguePath)),
+			"AssetId", "windows-amd64", "ArchivePath", CorpusDir . "\portable.zip", "TicketId", Ticket))
+		Prepared := Prepare["receipt"]
+		ExpectedStage := ManagedRoot . "\.stage-" . Ticket
+		AssertTrue(DirExist(ExpectedStage), "the independently known native stage must exist")
+		AssertTrue(FileExist(ExpectedStage . "\ollama.exe"), "only the inert existing corpus has been extracted")
+		; Continue only with ASCII identity/hash fields, just as the production
+		; prepare→publish transition does; do not substitute a corrected path.
+		Publish := _AP70_Run(Scope, "publish", Map("ManagedRoot", ManagedRoot, "TicketId", Ticket,
+			"StageIdentity", Prepared["stage_identity"], "ManifestSha256", Prepared["manifest_sha256"]))
+		Published := Publish["receipt"]
+		ExpectedVersion := ManagedRoot . "\versions\0.24.0-windows-amd64-" . Corpus["sha256"]
+		AssertTrue(DirExist(ExpectedVersion), "publication must have completed at the independently authored native path")
+		ExpectedExe := ExpectedVersion . "\ollama.exe"
+		AssertTrue(FileExist(ExpectedExe))
+		_TestPrint("# MANAGED_NATIVE_UNICODE_RECEIPT " . KL_JsonEncode(Map("unicode", Unicode,
+			"read_encoding", Publish["encoding"], "prepare_lines", Prepare["lines"],
+			"stage_exact", _AP70_CodeUnits(ExpectedStage, Prepared["stage"]),
+			"version_exact", _AP70_CodeUnits(ExpectedVersion, Published["version_path"]),
+			"exe_exact", _AP70_CodeUnits(ExpectedExe, Published["executable"]),
+			"physical_exe", FileExist(ExpectedExe) != "", "received_exe_exists", FileExist(Published["executable"]) != "")))
+		AssertTrue(_AP70_CodeUnits(ExpectedStage, Prepared["stage"]), "the real progressive prepare receipt must preserve its exact native stage path")
+		AssertTrue(_AP70_CodeUnits(ExpectedVersion, Published["version_path"]), "the real published receipt must preserve the path handed to runtime admission")
+		AssertTrue(_AP70_CodeUnits(ExpectedExe, Published["executable"]), "the runtime executable receipt must preserve every Unicode unit")
+	} catch Error as Caught {
+		Failure := Caught
+		throw Caught
+	} finally {
+		; The existing owner must confirm every process/tree before its private
+		; files can be retired. A failed physical cleanup retains the namespace.
+		Retired := Scope.Cleanup()
+		if !Retired
+			Scope.Finish(Failure)
+		if Retired && Birth is Map {
+			CleanupScope := _CRWF_Fixture("managed-root-retirement")
+			CleanupFailure := 0
+			try {
+				_AP70_RootHelper(CleanupScope, "cleanup", ManagedRoot, Nonce, "", Birth["root_identity"])
+				AssertFalse(DirExist(ManagedRoot), "Only the exact acquired root may acknowledge by-handle retirement")
+			} catch Error as Err {
+				CleanupFailure := Err
+				throw Err
+			} finally CleanupScope.Finish(CleanupFailure)
+		}
+	}
+}
+for _AP70_Unicode in [false, true]
+	Test("Managed worker Unicode receipt: " . (_AP70_Unicode ? "Unicode" : "ASCII control") . " (worker-unicode-sibling070)",
+		_AP70_ManagedUnicodeReceipt.Bind(_AP70_Unicode))

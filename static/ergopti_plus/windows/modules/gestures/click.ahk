@@ -178,18 +178,24 @@ GestureReleaseCapturedBindingHold(ActionName, Owner) {
 }
 
 ; Installs a low-level keyboard hook to detect any key press.
-; Uses no flags so both physical and synthetic keys cancel selection
+; Keeps MinSendLevel zero so both physical and synthetic keys cancel selection
 ; (e.g. a tap-hold that fires Ctrl+C should also stop the drag).
 GestureStartKeyboardWatcher() {
 	global GestureKeyboardHook
 	PreviousCritical := Critical("On")
 	try {
+		; Both click holds share one observer. Replacing a live observer creates
+		; a failure window in which the earlier held button has no release path.
+		if IsObject(GestureKeyboardHook) && GestureKeyboardHook.InProgress
+			return true
 		if !GestureStopKeyboardWatcher()
 			throw Error("the previous keyboard watcher still owns its native hook")
-		; L3: Level 3 (higher than Ergopti's Level 2 hotkeys).
-		; V keeps the observer non-consuming so keys pass through normally.
-		Hook := InputHook("V L3")
-		Hook.KeyOpt("{All}", "N")
+		; Observe without a text limit or text retention while a Button Up is owed.
+		; L is a length limit, not an input level. KeyOpt I ignores text while N
+		; retains notifications; constructor MinSendLevel stays zero, and V lets
+		; both physical and synthetic keys pass through normally.
+		Hook := InputHook("V L0")
+		Hook.KeyOpt("{All}", "NI")
 		Hook.OnKeyDown := GestureOnKeyDown
 		; Publish before Start so even a partial native admission keeps an exact
 		; cleanup owner. The surrounding Critical prevents its callback from

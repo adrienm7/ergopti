@@ -921,3 +921,476 @@ Test("managed bootstrap: actual enable admission preserves exact READY successor
 #Include test_ollama_runtime_terminal_delivery.ahk
 
 #Include test_ollama_failure_epoch_publication.ahk
+
+
+; This scope owns no file task, daemon or external callback. The native timer
+; identity is the real bound production method, not the fixture scheduler.
+_G4L_Deleted(Counter, This) {
+	Counter.Deleted += 1
+}
+_G4L_CancelLifetime() {
+	Counter := {Deleted: 0}, Control := {Deleted: 0}
+	Acyclic := {}
+	Acyclic.DefineProp("__Delete", {Call: _G4L_Deleted.Bind(Control)})
+	Acyclic := 0
+	AssertEqual(1, Control.Deleted, "the runtime synchronously destroys an acyclic owned object")
+	Port := Map("plan", Map(), "files", {HasOwner: (*) => false},
+		"runtime", {Stop: (*) => true, HasOwner: (*) => false})
+	Flow := OllamaManagedBootstrap("", 0, 0, 0, Port)
+	Flow.DefineProp("__Delete", {Call: _G4L_Deleted.Bind(Counter)})
+	Callback := Flow.Timer
+	try {
+		AssertTrue(TimerSetCallback(Callback, -60000), "the real scheduler owns the captured production timer")
+		AssertTrue(Flow.Cancel(), "no external file or runtime owner prevents cancellation")
+		AssertTrue(Flow.Cancelled)
+		AssertTrue(Flow.CanReplace(), "the canceled flow has no retained native debt")
+	} finally {
+		AssertTrue(TimerSetCallback(Callback, 0), "the exact native callback is retired before local references are released")
+	}
+	Callback := 0
+	Flow := 0
+	_TestPrint("# MANAGED_BOOTSTRAP_LIFETIME " . KL_JsonEncode(Map(
+		"acyclic_deleted", Control.Deleted, "owner_deleted", Counter.Deleted)))
+	AssertEqual(1, Counter.Deleted, "a canceled replaceable bootstrap must release its bound polling callback")
+}
+Test("managed bootstrap: canceled replaceable owner releases its actual timer (managed-bootstrap-lifetime)", _G4L_CancelLifetime)
+
+; Real production port objects retain the bootstrap through their terminal
+; observer slots, even with no native task. A timer-only fixture cannot see it.
+_G4LG_BindProductionPorts(Flow, State) {
+	Files := OllamaInstallFilesPort(Map("helper", "C:\owned\files.ps1",
+		"powershell", "C:\owned\powershell.exe", "capture_bytes", 4096,
+		"spawn", _G4LG_Spawn.Bind(State),
+		"on_physical", ObjBindMethod(Flow, "_Physical"), "on_error", ObjBindMethod(Flow, "_Error")))
+	Runtime := OllamaRuntimeOwner(Map("launcher", "C:\bundled\runtime.ps1", "helper", "C:\bundled\files.ps1",
+		"helper_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		"environment", "C:\bundled\managed_ollama_environment.json",
+		"environment_sha256", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+		"proxy", _ORT_Proxy(), "on_retired", ObjBindMethod(Flow, "_RuntimeRetired"),
+		"on_error", ObjBindMethod(Flow, "_Error")))
+	Flow.Files := Files, Flow.Runtime := Runtime
+	return [Files, Runtime]
+}
+_G4LG_Spawn(State, Exe, Args, Done, Adopt, Capture) {
+	Task := {start: (*) => true, requestTerminate: (*) => State.StopAck}
+	State.Done := Done, State.Task := Task
+	AssertTrue(Adopt.Call(Task), "the real file port must adopt the exact passive IO task")
+	return Task
+}
+_G4LG_Case(Mode) {
+	global _LLM_Deps_Epoch, _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_FailureMessage
+	AssertFalse(OllamaNativeIdentityHasDebt(), "the idle graph cannot borrow another native identity debt")
+	Saved := [_LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_FailureMessage]
+	Priority := DllCall("GetPriorityClass", "Ptr", DllCall("GetCurrentProcess", "Ptr"), "UInt")
+	AssertTrue(Priority != 0, "the scope must capture its actual native priority")
+	Counter := {Deleted: 0, Ready: 0}, State := {StopAck: false, Done: 0, Task: 0}
+	Flow := 0, Callback := 0
+	PreviousCritical := Critical("On")
+	try {
+		Port := Map("plan", Map(), "files", {HasOwner: (*) => false},
+			"runtime", {Stop: (*) => true, HasOwner: (*) => false}, "current", (*) => true)
+		Flow := OllamaManagedBootstrap("", _LLM_Deps_Epoch, (*) => Counter.Ready += 1, (*) => true, Port)
+		Flow.DefineProp("__Delete", {Call: _G4L_Deleted.Bind(Counter)})
+		Roots := _G4LG_BindProductionPorts(Flow, State)
+		Callback := Flow.Timer
+		AssertTrue(TimerSetCallback(Callback, -60000))
+		if Mode == "ready" {
+			AssertTrue(Flow._Complete(), "the actual ready branch publishes its callback")
+			AssertEqual(1, Counter.Ready)
+			AssertTrue(Flow.Ready)
+		} else if Mode == "failed" {
+			AssertFalse(Flow._Fail("lifetime-fixture"))
+			AssertTrue(Flow.Failed)
+		} else if Mode == "file-debt" {
+			AssertTrue(Roots[1].Run("inspect", Map(),
+				Map("authorize", (*) => true, "is_current", (*) => true), (*) => true))
+			AssertFalse(Flow.Cancel(), "a refused passive task retirement remains genuine file-port debt")
+			AssertFalse(Flow.CanReplace())
+			AssertTrue(Roots[1].HasOwner())
+			AssertTrue(Flow.Timer == Callback, "debt retains the existing callback for later cleanup")
+			AssertTrue(HasMethod(Roots[1].Options["on_physical"], "Call"))
+			AssertTrue(HasMethod(Roots[2].Options["on_retired"], "Call"))
+			; This is the captured IO completion, not a forged file-port record or
+			; an invented quiescence ACK. The real port adopts its physical proof.
+			State.Done.Call(0, '{"ok":true}', "")
+			AssertFalse(Roots[1].HasOwner())
+		}
+		AssertTrue(Flow.Cancel())
+		AssertTrue(Flow.Cancel(), "terminal callback release must remain idempotent")
+		AssertTrue(Flow.CanReplace())
+		AssertTrue(TimerSetCallback(Callback, 0))
+		Callback := 0
+		Flow := 0
+		; A late physical receipt schedules the real one-shot Cancel callback.
+		; Let that independent native reference finish before testing collection.
+		Critical("Off")
+		Started := A_TickCount
+		while Counter.Deleted == 0 && TickElapsed64(Started) < 1000
+			Sleep(10)
+		_TestPrint("# MANAGED_BOOTSTRAP_GRAPH mode=" . Mode . " owner_deleted=" . Counter.Deleted)
+		AssertEqual(1, Counter.Deleted, "no terminal production observer may retain the canceled bootstrap")
+	} finally {
+		if IsObject(Callback)
+			TimerSetCallback(Callback, 0)
+		if IsObject(Flow)
+			Flow.Cancel()
+		try {
+			_LLM_Deps_State := Saved[1], _LLM_Deps_Checking := Saved[2], _LLM_Deps_FailureMessage := Saved[3]
+			AssertTrue(DllCall("SetPriorityClass", "Ptr", DllCall("GetCurrentProcess", "Ptr"), "UInt", Priority, "Int") != 0,
+				"failure publication must restore this fixture's exact native priority")
+		} finally Critical(PreviousCritical)
+	}
+}
+for _G4LG_Mode in ["cancel", "ready", "failed", "file-debt"]
+	Test("managed bootstrap lifetime: " . _G4LG_Mode . " retires the actual file/runtime observer graph (managed-bootstrap-graph-lifetime)",
+		_G4LG_Case.Bind(_G4LG_Mode))
+
+class _G4LG_InlineRuntime extends _G4B_Runtime {
+	Start(Target, Authority, Ready, Exit) {
+		Accepted := super.Start(Target, Authority, Ready, Exit)
+		if Accepted
+			this.PublishReady()
+		return Accepted
+	}
+}
+_G4LG_CancelReady(State, Fixture, This, Value) {
+	State.Calls += 1
+	return Fixture.Flow.Cancel()
+}
+_G4LG_InlineCancel() {
+	Fixture := _G4B_Fixture(), State := {Calls: 0}
+	Fixture.Runtime := _G4LG_InlineRuntime(Fixture)
+	; Start installs Flow before any actual runtime callback is delivered.
+	Fixture.DefineProp("ReadyCalls", {Get: (*) => State.Calls, Set: _G4LG_CancelReady.Bind(State, Fixture)})
+	try {
+		Fixture.Start()
+		AssertEqual(1, State.Calls)
+		AssertTrue(Fixture.Flow.Cancelled)
+		AssertTrue(Fixture.Flow.CanReplace())
+		AssertFalse(IsObject(Fixture.Flow.Timer), "the returning Start frame must not rearm its retired callback")
+	} finally {
+		Fixture.Close()
+		Fixture.Runtime.Ready := 0
+		Fixture.DeleteProp("ReadyCalls")
+		Fixture.ReadyCalls := State.Calls
+	}
+}
+Test("managed bootstrap lifetime: inline READY cancellation cannot rearm the returning Start frame (managed-bootstrap-timer-control)",
+	_G4LG_InlineCancel)
+
+; Closing logical observers is terminal for the exact port, while ordinary
+; Stop/Cancel remain usable and cannot mistake a live record for a closed one.
+_G4LOR_CallbackRetirementContract() {
+	global _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL, _LLM_Deps_Epoch
+	AssertFalse(OllamaNativeIdentityHasDebt())
+	State := {StopAck: false, Done: 0, Task: 0}
+	Port := Map("plan", Map(), "files", {HasOwner: (*) => false},
+		"runtime", {Stop: (*) => true, HasOwner: (*) => false})
+	Flow := OllamaManagedBootstrap("", _LLM_Deps_Epoch, 0, 0, Port)
+	Roots := _G4LG_BindProductionPorts(Flow, State)
+	RuntimeFixture := _ORT_Fixture()
+	PreviousCritical := Critical("On")
+	try {
+		AssertTrue(Roots[1].Run("inspect", Map(),
+			Map("authorize", (*) => true, "is_current", (*) => true), (*) => true))
+		Observer := Roots[1].Options["on_physical"]
+		AssertFalse(Roots[1].RetireCallbacks(), "a live file task keeps its physical observer")
+		AssertTrue(Roots[1].HasOwner())
+		AssertTrue(Roots[1].Options["on_physical"] == Observer)
+		State.Done.Call(0, '{"ok":true}', "")
+		AssertFalse(Roots[1].HasOwner())
+		AssertTrue(Flow.Cancel())
+		AssertTrue(Flow.Cancel(), "the bootstrap's repeated cancellation still acknowledges retirement")
+		AssertTrue(Flow.CanReplace(), "closed logical observers leave replacement admission intact")
+		State.Task := 0
+		AssertFalse(Roots[1].Run("inspect", Map(),
+			Map("authorize", (*) => true, "is_current", (*) => true), (*) => true),
+			"a permanently retired file port must not acquire a new task")
+		AssertEqual(0, State.Task, "closed-port refusal happens before the native spawn port")
+		AssertTrue(Roots[1].Cancel())
+		AssertFalse(Roots[1].HasOwner())
+
+		; The real runtime record, task and strict retirement observer are owned
+		; by the existing passive native-IO fixture, never injected as Records.
+		AssertTrue(RuntimeFixture.Run())
+		Runtime := RuntimeFixture.Owner
+		Record := Runtime.Record, Observer := Runtime.Options["on_retired"]
+		AssertFalse(Runtime.RetireCallbacks(), "a live runtime retains exact lease retirement authority")
+		AssertTrue(Runtime.Record == Record && Runtime.HasOwner())
+		AssertTrue(Runtime.Options["on_retired"] == Observer)
+		AssertTrue(Runtime.Stop())
+		AssertFalse(Runtime.HasOwner())
+		AssertTrue(Runtime.RetireCallbacks(&Retired))
+		AssertTrue(Retired is Array && Retired.Length == 2)
+		AssertTrue(Retired[1] == Observer, "the caller can retain the exact callbacks through an outer RAM claim")
+		AssertTrue(Runtime.RetireCallbacks(), "observer retirement is idempotent")
+		Starts := RuntimeFixture.Starts
+		AssertFalse(Runtime.Start(RuntimeFixture.Target, RuntimeFixture.Authority))
+		AssertEqual(Starts, RuntimeFixture.Starts, "a closed runtime never reacquires its native task")
+		AssertTrue(Runtime.Stop())
+		AssertFalse(Runtime.HasOwner())
+
+		SavedBootstrap := _LLM_ManagedBootstrap
+		try {
+			_LLM_ManagedBootstrap := Flow
+			AssertEqual(LLM_OLLAMA_BASE_URL, LLM_OllamaRequestOrigin(),
+				"a retired bootstrap still resolves the ordinary configured origin")
+		} finally _LLM_ManagedBootstrap := SavedBootstrap
+	} finally {
+		try {
+			if Roots[1].HasOwner() && HasMethod(State.Done, "Call")
+				State.Done.Call(0, '{"ok":true}', "")
+			Flow.Cancel()
+			RuntimeFixture.Owner.Stop()
+		} finally Critical(PreviousCritical)
+	}
+}
+Test("managed bootstrap observers: live debt, closed-port refusal and ordinary APIs remain exact (managed-bootstrap-observer-retirement)",
+	_G4LOR_CallbackRetirementContract)
+
+; Runtime diagnostics are optional in the genuine constructor contract.
+_G4LOR_NoErrorObserver() {
+	AssertFalse(OllamaNativeIdentityHasDebt())
+	Fixture := _ORT_Fixture()
+	Options := Fixture.Owner.Options.Clone()
+	Options.Delete("on_error")
+	Owner := OllamaRuntimeOwner(Options)
+	try {
+		AssertFalse(Owner.Options.Has("on_error"), "the genuine constructor accepts an absent diagnostic observer")
+		AssertFalse(Owner.HasOwner())
+		AssertTrue(Owner.RetireCallbacks(&Retired))
+		AssertTrue(Retired is Array && Retired.Length == 2)
+		AssertEqual(0, Retired[2], "absence of the optional observer contributes no retained callback")
+		AssertTrue(Owner.RetireCallbacks(), "an idle owner without diagnostics still retires idempotently")
+		AssertTrue(Owner.Stop())
+		AssertFalse(Owner.Start(Fixture.Target, Fixture.Authority))
+		AssertEqual(0, Fixture.Starts, "the retired owner cannot reach its native spawn port")
+		AssertFalse(Owner.HasOwner())
+	} finally Owner.Stop()
+}
+Test("managed bootstrap observers: valid runtime without optional diagnostics still retires (managed-bootstrap-observer-retirement)",
+	_G4LOR_NoErrorObserver)
+
+
+; Constructor-failure witnesses hold no callback, partial object or timer root.
+; No Begin call occurs: the refused endpoint precedes source/native acquisition.
+class _G4CF_AcyclicFailure {
+	__New(Counter) {
+		this.DefineProp("__Delete", {Call: _G4L_Deleted.Bind(Counter)})
+		throw ValueError("acyclic-constructor-lifetime-control")
+	}
+}
+
+class _G4CF_ObservedBootstrap extends OllamaManagedBootstrap {
+	__New(Counter, Arguments*) {
+		this.DefineProp("__Delete", {Call: _G4L_Deleted.Bind(Counter)})
+		; Delegate the complete genuine constructor, with no overridden source,
+		; scheduler, cancellation, native factory or method implementation.
+		super.__New(Arguments*)
+	}
+}
+
+_G4CF_Case(Mode) {
+	global LLM_OLLAMA_BASE_URL, _LLM_Deps_Epoch
+	Counter := {Deleted: 0}, Thrown := false, Observed := ""
+	PreviousEndpoint := LLM_OLLAMA_BASE_URL
+	PreviousCritical := Critical("On")
+	try {
+		if Mode == "acyclic" {
+			try CtorUnreachable :=  _G4CF_AcyclicFailure(Counter)
+			catch ValueError as CtorFailure {
+				Thrown := true
+				Observed := CtorFailure.Message
+			}
+			AssertTrue(Thrown && Observed == "acyclic-constructor-lifetime-control",
+				"The actual AHK constructor-failure path must release its acyclic object synchronously")
+		} else {
+			LLM_OLLAMA_BASE_URL := "https://invalid-managed-endpoint.example"
+			try CtorUnreachable :=  _G4CF_ObservedBootstrap(Counter, "", _LLM_Deps_Epoch, 0, 0)
+			catch ValueError as CtorFailure {
+				Thrown := true
+				Observed := CtorFailure.Message
+			}
+			AssertTrue(Thrown && Observed == "Managed runtime requires the selected loopback Ollama endpoint.",
+				"Only the genuine pre-acquisition endpoint refusal qualifies this constructor-failure witness")
+		}
+		_TestPrint("# MANAGED_CONSTRUCTOR_LIFETIME mode=" . Mode . " threw=" . Thrown . " owner_deleted=" . Counter.Deleted)
+		AssertEqual(1, Counter.Deleted,
+			"A failed constructor with no acquired native task, armed timer or external callback must not retain its partial owner")
+	} finally {
+		LLM_OLLAMA_BASE_URL := PreviousEndpoint
+		Critical(PreviousCritical)
+	}
+}
+for _G4CF_Mode in ["acyclic", "endpoint"]
+	Test("managed bootstrap constructor lifetime: " . _G4CF_Mode . " releases an unowned failed construction (managed-bootstrap-constructor-failure-lifetime)",
+		_G4CF_Case.Bind(_G4CF_Mode))
+
+
+; Genuine constructor fault boundaries. None calls Begin or starts a native task.
+_G4CX_Throw(Stage) {
+	throw Error("managed-constructor-cutpoint:" . Stage)
+}
+_G4CX_FilesAssigned(State, Owner, Value) {
+	State.FilesConstructed := Value is OllamaInstallFilesPort && !Value.HasOwner()
+	; Retain no owner or port in the witness. Publish the exact genuine value.
+	Owner.DefineProp("Files", {Value: Value})
+	return Value
+}
+class _G4CX_ObservedBootstrap extends OllamaManagedBootstrap {
+	__New(Counter, State, Arguments*) {
+		this.DefineProp("__Delete", {Call: _G4L_Deleted.Bind(Counter)})
+		this.CtorWitness := State
+		if State.Mode == "timings" || State.Mode == "postports"
+			this.DefineProp("Files", {Set: _G4CX_FilesAssigned.Bind(State)})
+		super.__New(Arguments*)
+	}
+	_PublishConstructionObservers() {
+		State := this.CtorWitness
+		if State.Mode == "postports" {
+			State.RuntimeConstructed := this.Runtime is OllamaRuntimeOwner && !this.Runtime.HasOwner()
+			State.Neutral := this.Files.Options["on_physical"] == OllamaManagedBootstrap._UnstartedObserver
+				&& this.Runtime.Options["on_retired"] == OllamaManagedBootstrap._UnstartedObserver
+				&& !IsObject(this.Timer)
+			_G4CX_Throw("postports")
+		}
+		return super._PublishConstructionObservers()
+	}
+}
+_G4CX_BorrowedRetirement(State, *) {
+	State.BorrowedRetirements += 1
+	return true
+}
+
+_G4CX_CaseWithTimingsReady(Mode) {
+	global LLM_OLLAMA_BASE_URL, ConfigurationFile, _TimingsCache, _LLM_Deps_Epoch
+	AssertFalse(OllamaNativeIdentityHasDebt(), "The constructor witness cannot borrow another owner's native identity debt")
+	Counter := {Deleted: 0}
+	State := {Mode: Mode, FilesConstructed: false, RuntimeConstructed: false, Neutral: false, BorrowedRetirements: 0}
+	SavedEndpoint := LLM_OLLAMA_BASE_URL, SavedConfig := ConfigurationFile, SavedTimings := _TimingsCache
+	PreviousCritical := Critical("Off")
+	Directory := "", Created := false, Returned := 0, Thrown := false, Message := ""
+	try {
+		if Mode == "timings" || Mode == "postports" {
+			Directory := A_Temp . "\ergopti_ctor_capture_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+			Creation := FSCreateDirectoryExclusiveStrict(Directory)
+			AssertTrue(Creation is Integer && Creation == 1)
+			Created := true
+			ConfigPath := Directory . "\source.toml"
+			AssertTrue(FSWriteCreateDurable(ConfigPath, "[llm]`nenabled = false`n") != 0)
+		}
+		Critical(Mode == "timings" || Mode == "postports" ? "Off" : "On")
+		LLM_OLLAMA_BASE_URL := "http://127.0.0.1:11434"
+		if Mode == "read-source" || Mode == "menu-intent" {
+			Borrowed := {HasOwner: (*) => false, Stop: (*) => true, RetireCallbacks: _G4CX_BorrowedRetirement.Bind(State)}
+			Port := Map("plan", Map(), "files", Borrowed, "runtime", Borrowed,
+				"read_source", Mode == "read-source" ? _G4CX_Throw.Bind(Mode) : ((*) => Map()),
+				"menu_intent", Mode == "menu-intent" ? _G4CX_Throw.Bind(Mode) : ((*) => Map()),
+				"aux_generation", (*) => 0)
+			try Returned := _G4CX_ObservedBootstrap(Counter, State, "", _LLM_Deps_Epoch, 0, 0, Port)
+			catch Error as CtorFault {
+				Thrown := true, Message := CtorFault.Message
+			}
+			AssertTrue(Thrown && Message == "managed-constructor-cutpoint:" . Mode,
+				"Only the actual borrowed constructor reader failure qualifies this boundary")
+			AssertEqual(0, State.BorrowedRetirements, "A failed constructor cannot retire caller-borrowed ports")
+		} else {
+			ConfigurationFile := ConfigPath
+			if Mode == "timings" {
+				AssertTrue(_TimingsCache is Map && _TimingsCache.Has("adapters") && _TimingsCache["adapters"] is Map)
+				Replacement := _TimingsCache.Clone()
+				Replacement["adapters"] := _TimingsCache["adapters"].Clone()
+				AssertTrue(Replacement["adapters"].Has("proxy_relay_dial_timeout_ms"))
+				Replacement["adapters"].Delete("proxy_relay_dial_timeout_ms")
+				_TimingsCache := Replacement
+			}
+			try Returned := _G4CX_ObservedBootstrap(Counter, State, "", _LLM_Deps_Epoch, 0, 0)
+			catch Error as CtorFault {
+				Thrown := true, Message := CtorFault.Message
+			}
+			if Mode == "timings"
+				AssertTrue(Thrown && InStr(Message, "proxy_relay_dial_timeout_ms") > 0 && State.FilesConstructed,
+					"The real TimingsGet refusal must follow construction of the actual idle file port")
+			else
+				AssertTrue(Thrown && Message == "managed-constructor-cutpoint:postports"
+					&& State.FilesConstructed && State.RuntimeConstructed && State.Neutral,
+					"Both actual idle ports must remain acyclic until the final observer publication boundary")
+		}
+		if Mode == "postports" {
+			; The same real capture must also return a fully wired native owner
+			; when this deliberate observation refusal is absent.
+			ControlCounter := {Deleted: 0}
+			ControlState := {Mode: "native-control", FilesConstructed: false, RuntimeConstructed: false, Neutral: false}
+			Returned := _G4CX_ObservedBootstrap(ControlCounter, ControlState, "", _LLM_Deps_Epoch, 0, 0)
+			AssertTrue(Returned.Files is OllamaInstallFilesPort && Returned.Runtime is OllamaRuntimeOwner
+				&& !Returned.Files.HasOwner() && !Returned.Runtime.HasOwner() && IsObject(Returned.Timer),
+				"The ordinary full constructor must publish its actual idle ports and polling capability")
+			AssertTrue(HasMethod(Returned.Files.Options["on_physical"], "Call")
+				&& Returned.Files.Options["on_physical"] != OllamaManagedBootstrap._UnstartedObserver
+				&& HasMethod(Returned.Runtime.Options["on_retired"], "Call")
+				&& Returned.Runtime.Options["on_retired"] != OllamaManagedBootstrap._UnstartedObserver,
+				"Normal constructor success must replace every provisional physical observer before returning")
+			AssertTrue(Returned.Cancel(), "No native task was started; the actual owner must acknowledge ordinary retirement")
+			Returned := 0
+			AssertEqual(1, ControlCounter.Deleted, "The ordinary full constructor remains destructible after real cancellation")
+		}
+		_TestPrint("# MANAGED_CONSTRUCTOR_CUTPOINT mode=" . Mode . " threw=" . Thrown . " files=" . State.FilesConstructed
+			. " runtime=" . State.RuntimeConstructed . " neutral=" . State.Neutral . " owner_deleted=" . Counter.Deleted)
+		AssertEqual(1, Counter.Deleted, "A failed unstarted constructor cannot retain timer or native observer cycles")
+	} finally {
+		try {
+			if IsObject(Returned)
+				AssertTrue(Returned.Cancel(), "An unexpected successful unstarted constructor must retire its exact callbacks")
+			Returned := 0
+		} finally {
+			Critical("On")
+			LLM_OLLAMA_BASE_URL := SavedEndpoint, ConfigurationFile := SavedConfig, _TimingsCache := SavedTimings
+			Critical("Off")
+			try {
+				if Created
+					DirDelete(Directory, true)
+			} finally Critical(PreviousCritical)
+		}
+	}
+}
+; Filtered tests do not execute the timing-loader test. Use the genuine boot
+; loaders and restore all seven timing leaves, including a previously unset one.
+_G4CX_Case(Mode) {
+	global _TimingsCache, _LLM_Menu
+	global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS
+	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS, LLM_OLLAMA_DELETE_TIMEOUT_MS
+	if Mode != "timings" && Mode != "postports"
+		return _G4CX_CaseWithTimingsReady(Mode)
+	SavedCache := _TimingsCache
+	Previous := [IsSet(LLM_OLLAMA_POLL_MS) ? LLM_OLLAMA_POLL_MS : unset,
+		IsSet(LLM_REMOTE_TIMEOUT_MS) ? LLM_REMOTE_TIMEOUT_MS : unset,
+		IsSet(LLM_REMOTE_POLL_MS) ? LLM_REMOTE_POLL_MS : unset,
+		IsSet(LLM_INSTALLED_CACHE_TTL_MS) ? LLM_INSTALLED_CACHE_TTL_MS : unset,
+		IsSet(LLM_DEPS_POLL_TIMEOUT_MS) ? LLM_DEPS_POLL_TIMEOUT_MS : unset,
+		IsSet(LLM_REMOTE_READY_PING_DEADLINE_MS) ? LLM_REMOTE_READY_PING_DEADLINE_MS : unset,
+		IsSet(LLM_OLLAMA_DELETE_TIMEOUT_MS) ? LLM_OLLAMA_DELETE_TIMEOUT_MS : unset]
+	PreviousCritical := Critical("Off")
+	try {
+		TimingsLoadShared()
+		LLMApiLoadTimings()
+		AssertTrue(_TimingsCache is Map && LLM_DEPS_POLL_TIMEOUT_MS > 0,
+			"Native constructor captures require the genuine loaded boot timings")
+		AssertTrue(_LLM_Menu is Map && LLM_AuxGeneration() is Integer,
+			"Use the genuine run_all menu and auxiliary initial state")
+		return _G4CX_CaseWithTimingsReady(Mode)
+	} finally {
+		Critical("On")
+		_TimingsCache := SavedCache
+		LLM_OLLAMA_POLL_MS := Previous.Has(1) ? Previous[1] : unset
+		LLM_REMOTE_TIMEOUT_MS := Previous.Has(2) ? Previous[2] : unset
+		LLM_REMOTE_POLL_MS := Previous.Has(3) ? Previous[3] : unset
+		LLM_INSTALLED_CACHE_TTL_MS := Previous.Has(4) ? Previous[4] : unset
+		LLM_DEPS_POLL_TIMEOUT_MS := Previous.Has(5) ? Previous[5] : unset
+		LLM_REMOTE_READY_PING_DEADLINE_MS := Previous.Has(6) ? Previous[6] : unset
+		LLM_OLLAMA_DELETE_TIMEOUT_MS := Previous.Has(7) ? Previous[7] : unset
+		Critical(PreviousCritical)
+	}
+}
+for _G4CX_Mode in ["read-source", "menu-intent", "timings", "postports"]
+	Test("managed bootstrap constructor cutpoint: " . _G4CX_Mode . " retains no unstarted cycle (managed-bootstrap-constructor-cutpoints)",
+		_G4CX_Case.Bind(_G4CX_Mode))

@@ -42,10 +42,12 @@ ConfigTomlTryReadBootValue(Cache, Section, Key, &Value) {
  * @returns {Object|Integer} The snapshot, or 0 when Cache is not the bootstrap cache.
  */
 ConfigTomlBootSnapshot(Cache) {
-	global ConfigurationFile, _ParseTomlCache
+	global ConfigurationFile, _ParseTomlCache, _ConfigTomlSnapshots
 	if !IsSet(ConfigurationFile) || ConfigurationFile == ""
 			|| !IsSet(_ParseTomlCache) || !_ParseTomlCache.Has(ConfigurationFile)
 			|| _ParseTomlCache[ConfigurationFile] != Cache
+			|| !IsSet(_ConfigTomlSnapshots) || !_ConfigTomlSnapshots.Has(ConfigurationFile)
+			|| _ConfigTomlSnapshots[ConfigurationFile].Cache != Cache
 		return 0
 	Snapshot := ConfigTomlReadSnapshot(ConfigurationFile)
 	if Snapshot.Cache != Cache

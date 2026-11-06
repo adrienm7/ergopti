@@ -56,6 +56,8 @@ _UCNO_ChildSource(Fixture) {
 			Source .= Declaration[0] . "`n"
 		}
 	}
+	if Fixture == "update_check_startup_owner_body.ahk"
+		Source .= "#Include " . _DriverDir . "\vendor\Promise.ahk`n"
 	return Source . "#Include " . _DriverDir . "\tests\fixtures\" . Fixture . "`n"
 }
 
@@ -71,11 +73,16 @@ _UCNO_Case(Mode) {
 	Directory := A_Temp . "\ergopti_update_consent_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
 	FSCreateDirectoryExclusiveStrict(Directory)
 	Script := Directory . "\subject.ahk"
-	Fixture := Mode == "geometry" ? "update_check_geometry_body.ahk" : "update_check_native_consent_body.ahk"
+	Fixture := InStr(Mode, "startup-") == 1 ? "update_check_startup_owner_body.ahk"
+		: (Mode == "geometry" ? "update_check_geometry_body.ahk" : "update_check_native_consent_body.ahk")
 	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
 	AtDeadline := 0, ExportFailure := 0
 	PreviousCritical := Critical("Off")
 	try {
+		if InStr(Mode, "startup-") == 1 {
+			FSCreateDirectoryExclusiveStrict(Directory . "\64bit")
+			AssertTrue(FSWriteCreateDurable(Directory . "\64bit\WebView2Loader.dll", "passive availability marker") != 0)
+		}
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _UCNO_ChildSource(Fixture)) != 0)
 		_TestPrint("# update-check-native-consent-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
@@ -137,3 +144,14 @@ Test("Update consent: fresh successor native button remains usable (update-check
 
 Test("Update geometry: canonical owner sizes native fallback and refuses invalid entries (update-check-geometry-source)",
 	_UCNO_Case.Bind("geometry"))
+
+
+Test("Update result: closing at the log boundary revokes publication (update-check-result-owner)",
+	_UCNO_Case.Bind("result-close"))
+Test("Update result: replacement keeps its own state (update-check-result-owner)",
+	_UCNO_Case.Bind("result-replaced"))
+
+for _UCNO_StartupMode in ["startup-current", "startup-close", "startup-reopen", "startup-reopen-reject",
+	"startup-current-reject", "startup-close-retire-refusal", "startup-current-partial-refusal"]
+	Test("Update startup: late browser resources retain their exact host in " . _UCNO_StartupMode,
+		_UCNO_Case.Bind(_UCNO_StartupMode))

@@ -71,7 +71,7 @@ _LMH_Deps(Dir, Log) {
 		"install", (Id, OnDone) => (Log.Push(Map("call", "install " . Id)), Pending.Push(OnDone)),
 		"uninstall", (Id) => (Log.Push(Map("call", "uninstall " . Id)), Map("ok", true)),
 		"select", (Id) => Log.Push(Map("call", "select " . Id)),
-		"open_url", (Url) => Log.Push(Map("call", "open " . Url)),
+		"open_url", (Url) => (Log.Push(Map("call", "open " . Url)), true),
 		"close", () => Log.Push(Map("call", "close")),
 		"pending", Pending
 	)
@@ -135,6 +135,9 @@ _LMH_AllowlistCase() {
 		AssertEqual("select ergopti", _LMH_Calls(Log)[2])
 		AssertTrue(LayoutManager_HandleMessage(Map("action", "open_homepage", "id", "ergol", "url", "https://evil.test"), Deps))
 		AssertEqual("open https://ergol.org", _LMH_Calls(Log)[3], "the page never chooses the URL")
+		Deps["open_url"] := (*) => false
+		AssertFalse(LayoutManager_HandleMessage(Map("action", "open_homepage", "id", "ergol"), Deps),
+			"a refused native URL launch must not report success")
 		AssertTrue(LayoutManager_HandleMessage(Map("action", "close"), Deps))
 		AssertEqual("close", _LMH_Calls(Log)[4])
 	} finally {
@@ -621,3 +624,75 @@ for _LMOC_Mode in ["cold-success", "cold-refusal", "close-refusal", "close-reope
 	Test("Layout opening generation: " . _LMOC_Mode . " preserves the current window (layout-open-generation)", _LMOC_Case.Bind(_LMOC_Mode))
 
 #Include test_layout_manager_early_show.ahk
+
+_LMH_StaleCompletion(Mode) {
+	global _LayMgrWeb_SessionEpoch, _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh, _LayoutCatalogueLast
+	global _LayMgrWeb_PresentationDeps
+	SavedDeps := _LayMgrWeb_PresentationDeps
+	SavedEpoch := _LayMgrWeb_SessionEpoch, SavedResult := _LayMgrWeb_Result
+	SavedRefresh := _LayMgrWeb_RuntimeRefresh, SavedCatalogue := _LayoutCatalogueLast
+	Dir := _LMH_TempDir(), DirB := _LMH_TempDir(), Log := [], LogB := [], Finish := 0, AfterCalls := 0, Refresh := 0
+	After(Id, Action, Done) {
+		AfterCalls += 1
+		Finish := Done
+		return true
+	}
+	RetainRefresh(Done) {
+		Refresh := Done
+		return true
+	}
+	try {
+		_LayMgrWeb_SessionEpoch := 7001
+		_LayMgrWeb_RuntimeRefresh := 0
+		_LayoutCatalogueLast := Map("index", _LMH_Index(), "source", "network", "error", 0)
+		Deps := _LMH_Deps(Dir, Log)
+		if Mode == "runtime"
+			Deps["after"] := After
+		if Mode == "refresh" {
+			Deps["refresh"] := RetainRefresh
+			AssertTrue(LayoutManager_HandleMessage(Map("action", "refresh"), Deps))
+		} else {
+			AssertTrue(LayoutManager_HandleMessage(Map("action", "install", "id", "ergol"), Deps))
+			AssertEqual(1, Deps["pending"].Length, "the actual message owner retains one install callback")
+		}
+		AssertFalse(Deps.Has("session_epoch"), "admission must not mutate shared dependencies")
+		; Session B owns a distinct result while A's callback remains retained.
+		_LayMgrWeb_SessionEpoch += 1
+		DepsB := _LMH_Deps(DirB, LogB)
+		AssertTrue(LayoutManager_HandleMessage(Map("action", "ready"), DepsB))
+		BeforeB := LogB.Length
+		ResultB := Map("id", "session-b", "ok", true)
+		_LayMgrWeb_Result := ResultB
+		Before := Log.Length
+		if Mode == "refresh"
+			Refresh.Call(LayoutCatalogue_Last())
+		else
+			Deps["pending"][1].Call(Mode != "failure", "fixture-failure")
+		AssertTrue(_LayMgrWeb_Result == ResultB, "A must preserve B's result")
+		AssertEqual(Before, Log.Length, "A must not publish a stale completion or refresh")
+		if Mode == "runtime" {
+			AssertEqual(1, AfterCalls, "durable completion still refreshes the runtime exactly once")
+			AssertTrue(_LayMgrWeb_RuntimeRefresh is Map, "the operation retains its terminal acknowledgement owner")
+			AssertTrue(LayoutManager_PageState(Dir)["busy"] is Map, "B may observe the current operation as busy")
+			Finish.Call(true)
+			AssertFalse(_LayMgrWeb_RuntimeRefresh is Map, "terminal acknowledgement retires the exact operation")
+			AssertTrue(_LayMgrWeb_Result == ResultB, "retiring A must preserve B's result")
+			AssertEqual(Before, Log.Length, "the old push port must remain unused")
+			AssertEqual(BeforeB + 1, LogB.Length, "B receives fresh state to retire its busy projection")
+			AssertFalse(_LMH_LastPush(LogB)["payload"]["busy"] is Map, "the published state is no longer busy")
+			Finish.Call(false)
+			AssertEqual(BeforeB + 1, LogB.Length, "duplicate completion cannot publish again")
+		}
+	} finally {
+		_LayMgrWeb_PresentationDeps := SavedDeps
+		_LayMgrWeb_SessionEpoch := SavedEpoch
+		_LayMgrWeb_Result := SavedResult
+		_LayMgrWeb_RuntimeRefresh := SavedRefresh
+		_LayoutCatalogueLast := SavedCatalogue
+		DirDelete(Dir, true)
+		DirDelete(DirB, true)
+	}
+}
+for _LMH_StaleMode in ["failure", "success", "runtime", "refresh"]
+	Test("layout manager: replacement page fences old " . _LMH_StaleMode,
+		_LMH_StaleCompletion.Bind(_LMH_StaleMode))

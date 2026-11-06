@@ -593,3 +593,5 @@ helpers.describe("word reset: the cascade arrow count", function()
 		helpers.assert_contains(daemon, "cascade_gate        = within_delay")
 	end)
 end)
+
+require("test.hotstring_idle_clock_contract").register(helpers)

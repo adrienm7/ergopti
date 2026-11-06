@@ -187,8 +187,40 @@ global CATEGORY_FOLLOWS_HOTSTRINGS_MASTER := Map(
 		"Personal",          true,
 )
 
+
+; Only the actual published bootstrap cache has authored type provenance.
+; Project outdated manifest leaves into detached section copies so strict
+; detached-map validators and the retained canonical snapshot stay unchanged.
+_FeatureStateAdmitBootCache(Cache, Sections) {
+	Snapshot := ConfigTomlBootSnapshot(Cache)
+	if !IsObject(Snapshot)
+		return Cache
+	Effective := Cache, Copied := Map()
+	for Row in Snapshot.Rows {
+		if !Sections.Has(Row.Section)
+			continue
+		Entry := ManifestFindEntryByPath(Row.Section . "." . Row.Key)
+		; Dynamic/private gates keep their existing owner contract. They do not
+		; acquire an invented static manifest default through this projection.
+		if !(Entry is Map) || !Entry.Has("default")
+			continue
+		if TomlConfigValueMatchesManifest(Row.Section, Row.Key, Row.Value,
+				&ExpectedType, TOML_StripInlineComment(Row.Raw))
+			continue
+		if Effective == Cache
+			Effective := Cache.Clone()
+		if !Copied.Has(Row.Section) {
+			Effective[Row.Section] := Cache[Row.Section].Clone()
+			Copied[Row.Section] := true
+		}
+		Effective[Row.Section][Row.Key] := _ConfigTomlNativeValue(ManifestDefaultFor(Entry["path"]))
+	}
+	return Effective
+}
+
 ReadCategoryEnabled(Cache) {
 		global CategoryEnabled
+		Cache := _FeatureStateAdmitBootCache(Cache, Map(ConfigLeaf.CATEGORY_ENABLED, true))
 		for Category, _Default in CategoryEnabled {
 				Raw := _FeatureStateIniGet(Cache, ConfigLeaf.CATEGORY_ENABLED, _FeatureStateCategoryKey(Category))
 				if (Raw == "_") {
@@ -216,6 +248,7 @@ IsCategoryGated(Category) {
 }
 
 ReadScriptConfig(Cache) {
+		Cache := _FeatureStateAdmitBootCache(Cache, Map("hotstrings", true, "script", true))
 		; MagicKey lives in [hotstrings] trigger_char in the v2 TOML.
 		Raw := _FeatureStateIniGet(Cache, "hotstrings", ConfigLeaf.TRIGGER_CHAR)
 		if Raw != "_"

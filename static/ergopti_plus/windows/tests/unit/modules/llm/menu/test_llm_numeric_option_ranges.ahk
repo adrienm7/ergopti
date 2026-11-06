@@ -337,3 +337,88 @@ _LNR_DisplayIndentCatalogueOwnsItsReader() {
 }
 Test("LLM display: the native reader owns the complete checked indent catalogue "
 	. "(llm-indent-include-owner)", _LNR_DisplayIndentCatalogueOwnsItsReader)
+
+_LNR_IntegerPromptCannotWrapIntoAllowedRange() {
+	Notices := [], Normalized := false
+	Notice := (Body, Title) => Notices.Push(Map("body", Body, "title", Title))
+	AssertTrue(_LLM_Menu_TryNormalizeIntegerPrompt("OK", "3", "n_predictions", &Normalized, Notice),
+		"The selected option really admits the small value the overflowing decimal could alias")
+	AssertEqual(3, Normalized)
+	AssertEqual(0, Notices.Length)
+	Accepted := _LLM_Menu_TryNormalizeIntegerPrompt("OK", "18446744073709551619",
+		"n_predictions", &Normalized, Notice)
+	_TestPrint("# llm-ui-integer-decimal-overflow accepted=" . Accepted
+		. " normalized=" . String(Normalized) . " notices=" . Notices.Length)
+	AssertFalse(Accepted, "An overflowing decimal must be refused before its wrapped integer can enter the allowed1..N option range")
+	AssertEqual(false, Normalized)
+	AssertEqual(1, Notices.Length)
+}
+Test("LLM integer prompt: an overflowing decimal cannot alias a valid prediction count (ui-decimal-sibling-domain)",
+	_LNR_IntegerPromptCannotWrapIntoAllowedRange)
+
+_LNR_InputIntegerGrammarPreserved() {
+	Notices := [], Normalized := false
+	Notify := (Body, Title) => Notices.Push(Body)
+	for Raw in [3, "3", "+3", "0x3", "+0x0003", "0X3", "0X0003", "0003", "+0003", " 3 ", "`t3`t"] {
+		AssertTrue(IsInteger(Raw), "The compatibility control must belong to the original native integer grammar")
+		AssertTrue(_LLM_Menu_TryNormalizeIntegerPrompt("OK", Raw, "n_predictions", &Normalized, Notify),
+			"Native integer syntax that represents3 must keep its prior public prompt behavior")
+		AssertTrue(Normalized is Integer)
+		AssertEqual(3, Normalized)
+	}
+	for Raw in ["-3", "-0003", "-0x3"] {
+		AssertTrue(IsInteger(Raw), "Signed negative controls use the same original native grammar")
+		AssertTrue(_LLM_Menu_TryNormalizeIntegerPrompt("OK", Raw, "pred_indent", &Normalized, Notify))
+		AssertEqual(-3, Normalized, "The indentation option retains its existing signed range")
+	}
+	AssertTrue(_LLM_Menu_TryNormalizeIntegerPrompt("OK", "-0", "max_words", &Normalized, Notify))
+	AssertEqual(0, Normalized, "Negative zero keeps its native integer meaning for the existing unlimited option")
+	AssertEqual(0, Notices.Length, "Valid legacy syntax remains silent")
+}
+Test("LLM integer input keeps plus, hex, whitespace, zero padding and negative indentation (llm-integer-input-domain)",
+	_LNR_InputIntegerGrammarPreserved)
+
+_LNR_InputIntegerRejectsAliases() {
+	for Vector in [
+		["18446744073709551619", "n_predictions"],
+		["+18446744073709551619", "n_predictions"],
+		["00018446744073709551619", "n_predictions"],
+		[" 18446744073709551619 ", "n_predictions"],
+		["-18446744073709551613", "n_predictions"],
+		["0x10000000000000003", "n_predictions"],
+		["-0xFFFFFFFFFFFFFFFD", "n_predictions"],
+		["0xFFFFFFFFFFFFFFFD", "pred_indent"]] {
+		Notices := [], Normalized := "sentinel"
+		AssertFalse(_LLM_Menu_TryNormalizeIntegerPrompt("OK", Vector[1], Vector[2], &Normalized,
+			(Body, Title) => Notices.Push(Body)), "The decimal/hex magnitude must be refused before it aliases a valid option")
+		AssertEqual(false, Normalized)
+		AssertEqual(1, Notices.Length)
+	}
+}
+Test("LLM integer input rejects decimal and hexadecimal aliases before option validation (llm-integer-input-domain)",
+	_LNR_InputIntegerRejectsAliases)
+
+_LNR_InputIntegerNativeEdges() {
+	MaxInteger := 0x7FFFFFFFFFFFFFFF
+	MinInteger := -MaxInteger - 1
+	for Vector in [
+		["9223372036854775807", MaxInteger],
+		[" +9223372036854775807 ", MaxInteger],
+		["-9223372036854775808", MinInteger],
+		["0x7FFFFFFFFFFFFFFF", MaxInteger],
+		["-0x8000000000000000", MinInteger],
+		["0x00000000000000000000000000000003", 3]] {
+		Parsed := "sentinel"
+		AssertTrue(NumberTryParseInputInteger(Vector[1], &Parsed), "Each representable signed native edge remains parseable")
+		AssertTrue(Parsed is Integer)
+		AssertEqual(Vector[2], Parsed)
+	}
+	for Raw in ["9223372036854775808", "-9223372036854775809", "0x8000000000000000",
+			"-0x8000000000000001", "0x10000000000000000", "-0x10000000000000000", "3.0", "3e0", "", Map()] {
+		Parsed := "sentinel"
+		AssertFalse(NumberTryParseInputInteger(Raw, &Parsed), "Out-of-domain magnitudes or non-integer grammar cannot reach Integer")
+		AssertEqual("", Parsed)
+	}
+}
+Test("Integer input parser checks exact signed native bounds before casting (llm-integer-input-domain)",
+	_LNR_InputIntegerNativeEdges)

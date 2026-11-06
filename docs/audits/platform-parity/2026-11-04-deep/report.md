@@ -44,7 +44,7 @@ See the [cross-OS provenance register](intentional-differences.md), its [machine
 
 ## Reproduction and validation
 
-The companion OS manifests are [Windows](../../ahk/2026_11_04/findings.json), [macOS](../../hammerspoon/2026_11_04/findings.json) and [Linux](../../linux/2026_11_04/findings.json). AHK/Hammerspoon envelopes use the existing workflow validator. Linux uses the same required-field/enumeration integration check; the shared workflow currently has no Linux scope.
+The companion OS manifests are [Windows](windows-envelope/findings.json), [macOS](../../hammerspoon/2026_11_04/findings.json) and [Linux](../../linux/2026_11_04/findings.json). The Hammerspoon envelope uses the existing workflow validator. The Windows envelope lives beside this report because the separate AHK audit pass of the same date owns `docs/audits/ahk/2026_11_04/`. Linux uses the same required-field/enumeration integration check; the shared workflow currently has no Linux scope.
 
 - Real local runtimes: Lua 5.4.8, LuaJIT 2.1, LuaFileSystem 1.8, luv/libuv, Node 22.22.2. A real PowerShell 7.4.6 engine ran extracted Windows worker bodies with fake Windows primitives; this does not certify PowerShell 5.1/PnP on Windows.
 - Each report records actual commands and outcomes. Earlier missing `luv`, wrong CWD or Node24 NUL expectations are preserved as provenance and superseded only by explicitly recorded successful reruns. Do not sum overlapping test batches as unique coverage.

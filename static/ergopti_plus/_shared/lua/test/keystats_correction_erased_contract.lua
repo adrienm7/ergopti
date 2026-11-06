@@ -28,7 +28,16 @@ return function(helpers, data, replay, expected_count)
 	helpers.describe("shared erased and synthetic n-gram vectors", function()
 		for _, vec in ipairs(data.vectors) do
 			helpers.it(vec.id, function()
-				local ngram = replay(vec)
+				local ngram, metrics = replay(vec)
+				if vec.expected_bs_total then
+					helpers.assert_true(type(metrics) == "table", vec.id .. ": the driver must expose the actual walked counters")
+					helpers.assert_eq(metrics.bs_total, vec.expected_bs_total, vec.id .. ": every physical correction still counts")
+					helpers.assert_eq(metrics.cur_word, vec.expected_cur_word, vec.id .. ": erasure retains admitted word history")
+					helpers.assert_eq(metrics.word_err, vec.expected_word_error, vec.id .. ": an unrecorded unit cannot flag the prefix")
+					if vec.expected_hs_input_chars then
+						helpers.assert_eq(metrics.hs_input_chars, vec.expected_hs_input_chars, vec.id .. ": no admitted trigger was deleted")
+					end
+				end
 				for _, family in ipairs(FAMILIES) do
 					local expected = vec.expected[family] or {}
 					local seen = {}

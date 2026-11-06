@@ -583,6 +583,7 @@ LLM_Menu_OpenAppPicker() {
 	global _LLM_Menu
 	AppPicker_Show(Map(
 		"owner",    "llm:disabled_apps",
+		"durable",  true,
 		"title",    t("menu.llm.exclude_from_ai"),
 		"prompt",   t("dialog.llm.exclude_prompt"),
 		"ok_label", t("dialog.llm.exclude_ok"),
@@ -592,10 +593,11 @@ LLM_Menu_OpenAppPicker() {
 }
 
 LLM_Menu_OnAppPickerSave(selected, receipt) {
+	Outcome := receipt is Map && receipt.Get("durable_mode", false) ? AppPicker_BeginDurableSave(receipt) : 0
 	return LLM_Menu_CommitMutation("the LLM disabled-applications setting",
 		(Candidate) => _LLM_Menu_ApplyAppPickerSelection(Candidate,
 			selected, receipt),
-		_LLM_Menu_ApplyStandardCommitted)
+		_LLM_Menu_ApplyStandardCommitted, 0, 0, 0, 0, 0, 0, 0, Outcome)
 }
 
 

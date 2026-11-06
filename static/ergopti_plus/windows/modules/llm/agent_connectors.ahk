@@ -19,8 +19,8 @@
 ;    argument, quoted for the Windows command line, never through a shell
 ;    string built from the input.
 ; 4. Every COM, file and process call goes through windows/adapters, behind a
-;    seam the test suite replaces. A temporary file is deleted at the next
-;    connector run, once the application that opened it has read it.
+;    seam the test suite replaces. The OS retains a private temporary calendar
+;    file: opening a handler gives no receipt that it has read the file.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -56,19 +56,16 @@ global LLM_AGENT_CMD_UNSAFE := '["%\r\n]'
 ; The tools list: Map("names", Array, "paths", Map(Name -> Path), "tick", Integer)
 global _LLM_AgentConnector_Tools := ""
 
-; Temporary files written by earlier runs, deleted at the next one
-global _LLM_AgentConnector_TempFiles := []
-
 ; Test seams, 0 in production. Com: (ProgId) => object or "". Open: (Target)
 ; opens a file or URI, throws on failure. Launch: (Argv) starts a program,
-; throws on failure. Write: (Path, Text) => Boolean. Delete: (Path) => Boolean.
+; throws on failure. Publish: (Text) => String path.
 ; List: (Dir) => Array of file paths. EnsureDir: (Dir). Id: () => Map("uid",
 ; "stamp").
 global _LLM_AgentConnector_ComFn := 0
 global _LLM_AgentConnector_OpenFn := 0
 global _LLM_AgentConnector_LaunchFn := 0
-global _LLM_AgentConnector_WriteFn := 0
-global _LLM_AgentConnector_DeleteFn := 0
+global _LLM_AgentConnector_PublishFn := 0
+global _LLM_AgentConnector_ParentFn := 0
 global _LLM_AgentConnector_ListFn := 0
 global _LLM_AgentConnector_EnsureDirFn := 0
 global _LLM_AgentConnector_IdFn := 0
@@ -90,7 +87,6 @@ global _LLM_AgentConnector_IdFn := 0
  * @returns {Map} Map("ok", true, "path", How) or Map("ok", false, "reason", Why).
  */
 LLM_AgentConnector_Execute(Action, Config) {
-	_LLM_AgentConnector_DeleteEarlierFiles()
 	try {
 		switch Action["type"] {
 			case "calendar", "reminder":
@@ -198,16 +194,29 @@ _LLM_AgentConnector_Shortcut(Action, Config) {
 	return "tool"
 }
 
-; Writes the action's iCalendar file to a private temp file and opens it.
+; Publishes a separate private handoff. Never infer a handler read receipt from Run.
+_LLM_AgentConnector_PublishIcs(Image) {
+	global _LLM_AgentConnector_ParentFn
+	Guid := Buffer(16, 0)
+	if PLC_CreateGuid(Guid) != 0
+		throw Error("the private calendar directory identity could not be allocated")
+	Hex := ""
+	loop Guid.Size
+		Hex .= Format("{:02x}", NumGet(Guid, A_Index - 1, "UChar"))
+	Parent := HasMethod(_LLM_AgentConnector_ParentFn, "Call") ? _LLM_AgentConnector_ParentFn.Call() : A_Temp
+	return FSWritePrivateRetained(Parent, "ergopti_agent_" . Hex, "invitation.ics", Image)
+}
+
+; The file is left for OS or user temp cleanup, with no guaranteed cleanup date.
+; There is no consumption receipt, so no subsequent action may delete it.
 _LLM_AgentConnector_OpenIcs(Action, Config) {
-	global _LLM_AgentConnector_WriteFn, _LLM_AgentConnector_IdFn, _LLM_AgentConnector_TempFiles
+	global _LLM_AgentConnector_PublishFn, _LLM_AgentConnector_IdFn
 	Id := HasMethod(_LLM_AgentConnector_IdFn, "Call") ? _LLM_AgentConnector_IdFn.Call() : _LLM_AgentConnector_NewId()
-	Path := _LLM_Ollama_TempDir() . "\ergopti_agent_" . StrReplace(Id["uid"], "@", "_") . ".ics"
-	Write := HasMethod(_LLM_AgentConnector_WriteFn, "Call") ? _LLM_AgentConnector_WriteFn : FSWrite
-	if !Write.Call(Path, LLM_Agent_Ics(Config, Action, Id["uid"], Id["stamp"]))
-		throw Error("the calendar file could not be written")
-	; Deleted at the next run: the calendar application reads it after this returns
-	_LLM_AgentConnector_TempFiles.Push(Path)
+	Image := LLM_Agent_Ics(Config, Action, Id["uid"], Id["stamp"])
+	Publish := HasMethod(_LLM_AgentConnector_PublishFn, "Call") ? _LLM_AgentConnector_PublishFn : _LLM_AgentConnector_PublishIcs
+	Path := Publish.Call(Image)
+	if !(Path is String) || Path == ""
+		throw Error("the private calendar file could not be published")
 	_LLM_AgentConnector_Open(Path)
 }
 
@@ -235,22 +244,6 @@ _LLM_AgentConnector_NewId() {
 	return Map(
 		"uid", Format("{:08x}{:08x}", Random(0, 0xFFFFFFFF), Random(0, 0xFFFFFFFF)) . "@ergopti",
 		"stamp", SubStr(Stamp, 1, 8) . "T" . SubStr(Stamp, 9, 6) . "Z")
-}
-
-; Deletes the temporary files of the earlier runs; a failure is logged.
-_LLM_AgentConnector_DeleteEarlierFiles() {
-	global _LLM_AgentConnector_TempFiles, _LLM_AgentConnector_DeleteFn
-	if !_LLM_AgentConnector_TempFiles.Length
-		return
-	Delete := HasMethod(_LLM_AgentConnector_DeleteFn, "Call") ? _LLM_AgentConnector_DeleteFn : FSDelete
-	Pending := _LLM_AgentConnector_TempFiles
-	_LLM_AgentConnector_TempFiles := []
-	for Path in Pending {
-		if !Delete.Call(Path) {
-			LoggerError("LLM", "AI agent connector: a temporary calendar file could not be deleted.")
-			_LLM_AgentConnector_TempFiles.Push(Path)
-		}
-	}
 }
 
 

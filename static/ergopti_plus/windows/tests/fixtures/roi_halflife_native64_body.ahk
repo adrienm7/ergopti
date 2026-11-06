@@ -24,6 +24,26 @@ LoggerWarn(Source, Message, Values*) {
 	LoggerError(Source, Message, Values*)
 }
 
+LoggerInfo(Source, Message, Values*) {
+	global _RHL
+	FileAppend("info " . Source . " " . Format(Message, Values*) . "`n", _RHL.Log, "UTF-8")
+}
+
+_RHL_FocusPort(App, Title, TimeoutMs) {
+	_RHL_Require(TimeoutMs == WI_FOCUS_TITLE_TIMEOUT_MS && !A_IsCritical,
+		"The genuine focus owner must perform its bounded acquisition outside Critical.")
+	return {ok: true, hwnd: 91, process_name: App, title: Title, class: "Fixture",
+		failure_reason: "", timed_out: false}
+}
+
+_RHL_AcquireFocus(App, Title) {
+	_RHL_Require(MF_RefreshFocus(true, _RHL_FocusPort.Bind(App, Title)),
+		"The actual MF normalizer and publisher must admit the private fixture's full identity.")
+	Snapshot := MF_GetFocusSnapshot()
+	_RHL_Require(Snapshot.valid && Snapshot.hwnd == 91 && Snapshot.process_name == App && Snapshot.title == Title,
+		"Only a complete genuinely published snapshot can admit the ROI producer.")
+}
+
 _RHL_Now(Producer) {
 	global _RHL
 	NativeNow := A_TickCount
@@ -109,7 +129,7 @@ _RHL_Exercise() {
 	Keystats.initialized := true
 	Keystats.session_app := "roi-clock-fixture.exe"
 	MetricsFilters.secure_field := false
-	MetricsFocusCache.state := {valid: true, process_name: "roi-clock-fixture.exe", title: "private ROI fixture", class: "Fixture"}
+	_RHL_AcquireFocus("roi-clock-fixture.exe", "private ROI fixture")
 	_RHL_Require(!A_IsSuspended && KLRoi.trigger_last_use.Count == 0
 		&& KLRoi.session_fired_count == 0 && Keystats._pending_entries.Length == 0,
 		"Fresh real state, not historical persisted dates or a previous run, must own the fixture.")
@@ -185,6 +205,157 @@ _RHL_Exercise() {
 	_RHL_Observe("complete")
 }
 
+_RHL_NonpositiveUsage() {
+	global _RHL
+	SavedChars := KLRoi.session_saved_chars
+	Fired := KLRoi.session_fired_count
+	_RHL.PushTick += 500
+	KL_Roi_OnHotstring(_RHL.Trigger, 0, false)
+	_RHL_Require(KLRoi.trigger_last_use[_RHL.Trigger] == _RHL.PushTick,
+		"A zero-saving fire must refresh public last use.")
+	_RHL.PushTick += 500
+	KL_Roi_OnHotstring(_RHL.Trigger, -3, false)
+	_RHL_Require(KLRoi.trigger_last_use[_RHL.Trigger] == _RHL.PushTick,
+		"A negative-saving fire must refresh public last use.")
+	Private := "private-zero-saving-fixture"
+	KL_Roi_OnHotstring(Private, 0, true)
+	_RHL_Require(!KLRoi.trigger_last_use.Has(Private), "Private trigger names must remain absent.")
+	_RHL_Require(KLRoi.session_fired_count == Fired + 3 && KLRoi.session_saved_chars == SavedChars,
+		"All accepted fires count as usage without adding nonpositive savings.")
+}
+
+global _RHL_KeyWpm := 0
+
+WPMWidget_Push(*) {
+	global _RHL_KeyWpm
+	_RHL_KeyWpm += 1
+	return true
+}
+
+_RHL_RevokeInput(Mode, *) {
+	switch Mode {
+		case "pause": Suspend(true)
+		case "capture": KL_Hook_InvalidateCapture()
+		case "focus": MetricsFocusCache.generation += 1
+	}
+}
+
+_RHL_Public() => false
+_RHL_Private() => true
+_RHL_NoShortcut(*) => ""
+_RHL_NoErgo(*) => 0
+
+_RHL_Type(Text, Private := false) {
+	for Character in StrSplit(Text)
+		KL_Hook_OnChar(0, Character, Private ? _RHL_Private : _RHL_Public, A_TickCount, _RHL_NoErgo)
+}
+
+_RHL_Key(vk, Private := false) {
+	KL_Hook_OnKeyDown(0, vk, 0, Private ? _RHL_Private : _RHL_Public,
+		A_TickCount, _RHL_NoShortcut, _RHL_NoErgo)
+}
+
+_RHL_ClearWords() {
+	KLRoi.current_word := ""
+	KLRoi.word_overflowed := false
+	KLRoi.word_context := false
+	KLRoi.word_counts := Map()
+	KLRoi.word_counts_generation += 1
+}
+
+_RHL_Keys() {
+	global _RHL, _RHL_KeyWpm
+	Keystats.initialized := true
+	Keystats.session_app := "roi-keys-fixture.exe"
+	KLWatch.is_session_active := true
+	KLWatch.session_started_at := A_TickCount
+	KLWatch.last_authorized_tick := A_TickCount
+	KLHook.last_tick := A_TickCount
+	MetricsFilters.secure_field := false
+	_RHL_AcquireFocus(Keystats.session_app, "ROI keys fixture")
+	for Separator in [0x0D, 0x09] {
+		_RHL_ClearWords()
+		_RHL_Type("hello")
+		_RHL_Key(Separator)
+		_RHL_Type("world ")
+		_RHL_Require(KLRoi.word_counts.Count == 2 && KLRoi.word_counts.Get("hello", 0) == 1
+			&& KLRoi.word_counts.Get("world", 0) == 1, "Enter and Tab must separate genuine hook words.")
+	}
+	for Suffix in ["x", Chr(0x1F600)] {
+		_RHL_ClearWords()
+		_RHL_Type("hello")
+		KL_Hook_OnChar(0, Suffix, _RHL_Public, A_TickCount, _RHL_NoErgo)
+		_RHL_Key(0x08)
+		_RHL_Type(" ")
+		_RHL_Require(KLRoi.word_counts.Count == 1 && KLRoi.word_counts.Get("hello", 0) == 1,
+			"Backspace must remove one entire Unicode codepoint through the real hook.")
+	}
+	_RHL_ClearWords()
+	_RHL_Key(0x08)
+	_RHL_Key(0x0D)
+	_RHL_Require(KLRoi.word_counts.Count == 0, "Empty backspace must remain neutral.")
+	Loop KLRoiConst.MAX_INPROGRESS_WORD_LEN + 1
+		_RHL_Type("x")
+	_RHL_Key(0x08)
+	_RHL_Type("hello")
+	_RHL_Key(0x0D)
+	_RHL_Require(KLRoi.word_counts.Count == 0 && !KLRoi.word_overflowed,
+		"A backspace must not turn an overflowed token into a fragment candidate.")
+	_RHL_Type("world ")
+	_RHL_Require(KLRoi.word_counts.Get("world", 0) == 1, "The next complete word must remain admissible.")
+	_RHL_ClearWords()
+	_RHL_Type("hello")
+	Keystats.synth_active := true
+	try {
+		_RHL_Key(0x08)
+		_RHL_Key(0x0D)
+		_RHL_Key(0x09)
+		_RHL_Type("x ")
+	} finally Keystats.synth_active := false
+	_RHL_Require(KLRoi.current_word == "" && KLRoi.word_counts.Count == 0,
+		"Synthetic input retires the fragment without counting its output as a public word.")
+	for Payload in ["^z", Chr(0x1F600)] {
+		_RHL_ClearWords()
+		Loop KLRoiConst.MAX_INPROGRESS_WORD_LEN - 1
+			_RHL_Type("a")
+		KL_Hook_OnChar(0, Payload, _RHL_Public, A_TickCount, _RHL_NoErgo)
+		_RHL_Require(KLRoi.word_overflowed && StrLen(KLRoi.current_word) <= KLRoiConst.MAX_INPROGRESS_WORD_LEN,
+			"A native multi-unit callback must respect the exact storage bound before publication.")
+		_RHL_Type(" ")
+		_RHL_Require(KLRoi.word_counts.Count == 0, "Overflow inside one callback must discard the entire word.")
+	}
+	_RHL_ClearWords()
+	_RHL_Type("hello")
+	KL_Hook_OnChar(0, "^.world ", _RHL_Public, A_TickCount, _RHL_NoErgo)
+	_RHL_Require(KLRoi.word_counts.Count == 2 && KLRoi.word_counts.Get("hello^", 0) == 1
+		&& KLRoi.word_counts.Get("world", 0) == 1,
+		"Boundaries inside a single callback must split the candidate stream in order.")
+	for Mode in ["pause", "capture", "focus"] {
+		_RHL_ClearWords()
+		_RHL_Type("hello")
+		BeforeWpm := _RHL_KeyWpm
+		try KL_Hook_OnChar(0, " ", _RHL_Public, A_TickCount, _RHL_RevokeInput.Bind(Mode))
+		finally Suspend(false)
+		_RHL_Require(KLRoi.current_word == "" && KLRoi.word_counts.Count == 0,
+			"Ergonomic callout revocation retires the fragment and fences subsequent ROI: " . Mode)
+		_RHL_Require(_RHL_KeyWpm == BeforeWpm,
+			"Ergonomic callout revocation must fence subsequent WPM: " . Mode)
+	}
+	_RHL_ClearWords()
+	_RHL_Type("hello")
+	_RHL_Key(0x08, true)
+	_RHL_Key(0x0D, true)
+	_RHL_Key(0x09, true)
+	_RHL_Type("x ", true)
+	_RHL_Require(KLRoi.current_word == "" && KLRoi.word_counts.Count == 0,
+		"Private input retires the fragment without counting or exposing its content.")
+	_RHL_Type("world ")
+	_RHL_Require(KLRoi.word_counts.Count == 1 && KLRoi.word_counts.Get("world", 0) == 1
+		&& !KLRoi.word_counts.Has("helloworld"),
+		"A fresh accepted word after the private gap cannot reuse its public prefix.")
+	_RHL_Require(_RHL.Errors == 0, "No swallowed hook dependency error may qualify the assertions.")
+}
+
 _RHL_Main() {
 	if A_Args.Length != 2
 		ExitApp(2)
@@ -195,7 +366,14 @@ _RHL_Main() {
 		ActivityCalls: 0, ActivityDone: false, CutpointProtected: false, TickTimer: _RHL_ObserveTick, ActivityTimer: _RHL_AdmitNewFire,
 		Failure: 0, Errors: 0}
 	Primary := 0
-	try _RHL_Exercise()
+	try {
+		if _RHL.Mode == "keys"
+			_RHL_Keys()
+		else {
+			_RHL_Exercise()
+			_RHL_NonpositiveUsage()
+		}
+	}
 	catch Any as Failure
 		Primary := Failure
 	finally {

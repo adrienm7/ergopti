@@ -266,7 +266,7 @@ global LAYOUT_ROW_PASSTHROUGH_PREFIXES := ["", "*", "+", "^", "!"]
  * Ergopti emulation. Its remaps are global variants and its layers criterion
  * variants created after this, so a variant created first, whose criterion
  * holds while the key's row is off, wins every press of that row, on every
- * level, with no reload, and sends the physical key on to the OS layout. The
+ * level, with no reload, and lets the original key reach the OS layout. The
  * registry emulation stands down through its own criteria instead, and the
  * AltGr layer through its own (RegisterAltGrLayer). The magic key keeps its
  * key: it is a feature of its own, not the layout's.
@@ -283,7 +283,7 @@ RegisterLayoutRowPassthrough(HotkeyFn := Hotkey, HotIfFn := HotIf) {
 			for Sc in Keys {
 				HotIfFn.Call(_LayoutRowPassthroughCriterion.Bind(Sc))
 				for Prefix in LAYOUT_ROW_PASSTHROUGH_PREFIXES {
-					HotkeyFn.Call(Prefix . Sc, _LayoutRowPassthrough.Bind(Sc), Prefix == "!" ? "I3" : "I2")
+					HotkeyFn.Call("~" . Prefix . Sc, _LayoutRowPassthrough.Bind(Sc), Prefix == "!" ? "I3" : "I2")
 					Count += 1
 				}
 			}
@@ -308,23 +308,15 @@ _LayoutRowPassthroughCriterion(Sc, HotkeyName := "", *) {
 		return true
 	; A chosen source owns only its plain press. Its wildcard and modifier
 	; variants follow the effective row; a layout's own source keeps every level.
-	return ScriptInformation["MagicKeySourceChosen"] && StrCompare(HotkeyName, Sc, true) != 0
+	return ScriptInformation["MagicKeySourceChosen"] && StrCompare(StrReplace(HotkeyName, "~"), Sc, true) != 0
 }
 
-; Hook hotkeys ignore synthetic events at or below their input level. Match
-; the ordinary remaps' level: I2/I3 must leave the already-forwarded key to
-; the OS, while the I1 input observers still see it with its held modifiers.
-global LAYOUT_ROW_SEND_LEVEL := 2
-
+; The tilde variant admits the original host event with its original modifier
+; flags and lets the I1 observers see it once. A delayed Blind replay loses
+; modifiers already released while its callback was queued. No synthetic input
+; or send-level change belongs to this callback.
 _LayoutRowPassthrough(Sc, *) {
-	global LAYOUT_ROW_SEND_LEVEL
-	Previous := A_SendLevel
-	SendLevel(LAYOUT_ROW_SEND_LEVEL)
-	try {
-		SendEvent("{Blind}{" . Sc . "}")
-	} finally {
-		SendLevel(Previous)
-	}
+	return
 }
 
 /**

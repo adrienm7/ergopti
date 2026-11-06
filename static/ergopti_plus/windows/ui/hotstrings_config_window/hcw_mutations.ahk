@@ -16,6 +16,8 @@
 ; extension entries) or _HCW_PatchTomlMeta (for personal TOML files).
 ; ==============================================================================
 
+#Include ../../infra/number.ahk
+
 ; Override fields that are BAKED INTO EACH SPEC at registration time rather than
 ; derived at read time. Persisting one of these only bumps the resolve
 ; generation, so the window (which reads through HotstringsResolve) shows the new
@@ -113,15 +115,65 @@ _HCW_ReconcileNativeReset(Outcome) {
 ; the batch can let the user close it and reopen another window; that newer
 ; window shows the cleared state already and is not this reset's to retire.
 _HCW_CompleteNativeReset(Owner, Outcome) {
-	global _HCWGui, _HCWWidgets
-	if (Owner != 0 && _HCWGui == Owner) {
-		_HCWGui.Destroy()
-		; Destroy() does not fire OnEvent('Close'), so clear globals manually to
-		; prevent OpenHotstringsConfigWindow from showing a destroyed Gui.
-		_HCWGui := 0
-		_HCWWidgets := 0
-	}
+	global _HCWGui, _HCWWidgets, _HCW_RetiredNativeResets
+	PreviousCritical := Critical("On")
+	try {
+		if (Owner != 0 && _HCWGui == Owner) {
+			; Retain exact cleanup custody before WM_DESTROY can admit B.
+			Host := {window: _HCWGui, hwnd: _HCWGui.Hwnd, widgets: _HCWWidgets, closing: false}
+			_HCW_RetiredNativeResets.Push(Host)
+			_HCWGui := 0
+			_HCWWidgets := 0
+		}
+	} finally Critical(PreviousCritical)
+	_HCW_RetryRetiredNativeResets()
 	TrayTip(t("hs_config.notify_reset_all"), t("hs_config.btn_reset_all"), "Iconi Mute")
+}
+
+; A refused retirement never restores A over a successor. Its independent
+; record remains available to the next real public opening.
+_HCW_RetryRetiredNativeResets() {
+	global _HCW_RetiredNativeResets
+	PreviousCritical := Critical("On")
+	try Pending := _HCW_RetiredNativeResets.Clone()
+	finally Critical(PreviousCritical)
+	for Host in Pending {
+		PreviousCritical := Critical("On")
+		try {
+			if Host.closing
+				continue
+			Host.closing := true
+		} finally Critical(PreviousCritical)
+		Settled := false
+		try {
+			Window := Host.window
+			; A retained old form cannot continue accepting edits or native focus.
+			try Window.Hide()
+			Window.Destroy()
+			if Host.hwnd && DllCall("IsWindow", "Ptr", Host.hwnd, "Int") {
+				Remaining := GuiFromHwnd(Host.hwnd)
+				if !IsObject(Remaining) || Remaining == Window
+					throw Error("The retired hotstrings reset window has not closed.")
+			}
+			Host.window := 0, Host.widgets := 0
+			Settled := true
+		} catch Any as Failure {
+			try LoggerWarn("HotstringsConfigWindow", "Native reset retirement remains pending (error_type={1}).", Type(Failure))
+		} finally {
+			PreviousCritical := Critical("On")
+			try {
+				Host.closing := false
+				if Settled {
+					Count := _HCW_RetiredNativeResets.Length
+					Loop Count {
+						Index := Count - A_Index + 1
+						if _HCW_RetiredNativeResets[Index] == Host
+							_HCW_RetiredNativeResets.RemoveAt(Index)
+					}
+				}
+			} finally Critical(PreviousCritical)
+		}
+	}
 }
 
 
@@ -137,7 +189,11 @@ _HCW_OnDelayChanged() {
 	global _HCWWidgets
 	Entry := _HCW_SelectedEntry()
 	Sec := _HCW_SelectedSection(Entry)
-	Ms := _HCWWidgets.DelayEdit.Value + 0
+	if !NumberTryParseInputInteger(_HCWWidgets.DelayEdit.Value, &Ms) {
+		; A partial/invalid edit supersedes its own pending numeric candidate.
+		_HCW_CancelNumericWrite(Entry, Sec, "delay")
+		return
+	}
 	if (Ms < 0) {
 		Ms := 0
 	}
@@ -149,7 +205,10 @@ _HCW_OnPriorityChanged() {
 	global _HCWWidgets
 	Entry := _HCW_SelectedEntry()
 	Sec := _HCW_SelectedSection(Entry)
-	Prio := _HCWWidgets.PriorityEdit.Value + 0
+	if !NumberTryParseInputInteger(_HCWWidgets.PriorityEdit.Value, &Prio) {
+		_HCW_CancelNumericWrite(Entry, Sec, "priority")
+		return
+	}
 	if (Prio < 0) {
 		Prio := 0
 	} else if (Prio > 100) {
@@ -432,16 +491,35 @@ _HCW_SetAllGrey() {
 	return Outcome["ok"]
 }
 
-_HCW_OnClose() {
+_HCW_OnClose(ExpectedWindow := unset, *) {
 	global _HCWGui, _HCWWidgets, _HCW_LastSelection
-	; Commit any numeric edit still inside the debounce window before tearing
-	; down the widgets, otherwise the last value the user typed would be lost.
+	if IsSet(ExpectedWindow) && !_HCW_NativeResetCloseCurrent(ExpectedWindow)
+		return 1
+	; Commit any numeric edit still inside the debounce window before teardown.
 	if !_HCW_DrainBeforeTransition(_HCW_FlushNumericWrite.Bind(false))
 		return 1
-	_HCWGui := 0
-	_HCWWidgets := 0
-	_HCW_LastSelection := 0
+	PreviousCritical := Critical("On")
+	try {
+		if IsSet(ExpectedWindow) && !_HCW_NativeResetCloseCurrent(ExpectedWindow)
+			return 1
+		RetiredWindow := _HCWGui, RetiredWidgets := _HCWWidgets, RetiredSelection := _HCW_LastSelection
+		_HCWGui := 0
+		_HCWWidgets := 0
+		_HCW_LastSelection := 0
+	} finally Critical(PreviousCritical)
 	return 0
+}
+
+; A retained A cannot clear B. An unrecorded Gui in its first Show still uses
+; the original native Close behavior before its singleton has been published.
+_HCW_NativeResetCloseCurrent(Window) {
+	global _HCWGui, _HCW_RetiredNativeResets
+	if IsObject(_HCWGui) && _HCWGui != Window
+		return false
+	for Host in _HCW_RetiredNativeResets
+		if Host.window == Window
+			return false
+	return true
 }
 
 

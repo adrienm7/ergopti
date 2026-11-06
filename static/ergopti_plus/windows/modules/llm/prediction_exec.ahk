@@ -142,7 +142,12 @@ _LLM_Engine_NormalizeAcceptSource(AcceptSource := unset) {
 	if !(Hwnd is Integer and Hwnd > 0
 			and ControlToken is Integer and ControlToken > 0)
 		return Map("hwnd", 0, "control", 0)
-	return Map("hwnd", Hwnd, "control", ControlToken)
+	Source := Map("hwnd", Hwnd, "control", ControlToken)
+	if AcceptSource.Has("source_secure") {
+		Secure := AcceptSource["source_secure"]
+		Source["source_secure"] := !(Secure is Integer) || Secure != 0
+	}
+	return Source
 }
 
 ; Resolve the source owned by the request whose tooltip is about to be painted.
@@ -193,7 +198,7 @@ _LLM_Engine_AppIsExcluded(AppId, Apps) {
 	if (Needle = "")
 		return true
 	for App in Apps {
-		if !(App is String)
+		if !(App is String) || Trim(App) == ""
 			return true
 		if (RegExReplace(StrLower(Trim(App)), "\.exe$", "") == Needle)
 			return true
@@ -203,7 +208,7 @@ _LLM_Engine_AppIsExcluded(AppId, Apps) {
 
 ; Owns the complete disabled-app privacy decision so the production caller and
 ; tests cannot disagree about invalid state, focus lookup, or name matching.
-_LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0) {
+_LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0, SourceAppId := unset) {
 	global _LLM_Engine
 	Apps := _LLM_Engine.Get(ConfigLeaf.DISABLED_APPS, [])
 	if !(Apps is Array) {
@@ -224,6 +229,12 @@ _LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0) {
 			return true
 		}
 		Policy.Push(App)
+	}
+	; A timer owns the origin's buffer, not the app that happens to be focused
+	; when it fires. Unknown captured identity also refuses a nonempty policy.
+	if IsSet(SourceAppId) && _LLM_Engine_AppIsExcluded(SourceAppId, Policy) {
+		try LoggerInfo("LLM", "Prediction suppressed - captured source app is excluded or unavailable.")
+		return true
 	}
 	Focused := 0
 	try Focused := HasMethod(FocusFn, "Call") ? FocusFn.Call() : WIGetFocused()
@@ -335,8 +346,11 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		; caller must still fail closed if a future port implementation throws.
 		; Sending a password context is irreversible; suppressing one prediction
 		; until the next safe buffer is always the correct privacy outcome.
-		IsPw := true
-		try IsPw := SFD_IsSecureField()
+		IsPw := AcceptSource.Get("source_secure", false)
+		if !IsPw {
+			IsPw := true
+			try IsPw := SFD_IsSecureField()
+		}
 		if IsPw {
 			try LoggerInfo("LLM", "Prediction suppressed — password field detected.")
 			return
@@ -375,7 +389,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; and shown in the menu but was previously never enforced. Resolve the focused process
 	; only when the list is non-empty, so no OS call runs on the per-fire path when the user
 	; has not excluded any app (llm-app-filter-enforced).
-	if _LLM_Engine_ShouldSuppressForDisabledApps()
+	if _LLM_Engine_ShouldSuppressForDisabledApps(, RequestAcceptSource["app_name"])
 		return
 
 	backend_now := _LLM_Engine.Has("backend") ? _LLM_Engine["backend"] : "ollama"
@@ -637,7 +651,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; "REWRITE: …" text, which carries no erasure and would be typed as is.
 	streaming_enabled := is_rewrite ? false : LLM_EffectiveStreaming(backend,
 		_LLM_Engine.Has("streaming") and _LLM_Engine["streaming"])
-	request_current := _LLM_Engine_RenderIdentityIsCurrent.Bind(this_request_id, request_semantic_signature)
+	request_current := _LLM_Engine_RequestSourceIsCurrent.Bind(this_request_id, request_semantic_signature,
+		RequestAcceptSource["app_name"])
 	if (backend == "api") {
 		entry := _LLM_Engine_GetActiveApiEntry()
 		if (entry == "") {
@@ -839,6 +854,41 @@ _LLM_Engine_DispatchBatch(state) {
 		(failure := "") => _LLM_Engine_OnBatchFail(state_ref, failure))
 }
 
+; Each accepted response already owns the native usage domain. Aggregate
+; fields independently: once a full-request sum cannot be represented, zero
+; means unknown for that field until this exact request has finished.
+_LLM_Engine_AccumulateUsage(state, meta) {
+	if !(meta is Map)
+		return
+	if !state.Has("usage_unknown_fields")
+		state["usage_unknown_fields"] := Map()
+	Unknown := state["usage_unknown_fields"]
+	for Field in ["prompt_tokens", "completion_tokens", "total_tokens"] {
+		if Unknown.Has(Field)
+			continue
+		Previous := _LLMRemoteUsageCount(state.Get(Field, 0))
+		Added := _LLMRemoteUsageCount(meta.Get(Field, 0))
+		if Previous > 0x7FFFFFFFFFFFFFFF - Added {
+			Unknown[Field] := true
+			state[Field] := 0
+		} else
+			state[Field] := Previous + Added
+	}
+	Field := "est_cost_usd"
+	if Unknown.Has(Field)
+		return
+	Previous := state.Get(Field, 0.0), Added := meta.Get(Field, 0.0)
+	if _LLMRemote_CatalogPriceIsValid(Previous) && _LLMRemote_CatalogPriceIsValid(Added) {
+		Total := Float(Previous) + Float(Added)
+		if _LLMRemote_CatalogPriceIsValid(Total) {
+			state[Field] := Total
+			return
+		}
+	}
+	Unknown[Field] := true
+	state[Field] := 0.0
+}
+
 _LLM_Engine_OnBatchSuccess(state, text, meta := "") {
 	global _LLM_Engine
 	if !_LLM_Engine_IsCurrent(state)
@@ -846,12 +896,7 @@ _LLM_Engine_OnBatchSuccess(state, text, meta := "") {
 	; Capture per-request token usage when the backend provided it. Same
 	; structure as the sequential path so the finalize step can emit a
 	; unified keystats event regardless of dispatch strategy.
-	if (meta is Map) {
-		state["prompt_tokens"]     := (state.Has("prompt_tokens")     ? state["prompt_tokens"]     : 0) + (meta.Has("prompt_tokens")     ? meta["prompt_tokens"]     : 0)
-		state["completion_tokens"] := (state.Has("completion_tokens") ? state["completion_tokens"] : 0) + (meta.Has("completion_tokens") ? meta["completion_tokens"] : 0)
-		state["total_tokens"]      := (state.Has("total_tokens")      ? state["total_tokens"]      : 0) + (meta.Has("total_tokens")      ? meta["total_tokens"]      : 0)
-		state["est_cost_usd"]      := (state.Has("est_cost_usd")      ? state["est_cost_usd"]      : 0.0) + (meta.Has("est_cost_usd")    ? meta["est_cost_usd"]      : 0.0)
-	}
+	_LLM_Engine_AccumulateUsage(state, meta)
 	slots := _LLM_Engine_ParseSlots(text, state)
 	state["slots"] := slots
 	_LLM_Engine_FinalizeRequest(state)
@@ -1030,7 +1075,7 @@ _LLM_Engine_OnStreamPartial(state, slot_idx, partial) {
 	while (preview.Length < slot_idx - 1)
 		preview.Push("")
 	; Strip thinking tags during streaming; full parser runs on on_success.
-	display := LLM_Parser_StripThinking(partial)
+	display := LLM_Parser_StripThinking(partial, true)
 	preview.Push(display)
 	; Active = the slot currently streaming, so Tab during streaming still
 	; produces something sensible.
@@ -1047,12 +1092,7 @@ _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 	; Accumulate token usage / cost across variants. The Ollama path does
 	; not pass meta (its sync /api/generate response carries different
 	; fields we don't bill on); the API path does. Missing values stay 0.
-	if (meta is Map) {
-		state["prompt_tokens"]     := (state.Has("prompt_tokens")     ? state["prompt_tokens"]     : 0) + (meta.Has("prompt_tokens")     ? meta["prompt_tokens"]     : 0)
-		state["completion_tokens"] := (state.Has("completion_tokens") ? state["completion_tokens"] : 0) + (meta.Has("completion_tokens") ? meta["completion_tokens"] : 0)
-		state["total_tokens"]      := (state.Has("total_tokens")      ? state["total_tokens"]      : 0) + (meta.Has("total_tokens")      ? meta["total_tokens"]      : 0)
-		state["est_cost_usd"]      := (state.Has("est_cost_usd")      ? state["est_cost_usd"]      : 0.0) + (meta.Has("est_cost_usd")    ? meta["est_cost_usd"]      : 0.0)
-	}
+	_LLM_Engine_AccumulateUsage(state, meta)
 	; Dedup against existing slots; skip empties. Comparison is case-SENSITIVE
 	; via StrCompare(.., true): AHK v2's ``==`` operator is case-INSENSITIVE
 	; for strings, so without StrCompare two predictions that differ only by
@@ -1140,6 +1180,26 @@ _LLM_Engine_IsCurrent(state) {
 	return (state["request_id"] == current_id
 		and _LLM_Engine_SignaturesEqual(
 			state["semantic_signature"], _LLM_Engine.Get("active_request_signature", "")))
+}
+
+; Transport admission may run under a native publication claim. This guard
+; only reads validated RAM policy: no focus probe, logging or message pumping.
+_LLM_Engine_SourceAppAllowed(SourceAppId) {
+	global _LLM_Engine
+	if !(_LLM_Engine is Map)
+		return false
+	Apps := _LLM_Engine.Get(ConfigLeaf.DISABLED_APPS, [])
+	return Apps is Array && (Apps.Length == 0 || !_LLM_Engine_AppIsExcluded(SourceAppId, Apps))
+}
+
+_LLM_Engine_RequestSourceIsCurrent(RequestId, SemanticSignature, SourceAppId) {
+	global _LLM_Engine
+	PreviousCritical := Critical("On")
+	try {
+		return _LLM_Engine is Map && !A_IsSuspended && _LLM_Engine.Get("enabled", false)
+			&& _LLM_Engine_RenderIdentityIsCurrent(RequestId, SemanticSignature)
+			&& _LLM_Engine_SourceAppAllowed(SourceAppId)
+	} finally Critical(PreviousCritical)
 }
 
 _LLM_Engine_RenderIdentityIsCurrent(RequestId, SemanticSignature) {
@@ -1338,7 +1398,18 @@ _LLM_Engine_ParseSlots(raw, state) {
 		&displays
 	)
 	state["dedup_stats"] := dedup_ref
-	_LLM_Engine_RememberSlotDisplays(state["ctx"], displays)
+	; Parsing can yield through a refusal diagnostic. The current request may
+	; already own another context's display when that older parser returns.
+	; Revalidate and publish as one bounded memory operation, with all parser
+	; work and logging outside Critical. Pure parser/render helpers carry no
+	; request identity; any supplied identity must be complete and current.
+	PreviousCritical := Critical("On")
+	try {
+		if (state.Has("request_id") || state.Has("semantic_signature"))
+				&& !_LLM_Engine_IsCurrent(state)
+			return []
+		_LLM_Engine_RememberSlotDisplays(state["ctx"], displays)
+	} finally Critical(PreviousCritical)
 	; The first erasure recorded for a slot text wins, like the slot itself: a
 	; later duplicate is dropped by the dedup and must not replace its edit.
 	if !state.Has("rewrite_edits")

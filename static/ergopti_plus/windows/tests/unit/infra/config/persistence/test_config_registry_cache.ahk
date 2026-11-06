@@ -227,3 +227,117 @@ _CRC_StaleIsInfoCorruptionWarns() {
 }
 Test("registry cache: a stale cache is an INFO miss, a tampered one warns (registry-cache-stale-info)",
 	_CRC_StaleIsInfoCorruptionWarns)
+
+_CRC_PendingOwnsSourceModel(MutateReturned) {
+	global _ConfigRegistryCachePending
+	SavedPending := _ConfigRegistryCachePending
+	Root := A_Temp . "\ergopti_registry_pending_owner_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	SourcePath := Root . "\registry.toml", CachePath := Root . "\registry.cache", Created := false
+	Source := '[registry]`ncurrent_version = 2`nunstamped_version = 1`n'
+		. '[steps.v1_to_v2]`nfrom = 1`nto = 2`ndrivers = ["ahk"]`nreason = "owned source"`n'
+		. 'ops = [{ op = "rename", section = "data", key = "old", to_key = "new" }]`n'
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(SourcePath, Source))
+		Before := FSReadBytesStrict(SourcePath)
+		Registry := ConfigRegistryCacheLoad(SourcePath, CachePath)
+		AssertEqual("new", Registry["steps"][1]["ops"][1]["to_key"])
+		Mutable := MutateReturned ? Registry : ManifestCloneValue(Registry)
+		Mutable["steps"][1]["ops"][1]["to_key"] := "foreign"
+		AssertTrue(ConfigRegistryCacheFlushPending(), "the real deferred encoder and native publication must complete")
+		Fresh := ConfigRegistryCacheLoad(SourcePath, CachePath)
+		Plan := ConfigMigratePlan('[data]`nold = "Original"`n', Fresh, "ahk")
+		ActualKey := Fresh["steps"][1]["ops"][1]["to_key"]
+		After := FSReadBytesStrict(SourcePath)
+		_TestPrint("# registry-pending-owner mutate_returned=" . MutateReturned
+			. " cached_to_key=" . ActualKey . " plan=" . Plan["outcome"]
+			. " has_new=" . (Plan.Has("model") && Plan["model"].Has("data") && Plan["model"]["data"].Has("new"))
+			. " has_foreign=" . (Plan.Has("model") && Plan["model"].Has("data") && Plan["model"]["data"].Has("foreign"))
+			. " before_bytes=" . Before.Size . " after_bytes=" . After.Size)
+		AssertEqual(Before.Size, After.Size)
+		AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+			"Ptr", After, "UPtr", Before.Size, "UPtr"), "the authoritative source must never be altered by this probe")
+		AssertEqual("new", ActualKey, "a cache must retain the source parse, independently of a returned runtime registry")
+		AssertEqual("migrated", Plan["outcome"])
+		AssertEqual("Original", Plan["model"]["data"]["new"])
+		AssertFalse(Plan["model"]["data"].Has("foreign"), "fresh migrations must follow the still-authoritative registry source")
+	} finally {
+		_ConfigRegistryCachePending := SavedPending
+		if Created {
+			Pristine := _ConfigRegistryPristineStore()
+			if Pristine.Has(SourcePath)
+				Pristine.Delete(SourcePath)
+			_TOML_InvalidateParseCache(SourcePath)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _CRC_MutateReturned in [true, false]
+	Test("registry cache: pending source model owns returned mutation=" . _CRC_MutateReturned
+		. " (registry-pending-source-ownership)", _CRC_PendingOwnsSourceModel.Bind(_CRC_MutateReturned))
+
+
+_CRC_PendingOwnsDeepValues(Mode) {
+	global _ConfigRegistryCachePending
+	SavedPending := _ConfigRegistryCachePending
+	Root := A_Temp . "\ergopti_registry_deep_pending_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	SourcePath := Root . "\registry.toml", CachePath := Root . "\registry.cache", Created := false
+	Source := '[registry]`ncurrent_version = 2`nunstamped_version = 1`n'
+		. '[steps.v1_to_v2]`nfrom = 1`nto = 2`ndrivers = ["ahk"]`nreason = "deep owned source"`n'
+		. 'ops = [{ op = "rename", section = "data", key = "old", to_key = "new" },'
+		. '{ op = "set_if_absent", section = "data", key = "flags", value = [true, false] }]`n'
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(SourcePath, Source))
+		Before := FSReadBytesStrict(SourcePath)
+		Registry := ConfigRegistryCacheLoad(SourcePath, CachePath)
+		Ops := Registry["steps"][1]["ops"]
+		AssertEqual(2, Ops.Length)
+		AssertTrue(Ops[2]["value"][1] is TOML_Bool && Ops[2]["value"][1].Value)
+		if Mode == "typed-booleans" {
+			Ops[2]["value"][1].Value := false
+			Ops[2]["value"][2].Value := true
+		} else {
+			Ops.Push(Map("op", "set_if_absent", "section", "data", "key", "foreign", "value", "Injected"))
+		}
+		AssertTrue(ConfigRegistryCacheFlushPending(), "The actual deferred encoder and native publisher must flush the detached source model")
+		Fresh := ConfigRegistryCacheLoad(SourcePath, CachePath)
+		Plan := ConfigMigratePlan('[data]`nold = "Original"`n', Fresh, "ahk")
+		FreshOps := Fresh["steps"][1]["ops"]
+		_TestPrint("# registry-deep-pending mode=" . Mode . " ops=" . FreshOps.Length
+			. " flag0=" . FreshOps[2]["value"][1].Value . " flag1=" . FreshOps[2]["value"][2].Value
+			. " migrated=" . (Plan["outcome"] == "migrated") . " has_foreign=" . Plan["model"]["data"].Has("foreign"))
+		AssertEqual(2, FreshOps.Length, "Appending to the returned runtime ops array cannot append an operation to the pending source parse")
+		AssertTrue(FreshOps[2]["value"][1] is TOML_Bool && FreshOps[2]["value"][1].Value)
+		AssertTrue(FreshOps[2]["value"][2] is TOML_Bool && !FreshOps[2]["value"][2].Value)
+		AssertEqual("migrated", Plan["outcome"])
+		AssertEqual("Original", Plan["model"]["data"]["new"])
+		AssertFalse(Plan["model"]["data"].Has("foreign"))
+		AssertTrue(Plan["model"]["data"]["flags"][1] is TOML_Bool && Plan["model"]["data"]["flags"][1].Value)
+		AssertTrue(Plan["model"]["data"]["flags"][2] is TOML_Bool && !Plan["model"]["data"]["flags"][2].Value)
+		; A later runtime mutation on a genuine cache hit must also be local.
+		FreshOps[1]["to_key"] := "hit_foreign"
+		Again := ConfigRegistryCacheLoad(SourcePath, CachePath)
+		AssertEqual("new", Again["steps"][1]["ops"][1]["to_key"])
+		AssertFalse(ConfigRegistryCacheFlushPending(), "A genuine cache hit schedules no new cache model from its returned runtime")
+		After := FSReadBytesStrict(SourcePath)
+		AssertEqual(Before.Size, After.Size)
+		AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before, "Ptr", After, "UPtr", Before.Size, "UPtr"))
+	} finally {
+		_ConfigRegistryCachePending := SavedPending
+		if Created {
+			Pristine := _ConfigRegistryPristineStore()
+			if Pristine.Has(SourcePath)
+				Pristine.Delete(SourcePath)
+			_TOML_InvalidateParseCache(SourcePath)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _CRC_DeepMode in ["typed-booleans", "ops-array"]
+	Test("Registry cache pending source: " . _CRC_DeepMode . " stays independent of mutable runtime values (registry-pending-deep-ownership)",
+		_CRC_PendingOwnsDeepValues.Bind(_CRC_DeepMode))
