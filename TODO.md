@@ -21,6 +21,10 @@ MIT notice has to ship and the design can go further (one `.keylayout` source, g
       existing bricks: `static/ergopti/linux/xkb_generation/keylayout_to_xkb.py`, `_shared/lua/layouts/composer.lua`
       and `composer_check`, `_shared/ui/layout_composer/`, the composer corpus vectors, and the Windows installer from
       `layout/windows-klc-installer`. Each target gets a golden-vector test against the same corpus.
+- [ ] **macOS export: bundle by default, ISO and ANSI.** A macOS layout can be one `.keylayout` file, but the
+      default export is a `.bundle` holding both physical variants, ISO and ANSI (as
+      `Ergopti_v2.2.0.bundle` does today). The export dialog has a drop-down: « Bundle ISO + ANSI » (default),
+      « ISO only » or « ANSI only », the last two giving a single `.keylayout`.
 - [ ] **Layout editor on the Svelte site.** A new tab where a user configures their own layout and edits it as a
       `.keylayout`, then downloads every generated target.
 - [ ] **The same UI inside ErgoptiPlus.** The editor page runs locally in the app's webview on Windows, macOS and
