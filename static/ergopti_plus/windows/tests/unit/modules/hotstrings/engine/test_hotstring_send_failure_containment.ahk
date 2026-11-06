@@ -196,6 +196,11 @@ _SCSC_Revoke(State, Boundary) {
 			Suspend(true)
 			GetSelectionCancel()
 			Suspend(false)
+		; External changes leave every helper input alone: only the window,
+		; the focused control or the physical-input generation moves (WCP-001).
+		case "foreground": State["foreground"] := 102
+		case "focus": State["control"] := 202
+		case "generation": State["generation"] += 1
 		case "new":
 			State["nested"] := GetSelectionAsync((*) => 0, State["ports"])
 			AssertFalse(State["nested"], "the newer request cannot snapshot an in-flight clear")
@@ -247,10 +252,12 @@ _SCSC_Startup(Boundary, Action) {
 	PreviousSettle := CBClipboardOwner.settle_hook
 	State := Map("boundary", Boundary, "action", Action, "revoked", false,
 		"saves", 0, "clears", 0, "sequences", 0, "sends", 0,
-		"restores", 0, "job", 0, "deliveries", 0, "nested", true)
+		"restores", 0, "job", 0, "deliveries", 0, "nested", true,
+		"foreground", 101, "control", 201, "generation", 7)
 	Ports := Map("save", _SCSC_Save.Bind(State), "clear", _SCSC_Clear.Bind(State),
 		"sequence", _SCSC_Sequence.Bind(State), "send", _SCSC_Send.Bind(State),
-		"restore", _SCSC_Restore.Bind(State), "control", (*) => 201, "foreground", (*) => 101)
+		"restore", _SCSC_Restore.Bind(State), "control", (*) => State["control"],
+		"foreground", (*) => State["foreground"], "physical_generation", (*) => State["generation"])
 	State["ports"] := Ports
 	try {
 		CBClipboardOwner.settle_hook := 0
@@ -299,6 +306,8 @@ _SCSC_Startup(Boundary, Action) {
 			CB_EndOwnedTransaction(State["job"]["owner_token"])
 			State["job"]["callback"] := 0
 			State["job"]["timer"] := 0
+			for Observer in ["control_fn", "foreground_fn", "generation_fn"]
+				State["job"][Observer] := 0
 		}
 		State.Delete("ports")
 		CBClipboardOwner.settle_hook := PreviousSettle
@@ -310,7 +319,7 @@ _SCSC_Startup(Boundary, Action) {
 }
 
 for Boundary in ["snapshot", "clear", "sequence", "send"] {
-	for Action in ["pause", "cancel", "pause-resume", "new"] {
+	for Action in ["pause", "cancel", "pause-resume", "new", "foreground", "focus", "generation"] {
 		Test("hotstrings: selection startup " . Action . " during " . Boundary
 			. " (selection-startup-revocation)", _SCSC_Startup.Bind(Boundary, Action))
 	}
