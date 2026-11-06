@@ -90,7 +90,15 @@ assert.equal(posted.at(-1).values.address, original);
 city.value = 'Paris\nÎle-de-France';
 elements['btn-save'].listeners.click();
 assert.equal(posted.at(-1).values.city, 'Paris\nÎle-de-France');
-context.window.initData({ fields: [{ key: '__proto__', label: 'custom', value: 'before' }] });
+// A late second initialization must not discard edits in this document.
+context.window.initData({ fields: [{ key: 'city', label: 'city', value: 'Puteaux' }] });
+assert.equal(city.value, 'Paris\nÎle-de-France');
+assert.equal(elements.rows.children.length, 2);
+// A navigation creates a fresh JavaScript realm and accepts its own initial data.
+elements.rows.innerHTML = '';
+const fresh = { ...context, window: {} };
+vm.runInNewContext(fs.readFileSync(script, 'utf8'), fresh);
+fresh.window.initData({ fields: [{ key: '__proto__', label: 'custom', value: 'before' }] });
 elements.rows.children[0].children[1].value = 'after';
 elements['btn-save'].listeners.click();
 assert.equal(Object.getPrototypeOf(posted.at(-1).values), null);

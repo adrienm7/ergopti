@@ -166,7 +166,7 @@ local _shutdown_gate_owner = nil
 local _next_window_epoch = 0
 
 -- Deferred producers publish only into their exact acknowledged document.
-local DOCUMENT_APPS = { changelog = true, download_window = true, model_browser = true }
+local DOCUMENT_APPS = { changelog = true, download_window = true, model_browser = true, personal_info_editor = true }
 local _document_windows, _document_debts = {}, {}
 
 --- Announces a native initialization error without writing to the failed page.
