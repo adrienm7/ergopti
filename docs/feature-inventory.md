@@ -556,7 +556,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `tap_hold_close_other_karabiner_rows.tap_hold_close_other_karabiner` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `tap_hold_vhid_update_rows.tap_hold_vhid_update` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `tap_hold_owned_install_rows.tap_hold_owned_install` (hide): Review the platform-specific presentation and equivalent.
-- [ ] `key_combinations_group.copy_tap_to_combo` (hide): Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.
 - [ ] `metrics_menu.wpm_menubar` (hide): Not on Windows: these rows govern the words-per-minute readout in the menu bar (macOS) or the notification area (Linux). Windows has no equivalent; its readout is the floating widget.
 - [ ] `metrics_menu.menubar_colors` (hide): Not on Windows: these rows govern the words-per-minute readout in the menu bar (macOS) or the notification area (Linux). Windows has no equivalent; its readout is the floating widget.
 - [ ] `metrics_menu.metrics_migration` (hide): Background encryption migration — Linux only

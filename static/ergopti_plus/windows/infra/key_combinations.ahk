@@ -167,42 +167,57 @@ KeyCombinationsReadConfig(Cache) {
 	}
 	_KeyCombinationScanNames := ScanNames
 	_KeyCombinationKeysByScanName := KeysByScanName
-	Taps := Map()
-	Holds := Map()
-	for _, Entry in ManifestFeaturesForSection(KEY_COMBINATION_TAP_SECTION) {
-		if (Entry["default"] != KEY_COMBINATION_NONE)
-			Taps[Entry["id"]] := Entry["default"]
-	}
-	for Section, Target in Map(KEY_COMBINATION_TAP_SECTION, Taps, KEY_COMBINATION_HOLD_SECTION, Holds) {
-		if !(Cache is Map) || !Cache.Has(Section)
-			continue
-		for PairId, Value in Cache[Section] {
-			if !(KeyCombinationParsePair(PairId) is Map) {
-				LoggerWarn("KeyCombinations", "[{1}] '{2}' names no pair of tap-hold keys — ignored.", Section, PairId)
-				continue
-			}
-			if (Value == KEY_COMBINATION_NONE) {
-				if Target.Has(PairId)
-					Target.Delete(PairId)
-				continue
-			}
-			Known := (Section == KEY_COMBINATION_TAP_SECTION)
-				? ((Value is String) && GESTURE_ACTIONS.Has(Value))
-				: KeyCombinationHoldIsKnown(Value)
-			if !Known {
-				LoggerWarn("KeyCombinations", "[{1}] '{2}' holds unknown value '{3}' — left empty.", Section, PairId, Value)
-				if Target.Has(PairId)
-					Target.Delete(PairId)
-				continue
-			}
-			Target[PairId] := Value
-		}
-	}
+	Taps := _KeyCombinationReadSlots(Cache, KEY_COMBINATION_TAP_SECTION, true)
+	Holds := _KeyCombinationReadSlots(Cache, KEY_COMBINATION_HOLD_SECTION, true)
 	KeyCombinationTaps := Taps
 	KeyCombinationHolds := Holds
 	_KeyCombinationFirstKeys := _KeyCombinationIndexFirstKeys(Taps, Holds)
 	LoggerInfo("KeyCombinations", "Key combinations read: {1} tap slot(s), {2} hold slot(s).", Taps.Count, Holds.Count)
 	KeyCombinationChordsReadConfig(Cache)
+}
+
+; The filled slots of one section: the config value when present, the manifest
+; default of a declared tap slot otherwise. The boot read reports what it
+; drops; a later planner reading the same file passes Warn := false.
+; @param Cache {Map} A parsed config (boot cache or decoded snapshot cache).
+; @param Section {String} KEY_COMBINATION_TAP_SECTION or KEY_COMBINATION_HOLD_SECTION.
+; @param Warn {Boolean} Whether to log the ignored and emptied slots.
+; @returns {Map} Pair id -> action or hold id; an empty slot is absent.
+_KeyCombinationReadSlots(Cache, Section, Warn) {
+	global KEY_COMBINATION_TAP_SECTION, KEY_COMBINATION_NONE, GESTURE_ACTIONS
+	Target := Map()
+	if (Section == KEY_COMBINATION_TAP_SECTION) {
+		for _, Entry in ManifestFeaturesForSection(KEY_COMBINATION_TAP_SECTION) {
+			if (Entry["default"] != KEY_COMBINATION_NONE)
+				Target[Entry["id"]] := Entry["default"]
+		}
+	}
+	if !(Cache is Map) || !Cache.Has(Section)
+		return Target
+	for PairId, Value in Cache[Section] {
+		if !(KeyCombinationParsePair(PairId) is Map) {
+			if Warn
+				LoggerWarn("KeyCombinations", "[{1}] '{2}' names no pair of tap-hold keys — ignored.", Section, PairId)
+			continue
+		}
+		if (Value == KEY_COMBINATION_NONE) {
+			if Target.Has(PairId)
+				Target.Delete(PairId)
+			continue
+		}
+		Known := (Section == KEY_COMBINATION_TAP_SECTION)
+			? ((Value is String) && GESTURE_ACTIONS.Has(Value))
+			: KeyCombinationHoldIsKnown(Value)
+		if !Known {
+			if Warn
+				LoggerWarn("KeyCombinations", "[{1}] '{2}' holds unknown value '{3}' — left empty.", Section, PairId, Value)
+			if Target.Has(PairId)
+				Target.Delete(PairId)
+			continue
+		}
+		Target[PairId] := Value
+	}
+	return Target
 }
 
 ; Second key id -> first key ids with a slot, in catalogue order.
@@ -1626,8 +1641,19 @@ SetKeyCombinationChord(PairId, ActionName, Path := "", ReloadFn := 0) {
 ; @returns {String} A pair id.
 KeyCombinationChordOwnerPair(PairId) {
 	global KeyCombinationChordConfig
+	if !IsObject(KeyCombinationChordConfig)
+		return PairId
+	return _KeyCombinationChordOwnerPairFor(PairId, KeyCombinationChordConfig[MenuCommand.COMBO_SYMMETRIC])
+}
+
+; The owner pair of PairId's chord under an explicit symmetry, for a planner
+; reading a configuration other than the one in force.
+; @param PairId {String} A pair id.
+; @param Symmetric {Boolean} Whether both orders of a pair share one chord.
+; @returns {String} A pair id.
+_KeyCombinationChordOwnerPairFor(PairId, Symmetric) {
 	Pair := KeyCombinationParsePair(PairId)
-	if !(Pair is Map) || !IsObject(KeyCombinationChordConfig) || !KeyCombinationChordConfig[MenuCommand.COMBO_SYMMETRIC]
+	if !(Pair is Map) || !Symmetric
 		return PairId
 	for _, Id in KeyCombinationKeyIds() {
 		if (Id == Pair["first"])
@@ -1666,6 +1692,81 @@ KeyCombinationChordToggleSymmetric(Path := "", ReloadFn := 0) {
 	Rows := [ManifestSparseOperation(ConfigKey.MOD_COMBOS_SYMMETRIC, !KeyCombinationChordCurrentSettings()[MenuCommand.COMBO_SYMMETRIC])]
 	if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, Rows, "the symmetry of the key chords")
 		return false
+	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
+}
+
+; The rows that copy every pair's tap slot into its chord slot, planned from one
+; decoded configuration as macOS and Linux plan their bulk copy: the chord takes
+; the tap's action and an empty tap empties the chord. Under symmetry a chord
+; slot belongs to the earlier order of its pair, so only that order's tap is
+; copied. A pair that cannot hold a chord on the layout in force is skipped, and
+; so is a tap action no chord can run (KEY_COMBINATION_CHORD_REFUSED_ACTIONS),
+; which is logged with its pair.
+; @param Snapshot {Object} A ConfigTomlDecodeSnapshot result.
+; @param AllowedFn {Func} Replaces KeyCombinationChordPairIsAllowed in tests.
+; @returns {Array} Config update rows; empty when every chord already matches.
+KeyCombinationChordCopyRows(Snapshot, AllowedFn := 0) {
+	global KEY_COMBINATION_TAP_SECTION, KEY_COMBINATION_NONE, KEY_COMBINATION_CHORD_REFUSED_ACTIONS
+	Cache := Snapshot.Cache
+	Taps := _KeyCombinationReadSlots(Cache, KEY_COMBINATION_TAP_SECTION, false)
+	ConfigTomlBootSnapshotValue(Snapshot, ConfigLeaf.MOD_COMBOS, "symmetric", &Symmetric)
+	Allowed := HasMethod(AllowedFn, "Call") ? AllowedFn : KeyCombinationChordPairIsAllowed
+	Rows := []
+	Ids := KeyCombinationKeyIds()
+	for _, First in Ids {
+		for _, Second in Ids {
+			if (First == Second)
+				continue
+			PairId := KeyCombinationPairId(First, Second)
+			if (_KeyCombinationChordOwnerPairFor(PairId, Symmetric) != PairId) || !Allowed.Call(PairId)
+				continue
+			Tap := Taps.Get(PairId, KEY_COMBINATION_NONE)
+			if KEY_COMBINATION_CHORD_REFUSED_ACTIONS.Has(Tap) {
+				LoggerWarn("KeyCombinations", "Pair '{1}' tap '{2}' cannot run as a chord — its chord is left as it is.",
+					PairId, Tap)
+				continue
+			}
+			Section := "mod_combos.config." . PairId
+			Stored := Cache.Get(Section, 0)
+			Current := (Stored is Map) && Stored.Has("combo") ? Stored["combo"] : KEY_COMBINATION_NONE
+			if (Current == Tap)
+				continue
+			if (Tap == KEY_COMBINATION_NONE)
+				Rows.Push({ Section: Section, Key: "combo", Delete: 1 })
+			else
+				Rows.Push({ Section: Section, Key: "combo", Value: Tap })
+		}
+	}
+	return Rows
+}
+
+; Reads the configuration only once the commit owns it, so a sibling write
+; cannot slip between the plan and its batch.
+_KeyCombinationBuildChordCopyPlan(Path, Outcome, AllowedFn := 0) {
+	Content := FileExist(Path) ? FSReadStrict(Path) : ""
+	Rows := KeyCombinationChordCopyRows(ConfigTomlDecodeSnapshot(Content), AllowedFn)
+	Outcome.rows := Rows.Length
+	return Rows.Length ? { updates: Rows } : { noop: true }
+}
+
+; The « Copy tap → combo » command, as on macOS and Linux: every pair's chord
+; slot takes its tap action in one config batch, then the driver reloads.
+; @param Path {String} The config.toml to write; ConfigurationFile by default.
+; @param ReloadFn {Func} Replaces the reload in tests.
+; @param AllowedFn {Func} Replaces KeyCombinationChordPairIsAllowed in tests.
+; @returns {Boolean} False when nothing was committed.
+KeyCombinationCopyTapsToChords(Path := "", ReloadFn := 0, AllowedFn := 0) {
+	global ConfigurationFile
+	Target := Path != "" ? Path : ConfigurationFile
+	Outcome := { rows: 0 }
+	if !ConfigCommitBuilt(Target, "the copy of the key combination taps into their chords",
+			_KeyCombinationBuildChordCopyPlan.Bind(Target, Outcome, AllowedFn))
+		return false
+	if (Outcome.rows == 0) {
+		LoggerInfo("KeyCombinations", "Every chord already runs its pair's tap: nothing to copy.")
+		return true
+	}
+	LoggerInfo("KeyCombinations", "{1} chord slot(s) copied from their tap.", Outcome.rows)
 	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
 }
 

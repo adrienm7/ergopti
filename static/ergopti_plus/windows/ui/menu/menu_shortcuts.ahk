@@ -90,6 +90,7 @@ _SC_KeyCombinationCommands(Options := unset) {
 	return Map(
 		MenuCommand.KEY_COMBINATIONS_TOGGLE, MenuRenderer_CategoryGateCommand("KeyCombinations"),
 		MenuCommand.COMBO_SYMMETRIC, (*) => KeyCombinationChordToggleSymmetric(),
+		MenuCommand.COPY_TAP_TO_COMBO, (*) => KeyCombinationCopyTapsToChords(),
 		MenuCommand.SCOPE_RESTORE, (*) => KeyCombinationsApplyScope("recommended", OwnedOptions),
 		MenuCommand.SCOPE_CLEAR, (*) => KeyCombinationsApplyScope("clear", OwnedOptions))
 }

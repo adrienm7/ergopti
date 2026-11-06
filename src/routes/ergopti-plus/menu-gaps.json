@@ -478,21 +478,6 @@
 		"reasons": { "windows": { "en": "", "fr": "" }, "linux": { "en": "", "fr": "" } }
 	},
 	{
-		"path": "key_combinations_group.copy_tap_to_combo",
-		"visibility": "hide",
-		"labels": {
-			"fr": "🔁 Propager tap → combo sur tous les raccourcis",
-			"en": "🔁 Copy tap → combo for all modifier shortcuts"
-		},
-		"platforms": { "windows": false, "macos": true, "linux": true },
-		"reasons": {
-			"windows": {
-				"en": "Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.",
-				"fr": "Chaque pilote remappe le clavier avec un moteur différent — Windows avec sa propre couche tap-hold, macOS avec Karabiner-Elements, Linux avec le moteur tap-hold de son propre daemon — chacun porte donc le menu du moteur qu'il exécute, et aucun ne peut configurer celui d'un autre."
-			}
-		}
-	},
-	{
 		"path": "metrics_menu.wpm_menubar",
 		"visibility": "hide",
 		"labels": { "fr": "MPM dans la barre des menus", "en": "WPM in menu bar" },
