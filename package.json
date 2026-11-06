@@ -524,6 +524,7 @@
 		"test:script-source": "node ./tools/test/test-script-source.cjs",
 		"test:locale-hints-quote-live-labels": "node ./tools/test/test-locale-hints-quote-live-labels.cjs",
 		"test:magic-key-single-source": "node ./tools/test/test-magic-key-single-source.cjs",
+		"test:capsword-fixed-exits-single-source": "node ./tools/test/test-capsword-fixed-exits-single-source.cjs",
 		"test:tap-hold-threshold-parity": "node ./tools/test/test-tap-hold-threshold-parity.cjs",
 		"test:adapter-reachability": "node ./tools/test/test-adapter-reachability.cjs",
 		"test:hotstring-telemetry-is-deferred": "node ./tools/test/test-hotstring-telemetry-is-deferred.cjs",

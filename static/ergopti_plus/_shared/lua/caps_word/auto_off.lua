@@ -49,6 +49,23 @@ end
 -- ======================================
 -- ======================================
 
+-- The editing and navigation keys that always end CapsWord, whatever the
+-- delimiter settings: macOS's fixed Karabiner exits (capsword.json), which
+-- Windows and Linux follow (decision of 2026-11-06). Backspace keeps CapsWord.
+M.FIXED_EXIT_KEYS = {
+	"escape", "delete", "up", "down", "left", "right", "home", "end", "page_up", "page_down",
+	"f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
+}
+local FIXED_EXIT_SET = {}
+for _, key in ipairs(M.FIXED_EXIT_KEYS) do FIXED_EXIT_SET[key] = true end
+
+--- Whether `key` is one of the editing or navigation keys that always end CapsWord.
+--- @param key any Neutral key name (FIXED_EXIT_KEYS spelling).
+--- @return boolean
+function M.is_fixed_exit_key(key)
+	return type(key) == "string" and FIXED_EXIT_SET[key] == true
+end
+
 --- Whether `key` names a built-in delimiter of the hotstring catalogue.
 --- @param key any Candidate delimiter key.
 --- @return boolean

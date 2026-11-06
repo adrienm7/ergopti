@@ -202,6 +202,38 @@ _CWAO_IdleTimeout() {
 }
 Test("capsword auto-off: CapsWord ends after the configured delay without a keystroke", _CWAO_IdleTimeout)
 
+; Escape, the arrows, Delete, Home/End, Page Up/Down and F1-F12 end CapsWord
+; whatever the delimiters, as macOS's fixed exits do (capsword-fixed-exits).
+_CWAO_FixedExits() {
+	for Vk in [0x1B, 0x25, 0x26, 0x2E, 0x24, 0x23, 0x21, 0x22, 0x74, 0x7B] {
+		try {
+			_CWAO_ArmWith([], Map(), 0)
+			HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_DOWN, 0, Vk, 0)
+			AssertFalse(CapsWordEnabled, Format("VK {:#x} ends CapsWord with no delimiter or delay", Vk))
+		} finally _CWAO_Reset()
+	}
+	try {
+		_CWAO_ArmWith([], Map(), 0)
+		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_DOWN, 0, 0x08, 0x0E)
+		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_DOWN, 0, 0x41, 0x1E)
+		AssertTrue(CapsWordEnabled, "control: Backspace and a letter keep CapsWord on")
+	} finally _CWAO_Reset()
+}
+Test("capsword auto-off: the editing and navigation keys always end CapsWord (capsword-fixed-exits)", _CWAO_FixedExits)
+
+; A modifier pressed alone is no keystroke for the delay, as on macOS and
+; Linux (capsword-modifier-activity).
+_CWAO_ModifierIsNoActivity() {
+	try {
+		_CWAO_ArmWith([], Map(), 0.3)
+		Sleep(150)
+		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_DOWN, 0, 0xA0, 0x2A)
+		Sleep(250)
+		AssertFalse(CapsWordEnabled, "a lone Shift does not restart the delay")
+	} finally _CWAO_Reset()
+}
+Test("capsword auto-off: a lone modifier does not restart the delay (capsword-modifier-activity)", _CWAO_ModifierIsNoActivity)
+
 _CWAO_DisarmRemovesEverything() {
 	try {
 		_CWAO_ArmWith(["space"], Map("middle_click", 1), 0.2)

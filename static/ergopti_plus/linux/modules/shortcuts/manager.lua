@@ -425,6 +425,9 @@ end
 -- =========================================
 
 local _caps_word_active = false
+-- Hook control-key names (infra/evdev_codes CONTROL_NAME_OF) spelled apart from
+-- the shared CapsWord fixed-exit names.
+local CAPS_WORD_HOOK_KEY_NAMES = { pageup = "page_up", pagedown = "page_down" }
 -- What ends this CapsWord session on its own (modules/shortcuts/caps_word_auto_off),
 -- compiled when it was switched on and replaced by every acknowledged menu change
 -- (M.caps_word_policy_published); nil while CapsWord is off.
@@ -590,6 +593,13 @@ end
 --- @return boolean ended
 function M.caps_word_observe_control(key_name)
 	if not observe_caps_word_keystroke() then return false end
+	-- Escape, Delete, the arrows, Home/End, Page Up/Down and F1-F12 always end it,
+	-- as macOS's fixed exits do; the hook spells two of them without the underscore.
+	local neutral = CAPS_WORD_HOOK_KEY_NAMES[key_name] or key_name
+	if CapsWordPolicy.is_fixed_exit_key(neutral) then
+		end_caps_word("editing key " .. key_name)
+		return true
+	end
 	if CapsWordPolicy.is_terminator_key(key_name) and CapsWordPolicy.ends_on_key(_caps_word_policy, key_name) then
 		end_caps_word("delimiter key " .. key_name)
 		return true
