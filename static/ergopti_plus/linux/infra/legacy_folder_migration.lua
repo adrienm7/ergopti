@@ -27,7 +27,8 @@ local M = {}
 local AppDirs = require("app_dirs")
 local Core = require("legacy_folder_migration")
 local NoReplaceMove = require("infra.no_replace_move")
--- The installer bundles luv; without it a folder is reported as unlistable.
+-- The installer bundles luv; without it a folder is reported as unlistable
+-- (so nothing is merged, and no link can be mistaken for a second folder).
 local uv_loaded, uv = pcall(require, "luv")
 local quote = require("text_utils").shell_quote
 
@@ -79,6 +80,13 @@ function M.native_ports()
 		rename = function(from, to) return NoReplaceMove.move(from, to) end,
 		make_dir = function(path) return succeeds("mkdir -p -- " .. quote(path) .. " 2>/dev/null") end,
 		remove_empty_dir = function(path) return succeeds("rmdir -- " .. quote(path) .. " 2>/dev/null") end,
+		-- stat follows links: a legacy folder linked to the new one has the new
+		-- one's device and inode.
+		same_object = function(a, b)
+			if not uv_loaded then return false end
+			local left, right = uv.fs_stat(a), uv.fs_stat(b)
+			return type(left) == "table" and type(right) == "table" and left.dev == right.dev and left.ino == right.ino
+		end,
 	}
 end
 
