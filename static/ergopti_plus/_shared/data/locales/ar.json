@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "Windows فقط: يجعل Microsoft Office الفرنسي النص عريضاً بـ Ctrl+G حيث تستخدم التطبيقات الأخرى Ctrl+B، لذا يختار هذا الإجراء المفتاح حسب التطبيق. في macOS ‏(Cmd+B) وLinux ‏(Ctrl+B) تعمل تركيبة واحدة في كل مكان: عيّنها من «اختصارات».",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "يسجّل هذا النظام الشاشة من أداة الالتقاط الخاصة به (شريط لقطة الشاشة في macOS، أو أداة GNOME أو KDE)، والتي يفتحها الإجراء المكافئ.",
 	"platform_reason.action_same_action_under_another_name": "يقدّم هذا النظام الإجراء نفسه باسم آخر: استخدم الإجراء المكافئ.",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "ليس في Linux: الرسم فوق كل النوافذ يتطلب سطح تراكب لا تمنحه مركِّبات Wayland لأي تطبيق.",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "ليس إجراءً مستقلاً في هذا النظام: إنه أحد تركيبات مفتاح التعديل + مفتاح (Cmd في macOS وCtrl في Windows وLinux) المدرجة ضمن «اختصارات».",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "‏Spaces في macOS وسطوح المكتب في Windows وLinux هي سطوح المكتب الافتراضية نفسها باسمين: استخدم الإجراء المكافئ.",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "ليس في macOS: تُضاف Spaces وتُزال في Mission Control، الذي لا يسمح macOS لأي تطبيق آخر بالتحكم فيه.",

@@ -71,6 +71,7 @@ graph TD
         LINUX_secure_field_detector["SecureFieldDetector.lua"]
         LINUX_selection_transaction["SelectionTransaction.lua"]
         LINUX_shell_runner["ShellRunner.lua"]
+        LINUX_spotlight_overlay["SpotlightOverlay.lua"]
         LINUX_sqlite_process_worker["SqliteProcessWorker.lua"]
         LINUX_storage["Storage.lua"]
         LINUX_system_proxy["SystemProxy.lua"]

@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "Лише Windows: французький Microsoft Office виділяє жирним сполученням Ctrl+G там, де інші застосунки використовують Ctrl+B, тому ця дія вибирає клавішу за застосунком. У macOS (Cmd+B) і Linux (Ctrl+B) одне сполучення працює всюди: призначте його в розділі «Сполучення клавіш».",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Ця система записує екран зі свого інструмента знімків (панелі «Знімок екрана» в macOS, інструмента GNOME або KDE), який відкриває рівноцінна дія.",
 	"platform_reason.action_same_action_under_another_name": "Ця система пропонує ту саму дію під іншою назвою: скористайтеся рівноцінною дією.",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "Не в Linux: малювання поверх усіх вікон потребує поверхні накладання, якої композитори Wayland не дають жодному застосунку.",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "У цій системі це не окрема дія: це одне з її сполучень модифікатор + клавіша (Cmd у macOS, Ctrl у Windows і Linux), перелічених у розділі «Сполучення клавіш».",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "Spaces у macOS і робочі столи у Windows та Linux — це ті самі віртуальні робочі столи під двома назвами: скористайтеся рівноцінною дією.",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "Не в macOS: Spaces додаються й видаляються в Mission Control, яким macOS не дає керувати жодному іншому застосунку.",

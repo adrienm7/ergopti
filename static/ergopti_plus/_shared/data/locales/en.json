@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "This system records the screen from its own capture tool (the macOS Screenshot toolbar, the GNOME or KDE screenshot tool), which the equivalent action opens.",
 	"platform_reason.action_same_action_under_another_name": "This system offers the same action under another name: use the equivalent action.",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "Not on Linux: drawing over every window needs an overlay surface that Wayland compositors give no application.",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "Not a separate action on this system: it is one of its modifier + key combinations (Cmd on macOS, Ctrl on Windows and Linux), listed under “Shortcuts”.",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "Spaces on macOS and desktops on Windows and Linux are the same virtual desktops under two names: use the equivalent action.",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "Not on macOS: Spaces are added and removed in Mission Control, which macOS lets no other application drive.",

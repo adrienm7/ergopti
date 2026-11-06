@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "Endast Windows: franska Microsoft Office gör text fet med Ctrl+G där andra appar använder Ctrl+B, så den här åtgärden väljer tangent efter app. I macOS (Cmd+B) och Linux (Ctrl+B) fungerar en kombination överallt: tilldela den från ”Kortkommandon”.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Det här systemet spelar in skärmen från sitt eget skärmdumpsverktyg (Skärmdump-fältet i macOS, verktyget i GNOME eller KDE), som motsvarande åtgärd öppnar.",
 	"platform_reason.action_same_action_under_another_name": "Det här systemet erbjuder samma åtgärd under ett annat namn: använd motsvarande åtgärd.",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "Inte i Linux: att rita över alla fönster kräver en överlagringsyta som Wayland-kompositörer inte ger någon app.",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "Ingen egen åtgärd i det här systemet: det är en av dess kombinationer av modifierare + tangent (Cmd i macOS, Ctrl i Windows och Linux), listade under ”Kortkommandon”.",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "Spaces i macOS och skrivbord i Windows och Linux är samma virtuella skrivbord under två namn: använd motsvarande åtgärd.",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "Inte i macOS: Spaces läggs till och tas bort i Mission Control, som macOS inte låter någon annan app styra.",

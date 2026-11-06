@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "Alleen Windows: het Franse Microsoft Office maakt tekst vet met Ctrl+G waar andere apps Ctrl+B gebruiken, dus kiest deze actie de toets per app. Op macOS (Cmd+B) en Linux (Ctrl+B) werkt één combinatie overal: koppel die via ‘Sneltoetsen’.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Dit systeem neemt het scherm op vanuit zijn eigen opnamehulpmiddel (de Schermafbeelding-balk van macOS, het hulpmiddel van GNOME of KDE), dat de gelijkwaardige actie opent.",
 	"platform_reason.action_same_action_under_another_name": "Dit systeem biedt dezelfde actie onder een andere naam: gebruik de gelijkwaardige actie.",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "Niet op Linux: tekenen boven alle vensters vraagt een overlay-oppervlak dat Wayland-compositors aan geen enkele app geven.",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "Geen aparte actie op dit systeem: het is een van zijn combinaties van modificatietoets + toets (Cmd op macOS, Ctrl op Windows en Linux), vermeld onder ‘Sneltoetsen’.",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "Spaces op macOS en bureaubladen op Windows en Linux zijn dezelfde virtuele bureaubladen onder twee namen: gebruik de gelijkwaardige actie.",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "Niet op macOS: Spaces worden toegevoegd en verwijderd in Mission Control, dat macOS door geen enkele andere app laat bedienen.",

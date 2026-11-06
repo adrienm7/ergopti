@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "केवल Windows: फ़्रेंच Microsoft Office बोल्ड के लिए Ctrl+G का उपयोग करता है जहाँ अन्य ऐप Ctrl+B का, इसलिए यह क्रिया ऐप के अनुसार कुंजी चुनती है। macOS (Cmd+B) और Linux (Ctrl+B) पर एक ही संयोजन हर जगह काम करता है: इसे “शॉर्टकट” से बाँधें।",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "यह सिस्टम स्क्रीन को अपने कैप्चर टूल से रिकॉर्ड करता है (macOS का स्क्रीनशॉट टूलबार, GNOME या KDE का टूल), जिसे समकक्ष क्रिया खोलती है।",
 	"platform_reason.action_same_action_under_another_name": "यह सिस्टम वही क्रिया दूसरे नाम से देता है: समकक्ष क्रिया का उपयोग करें।",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "Linux पर नहीं: सभी विंडो के ऊपर चित्र बनाने के लिए एक ओवरले सतह चाहिए, जो Wayland कंपोज़िटर किसी ऐप को नहीं देते।",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "इस सिस्टम पर यह अलग क्रिया नहीं है: यह “शॉर्टकट” में सूचीबद्ध मॉडिफ़ायर + कुंजी संयोजनों में से एक है (macOS पर Cmd, Windows और Linux पर Ctrl)।",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "macOS के Spaces और Windows व Linux के डेस्कटॉप दो नामों वाले वही वर्चुअल डेस्कटॉप हैं: समकक्ष क्रिया का उपयोग करें।",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "macOS पर नहीं: Spaces Mission Control में जोड़े और हटाए जाते हैं, जिसे macOS किसी और ऐप को चलाने नहीं देता।",

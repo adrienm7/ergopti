@@ -1505,11 +1505,11 @@ requires_ahk = ["ai:on"]
 platform = "all"
 
 [sg_actions.spotlight_mouse]
-# Implemented on BOTH: Windows in modules/shortcuts, macOS in
-# modules/shortcuts/actions/. Linux has no cross-desktop overlay implementation;
-# declaring it there made the action picker offer a binding that did nothing.
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_screen_overlay_is_not_on_linux"
+# Windows in modules/shortcuts, macOS in modules/shortcuts/actions/, Linux on
+# X11 only (modules/gestures/pointer_spotlight.lua): Wayland gives no client the
+# global pointer position nor a window placed at screen coordinates.
+platform = "all"
+requires_linux = ["session:x11", "tool:xdotool", "tool:xrandr"]
 
 [sg_actions.toggle_capslock]
 # Implemented on BOTH: Windows in modules/shortcuts, macOS in

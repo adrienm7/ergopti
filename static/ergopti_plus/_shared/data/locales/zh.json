@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "仅限 Windows：法语版 Microsoft Office 用 Ctrl+G 加粗，而其他应用用 Ctrl+B，因此此操作按应用选择按键。在 macOS（Cmd+B）和 Linux（Ctrl+B）上一个组合到处通用：请在“快捷键”中绑定它。",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "此系统通过自己的截图工具（macOS 的截屏工具栏、GNOME 或 KDE 的工具）录制屏幕，对应的操作会打开该工具。",
 	"platform_reason.action_same_action_under_another_name": "此系统以另一个名称提供相同的操作：请使用对应的操作。",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "Linux 上没有：在所有窗口之上绘制需要一个覆盖层表面，而 Wayland 合成器不会把它交给任何应用。",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "在此系统上不是单独的操作：它是“快捷键”中列出的修饰键 + 按键组合之一（macOS 用 Cmd，Windows 和 Linux 用 Ctrl）。",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "macOS 的 Spaces 与 Windows、Linux 的桌面是同一种虚拟桌面的两个名称：请使用对应的操作。",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "macOS 上没有：Spaces 在调度中心中添加和移除，而 macOS 不允许其他应用操控它。",

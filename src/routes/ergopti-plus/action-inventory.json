@@ -1597,14 +1597,8 @@
 	{
 		"path": "sg_actions.spotlight_mouse",
 		"labels": { "fr": "🔦 Surbrillance souris", "en": "🔦 Mouse spotlight" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "Not on Linux: drawing over every window needs an overlay surface that Wayland compositors give no application.",
-				"fr": "Pas sous Linux : dessiner par-dessus toutes les fenêtres demande une surface superposée que les compositeurs Wayland n’accordent à aucune application.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.toggle_capslock",

@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "Windows בלבד: ‏Microsoft Office בצרפתית מדגיש טקסט עם Ctrl+G במקום שבו יישומים אחרים משתמשים ב-Ctrl+B, ולכן פעולה זו בוחרת את המקש לפי היישום. ב-macOS ‏(Cmd+B) וב-Linux ‏(Ctrl+B) צירוף אחד עובד בכל מקום: הקצו אותו מתוך „קיצורי מקלדת”.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "מערכת זו מקליטה את המסך מכלי הלכידה שלה (סרגל צילום המסך של macOS, הכלי של GNOME או KDE), שהפעולה המקבילה פותחת.",
 	"platform_reason.action_same_action_under_another_name": "מערכת זו מציעה את אותה פעולה בשם אחר: השתמשו בפעולה המקבילה.",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "לא ב-Linux: ציור מעל כל החלונות דורש משטח שכבת-על שמרכיבי Wayland אינם נותנים לשום יישום.",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "אין זו פעולה נפרדת במערכת זו: זהו אחד מצירופי מקש שינוי + מקש (Cmd ב-macOS, Ctrl ב-Windows וב-Linux) המופיעים תחת „קיצורי מקלדת”.",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "‏Spaces ב-macOS ושולחנות העבודה ב-Windows וב-Linux הם אותם שולחנות עבודה וירטואליים בשני שמות: השתמשו בפעולה המקבילה.",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "לא ב-macOS: מוסיפים ומסירים Spaces ב-Mission Control, ש-macOS אינו מאפשר לשום יישום אחר לשלוט בו.",

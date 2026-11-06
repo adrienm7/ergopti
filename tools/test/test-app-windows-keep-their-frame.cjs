@@ -39,7 +39,8 @@ const FRAMELESS_BY_DESIGN = {
 	},
 	linux: {
 		'adapters/graphics_renderer.lua': 'preview tooltip',
-		'adapters/wpm_surface.lua': 'floating WPM widget and graph'
+		'adapters/wpm_surface.lua': 'floating WPM widget and graph',
+		'adapters/spotlight_overlay.lua': 'pointer spotlight ring and crosses'
 	}
 };
 

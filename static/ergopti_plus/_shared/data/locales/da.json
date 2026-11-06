@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "Kun Windows: fransk Microsoft Office gør tekst fed med Ctrl+G, hvor andre apps bruger Ctrl+B, så denne handling vælger tasten efter app. På macOS (Cmd+B) og Linux (Ctrl+B) virker én kombination overalt: tildel den fra »Genveje«.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Dette system optager skærmen fra sit eget optageværktøj (Skærmbillede-bjælken på macOS, værktøjet i GNOME eller KDE), som den tilsvarende handling åbner.",
 	"platform_reason.action_same_action_under_another_name": "Dette system tilbyder den samme handling under et andet navn: brug den tilsvarende handling.",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "Ikke på Linux: at tegne over alle vinduer kræver en overlejringsflade, som Wayland-compositorer ikke giver nogen app.",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "Ikke en særskilt handling på dette system: det er en af dets kombinationer af modifikator + tast (Cmd på macOS, Ctrl på Windows og Linux), vist under »Genveje«.",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "Spaces på macOS og skriveborde på Windows og Linux er de samme virtuelle skriveborde under to navne: brug den tilsvarende handling.",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "Ikke på macOS: Spaces tilføjes og fjernes i Mission Control, som macOS ikke lader nogen anden app styre.",
