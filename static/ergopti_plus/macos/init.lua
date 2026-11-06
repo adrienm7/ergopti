@@ -2229,6 +2229,10 @@ end
 if keymap.apply_hotstring_preferences(boot_saved_prefs) ~= true then
 	error("canonical hotstring preferences did not commit before eventtap startup")
 end
+-- The layout emulation the keymap tap types through. A layout it cannot read
+-- is an ERROR of its owner and the system layout keeps typing; only a broken
+-- owner (a raise) stops the boot.
+keymap.start_layout_emulation()
 local keymap_started = keymap.start()
 if keymap_started ~= true then
 	error("keymap.start did not commit")

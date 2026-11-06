@@ -133,6 +133,15 @@ function M.reload()
 	return true
 end
 
+--- Reloads after a settings change made outside the emulation (a menu row, a
+--- scope restore): a no-op answering nil while the owner is not started (a
+--- dry run, a menu test).
+--- @return boolean|nil ok M.reload's answer, nil when not started.
+function M.reload_if_started()
+	if _deps == nil then return nil end
+	return M.reload()
+end
+
 --- What the emulation does now, for the menu.
 --- @return table status { active, id, error }
 function M.status()

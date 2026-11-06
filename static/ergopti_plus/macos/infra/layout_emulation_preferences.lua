@@ -3,65 +3,63 @@
 --- ==============================================================================
 --- MODULE: Layout Emulation Preferences (macOS)
 --- DESCRIPTION:
---- Reads and writes the [layout] settings of the layout emulation in
---- config.toml: which layout is emulated (emulated_layout, ergopti_variant,
---- ergopti_base), its AltGr layer (ergopti_alt_gr) and its four row switches
---- (emulate_<row>). The emulation (modules/keymap/layout_emulation.lua) reads
---- them through the shared resolver; this module writes them for the menu.
----
---- FEATURES & RATIONALE:
---- 1. Read on every use, so a hand edit applies the next time the emulation reloads.
---- 2. Owned leaves outside the menu state: published through
----    Preferences.publish_owned, the conditional writer tap keys use, so a
----    concurrent save of the menu state never overwrites them.
---- 3. Which leaves a choice writes is the shared resolver's, as on Linux.
+--- Reads and writes the [layout] settings of the layout emulation through the
+--- menu's preference state (infra/preferences.lua flat keys layout_emulated_layout,
+--- layout_ergopti_variant, layout_ergopti_base, layout_ergopti_alt_gr and
+--- layout_emulate_<row>), so the keyboard-layout scope's restore and clear, the
+--- session demotions and every save see them like any other row. The emulation
+--- (modules/keymap/layout_emulation.lua) reads config.toml through the shared
+--- resolver after each save.
 --- ==============================================================================
 
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local ConfigPaths = require("infra.config_paths")
-local FileSystem = require("adapters.file_system")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
 local Logger = require("infra.logger")
-local ConfigOutdated = require("config_outdated")
 local Settings = require("layouts.emulation_settings")
 local LOG = "infra.layout_emulation_preferences"
 
---- Reads config.toml and its exact source.
---- @return table config Parsed config.toml.
---- @return table source Classified source bytes for a conditional write.
-function M.snapshot()
-	local content, status, detail = Writer.read_classified(ConfigPaths.get("ConfigTomlPath"), FileSystem)
-	assert(status == "ok" or status == "absent", "layout emulation preferences are unreadable: " .. tostring(detail))
-	return Codec.decode(content or ""), { status = status, content = content }
+--- The flat state key of one [layout] path.
+local function flat_key(path)
+	return assert(require("infra.preferences").flat_key_for(path), "no preference owner for " .. tostring(path))
 end
 
---- The emulation settings in force.
+--- The emulation settings the menu state holds.
+--- @param state table The menu preference state.
 --- @return table settings layouts/emulation_settings.lua's resolve result.
-function M.settings()
-	return Settings.resolve((M.snapshot()), Manifest.default_for,
-		function(segments, detail) ConfigOutdated.report(segments, detail, Logger) end)
+function M.settings(state)
+	local layout = {}
+	for _, leaf in ipairs(Settings.LEAVES) do
+		local section, key = leaf.path:match("^([^.]+)%.([^.]+)$")
+		if section == "layout" and type(state) == "table" then layout[key] = state[flat_key(leaf.path)] end
+	end
+	return Settings.resolve({ layout = layout }, Manifest.default_for)
 end
 
---- The value of one switch in force.
+--- The value of one switch in the state.
+--- @param state table
 --- @param path string One of the shared resolver's SWITCHES.
 --- @return boolean
-function M.switch(path)
-	return Settings.switch_value(M.settings(), path)
+function M.switch(state, path)
+	return Settings.switch_value(M.settings(state), path)
 end
 
---- Publishes several leaves in one batch while preserving the rest of config.toml.
---- @param values table path -> value.
+--- Stores several leaves in the state and saves them; the state is rolled back
+--- when the save is refused.
 --- @return boolean committed
-local function publish(values)
-	local called, committed = pcall(function()
-		local _, source = M.snapshot()
-		return require("infra.preferences").publish_owned(ConfigPaths.get("ConfigTomlPath"),
-			Settings.operations(values, Manifest.sparse_operation), source)
-	end)
-	if not called or committed ~= true then
-		Logger.error(LOG, "Layout emulation settings were not persisted: %s.", tostring(committed))
+local function publish(state, save_prefs, values)
+	if type(state) ~= "table" or type(save_prefs) ~= "function" then
+		Logger.error(LOG, "No preference state to store the layout emulation settings in.")
+		return false
+	end
+	local previous = {}
+	for path, value in pairs(values) do
+		local key = flat_key(path)
+		previous[key] = state[key]
+		state[key] = value
+	end
+	if save_prefs() ~= true then
+		for key, value in pairs(previous) do state[key] = value end
+		Logger.error(LOG, "Layout emulation settings were not persisted.")
 		return false
 	end
 	Logger.debug(LOG, "Layout emulation settings persisted.")
@@ -69,27 +67,31 @@ local function publish(values)
 end
 
 --- Sets one switch.
+--- @param state table
+--- @param save_prefs function
 --- @param path string One of the shared resolver's SWITCHES.
 --- @param value boolean
 --- @return boolean committed
-function M.set_switch(path, value)
+function M.set_switch(state, save_prefs, path, value)
 	if Settings.SWITCHES[path] == nil or type(value) ~= "boolean" then
 		Logger.error(LOG, "Refused layout emulation switch %s = %s.", tostring(path), tostring(value))
 		return false
 	end
-	return publish({ [path] = value })
+	return publish(state, save_prefs, { [path] = value })
 end
 
 --- Chooses the emulated layout: "none", a built-in Ergopti variant or a registry id.
+--- @param state table
+--- @param save_prefs function
 --- @param choice string
 --- @return boolean committed
-function M.choose(choice)
+function M.choose(state, save_prefs, choice)
 	local values = Settings.choice_values(choice)
 	if values == nil then
 		Logger.error(LOG, "Refused emulated layout choice %s.", tostring(choice))
 		return false
 	end
-	return publish(values)
+	return publish(state, save_prefs, values)
 end
 
 return M

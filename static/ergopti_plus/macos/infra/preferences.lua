@@ -194,6 +194,16 @@ local KEY_MAP = {
 	layout_number_row_mode               = { sec = "layout", key = ConfigKeys.LEAF.DIRECT_ACCESS_DIGITS, enum = true },
 	-- Declared for macOS like the ordering it extends: kept, never applied here.
 	layout_number_row_reorder_edges      = { sec = "layout", key = ConfigKeys.LEAF.NUMBER_ROW_REORDER_EDGES },
+	-- The layout emulation (modules/keymap/layout_emulation.lua): the layout it
+	-- types, its two layers and its four rows, as on Windows and Linux.
+	layout_emulated_layout               = { sec = "layout", key = LEAF.EMULATED_LAYOUT          },
+	layout_ergopti_variant               = { sec = "layout", key = LEAF.ERGOPTI_VARIANT, enum = true },
+	layout_ergopti_base                  = { sec = "layout", key = LEAF.ERGOPTI_BASE             },
+	layout_ergopti_alt_gr                = { sec = "layout", key = LEAF.ERGOPTI_ALT_GR           },
+	layout_emulate_number_row            = { sec = "layout", key = LEAF.EMULATE_NUMBER_ROW       },
+	layout_emulate_top_row               = { sec = "layout", key = LEAF.EMULATE_TOP_ROW          },
+	layout_emulate_home_row              = { sec = "layout", key = LEAF.EMULATE_HOME_ROW         },
+	layout_emulate_bottom_row            = { sec = "layout", key = LEAF.EMULATE_BOTTOM_ROW       },
 	layout_pause_switch_enabled          = { sec = "layout", key = ConfigKeys.LEAF.PAUSE_SWITCH_ENABLED    },
 	layout_on_pause                      = { sec = "layout", key = ConfigKeys.LEAF.ON_PAUSE                },
 	layout_on_resume                     = { sec = "layout", key = ConfigKeys.LEAF.ON_RESUME               },
