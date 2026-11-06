@@ -201,11 +201,51 @@ LegacyFolderNormalize(Value) {
 		return RTrim(Value, "\")
 }
 
-; Rewrites the paths.toml lines whose value is an old default folder.
-; Mirrors rewrite_paths_text of _shared/lua/legacy_folder_migration.lua; the
-; comparison ignores case, as Windows paths do.
+; The new value of one locator, or "" when the rule does not name it. Mirrors
+; rebased of _shared/lua/legacy_folder_migration.lua: the old folder itself
+; becomes "new", a folder below it the same folder below "under" (where the old
+; folder went; "new" by default). The comparison ignores case, as Windows paths
+; do, and the result keeps the separator style of the value.
+; @param Value {String} Current value, as spelled in the line.
+; @param Rule {Map} "old" (Array), "new" and an optional "under".
+; @returns {String}
+LegacyFolderRebased(Value, Rule) {
+		if (Value == "")
+				return ""
+		Current := LegacyFolderNormalize(Value)
+		; The trailing separators, spelled like the rest before the style below.
+		RegExMatch(Value, "[\\/]+$", &Tail)
+		Trailing := IsObject(Tail) ? StrReplace(StrReplace(Tail[0], "\\", "\"), "/", "\") : ""
+		New := ""
+		for Old in Rule["old"] {
+				OldFolder := LegacyFolderNormalize(Old)
+				if (Current = OldFolder) {
+						New := LegacyFolderNormalize(Rule["new"]) . Trailing
+						break
+				}
+				Prefix := OldFolder . "\"
+				if (OldFolder != "" && StrLen(Current) > StrLen(Prefix) && SubStr(Current, 1, StrLen(Prefix)) = Prefix) {
+						Base := Rule.Has("under") ? Rule["under"] : Rule["new"]
+						New := LegacyFolderNormalize(Base) . SubStr(Current, StrLen(OldFolder) + 1) . Trailing
+						break
+				}
+		}
+		if (New == "")
+				return ""
+		; Keep the separator style of the line: forward slashes, or the doubled
+		; backslashes of a TOML basic string.
+		if InStr(Value, "/")
+				New := StrReplace(New, "\", "/")
+		else if InStr(Value, "\\")
+				New := StrReplace(New, "\", "\\")
+		return New
+}
+
+; Rewrites the paths.toml lines whose value is an old default folder or a
+; folder below one. Mirrors rewrite_paths_text of
+; _shared/lua/legacy_folder_migration.lua.
 ; @param Text {String} paths.toml content.
-; @param Rewrites {Array} Maps with "key", "old" (Array) and "new".
+; @param Rewrites {Array} Maps with "key", "old" (Array), "new" and an optional "under".
 ; @returns {String} The new text, or "" when nothing changed.
 LegacyFolderRewritePathsText(Text, Rewrites) {
 		Changed := false
@@ -220,26 +260,16 @@ LegacyFolderRewritePathsText(Text, Rewrites) {
 				}
 				Replacement := Line
 				for Rule in Rewrites {
-						if (Rule["key"] != Match[2] || Match[4] == "")
+						if (Rule["key"] != Match[2])
 								continue
-						for Old in Rule["old"] {
-								if (LegacyFolderNormalize(Match[4]) != LegacyFolderNormalize(Old))
-										continue
-								RegExMatch(Match[4], "[\\/]+$", &Tail)
-								Trailing := IsObject(Tail) ? Tail[0] : ""
-								New := RTrim(Rule["new"], "\/") . Trailing
-								; Keep the separator style of the line: forward slashes, or the
-								; doubled backslashes of a TOML basic string.
-								if InStr(Match[4], "/")
-										New := StrReplace(New, "\", "/")
-								else if InStr(Match[4], "\\")
-										New := StrReplace(StrReplace(New, "\\", "\"), "\", "\\")
-								if (New != Match[4]) {
-										Replacement := Match[1] . Match[2] . Match[3] . '"' . New . '"' . Match[5]
-										Changed := true
-								}
-								break
+						New := LegacyFolderRebased(Match[4], Rule)
+						if (New == "")
+								continue
+						if (New != Match[4]) {
+								Replacement := Match[1] . Match[2] . Match[3] . '"' . New . '"' . Match[5]
+								Changed := true
 						}
+						break
 				}
 				Out .= Replacement
 		}
@@ -320,9 +350,14 @@ LegacyFolderSettleRewrites(Rules, Report) {
 		Settled := []
 		for Rule in Rules {
 				if Rule.Has("source") {
-						LegacyFolderOutcomeOf(Report, Rule["source"], &Kind)
+						Row := LegacyFolderOutcomeOf(Report, Rule["source"], &Kind)
 						if (Kind == "kept")
 								continue
+						if (Kind == "moved" || Kind == "backed_up") {
+								; A folder chosen below the old one is where its ancestor went.
+								Settled.Push(Map("key", Rule["key"], "old", Rule["old"], "new", Rule["new"], "under", Row["to"]))
+								continue
+						}
 				}
 				Settled.Push(Rule)
 		}

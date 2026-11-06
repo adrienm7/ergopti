@@ -116,7 +116,7 @@ function M.run(helpers, shared_root)
 		end)
 
 		helpers.it("rewrites only the old default folders of paths.toml (legacy-folder-migration-paths)", function()
-			helpers.assert_eq(#corpus.paths_text, 4, "complete paths.toml vectors")
+			helpers.assert_eq(#corpus.paths_text, 8, "complete paths.toml vectors")
 			-- A Windows row spells backslash separators, a filename byte on POSIX;
 			-- the AutoHotkey replay holds it on Windows.
 			local backslash_separates = NativePath.separators():find("\\", 1, true) ~= nil
@@ -129,7 +129,7 @@ function M.run(helpers, shared_root)
 					helpers.assert_eq(rewritten, expected, row.name)
 				end
 			end
-			helpers.assert_true(replayed >= 3, "the POSIX paths.toml vectors replay")
+			helpers.assert_true(replayed >= 6, "the POSIX paths.toml vectors replay")
 		end)
 
 		helpers.it("keeps the previous paths.toml text before rewriting it (legacy-folder-migration-backup)", function()

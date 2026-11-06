@@ -112,11 +112,15 @@ Test("legacy folder migration: every shared move vector replays on a private tre
 
 _LFM_EveryPathsTextVectorReplays() {
 	Corpus := _LFM_Corpus()
-	AssertEqual(4, Corpus["paths_text"].Length, "complete paths.toml vectors")
+	AssertEqual(8, Corpus["paths_text"].Length, "complete paths.toml vectors")
 	for Row in Corpus["paths_text"] {
 		Rewrites := []
-		for Rule in Row["rewrites"]
-			Rewrites.Push(Map("key", Rule["key"], "old", Rule["old"], "new", Rule["new"]))
+		for Rule in Row["rewrites"] {
+			Rewrite := Map("key", Rule["key"], "old", Rule["old"], "new", Rule["new"])
+			if Rule.Has("under")
+				Rewrite["under"] := Rule["under"]
+			Rewrites.Push(Rewrite)
+		}
 		Expected := Row["expected"] == JSON_NULL ? "" : Row["expected"]
 		AssertEqual(Expected, LegacyFolderRewritePathsText(Row["text"], Rewrites), Row["name"])
 	}
@@ -242,10 +246,11 @@ _LFM_WindowsPlanMovesEveryOldFolderOnAPrivateProfile() {
 Test("legacy folder migration: the Windows plan moves both old Ollama folders on a private profile (legacy-folder-migration-windows-plan)",
 	_LFM_WindowsPlanMovesEveryOldFolderOnAPrivateProfile)
 
-; Runs Body(Home) with LOCALAPPDATA, APPDATA and USERPROFILE pointing at a
-; private profile holding an old paths.toml that names the old configuration
-; folder, so the real AppData is never read or moved.
-_LFM_WithOldConfigProfile(Body) {
+; Runs Body(OldConfig) with LOCALAPPDATA, APPDATA and USERPROFILE pointing at
+; a private profile holding an old paths.toml that names the old configuration
+; folder (or the folder Chosen below it), so the real AppData is never read or
+; moved.
+_LFM_WithOldConfigProfile(Body, Chosen := "") {
 	Profile := A_Temp . "\ergopti_test_legacy_folder_locator_" . A_TickCount
 	Saved := Map()
 	for Name in ["LOCALAPPDATA", "APPDATA", "USERPROFILE"]
@@ -257,8 +262,9 @@ _LFM_WithOldConfigProfile(Body) {
 		SplitPath(OldPaths, , &OldPathsDir)
 		for Path in [Local_, OldPathsDir, OldConfig]
 			DirCreate(Path)
-		FileAppend('ConfigDirPath = "' . StrReplace(OldConfig, "\", "/") . '/"`n', OldPaths, "UTF-8-RAW")
-		FileAppend("PERSONAL", OldConfig . "\config.toml")
+		FileAppend('ConfigDirPath = "' . StrReplace(OldConfig . Chosen, "\", "/") . '/"`n', OldPaths, "UTF-8-RAW")
+		DirCreate(OldConfig . Chosen)
+		FileAppend("PERSONAL", OldConfig . Chosen . "\config.toml")
 		EnvSet("LOCALAPPDATA", Local_), EnvSet("APPDATA", Roaming), EnvSet("USERPROFILE", Home)
 		Body(OldConfig)
 	} finally {
@@ -313,3 +319,20 @@ _LFM_UnpublishedLocatorMovesTheConfigBack() {
 }
 Test("legacy folder migration: the configuration moves back when paths.toml cannot follow (legacy-folder-migration-unpublished)",
 	_LFM_UnpublishedLocatorMovesTheConfigBack)
+
+; A configuration folder chosen below the old default one moves with it: the
+; locator follows it below the new folder instead of naming the removed old
+; path (WFM-002).
+_LFM_ChosenDescendantFollowsItsAncestor() {
+	_LFM_WithOldConfigProfile(Body, "\profiles\private")
+	Body(OldConfig) {
+		Report := LegacyFolderMigrationRun(AppFoldersPathsFile())
+		NewChosen := RTrim(AppFoldersDefaultConfigDir(), "\") . "\profiles\private"
+		Assert(FileExist(NewChosen . "\config.toml"), "the chosen folder moved with its ancestor")
+		AssertEqual('ConfigDirPath = "' . StrReplace(NewChosen, "\", "/") . '/"`n', FileRead(AppFoldersPathsFile(), "UTF-8"),
+			"paths.toml names it where it went")
+		AssertEqual("rewritten", Report["paths_file"])
+	}
+}
+Test("legacy folder migration: a folder chosen below the old configuration follows it (legacy-folder-migration-descendant)",
+	_LFM_ChosenDescendantFollowsItsAncestor)
