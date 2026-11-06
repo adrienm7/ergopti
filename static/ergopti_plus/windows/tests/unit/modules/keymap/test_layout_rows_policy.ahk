@@ -15,6 +15,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include %A_LineFile%\..\..\..\..\fixtures\layout_row_host_character.ahk
+
 
 
 
@@ -134,6 +136,8 @@ _LRPS_ChildSource(BodyName := "layout_row_passthrough_body.ahk", ExtraSource := 
 		AssertTrue(Definition != "", "the real row policy helper must exist: " . Name)
 		Code .= Definition . "`n"
 	}
+	if BodyName == "layout_row_native_flags_body.ahk" || BodyName == "layout_row_external_flags_body.ahk"
+		Code .= "#Include " . _DriverDir . "\tests\fixtures\layout_row_host_character.ahk`n"
 	Code .= ExtraSource . "`n"
 	Code .= FileRead(_DriverDir . "\tests\fixtures\" . BodyName, "UTF-8")
 	return Code
@@ -174,7 +178,15 @@ _LRPS_LevelCustody(CallerLevel, Throws, SourceFn := _LRPS_ChildSource, ExtraArgs
 		AssertEqual(1, State.Calls, "the row sender child must settle once")
 		AssertEqual(0, State.Code, "the row sender refused: " . State.ErrorText . State.Output)
 		AssertEqual("", State.ErrorText, "no native child error may be hidden")
-		AssertEqual(Receipt, State.Output)
+		if Receipt == "PASS layout-row-native-flags" {
+			AssertTrue(IsSet(ExtraArgs) && ExtraArgs.Length >= 1)
+			Observation := "OBSERVATION row-native-feed mode=" . ExtraArgs[1]
+				. " observer_level=1 keydowns=1 char_units=1 expected_units=1"
+			AssertEqual(Observation . "`n" . Receipt, State.Output,
+				"the exact I1 observation and terminal native receipt must both be received")
+			_TestPrint("# " . Observation)
+		} else
+			AssertEqual(Receipt, State.Output)
 	} catch as Err {
 		Primary := Err
 	}
@@ -198,8 +210,8 @@ _LRPS_LevelCustody(CallerLevel, Throws, SourceFn := _LRPS_ChildSource, ExtraArgs
 
 for _LRPS_CallerLevel in [0, 2, 3]
 	for _LRPS_Throws in [false, true]
-		Test("layout row sender: caller level " . _LRPS_CallerLevel . " survives " . (_LRPS_Throws ? "refusal" : "success")
-			. " without rehooking (layout-row-send-level)", _LRPS_LevelCustody.Bind(_LRPS_CallerLevel, _LRPS_Throws))
+		Test("layout row native callback: caller level " . _LRPS_CallerLevel . " ignores a " . (_LRPS_Throws ? "refusing" : "recording") . " sender trap"
+			. " without synthetic replay (layout-row-send-level)", _LRPS_LevelCustody.Bind(_LRPS_CallerLevel, _LRPS_Throws))
 
 
 _LRPW_ChildSource() {
@@ -412,3 +424,106 @@ for _LRCZ_Sc in ["SC00C", "SC00D"]
 		Test("layout zoom: " . _LRCZ_Sc . " chooses its actual " . _LRCZ_Host . " host owner (layout-zoom-host-precedence)",
 			_LRPS_LevelCustody.Bind(0, false, _LRCZ_ChildSource,
 				[_LRCZ_Sc, _LRCZ_Host], "PASS layout-zoom-host-precedence"))
+
+_LRNF_ChildSource() {
+	return _LRPS_ChildSource("layout_row_native_flags_body.ahk")
+}
+for _LRNF_Mode in ["plain", "held", "released"]
+	Test("layout row native modifier flags: " . _LRNF_Mode . " (layout-row-native-flags)",
+		_LRPS_LevelCustody.Bind(0, false, _LRNF_ChildSource,
+			[_LRNF_Mode, "--allow-explicit-owned-edit-row-flags"], "PASS layout-row-native-flags"))
+
+_LRNX_Receiver(Record, WParam, LParam, Message, Hwnd) {
+	if Hwnd != Record["edit"].Hwnd || WParam != Record["vk"]
+		return
+	Record["received"] += 1
+	if Record["received"] == 1 {
+		Shift := !!(DllCall("GetKeyState", "Int", 0x10, "Short") & 0x8000)
+		Extra := DllCall("GetMessageExtraInfo", "UPtr")
+		Payload := Shift . "|" . Extra . "|" . WParam . "|" . Hwnd . "|" . DllCall("GetCurrentProcessId", "UInt")
+		try {
+			if !FSWriteCreateDurable(Record["receipt"], Payload)
+				throw Error("the owned external receiver receipt could not be created")
+		} catch as Err
+			Record["failure"] := Err
+	}
+	return
+}
+
+_LRNX_Case(Mode) {
+	global _DriverDir, _SharedDir
+	static RetirementDebt := 0
+	if IsObject(RetirementDebt)
+		throw Error("A prior external receiver probe retains its owned process/window retirement debt.")
+	Root := A_Temp . "\ergopti_external_row_flags_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Record := Map("window", 0, "edit", 0, "vk", 0, "receipt", Root . "\received.txt", "received", 0, "failure", 0)
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}
+	Created := false, Handle := 0, Primary := 0, Receiver := _LRNX_Receiver.Bind(Record)
+	PreviousCritical := Critical("Off")
+	try {
+		Created := FSCreateDirectoryExclusiveStrict(Root)
+		AssertTrue(Created)
+		Script := Root . "\sender.ahk"
+		Code := _LRPS_ChildSource("layout_row_external_flags_body.ahk")
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . Code) != 0)
+		Record["window"] := Gui(, "Ergopti external native row receiver")
+		Record["edit"] := Record["window"].AddEdit("w320 r3")
+		Record["window"].Show()
+		WinActivate("ahk_id " . Record["window"].Hwnd)
+		AssertTrue(WinWaitActive("ahk_id " . Record["window"].Hwnd, , 2), "the parent-owned external receiver must acquire focus")
+		Record["edit"].Focus()
+		for Name in ["Ctrl", "Alt", "Shift", "LWin", "RWin"]
+			AssertTrue(!GetKeyState(Name, "P") && !GetKeyState(Name), "release modifiers before native external row input")
+		Record["vk"] := DllCall("MapVirtualKeyW", "UInt", 0x10, "UInt", 3, "UInt")
+		AssertTrue(Record["vk"] >= 0x41 && Record["vk"] <= 0x5A)
+		ExpectedHost := _LRN_HostCharacter(Record["vk"], Mode != "plain", DllCall("GetKeyboardLayout", "UInt", 0, "Ptr"))
+		OnMessage(0x100, Receiver)
+		Args := ["/ErrorStdOut=UTF-8", Script, "--allow-explicit-family-edit-row-flags", Mode,
+			String(Record["window"].Hwnd), String(Record["edit"].Hwnd), String(DllCall("GetCurrentProcessId", "UInt")),
+			String(Record["vk"]), Record["receipt"], _SharedDir]
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, Args, _LRPS_Completion.Bind(State))
+		AssertTrue(Handle.start(), "the exact owned sender process must start separately from its receiving parent")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		FileAppend("# external-row-flags " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText . "`n", "*")
+		AssertEqual(1, State.Calls, "the external sender must settle exactly once")
+		AssertEqual(1, Record["received"], "the parent-owned receiver must actually observe exactly one keydown")
+		AssertEqual(ExpectedHost, Record["edit"].Value, "the separate receiving process must obtain the host character exactly once")
+		if IsObject(Record["failure"])
+			throw Record["failure"]
+		AssertEqual(0, State.Code, "the native external row sender refused: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText)
+		AssertTrue(InStr(State.Output, "PASS layout-row-external-native-flags") > 0)
+	} catch as Err {
+		Primary := Err
+	}
+	Retired := false
+	try Retired := !IsObject(Handle) || ((Result := Handle.terminate()) is Integer && Result == 1)
+	catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	if Retired {
+		try {
+			OnMessage(0x100, Receiver, 0)
+			if IsObject(Record["window"])
+				Record["window"].Destroy()
+			if Created
+				DirDelete(Root, true)
+		} catch as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+	} else
+		RetirementDebt := {Handle: Handle, Record: Record, Receiver: Receiver, Root: Root}
+	Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "the owned sender must retire before its external receiver is destroyed")
+}
+
+for _LRNX_Mode in ["plain", "held", "released"]
+	Test("layout row external native modifier flags: " . _LRNX_Mode . " (layout-row-external-native-flags)", _LRNX_Case.Bind(_LRNX_Mode))

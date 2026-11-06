@@ -11,7 +11,8 @@
 --- the AutoHotkey port is windows/modules/llm/parser.ahk, and both are pinned to
 --- the _shared/tests/corpus/llm/process_prediction_vectors.json golden corpus.
 ---
---- This module is PURE: it contains zero Hammerspoon API references. The only
+--- This module is platform-neutral and reads its fixed shared resource policy
+--- once. It contains zero Hammerspoon API references. The only
 --- OS-specific inputs — the min/max word limits — are resolved by the caller and
 --- threaded in through the `opts` table of process_prediction (the macOS shim
 --- reads them from its settings store; a Linux driver would read its own config).
@@ -421,6 +422,29 @@ local function tokenize(s)
 end
 
 --- Calculates the cost of substituting two semantic tokens.
+-- The shared resource policy bounds work before tokenization or any DP allocation.
+-- Byte counts are conservative for both the Lua codepoints and AHK UTF-16 port.
+local diff_limits
+local function diff_within_limits(original, corrected)
+	if not diff_limits then
+		local source = debug.getinfo(1, "S").source
+		assert(source:sub(1, 1) == "@", "parser resource policy requires its shipped source location")
+		local directory = assert(require("native_path").dirname(source:sub(2)), "parser source directory is unavailable")
+		local file = assert(io.open(directory .. "/../../modules/llm/parser_limits.json", "rb"))
+		local text = file:read("*a")
+		file:close()
+		local limits = assert(require("json").decode(text), "invalid shared parser resource policy")
+		assert(type(limits) == "table", "shared parser resource policy must be an object")
+		for _, name in ipairs({ "max_operand_bytes", "max_grid_cells" }) do
+			local value = limits[name]
+			assert(type(value) == "number" and value >= 1 and value < math.huge and value == math.floor(value), "invalid shared parser limit: " .. name)
+		end
+		diff_limits = limits
+	end
+	return #original <= diff_limits.max_operand_bytes and #corrected <= diff_limits.max_operand_bytes
+		and (#original + 1) * (#corrected + 1) <= diff_limits.max_grid_cells
+end
+
 --- Implements a strict similarity threshold to avoid scrambling unrelated words.
 --- @param t1 string The original token.
 --- @param t2 string The target token.
@@ -648,6 +672,10 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		tc = utils.trim((tc:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", "")))
 		nw = utils.trim((nw:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", "")))
 		
+		if not diff_within_limits("", tc) or not diff_within_limits("", nw) then
+			Logger.warn(LOG, "Prediction refused: model text exceeds the shared parser resource limits.")
+			return nil
+		end
 		tc = apply_french_typography(tc)
 		nw = apply_french_typography(nw)
 		nw = strip_prediction_padding(nw)
@@ -661,6 +689,11 @@ function M.process_prediction(full_text, tail_text, block, opts)
 			tc = utils.trim(((tail_text or ""):gsub("^\"", ""):gsub("\"$", "")))
 		end
 		if tc == "" and nw == "" then return nil end
+
+		if not diff_within_limits(full_text, tc) or not diff_within_limits("", nw) then
+			Logger.warn(LOG, "Prediction refused: correction exceeds the shared diff resource limits.")
+			return nil
+		end
 
 		local normalized_full = (full_text or "")
 		local tc_norm = tc
@@ -824,6 +857,10 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		end
 		
 		-- 1. Diff strictly against TAIL_CORRECTED to avoid misaligning new words
+		if not diff_within_limits(orig_context, tc_norm) then
+			Logger.warn(LOG, "Prediction refused: normalized correction exceeds the shared diff resource limits.")
+			return nil
+		end
 		local ops = token_diff_ops(orig_context, tc_norm, budget)
 		if not ops then
 			Logger.error(LOG, "Prediction parser refused invalid UTF-8 or excessive work during token alignment.")
@@ -1097,6 +1134,10 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		nw = nw:gsub("^%[?[Nn][Ee][Xx][Tt]%]?%s*:?%s*", "")
 		nw = nw:gsub("^[Ss][Uu][Ii][Tt][Ee]%s*:%s*", "")
 		nw = nw:gsub("^[Ss]uite%s+[Ff]inale%s*[:%.%-]*%s*", "")
+		if not diff_within_limits("", nw) or not diff_within_limits("", full_text) then
+			Logger.warn(LOG, "Prediction refused: raw text exceeds the shared parser resource limits.")
+			return nil
+		end
 		nw = strip_bullet_prefix(nw)
 		nw = strip_prediction_padding(nw)
 		nw = apply_french_typography(nw)

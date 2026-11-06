@@ -77,7 +77,7 @@ _GPO_Source(Owners) {
 	Bound := StrReplace(Bound, "Hook.Stop()", "_GPO_Stop(Hook)", true, &StopBindings)
 	AssertEqual(MouseSites, MouseBindings, "no comment or string may introduce a mouse substitution")
 	AssertEqual(StopSites, StopBindings, "no comment or string may introduce a Stop substitution")
-	AssertTrue(InStr(Bound, 'InputHook("V L3")', true) > 0, "native construction remains intact")
+	AssertTrue(InStr(Bound, 'InputHook("V L0")', true) > 0, "native construction remains intact")
 	Owners["click_owner_sha256"] := CryptoSha256Bytes(FSReadBytesStrict(ClickOwner))
 	Owners["click_bindings"] := MouseBindings
 	Owners["stop_observers"] := StopBindings

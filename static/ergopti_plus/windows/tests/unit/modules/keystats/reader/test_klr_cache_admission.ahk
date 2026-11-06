@@ -40,7 +40,7 @@ _KLRDC_LegacyJsonImageIsRefused(Version := "1") {
 			SQLite_Close(Stored)
 		}
 		AssertEqual(0, KLR_CacheAttach(_KLRDC_Root(), A_Temp . "\ergopti_klrdc.log"),
-			"images built with truncating JSON flushes must force reconstruction")
+			"images built with an obsolete reader format must force reconstruction")
 		AssertFalse(FSExists(CachePath), "the rejected image must be retired")
 		AssertEqual(Before, _KLRDC_DerivedFingerprint(_KLRDC_BuildAsWorker()),
 			"the original ledger must remain available for a clean rebuild")
@@ -259,3 +259,16 @@ _KLRDC_NewDeviceIsRefused() {
 }
 Test("KLR durable cache: an unknown device ledger refuses the image (klr-reader-durable-cache)",
 	_KLRDC_CheckTeardown.Bind(_KLRDC_NewDeviceIsRefused))
+
+
+Test("KLR durable cache: pre-collision-fix image forces rebuild (klr-newest-first-collision)",
+	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("16")))
+
+Test("KLR durable cache: ambiguous tuple image forces rebuild (walker-composite-cache)",
+	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("17")))
+
+Test("KLR durable cache: window visit counts force reconstruction as typing counts (window-title-app-attribution)",
+	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("18")))
+
+Test("KLR durable cache: missing canonical Wi-Fi mobility forces rebuild (wifi-dashboard-kpi-owner)",
+	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("19")))

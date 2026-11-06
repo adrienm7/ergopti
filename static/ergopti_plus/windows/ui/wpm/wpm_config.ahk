@@ -172,6 +172,10 @@ _WPMWidget_CurrentWorkAreas() {
 	return Areas
 }
 
+; Only the legacy pair is the automatic-position sentinel. A single -1 can
+; be a real coordinate on a monitor to the left or above the primary screen.
+_WPMWidget_IsAutoPosition(X, Y) => X == -1 && Y == -1
+
 ; The saved position is read from the Storage port, never from config.toml:
 ; it is where the user left the widget, not a preference. StoreFn(Key) is
 ; injectable for tests and returns "_" for an absent key.
@@ -299,31 +303,109 @@ WPMWidget_Toggle(WriterFn := 0, NotifyFn := 0, ShowFn := 0, HideFn := 0) {
 
 _WPMWidget_StoreSet(Key, Value) => ST_Set(Key, Value)
 
-; Stores both coordinates through the Storage port and publishes them only when
-; both writes are acknowledged. A refused second write puts the first back, so
-; a half-written pair never reaches the next boot. StoreFn(Key, Value) is
-; injectable for tests.
-_WPMWidget_StorePosition(TargetX, TargetY, StoreFn := 0, NotifyFn := 0) {
-	Store := HasMethod(StoreFn, "Call") ? StoreFn : _WPMWidget_StoreSet
-	PreviousX := WPMWidget.pos_x
-	PreviousY := WPMWidget.pos_y
-	Stored := false
-	try Stored := (Store.Call(WPMWidgetConst.STORE_X, TargetX) == true)
-		&& (Store.Call(WPMWidgetConst.STORE_Y, TargetY) == true)
-	if !Stored {
-		try Store.Call(WPMWidgetConst.STORE_X, PreviousX)
-		try Store.Call(WPMWidgetConst.STORE_Y, PreviousY)
-		return ConfigReportPersistenceFailure("widget position", NotifyFn,
-			"the position store refused the write")
+; A publication receipt is opaque: a successor which acknowledges the same
+; coordinates still retires the older writer's right to compensate them.
+_WPMWidget_PositionAuthority(Replacement := unset) {
+	static State := {active: 0, published: 0}
+	if IsSet(Replacement)
+		State := Replacement
+	return State
+}
+
+; Pure memory admission only. Storage and notification remain outside Critical.
+_WPMWidget_PositionOwnerIsCurrent(State, Token) {
+	global STORAGE_REG_BASE
+	PreviousCritical := Critical("On")
+	try return State == _WPMWidget_PositionAuthority() && State.active == Token
+		&& WPMWidgetConst.STORE_X == Token.keyX && WPMWidgetConst.STORE_Y == Token.keyY
+		&& (!Token.native || STORAGE_REG_BASE == Token.storagePath)
+	finally Critical(PreviousCritical)
+}
+
+; Stores both coordinates, publishing RAM only after both ACKs. A refused write
+; attempts compensation only while this exact in-flight owner remains current.
+; The optional publication receipt is used by the enclosing config operation.
+_WPMWidget_StorePosition(TargetX := unset, TargetY := unset, StoreFn := 0, NotifyFn := 0,
+		&PublishedReceipt := 0, ExpectedPublication := unset) {
+	global STORAGE_REG_BASE
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _WPMWidget_StorePosition(TargetX?, TargetY?, StoreFn, NotifyFn,
+			&PublishedReceipt, ExpectedPublication?)
+		finally Critical(InheritedCritical)
 	}
-	WPMWidget.pos_x := TargetX
-	WPMWidget.pos_y := TargetY
-	return true
+	PublishedReceipt := 0
+	Store := HasMethod(StoreFn, "Call") ? StoreFn : _WPMWidget_StoreSet
+	PreviousCritical := Critical("On")
+	try {
+		State := _WPMWidget_PositionAuthority()
+		; The two native Registry writes form one owned operation. A reentrant
+		; contender cannot splice its pair into this writer or its compensation.
+		if State.active != 0
+			return false
+		if IsSet(ExpectedPublication) && (!(ExpectedPublication is Object) || State.active != 0
+				|| State.published != ExpectedPublication
+				|| WPMWidget.pos_x != ExpectedPublication.x || WPMWidget.pos_y != ExpectedPublication.y
+				|| WPMWidgetConst.STORE_X != ExpectedPublication.keyX
+				|| WPMWidgetConst.STORE_Y != ExpectedPublication.keyY
+				|| (ExpectedPublication.native && STORAGE_REG_BASE != ExpectedPublication.storagePath))
+			return false
+		PreviousX := WPMWidget.pos_x, PreviousY := WPMWidget.pos_y
+		if !IsSet(TargetX)
+			TargetX := PreviousX
+		if !IsSet(TargetY)
+			TargetY := PreviousY
+		Token := {x: TargetX, y: TargetY, previousX: PreviousX, previousY: PreviousY, keyX: WPMWidgetConst.STORE_X,
+			keyY: WPMWidgetConst.STORE_Y, native: !HasMethod(StoreFn, "Call"), storagePath: STORAGE_REG_BASE}
+		State.active := Token
+	} finally Critical(PreviousCritical)
+	try {
+		Stored := false
+		try {
+			Stored := (Store.Call(Token.keyX, TargetX) == true)
+			if !_WPMWidget_PositionOwnerIsCurrent(State, Token)
+				return false
+			if Stored
+				Stored := (Store.Call(Token.keyY, TargetY) == true)
+		}
+		if !_WPMWidget_PositionOwnerIsCurrent(State, Token)
+			return false
+		if !Stored {
+			; Each adapter can pump a successor; never resume a retired rollback.
+			try Store.Call(Token.keyX, PreviousX)
+			if _WPMWidget_PositionOwnerIsCurrent(State, Token)
+				try Store.Call(Token.keyY, PreviousY)
+			; Compensation has completed. Retire before diagnostics/notification,
+			; which may legitimately publish a new position and receive its ACK.
+			PreviousCritical := Critical("On")
+			try {
+				if State.active == Token
+					State.active := 0
+			} finally Critical(PreviousCritical)
+			return ConfigReportPersistenceFailure("widget position", NotifyFn,
+				"the position store refused the write")
+		}
+		PreviousCritical := Critical("On")
+		try {
+			if !_WPMWidget_PositionOwnerIsCurrent(State, Token)
+				return false
+			WPMWidget.pos_x := TargetX, WPMWidget.pos_y := TargetY
+			State.published := Token
+			PublishedReceipt := Token
+		} finally Critical(PreviousCritical)
+		return true
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			if State.active == Token
+				State.active := 0
+		} finally Critical(PreviousCritical)
+	}
 }
 
 WPMWidget_SavePosition(X := unset, Y := unset, StoreFn := 0, NotifyFn := 0) {
-	return _WPMWidget_StorePosition(IsSet(X) ? X : WPMWidget.pos_x,
-		IsSet(Y) ? Y : WPMWidget.pos_y, StoreFn, NotifyFn)
+	return _WPMWidget_StorePosition(X?, Y?, StoreFn, NotifyFn)
 }
 
 ; Resets the widget to its default bottom-right position and stores it.
@@ -382,11 +464,8 @@ WPMWidget_SaveConfig(Colors := unset, Graph := unset, X := unset, Y := unset,
 		WriterFn := 0, NotifyFn := 0, StoreFn := 0) {
 	HasColors := IsSet(Colors)
 	HasGraph := IsSet(Graph)
-	PreviousX := WPMWidget.pos_x
-	PreviousY := WPMWidget.pos_y
 	Moves := IsSet(X) || IsSet(Y)
-	if Moves && !_WPMWidget_StorePosition(IsSet(X) ? X : PreviousX,
-			IsSet(Y) ? Y : PreviousY, StoreFn, NotifyFn)
+	if Moves && !_WPMWidget_StorePosition(X?, Y?, StoreFn, NotifyFn, &PositionReceipt)
 		return false
 	BuildFn := _WPMWidget_BuildDisplayCandidate.Bind(
 		HasColors, HasColors ? Colors : false,
@@ -394,7 +473,8 @@ WPMWidget_SaveConfig(Colors := unset, Graph := unset, X := unset, Y := unset,
 	if _WPMWidget_SaveBuilt(BuildFn, "widget display settings", WriterFn, NotifyFn)
 		return true
 	if Moves
-		_WPMWidget_StorePosition(PreviousX, PreviousY, StoreFn, (*) => 0)
+		_WPMWidget_StorePosition(PositionReceipt.previousX, PositionReceipt.previousY,
+			StoreFn, (*) => 0, , PositionReceipt)
 	return false
 }
 
@@ -421,13 +501,12 @@ WPMWidget_ToggleColorsConfig(WriterFn := 0, NotifyFn := 0) {
 ; default (-1) with it. The anchor is stored first and put back when the
 ; configuration refuses.
 WPMWidget_ToggleGraphConfig(WriterFn := 0, NotifyFn := 0, StoreFn := 0) {
-	PreviousX := WPMWidget.pos_x
-	PreviousY := WPMWidget.pos_y
-	if !_WPMWidget_StorePosition(-1, -1, StoreFn, NotifyFn)
+	if !_WPMWidget_StorePosition(-1, -1, StoreFn, NotifyFn, &PositionReceipt)
 		return false
 	BuildFn := _WPMWidget_BuildDisplayToggleCandidate.Bind("graph")
 	if _WPMWidget_SaveBuilt(BuildFn, "widget display settings", WriterFn, NotifyFn)
 		return true
-	_WPMWidget_StorePosition(PreviousX, PreviousY, StoreFn, (*) => 0)
+	_WPMWidget_StorePosition(PositionReceipt.previousX, PositionReceipt.previousY,
+			StoreFn, (*) => 0, , PositionReceipt)
 	return false
 }

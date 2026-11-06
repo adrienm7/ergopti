@@ -95,7 +95,7 @@ _SCAS_WithFixture(Fn) {
 		"timer_ran", false)
 	Ports := Map("save", _SCAS_Save.Bind(State), "clear", _SCAS_Clear.Bind(State),
 		"send", (*) => State["sends"] += 1, "sequence", _SCAS_Sequence.Bind(State),
-		"restore", _SCAS_Restore.Bind(State), "foreground", (*) => 101)
+		"restore", _SCAS_Restore.Bind(State), "control", (*) => 201, "foreground", (*) => 101)
 	State["ports"] := Ports
 	try {
 		CBClipboardOwner.settle_hook := 0
@@ -216,7 +216,7 @@ _SCAS_Ready(Mode, State, Ports) {
 	if Mode != "ordinary"
 		State["read_action"] := _SCAS_ChangeDuringRead.Bind(State, Mode)
 	AssertTrue(_SelectionCaptureReadReady(Job, _SCAS_Read.Bind(State), Ports["sequence"],
-		Ports["restore"], (J) => Map("foreground", 101, "physical_generation", J["physical_generation"])))
+		Ports["restore"], (J) => Map("foreground", 101, "control", J["control"], "physical_generation", J["physical_generation"])))
 	AssertEqual(Mode == "admission-zero" ? 0 : 1, State["reads"], "unavailable initial ownership must refuse the clipboard read")
 	AssertEqual(Expected, Job["owned_sequence"], "a positive copy is admitted before reading, while zero retains proven clear ownership")
 	AssertEqual(Mode == "ordinary" ? 1 : 0, State["delivered"].Length,
@@ -279,7 +279,7 @@ _SCAS_ReentrantRead(Boundary, Action, State, Ports) {
 	else
 		State[Boundary . "_action"] := Reenter
 	AssertFalse(_SelectionCaptureReadReady(Job, _SCAS_Read.Bind(State), Ports["sequence"],
-		Ports["restore"], (J) => Map("foreground", 101, "physical_generation", J["physical_generation"])),
+		Ports["restore"], (J) => Map("foreground", 101, "control", J["control"], "physical_generation", J["physical_generation"])),
 		"revocation at either native boundary must stop the old completion")
 	AssertEqual(Boundary == "sequence" ? 0 : 1, State["reads"], "a revoked probe cannot proceed to a clipboard read")
 	AssertEqual(Boundary == "sequence" ? 42 : 43, Job["owned_sequence"], "only a current sequence probe can admit ownership")
@@ -322,7 +322,7 @@ _SCAS_ReadFailure(Action, State, Ports) {
 	else if Action != "none"
 		State["read_action"] := _SCAS_Reenter.Bind(State, Ports, Action)
 	Completed := _SelectionCaptureReadReady(Job, _SCAS_Read.Bind(State), Ports["sequence"],
-		Ports["restore"], (J) => Map("foreground", 101, "physical_generation", J["physical_generation"]))
+		Ports["restore"], (J) => Map("foreground", 101, "control", J["control"], "physical_generation", J["physical_generation"]))
 	AssertEqual(1, State["reads"], "the failing getter must actually run")
 	AssertEqual(0, State["delivered"].Length, "a failed getter never delivers partial or foreign text")
 	AssertEqual(43, Job["owned_sequence"], "error cleanup retains the sequence admitted before the getter")
@@ -380,3 +380,91 @@ _SCAS_CancelFromNativeTimer(State, Ports) {
 }
 Test("selection sequence: native cancellation preserves a newer copy (selection-admitted-sequence-timer)",
 	_SCAS_WithFixture.Bind(_SCAS_CancelFromNativeTimer))
+
+
+_SCEO_Empty(State) {
+	State["empty_calls"] += 1
+	AssertEqual(0, CBClipboardOwner.active.Count, "OnEmpty starts only after its exact clipboard owner has settled")
+	AssertFalse(CBClipboardOwner.restore_debt, "OnEmpty must never run with retained restore debt")
+	if State["empty_mode"] == "successor"
+		State["empty_successor"] := _SCAS_Begin(State, State["ports"])
+}
+_SCEO_Restore(State, Saved) {
+	if State["empty_mode"] == "restore-refusal" && !State["empty_refused"] {
+		State["empty_refused"] := true
+		return false
+	}
+	if State["empty_mode"] == "cancel-during-restore"
+		GetSelectionCancel()
+	return _SCAS_Restore(State, Saved)
+}
+_SCEO_Case(Mode, State, Ports) {
+	global _SelectionCaptureJob
+	; Recreate through the actual private typed startup option, not by assigning
+	; the new Job field by hand. The generic fixture's first job is unrelated.
+	_SCAS_Finish(State, Ports, "on-empty setup")
+	State["empty_mode"] := Mode
+	State["empty_calls"] := 0
+	State["empty_refused"] := false
+	State["restores"] := []
+	Ports["on_empty"] := _SCEO_Empty.Bind(State)
+	Ports["restore"] := _SCEO_Restore.Bind(State)
+	Job := _SCAS_Begin(State, Ports)
+	State["job"] := Job
+	State["text"] := ""
+	if Mode == "foreign" {
+		State["sequence"] := 43
+		State["text"] := "independent user copy"
+	}
+	if Mode == "paused"
+		Suspend(true)
+	Reason := Mode == "cancelled" ? "cancelled" : "timeout"
+	Context := (J) => Map("foreground", 101, "control", Mode == "focus-changed" ? 202 : 201,
+		"physical_generation", J["physical_generation"])
+	_SelectionCaptureFinish(Job, "", false, Reason, Ports["restore"], Ports["sequence"], Context)
+	Expected := Mode == "owned" || Mode == "foreign" || Mode == "successor" ? 1 : 0
+	AssertEqual(Expected, State["empty_calls"], "Only a context-current settled timeout owns its one empty continuation")
+	AssertEqual(0, State["delivered"].Length, "An empty timeout never calls the successful-selection continuation")
+	AssertEqual(0, Job["timer"], "The exact native callback detaches before any empty continuation")
+	if Mode == "restore-refusal" {
+		AssertTrue(CB_HasRestoreDebtForOwner(Job["owner_token"]), "A refused restore retains its actual original debt")
+		AssertTrue(CB_RetryRestoreDebt(), "The following acknowledged retry must settle that exact debt")
+		AssertEqual(0, State["empty_calls"], "A later generic debt retry must not resurrect a retired timeout callback")
+	}
+	if Mode == "foreign" {
+		AssertEqual(0, State["restores"].Length, "Settling a foreign winner must never overwrite it")
+		AssertEqual("independent user copy", State["text"])
+	}
+	if Mode == "successor" {
+		Successor := State["empty_successor"]
+		AssertTrue(_SelectionCaptureJob == Successor, "OnEmpty may admit a fresh independent successor after cleanup")
+		AssertTrue(CBClipboardOwner.active.Has(Successor["owner_token"]))
+		_SelectionCapturePoll(Job)
+		AssertTrue(_SelectionCaptureJob == Successor, "The retired original timer cannot erase the successor")
+		AssertEqual(1, State["empty_calls"])
+	} else {
+		AssertFalse(IsObject(_SelectionCaptureJob))
+		_SelectionCapturePoll(Job)
+		AssertEqual(Expected, State["empty_calls"], "A replayed retired poll cannot deliver OnEmpty twice")
+	}
+}
+for _SCEO_Mode in ["owned", "foreign", "restore-refusal", "cancelled", "focus-changed", "paused", "cancel-during-restore", "successor"]
+	Test("selection private empty continuation: " . _SCEO_Mode . " (selection-on-empty-owner)",
+		_SCAS_WithFixture.Bind(_SCEO_Case.Bind(_SCEO_Mode)))
+
+_SCEO_InvalidOption(State, Ports) {
+	global _SelectionCaptureJob, _SelectionCaptureNextId
+	Incumbent := _SelectionCaptureJob
+	Id := _SelectionCaptureNextId
+	InvalidPorts := Ports.Clone()
+	InvalidPorts["on_empty"] := Map("not", "callable")
+	Refused := false
+	try GetSelectionAsync(_SCAS_Deliver.Bind(State), InvalidPorts)
+	catch TypeError
+		Refused := true
+	AssertTrue(Refused, "The private optional continuation must be typed before startup mutation")
+	AssertTrue(_SelectionCaptureJob == Incumbent, "An invalid optional callback cannot cancel the incumbent")
+	AssertEqual(Id, _SelectionCaptureNextId, "Validation must not renumber the current owner's admission")
+}
+Test("selection private empty continuation: invalid option preserves incumbent (selection-on-empty-owner)",
+	_SCAS_WithFixture.Bind(_SCEO_InvalidOption))

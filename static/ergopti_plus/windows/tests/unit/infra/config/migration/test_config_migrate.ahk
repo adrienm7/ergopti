@@ -844,3 +844,195 @@ _CMG_RegistryHashCrossCheck() {
 }
 Test("config migrate: the registry cross-check matches by content hash and still refuses changed, invalid or removed sources (config-registry-hash)",
 	_CMG_RegistryHashCrossCheck)
+
+_CMGS_ForeignStage(Collision) {
+	Root := A_Temp . "\ergopti_config_migration_stage_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\config.toml", Created := false
+	Owner := FSWriteReplaceOwned, HadOwn := Owner.HasOwnProp("Call")
+	if HadOwn
+		SavedCall := Owner.GetOwnPropDesc("Call")
+	Installed := false
+	State := {hits: 0, stagePath: "", sentinelBytes: 0, createdSentinel: 0, originalEntered: 0, originalCompleted: 0}
+	Source := '[hotstrings.dynamic]`ndatefr = "Original"`n'
+	Sentinel := "Foreign migration stage: é😀 unchanged"
+	Observe(This, Target, Content, Suffix, &Detail := "", StageFn := 0,
+			BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true,
+			&Publication := 0, FlushFn := 0) {
+		Mine := (Target is String) && StrCompare(Target, Path, true) == 0
+		CreateOriginal(Folder, Name, Attributes) {
+			SplitPath(Path, &Leaf)
+			AssertEqual(Leaf . Suffix, Name)
+			State.hits += 1
+			State.stagePath := Path . Suffix
+			if Collision {
+				State.createdSentinel := FSWriteCreateDurable(State.stagePath, Sentinel)
+				AssertEqual(1, State.createdSentinel, "the foreign migration stage is actually created exclusively")
+				State.sentinelBytes := FSReadBytesStrict(State.stagePath)
+			}
+			return StageFn.Call(Folder, Name, Attributes)
+		}
+		if Mine
+			State.originalEntered += 1
+		NativeResult := Func.Prototype.Call.Call(This, Target, Content, Suffix, &Detail,
+			Mine ? CreateOriginal : StageFn, BeforePublishFn, AdmissionFn, ReplaceExisting, &Publication, FlushFn)
+		if Mine
+			State.originalCompleted += 1
+		return NativeResult
+	}
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Before := FSReadBytesStrict(Path)
+		Owner.DefineProp("Call", {Call: Observe})
+		Installed := true
+		Result := ConfigMigrateRun(Path, _CMG_OneStepRegistry(), "20990101-000000")
+		After := FSReadBytesStrict(Path)
+		StagePresent := State.stagePath != "" && FSStrictExists(State.stagePath)
+		StageBytes := StagePresent ? FSReadBytesStrict(State.stagePath) : Buffer(0)
+		_TestPrint("# config-migration-stage collision=" . Collision . " calls=" . State.hits
+			. " created_sentinel=" . State.createdSentinel . " original_entered=" . State.originalEntered
+			. " original_completed=" . State.originalCompleted
+			. " status=" . Result["status"] . " stage_present=" . StagePresent
+			. " before_bytes=" . Before.Size . " after_bytes=" . After.Size
+			. " detail=" . Result["detail"])
+		AssertEqual(1, State.hits, "the actual default migration publisher must reach its real native staging owner")
+		AssertEqual(1, State.originalEntered, "the real staging writer must be delegated exactly once")
+		AssertEqual(1, State.originalCompleted, "the real original writer must return before business assertions")
+		AssertEqual(Collision ? 1 : 0, State.createdSentinel)
+		AssertTrue(FSUtf8ExactMatches(Result["backup"], Source), "the actual backup retains the admitted original source")
+		if Collision {
+			AssertTrue(StagePresent, "a migration cannot rename or delete another owner's stage")
+			AssertEqual(State.sentinelBytes.Size, StageBytes.Size)
+			AssertEqual(StageBytes.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", State.sentinelBytes,
+				"Ptr", StageBytes, "UPtr", StageBytes.Size, "UPtr"), "foreign bytes must remain exact")
+			AssertEqual("failed", Result["status"])
+			AssertEqual(1, Result["read_only"])
+			AssertEqual(Before.Size, After.Size)
+			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+				"Ptr", After, "UPtr", Before.Size, "UPtr"), "collision refuses all target publication")
+		} else {
+			AssertEqual("migrated", Result["status"])
+			AssertFalse(StagePresent)
+			Actual := TOML_ParseDocument(FSReadUtf8Exact(Path))
+			AssertEqual(2, Actual["_meta"]["schema_version"])
+			AssertEqual("Original", Actual["hotstrings"]["dynamic"]["date_fr"])
+			AssertFalse(Actual["hotstrings"]["dynamic"].Has("datefr"))
+		}
+	} finally {
+		if Installed {
+			if HadOwn
+				Owner.DefineProp("Call", SavedCall)
+			else
+				Owner.DeleteProp("Call")
+		}
+		if Created {
+			_TOML_InvalidateParseCache(Path)
+			Refusals := _TOML_WriteRefusals(), RefusalKey := _TOML_WriteRefusalKey(Path)
+			if Refusals.Has(RefusalKey)
+				Refusals.Delete(RefusalKey)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _CMGS_Collision in [true, false]
+	Test("config migration stage: foreign collision=" . _CMGS_Collision . " (config-migration-stage-ownership)", _CMGS_ForeignStage.Bind(_CMGS_Collision))
+
+_CMHP_Outcome(Denied) {
+	Root := A_Temp . "\ergopti_migration_partial_owner_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\config.toml", Created := false
+	Owner := FSWriteReplaceOwned, HadOwn := Owner.HasOwnProp("Call"), Installed := false
+	if HadOwn
+		SavedCall := Owner.GetOwnPropDesc("Call")
+	State := {calls: 0, completed: 0, publishedFlushes: 0, nativeFlushAck: 0, handle: -1, handleQuery: -1, handleError: 0}
+	Source := '[hotstrings.dynamic]`ndatefr = "Original"`n'
+	FlushNative(Handle, Phase) {
+		NativeAck := DllCall("kernel32\FlushFileBuffers", "Ptr", Handle, "Int")
+		if Phase == "published" {
+			State.publishedFlushes += 1
+			State.nativeFlushAck := NativeAck
+			State.handle := Handle
+		}
+		if !NativeAck
+			throw OSError(A_LastError, "fixture actual private migration flush")
+		; The native flush happened; only its typed durable acknowledgement is
+		; declined at the published boundary. This is not a claim of OS failure.
+		return Denied && Phase == "published" ? 0 : 1
+	}
+	Observe(This, Target, Content, Suffix, &Detail := "", StageFn := 0,
+			BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true,
+			&Publication := 0, FlushFn := 0) {
+		Mine := (Target is String) && StrCompare(Target, Path, true) == 0
+		if Mine {
+			State.calls += 1
+			AssertTrue((FlushFn is Integer) && FlushFn == 0)
+		}
+		Result := Func.Prototype.Call.Call(This, Target, Content, Suffix, &Detail,
+			StageFn, BeforePublishFn, AdmissionFn, ReplaceExisting, &Publication, Mine ? FlushNative : FlushFn)
+		if Mine {
+			State.completed += 1
+			if State.handle != -1 {
+				Info := Buffer(52, 0)
+				DllCall("kernel32\SetLastError", "UInt", 0)
+				State.handleQuery := DllCall("kernel32\GetFileInformationByHandle", "Ptr", State.handle, "Ptr", Info, "Int")
+				State.handleError := A_LastError
+			}
+		}
+		return Result
+	}
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Owner.DefineProp("Call", {Call: Observe})
+		Installed := true
+		Result := ConfigMigrateRun(Path, _CMG_OneStepRegistry(), "20990101-000000")
+		Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		Partial := _TOML_SessionHasPartialPublication(Path)
+		_TestPrint("# config-migration-partial denied_ack=" . Denied . " calls=" . State.calls
+			. " completed=" . State.completed . " native_flush_ack=" . State.nativeFlushAck
+			. " published_flushes=" . State.publishedFlushes . " handle_query=" . State.handleQuery
+			. " handle_error=" . State.handleError . " status=" . Result["status"]
+			. " partial_session=" . Partial . " schema=" . Disk["_meta"]["schema_version"])
+		AssertEqual(1, State.calls)
+		AssertEqual(1, State.completed)
+		AssertEqual(1, State.publishedFlushes)
+		AssertEqual(1, State.nativeFlushAck)
+		AssertEqual(0, State.handleQuery, "the exact returned stage handle must have been retired before any logging")
+		AssertEqual(6, State.handleError)
+		AssertEqual(2, Disk["_meta"]["schema_version"])
+		AssertEqual("Original", Disk["hotstrings"]["dynamic"]["date_fr"])
+		AssertTrue(FSUtf8ExactMatches(Result["backup"], Source))
+		AssertEqual(Denied ? "failed" : "migrated", Result["status"])
+		AssertEqual(Denied ? 1 : 0, Result["read_only"])
+		AssertEqual(Denied, Partial)
+		if Denied {
+			BeforeRetry := FSReadBytesStrict(Path)
+			AssertFalse(TOML_BatchWrite(Path, [{Section: "hotstrings.dynamic", Key: "date_fr", Value: "must refuse"}]))
+			AfterRetry := FSReadBytesStrict(Path)
+			AssertEqual(BeforeRetry.Size, AfterRetry.Size)
+			AssertEqual(BeforeRetry.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", BeforeRetry,
+				"Ptr", AfterRetry, "UPtr", BeforeRetry.Size, "UPtr"))
+			AssertEqual(1, State.calls, "a session refusal does not rename the candidate again")
+		}
+	} finally {
+		if Installed {
+			if HadOwn
+				Owner.DefineProp("Call", SavedCall)
+			else
+				Owner.DeleteProp("Call")
+		}
+		if Created {
+			_TOML_InvalidateParseCache(Path)
+			Refusals := _TOML_WriteRefusals(), Key := _TOML_WriteRefusalKey(Path)
+			if Refusals.Has(Key)
+				Refusals.Delete(Key)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _CMHP_Denied in [true, false]
+	Test("config migration partial: actual rename declined durable ack=" . _CMHP_Denied
+		. " (config-migration-partial-publication)", _CMHP_Outcome.Bind(_CMHP_Denied))

@@ -134,3 +134,69 @@ _SRNUL_ExecRefusesNulCommand() {
 }
 Test("shell runner: exec refuses a NUL command before cmd.exe runs (shell-nul-argv)",
 	_SRNUL_ExecRefusesNulCommand)
+
+_SRNUL_EnvironmentRejectsNul() {
+	for Position in ["leading", "middle", "trailing"] {
+		Value := Position == "leading" ? Chr(0) . "drop"
+			: Position == "trailing" ? "keep" . Chr(0) : "keep" . Chr(0) . "drop"
+		Overrides := Map("ERGOPTI_SRNUL_VALUE", Value)
+		AssertEqual(StrLen(Value), StrLen(Overrides["ERGOPTI_SRNUL_VALUE"]), "the actual Map must preserve the complete value")
+		AssertTrue(_SR_HasNul(Overrides["ERGOPTI_SRNUL_VALUE"]), "the stored override must genuinely contain an embedded NUL")
+		Rejected := false
+		try ShellRunner_BuildEnvironment(Overrides)
+		catch ValueError
+			Rejected := true
+		AssertTrue(Rejected, "a " . Position . " NUL in an environment value must be refused before returning a launchable buffer")
+	}
+}
+Test("shell runner: environment overrides refuse NUL values", _SRNUL_EnvironmentRejectsNul)
+
+_SRNUL_EnvironmentControl() {
+	Name := "ERGOPTI_SRNUL_VALUE"
+	Original := EnvGet(Name)
+	Root := _FSWL_Path() . "_environment"
+	FSCreateDirectoryExclusiveStrict(Root)
+	Task := 0, State := Map("done", false)
+	try {
+		EnvSet(Name, "parent")
+		Value := "keep space é=value"
+		Environment := ShellRunner_BuildEnvironment(Map(StrLower(Name), Value, Name . "_EMPTY", ""))
+		Cursor := Environment.Ptr, Entries := 0, EmptySeen := false
+		while NumGet(Cursor, 0, "UShort") {
+			Entry := StrGet(Cursor, "UTF-16")
+			Cursor += (StrLen(Entry) + 1) * 2
+			if StrCompare(SubStr(Entry, 1, StrLen(Name) + 1), Name . "=", false) == 0 {
+				Entries += 1
+				AssertEqual(Value, SubStr(Entry, StrLen(Name) + 2), "the encoded value retains Unicode, spaces and equals")
+			}
+			if StrCompare(Entry, Name . "_EMPTY=", false) == 0
+				EmptySeen := true
+		}
+		AssertEqual(1, Entries, "overriding an inherited name is case insensitive")
+		AssertTrue(EmptySeen, "an empty value remains an explicit native entry")
+		Receipt := Root . "\receipt.txt"
+		Command := '"' . A_ComSpec . '" /D /U /S /C "(echo %ERGOPTI_SRNUL_VALUE%) >"' . Receipt . '" & exit /b 0"'
+		Task := ShellRunner_SpawnTreeOwnedCommand(A_ComSpec, Command, Environment, Root, _SRAV_Done.Bind(State))
+		AssertTrue(Task.start(), "the real child must receive the builder's private environment")
+		Started := A_TickCount
+		while !State["done"] && TickElapsed(Started) < 10000
+			Sleep(10)
+		AssertTrue(State["done"], "the real child must settle within its bounded wait")
+		AssertEqual(0, State["code"])
+		AssertEqual("", State["errors"])
+		AssertEqual(Value, RTrim(FileRead(Receipt, "UTF-16"), "`r`n"), "the native process receives the exact valid value")
+		AssertEqual("parent", EnvGet(Name), "building or using the private environment never mutates the parent")
+	} finally {
+		EnvSet(Name, Original)
+		if IsObject(Task) {
+			Retired := Task.requestTerminate(), Started := A_TickCount
+			while !Retired && TickElapsed(Started) < 5000 {
+				Sleep(10)
+				Retired := Task.requestTerminate()
+			}
+			AssertTrue(Retired, "the exact environment-control process must retire before its private files")
+		}
+		DirDelete(Root, true)
+	}
+}
+Test("shell runner: a valid Unicode environment reaches the native child unchanged", _SRNUL_EnvironmentControl)

@@ -84,8 +84,11 @@ _DHLC_AllFireSinksGuardBeforeMutation() {
 	FlushBody := _DriverFuncBody("KL_FlushBuffer")
 	Assert(FlushBody != "", "KL_FlushBuffer() must exist in the driver source")
 	FlushGatePos := InStr(FlushBody, "PublishGuard.Call")
-	SnapshotPos := InStr(FlushBody, "Snapshot := {")
-	Assert(FlushGatePos > 0 && SnapshotPos > 0 && FlushGatePos < SnapshotPos,
+	SnapshotPos := InStr(FlushBody, "Snapshot := _KL_DetachBufferSnapshot()")
+	FlushCriticalPos := InStr(FlushBody, 'previous_critical := Critical("On")')
+	FlushRestorePos := InStr(FlushBody, "Critical(previous_critical)")
+	Assert(FlushCriticalPos > 0 && FlushGatePos > FlushCriticalPos && SnapshotPos > FlushGatePos
+		&& FlushRestorePos > SnapshotPos,
 		"AHK-22: KL_FlushBuffer must verify generation inside its Critical snapshot transaction before clearing shared typing state")
 	PublishBody := _DriverFuncBody("_KL_PublishBufferSnapshot")
 	Assert(PublishBody != "", "_KL_PublishBufferSnapshot() must exist in the driver source")
@@ -93,8 +96,17 @@ _DHLC_AllFireSinksGuardBeforeMutation() {
 		"AHK-22: a lifecycle loss observed after the snapshot must restore the pre-pause buffer instead of destroying it")
 	LatchPos := InStr(FlushBody, "if Keystats._flush_in_progress")
 	ClaimPos := InStr(FlushBody, "Keystats._flush_in_progress := true")
-	Assert(LatchPos > 0 && ClaimPos > LatchPos && LatchPos < SnapshotPos,
+	Assert(LatchPos > FlushGatePos && ClaimPos > LatchPos && ClaimPos < SnapshotPos,
 		"AHK-22: detached snapshots must be serialised before the destructive swap so rejected restores cannot reverse typing order")
+	DetachBody := _DriverFuncBody("_KL_DetachBufferSnapshot")
+	Assert(DetachBody != "", "The actual shared detach helper must remain present")
+	DetachCriticalPos := InStr(DetachBody, 'previous_critical := Critical("On")')
+	PayloadPos := InStr(DetachBody, "Snapshot := {")
+	ResetPos := InStr(DetachBody, "Keystats.buffer_events    := []")
+	DetachRestorePos := InStr(DetachBody, "Critical(previous_critical)")
+	Assert(DetachCriticalPos > 0 && PayloadPos > DetachCriticalPos && ResetPos > PayloadPos
+		&& DetachRestorePos > ResetPos,
+		"AHK-22: the real reached helper must preserve snapshot-before-reset within its caller-restored Critical claim")
 	Assert(InStr(PublishBody, "KL_AppendLog(entry, &RejectedBySuspend, PublishGuard?)") > 0
 		&& InStr(PublishBody, "if RejectedBySuspend") > 0,
 		"AHK-22: typing publication must carry its exact lifecycle guard into the append; restoration uses its explicit receipt, never an ambiguous false shared with privacy filtering")

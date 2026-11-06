@@ -55,40 +55,34 @@ class _LAG_FakeRecipients {
 ; machine without Outlook.
 _LAG_RunConnectors(Outlook, Body) {
 	global _LLM_AgentConnector_ComFn, _LLM_AgentConnector_OpenFn, _LLM_AgentConnector_LaunchFn
-	global _LLM_AgentConnector_WriteFn, _LLM_AgentConnector_DeleteFn, _LLM_AgentConnector_ListFn
+	global _LLM_AgentConnector_PublishFn, _LLM_AgentConnector_ListFn
 	global _LLM_AgentConnector_EnsureDirFn, _LLM_AgentConnector_IdFn, _LLM_AgentConnector_Tools
-	global _LLM_AgentConnector_TempFiles
 	Saved := {
 		Com: _LLM_AgentConnector_ComFn, Open: _LLM_AgentConnector_OpenFn, Launch: _LLM_AgentConnector_LaunchFn,
-		Write: _LLM_AgentConnector_WriteFn, Delete: _LLM_AgentConnector_DeleteFn, List: _LLM_AgentConnector_ListFn,
-		Ensure: _LLM_AgentConnector_EnsureDirFn, Id: _LLM_AgentConnector_IdFn, Tools: _LLM_AgentConnector_Tools,
-		Temp: _LLM_AgentConnector_TempFiles
+		Publish: _LLM_AgentConnector_PublishFn, List: _LLM_AgentConnector_ListFn,
+		Ensure: _LLM_AgentConnector_EnsureDirFn, Id: _LLM_AgentConnector_IdFn, Tools: _LLM_AgentConnector_Tools
 	}
 	Fx := { Outlook: Outlook, ProgIds: [], Opened: [], Launched: [], Written: [], Deleted: [], Dirs: [] }
 	try {
 		_LLM_AgentConnector_ComFn := (ProgId) => (Fx.ProgIds.Push(ProgId), Fx.Outlook)
 		_LLM_AgentConnector_OpenFn := (Target) => Fx.Opened.Push(Target)
 		_LLM_AgentConnector_LaunchFn := (Argv) => Fx.Launched.Push(Argv)
-		_LLM_AgentConnector_WriteFn := (Path, Text) => (Fx.Written.Push(Map("path", Path, "text", Text)), true)
-		_LLM_AgentConnector_DeleteFn := (Path) => (Fx.Deleted.Push(Path), true)
+		_LLM_AgentConnector_PublishFn := (Text) => (Fx.Written.Push(Map("path", "C:\synthetic-calendar\invitation.ics", "text", Text)), "C:\synthetic-calendar\invitation.ics")
 		_LLM_AgentConnector_ListFn := (Dir) => ["C:\t\Envoyer la facture.ps1", "C:\t\Mode focus.cmd",
 			"C:\t\notes.txt", "C:\t\Ouvrir le CRM.ahk"]
 		_LLM_AgentConnector_EnsureDirFn := (Dir) => Fx.Dirs.Push(Dir)
 		_LLM_AgentConnector_IdFn := () => Map("uid", "abc123@ergopti", "stamp", "20260929T120500Z")
 		_LLM_AgentConnector_Tools := ""
-		_LLM_AgentConnector_TempFiles := []
 		Body.Call(Fx)
 	} finally {
 		_LLM_AgentConnector_ComFn := Saved.Com
 		_LLM_AgentConnector_OpenFn := Saved.Open
 		_LLM_AgentConnector_LaunchFn := Saved.Launch
-		_LLM_AgentConnector_WriteFn := Saved.Write
-		_LLM_AgentConnector_DeleteFn := Saved.Delete
+		_LLM_AgentConnector_PublishFn := Saved.Publish
 		_LLM_AgentConnector_ListFn := Saved.List
 		_LLM_AgentConnector_EnsureDirFn := Saved.Ensure
 		_LLM_AgentConnector_IdFn := Saved.Id
 		_LLM_AgentConnector_Tools := Saved.Tools
-		_LLM_AgentConnector_TempFiles := Saved.Temp
 	}
 }
 
@@ -151,18 +145,16 @@ _LAG_FallbackConnectors() {
 		AssertTrue(Result["ok"] && Result["path"] == "ics", "without Outlook, an iCalendar file")
 		AssertEqual(1, Fx.Written.Length, "written once")
 		Path := Fx.Written[1]["path"]
-		AssertTrue(InStr(Path, _LLM_Ollama_TempDir() . "\") == 1 && SubStr(Path, -4) == ".ics",
-			"to a private temp .ics file")
+		AssertEqual("C:\synthetic-calendar\invitation.ics", Path,
+			"the file is placed in its private directory")
 		AssertEqual(LLM_Agent_Ics(Config, Action, "abc123@ergopti", "20260929T120500Z"), Fx.Written[1]["text"],
 			"with the shared bytes")
 		AssertEqual("", _LVS_DeepEqual([Path], Fx.Opened), "opened with the default handler")
-		AssertEqual(0, Fx.Deleted.Length, "and not deleted before the application read it")
 
 		Mail := _LAG_Action('{"type":"mail","to":["paul@example.com"],"subject":"Devis","body":"Bonjour"}')
 		Result := LLM_AgentConnector_Execute(Mail, Config)
 		AssertTrue(Result["ok"] && Result["path"] == "mailto", "without Outlook, a mailto: link")
 		AssertEqual(LLM_Agent_Mailto(Mail), Fx.Opened[2], "opened with the mail client")
-		AssertEqual("", _LVS_DeepEqual([Path], Fx.Deleted), "the earlier calendar file is deleted at this run")
 	}
 }
 Test("LLM agent: without Outlook, an .ics file or a mailto: link is opened", _LAG_FallbackConnectors)
@@ -591,3 +583,376 @@ _LAG_SchedulerIsOneShot() {
 	AssertThrows(() => _LLM_Agent_Schedule((*) => 0, "-5"), "a period is an integer")
 }
 Test("LLM agent: the agent's timers are one-shots", _LAG_SchedulerIsOneShot)
+
+/** Observes native launch identity while delegating the complete genuine argv. */
+_LAGNN_Launch(State, Argv) {
+	State.Attempts += 1
+	State.Vector := Argv.Clone()
+	State.Pid := AL_LaunchArgvStrict(Argv)
+}
+
+_LAGNN_ArgvReceipt(Text) {
+	Receipt := "1|" . StrLen(Text) . ":"
+	Loop StrLen(Text)
+		Receipt .= Format("{:04X}", NumGet(StrPtr(Text), (A_Index - 1) * 2, "UShort"))
+	return Receipt
+}
+
+/** The exact JSON producer and connector dispatch reach the real native launcher. */
+_LAGNN_Run(Position) {
+	global _ConfigDir, _DriverDir, _LLM_AgentConnector_Tools
+	global _LLM_AgentConnector_LaunchFn, _LLM_AgentConnector_ListFn, _LLM_AgentConnector_EnsureDirFn
+	static Debt := 0
+	AssertFalse(IsObject(Debt), "SETUP: a previous exact native tool still owns retirement debt")
+	Saved := {ConfigDir: _ConfigDir, Tools: _LLM_AgentConnector_Tools,
+		Launch: _LLM_AgentConnector_LaunchFn, List: _LLM_AgentConnector_ListFn,
+		Ensure: _LLM_AgentConnector_EnsureDirFn, Critical: A_IsCritical, Suspended: A_IsSuspended}
+	Root := A_Temp . "\ergopti_agent_native_input_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	State := {Attempts: 0, Pid: 0, Vector: 0, Process: 0, Ready: false, Joined: false, ExitKnown: false, ExitCode: -1}
+	Primary := 0, Passed := false, HandleClosed := false, Result := 0, Created := false
+	try {
+		Critical("Off"), Suspend(false)
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "SETUP: own the exact native-tool directory")
+		DirCreate(Root . "\agent_tools")
+		FileCopy(_DriverDir . "\tests\fixtures\agent_native_tool_input.ahk", Root . "\agent_tools\Native receiver.ahk")
+		AssertTrue(FSWriteCreateDurable(Root . "\parent", String(ProcessExist())), "SETUP: parent identity receipt")
+		_ConfigDir := Root
+		_LLM_AgentConnector_Tools := ""
+		_LLM_AgentConnector_ListFn := 0, _LLM_AgentConnector_EnsureDirFn := 0
+		_LLM_AgentConnector_LaunchFn := _LAGNN_Launch.Bind(State)
+		Config := LLM_Agent_Config()
+		Tools := LLM_AgentConnector_Tools(Config, true)
+		AssertTrue(Tools["paths"].Has("Native receiver"), "SETUP: genuine native tool discovery must find the copied tool")
+		Left := Position == "head" ? "" : "prefix"
+		Right := Position == "tail" ? "" : "suffix"
+		Legal := Position == "legal"
+		InputJson := Legal ? JsonStringLiteral("é漢 " . Chr(0x1F642) . ' tail\"')
+			: '"' . Left . '\u0000' . Right . '"'
+		Raw := Config["system2"]["tag"] . '[{"type":"shortcut","name":"Native receiver","input":' . InputJson . '}]'
+		Actions := LLM_Agent_ParseActions(Config, Raw, Tools["names"], &Rejected)
+		AssertTrue(Actions is Array && Actions.Length == 1, "SETUP: actual System2 JSON action is admitted")
+		AssertEqual(0, Rejected.Length, "SETUP: actual producer has no action rejection")
+		Input := Actions[1]["input"]
+		if !Legal {
+			AssertEqual(StrLen(Left) + 1 + StrLen(Right), StrLen(Input), "SETUP: admitted producer retains its complete NUL input")
+			AssertEqual(0, NumGet(StrPtr(Input), StrLen(Left) * 2, "UShort"), "SETUP: actual admitted input contains NUL")
+		}
+		Result := LLM_AgentConnector_Execute(Actions[1], Config)
+		AssertEqual(1, State.Attempts, "BUSINESS: genuine connector reaches the real launcher once")
+		if State.Pid {
+			; Acquire only query/wait rights. Never kill a PID which could be reused.
+			State.Process := DllCall("Kernel32\OpenProcess", "UInt", 0x101000,
+				"Int", false, "UInt", State.Pid, "Ptr")
+			AssertTrue(State.Process != 0, "SETUP: retain the actual native child for independent joining")
+			Started := A_TickCount
+			while !FileExist(Root . "\ready") && TickElapsed(Started) < 5000
+				Sleep(10)
+			AssertTrue(FileExist(Root . "\ready") != "", "SETUP: the actual tool script must run and report readiness")
+			Identity := StrSplit(FSReadUtf8Exact(Root . "\ready"), "|")
+			AssertEqual(2, Identity.Length, "SETUP: complete native tool identity receipt")
+			AssertEqual(State.Pid, Integer(Identity[1]), "SETUP: returned PID and actual child PID agree")
+			Times := Buffer(32, 0)
+			AssertTrue(DllCall("Kernel32\GetProcessTimes", "Ptr", State.Process, "Ptr", Times,
+				"Ptr", Times.Ptr + 8, "Ptr", Times.Ptr + 16, "Ptr", Times.Ptr + 24, "Int"), "SETUP: exact child creation FILETIME")
+			AssertEqual(Integer(Identity[2]), NumGet(Times, 0, "Int64"), "SETUP: retained process is the reporting tool, not a reused PID")
+			State.Ready := true
+			Observed := FSReadUtf8Exact(Root . "\argv")
+			_TestPrint("# agent-native-input position=" . Position . " admitted_units=" . StrLen(Input)
+				. " native_argv=" . Observed . " connector_ok=" . Result["ok"])
+			if Legal
+				AssertEqual(_LAGNN_ArgvReceipt(Input), Observed, "BUSINESS: native legal Unicode input arrives exactly once and whole")
+		}
+		if Legal {
+			AssertTrue(Result["ok"] && State.Ready, "BUSINESS: legal Unicode tool dispatch remains successful")
+		} else {
+			AssertFalse(Result["ok"], "BUSINESS: native argument NUL must refuse rather than report a truncated tool input as complete")
+			AssertEqual(0, State.Pid, "BUSINESS: refusal must precede native child creation")
+			AssertFalse(FileExist(Root . "\ready"), "BUSINESS: refused NUL cannot run the tool")
+			AssertContains(Result["reason"], "NUL", "BUSINESS: refusal explains the unsupported native argument boundary")
+		}
+		Passed := true
+	} catch Any as Err {
+		Primary := Err
+	} finally {
+		try {
+			if State.Pid {
+				; This private path is the only control signal; no PID-based kill exists.
+				if !FileExist(Root . "\stop")
+					AssertTrue(FSWriteCreateDurable(Root . "\stop", "stop"), "RETIREMENT: signal only the owned tool fixture")
+				if State.Process
+					State.Joined := DllCall("Kernel32\WaitForSingleObject", "Ptr", State.Process, "UInt", 5000, "UInt") == 0
+				if State.Joined {
+					State.ExitKnown := DllCall("Kernel32\GetExitCodeProcess", "Ptr", State.Process, "UInt*", &Code := 0, "Int") != 0
+					State.ExitCode := Code
+					HandleClosed := DllCall("Kernel32\CloseHandle", "Ptr", State.Process, "Int") != 0
+					if HandleClosed
+						State.Process := 0
+				}
+			} else
+				State.Joined := true, HandleClosed := true
+		} catch Any as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+		if !State.Joined || !HandleClosed
+			Debt := {State: State, Root: Root}
+		_ConfigDir := Saved.ConfigDir
+		_LLM_AgentConnector_Tools := Saved.Tools
+		_LLM_AgentConnector_LaunchFn := Saved.Launch, _LLM_AgentConnector_ListFn := Saved.List
+		_LLM_AgentConnector_EnsureDirFn := Saved.Ensure
+		Suspend(Saved.Suspended), Critical(Saved.Critical)
+	}
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(State.Joined && HandleClosed, "RETIREMENT: exact native tool and handle debt must retire")
+	if State.Pid {
+		AssertTrue(State.ExitKnown, "RETIREMENT: query exact child exit status")
+		AssertEqual(0, State.ExitCode, "RETIREMENT: exact child exited normally")
+		AssertEqual("done", FSReadUtf8Exact(Root . "\done"), "RETIREMENT: actual child observed the stop signal and exited")
+	}
+	if Passed && Created
+		DirDelete(Root, true)
+}
+
+for _LAGNN_Position in ["head", "middle", "tail", "legal"]
+	Test("LLM agent: " . _LAGNN_Position . " native shortcut input survives JSON and obeys argv admission (agent-native-nul-input)",
+		_LAGNN_Run.Bind(_LAGNN_Position))
+
+
+_LAGICS_Done(State, ExitCode, Stdout, Stderr) {
+	State["done"] := true, State["exit"] := ExitCode, State["stdout"] := Stdout, State["stderr"] := Stderr
+}
+
+; Model a registered handler which starts asynchronously but has not opened yet.
+_LAGICS_Open(State, Target) {
+	if InStr(Target, "mailto:") == 1
+		return true
+	State["target"] := Target
+	Task := ShellRunner_SpawnTreeOwned(A_AhkPath,
+		["/ErrorStdOut", State["fixture"], State["root"], Target], _LAGICS_Done.Bind(State))
+	State["task"] := Task
+	if !Task.start()
+		throw Error("SETUP: the delayed native reader could not start")
+	State["pid"] := Task.processId()
+	return true
+}
+
+_LAGICS_Wait(Path, Milliseconds := 10000) {
+	Start := A_TickCount
+	while !FileExist(Path) && TickElapsed(Start) < Milliseconds {
+		_SR_TreePoll()
+		Sleep(10)
+	}
+	return FileExist(Path) != ""
+}
+
+_LAGICS_Run(DoSecond) {
+	global _LLM_Ollama_InstanceNonce, _LLM_AgentConnector_ComFn, _LLM_AgentConnector_OpenFn
+	global _LLM_AgentConnector_PublishFn, _LLM_AgentConnector_ParentFn, _LLM_AgentConnector_IdFn
+	global _DriverDir
+	static Debt := 0
+	AssertFalse(IsObject(Debt), "SETUP: a previous native reader still owns retirement debt")
+	Saved := {Nonce: _LLM_Ollama_InstanceNonce, Com: _LLM_AgentConnector_ComFn, Open: _LLM_AgentConnector_OpenFn,
+		Publish: _LLM_AgentConnector_PublishFn, Parent: _LLM_AgentConnector_ParentFn,
+		Id: _LLM_AgentConnector_IdFn, Critical: A_IsCritical, Suspended: A_IsSuspended}
+	Guid := Buffer(16, 0)
+	AssertEqual(0, PLC_CreateGuid(Guid), "SETUP: unique private directory identity")
+	Nonce := ""
+	loop Guid.Size
+		Nonce .= Format("{:02x}", NumGet(Guid, A_Index - 1, "UChar"))
+	Root := _LLM_Ollama_BuildTempDir(A_Temp, ProcessExist(), Nonce)
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	AssertTrue((Created is Integer) && Created == 1, "SETUP: exact private directory acquired")
+	State := Map("root", Root, "fixture", _DriverDir . "\tests\fixtures\agent_delayed_ics_reader.ahk",
+		"target", "", "task", 0, "pid", 0, "done", false, "exit", -1, "stdout", "", "stderr", "")
+	Primary := 0, Joined := true, Passed := false
+	try {
+		Critical("Off"), Suspend(false)
+		_LLM_Ollama_InstanceNonce := Nonce
+		_LLM_AgentConnector_ComFn := (*) => ""
+		_LLM_AgentConnector_PublishFn := 0, _LLM_AgentConnector_ParentFn := () => Root
+		_LLM_AgentConnector_IdFn := () => Map("uid", Nonce . "@ergopti", "stamp", "20260929T120500Z")
+		_LLM_AgentConnector_OpenFn := _LAGICS_Open.Bind(State)
+		Config := LLM_Agent_Config()
+		Calendar := _LAG_Action('{"type":"calendar","title":"Devis","start":"2026-10-01T14:00"}')
+		First := LLM_AgentConnector_Execute(Calendar, Config)
+		AssertTrue(First["ok"] && First["path"] == "ics", "SETUP: real calendar connector accepted the file")
+		AssertTrue(State["pid"] > 0, "SETUP: real owned reader started")
+		SplitPath(State["target"], &TargetName, &TargetDir)
+		AssertEqual("invitation.ics", TargetName, "SETUP: actual owner published its named file")
+		AssertTrue(InStr(TargetDir, Root . "\ergopti_agent_") == 1, "SETUP: actual owner used the private proof root")
+		Joined := false
+		AssertTrue(_LAGICS_Wait(Root . "\ready"), "SETUP: reader reaches its pre-open barrier")
+		AssertEqual(State["pid"], Integer(FSReadUtf8Exact(Root . "\ready")), "SETUP: ready belongs to the owned reader")
+		Expected := FSReadUtf8Exact(State["target"])
+		AssertTrue(Expected is String && InStr(Expected, "BEGIN:VCALENDAR"), "SETUP: exact real ICS exists before second action")
+		if DoSecond {
+			Mail := _LAG_Action('{"type":"mail","to":["paul@example.com"],"body":"Bonjour"}')
+			Second := LLM_AgentConnector_Execute(Mail, Config)
+			AssertTrue(Second["ok"] && Second["path"] == "mailto", "SETUP: second real connector accepted")
+		}
+		ExistsBeforeRelease := FileExist(State["target"]) != ""
+		AssertTrue(FSWriteCreateDurable(Root . "\release", "release"), "SETUP: release only the owned reader")
+		AssertTrue(_LAGICS_Wait(Root . "\result"), "SETUP: reader publishes its exact file result")
+		Outcome := FSReadUtf8Exact(Root . "\result")
+		Start := A_TickCount
+		while !State["done"] && TickElapsed(Start) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		Joined := State["done"]
+		_TestPrint("# agent-ics-delayed second=" . DoSecond . " exists_before_release=" . ExistsBeforeRelease
+			. " reader=" . Outcome . " joined=" . Joined . " exit=" . State["exit"])
+		AssertTrue(Joined && State["exit"] == 0, "RETIREMENT: exact reader exited successfully")
+		AssertEqual("", State["stderr"], "RETIREMENT: the shell runner reports no capture errors")
+		AssertEqual("", State["stdout"], "RETIREMENT: merged child output contains no warnings or errors")
+		AssertEqual("READ", Outcome, "BUSINESS: accepted calendar remains readable by its delayed handler")
+		AssertEqual(Expected, FSReadUtf8Exact(Root . "\received.ics"), "BUSINESS: delayed reader sees exact accepted ICS")
+		Passed := true
+	} catch Any as Err {
+		Primary := Err
+	} finally {
+		if IsObject(State["task"]) && !State["done"] {
+			Joined := false
+			if !FileExist(Root . "\release")
+				try FSWriteCreateDurable(Root . "\release", "release")
+			; A request alone is not a quiescence receipt. Retire the exact Job,
+			; or accept only its dispatched completion after accounting reached zero.
+			try State["task"].requestTerminate()
+			RetireStart := A_TickCount
+			while !State["done"] && TickElapsed(RetireStart) < 5000 {
+				Retired := false
+				try Retired := State["task"].terminate()
+				if (Retired is Integer) && Retired == 1 {
+					Joined := true
+					break
+				}
+				_SR_TreePoll()
+				Sleep(10)
+			}
+			if State["done"]
+				Joined := true
+		}
+		if !Joined
+			Debt := {State: State, Root: Root}
+		_LLM_Ollama_InstanceNonce := Saved.Nonce, _LLM_AgentConnector_ComFn := Saved.Com
+		_LLM_AgentConnector_OpenFn := Saved.Open, _LLM_AgentConnector_PublishFn := Saved.Publish
+		_LLM_AgentConnector_ParentFn := Saved.Parent, _LLM_AgentConnector_IdFn := Saved.Id
+		Suspend(Saved.Suspended), Critical(Saved.Critical)
+		if Joined && DirExist(Root)
+			DirDelete(Root, true)
+	}
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Passed && Joined, "the exact native reader and private directory retired")
+}
+Test("LLM agent: delayed native calendar handler reads without a second action (agent-ics-delayed)", _LAGICS_Run.Bind(false))
+Test("LLM agent: delayed native calendar handler survives the next action (agent-ics-delayed)", _LAGICS_Run.Bind(true))
+
+
+
+; Read the process token user into an owned SID buffer for ACL comparison.
+_LAGICS_CurrentUserSid() {
+	Token := 0
+	if !DllCall("advapi32\OpenProcessToken", "Ptr", DllCall("kernel32\GetCurrentProcess", "Ptr"),
+			"UInt", 0x8, "Ptr*", &Token, "Int")
+		throw OSError(A_LastError, "open test token")
+	try {
+		Needed := 0
+		DllCall("advapi32\GetTokenInformation", "Ptr", Token, "Int", 1,
+			"Ptr", 0, "UInt", 0, "UInt*", &Needed, "Int")
+		if Needed < A_PtrSize
+			throw OSError(A_LastError, "size test token")
+		User := Buffer(Needed, 0)
+		if !DllCall("advapi32\GetTokenInformation", "Ptr", Token, "Int", 1,
+				"Ptr", User, "UInt", User.Size, "UInt*", &Needed, "Int")
+			throw OSError(A_LastError, "read test token")
+		Sid := NumGet(User, 0, "Ptr")
+		Size := DllCall("advapi32\GetLengthSid", "Ptr", Sid, "UInt")
+		if !Size
+			throw OSError(A_LastError, "size test SID")
+		Copy := Buffer(Size, 0)
+		if !DllCall("advapi32\CopySid", "UInt", Size, "Ptr", Copy, "Ptr", Sid, "Int")
+			throw OSError(A_LastError, "copy test SID")
+		return Copy
+	} finally DllCall("kernel32\CloseHandle", "Ptr", Token, "Int")
+}
+
+
+; Inspect effective security, including on filesystems that ignore create descriptors.
+_LAGICS_AssertPrivateAcl(Path, User) {
+	Descriptor := 0
+	try {
+		Owner := 0, Dacl := 0
+		Status := DllCall("advapi32\GetNamedSecurityInfoW", "Str", Path, "Int", 1, "UInt", 5,
+			"Ptr*", &Owner, "Ptr", 0, "Ptr*", &Dacl, "Ptr", 0, "Ptr*", &Descriptor, "UInt")
+		AssertEqual(0, Status, "the native descriptor is readable")
+		AssertTrue(Descriptor && Owner && Dacl, "owner and DACL exist")
+		AssertTrue(DllCall("advapi32\EqualSid", "Ptr", Owner, "Ptr", User, "Int"), "the token user owns the object")
+		Control := 0, Revision := 0
+		AssertTrue(DllCall("advapi32\GetSecurityDescriptorControl", "Ptr", Descriptor,
+			"UShort*", &Control, "UInt*", &Revision, "Int"))
+		AssertTrue((Control & 0x1000) != 0, "DACL inheritance is protected")
+		AclInfo := Buffer(12, 0)
+		AssertTrue(DllCall("advapi32\GetAclInformation", "Ptr", Dacl, "Ptr", AclInfo, "UInt", 12, "Int", 2, "Int"))
+		AssertEqual(2, NumGet(AclInfo, 0, "UInt"), "exactly the user and SYSTEM have ACEs")
+		SeenUser := false, SeenSystem := false
+		loop 2 {
+			Ace := 0
+			AssertTrue(DllCall("advapi32\GetAce", "Ptr", Dacl, "UInt", A_Index - 1, "Ptr*", &Ace, "Int"))
+			AssertEqual(0, NumGet(Ace, 0, "UChar"), "only allow ACEs are admitted")
+			AssertEqual(0x1F01FF, NumGet(Ace, 4, "UInt"), "each owner receives file full access")
+			Sid := Ace + 8
+			IsUser := DllCall("advapi32\EqualSid", "Ptr", Sid, "Ptr", User, "Int") != 0
+			IsSystem := DllCall("advapi32\IsWellKnownSid", "Ptr", Sid, "Int", 22, "Int") != 0
+			if !IsUser && !IsSystem
+				throw Error("unexpected handoff ACE SID")
+			SeenUser := SeenUser || IsUser, SeenSystem := SeenSystem || IsSystem
+		}
+		AssertTrue(SeenUser && SeenSystem, "the exact two principals are user and SYSTEM")
+	} finally {
+		if Descriptor
+			DllCall("kernel32\LocalFree", "Ptr", Descriptor, "Ptr")
+	}
+}
+
+_LAGICS_PrivateAclAndCollision() {
+	Guid := Buffer(16, 0)
+	AssertEqual(0, PLC_CreateGuid(Guid), "SETUP: acquire unique directory identity")
+	Nonce := ""
+	loop Guid.Size
+		Nonce .= Format("{:02x}", NumGet(Guid, A_Index - 1, "UChar"))
+	Root := RTrim(A_Temp, "\/") . "\ergopti_agent_acl_test_" . Nonce
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	AssertTrue((Created is Integer) && Created == 1, "SETUP: own exact private proof root")
+	try {
+		Expected := "accepted-é"
+		Path := FSWritePrivateRetained(Root, "handoff", "invitation.ics", Expected)
+		AssertEqual(Root . "\handoff\invitation.ics", Path, "the real owner returns its exact path")
+		AssertEqual(Expected, FSReadUtf8Exact(Path), "the real owner writes complete UTF-8 bytes")
+		User := _LAGICS_CurrentUserSid()
+		_LAGICS_AssertPrivateAcl(Root . "\handoff", User)
+		_LAGICS_AssertPrivateAcl(Path, User)
+		CollisionRefused := false
+		try FSWritePrivateRetained(Root, "handoff", "invitation.ics", "foreign")
+		catch
+			CollisionRefused := true
+		AssertTrue(CollisionRefused, "an existing directory is never adopted")
+		AssertEqual(Expected, FSReadUtf8Exact(Path), "collision leaves existing bytes intact")
+		NulText := JsonParse('"prefix\u0000suffix"')
+		AssertEqual(13, StrLen(NulText), "SETUP: the input really contains embedded NUL")
+		NulRefused := false
+		try FSWritePrivateRetained(Root, "invalid", "invitation.ics", NulText)
+		catch
+			NulRefused := true
+		AssertTrue(NulRefused, "embedded NUL is refused instead of truncating the handoff")
+		AssertFalse(FileExist(Root . "\invalid"), "NUL refusal precedes directory creation")
+	} finally {
+		if Created && DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("LLM agent: retained calendar owner verifies private ACL and refuses collision (agent-ics-private-acl)",
+	_LAGICS_PrivateAclAndCollision)

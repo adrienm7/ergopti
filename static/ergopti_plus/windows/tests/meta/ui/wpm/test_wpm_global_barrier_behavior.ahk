@@ -185,7 +185,10 @@ _WPMGB_ThrowingHide() {
 
 _WPMGB_SaveState() {
 	global ConfigurationFile
+	Authority := _WPMWidget_PositionAuthority()
+	_WPMWidget_PositionAuthority({active: 0, published: 0})
 	return {
+		authority: Authority,
 		path: ConfigurationFile,
 		fixture: 0,
 		visible: WPMWidget.visible,
@@ -198,6 +201,7 @@ _WPMGB_SaveState() {
 
 _WPMGB_RestoreState(Saved) {
 	global ConfigurationFile
+	_WPMWidget_PositionAuthority(Saved.authority)
 	ConfigurationFile := Saved.path
 	WPMWidget.visible := Saved.visible
 	WPMWidget.use_colors := Saved.colors
@@ -454,6 +458,7 @@ _WPMGB_InheritedCriticalStopsAtCompleteUserActions() {
 	HadGraphGui := WPMWidget.HasOwnProp("_graph_gui")
 	HadLblWpm := WPMWidget.HasOwnProp("_lbl_wpm")
 	HadLblUnit := WPMWidget.HasOwnProp("_lbl_unit")
+	HadLblStrip := WPMWidget.HasOwnProp("_lbl_strip")
 	if HadDragging
 		SavedDragging := WPMWidget._dragging
 	if HadGui
@@ -464,6 +469,8 @@ _WPMGB_InheritedCriticalStopsAtCompleteUserActions() {
 		SavedLblWpm := WPMWidget._lbl_wpm
 	if HadLblUnit
 		SavedLblUnit := WPMWidget._lbl_unit
+	if HadLblStrip
+		SavedLblStrip := WPMWidget._lbl_strip
 	Barrier := false
 	try {
 		Saved.fixture := _ScopeOwnerFixture()
@@ -594,6 +601,10 @@ _WPMGB_InheritedCriticalStopsAtCompleteUserActions() {
 			WPMWidget._lbl_unit := SavedLblUnit
 		else if WPMWidget.HasOwnProp("_lbl_unit")
 			WPMWidget.DeleteProp("_lbl_unit")
+		if HadLblStrip
+			WPMWidget._lbl_strip := SavedLblStrip
+		else if WPMWidget.HasOwnProp("_lbl_strip")
+			WPMWidget.DeleteProp("_lbl_strip")
 		Critical(SavedCritical)
 	}
 }

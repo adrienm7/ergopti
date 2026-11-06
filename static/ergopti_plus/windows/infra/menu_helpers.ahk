@@ -243,14 +243,23 @@ MenuSectionTitle(Text) {
 ; @param TomlData {Map} Parsed personal_hotstrings.toml (ReadPersonalToml shape).
 ; @returns {Map} SecName -> disambiguated description string.
 _HS_BuildDisambiguatedSectionLabels(TomlData) {
-		Seen := Map()
+		Seen := Map(), Used := Map()
+		; AHK Menu.Add matches labels without regard to case.
+		Used.CaseSense := false
 		Out := Map()
 		for _, SecName in TomlData["sections_order"] {
 				if (SecName == "-" or !TomlData["sections"].Has(SecName))
 						continue
 				Desc := TomlData["sections"][SecName]["description"]
-				Seen[Desc] := (Seen.Has(Desc) ? Seen[Desc] : 0) + 1
-				Out[SecName] := (Seen[Desc] > 1) ? (Desc . " #" . Seen[Desc]) : Desc
+				Number := (Seen.Has(Desc) ? Seen[Desc] : 0) + 1
+				Candidate := Number > 1 ? Desc . " #" . Number : Desc
+				while Used.Has(Candidate) {
+						Number := Max(2, Number + 1)
+						Candidate := Desc . " #" . Number
+				}
+				Seen[Desc] := Number
+				Used[Candidate] := true
+				Out[SecName] := Candidate
 		}
 		return Out
 }

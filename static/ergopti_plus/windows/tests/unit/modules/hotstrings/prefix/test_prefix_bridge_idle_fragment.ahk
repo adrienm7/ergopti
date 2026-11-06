@@ -41,6 +41,7 @@ _PBIF_Sequence(Mode, State, Schedule, Focus) {
 		HSE_IdleResetSeconds := Mode == "idle-disabled" ? 0 : 1
 		_LLM_Bridge_Active := !AgentOnly
 		_LLM_Bridge_AgentFeeding := AgentOnly
+		AssertTrue(IsObject(_LLM_Bridge_BindTypingSource(Focus(), !AgentOnly)))
 		_LLM_Bridge_Buffer := AgentOnly ? "" : "word"
 		_LLM_Bridge_AgentBuffer := AgentOnly ? "word" : ""
 		Feed(Mode == "complete-context" ? "a" : High)

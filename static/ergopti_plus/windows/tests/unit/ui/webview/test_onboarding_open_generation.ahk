@@ -58,7 +58,8 @@ _OWOC_Case(Mode) {
 	static Serial := 0, Debt := 0
 	AssertFalse(IsObject(Debt), "A previous unretired child prevents another component")
 	Root := A_Temp . "\ergopti_onboarding_open_" . A_ScriptHwnd . "_" . ++Serial
-	FSCreateDirectoryExclusiveStrict(Root)
+	Creation := FSCreateDirectoryExclusiveStrict(Root)
+	AssertTrue(Creation is Integer && Creation == 1, "Acquire the exact private root before assets or recursive cleanup")
 	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0
 	Retired := false, AtDeadline := 0, ExportFailure := 0, PreviousCritical := Critical("Off")
 	try {
@@ -121,3 +122,10 @@ _OWOC_Case(Mode) {
 
 for _OWOC_Mode in ["cold-success", "cold-refusal", "close-refusal", "close-reopen-refusal", "close-success", "close-reopen-success"]
 	Test("Onboarding opening generation: " . _OWOC_Mode . " preserves the current window (onboarding-open-generation)", _OWOC_Case.Bind(_OWOC_Mode))
+
+for _OWOC_ShowMode in ["show-current", "show-close"]
+	Test("Onboarding initial native Show: " . _OWOC_ShowMode . " respects its bound Close (onboarding-show-native-close)",
+		_OWOC_Case.Bind(_OWOC_ShowMode))
+
+Test("Onboarding native host: manual Close after default plumbing Reset destroys only that host once (onboarding-reset-host-close)",
+	_OWOC_Case.Bind("reset-then-close"))

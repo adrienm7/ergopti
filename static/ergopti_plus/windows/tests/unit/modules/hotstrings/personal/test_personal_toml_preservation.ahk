@@ -281,3 +281,190 @@ Test("personal-editor-preservation: unchanged fallbacks preserve invisible descr
 Test("personal-editor-preservation: edited fallbacks refuse replacing invisible description data", _PTIO_PreservationUnownedDescriptions.Bind(true))
 
 #Include test_personal_info_editor_consent.ahk
+
+_PNOS_Case(Invalid) {
+	global ScriptInformation, _ReadPersonalTomlCache, _TomlUnreadableFiles
+	OldCache := _ReadPersonalTomlCache
+	HadPath := ScriptInformation.Has("PersonalTomlPath")
+	OldPath := ScriptInformation.Get("PersonalTomlPath", "")
+	Root := A_Temp . "\ergopti_personal_output_scalar_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\personal_hotstrings.toml", Created := false
+	try {
+		AssertFalse(_ConfigFullSaveHasPending(), "the private personal path must not detach a foreign accepted full-save obligation")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		ScriptInformation["PersonalTomlPath"] := Path
+		_ReadPersonalTomlCache := false
+		Source := '[[words]]`n"hello" = { output = "Original", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n'
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Observed := ReadPersonalToml(true)
+		AssertEqual(1, Observed["sections"]["words"]["entries"].Length)
+		AssertEqual("Original", Observed["sections"]["words"]["entries"][1]["output"])
+		Candidate := _PersonalTomlCloneDetached(Observed)
+		Payload := JsonParse(Invalid ? '{"output":"A\u0000B"}' : '{"output":"A\nB\tC"}')
+		Value := Payload["output"]
+		AssertTrue(Value is String)
+		if Invalid {
+			AssertEqual(3, StrLen(Value))
+			AssertEqual(65, NumGet(StrPtr(Value), 0, "UShort"))
+			AssertEqual(0, NumGet(StrPtr(Value), 2, "UShort"))
+			AssertEqual(66, NumGet(StrPtr(Value), 4, "UShort"))
+		} else
+			AssertEqual("A`nB`tC", Value)
+		Candidate["sections"]["words"]["entries"][1]["output"] := Value
+		Before := FSReadBytesStrict(Path)
+		Result := WritePersonalToml(Candidate)
+		After := FSReadBytesStrict(Path)
+		Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		Actual := Disk["words"][1]["hello"]["output"]
+		_TestPrint("# personal-output-scalar invalid=" . Invalid . " result=" . Result
+			. " requested-length=" . StrLen(Value) . " actual-length=" . StrLen(Actual)
+			. " before-bytes=" . Before.Size . " after-bytes=" . After.Size)
+		if Invalid {
+			AssertFalse(Result, "a public personal edit must refuse before normalization can truncate its original scalar")
+			AssertEqual(Before.Size, After.Size)
+			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+				"Ptr", After, "UPtr", Before.Size, "UPtr"), "the unsupported JSON output must not replace the original complete source")
+			AssertEqual("Original", Actual)
+		} else {
+			AssertTrue(Result, "ordinary newline/tab input retains its canonical personal token policy")
+			AssertEqual("A{Enter}B{Tab}C", Actual)
+			Reloaded := ReadPersonalToml(true)
+			AssertEqual("A{Enter}B{Tab}C", Reloaded["sections"]["words"]["entries"][1]["output"])
+		}
+	} finally {
+		if Created {
+			_PersonalTomlInvalidateCaches(Path)
+			if _TomlUnreadableFiles.Has(Path)
+				_TomlUnreadableFiles.Delete(Path)
+			DirDelete(Root, true)
+		}
+		if HadPath
+			ScriptInformation["PersonalTomlPath"] := OldPath
+		else
+			ScriptInformation.Delete("PersonalTomlPath")
+		_ReadPersonalTomlCache := OldCache
+	}
+}
+Test("personal output scalar: JSON NUL cannot disappear during normalization (personal-output-scalar)", _PNOS_Case.Bind(true))
+Test("personal output scalar: newline and tab remain canonical tokens (personal-output-scalar)", _PNOS_Case.Bind(false))
+
+_PSTG_ForeignStage(Collision, PersonalInfo := false) {
+	Root := A_Temp . "\ergopti_personal_stage_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . (PersonalInfo ? "\personal_info.toml" : "\personal_hotstrings.toml"), Created := false
+	global ScriptInformation, _ReadPersonalTomlCache, _ReadPersonalInfoTomlCache, _TomlUnreadableFiles
+	PathKey := PersonalInfo ? "PersonalInfoTomlPath" : "PersonalTomlPath"
+	OldCache := _ReadPersonalTomlCache, OldInfoCache := _ReadPersonalInfoTomlCache
+	HadPath := ScriptInformation.Has(PathKey), OldPath := ScriptInformation.Get(PathKey, "")
+	Owner := FSWriteReplaceOwned, HadOwn := Owner.HasOwnProp("Call")
+	if HadOwn
+		SavedCall := Owner.GetOwnPropDesc("Call")
+	Installed := false
+	State := {hits: 0, stagePath: "", sentinelBytes: 0, createdSentinel: 0, originalEntered: 0, originalCompleted: 0}
+	Source := '[[words]]`n"hello" = { output = "Original", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n'
+	if PersonalInfo
+		Source := '[info]`nfirst_name = "Original"`n[letters]`np = "first_name"`n'
+	Sentinel := "Foreign personal stage: é😀 unchanged"
+	Observe(This, Target, Content, Suffix, &Detail := "", StageFn := 0,
+			BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true,
+			&Publication := 0, FlushFn := 0) {
+		Mine := (Target is String) && StrCompare(Target, Path, true) == 0
+		CreateOriginal(Folder, Name, Attributes) {
+			SplitPath(Path, &Leaf)
+			AssertEqual(Leaf . Suffix, Name, "the actual factory must name the target's exact stage leaf")
+			State.hits += 1
+			State.stagePath := Path . Suffix
+			if Collision {
+				State.createdSentinel := FSWriteCreateDurable(State.stagePath, Sentinel)
+				AssertEqual(1, State.createdSentinel, "the foreign stage must actually be acquired with CREATE_NEW")
+				State.sentinelBytes := FSReadBytesStrict(State.stagePath)
+			}
+			return StageFn.Call(Folder, Name, Attributes)
+		}
+		if Mine
+			State.originalEntered += 1
+		NativeResult := Func.Prototype.Call.Call(This, Target, Content, Suffix, &Detail,
+			Mine ? CreateOriginal : StageFn, BeforePublishFn, AdmissionFn, ReplaceExisting, &Publication, FlushFn)
+		if Mine
+			State.originalCompleted += 1
+		return NativeResult
+	}
+	try {
+		AssertFalse(_ConfigFullSaveHasPending(), "a private personal target must not displace another accepted full-save obligation")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		ScriptInformation[PathKey] := Path
+		if PersonalInfo {
+			_ReadPersonalInfoTomlCache := false
+			Candidate := Map("first_name", "Edited")
+		} else {
+			_ReadPersonalTomlCache := false
+			Observed := ReadPersonalToml(true)
+			AssertEqual("Original", Observed["sections"]["words"]["entries"][1]["output"])
+			Candidate := _PersonalTomlCloneDetached(Observed)
+			Candidate["sections"]["words"]["entries"][1]["output"] := "Edited"
+		}
+		Before := FSReadBytesStrict(Path)
+		Owner.DefineProp("Call", {Call: Observe})
+		Installed := true
+		Result := PersonalInfo ? WritePersonalInfoToml(Path, Candidate, Map("p", "first_name")) : WritePersonalToml(Candidate)
+		After := FSReadBytesStrict(Path)
+		StagePresent := State.stagePath != "" && FSStrictExists(State.stagePath)
+		StageBytes := StagePresent ? FSReadBytesStrict(State.stagePath) : Buffer(0)
+		_TestPrint("# personal-stage-ownership info=" . PersonalInfo . " collision=" . Collision . " calls=" . State.hits
+			. " created_sentinel=" . State.createdSentinel . " original_entered=" . State.originalEntered
+			. " original_completed=" . State.originalCompleted
+			. " result=" . Result . " stage_present=" . StagePresent
+			. " before_bytes=" . Before.Size . " after_bytes=" . After.Size)
+		AssertEqual(1, State.hits, "the actual default personal publisher must reach its real native staging owner")
+		AssertEqual(1, State.originalEntered, "the real staging writer must be delegated exactly once")
+		AssertEqual(1, State.originalCompleted, "the real original writer must return before business assertions")
+		AssertEqual(Collision ? 1 : 0, State.createdSentinel)
+		if Collision {
+			AssertTrue(StagePresent, "a personal save cannot rename or delete another owner's stage")
+			AssertEqual(State.sentinelBytes.Size, StageBytes.Size)
+			AssertEqual(StageBytes.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", State.sentinelBytes,
+				"Ptr", StageBytes, "UPtr", StageBytes.Size, "UPtr"), "foreign bytes must remain exact")
+			AssertFalse(Result)
+			AssertEqual(Before.Size, After.Size)
+			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+				"Ptr", After, "UPtr", Before.Size, "UPtr"), "collision refuses all target publication")
+		} else {
+			AssertTrue(Result)
+			AssertFalse(StagePresent)
+			Actual := TOML_ParseDocument(FSReadUtf8Exact(Path))
+			AssertEqual("Edited", PersonalInfo ? Actual["info"]["first_name"] : Actual["words"][1]["hello"]["output"])
+		}
+	} finally {
+		if Installed {
+			if HadOwn
+				Owner.DefineProp("Call", SavedCall)
+			else
+				Owner.DeleteProp("Call")
+		}
+		if Created {
+			_PersonalTomlInvalidateCaches(Path)
+			if _TomlUnreadableFiles.Has(Path)
+				_TomlUnreadableFiles.Delete(Path)
+			Refusals := _TOML_WriteRefusals(), RefusalKey := _TOML_WriteRefusalKey(Path)
+			if Refusals.Has(RefusalKey)
+				Refusals.Delete(RefusalKey)
+			DirDelete(Root, true)
+		}
+		if HadPath
+			ScriptInformation[PathKey] := OldPath
+		else
+			ScriptInformation.Delete(PathKey)
+		_ReadPersonalTomlCache := OldCache
+		_ReadPersonalInfoTomlCache := OldInfoCache
+	}
+}
+for _PSTG_Collision in [true, false]
+	Test("personal stage: foreign collision=" . _PSTG_Collision . " (personal-stage-ownership)", _PSTG_ForeignStage.Bind(_PSTG_Collision))
+
+for _PSTG_InfoCollision in [true, false]
+	Test("personal information stage: foreign collision=" . _PSTG_InfoCollision . " (personal-info-stage-ownership)",
+		_PSTG_ForeignStage.Bind(_PSTG_InfoCollision, true))

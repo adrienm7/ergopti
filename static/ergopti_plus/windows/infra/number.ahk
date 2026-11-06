@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Numeric Representation Boundaries
 ; DESCRIPTION:
-; Shared fail-closed conversion helpers for decimal values parsed from external
+; Shared fail-closed conversion helpers for numeric values parsed from external
 ; text formats. AutoHotkey wraps overflowing integers modulo 2^64 and represents
 ; overflowing floats as infinity, so callers must validate before publication.
 ; ==============================================================================
@@ -49,5 +49,35 @@ NumberTryParseFiniteFloat(Raw, &Value) {
 	if !(Candidate >= -MaxFinite and Candidate <= MaxFinite)
 		return false
 	Value := Candidate
+	return true
+}
+
+/**
+ * Parses the native integer-input grammar without accepting its modulo wrap.
+ * Leading sign/whitespace, hexadecimal and decimal zero padding stay valid;
+ * the magnitude must fit the signed native domain before Integer is called.
+ */
+NumberTryParseInputInteger(Raw, &Value) {
+	Value := ""
+	if Raw is Integer {
+		Value := Raw
+		return true
+	}
+	if !(Raw is String) || !IsInteger(Raw)
+		return false
+	Text := Trim(Raw, " `t`r`n`v`f")
+	Negative := SubStr(Text, 1, 1) == "-"
+	if Negative || SubStr(Text, 1, 1) == "+"
+		Text := SubStr(Text, 2)
+	if !RegExMatch(Text, "i)^0x([0-9a-f]+)$", &Hex)
+		return NumberTryParseSignedInteger((Negative ? "-" : "") . Text, &Value)
+	Digits := StrUpper(LTrim(Hex[1], "0"))
+	if Digits == ""
+		Digits := "0"
+	Limit := Negative ? "8000000000000000" : "7FFFFFFFFFFFFFFF"
+	if StrLen(Digits) > StrLen(Limit)
+			|| (StrLen(Digits) == StrLen(Limit) && StrCompare(Digits, Limit, true) > 0)
+		return false
+	Value := Integer((Negative ? "-" : "") . "0x" . Digits)
 	return true
 }

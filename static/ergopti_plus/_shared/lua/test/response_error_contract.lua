@@ -7,8 +7,8 @@
 --- fields. Linux registered provider tests, native public HTTP receipts and the
 --- macOS response classifier consume these independent values; other JSON
 --- adapters and classifiers require their own native validation before adopting
---- this contract. Existing universal parser
---- corpora and their first-part selection remain unchanged.
+--- this contract. Healthy multipart responses concatenate ordinary text while
+--- thinking parts and other candidates remain outside the answer.
 --- ==============================================================================
 
 local M = {}
@@ -111,16 +111,16 @@ M.vectors = {
 		expected = "decoy completion",
 	},
 	{
-		name = "anthropic first block policy",
+		name = "anthropic ordered text blocks",
 		format = "anthropic",
 		body = "{\"content\":[{\"type\":\"text\",\"text\":\"first\"},{\"type\":\"text\",\"text\":\"second\"}]}",
-		expected = "first",
+		expected = "firstsecond",
 	},
 	{
-		name = "gemini first part policy",
+		name = "gemini ordered parts of first candidate",
 		format = "gemini",
 		body = "{\"candidates\":[{\"content\":{\"parts\":[{\"thought\":true,\"text\":\"private\"},{\"text\":\"first\"},{\"text\":\"second\"}]}},{\"content\":{\"parts\":[{\"text\":\"other candidate\"}]}}]}",
-		expected = "first",
+		expected = "firstsecond",
 	},
 	{
 		name = "openai escaped literal and Unicode",

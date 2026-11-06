@@ -527,3 +527,245 @@ Test("api_remote: trim detaches owner before reentrant callback (async-trim-deta
 	_RemoteTrimRegistry_DetachesBeforeReentrantCallback)
 
 #Include test_llm_backboard_exchange_after.ahk
+
+
+_LTRC_Create(Control) {
+    Http := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(Control)))
+    Control["request"] := Http
+    return Http
+}
+_LTRC_Port(Control) {
+    return Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+        "create_http", _LTRC_Create.Bind(Control))
+}
+_LTRC_Admit(Control) {
+    Http := Control["request"]
+    AssertEqual(1, Control["spawns"])
+    _ManagedCurlControlAck(Control)
+    Http._PollManagedAdmission()
+    AssertTrue(Http.ManagedPayloadPublished)
+    AssertTrue(IsObject(Http.Handle))
+}
+
+_LTRC_Body(Cancelled) {
+    global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT
+    AssertFalse(A_IsSuspended)
+    AssertEqual(0, _LLM_Remote_Async.Count, "do not borrow any foreign reservation")
+    SavedCap := LLM_REMOTE_MAX_INFLIGHT
+    Controls := [_ManagedCurlControlState(), _ManagedCurlControlState()]
+    Ids := [], Entries := [], First := [], Second := [], Primary := 0, CleanupIssues := []
+    Resolved := _LLMRemoteResolveEntry(Map("Provider", "openai_compat", "Model", "fixture-model",
+        "Token", "owned-fixture-secret", "BaseUrl", "https://trim-fixture.invalid/v1"))
+    Url := "https://trim-fixture.invalid/v1/chat/completions"
+    PreviousCritical := Critical("Off")
+    try {
+        LLM_REMOTE_MAX_INFLIGHT := 1
+        Id1 := LLM_RemotePostBody_Async(Resolved, Url, '{"messages":[]}',
+            (*) => First.Push(Map("ok", true)), (Info := "") => First.Push(Map("ok", false, "info", Info)),
+            20000, "trim_cancel_control", 0, 0, _LTRC_Port(Controls[1]))
+        Ids.Push(Id1)
+        AssertTrue(_LLM_Remote_Async.Has(Id1))
+        Entry1 := _LLM_Remote_Async[Id1]
+        Entries.Push(Entry1)
+        _LTRC_Admit(Controls[1])
+        ; Cancel queues native cleanup by design. Hold that exact requesting
+        ; thread through successor admission so a poll cannot retire it first.
+        HandoffCritical := Critical("On")
+        try {
+            if Cancelled {
+                LLM_RemoteCancelAsync(Id1)
+                AssertTrue(Entry1["cancelled"])
+                AssertTrue(_LLM_Remote_Async.Has(Id1), "cancellation is logically marked before deferred retirement")
+            }
+            Id2 := LLM_RemotePostBody_Async(Resolved, Url, '{"messages":[]}',
+                (Text, Usage := "") => Second.Push(Map("ok", true, "text", Text)),
+                (Info := "") => Second.Push(Map("ok", false, "info", Info)),
+                20000, "trim_cancel_successor", 0, 0, _LTRC_Port(Controls[2]))
+            Ids.Push(Id2)
+            AssertTrue(_LLM_Remote_Async.Has(Id2))
+            Entry2 := _LLM_Remote_Async[Id2]
+            Entries.Push(Entry2)
+        } finally Critical(HandoffCritical)
+        AssertFalse(_LLM_Remote_Async.Has(Id1), "actual capacity trim must detach the predecessor")
+        AssertTrue(_LLM_Remote_Async.Has(Id2) && _LLM_Remote_Async[Id2] == Entry2)
+        Http1 := Controls[1]["request"], Http2 := Controls[2]["request"]
+        AssertTrue(Http1.Completed && Http1.Aborted)
+        AssertFalse(IsObject(Http1.Handle), "the actual trim must retire its predecessor's controlled Job")
+        _LTRC_Admit(Controls[2])
+        AssertTrue(FSWrite(Http2.BodyPath, '{"choices":[{"message":{"content":"owned-successor-ok"}}]}'))
+        AssertTrue(FSWrite(Http2.HeaderPath, "HTTP/1.1 200 OK`r`nContent-Type: application/json`r`n`r`n"))
+        TerminalCritical := Critical("On")
+        try {
+            Controls[2]["callback"].Call(0, '{"schema_version":1,"ok":true,"status":200,"child_quiesced":true,"receipt":{}}', "")
+            _LLMRemote_PollRequest(Id2)
+        } finally Critical(TerminalCritical)
+        _TestPrint("# REMOTE_TRIM_CANCEL " . KL_JsonEncode(Map("cancelled_case", Cancelled,
+            "predecessor_cancelled", Entry1["cancelled"], "predecessor_callbacks", First.Length,
+            "predecessor_reason", First.Length && !First[1]["ok"] ? First[1]["info"]["reason"] : "",
+            "predecessor_registry_present", _LLM_Remote_Async.Has(Id1),
+            "predecessor_handle_retired", !IsObject(Http1.Handle),
+            "successor_callbacks", Second.Length, "successor_registry_present", _LLM_Remote_Async.Has(Id2),
+            "successor_handle_retired", !IsObject(Http2.Handle), "native_spawns", Controls[1]["spawns"] + Controls[2]["spawns"])))
+        AssertEqual(Cancelled ? 0 : 1, First.Length,
+            "cancelled predecessor must stay silent; a live capacity eviction must fail exactly once")
+        if !Cancelled {
+            AssertFalse(First[1]["ok"])
+            AssertEqual("trimmed", First[1]["info"]["reason"])
+        }
+        AssertEqual(1, Second.Length)
+        AssertTrue(Second[1]["ok"] && Second[1]["text"] == "owned-successor-ok")
+        AssertFalse(_LLM_Remote_Async.Has(Id2))
+        AssertFalse(IsObject(Http2.Handle))
+    } catch Any as Failure {
+        Primary := Failure
+    } finally {
+        for Index, Id in Ids {
+            try {
+                if Index <= Entries.Length && _LLM_Remote_Async.Has(Id) && _LLM_Remote_Async[Id] == Entries[Index] {
+                    LLM_RemoteCancelAsync(Id)
+                    _LLMRemote_PollRequest(Id)
+                }
+            } catch Any as Failure {
+                CleanupIssues.Push(Map("phase", "reservation", "error", Type(Failure), "message", SubStr(Failure.Message, 1, 200)))
+                if !IsObject(Primary)
+                    Primary := Failure
+            }
+        }
+        for Control in Controls {
+            try {
+                if Control.Has("request") {
+                    AssertTrue(Control["request"].Abort())
+                    AssertFalse(IsObject(Control["request"].Handle))
+                    _ManagedCurlControlRelease(Control)
+                }
+            } catch Any as Failure {
+                CleanupIssues.Push(Map("phase", "facade", "error", Type(Failure), "message", SubStr(Failure.Message, 1, 200)))
+                if !IsObject(Primary)
+                    Primary := Failure
+            }
+        }
+        LLM_REMOTE_MAX_INFLIGHT := SavedCap
+        Critical(PreviousCritical)
+        if CleanupIssues.Length > 0
+            _TestPrint("# REMOTE_TRIM_CANCEL_CLEANUP " . KL_JsonEncode(CleanupIssues))
+    }
+    if IsObject(Primary)
+        throw Primary
+}
+_LTRC_Run(Cancelled) {
+    _ManagedRemoteFixtureWithLlmTimings(_LTRC_Body.Bind(Cancelled))
+}
+Test("Remote capacity trim: a live predecessor fails once (remote-trim-cancel)", _LTRC_Run.Bind(false))
+Test("Remote capacity trim: a cancelled predecessor stays silent (remote-trim-cancel)", _LTRC_Run.Bind(true))
+
+_LTRS_Body(Revoked) {
+    global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT
+    AssertFalse(A_IsSuspended)
+    AssertEqual(0, _LLM_Remote_Async.Count, "do not borrow any foreign reservation")
+    SavedCap := LLM_REMOTE_MAX_INFLIGHT
+    Controls := [_ManagedCurlControlState(), _ManagedCurlControlState()]
+    Ids := [], Entries := [], First := [], Second := [], Primary := 0, CleanupIssues := []
+    Scope := Map("current", true)
+    Resolved := _LLMRemoteResolveEntry(Map("Provider", "openai_compat", "Model", "fixture-model",
+        "Token", "owned-fixture-secret", "BaseUrl", "https://trim-fixture.invalid/v1"))
+    Url := "https://trim-fixture.invalid/v1/chat/completions"
+    PreviousCritical := Critical("Off")
+    try {
+        LLM_REMOTE_MAX_INFLIGHT := 1
+        Id1 := LLM_RemotePostBody_Async(Resolved, Url, '{"messages":[]}',
+            (*) => First.Push(Map("ok", true)), (Info := "") => First.Push(Map("ok", false, "info", Info)),
+            20000, "trim_scope_control", 0, () => Scope["current"], _LTRC_Port(Controls[1]))
+        Ids.Push(Id1)
+        AssertTrue(_LLM_Remote_Async.Has(Id1))
+        Entry1 := _LLM_Remote_Async[Id1]
+        Entries.Push(Entry1)
+        _LTRC_Admit(Controls[1])
+        ; The requester disappears without calling CancelAsync. Hold only the
+        ; native admission handoff so polling cannot retire the first request.
+        HandoffCritical := Critical("On")
+        try {
+            if Revoked {
+                Scope["current"] := false
+                AssertFalse(Entry1["cancelled"], "scope withdrawal is independent of explicit cancellation")
+                AssertTrue(_LLM_Remote_Async.Has(Id1), "the actual scope-revoked predecessor remains owned before trim")
+            }
+            Id2 := LLM_RemotePostBody_Async(Resolved, Url, '{"messages":[]}',
+                (Text, Usage := "") => Second.Push(Map("ok", true, "text", Text)),
+                (Info := "") => Second.Push(Map("ok", false, "info", Info)),
+                20000, "trim_scope_successor", 0, 0, _LTRC_Port(Controls[2]))
+            Ids.Push(Id2)
+            AssertTrue(_LLM_Remote_Async.Has(Id2))
+            Entry2 := _LLM_Remote_Async[Id2]
+            Entries.Push(Entry2)
+        } finally Critical(HandoffCritical)
+        AssertFalse(_LLM_Remote_Async.Has(Id1), "actual capacity trim must detach the predecessor")
+        AssertTrue(_LLM_Remote_Async.Has(Id2) && _LLM_Remote_Async[Id2] == Entry2)
+        Http1 := Controls[1]["request"], Http2 := Controls[2]["request"]
+        AssertTrue(Http1.Completed && Http1.Aborted)
+        AssertFalse(IsObject(Http1.Handle), "the actual trim must retire its predecessor's controlled Job")
+        _LTRC_Admit(Controls[2])
+        AssertTrue(FSWrite(Http2.BodyPath, '{"choices":[{"message":{"content":"owned-successor-ok"}}]}'))
+        AssertTrue(FSWrite(Http2.HeaderPath, "HTTP/1.1 200 OK`r`nContent-Type: application/json`r`n`r`n"))
+        TerminalCritical := Critical("On")
+        try {
+            Controls[2]["callback"].Call(0, '{"schema_version":1,"ok":true,"status":200,"child_quiesced":true,"receipt":{}}', "")
+            _LLMRemote_PollRequest(Id2)
+        } finally Critical(TerminalCritical)
+        _TestPrint("# REMOTE_TRIM_SCOPE " . KL_JsonEncode(Map("revoked_case", Revoked, "requester_current", Scope["current"],
+            "predecessor_cancelled", Entry1["cancelled"], "predecessor_callbacks", First.Length,
+            "predecessor_reason", First.Length && !First[1]["ok"] ? First[1]["info"]["reason"] : "",
+            "predecessor_registry_present", _LLM_Remote_Async.Has(Id1),
+            "predecessor_handle_retired", !IsObject(Http1.Handle),
+            "successor_callbacks", Second.Length, "successor_registry_present", _LLM_Remote_Async.Has(Id2),
+            "successor_handle_retired", !IsObject(Http2.Handle), "native_spawns", Controls[1]["spawns"] + Controls[2]["spawns"])))
+        AssertEqual(Revoked ? 0 : 1, First.Length,
+            "a revoked requester must stay silent; a live capacity eviction must fail exactly once")
+        if !Revoked {
+            AssertFalse(First[1]["ok"])
+            AssertEqual("trimmed", First[1]["info"]["reason"])
+        }
+        AssertEqual(1, Second.Length)
+        AssertTrue(Second[1]["ok"] && Second[1]["text"] == "owned-successor-ok")
+        AssertFalse(_LLM_Remote_Async.Has(Id2))
+        AssertFalse(IsObject(Http2.Handle))
+    } catch Any as Failure {
+        Primary := Failure
+    } finally {
+        for Index, Id in Ids {
+            try {
+                if Index <= Entries.Length && _LLM_Remote_Async.Has(Id) && _LLM_Remote_Async[Id] == Entries[Index] {
+                    LLM_RemoteCancelAsync(Id)
+                    _LLMRemote_PollRequest(Id)
+                }
+            } catch Any as Failure {
+                CleanupIssues.Push(Map("phase", "reservation", "error", Type(Failure), "message", SubStr(Failure.Message, 1, 200)))
+                if !IsObject(Primary)
+                    Primary := Failure
+            }
+        }
+        for Control in Controls {
+            try {
+                if Control.Has("request") {
+                    AssertTrue(Control["request"].Abort())
+                    AssertFalse(IsObject(Control["request"].Handle))
+                    _ManagedCurlControlRelease(Control)
+                }
+            } catch Any as Failure {
+                CleanupIssues.Push(Map("phase", "facade", "error", Type(Failure), "message", SubStr(Failure.Message, 1, 200)))
+                if !IsObject(Primary)
+                    Primary := Failure
+            }
+        }
+        LLM_REMOTE_MAX_INFLIGHT := SavedCap
+        Critical(PreviousCritical)
+        if CleanupIssues.Length > 0
+            _TestPrint("# REMOTE_TRIM_SCOPE_CLEANUP " . KL_JsonEncode(CleanupIssues))
+    }
+    if IsObject(Primary)
+        throw Primary
+}
+_LTRS_Run(Revoked) {
+    _ManagedRemoteFixtureWithLlmTimings(_LTRS_Body.Bind(Revoked))
+}
+Test("Remote capacity trim: a current requester fails once (remote-trim-scope)", _LTRS_Run.Bind(false))
+Test("Remote capacity trim: a scope-revoked requester stays silent (remote-trim-scope)", _LTRS_Run.Bind(true))

@@ -64,21 +64,37 @@ _RCtrlHoldModKey() {
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "backspace" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and not LayerEnabled
 *SC11D::
 {
+	; Cleanup retires this callback even when the key remains held after resume.
+	RepeatEpoch := _TH_SyntheticEpoch
 	if KS_IsDown("LShift") { ; LShift physically held → Delete
+		if A_IsSuspended || RepeatEpoch != _TH_SyntheticEpoch
+			return
 		TextPressKey("Delete", "")
 	} else if TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and KS_IsDown("SC038") { ; LAlt(=OneShotShift) physically held
 		; Cannot simply send Delete — RCtrl+LAlt would be Ctrl+Alt+Delete
+		if A_IsSuspended || RepeatEpoch != _TH_SyntheticEpoch
+			return
 		OneShotShiftFix()
+		if A_IsSuspended || RepeatEpoch != _TH_SyntheticEpoch
+			return
 		TextPressKey("Right", "")
+		if A_IsSuspended || RepeatEpoch != _TH_SyntheticEpoch
+			return
 		TextPressKey("BackSpace", "")
 	} else {
+		if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
+			return
 		TapHoldEmitKeyTap("BackSpace")
 		Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
+		if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
+			return
 		while KS_IsDown("SC11D") { ; key-repeat loop while RCtrl physically held
-			if A_IsSuspended
+			if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
 				break
 			TapHoldEmitKeyTap("BackSpace")
 			Sleep(KEY_REPEAT_INTERVAL_MS)
+			if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
+				break
 		}
 	}
 }
@@ -124,21 +140,22 @@ _RCtrlHoldModKey() {
 
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and not LayerEnabled
 *SC11D:: {
+	Owner := TapHoldNewOwner()
 	tap := KS_WaitReleased("SC11D", TapHoldDuration(TapHold, "right_ctrl"))
 	if tap {
-		TapHoldDispatchTap("right_ctrl", OneShotShift)
+		TapHoldDispatchTap("right_ctrl", () => (TapHoldOwnerCurrent(Owner) ? OneShotShift() : false))
 		return
 	}
 	; Long press — arm Shift until key-up, releasing it in a finally so it can
 	; NEVER latch. The wait is capped (U T<timeout>) so a lost SC11D key-up
 	; (focus stolen by a UAC prompt, Suspend toggled mid-press) cannot block the
 	; release forever and leave Shift stuck Down.
-	if !TapHoldSyntheticKeyDown("LShift")
+	if !TapHoldSyntheticKeyDown("LShift", Owner)
 		return
 	try {
 		KS_WaitReleased("SC11D", STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
-		TapHoldSyntheticKeyUp("LShift")
+		TapHoldSyntheticKeyUp("LShift", Owner)
 	}
 }
 #HotIf
@@ -242,13 +259,24 @@ _RCtrlTabTap() {
 }
 
 _RCtrlBackspaceTap() {
+	Epoch := _TH_SyntheticEpoch
 	if KS_IsDown("LShift") {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return
 		TextPressKey("Delete", "")
 	} else if TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and KS_IsDown("SC038") {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return
 		OneShotShiftFix()
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return
 		TextPressKey("Right", "")
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return
 		TextPressKey("BackSpace", "")
 	} else {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return
 		TapHoldEmitKeyTap("BackSpace")
 	}
 }

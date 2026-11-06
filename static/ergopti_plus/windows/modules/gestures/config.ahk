@@ -106,18 +106,29 @@ _GestureCloneActionParameters(Parameters) {
 GestureSetActionParameter(BindingId, ActionName, Value, WriterFn := 0, NotifyFn := 0) {
 		if IsSet(ProgramActions_Stop) && ProgramActions_Stop() != true
 				return false
-		global GestureActionParameters, ConfigurationFile
+		global ConfigurationFile
 		if TomlConfigParameterBindingStatus(BindingId) == "retired"
 				return false
 		Key := GestureActionParameterKey(BindingId, ActionName)
-		; TOML identities are case-exact. A preserved, unjudged prefix must never
-		; alias a canonical gesture in a default case-insensitive native Map.
+		return ConfigCommitBuilt(ConfigurationFile, "the parameter for action '" . ActionName . "'",
+				_GestureBuildActionParameterPlan.Bind(Key, Value), WriterFn, NotifyFn)
+}
+
+; Snapshot live parameters only after the actual path owner admits this build.
+_GestureBuildActionParameterPlan(Key, Value) {
+		global GestureActionParameters
+		; TOML identities stay case-exact even when an older runtime supplied a
+		; case-insensitive Map. Never change the populated source Map in place.
 		CandidateParameters := _GestureCloneActionParameters(GestureActionParameters)
 		CandidateParameters[Key] := Value
-		Updates := [{ Section: "action_parameters", Key: Key, Value: Value }]
-		if !ConfigCommitUpdates(ConfigurationFile, Updates,
-				"the parameter for action '" . ActionName . "'", WriterFn, NotifyFn)
-				return false
+		return {
+				updates: [{ Section: "action_parameters", Key: Key, Value: Value }],
+				publish: _GesturePublishActionParameters.Bind(CandidateParameters),
+		}
+}
+
+_GesturePublishActionParameters(CandidateParameters) {
+		global GestureActionParameters
 		GestureActionParameters := CandidateParameters
 		return true
 }
@@ -536,32 +547,23 @@ _GestureCommitAssignment(&AssignmentsTarget, &ParametersTarget, AssignmentSectio
 		try {
 			if IsSet(ProgramActions_Stop) && ProgramActions_Stop() != true
 					return false
-			PreviousAction := AssignmentsTarget.Get(Slot, "")
-			HoldOwner := PreviousAction != ActionName ? GestureCaptureBindingHold(BindingId, PreviousAction) : 0
-			CandidateAssignments := AssignmentsTarget.Clone()
-			CandidateParameters := _GestureCloneActionParameters(ParametersTarget)
-			CandidateAssignments[Slot] := ActionName
-			Updates := [{ Section: AssignmentSection, Key: Slot, Value: ActionName }]
-			if ParameterCandidate.Get("has_value", false) {
+			HasParameter := ParameterCandidate.Get("has_value", false)
+			ParameterKey := "", ParameterValue := ""
+			if HasParameter {
 					if !ParameterCandidate.Has("key") or !ParameterCandidate.Has("value")
 							throw ValueError("Parameterized action candidate is incomplete.")
 					ParameterKey := ParameterCandidate["key"]
 					ParameterValue := ParameterCandidate["value"]
 					if TomlConfigActionParameterBindingStatus(ParameterKey) == "retired"
 							return false
-					CandidateParameters[ParameterKey] := ParameterValue
-					Updates.Push({ Section: "action_parameters", Key: ParameterKey, Value: ParameterValue })
 			}
-			if !ConfigCommitUpdates(ConfigurationFile, Updates,
-					"the action assignment for '" . Slot . "'", WriterFn, NotifyFn)
+			PreviousAction := AssignmentsTarget.Get(Slot, "")
+			HoldOwner := PreviousAction != ActionName ? GestureCaptureBindingHold(BindingId, PreviousAction) : 0
+			if ConfigCommitBuilt(ConfigurationFile, "the action assignment for '" . Slot . "'",
+					_GestureBuildAssignmentPlan.Bind(&AssignmentsTarget, &ParametersTarget,
+							AssignmentSection, Slot, ActionName, HasParameter, ParameterKey, ParameterValue),
+					WriterFn, NotifyFn) != true
 					return false
-			PreviousCritical := Critical("On")
-			try {
-					AssignmentsTarget := CandidateAssignments
-					ParametersTarget := CandidateParameters
-			} finally {
-					Critical(PreviousCritical)
-			}
 			if IsObject(HoldOwner) && !GestureReleaseCapturedBindingHold(PreviousAction, HoldOwner)
 					LoggerError("gestures", "Assignment committed, but its synthetic button release remains pending.")
 			return true
@@ -573,6 +575,30 @@ _GestureCommitAssignment(&AssignmentsTarget, &ParametersTarget, AssignmentSectio
 								GestureBindingWriteOwners.Delete(BindingId)
 				} finally Critical(PreviousCritical)
 		}
+}
+
+; The bound VarRefs retain the actual caller targets. Both snapshots and their
+; memory publication belong to the same path lease as the durable update batch.
+_GestureBuildAssignmentPlan(&AssignmentsTarget, &ParametersTarget, AssignmentSection, Slot, ActionName, HasParameter, ParameterKey, ParameterValue) {
+		CandidateAssignments := AssignmentsTarget.Clone()
+		CandidateParameters := _GestureCloneActionParameters(ParametersTarget)
+		CandidateAssignments[Slot] := ActionName
+		Updates := [{ Section: AssignmentSection, Key: Slot, Value: ActionName }]
+		if HasParameter {
+				CandidateParameters[ParameterKey] := ParameterValue
+				Updates.Push({ Section: "action_parameters", Key: ParameterKey, Value: ParameterValue })
+		}
+		return {
+				updates: Updates,
+				publish: _GesturePublishAssignment.Bind(&AssignmentsTarget, &ParametersTarget,
+						CandidateAssignments, CandidateParameters),
+		}
+}
+
+_GesturePublishAssignment(&AssignmentsTarget, &ParametersTarget, CandidateAssignments, CandidateParameters) {
+		AssignmentsTarget := CandidateAssignments
+		ParametersTarget := CandidateParameters
+		return true
 }
 
 ; Prompts when needed, then commits the related parameter + assignment once.

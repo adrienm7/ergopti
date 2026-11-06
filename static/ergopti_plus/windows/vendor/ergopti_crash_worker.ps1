@@ -130,7 +130,9 @@ try {
 
 try {
 	if (Test-CrashFault "architecture") { throw "Injected architecture fault" }
-	Set-CrashField $snapshot "os_arch" $env:PROCESSOR_ARCHITECTURE
+	# Process environment describes the worker under WOW64, not the host OS.
+	$osArchitecture = if ([Environment]::Is64BitOperatingSystem) { "64 bits" } else { "32 bits" }
+	Set-CrashField $snapshot "os_arch" $osArchitecture
 } catch { $enrichmentErrors.Add("architecture: " + $_.Exception.Message) }
 
 try {
@@ -149,9 +151,17 @@ try {
 
 try {
 	if (Test-CrashFault "cpu") { throw "Injected processor CIM fault" }
-	$processor = Get-CimInstance Win32_Processor | Select-Object -First 1
-	Set-CrashField $snapshot "cpu_name" ([string]$processor.Name)
-	Set-CrashField $snapshot "cpu_cores" ([string]$processor.NumberOfLogicalProcessors)
+	$processors = @(Get-CimInstance Win32_Processor)
+	if ($processors.Count -eq 0) { throw "No processor instance was returned" }
+	$logicalCores = 0L
+	foreach ($processor in $processors) {
+		$instanceCores = [long]$processor.NumberOfLogicalProcessors
+		if ($instanceCores -lt 1) { throw "Processor instance has no logical processor count" }
+		$logicalCores += $instanceCores
+	}
+	# Win32_Processor counts one socket per instance; retain the first model name.
+	Set-CrashField $snapshot "cpu_name" ([string]$processors[0].Name)
+	Set-CrashField $snapshot "cpu_cores" ([string]$logicalCores)
 } catch { $enrichmentErrors.Add("cpu: " + $_.Exception.Message) }
 
 # A compiled build already named its commit from the BUNDLE_COMMIT stamp; a
@@ -178,4 +188,13 @@ $reportDir = $transportReportsDir
 [IO.Directory]::CreateDirectory($reportDir) | Out-Null
 Remove-CrashTransportFields $snapshot
 $reportPath = Write-CrashDocument $reportDir ([string]$snapshot.timestamp) (ConvertTo-CrashDocument $snapshot)
-Write-Output ("OK:" + $reportPath)
+# This receipt contains a native Unicode path. Its explicit byte preamble lets
+# the parent's FileRead detect UTF-8 regardless of console/ANSI code pages.
+$ReceiptEncoding = [Text.UTF8Encoding]::new($true)
+[byte[]]$ReceiptBytes = $ReceiptEncoding.GetPreamble() +
+	$ReceiptEncoding.GetBytes("OK:" + $reportPath + [Environment]::NewLine)
+$ReceiptOutput = [Console]::OpenStandardOutput()
+try {
+	$ReceiptOutput.Write($ReceiptBytes, 0, $ReceiptBytes.Length)
+	$ReceiptOutput.Flush()
+} finally { $ReceiptOutput.Dispose() }

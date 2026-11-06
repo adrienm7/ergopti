@@ -83,4 +83,13 @@ if ([string]::IsNullOrWhiteSpace($reportsDir)) { throw "no crash reports folder"
 $snapshot.PSObject.Properties.Remove("_transport_script_dir")
 $snapshot.PSObject.Properties.Remove("_transport_reports_dir")
 $artifactPath = Write-CrashDocument $reportsDir ([string]$snapshot.timestamp) (ConvertTo-CrashDocument $snapshot)
-Write-Output ("OK:" + $artifactPath)
+# This receipt contains a native Unicode path. Its explicit byte preamble lets
+# the parent's FileRead detect UTF-8 regardless of console/ANSI code pages.
+$ReceiptEncoding = [Text.UTF8Encoding]::new($true)
+[byte[]]$ReceiptBytes = $ReceiptEncoding.GetPreamble() +
+	$ReceiptEncoding.GetBytes("OK:" + $artifactPath + [Environment]::NewLine)
+$ReceiptOutput = [Console]::OpenStandardOutput()
+try {
+	$ReceiptOutput.Write($ReceiptBytes, 0, $ReceiptBytes.Length)
+	$ReceiptOutput.Flush()
+} finally { $ReceiptOutput.Dispose() }

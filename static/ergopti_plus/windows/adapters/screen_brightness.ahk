@@ -44,11 +44,16 @@ ScreenBrightnessRequest(Action, Done := 0) {
 	Data := ScreenBrightnessData()
 	if !Data["actions"].Has(Action)
 		throw ValueError("Unknown screen brightness action.")
-	if A_IsSuspended || IsObject(ScreenBrightnessOwner.job)
-		return false
-	Id := ++ScreenBrightnessOwner.generation
-	Job := Map("id", Id, "action", Action, "done", Done, "data", Data,
-		"started", A_TickCount, "canceled", false, "handle", 0)
+	PreviousCritical := Critical("On")
+	try {
+		if A_IsSuspended || IsObject(ScreenBrightnessOwner.job)
+			return false
+		Id := ++ScreenBrightnessOwner.generation
+		Job := Map("id", Id, "action", Action, "done", Done, "data", Data,
+			"started", A_TickCount, "canceled", false, "handle", 0)
+		ScreenBrightnessOwner.job := Job
+	} finally
+		Critical(PreviousCritical)
 	Spawn := IsObject(ScreenBrightnessOwner.spawn_fn)
 		? ScreenBrightnessOwner.spawn_fn : ShellRunner_SpawnTreeOwned
 	Args := ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File",
@@ -57,13 +62,21 @@ ScreenBrightnessRequest(Action, Done := 0) {
 	try Handle := Spawn.Call("powershell.exe", Args,
 		ScreenBrightnessCompleted.Bind(Id), , , Data["max_receipt_bytes"])
 	catch as Err {
+		if ScreenBrightnessOwner.job == Job
+			ScreenBrightnessOwner.job := 0
 		LoggerError("ScreenBrightness", "Worker acquisition failed: {1}.", Err.Message)
 		return false
 	}
-	if !IsObject(Handle)
+	if !IsObject(Handle) {
+		if ScreenBrightnessOwner.job == Job
+			ScreenBrightnessOwner.job := 0
 		return false
+	}
 	Job["handle"] := Handle
-	ScreenBrightnessOwner.job := Job
+	if Job["canceled"] || A_IsSuspended {
+		ScreenBrightnessCancel("acquisition-canceled", Id)
+		return false
+	}
 	try Started := Handle.start()
 	catch as Err {
 		LoggerError("ScreenBrightness", "Worker start failed: {1}.", Err.Message)
@@ -94,6 +107,10 @@ ScreenBrightnessCancel(Reason := "canceled", ExpectedId := 0) {
 	if ExpectedId != 0 && Job["id"] != ExpectedId
 		return false
 	Job["canceled"] := true
+	; Acquisition may yield before it returns the prepared handle. Keep the
+	; reservation until that stack can attach and retire the exact worker.
+	if !IsObject(Job["handle"])
+		return false
 	try Retired := Job["handle"].requestTerminate()
 	catch as Err {
 		LoggerError("ScreenBrightness", "Worker retirement threw ({1}): {2}.", Reason, Err.Message)
@@ -112,25 +129,41 @@ ScreenBrightnessCancel(Reason := "canceled", ExpectedId := 0) {
 }
 
 ; Runs while a worker or native retirement debt exists, including during Suspend.
-ScreenBrightnessPoll() {
-	Job := ScreenBrightnessOwner.job
-	if !IsObject(Job) {
-		SetTimer(ScreenBrightnessPoll, 0)
-		return
-	}
+ScreenBrightnessPoll(BeforeCancelFn := 0) {
+	PreviousCritical := Critical("On")
+	try {
+		Job := ScreenBrightnessOwner.job
+		if !IsObject(Job) {
+			SetTimer(ScreenBrightnessPoll, 0)
+			return
+		}
+		Id := Job["id"]
+	} finally Critical(PreviousCritical)
 	if Job["canceled"] || A_IsSuspended
-		ScreenBrightnessCancel("suspended-or-canceled")
+		Reason := "suspended-or-canceled"
 	else if TickExpired(Job["started"], Job["data"]["worker_timeout_ms"])
-		ScreenBrightnessCancel("timeout")
+		Reason := "timeout"
+	else
+		return
+	if HasMethod(BeforeCancelFn, "Call")
+		BeforeCancelFn.Call()
+	ScreenBrightnessCancel(Reason, Id)
 }
 
 ; ShellRunner invokes this only after the child tree and its resources settle.
-ScreenBrightnessCompleted(Id, ExitCode, Stdout, Stderr) {
-	Job := ScreenBrightnessOwner.job
-	if !IsObject(Job) || Job["id"] != Id
-		return
-	ScreenBrightnessOwner.job := 0
-	SetTimer(ScreenBrightnessPoll, 0)
+ScreenBrightnessCompleted(Id, ExitCode, Stdout, Stderr, BeforeStopFn := 0) {
+	PreviousCritical := Critical("On")
+	try {
+		Job := ScreenBrightnessOwner.job
+		if !IsObject(Job) || Job["id"] != Id
+			return
+		; Detach and disarm as one short RAM/native-timer claim. A new job can
+		; start only after its predecessor has stopped its own polling timer.
+		ScreenBrightnessOwner.job := 0
+		if HasMethod(BeforeStopFn, "Call")
+			BeforeStopFn.Call()
+		SetTimer(ScreenBrightnessPoll, 0)
+	} finally Critical(PreviousCritical)
 	Receipt := 0
 	if ExitCode == 0 && StrLen(Stdout) <= Job["data"]["max_receipt_bytes"] {
 		try Receipt := JsonParse(Stdout)

@@ -41,10 +41,10 @@ _RHL_ReplaceClock(Body, Name) {
 		. SubStr(Body, Position + Token.Len[0])
 }
 
-_RHL_ChildSource() {
+_RHL_ChildSource(Mode := "") {
 	global _DriverDir
 	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
-	for Symbol in ["MF_ShouldFilter", "WallClockTimestamp", "TickElapsed64"] {
+	for Symbol in ["MF_ShouldFilter", "WallClockTimestamp", "TickElapsed64", "HotPath_Now", "WICaptureBoundedFocusSnapshot"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(Owner != "", "The child must include the actual owner of " . Symbol)
 		Source .= "#Include " . Owner . "`n"
@@ -71,10 +71,25 @@ _RHL_ChildSource() {
 	}
 	; KL_AppendLog and the hook sources ask the capture gate (Suspend or the
 	; metrics pause) that the collection module owns.
-	GateOwner := _DriverProductionFileForSymbol("KL_CaptureHeld", _DriverDir)
-	AssertTrue(RegExMatch(FileRead(GateOwner, "UTF-8"), "ms)^class KLCollection \{.*?^\}", &GateClass) > 0,
-		"The child must use the actual capture gate class KLCollection")
-	Source .= GateClass[0] . "`n" . _DriverFuncBody("KL_CaptureHeld") . "`n"
+	if Mode == "keys" {
+		Source .= _DriverFileSource("keystats_constants.ahk") . "`n"
+		for Symbol in ["KL_Hook_OnChar", "KL_Watchers_OnKeystroke", "KL_InvalidatePasswordFocus",
+			"KL_Roi_SelectWordCountSurvivors", "KLW_PopLast", "HotPath_Now", "_TextCodepointWidth"] {
+			Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
+			AssertTrue(Owner != "", "The genuine key/ROI dependency must have one owner: " . Symbol)
+			Source .= "#Include " . Owner . "`n"
+		}
+		for Symbol in ["_KL_CaptureLlmJournalPrivacy", "_KL_LlmJournalPrivacyStillCurrent"] {
+			Body := _DriverFuncBody(Symbol)
+			AssertTrue(Body != "", "The real privacy receipt owner must resolve")
+			Source .= Body . "`n"
+		}
+	} else {
+		GateOwner := _DriverProductionFileForSymbol("KL_CaptureHeld", _DriverDir)
+		AssertTrue(RegExMatch(FileRead(GateOwner, "UTF-8"), "ms)^class KLCollection \{.*?^\}", &GateClass) > 0,
+			"The child must use the actual capture gate class KLCollection")
+		Source .= GateClass[0] . "`n" . _DriverFuncBody("KL_CaptureHeld") . "`n"
+	}
 	return Source . "#Include " . _DriverDir . "\tests\fixtures\roi_halflife_native64_body.ahk`n"
 }
 
@@ -93,7 +108,7 @@ _RHL_Case(Mode) {
 	AtDeadline := 0, ExportFailure := 0
 	PreviousCritical := Critical("Off")
 	try {
-		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _RHL_ChildSource()) != 0)
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _RHL_ChildSource(Mode)) != 0)
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _RHL_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The real private child must start")
@@ -145,6 +160,6 @@ _RHL_Case(Mode) {
 		throw ExportFailure
 }
 
-for _RHL_Mode in ["days31", "days46", "era31", "future"]
+for _RHL_Mode in ["days31", "days46", "era31", "future", "keys"]
 	Test("ROI half-life: " . _RHL_Mode . " uses the retained monotonic age (roi-halflife-native64-owner)",
 		_RHL_Case.Bind(_RHL_Mode))

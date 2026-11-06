@@ -334,6 +334,39 @@ Test("config transition runtime: explicit boot override bypasses unused default 
 	_CTRT_BootOverrideIgnoresUnusedDefault)
 
 
+_CTRT_BootLocatorOverride(PathValue, Accept) {
+	Directory := A_Temp . "\ergopti_boot_override_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	FSCreateDirectoryExclusiveStrict(Directory)
+	Locator := Directory . "\paths.toml"
+	Content := "ConfigDirPath = " . TOML_RenderString(PathValue) . "`n"
+	try {
+		AssertTrue(FSWriteCreateDurable(Locator, Content))
+		Overrides := ReadPathsToml(Locator)
+		Expected := StrReplace(PathValue, "/", "\")
+		AssertTrue(Overrides.Has("ConfigDirPath"), "The genuine locator parser must preserve the explicit override")
+		AssertEqual(Expected, Overrides["ConfigDirPath"], "The actual decoded locator value must reach boot selection")
+		if Accept
+			AssertEqual(Expected, ConfigTransitionSelectBootConfigDir(Overrides, "\invalid-unused-default\"),
+				"A valid explicit root must preserve its decoded bytes without validating an unused default")
+		else {
+			Refused := false
+			try ConfigTransitionSelectBootConfigDir(Overrides, "C:\valid-unused-default\")
+			catch ValueError
+				Refused := true
+			AssertTrue(Refused, "A selected invalid locator root must fail before boot creates or reads a profile")
+		}
+		AssertEqual(Content, FSReadStrict(Locator), "Selecting or refusing a root must never rewrite its locator")
+	} finally DirDelete(Directory, true)
+}
+for _CTRT_InvalidOverride in ["relative-profile", "C:relative-profile", "\root-relative", "..\outside",
+	"\\server-only", "C:\profile\..\outside", "C:\bad|component", "C:\NUL", "\\?\C:\profile"]
+	Test("config transition runtime: explicit invalid locator " . _CTRT_InvalidOverride . " is refused (boot-explicit-root)",
+		_CTRT_BootLocatorOverride.Bind(_CTRT_InvalidOverride, false))
+for _CTRT_ValidOverride in ["C:/Owned Profile/é/", "\\server\share\profile\", "D:\"]
+	Test("config transition runtime: explicit absolute locator " . _CTRT_ValidOverride . " stays supported (boot-explicit-root)",
+		_CTRT_BootLocatorOverride.Bind(_CTRT_ValidOverride, true))
+
+
 
 
 
@@ -568,6 +601,112 @@ Test("config transition retention: settled raw rollback releases its original na
 
 
 
+
+_PBAD_Case(Invalid, Protocol := "utf8", ReplacementScalar := false) {
+	Root := A_Temp . "\ergopti_paths_byte_admission_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Created := false
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		DefaultDir := Root . "\default\"
+		TargetDir := Root . ((Invalid || ReplacementScalar) ? "\profile" . Chr(0xFFFD) . "\" : "\profilé\")
+		AssertEqual(1, FSCreateDirectoryExclusiveStrict(DefaultDir))
+		AssertEqual(1, FSCreateDirectoryExclusiveStrict(TargetDir))
+		AssertEqual(1, FSWriteCreateDurable(DefaultDir . "config.toml", '[private]`nowner = "default"`n'))
+		AssertEqual(1, FSWriteCreateDurable(TargetDir . "config.toml", '[private]`nowner = "redirected"`n'))
+		Path := Root . "\paths.toml"
+		Source := "ConfigDirPath = " . TOML_RenderValue(StrReplace(TargetDir, "\", "/")) . "`n"
+		if Invalid
+			Source := StrReplace(Source, Chr(0xFFFD), "?", true)
+		if Protocol == "utf16le-bom" {
+			AssertFalse(Invalid)
+			Count := 2 + StrLen(Source) * 2
+			Bytes := Buffer(Count + 2, 0)
+			NumPut("UShort", 0xFEFF, Bytes)
+			StrPut(Source, Bytes.Ptr + 2, StrLen(Source) + 1, "UTF-16")
+		} else {
+			Prefix := Protocol == "utf8-bom" ? 3 : 0
+			AssertTrue(Protocol == "utf8" || Protocol == "utf8-bom")
+			Count := Prefix + StrPut(Source, "UTF-8") - 1
+			Bytes := Buffer(Count + 1, 0)
+			if Prefix {
+				NumPut("UChar", 0xEF, "UChar", 0xBB, "UChar", 0xBF, Bytes)
+				AssertFalse(Invalid)
+			}
+			StrPut(Source, Bytes.Ptr + Prefix, Count - Prefix + 1, "UTF-8")
+		}
+		Marker := -1
+		if Invalid {
+			Loop Count {
+				if NumGet(Bytes, A_Index - 1, "UChar") == Ord("?") {
+					AssertEqual(-1, Marker, "the invalid-byte injection marker must be unique")
+					Marker := A_Index - 1
+				}
+			}
+			AssertTrue(Marker >= 0)
+			NumPut("UChar", 0xFF, Bytes, Marker)
+		}
+		FileHandle := FSOpenStrict(Path, "w", "UTF-8-RAW")
+		AssertTrue(IsObject(FileHandle))
+		try AssertEqual(Count, FileHandle.RawWrite(Bytes, Count))
+		finally FileHandle.Close()
+		Before := FSReadBytesStrict(Path)
+		AssertEqual(Count, Before.Size)
+		AssertEqual(Count, DllCall("ntdll\RtlCompareMemory", "Ptr", Bytes, "Ptr", Before, "UPtr", Count, "UPtr"))
+		if Invalid {
+			AssertEqual(0xFF, NumGet(Before, Marker, "UChar"))
+			AssertFalse(FSReadUtf8Exact(Path) is String, "the actual raw locator is not valid UTF-8")
+			AssertTrue(InStr(FileRead(Path, "UTF-8"), Chr(0xFFFD), true) > 0,
+				"the native compatibility reader really substitutes a different scalar")
+		}
+		if !Invalid {
+			AssertEqual(Source, FileRead(Path, "UTF-8"), "the declared native source protocol must independently decode exactly")
+			if Protocol == "utf16le-bom"
+				AssertEqual(0xFEFF, NumGet(Before, 0, "UShort"))
+			else if Protocol == "utf8-bom" {
+				AssertEqual(0xEF, NumGet(Before, 0, "UChar"))
+				AssertEqual(0xBB, NumGet(Before, 1, "UChar"))
+				AssertEqual(0xBF, NumGet(Before, 2, "UChar"))
+			}
+		}
+		Selected := "", Refused := false, Owner := "<none>"
+		try {
+			Overrides := ReadPathsToml(Path)
+			Selected := ConfigTransitionSelectBootConfigDir(Overrides, DefaultDir)
+			if FSStrictExists(Selected . "config.toml")
+				Owner := TOML_ParseDocument(FSReadUtf8Exact(Selected . "config.toml"))["private"]["owner"]
+		} catch {
+			Refused := true
+		}
+		_TestPrint("# paths-byte-admission invalid=" . Invalid . " refused=" . Refused
+			. " selected-target=" . (Selected == TargetDir) . " actual-profile=" . Owner)
+		After := FSReadBytesStrict(Path)
+		AssertEqual(Before.Size, After.Size)
+		AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+			"Ptr", After, "UPtr", Before.Size, "UPtr"), "reading must preserve every original locator byte")
+		if Invalid
+			AssertTrue(Refused || (Selected == DefaultDir && Owner == "default"),
+				"malformed locator bytes must not admit a replacement-character configuration profile")
+		else {
+			AssertFalse(Refused, "a valid non-ASCII UTF-8 override must remain supported")
+			AssertEqual(TargetDir, Selected)
+			AssertEqual("redirected", Owner)
+		}
+	} finally {
+		if Created
+			DirDelete(Root, true)
+	}
+}
+Test("paths byte admission: invalid UTF-8 cannot select another profile (paths-byte-admission)", _PBAD_Case.Bind(true))
+Test("paths byte admission: actual Unicode UTF-8 profile remains selected (paths-byte-admission)", _PBAD_Case.Bind(false))
+Test("paths byte admission: actual Unicode UTF-8 BOM profile remains selected (paths-byte-admission)", _PBAD_Case.Bind(false, "utf8-bom"))
+Test("paths byte admission: actual Unicode UTF-16LE BOM profile remains selected (paths-byte-admission)", _PBAD_Case.Bind(false, "utf16le-bom"))
+
+
+
+
+
 ; ===================================
 ; ===================================
 ; ======= 3/ Direct-run Entry =======
@@ -576,3 +715,75 @@ Test("config transition retention: settled raw rollback releases its original na
 
 if A_LineFile = A_ScriptFullPath
 	RunTests()
+
+Test("paths byte admission: valid replacement scalar selects its exact profile (paths-valid-replacement-scalar)", _PBAD_Case.Bind(false, "utf8", true))
+
+_PGOW_Case(Collision) {
+	Root := A_Temp . "\ergopti_paths_generation_owner_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\paths.toml", Created := false
+	Owner := FSWriteCreateDurable, HadOwn := Owner.HasOwnProp("Call"), Installed := false
+	if HadOwn
+		SavedCall := Owner.GetOwnPropDesc("Call")
+	State := {calls: 0, createdSentinel: 0, nativeCompleted: 0, originalBytes: 0}
+	Route := StrReplace(Root, "\", "/") . "/profile"
+	Sentinel := '# Concurrent locator owner`nConfigDirPath = "' . Route . '"`n'
+	Observe(This, Target, Content) {
+		Mine := (Target is String) && StrCompare(Target, Path, true) == 0
+		if Mine {
+			State.calls += 1
+			if Collision {
+				State.createdSentinel := Func.Prototype.Call.Call(This, Path, Sentinel)
+				AssertEqual(1, State.createdSentinel, "the concurrent locator must actually be created exclusively")
+				State.originalBytes := FSReadBytesStrict(Path)
+			}
+		}
+		Result := Func.Prototype.Call.Call(This, Target, Content)
+		if Mine
+			State.nativeCompleted += 1
+		return Result
+	}
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertFalse(FSStrictExists(Path))
+		Owner.DefineProp("Call", {Call: Observe})
+		Installed := true
+		Initial := ReadPathsToml(Path)
+		Present := FSStrictExists(Path)
+		ActualBytes := Present ? FSReadBytesStrict(Path) : Buffer(0)
+		Actual := Present ? ReadPathsToml(Path) : Map()
+		_TestPrint("# paths-generation-owner collision=" . Collision . " calls=" . State.calls
+			. " created_sentinel=" . State.createdSentinel . " native_completed=" . State.nativeCompleted
+			. " present=" . Present . " bytes=" . ActualBytes.Size
+			. " reload_route=" . Actual.Get("ConfigDirPath", "<absent>"))
+		AssertEqual(1, State.calls, "the actual bootstrap default writer must reach its exclusive native creator")
+		AssertEqual(1, State.nativeCompleted, "the original exclusive writer must return without an injected result")
+		AssertEqual(Collision ? 1 : 0, State.createdSentinel)
+		AssertTrue(Initial is Map)
+		AssertTrue(Present)
+		if Collision {
+			AssertEqual(State.originalBytes.Size, ActualBytes.Size)
+			AssertEqual(ActualBytes.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", State.originalBytes,
+				"Ptr", ActualBytes, "UPtr", ActualBytes.Size, "UPtr"), "default generation must not truncate a concurrently published locator")
+			AssertEqual(StrReplace(Route, "/", "\"), Actual.Get("ConfigDirPath", "<absent>"), "the genuine reload must still route to the published profile")
+			AssertEqual(StrReplace(Route, "/", "\"), Initial.Get("ConfigDirPath", "<absent>"), "the first actual boot read consumes the concurrent winner too")
+		} else {
+			AssertTrue(ActualBytes.Size > 0)
+			AssertTrue(InStr(FSReadUtf8Exact(Path), "# Custom paths") > 0)
+			AssertEqual(0, Actual.Count)
+		}
+	} finally {
+		if Installed {
+			if HadOwn
+				Owner.DefineProp("Call", SavedCall)
+			else
+				Owner.DeleteProp("Call")
+		}
+		if Created
+			DirDelete(Root, true)
+	}
+}
+for _PGOW_Collision in [true, false]
+	Test("paths generation: concurrent locator ownership=" . _PGOW_Collision
+		. " (paths-generation-ownership)", _PGOW_Case.Bind(_PGOW_Collision))

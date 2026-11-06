@@ -849,8 +849,9 @@ _TH_BuildNativeCandidate(KeyId, Candidate) {
 	if !_TH_CandidateEntry(Candidate, KeyId, &Entry)
 		return false
 	Entry["tap_action"] := ""
-	if Entry.Has("hold_modifier")
-		Entry.Delete("hold_modifier")
+	; Absence inherits the shipped hold when inherit_defaults remains true.
+	; Native passthrough therefore owns an explicit empty hold, as "none" does.
+	Entry["hold_modifier"] := ""
 	if Entry.Has("hold_layer")
 		Entry.Delete("hold_layer")
 	return 1
@@ -918,7 +919,7 @@ _TH_PublishTapHoldCandidate(Candidate, RuntimeCandidate, EmptyKeys, OwnerToken, 
 ; tap-hold writer on the same path cannot build from a stale snapshot.
 _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 		ReplaceFn := 0, DeleteFn := 0, AuthorizeFn := 0, ContentFn := 0) {
-	global TapHold, ConfigurationFile
+	global TapHold, ConfigurationFile, _SharedDir
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
@@ -971,6 +972,19 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 		try {
 			StartState := TapHold
 			Candidate := _TH_CloneData(MasterGateDesiredTapHold(StartState))
+			ContentBuilder := ContentFn
+			if !HasMethod(ContentFn, "Call") {
+				; Ordinary edits own their changed leaves, never all stale RAM.
+				; Project the same captured current source used by the renderer.
+				Source := _TH_CaptureDurationSource(BoundPath)
+				if !(Source is Map)
+					throw Error("The tap-hold source cannot be captured.")
+				Defaults := _SharedDir . "\tap_hold\defaults.toml"
+				if Source["source_present"]
+					Candidate := LoadTapHoldToml(BoundPath, "", Source)
+				BeforeMutation := _TH_CloneData(Candidate)
+				ContentBuilder := _TH_BuildMutationContent.Bind(Source, BeforeMutation, Defaults)
+			}
 			Built := BuildFn.Call(Candidate)
 		} catch as Err {
 			BuildError := Err.Message
@@ -986,7 +1000,7 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 			PersistError := ""
 			try Result := _TH_WriteTapHoldToml(Candidate, OwnerToken,
 				BoundPath, StartState, WriterFn, ReplaceFn, DeleteFn,
-				AuthorizeFn, ContentFn)
+				AuthorizeFn, ContentBuilder)
 			catch as Err {
 				Result := false
 				PersistError := Err.Message
@@ -1006,6 +1020,73 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 		return false
 	}
 	return (Result is Integer) && Result == 1 ? 1 : false
+}
+
+; Derive only changed modeled leaves; untouched physical records stay owned
+; by the captured document, including values unknown to this driver version.
+_TH_MutationRows(Before, After) {
+	Rows := []
+	AddFields(Old, New, Section) {
+		for Key, Value in New {
+			if !Old.Has(Key) || !TOML_SameValue(Old[Key], Value) {
+				Typed := TapHoldFieldKinds().Get(Key, "") == "boolean" || Key == "inherit_defaults"
+					? TOML_Bool(Value) : Value
+				Rows.Push({ Section: Section, Key: Key, Value: Typed })
+			}
+		}
+		for Key in Old
+			if !New.Has(Key)
+				Rows.Push({ Section: Section, Key: Key, Delete: true })
+	}
+	OldRoot := Map(), NewRoot := Map()
+	for Key in ["inherit_defaults", ConfigLeaf.TIME_ACTIVATION_SECONDS] {
+		if Before.Has(Key)
+			OldRoot[Key] := Before[Key]
+		if After.Has(Key)
+			NewRoot[Key] := After[Key]
+	}
+	AddFields(OldRoot, NewRoot, "tap_hold")
+	OldKeys := Before.Get("keys", Map()), NewKeys := After.Get("keys", Map())
+	for KeyId, Fields in NewKeys
+		AddFields(OldKeys.Get(KeyId, Map()), Fields, "tap_hold.keys." . TOML_RenderKey(KeyId))
+	for KeyId, Fields in OldKeys
+		if !NewKeys.Has(KeyId)
+			AddFields(Fields, Map(), "tap_hold.keys." . TOML_RenderKey(KeyId))
+	return Rows
+}
+
+_TH_BuildMutationContent(Source, Before, Defaults, Path, Data) {
+	if !_TH_DurationSourceMatches(Source, Path)
+		return false
+	if Source["source_present"] {
+		Image := _TH_BuildSemanticImage(Path, Source["source_content"], 1,
+			_TH_MutationRows(Before, Data), Defaults)
+		Source["content"] := Image["content"]
+		; Publish the projection of these exact future bytes, with defaults, rather
+		; than the stale input RAM or the sparse user-only mutation model.
+		Projected := LoadTapHoldToml(Path, Defaults,
+			Map("source_present", 1, "source_content", Source["content"]))
+		Data.Clear()
+		for Key, Value in Projected
+			Data[Key] := Value
+	} else
+		Source["content"] := _TH_DurationInitialImage(Data)
+	return Source
+}
+
+; I/O and optional test authorization run before the final RAM-only admission.
+_TH_BeforeHeldPublication(OwnerToken, BoundPath, StartState, AuthorizeFn, SourceWitness) {
+	PreviousCritical := Critical("On")
+	try Authorized := _TH_AuthorizeTapHoldCommit(OwnerToken, BoundPath, StartState, AuthorizeFn)
+	finally Critical(PreviousCritical)
+	if !(Authorized is Integer) || Authorized != 1
+		return false
+	return !(SourceWitness is Map) || _TH_DurationSourceMatches(SourceWitness, BoundPath)
+}
+
+_TH_FinalHeldAdmission(OwnerToken, BoundPath, StartState, SourceWitness) {
+	return _TH_AuthorizeTapHoldCommit(OwnerToken, BoundPath, StartState)
+		&& (!(SourceWitness is Map) || !SourceWitness.Has("key") || _TH_DurationContextMatches(SourceWitness))
 }
 
 ; Rewrite the captured tap_hold.toml target from one detached candidate. The
@@ -1052,7 +1133,6 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 		BoundPath, Data.Has("keys") ? Data["keys"].Count : 0,
                 Data.Has("inherit_defaults") ? (Data["inherit_defaults"] ? "true" : "false") : "unset")
 
-	RuntimeCandidate := _TH_CloneData(Data)
 	EmptyKeys := Map()
 	SourceWitness := 0
 	if HasMethod(ContentFn, "Call") {
@@ -1109,92 +1189,114 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 		}
 	}
 
+	RuntimeCandidate := _TH_CloneData(Data)
 	static WriteSequence := 0
 	PreviousCritical := Critical("On")
 	try LocalSequence := ++WriteSequence
 	finally Critical(PreviousCritical)
 	StagePath := BoundPath . "." . A_ScriptHwnd . "-" . LocalSequence . ".tmp"
 
-	Written := false
-	WriteError := ""
-	try Written := HasMethod(WriterFn, "Call")
-		? WriterFn.Call(StagePath, Content)
-		: FSWriteDurable(StagePath, Content)
-	catch as Err {
+	NativeAdapters := (WriterFn is Integer) && WriterFn == 0
+		&& (ReplaceFn is Integer) && ReplaceFn == 0
+		&& (DeleteFn is Integer) && DeleteFn == 0
+	if NativeAdapters {
+		StageSuffix := SubStr(StagePath, StrLen(BoundPath) + 1)
+		BeforePublish := _TH_BeforeHeldPublication.Bind(OwnerToken, BoundPath,
+			StartState, AuthorizeFn, SourceWitness)
+		FinalAdmission := _TH_FinalHeldAdmission.Bind(OwnerToken, BoundPath, StartState, SourceWitness)
+		if !FSWriteReplaceOwned(BoundPath, Content, StageSuffix, &StageDetail,
+				0, BeforePublish, FinalAdmission, !(SourceWitness is Map) || SourceWitness["source_present"] == 1, &Publication) {
+			if Publication.renamed {
+				try LoggerError("TapHoldWriter", "Tap-hold file was replaced but durable completion was not acknowledged: {1}. Reload is required.", StageDetail)
+			} else {
+				try LoggerError("TapHoldWriter", "Owned tap-hold publication at '{1}' was refused: {2}.", BoundPath, StageDetail)
+			}
+			return false
+		}
+	} else {
 		Written := false
-		WriteError := Err.Message
-	}
-	Written := (Written is Integer) && Written == 1
-	if !Written {
-		if (WriteError != "") {
-			try LoggerError("TapHoldWriter",
-				"Writing staging file for '{1}' failed: {2}. The previous contents are intact.",
-				BoundPath, WriteError)
-		} else {
-			try LoggerError("TapHoldWriter",
-				"Writing staging file for '{1}' was refused. The previous contents are intact.",
-				BoundPath)
-		}
-		_TH_CleanupTapHoldStage(StagePath, DeleteFn)
-		return false
-	}
-
-	Authorized := false
-	AuthorizeError := ""
-	PreviousCritical := Critical("On")
-	try {
-		try Authorized := _TH_AuthorizeTapHoldCommit(OwnerToken,
-			BoundPath, StartState, AuthorizeFn)
+		WriteError := ""
+		try Written := HasMethod(WriterFn, "Call")
+			? WriterFn.Call(StagePath, Content)
+			: FSWriteDurable(StagePath, Content)
 		catch as Err {
-			Authorized := false
-			AuthorizeError := Err.Message
+			Written := false
+			WriteError := Err.Message
 		}
-		Authorized := (Authorized is Integer) && Authorized == 1
-	} finally Critical(PreviousCritical)
-	if !Authorized {
-		if (AuthorizeError != "") {
-			try LoggerError("TapHoldWriter",
-				"Authorization before publishing '{1}' failed: {2}. The previous contents are intact.",
-				BoundPath, AuthorizeError)
-		} else {
-			try LoggerError("TapHoldWriter",
-				"Authorization before publishing '{1}' was refused. The previous contents are intact.",
-				BoundPath)
+		Written := (Written is Integer) && Written == 1
+		if !Written {
+			if (WriteError != "") {
+				try LoggerError("TapHoldWriter",
+					"Writing staging file for '{1}' failed: {2}. The previous contents are intact.",
+					BoundPath, WriteError)
+			} else {
+				try LoggerError("TapHoldWriter",
+					"Writing staging file for '{1}' was refused. The previous contents are intact.",
+					BoundPath)
+			}
+			_TH_CleanupTapHoldStage(StagePath, DeleteFn)
+			return false
 		}
-		_TH_CleanupTapHoldStage(StagePath, DeleteFn)
-		return false
-	}
 
-	; The duration owner captured exact physical bytes before staging. A foreign
-	; writer, create or delete cannot turn that image into authority over a successor.
-	if SourceWitness is Map && !_TH_DurationSourceMatches(SourceWitness, BoundPath) {
-		try LoggerError("TapHoldWriter", "The tap-hold source changed before duration publication.")
-		_TH_CleanupTapHoldStage(StagePath, DeleteFn)
-		return false
-	}
+		Authorized := false
+		AuthorizeError := ""
+		PreviousCritical := Critical("On")
+		try {
+			try Authorized := _TH_AuthorizeTapHoldCommit(OwnerToken,
+				BoundPath, StartState, AuthorizeFn)
+			catch as Err {
+				Authorized := false
+				AuthorizeError := Err.Message
+			}
+			Authorized := (Authorized is Integer) && Authorized == 1
+		} finally Critical(PreviousCritical)
+		if !Authorized {
+			if (AuthorizeError != "") {
+				try LoggerError("TapHoldWriter",
+					"Authorization before publishing '{1}' failed: {2}. The previous contents are intact.",
+					BoundPath, AuthorizeError)
+			} else {
+				try LoggerError("TapHoldWriter",
+					"Authorization before publishing '{1}' was refused. The previous contents are intact.",
+					BoundPath)
+			}
+			_TH_CleanupTapHoldStage(StagePath, DeleteFn)
+			return false
+		}
 
-	Replaced := false
-	ReplaceError := ""
-	try Replaced := HasMethod(ReplaceFn, "Call")
-		? ReplaceFn.Call(StagePath, BoundPath)
-		: FSAtomicMoveReplace(StagePath, BoundPath)
-	catch as Err {
+		; The duration owner captured exact physical bytes before staging. A foreign
+		; writer, create or delete cannot turn that image into authority over a successor.
+		if SourceWitness is Map && !_TH_DurationSourceMatches(SourceWitness, BoundPath) {
+			try LoggerError("TapHoldWriter", "The tap-hold source changed before duration publication.")
+			_TH_CleanupTapHoldStage(StagePath, DeleteFn)
+			return false
+		}
+
 		Replaced := false
-		ReplaceError := Err.Message
-	}
-	Replaced := (Replaced is Integer) && Replaced == 1
-	if !Replaced {
-		if (ReplaceError != "") {
-			try LoggerError("TapHoldWriter",
-				"Atomic replacement of '{1}' failed: {2}. The previous contents are intact.",
-				BoundPath, ReplaceError)
-		} else {
-			try LoggerError("TapHoldWriter",
-				"Atomic replacement of '{1}' was refused. The previous contents are intact.",
-				BoundPath)
+		ReplaceError := ""
+		try Replaced := HasMethod(ReplaceFn, "Call")
+			? ReplaceFn.Call(StagePath, BoundPath)
+			: FSConfigAtomicMoveReplace(StagePath, BoundPath, ,
+				(*) => _TH_AuthorizeTapHoldCommit(OwnerToken, BoundPath, StartState))
+		catch as Err {
+			Replaced := false
+			ReplaceError := Err.Message
 		}
-		_TH_CleanupTapHoldStage(StagePath, DeleteFn)
-		return false
+		Replaced := (Replaced is Integer) && Replaced == 1
+		if !Replaced {
+			if (ReplaceError != "") {
+				try LoggerError("TapHoldWriter",
+					"Atomic replacement of '{1}' failed: {2}. The previous contents are intact.",
+					BoundPath, ReplaceError)
+			} else {
+				try LoggerError("TapHoldWriter",
+					"Atomic replacement of '{1}' was refused. The previous contents are intact.",
+					BoundPath)
+			}
+			_TH_CleanupTapHoldStage(StagePath, DeleteFn)
+			return false
+		}
+
 	}
 
 	Published := false

@@ -153,16 +153,12 @@ _CLW_OpenCapturedRequest(Channel, Request) {
  * Closes the changelog window if open.
  */
 Changelog_Close() {
-	global _CLW_Gui
-	; Same reorder as _CLW_OnClose -- close the WebView2 controller before
-	; destroying the Gui (WebView2 spec requirement).
-	saved_gui := IsSet(_CLW_Gui) ? _CLW_Gui : 0
-	_CLW_Reset()
+	; Reset claims and detaches the exact closing owner before any COM callout.
+	SavedGui := _CLW_Reset()
 	try {
-		if saved_gui
-			saved_gui.Destroy()
+		if SavedGui
+			SavedGui.Destroy()
 	}
-	_CLW_Gui := unset   ; Always clear the reference, even if Destroy threw
 }
 
 
@@ -200,10 +196,39 @@ _CLW_BuildWindow(Channel, Request) {
 	g.OnEvent("Escape", _CLW_OnClose)
 	g.OnEvent("Size",   _CLW_OnResize)
 
-	g.Show("w860 h580")
-	_CLW_Gui := g
+	; Show pumps a real Close before it returns. Publish this native host first
+	; so Close can retire it, and never let its old opening republish afterward.
+	Published := false
+	PreviousCritical := Critical("On")
+	try {
+		if WindowEpoch == _CLW_WindowEpoch && !IsSet(_CLW_Gui) {
+			_CLW_Gui := g
+			_CLW_ResetDone := false
+			Published := true
+		}
+	} finally Critical(PreviousCritical)
+	if !Published {
+		try g.Destroy()
+		return false
+	}
+	try g.Show("w860 h580")
+	catch as Err {
+		; Native destruction during Show is an ordinary retired opening.
+		if WindowEpoch != _CLW_WindowEpoch || !IsSet(_CLW_Gui) || _CLW_Gui != g
+			return false
+		; This Show failed while its exact native host was still current.
+		; Reset first, then destroy only that host: Destroy may open a successor.
+		SavedGui := _CLW_Reset(g, WindowEpoch)
+		try {
+			if SavedGui
+				SavedGui.Destroy()
+		}
+		throw Err
+	}
+	if WindowEpoch != _CLW_WindowEpoch || !IsSet(_CLW_Gui) || _CLW_Gui != g
+		return false
 	if !_Updater_RequestMayPublish(Request) {
-		_CLW_OnClose()
+		_CLW_OnClose(g)
 		return false
 	}
 
@@ -219,13 +244,13 @@ _CLW_BuildWindow(Channel, Request) {
 		if WindowEpoch != _CLW_WindowEpoch || !IsSet(_CLW_Gui) || _CLW_Gui != g
 			return false
 		; Retire this opening before destroying its native host, which may pump.
-		_CLW_Reset()
-		if IsSet(_CLW_Gui) && _CLW_Gui == g
-			_CLW_Gui := unset
-		ResetEpoch := _CLW_WindowEpoch
-		try g.Destroy()
-		; A replacement owns its own renderer; a cancelled opening cannot fall back.
-		if ResetEpoch == _CLW_WindowEpoch && !IsSet(_CLW_Gui)
+		SavedGui := _CLW_Reset(g, WindowEpoch, &ResetEpoch)
+		try {
+			if SavedGui
+				SavedGui.Destroy()
+		}
+		; The epoch belongs to this retirement, before any abort/COM/native callout.
+		if SavedGui && ResetEpoch == _CLW_WindowEpoch && !IsSet(_CLW_Gui)
 			_Updater_OpenChangelogWindow(Channel, Request)
 		return false
 	}
@@ -238,7 +263,7 @@ _CLW_BuildWindow(Channel, Request) {
 	if !RequestCurrent {
 		CreatedController.Close()
 		if WindowEpoch == _CLW_WindowEpoch && IsSet(_CLW_Gui) && _CLW_Gui == g
-			_CLW_OnClose()
+			_CLW_OnClose(g)
 		return false
 	}
 	_CLW_Controller := CreatedController
@@ -1185,13 +1210,14 @@ _CLW_ReportRejectedBridgeMessage() {
  * @returns {integer} The new window epoch.
  */
 _CLW_BeginWindowSession() {
-	global _CLW_WindowEpoch, _CLW_RequestEpoch
+	global _CLW_WindowEpoch, _CLW_RequestEpoch, _CLW_ResetDone
 	global _CLW_ActiveRequest, _CLW_ActiveRequestEpoch
 	global _CLW_BridgeSessionToken, _CLW_BridgeRejectionReported
 	NewSession := _CLW_NewBridgeSessionToken()
 	OldRequest := 0
 	PreviousCritical := Critical("On")
 	try {
+		_CLW_ResetDone := false
 		_CLW_WindowEpoch += 1
 		_CLW_RequestEpoch += 1
 		OldRequest := _CLW_ActiveRequest
@@ -1383,31 +1409,51 @@ _CLW_JsStr(s) {
 /**
  * Resets all module-level state after window close.
  */
-_CLW_Reset() {
+_CLW_Reset(ExpectedGui := unset, ExpectedWindowEpoch := unset, &RetiredEpoch := 0) {
 	global _CLW_Gui, _CLW_WebView, _CLW_Controller, _CLW_MsgSub, _CLW_Ready, _CLW_Queue, _CLW_ResetDone
-	global _CLW_Request
-	; Close and Escape are wired to the same handler and Controller.Close() pumps
-	; messages, so a second dispatch can re-enter this function while the first
-	; teardown is still in flight. Short-circuit instead of running the release +
-	; Close sequence twice against a controller that is already going away.
-	if _CLW_ResetDone
-		return
-	_CLW_ResetDone := true
-	; Invalidate request and script provenance before releasing the controller.
-	; Abort is performed outside the helper's short Critical transaction.
-	_CLW_InvalidateWindowSession()
-	; Release the subscription FIRST, while the controller is still alive. Its
-	; __Delete unsubscribes via remove_WebMessageReceived on the live
-	; controller; doing it AFTER Controller.Close() raises a COM error.
-	try _CLW_MsgSub := unset
-	if IsSet(_CLW_Controller)
-		try _CLW_Controller.Close()
-	_CLW_Gui        := unset
-	_CLW_WebView    := unset
-	_CLW_Controller := unset
-	_CLW_Ready      := false
-	_CLW_Queue      := []
-	_CLW_Request    := unset
+	global _CLW_Request, _CLW_WindowEpoch, _CLW_RequestEpoch
+	global _CLW_ActiveRequest, _CLW_ActiveRequestEpoch
+	global _CLW_BridgeSessionToken, _CLW_BridgeRejectionReported
+	RetiredEpoch := 0
+	PreviousCritical := Critical("On")
+	try {
+		if _CLW_ResetDone
+			return 0
+		if IsSet(ExpectedGui) && (!IsSet(_CLW_Gui) || _CLW_Gui != ExpectedGui)
+			return 0
+		if IsSet(ExpectedWindowEpoch) && ExpectedWindowEpoch != _CLW_WindowEpoch
+			return 0
+		; Keep every old strong reference alive through the RAM-only detach.
+		; Subscription destruction, HTTP abort and controller Close may all reenter.
+		SavedGui := IsSet(_CLW_Gui) ? _CLW_Gui : 0
+		SavedWebView := IsSet(_CLW_WebView) ? _CLW_WebView : 0
+		SavedController := IsSet(_CLW_Controller) ? _CLW_Controller : 0
+		SavedSubscription := IsSet(_CLW_MsgSub) ? _CLW_MsgSub : 0
+		SavedRequest := IsSet(_CLW_Request) ? _CLW_Request : 0
+		SavedQueue := _CLW_Queue
+		SavedActiveRequest := _CLW_ActiveRequest
+		_CLW_ResetDone := true
+		_CLW_WindowEpoch += 1
+		_CLW_RequestEpoch += 1
+		RetiredEpoch := _CLW_WindowEpoch
+		_CLW_ActiveRequest := 0
+		_CLW_ActiveRequestEpoch := 0
+		_CLW_BridgeSessionToken := ""
+		_CLW_BridgeRejectionReported := false
+		_CLW_Gui := unset
+		_CLW_WebView := unset
+		_CLW_Controller := unset
+		_CLW_MsgSub := unset
+		_CLW_Request := unset
+		_CLW_Ready := false
+		_CLW_Queue := []
+	} finally Critical(PreviousCritical)
+	_CLW_AbortRequest(SavedActiveRequest)
+	; Unsubscribe while this exact old controller is still alive.
+	try SavedSubscription := unset
+	if SavedController
+		try SavedController.Close()
+	return SavedGui
 }
 
 
@@ -1420,20 +1466,14 @@ _CLW_Reset() {
 ; ========================================
 ; ========================================
 
-_CLW_OnClose(*) {
-	global _CLW_Gui
-	; Save the Gui reference BEFORE Reset clears the global, then close the
-	; WebView2 controller first (while the parent window is still alive) and
-	; only destroy the Gui afterwards -- the WebView2 spec requires Controller
-	; to be closed before its host HWND is destroyed. Mirrors
-	; ui/model_browser/init.ahk's _LLM_MBW_OnClose.
-	saved_gui := IsSet(_CLW_Gui) ? _CLW_Gui : 0
-	_CLW_Reset()
+_CLW_OnClose(GuiObj := unset, *) {
+	; Native Close/Escape supplies its originating Gui. A delayed event from A
+	; must never claim the replacement B published by a teardown callout.
+	SavedGui := IsSet(GuiObj) ? _CLW_Reset(GuiObj) : _CLW_Reset()
 	try {
-		if saved_gui
-			saved_gui.Destroy()
+		if SavedGui
+			SavedGui.Destroy()
 	}
-	_CLW_Gui := unset   ; Always clear the reference, even if Destroy threw
 }
 
 _CLW_OnResize(GuiObj, MinMax, Width, Height) {

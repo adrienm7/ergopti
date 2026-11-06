@@ -185,3 +185,126 @@ Test("LLM raw separator parity: preserves an already-separated ASCII tail",
 	TestLLMParser_RawSeparatorParity.Bind("hello ", "world", "world"))
 Test("LLM raw separator parity: does not separate an apostrophe suffix",
 	TestLLMParser_RawSeparatorParity.Bind("l'", "arbre", "arbre"))
+
+; An incomplete reasoning block must never become a selectable prediction.
+TestLLMParser_UnfinishedThinking() {
+	AssertEqual("answer ", LLM_Parser_StripThinking("answer <THINK>private`nreasoning"))
+	AssertEqual("answer ", LLM_Parser_StripThinking("<think>old</think>answer <thinking>private"))
+	AssertEqual("answer", LLM_Parser_StripThinking("<thinking>private</thinking>answer"))
+	AssertEqual("answer ", LLM_Parser_StripThinking("answer <thi", true))
+	AssertEqual("answer ", LLM_Parser_StripThinking("answer <THINK", true))
+	AssertEqual(0, LLM_Parser_ParseResponse("<think>private", "", "", 1, 0, false, 1).Length)
+	AssertEqual(0, LLM_Parser_ParseResponse("<thinking>private", "", "", 1, 0, true, 2).Length)
+}
+Test("LLM parser: unfinished thinking stays private (llm-truncated-thinking)", TestLLMParser_UnfinishedThinking)
+
+TestLLMParser_ResourcePolicy() {
+	global _SharedDir
+	Limits := JsonParse(FSReadStrict(_SharedDir . "\modules\llm\parser_limits.json"))
+	Small := "hello"
+	AtBytes := Limits["max_operand_bytes"]
+	Long := ""
+	Loop AtBytes
+		Long .= "a"
+	AssertTrue(_LLM_Parser_DiffWithinLimits("", Long), "the operand byte limit is inclusive")
+	AssertFalse(_LLM_Parser_DiffWithinLimits("", Long . "a"), "one more byte is refused before tokenization")
+	Row := Floor(Sqrt(Limits["max_grid_cells"])) - 1
+	Square := ""
+	Loop Row
+		Square .= "b"
+	AssertTrue(_LLM_Parser_DiffWithinLimits(Square, Square), "a grid at the inclusive cell bound is admitted")
+	AssertFalse(_LLM_Parser_DiffWithinLimits(Square . "b", Square), "a grid above the cell bound is refused")
+	Utf8 := ""
+	Loop AtBytes // 2
+		Utf8 .= "é"
+	AssertTrue(_LLM_Parser_DiffWithinLimits("", Utf8), "byte accounting admits complete multibyte text at the limit")
+	AssertFalse(_LLM_Parser_DiffWithinLimits("", Utf8 . "é"), "the canonical byte limit is independent of UTF-16 units")
+	Original := ""
+	Loop 500
+		Original .= "a"
+	Corrected := ""
+	Loop 8000
+		Corrected .= "a"
+	Prediction := LLM_Parser_ProcessPrediction(Original, Original,
+		"TAIL_CORRECTED: " . Corrected . "`nNEXT_WORDS: suite", 1, 15)
+	AssertFalse(Prediction is Map, "one oversized model word must be refused instead of entering quadratic DP")
+	AssertFalse(LLM_Parser_ProcessPrediction("hello", "hello",
+		"TAIL_CORRECTED: hello`nNEXT_WORDS: " . Corrected, 1, 15) is Map,
+		"next words cannot bypass the same resource admission through tokenization")
+	AssertFalse(LLM_Parser_ProcessPrediction("hello", "hello", Corrected, 1, 15) is Map,
+		"raw mode must refuse oversized text before character-array cleanup")
+	Prediction := LLM_Parser_ProcessPrediction("hello", "hello", "REWRITE: " . Corrected, 1, 15)
+	AssertFalse(Prediction is Map, "rewrite has the same resource admission as continuation")
+	Spaces := ""
+	Loop 2048
+		Spaces .= " "
+	Padded := "a" . SubStr(Spaces, 1, 1024) . "a" . Spaces
+	AssertTrue(_LLM_Parser_DiffWithinLimits(Padded, "aa"), "the raw short correction fits the first admission")
+	AssertFalse(LLM_Parser_ProcessPrediction(Padded, Padded,
+		"TAIL_CORRECTED: aa`nNEXT_WORDS: world", 1, 15) is Map,
+		"copied trailing spacing must be re-admitted before the actual diff allocation")
+	AssertTrue(LLM_Parser_ProcessPrediction(Small, Small,
+		"TAIL_CORRECTED: hello`nNEXT_WORDS: world", 1, 15) is Map, "ordinary continuation remains functional")
+}
+Test("LLM parser: shared byte and diff work limits refuse oversized model words", TestLLMParser_ResourcePolicy)
+
+
+_LTPS_Repeat(Text, Count) {
+    Out := ""
+    loop Count
+        Out .= Text
+    return Out
+}
+
+_LTPS_Observe(Name, Fn, Expected, SourceUnits, Count) {
+    Failure := 0, Value := 0
+    Started := BootClockWallMs()
+    try Value := Fn.Call()
+    catch Any as ErrorObject
+        Failure := ErrorObject
+    Elapsed := BootClockWallMs() - Started
+    Row := Map("stage", Name, "count", Count, "source_units", SourceUnits,
+        "elapsed_ms", Elapsed, "threw", IsObject(Failure),
+        "error_type", IsObject(Failure) ? Type(Failure) : "",
+        "error_message", IsObject(Failure) ? SubStr(Failure.Message, 1, 200) : "")
+    if Value is String {
+        Row["output_units"] := StrLen(Value)
+        Row["matches_expected"] := Value == Expected
+    } else if Value is Array {
+        Row["slots"] := Value.Length
+        Row["matches_expected"] := Expected == "" ? Value.Length == 0 : (Value.Length == 1 && Value[1] == Expected)
+    } else
+        Row["matches_expected"] := false
+    return Row
+}
+
+_LTPS_Run(Kind, Closed) {
+    Open := "<" . Kind . ">", Close := "</" . Kind . ">"
+    Rows := []
+    ; These sizes characterize native PCRE's actual optimization and exception
+    ; behavior. They are well inside the existing HTTP response byte limit.
+    for Count in [2000, 4000, 8000] {
+        Raw := _LTPS_Repeat(Closed ? Open . "p" . Close : Open, Count) . (Closed ? "answer" : "")
+        Expected := Closed ? "answer" : ""
+        Pattern := "si)" . Open . ".*?" . Close . "\s*"
+        ; The isolated first pass shows whether this PCRE build quickly rejects
+        ; an absent closing literal or instead revisits every possible opener.
+        Rows.Push(_LTPS_Observe("closed-block-regex", RegExReplace.Bind(Raw, Pattern, ""),
+            Closed ? "answer" : Raw, StrLen(Raw), Count))
+        Rows.Push(_LTPS_Observe("strip-thinking", LLM_Parser_StripThinking.Bind(Raw), Expected, StrLen(Raw), Count))
+        Rows.Push(_LTPS_Observe("parse-response", LLM_Parser_ParseResponse.Bind(Raw, "", "", 1, 0, false, 1),
+            Expected, StrLen(Raw), Count))
+    }
+    _TestPrint("# THINKING_REGEX " . KL_JsonEncode(Map("kind", Kind, "closed", Closed,
+        "runtime", A_AhkVersion, "rows", Rows)))
+    ; Collect every observation before asserting, so a failing first pass does
+    ; not hide the other sizes or the actual full parser's behavior.
+    for Row in Rows {
+        AssertFalse(Row["threw"], "real thinking processing must not throw on bounded model output: " . Row["stage"])
+        AssertTrue(Row["matches_expected"], "complete blocks preserve the answer and unfinished private blocks stay absent: " . Row["stage"])
+    }
+}
+for _LTPS_Kind in ["think", "thinking"] {
+    Test("LLM thinking PCRE: closed " . _LTPS_Kind . " control (thinking-regex-resource)", _LTPS_Run.Bind(_LTPS_Kind, true))
+    Test("LLM thinking PCRE: repeated unclosed " . _LTPS_Kind . " (thinking-regex-resource)", _LTPS_Run.Bind(_LTPS_Kind, false))
+}

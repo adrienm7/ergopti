@@ -23,6 +23,8 @@ _CRCT_ChildSource() {
 			Seen[Owner] := true
 		}
 	}
+	for Name in ["WIGetForegroundHwnd", "WIGetFocusedControlToken"]
+		Code .= _DriverFuncBody(Name) . "`n"
 	; Reuse canonical fixture-native readers and custody helpers as whole bodies.
 	; Its top-level Main, CB_Write decorator and physical send code are excluded.
 	Fixture := FSReadStrict(_DriverDir . "\tests\fixtures\sendinstant_clipboard_owner_body.ahk")

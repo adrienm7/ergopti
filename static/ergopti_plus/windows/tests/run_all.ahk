@@ -158,6 +158,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/webview_utils.ahk
 #Include ../ui/console_window.ahk
 #Include ../infra/wall_clock.ahk
+#Include ../infra/field_run.ahk
 ; Compiled-mode bundle bootstrapper — included this early (matching its real
 ; position right after app_state.ahk in ErgoptiPlus.ahk) so its functions are
 ; actually exercised by meta/infra/lifecycle/test_bundle_resolve_dir_local_appdata.ahk instead
@@ -430,6 +431,11 @@ InstallSendNoOps()
 #Include unit/adapters/test_app_launcher_native_targets.ahk
 #Include unit/ui/windows/test_spotlight_ownership.ahk
 #Include unit/modules/gestures/test_take_note_async_job.ahk
+#Include unit/modules/gestures/test_take_note_counted_nul.ahk
+#Include unit/modules/gestures/test_takenote_pause_lifecycle_owner.ahk
+#Include unit/modules/gestures/test_system_action_lifecycle_timer.ahk
+#Include unit/modules/gestures/test_system_action_inflight_lifecycle.ahk
+#Include unit/modules/gestures/test_takenote_native_document_owner.ahk
 #Include unit/adapters/input/test_text_sender_modifiers.ahk
 #Include unit/infra/dispatch/test_timer_scheduler.ahk
 #Include unit/infra/dispatch/test_timer_delay_ceiling.ahk
@@ -439,6 +445,7 @@ InstallSendNoOps()
 #Include unit/infra/logger/test_logger.ahk
 #Include unit/infra/logger/test_logger_shutdown_sinks.ahk
 #Include unit/infra/dispatch/test_wall_clock_snapshot.ahk
+#Include unit/infra/dispatch/test_field_run_utc.ahk
 #Include unit/platform/network/test_promise_timeout_budget.ahk
 #Include unit/infra/logger/test_logger_format_failure_is_visible.ahk
 #Include unit/infra/logger/test_logger_contract.ahk
@@ -550,6 +557,8 @@ InstallSendNoOps()
 #Include unit/adapters/uia/test_uia_worker_cleanup_debt.ahk
 #Include unit/adapters/uia/test_uia_worker_exit_reentry.ahk
 #Include unit/adapters/uia/test_secure_field_worker_context.ahk
+#Include unit/adapters/uia/test_secure_field_native_style_change.ahk
+#Include unit/adapters/uia/test_secure_field_native_style_cache.ahk
 
 #Include unit/infra/config/persistence/test_config.ahk
 #Include unit/infra/config/persistence/test_feature_state_boot.ahk
@@ -562,6 +571,7 @@ InstallSendNoOps()
 #Include unit/ui/wpm/test_wpm_drag_admission.ahk
 #Include unit/ui/wpm/test_wpm_region_target.ahk
 #Include unit/ui/wpm/test_wpm_canon.ahk
+#Include unit/ui/wpm/test_wpm_graph_native_reentry.ahk
 #Include unit/infra/config/persistence/test_features_manifest.ahk
 #Include unit/infra/config/persistence/test_apply_config_toml.ahk
 #Include unit/infra/config/persistence/test_config_semantic_snapshot.ahk
@@ -795,6 +805,16 @@ _LLM_Deps_State := "ready"
 #Include ../modules/keymap/llm_bridge.ahk
 #Include unit/modules/llm/prediction/test_llm_bridge_apply_expansion.ahk
 #Include unit/modules/hotstrings/prefix/test_prefix_char_admission.ahk
+#Include unit/modules/hotstrings/prefix/test_prefix_llm_typing_privacy.ahk
+#Include unit/modules/hotstrings/prefix/test_prefix_cached_privacy_gap.ahk
+#Include unit/modules/hotstrings/prefix/test_backspace_cached_privacy_gap.ahk
+#Include unit/modules/hotstrings/prefix/test_prefix_backspace_native_owned.ahk
+#Include unit/modules/hotstrings/prefix/test_prefix_backspace_native_gap.ahk
+#Include unit/modules/hotstrings/prefix/test_prefix_backspace_native_gap_controls.ahk
+#Include unit/modules/hotstrings/prefix/test_prefix_fresh_native_privacy.ahk
+#Include unit/modules/hotstrings/prefix/test_llm_native_admission_order.ahk
+#Include unit/modules/hotstrings/prefix/test_llm_native_entry_lifecycle.ahk
+#Include unit/modules/hotstrings/prefix/test_prefix_llm_observer_lifetime.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_idle_click_reset.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_event_word_reset.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_backspace_word_start.ahk
@@ -965,6 +985,7 @@ _LogBootProgress("loading gestures modules")
 #Include ../ui/onboarding/finish.ahk
 #Include ../ui/onboarding/webview.ahk
 #Include unit/adapters/crash_report/test_screenshot_worker_ownership.ahk
+#Include unit/adapters/crash_report/test_screenshot_layered_native.ahk
 #Include unit/ui/onboarding/test_onboarding_finish_payload.ahk
 #Include unit/ui/onboarding/test_onboarding_answers.ahk
 #Include unit/ui/onboarding/test_onboarding_metrics_path.ahk
@@ -975,7 +996,10 @@ _LogBootProgress("loading gestures modules")
 #Include unit/modules/gestures/test_virtual_desktops.ahk
 #Include unit/modules/shortcuts/test_text_case_vectors.ahk
 #Include unit/modules/shortcuts/test_wrap_selection_action.ahk
+#Include unit/modules/shortcuts/test_uia_selection_native64_owner.ahk
 #Include unit/modules/gestures/test_system_actions.ahk
+#Include unit/modules/gestures/test_unblock_selected_root_reparse.ahk
+#Include unit/modules/gestures/test_unblock_selected_file_reparse.ahk
 #Include unit/modules/gestures/test_system_actions_confirmed_targets.ahk
 #Include unit/modules/gestures/test_system_actions_query_pause.ahk
 #Include unit/modules/gestures/test_system_actions_process_lease.ahk
@@ -999,6 +1023,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/modules/llm/prediction/test_llm_hotstring_tooltip_hold.ahk
 #Include unit/modules/shortcuts/test_send_input_actions.ahk
 #Include unit/platform/remap/keys/test_tap_keys.ahk
+#Include unit/platform/remap/keys/test_tap_keys_kana_native.ahk
 #Include unit/platform/remap/keys/test_ai_action_gate.ahk
 #Include unit/platform/remap/key_combinations/test_key_combinations.ahk
 #Include unit/platform/remap/key_combinations/test_key_combination_chord_policy.ahk
@@ -1215,6 +1240,8 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/test_keystats_app_categories.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader_manifest_contract.ahk
+#Include unit/modules/keystats/test_context_nonempty_prepare_owner.ahk
+#Include unit/modules/keystats/test_context_roi_stale_owner.ahk
 #Include unit/modules/keystats/reader/test_keystats_query_catalogue.ahk
 #Include unit/modules/keystats/reader/test_klr_manifest_switches_to.ahk
 #Include unit/modules/keystats/test_keystats_llm_accepted_metrics.ahk
@@ -1347,6 +1374,9 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/platform/network/test_system_proxy_retirement.ahk
 #Include unit/platform/network/test_network_pac_source_contract.ahk
 #Include unit/platform/network/test_managed_routes_native.ahk
+#Include unit/platform/network/test_native_static_scheme_proxy.ahk
+#Include unit/platform/network/test_native_ipv6_http_socks.ahk
+#Include unit/platform/network/test_native_winhttp_ipv6_host.ahk
 #Include unit/platform/network/test_managed_remote_transport.ahk
 #Include unit/platform/network/test_managed_remote_cleanup_diagnostics.ahk
 #Include unit/platform/network/test_managed_remote_fixture_scope.ahk
@@ -1359,6 +1389,9 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/updater/test_updater_curl_capture_move_graph.ahk
 #Include unit/platform/network/test_managed_remote_sspi.ahk
 #Include unit/platform/network/test_winhttp_transport.ahk
+#Include unit/platform/network/test_native_http_forward_proxy.ahk
+#Include unit/platform/network/test_native_relay_hop_branches.ahk
+#Include unit/platform/network/test_native_ipv6_relay_upstream.ahk
 #Include unit/modules/updater/test_updater_artifact_winhttp.ahk
 #Include unit/platform/network/test_managed_winhttp_proxy.ahk
 #Include meta/modules/llm/servers/test_remote_connect_timeout_bounded.ahk
@@ -2344,7 +2377,9 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/shortcuts/test_run_program_actions.ahk
 #Include unit/modules/gestures/test_user_actions.ahk
 #Include unit/modules/gestures/test_sticky_and_navigation_actions.ahk
+#Include unit/modules/gestures/test_sticky_kana_native.ahk
 #Include unit/modules/gestures/test_display_mirror_toggle.ahk
+#Include unit/modules/gestures/test_display_mirror_query_pause.ahk
 #Include unit/modules/shortcuts/test_run_program_actions_custody.ahk
 #Include unit/modules/shortcuts/test_program_providers.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_launch_cleanup.ahk

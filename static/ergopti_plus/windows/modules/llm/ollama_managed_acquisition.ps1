@@ -40,6 +40,7 @@ function Invoke-OllamaManagedArchiveDownload {
 	try {
 		$construction = Get-OllamaCreationReceipt $wal
 		$construction.phase = 'creation-owned'
+		# The invoking physical CLI owns the UTF-8 stream and its initial BOM.
 		[Console]::Out.WriteLine(($construction | ConvertTo-Json -Compress))
 		Add-OllamaCreationRecord $wal 'stage-intent' '' ''
 		[Ergopti.Ollama.ManagedNative]::CreateProtectedDirectory($stagePath, (New-OllamaPrivateSecurity).GetSecurityDescriptorBinaryForm())

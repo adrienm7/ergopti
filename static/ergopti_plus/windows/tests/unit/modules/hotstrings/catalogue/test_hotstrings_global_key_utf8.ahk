@@ -26,8 +26,9 @@ _HGKU_Case(Mode) {
 		Ambient := A_FileEncoding
 		AssertEqual("CP1252", Ambient, "the fixture must exercise a real non-UTF-8 ambient code page")
 		if Mode == "writer" {
-			Overrides := Map("rolls", { Delay: 0.2, Color: "#112233", ShowTooltip: "",
-				Priority: "", Sections: Map() })
+			Overrides := _ParseOverrides(Path)
+			Overrides["rolls"] := { Delay: 0.2, Color: "#112233", ShowTooltip: "",
+				Priority: "", Sections: Map() }
 			AssertTrue(_SaveOverrides(Overrides, 0, 0, Path),
 				"the genuine override writer must publish its real BOM-less UTF-8 image")
 		} else {

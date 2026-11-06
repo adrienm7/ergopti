@@ -89,6 +89,42 @@ _PENR_Close(Owned) {
 		AssertFalse(DllCall("User32\IsWindow", "Ptr", Hwnd, "Int"), "retirement must destroy every original control")
 }
 
+_PENR_OpenPriority(State, Mode) {
+ global _PersonalEditorGui, _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch
+ global _PersonalEditorData, _PersonalEditorPrioCtrl
+ OpenPersonalEditor("alpha")
+ AssertTrue(_PersonalEditorGui is Gui, "The actual public entry must still open the supported native source editor")
+ Window := _PersonalEditorGui, Hwnd := Window.Hwnd
+ Owned := {Window: Window, Hwnd: Hwnd, Source: _PersonalEditorOpeningSource,
+  Epoch: _PersonalEditorSessionEpoch, Controls: WinGetControlsHwnd("ahk_id " . Hwnd)}
+ State.Windows.Push(Owned)
+ AssertTrue(_PersonalTomlOpeningSessionCurrent(Owned.Source), "The real file must own this exact public native editor")
+ AssertTrue(Owned.Source["admitted"] && Owned.Source["kind"] == "native" && Owned.Source["window"] == Window)
+ List := GuiCtrlFromHwnd(ControlGetHwnd("SysListView321", "ahk_id " . Hwnd))
+ Trigger := GuiCtrlFromHwnd(ControlGetHwnd("Edit1", "ahk_id " . Hwnd))
+ Output := GuiCtrlFromHwnd(ControlGetHwnd("Edit2", "ahk_id " . Hwnd))
+ Excluded := Mode == "priority-string" || Mode == "priority-float"
+ ExpectedRows := Excluded ? 0 : 1
+ AssertEqual(ExpectedRows, _PersonalEditorData["sections"]["alpha"]["entries"].Length,
+  "The actual file reader must prevent a wrongly typed priority from becoming an editable row")
+ AssertEqual(ExpectedRows, List.GetCount(), "Only a genuine projected row may enter the native ListView")
+ if !Excluded {
+  _PENR_SelectNative(List, Trigger, Output)
+  Expected := Mode == "priority-current" ? 47 : ""
+  AssertEqual(Expected, _PersonalEditorData["sections"]["alpha"]["entries"][1]["priority"],
+   "A valid integer survives and an out-of-range native integer inherits instead of entering the form")
+ } else {
+  AssertEqual(0, List.GetNext(0), "An excluded source row cannot acquire native selection")
+  Expected := ""
+ }
+ AssertTrue(IsObject(_PersonalEditorPrioCtrl), "The actual constructor must own the shipped priority Edit")
+ Actual := _PersonalEditorPrioCtrl.Value
+ _TestPrint("# personal-priority-file mode=" . Mode . " rows=" . List.GetCount()
+  . " selected=" . List.GetNext(0) . " priority_type=" . Type(Actual) . " priority=" . Actual)
+ AssertEqual(String(Expected), Actual, "Only empty or an admitted integer priority may reach the real form from the file")
+ return Owned
+}
+
 _PENR_Case(Mode) {
 	SavedCritical := A_IsCritical, SavedSuspend := A_IsSuspended
 	try _PENR_CaseOwned(Mode)
@@ -128,12 +164,23 @@ _PENR_CaseOwned(Mode) {
 		Source := '[_meta]`nsections_order = ["alpha"]`n'
 			. '[_meta.sections.alpha]`ndescription = "Private alpha"`n'
 			. '[[alpha]]`n"private_alpha" = { output = "Private output", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n'
+		PriorityMode := InStr(Mode, "priority-") == 1
+		if PriorityMode {
+			Literal := Mode == "priority-string" ? Chr(34) . "abc" . Chr(34)
+				: (Mode == "priority-float" ? "1.5" : (Mode == "priority-out-of-range" ? "101" : "47"))
+			Source := StrReplace(Source, "final_result = false }", "final_result = false, priority = " . Literal . " }", true, &Replaced)
+			AssertEqual(1, Replaced, "The actual private file must carry exactly the intended priority source member")
+		}
 		AssertTrue(FSWriteDurable(ScriptInformation["PersonalTomlPath"], Source))
-		Cycles := Mode == "current" ? 1 : 3
-		loop Cycles {
-			Owned := _PENR_Open(State)
-			if Mode != "current"
-				_PENR_Close(Owned)
+		if PriorityMode {
+			_PENR_OpenPriority(State, Mode)
+		} else {
+			Cycles := Mode == "current" ? 1 : 3
+			loop Cycles {
+				Owned := _PENR_Open(State)
+				if Mode != "current"
+					_PENR_Close(Owned)
+			}
 		}
 		AssertTrue(FSUtf8ExactMatches(ScriptInformation["PersonalTomlPath"], Source), "opening and closing must preserve the actual personal source")
 		AssertTrue(FSUtf8ExactMatches(Fixture.path, Fixture.source), "native Close must not rewrite configuration preferences")
@@ -181,3 +228,6 @@ Test("Personal native window: current public editor accepts actual selection (pe
 	_PENR_Case.Bind("current"))
 Test("Personal native window: repeated public Close destroys every owner (personal-editor-window-retirement)",
 	_PENR_Case.Bind("close-reopen"))
+
+for _PENR_PriorityMode in ["priority-string", "priority-float", "priority-out-of-range", "priority-current"]
+ Test("Personal native file priority: " . _PENR_PriorityMode . " retains reader admission (personal-priority-file-selection-guard)", _PENR_Case.Bind(_PENR_PriorityMode))

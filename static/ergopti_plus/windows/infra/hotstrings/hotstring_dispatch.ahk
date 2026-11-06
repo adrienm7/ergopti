@@ -1162,7 +1162,7 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 				if !LastSentCharacterKeyTime.Has(PrevKey)
 						return ""
 				GateOriginTick := LastSentCharacterKeyTime[PrevKey]
-				ElapsedMs := TickElapsed(GateOriginTick, NowTick?)
+				ElapsedMs := TickElapsed64(GateOriginTick, NowTick?)
 				; A complex keystroke widens the allowed delay, never the measured gap.
 				Widenable := !(Spec.HasOwnProp("Category") and Spec.Category = "autocorrection")
 				GateDurationMs := Min(0xFFFFFFFF, GateDurationMs * HSE_ComplexDelayMultiplier(
@@ -1236,7 +1236,7 @@ _HSE_ExpansionPath(EndChar) {
 ; or forced by the caller.
 _HSE_EndCharConsumed(EndChar, ForceConsumeEndChar) {
 		global HSE_CONSUMED_DELIMITERS
-		return ForceConsumeEndChar or (EndChar != "" and !!InStr(HSE_CONSUMED_DELIMITERS, EndChar))
+		return ForceConsumeEndChar or (EndChar != "" and !!InStr(HSE_CONSUMED_DELIMITERS, EndChar, true))
 }
 
 ; The UTF-16 units an expansion strips from the engine buffer: the plan's erase

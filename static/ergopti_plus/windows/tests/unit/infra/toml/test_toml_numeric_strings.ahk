@@ -64,11 +64,13 @@ _TNS_StoredAnchor(Stored, Key, Value) {
 ; configuration producer carries them.
 _TNS_WidgetProducers(Mode) {
 	global _LLM_Menu
+	OldAuthority := _WPMWidget_PositionAuthority()
 	OldX := WPMWidget.pos_x
 	OldY := WPMWidget.pos_y
 	OldStoreX := WPMWidgetConst.STORE_X
 	OldStoreY := WPMWidgetConst.STORE_Y
 	try {
+		_WPMWidget_PositionAuthority({active: 0, published: 0})
 		WPMWidgetConst.STORE_X := "test.pos_x"
 		WPMWidgetConst.STORE_Y := "test.pos_y"
 		WPMWidget.pos_x := -125
@@ -95,6 +97,7 @@ _TNS_WidgetProducers(Mode) {
 			AssertFalse(Update.Section == "metrics" && (Update.Key == "wpm_widget_x" || Update.Key == "wpm_widget_y"),
 				"no configuration producer may carry the widget anchor")
 	} finally {
+		_WPMWidget_PositionAuthority(OldAuthority)
 		WPMWidget.pos_x := OldX
 		WPMWidget.pos_y := OldY
 		WPMWidgetConst.STORE_X := OldStoreX

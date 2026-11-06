@@ -124,6 +124,8 @@ AL_LaunchArgvStrict(Argv) {
 AL_QuoteArgument(Arg) {
 	if !(Arg is String)
 		throw TypeError("AL_QuoteArgument expects a string.")
+	if RegExMatch(Arg, "\x00")
+		throw ValueError("A native launch argument cannot contain NUL.")
 	if (Arg != "" && !RegExMatch(Arg, '[ \t\n\x0B"]'))
 		return Arg
 	Out := '"'

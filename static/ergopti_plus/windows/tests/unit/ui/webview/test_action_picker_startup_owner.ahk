@@ -39,13 +39,15 @@ _APST_Case(Mode) {
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "An unsettled earlier picker child must retire first")
 	Directory := A_Temp . "\ergopti_picker_startup_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
-	FSCreateDirectoryExclusiveStrict(Directory)
+	Created := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue((Created is Integer) && Created == 1, "The private root requires its exact creation receipt")
 	Script := Directory . "\subject.ahk"
 	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }, Handle := 0, Primary := 0, Retired := false
 	AtDeadline := 0, ExportFailure := 0
 	PreviousCritical := Critical("Off")
 	try {
-		FSCreateDirectoryExclusiveStrict(Directory . "\64bit")
+		CreatedLoader := FSCreateDirectoryExclusiveStrict(Directory . "\64bit")
+		AssertTrue((CreatedLoader is Integer) && CreatedLoader == 1, "The private loader directory must be newly owned")
 		; Availability must take its genuine filesystem branch. This inert marker
 		; is never loaded: the browser factory is explicitly passive in the child.
 		AssertTrue(FSWriteCreateDurable(Directory . "\64bit\WebView2Loader.dll", "private availability marker") != 0)
@@ -124,3 +126,11 @@ for _APST_Mode in ["current", "close-create", "close-create-reject", "reopen-cre
 #Include test_action_picker_confirmation_failure.ahk
 
 #Include test_action_picker_create_owner.ahk
+
+for _APST_SubscriptionMode in ["subscription-current", "subscription-close"]
+	Test("Action picker add-event retirement: " . _APST_SubscriptionMode . " owns the actual HWND (action-picker-native-subscription-retirement-owner)",
+		_APST_Case.Bind(_APST_SubscriptionMode))
+
+for _APST_SdkMode in ["subscription-sdk-current", "subscription-sdk-retired", "subscription-reset-retain"]
+	Test("Action picker SDK/Reset contract: " . _APST_SdkMode . " preserves its exact owner (action-picker-subscription-sdk-owner)",
+		_APST_Case.Bind(_APST_SdkMode))

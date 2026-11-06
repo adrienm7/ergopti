@@ -13,9 +13,13 @@ global TapHold := Map("keys", Map())
 for _OSRA_Key in ["left_alt", "right_ctrl"]
 	TapHold["keys"][_OSRA_Key] := Map("enabled", true, "tap_action", "one_shot_shift", "time_activation_seconds", 0.2, "hold_modifier", "", "hold_layer", "")
 global _TH_PressesTakenByCombination := Map(), _TH_TapHoldTrackState := Map(), _TH_LastTapHoldCancelReason := ""
-global _TapHoldTapInDispatch := ""
+global _TapHoldTapInDispatch := "", _TH_SyntheticEpoch := 0
+global _TH_SyntheticHeldKeys := Map(), _TH_SyntheticReleasePendingKeys := Map(), _TH_SyntheticUserHeldKeys := Map()
+global _TH_OwnedModifiers := Map(), _TH_ModifierOwners := Map(), _TH_AltGrLCtrlOwners := Map()
+global _TH_TabAltOwner := 0, _TH_LayerOwner := 0, NumberOfRepetitions := 1
+global _TapCopyPending := 0, _TapCopyGeneration := 0
 global _OSRA := { Mode: A_Args[1], Hooks: [], Emits: [], Activations: 0, Errors: 0,
-	TimerCalls: 0, Done: false, Failure: 0, FirstToken: 0, Successor: 0, SuccessorToken: 0, Released: 0, KeyWaits: 0 }
+	TimerCalls: 0, Done: false, ActivationDone: false, Failure: 0, FirstToken: 0, Successor: 0, SuccessorToken: 0, Released: 0, KeyWaits: 0 }
 
 _OSRA_Require(Condition, Message) {
 	if !Condition
@@ -49,7 +53,7 @@ TapHoldReleasePhysicalKey(Name) {
 	return true
 }
 
-TapHoldSyntheticKeyDown(Name) {
+TapHoldSyntheticKeyDown(Name, Owner := 0) {
 	_OSRA_Require(Name == "LShift", "the real route must reach its Shift hold boundary")
 	return false
 }
@@ -72,6 +76,49 @@ LoggerWarn(*) {
 ActivateHotstrings() {
 	global _OSRA
 	_OSRA.Activations += 1
+	if InStr(_OSRA.Mode, "activation-") != 1
+		return
+	_OSRA_Require(SIHO_Count() == 0 && _OSRA.Hooks[1].Stops == 1,
+		"activation must run after actual original capture settlement")
+	SetTimer(_OSRA_ActivationTimer, -1)
+	Started := A_TickCount
+	while !_OSRA.ActivationDone && A_TickCount - Started < 3000
+		Sleep(5)
+	_OSRA_Require(_OSRA.ActivationDone, "the activation port must pump an independent native lifecycle timer")
+	if IsObject(_OSRA.Failure)
+		throw _OSRA.Failure
+}
+
+; The ledgers are deliberately empty: this fixture owns capture, never keyboard edges.
+TextPressKey(*) {
+	throw Error("No native keyboard edge belongs to the activation fixture.")
+}
+KS_IsMenuModifier(*) {
+	throw Error("The empty native teardown must not mask a modifier.")
+}
+
+_OSRA_ActivationTimer() {
+	global _OSRA, OneShotShiftEnabled, _TH_SyntheticEpoch
+	try {
+		_OSRA.TimerCalls += 1
+		BeforeEpoch := _TH_SyntheticEpoch
+		Suspend(true)
+		try {
+			_OSRA_Require(TapHoldReleaseSyntheticKeys() == true, "the real empty-ledger teardown must acknowledge retirement")
+			_OSRA_Require(_TH_SyntheticEpoch == BeforeEpoch + 1, "the actual lifecycle owner must revoke the suspended gesture")
+			_OSRA_Require(SIHO_StopAll() == 0, "the already-settled capture must no longer be visible to SIHO teardown")
+			OneShotShiftFix()
+		} finally Suspend(false)
+		if _OSRA.Mode == "activation-successor" {
+			_OSRA.Successor := _OSRA_Hook()
+			_OSRA.SuccessorToken := SIHO_StartOwned(_OSRA.Successor, "fresh-one-shot", true)
+			_OSRA_Require(_OSRA.SuccessorToken > _OSRA.FirstToken, "the successor must have a genuinely new SIHO identity")
+			; Model the admitted successor's enabled latch, not an old A authority.
+			OneShotShiftEnabled := true
+		}
+	} catch as Err {
+		_OSRA.Failure := Err
+	} finally _OSRA.ActivationDone := true
 }
 
 SendNewResult(Text, Args*) {
@@ -82,10 +129,10 @@ SendNewResult(Text, Args*) {
 class _OSRA_Hook {
 	__New(Primary := false) {
 		this.Primary := Primary, this.Starts := 0, this.Stops := 0, this.Waits := 0
-		this.Input := "", this.EndKey := "", this.EndReason := ""
+		this.Input := "", this.EndKey := "", this.EndReason := "", this.EndMods := ""
 	}
 	KeyOpt(Keys, Options) {
-		_OSRA_Require(Keys == "{BackSpace}{Enter}{Delete}" && Options == "E", "the real one-shot control end keys must remain unchanged")
+		_OSRA_Require(Keys == "{BackSpace}{Enter}{Delete}{Escape}{Tab}" && Options == "ES", "the real one-shot control end keys must remain unchanged")
 	}
 	Start() {
 		global _OSRA, OneShotShiftEnabled
@@ -126,7 +173,7 @@ class _OSRA_Hook {
 			if IsObject(_OSRA.Failure)
 				throw _OSRA.Failure
 		}
-		if _OSRA.Mode == "incumbent-special"
+		if _OSRA.Mode == "incumbent-special" || InStr(_OSRA.Mode, "activation-") == 1
 			this.EndKey := ".", this.EndReason := "EndKey"
 		else
 			this.EndKey := "a", this.EndReason := "EndKey"
@@ -176,7 +223,21 @@ _OSRA_Run() {
 	_OSRA_FirstRoute()
 	_OSRA_Require(_TapHoldOneShotCache["results"].Count > 0 && _OSRA.Errors == 0, "the actual shared JSON must be loaded without fallback or hidden errors")
 	_OSRA_Require(_OSRA.Released == 1, "the real LAlt callback must reach capture after physical release")
-	if _OSRA.Mode == "natural" || InStr(_OSRA.Mode, "incumbent-") == 1 {
+	if InStr(_OSRA.Mode, "activation-") == 1 {
+		_OSRA_Require(_OSRA.Emits.Length == 0, "the settled old A must emit nothing after lifecycle revocation inside activation")
+		_OSRA_Require(_OSRA.Activations == 1 && _OSRA.TimerCalls == 1 && _OSRA.ActivationDone,
+			"the genuine special result must reach one activation and one independent native timer")
+		_OSRA_Require(_OSRA.Hooks[1].Starts == 1 && _OSRA.Hooks[1].Waits == 1 && _OSRA.Hooks[1].Stops == 1,
+			"the original capture must settle exactly once before activation")
+		if _OSRA.Mode == "activation-successor" {
+			_OSRA_Require(OneShotShiftEnabled, "old A must not disable the resumed B latch")
+			_OSRA_Require(SIHO_Count() == 1 && SIHO_IsOwned(_OSRA.SuccessorToken, _OSRA.Successor),
+				"old A must preserve the exact resumed B hook/token")
+			_OSRA_Require(_OSRA.Successor.Starts == 1 && _OSRA.Successor.Stops == 0,
+				"old A must never stop its successor")
+		} else
+			_OSRA_Require(!OneShotShiftEnabled && SIHO_Count() == 0, "the lifecycle-cancelled latch must remain disabled")
+	} else if _OSRA.Mode == "natural" || InStr(_OSRA.Mode, "incumbent-") == 1 {
 		Expected := _OSRA.Mode == "incumbent-special" ? " :" : (_OSRA.Mode == "incumbent-disabled" ? "a" : "A")
 		_OSRA_Require(_OSRA.Emits.Length == 1 && _OSRA.Emits[1] == Expected, "the admitted capture must emit the independent expected result: " . Expected)
 		_OSRA_Require(_OSRA.Activations == (_OSRA.Mode == "incumbent-special" ? 1 : 0), "only the actual special result activates hotstrings")
@@ -203,6 +264,7 @@ try {
 	try _OSRA_Run()
 	finally {
 		SetTimer(_OSRA_SecondTimer, 0)
+		SetTimer(_OSRA_ActivationTimer, 0)
 		try SIHO_StopAll()
 		finally Suspend(false)
 	}

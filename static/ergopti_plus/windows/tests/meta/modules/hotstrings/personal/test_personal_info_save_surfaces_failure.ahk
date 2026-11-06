@@ -105,12 +105,14 @@ _PISF_TransactionOwnsBeforeCloneAndPublishesWithReplace() {
 
 	AtomicBody := _DriverFuncBody("_PersonalTomlWriteAtomic")
 	Assert(AtomicBody != "", "the atomic personal TOML publisher must exist")
-	ReplacePos := InStr(AtomicBody, "FSAtomicMoveReplace(StagePath, FilePath)")
+	ReplacePos := InStr(AtomicBody, "FSWriteReplaceOwned(PhysicalPath, Content")
 	LivePos := InStr(AtomicBody, "PublishFn.Call(")
 	Assert(ReplacePos > 0 && LivePos > ReplacePos,
 		"live publication must follow the durable non-Critical replace")
-	Assert(InStr(AtomicBody, "FSWriteDurable(StagePath, Content)") > 0,
-		"the private stage must be flushed before the write-through atomic replace")
+	Assert(InStr(AtomicBody, "_PersonalTomlHeldPreflight.Bind(") > 0,
+		"the held stage readback/source witness must precede native atomic replacement")
+	Assert(InStr(AtomicBody, "Publication.renamed && !Publication.durable") > 0,
+		"incomplete native durability cannot reach the later live publisher")
 }
 Test("meta personal-info-save: ownership precedes clone and replace precedes live publication",
 	_PISF_TransactionOwnsBeforeCloneAndPublishesWithReplace)

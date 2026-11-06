@@ -11,7 +11,7 @@
 #Requires AutoHotkey v2.0
 
 _LBDH_AllKeyboardDismissalsAreDeferred() {
-    for Fn in ["LLM_Bridge_OnBackspace", "LLM_Bridge_ResetPredictions", "_LLM_Bridge_OnInjectComplete"] {
+    for Fn in ["LLM_Bridge_ResetPredictions", "_LLM_Bridge_OnInjectComplete"] {
         Body := _DriverFuncBody(Fn)
         Assert(Body != "", Fn . " must exist")
         Assert(InStr(Body, "LLM_Bridge_DeferTooltipHide(") > 0,
@@ -19,6 +19,18 @@ _LBDH_AllKeyboardDismissalsAreDeferred() {
         Assert(InStr(Body, "LLM_Tooltip_Hide(") = 0,
             Fn . " must not synchronously destroy the layered tooltip surface")
     }
+	Backspace := _DriverFuncBody("LLM_Bridge_OnBackspace")
+	Schedule := _DriverFuncBody("_LLM_Bridge_SchedulePrefixObserver")
+	Observer := _DriverFuncBody("_LLM_Bridge_RunPrefixObserver")
+	Notify := _DriverFuncBody("_LLM_Bridge_NotifyChar")
+	AssertContains(Backspace, "_LLM_Bridge_SchedulePrefixObserver(")
+	AssertContains(Schedule, "_LLM_Bridge_RunPrefixObserver.Bind(Owner)")
+	AssertContains(Observer, "_LLM_Bridge_NotifyChar(Owner.Char, _LLM_Bridge_Buffer, CurrentFn, Owner.Source, Receipt)")
+	AssertContains(Notify, "LLM_Bridge_DeferTooltipHide(")
+	for Body in [Backspace, Schedule, Observer, Notify] {
+		Assert(!InStr(Body, "LLM_Tooltip_Hide("), "every Backspace delegation edge must exclude synchronous surface destruction")
+		Assert(!InStr(Body, "LLM_Tooltip_HideExact("), "the exact-record destroy belongs only to the deferred worker")
+	}
 	Defer := _DriverFuncBody("LLM_Bridge_DeferTooltipHide")
 	Worker := _DriverFuncBody("_LLM_Bridge_DeferredTooltipHide")
 	Complete := RegExReplace(

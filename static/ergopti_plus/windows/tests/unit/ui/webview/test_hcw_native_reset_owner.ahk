@@ -78,7 +78,7 @@ _HNRT_Case(Mode) {
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "A prior owned child must retire before a new case")
 	Directory := A_Temp . "\ergopti_hcw_reset_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
-	FSCreateDirectoryExclusiveStrict(Directory)
+	AssertEqual(1, FSCreateDirectoryExclusiveStrict(Directory), "The child root must be exclusively acquired before cleanup authority exists")
 	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}, Handle := 0, Primary := 0, Retired := false, AtDeadline := 0
 	PreviousCritical := Critical("Off")
 	try {
@@ -141,3 +141,19 @@ _HNRT_Case(Mode) {
 
 Test("Native hotstrings reset: current window retires after real writes (hcw-native-reset-owner)", _HNRT_Case.Bind("current"))
 Test("Native hotstrings reset: old completion preserves reopened window (hcw-native-reset-owner)", _HNRT_Case.Bind("reopen"))
+
+for _HNRT_DestroyMode in ["destroy-current", "destroy-reopen"]
+	Test("Native hotstrings reset destruction: " . _HNRT_DestroyMode . " preserves actual reopened widgets (hcw-native-destroy-owner)",
+		_HNRT_Case.Bind(_HNRT_DestroyMode))
+
+for _HNRT_RetirementMode in ["retire-pre", "retire-post"]
+	Test("Native hotstrings reset retirement: " . _HNRT_RetirementMode . " retains exact cleanup custody (hcw-native-reset-retirement-owner)",
+		_HNRT_Case.Bind(_HNRT_RetirementMode))
+
+for _HNRT_NumericMode in ["numeric-current", "numeric-overflow", "numeric-empty-delay", "numeric-empty-priority"]
+	Test("Native hotstrings numeric admission: " . _HNRT_NumericMode . " uses actual Edit and debounce (hcw-native-numeric-domain-owner)",
+		_HNRT_Case.Bind(_HNRT_NumericMode))
+
+for _HNRT_CompanionMode in ["numeric-pending-empty", "numeric-padded", "numeric-zero", "numeric-priority-clamp"]
+	Test("Native hotstrings numeric continuation: " . _HNRT_CompanionMode . " preserves admission and existing values (hcw-native-numeric-companion)",
+		_HNRT_Case.Bind(_HNRT_CompanionMode))

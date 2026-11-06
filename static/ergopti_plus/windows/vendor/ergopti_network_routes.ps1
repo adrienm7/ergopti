@@ -145,7 +145,7 @@ function Get-ErgoptiHttpRelay {
 
 # The owned loopback hop: what lets WinHTTP and HttpWebRequest, which reach a plain
 # http relay only, use an https relay, a socks5 relay or credentials in the address.
-# The client talks plain CONNECT to 127.0.0.1 in this same process; the hop speaks
+# The client talks HTTP or CONNECT to 127.0.0.1 in this same process; the hop speaks
 # the real relay's protocol, so the client's TLS to the origin stays end to end.
 # 1. It lives in this process and dies with it: a worker's request, nothing else.
 # 2. It answers only this process (the peer's owner is read from the TCP table): a
@@ -325,7 +325,23 @@ public sealed class ErgoptiRelayHop {
         return true;
     }
 
-    private Stream Dial(TcpClient relay, string authority) {
+    // Forward proxies need an absolute-form HTTP target. The hop owns the
+    // upstream credential header, so a caller cannot duplicate or replace it.
+    private string ForwardHead(string head) {
+        StringBuilder request = new StringBuilder();
+        foreach (string line in head.Split(new string[] { "\r\n" }, StringSplitOptions.None)) {
+            if (line.Length == 0) break;
+            if (line.StartsWith("Proxy-Authorization:", StringComparison.OrdinalIgnoreCase)) continue;
+            request.Append(line).Append("\r\n");
+        }
+        if (user != null) {
+            string token = Convert.ToBase64String(Encoding.UTF8.GetBytes(user + ":" + password));
+            request.Append("Proxy-Authorization: Basic " + token + "\r\n");
+        }
+        return request.Append("\r\n").ToString();
+    }
+
+    private Stream Dial(TcpClient relay, string authority, bool tunnel) {
         IAsyncResult connect = relay.BeginConnect(relayHost, relayPort, null, null);
         if (!connect.AsyncWaitHandle.WaitOne(timeoutMs)) return null;
         relay.EndConnect(connect);
@@ -337,7 +353,7 @@ public sealed class ErgoptiRelayHop {
             secure.AuthenticateAsClient(relayHost, null, SslProtocols.Tls12, false);
             stream = secure;
         }
-        bool open = scheme.StartsWith("socks") ? ConnectThroughSocks(stream, authority) : ConnectThroughHttp(stream, authority);
+        bool open = scheme.StartsWith("socks") ? ConnectThroughSocks(stream, authority) : (!tunnel || ConnectThroughHttp(stream, authority));
         if (!open) return null;
         relay.ReceiveTimeout = 0;
         relay.SendTimeout = 0;
@@ -355,7 +371,7 @@ public sealed class ErgoptiRelayHop {
     }
 
     private void Serve(TcpClient client) {
-        TcpClient relay = new TcpClient();
+        TcpClient relay = null;
         try {
             if (!PeerIsThisProcess(((IPEndPoint)client.Client.RemoteEndPoint).Port)) return;
             client.ReceiveTimeout = timeoutMs;
@@ -366,16 +382,33 @@ public sealed class ErgoptiRelayHop {
             string[] line = head.Substring(0, head.IndexOf("\r\n", StringComparison.Ordinal)).Split(' ');
             if (line.Length != 3) { Write(local, NotAllowed); return; }
             string authority, replay = null;
+            bool tunnel = true;
             if (line[0] == "CONNECT") {
                 authority = line[1];
             } else if (line[1].StartsWith("http://", StringComparison.OrdinalIgnoreCase)) {
-                // A plain http destination: the tunnel carries the request in origin form.
                 Uri target = new Uri(line[1]);
-                authority = target.Authority.Contains(":") ? target.Authority : target.Authority + ":80";
-                replay = line[0] + " " + target.PathAndQuery + " " + line[2] + head.Substring(head.IndexOf("\r\n", StringComparison.Ordinal));
+                // IPv6 punctuation cannot identify an explicit destination port.
+                // Build one canonical authority from the URI's separate fields.
+                string targetHost = target.IdnHost.Trim('[', ']');
+                if (target.HostNameType == UriHostNameType.IPv6) targetHost = "[" + targetHost + "]";
+                authority = targetHost + ":" + target.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                // HTTP proxies forward plaintext HTTP without CONNECT. SOCKS
+                // still establishes a destination tunnel carrying origin form.
+                tunnel = scheme.StartsWith("socks");
+                replay = tunnel
+                    ? line[0] + " " + target.PathAndQuery + " " + line[2] + head.Substring(head.IndexOf("\r\n", StringComparison.Ordinal))
+                    : ForwardHead(head);
             } else { Write(local, NotAllowed); return; }
             if (authority.LastIndexOf(':') < 1) { Write(local, Refused); return; }
-            Stream remote = Dial(relay, authority);
+            // Literal hosts select their own family. DNS keeps both supported
+            // families available without adding a synchronous lookup here.
+            IPAddress relayAddress;
+            bool literal = IPAddress.TryParse(relayHost, out relayAddress);
+            AddressFamily family = literal ? relayAddress.AddressFamily
+                : (Socket.OSSupportsIPv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork);
+            relay = new TcpClient(family);
+            if (!literal && family == AddressFamily.InterNetworkV6) relay.Client.DualMode = true;
+            Stream remote = Dial(relay, authority, tunnel);
             if (remote == null) { Write(local, Refused); return; }
             if (replay == null) Write(local, Established); else Write(remote, replay);
             client.ReceiveTimeout = 0;
@@ -389,7 +422,7 @@ public sealed class ErgoptiRelayHop {
             try { Write(client.GetStream(), Refused); } catch (Exception) { }
         } finally {
             client.Close();
-            relay.Close();
+            if (relay != null) relay.Close();
         }
     }
 }
@@ -502,6 +535,11 @@ function Get-ErgoptiStaticRoutes {
         elseif ($Name -eq '') { $Generic += $Relay }
     }
     $Chosen = @(if ($Specific.Count -gt 0) { $Specific } else { $Generic })
+    # WinHTTP leaves an unmapped protocol direct; every declared endpoint has
+    # already been admitted above, so malformed maps cannot take this branch.
+    if ($Chosen.Count -eq 0 -and $SeenSchemes.Count -gt 0) {
+        return ,@(@{ Kind = 'direct'; Endpoint = ''; Authentication = 'none'; Source = $Source + '_direct' })
+    }
     if ($Chosen.Count -ne 1) { throw 'WinINet static route capability was refused.' }
     return ,@(@{ Kind = 'proxy'; Endpoint = [string]$Chosen[0]; Source = $Source + '_proxy'; Authentication = 'current_user_proxy_only' })
 }

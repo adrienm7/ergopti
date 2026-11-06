@@ -12,6 +12,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\infra\number.ahk
 
 
 
@@ -563,7 +564,9 @@ _TH_PromptGlobalDelay(PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 		Raw := Trim(Answer.Value, " `t")
 		if !IsNumber(Raw)
 			return false
-		Ms := Round(Raw + 0)
+		if !(IsInteger(Raw) ? NumberTryParseInputInteger(Raw, &Ms) : NumberTryParseFiniteFloat(Raw, &Ms))
+			return false
+		Ms := Round(Ms)
 		if Ms <= 0 || !_TH_DurationValueValid(Ms / 1000)
 			return false
 	} catch as Err {
@@ -666,7 +669,8 @@ _TH_PromptKeyDelay(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 		Raw := Trim(Answer.Value, " `t")
 		if !IsNumber(Raw)
 			return false
-		Ms := Raw + 0
+		if !(IsInteger(Raw) ? NumberTryParseInputInteger(Raw, &Ms) : NumberTryParseFiniteFloat(Raw, &Ms))
+			return false
 		if !_TH_DurationValueValid(Ms / 1000)
 			return false
 		Ms := Round(Ms)

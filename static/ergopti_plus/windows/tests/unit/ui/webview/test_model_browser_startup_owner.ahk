@@ -19,14 +19,14 @@ _MBSTO_Case(Mode) {
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "An unsettled earlier editor child must retire first")
 	Directory := A_Temp . "\ergopti_model_browser_startup_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
-	FSCreateDirectoryExclusiveStrict(Directory)
+	AssertEqual(1, FSCreateDirectoryExclusiveStrict(Directory), "The child root must be exclusively acquired before cleanup is authorized")
 	Script := Directory . "\subject.ahk"
 	Owners := Map()
 	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }, Handle := 0, Primary := 0, Retired := false
 	AtDeadline := 0, ExportFailure := 0
 	PreviousCritical := Critical("Off")
 	try {
-		FSCreateDirectoryExclusiveStrict(Directory . "\64bit")
+		AssertEqual(1, FSCreateDirectoryExclusiveStrict(Directory . "\64bit"), "The marker directory must be exclusively acquired")
 		AssertTrue(FSWriteCreateDurable(Directory . "\64bit\WebView2Loader.dll", "passive availability marker") != 0)
 		Owner := _DriverProductionFileForSymbol("LLM_ModelBrowser_Show")
 		AssertTrue(Owner != "", "The public browser must resolve to its actual whole production owner")
@@ -119,3 +119,18 @@ for _MBSTO_Mode in ["current", "reuse", "close", "reopen", "teardown-reopen", "e
 	"subscription", "mapping", "seed", "navigation", "fill"]
 	Test("Model browser startup: " . _MBSTO_Mode . " preserves its native owner (model-browser-startup-owner)",
 		_MBSTO_Case.Bind(_MBSTO_Mode))
+
+for _MBSTO_SubscriptionMode in ["subscription-owner-current", "subscription-owner-close"]
+	Test("Model web add-event retirement: " . _MBSTO_SubscriptionMode . " owns the actual HWND (model-web-native-subscription-retirement-owner)",
+		_MBSTO_Case.Bind(_MBSTO_SubscriptionMode))
+
+for _MBSTO_SdkMode in ["subscription-throw-current", "subscription-throw-retired", "subscription-throw-cleanup-reopen", "subscription-throw-direct"]
+	Test("Model browser SDK refusal: " . _MBSTO_SdkMode . " preserves fallback ownership (model-subscription-sdk-failure-owner)",
+		_MBSTO_Case.Bind(_MBSTO_SdkMode))
+
+Test("Model browser SDK refusal: real Close during unwind keeps fallback canceled (model-subscription-sdk-reset-close-owner)",
+	_MBSTO_Case.Bind("subscription-throw-unwind-close"))
+
+for _MBSTO_RetryMode in ["retry-current", "retry-reentry"]
+	Test("Model browser initial retirement: " . _MBSTO_RetryMode . " preserves native cancellation (model-browser-native-initial-retirement-reentry)",
+		_MBSTO_Case.Bind(_MBSTO_RetryMode))

@@ -147,16 +147,8 @@ NetworkCheck_PacMaxBytes() {
 NetworkCheck_JudgePac(Status, Bytes) {
 	if Status != 200 || !(Bytes is Buffer) || Bytes.Size == 0 || Bytes.Size > NetworkCheck_PacMaxBytes()
 		return "error"
-	First := NumGet(Bytes, 0, "UChar")
-	Second := Bytes.Size > 1 ? NumGet(Bytes, 1, "UChar") : 0
-	if (First == 0xFF && Second == 0xFE) || (First == 0xFE && Second == 0xFF)
-		return "ok"
-	Offset := (Bytes.Size >= 3 && First == 0xEF && Second == 0xBB && NumGet(Bytes, 2, "UChar") == 0xBF) ? 3 : 0
-	BodyPtr := Bytes.Ptr + Offset
-	BodySize := Bytes.Size - Offset
-	if !_NetworkCheck_IsStrictUtf8(BodyPtr, BodySize)
-		return "error"
-	return InStr(StrGet(BodyPtr, BodySize, "UTF-8"), "FindProxyForURL") ? "ok" : "error"
+	Source := _HC_PacDecodeSource(Bytes, NetworkCheck_PacMaxBytes())
+	return !Source.Has("error") && InStr(Source["body"], "FindProxyForURL", true) ? "ok" : "error"
 }
 
 /**

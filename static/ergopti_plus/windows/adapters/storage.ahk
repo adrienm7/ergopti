@@ -49,6 +49,32 @@ global STORAGE_VALUE_PREFIX := "__ERGOPTI_STORAGE_V1__:"
 ; ====================================
 ; ====================================
 
+; The original native units are authoritative; C-string helpers stop at NUL.
+_ST_StringHasNativeNul(Text) {
+	Pointer := StrPtr(Text)
+	Loop StrLen(Text)
+		if NumGet(Pointer, (A_Index - 1) * 2, "UShort") == 0
+			return true
+	return false
+}
+
+; Win32 value-name parameters terminate at NUL. Preserve complete native
+; String metadata before any conversion, and retain legacy numeric names.
+; The admitted name is returned once so no later coercion can change it.
+_ST_TryNativeKeyName(Key, &Name) {
+	Name := ""
+	if Key is String
+		Candidate := Key
+	else if Key is Number
+		Candidate := String(Key)
+	else
+		return false
+	if _ST_StringHasNativeNul(Candidate)
+		return false
+	Name := Candidate
+	return true
+}
+
 ; Writes one supported Storage value to the registry under Key.
 ; @param Key   {String} The value name to write under STORAGE_REG_BASE.
 ; @param Value {String|Number|Map|Array} The value to persist.
@@ -59,7 +85,9 @@ ST_Set(Key, Value) {
 
 _ST_SetWith(Key, Value, WriteFn) {
 	try {
-		return WriteFn.Call(STORAGE_REG_BASE, Key, _ST_EncodeValue(Value))
+		if !_ST_TryNativeKeyName(Key, &Name)
+			return false
+		return WriteFn.Call(STORAGE_REG_BASE, Name, _ST_EncodeValue(Value))
 	} catch {
 		return false
 	}
@@ -67,8 +95,13 @@ _ST_SetWith(Key, Value, WriteFn) {
 
 _ST_EncodeValue(Value) {
 	global STORAGE_VALUE_PREFIX
-	if Value is String
-		return STORAGE_VALUE_PREFIX . "s:" . Value
+	if Value is String {
+		; Ordinary and historical strings retain their exact s: protocol. A
+		; NUL-bearing String needs a JSON scalar so REG_SZ cannot truncate it.
+		return _ST_StringHasNativeNul(Value)
+			? STORAGE_VALUE_PREFIX . "q:" . JsonStringLiteral(Value)
+			: STORAGE_VALUE_PREFIX . "s:" . Value
+	}
 	if Value is Integer
 		return STORAGE_VALUE_PREFIX . "i:" . String(Value)
 	if Value is Float
@@ -87,6 +120,11 @@ _ST_DecodeValue(Stored) {
 	Body := SubStr(Payload, 3)
 	switch Tag {
 		case "s:": return Body
+		case "q:":
+			Decoded := JsonParse(Body)
+			if !(Decoded is String)
+				throw ValueError("Storage quoted scalar envelope must contain a JSON String.")
+			return Decoded
 		case "i:": return Integer(Body)
 		case "f:": return Float(Body)
 		case "j:":
@@ -145,8 +183,10 @@ _ST_Join(Parts) {
 ; @return {Any} The stored typed value, or DefaultValue if absent or invalid.
 ST_Get(Key, DefaultValue) {
 	try {
+		if !_ST_TryNativeKeyName(Key, &Name)
+			return DefaultValue
 		local Result := ""
-		if !Reg_TryRead(STORAGE_REG_BASE, Key, &Result)
+		if !Reg_TryRead(STORAGE_REG_BASE, Name, &Result)
 			return DefaultValue
 		return _ST_DecodeValue(Result)
 	} catch {
@@ -176,7 +216,9 @@ ST_ReadExact(Key) {
 ; @return {Boolean} True on success (including "already absent"), false on error.
 ST_Delete(Key) {
 	try {
-		return Reg_DeleteValue(STORAGE_REG_BASE, Key)
+		if !_ST_TryNativeKeyName(Key, &Name)
+			return false
+		return Reg_DeleteValue(STORAGE_REG_BASE, Name)
 	} catch as e {
 		LoggerError("storage", "ST_Delete failed for '{1}': {2}.", Key, e.Message)
 		return false
@@ -188,8 +230,10 @@ ST_Delete(Key) {
 ; @return {Boolean} True on success, false on error.
 ST_Has(Key) {
 	try {
+		if !_ST_TryNativeKeyName(Key, &Name)
+			return false
 		local Result := ""
-		return Reg_TryRead(STORAGE_REG_BASE, Key, &Result)
+		return Reg_TryRead(STORAGE_REG_BASE, Name, &Result)
 	} catch {
 		return false
 	}
@@ -204,9 +248,14 @@ ST_Has(Key) {
 _ST_EnumerateKeys(&Names, EnumValuesFn := 0) {
 	Names := []
 	try {
-		Records := IsObject(EnumValuesFn)
-			? EnumValuesFn.Call(STORAGE_REG_BASE)
-			: Reg_EnumValues(STORAGE_REG_BASE)
+		if !IsObject(EnumValuesFn) {
+			if !Reg_TryEnumValueNames(STORAGE_REG_BASE, &Names) {
+				try LoggerError("storage", "The native registry value-name inventory could not be completely read.")
+				return false
+			}
+			return true
+		}
+		Records := EnumValuesFn.Call(STORAGE_REG_BASE)
 		for Rec in Records
 			Names.Push(Rec.name)
 		return true

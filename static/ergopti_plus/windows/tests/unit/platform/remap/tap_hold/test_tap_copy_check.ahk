@@ -213,3 +213,158 @@ _TCC_ContextReentry() {
 	}
 }
 Test("tap-hold copy: reentrant context lookup preserves the newer check (tap-copy-context)", _TCC_ContextReentry)
+
+; Invoke the same genuine remap teardown that the suspend lifecycle owns, with
+; private empty modifier ledgers so this copy test never releases another key.
+_TCC_PauseAndResume() {
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys
+	Saved := [_TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys]
+	WasSuspended := A_IsSuspended
+	_TH_SyntheticHeldKeys := Map(), _TH_SyntheticReleasePendingKeys := Map(), _TH_SyntheticUserHeldKeys := Map()
+	try {
+		Suspend(true)
+		AssertTrue(A_IsSuspended)
+		AssertTrue(TapHoldReleaseSyntheticKeys(), "The actual suspend-owned remap drain must acknowledge empty key ownership")
+	} finally {
+		_TH_SyntheticHeldKeys := Saved[1], _TH_SyntheticReleasePendingKeys := Saved[2], _TH_SyntheticUserHeldKeys := Saved[3]
+		Suspend(WasSuspended)
+	}
+}
+
+_TCC_PauseRetiresDeferred() {
+	global _TCC_Sends, _TCC_Warnings, _TCC_Timers, _TCC_Counter, _TapCopyPending
+	Restore := _TCC_Install(Map())
+	try {
+		TapCopySend("A", _TCC_Send)
+		AssertEqual(1, _TCC_Timers.Length)
+		_TCC_PauseAndResume()
+		AssertFalse(IsObject(_TapCopyPending), "The real remap teardown must revoke the pending check before resume")
+		_TCC_Fire()
+		AssertEqual(1, _TCC_Sends, "An old timer delivered after resume must send no retry")
+		AssertEqual(0, _TCC_Warnings)
+		AssertEqual(0, _TCC_Timers.Length)
+		TapCopySend("B", _TCC_Send)
+		_TCC_Counter += 1
+		_TCC_Fire()
+		AssertEqual(2, _TCC_Sends, "A newly requested copy after resume must still be admitted")
+		AssertEqual(0, _TCC_Warnings)
+		AssertFalse(IsObject(_TapCopyPending))
+	} finally Restore()
+}
+Test("tap-hold copy: suspend teardown retires a callback delivered after resume (tap-copy-owner)", _TCC_PauseRetiresDeferred)
+
+_TCC_PauseDuringProducer(Phase) {
+	global _TapCopyCounterFn, _TCC_Counter, _TCC_Sends, _TCC_Warnings, _TCC_Timers, _TapCopyPending
+	Restore := _TCC_Install(Map())
+	Counter() {
+		_TCC_PauseAndResume()
+		return _TCC_Counter
+	}
+	Send() {
+		_TCC_Send()
+		_TCC_PauseAndResume()
+		return true
+	}
+	try {
+		if Phase == "counter"
+			_TapCopyCounterFn := Counter
+		TapCopySend("A", Phase == "send" ? Send : _TCC_Send)
+		AssertEqual(Phase == "counter" ? 0 : 1, _TCC_Sends,
+			"Revocation during the initial observation must not admit an old send")
+		AssertFalse(IsObject(_TapCopyPending), "A producer revoked by teardown must not publish a new check after resume")
+		AssertEqual(0, _TCC_Timers.Length)
+		AssertEqual(0, _TCC_Warnings)
+	} finally Restore()
+}
+for _TCC_ProducerPhase in ["counter", "send"]
+	Test("tap-hold copy: revocation in initial " . _TCC_ProducerPhase . " cannot publish a check (tap-copy-owner)",
+		_TCC_PauseDuringProducer.Bind(_TCC_ProducerPhase))
+
+_TCC_CounterReplacesOwner(PauseOnly) {
+	global _TapCopyCounterFn, _TapCopyPending, _TCC_Counter, _TCC_Sends, _TCC_Warnings, _TCC_Timers
+	Restore := _TCC_Install(Map())
+	Counter() {
+		global _TapCopyCounterFn
+		_TapCopyCounterFn := () => _TCC_Counter
+		if PauseOnly
+			_TCC_PauseAndResume()
+		else
+			TapCopySend("B", _TCC_Send)
+		return _TCC_Counter
+	}
+	try {
+		TapCopySend("A", _TCC_Send)
+		_TapCopyCounterFn := Counter
+		_TCC_Fire()
+		AssertEqual(PauseOnly ? 1 : 2, _TCC_Sends, "The retired timer must not retry after its counter callout")
+		AssertEqual(0, _TCC_Warnings)
+		AssertEqual(PauseOnly ? 0 : 1, _TCC_Timers.Length)
+		if PauseOnly
+			AssertFalse(IsObject(_TapCopyPending))
+		else {
+			AssertEqual("B", _TapCopyPending["source"], "A replacement must retain the exact current record")
+			_TCC_Counter += 1
+			_TCC_Fire()
+			AssertFalse(IsObject(_TapCopyPending))
+			AssertEqual(0, _TCC_Warnings)
+		}
+	} finally Restore()
+}
+for _TCC_CounterPause in [false, true]
+	Test("tap-hold copy: timer counter revocation pause=" . _TCC_CounterPause . " preserves current ownership (tap-copy-owner)",
+		_TCC_CounterReplacesOwner.Bind(_TCC_CounterPause))
+
+_TCC_RetryReplacesOwner() {
+	global _TapCopyPending, _TCC_Sends, _TCC_Counter, _TCC_Warnings, _TCC_Timers
+	Restore := _TCC_Install(Map())
+	Send() {
+		_TCC_Send()
+		if _TCC_Sends == 2 {
+			TapCopySend("B", _TCC_Send)
+			return false
+		}
+		return true
+	}
+	try {
+		TapCopySend("A", Send)
+		_TCC_Fire()
+		AssertEqual(3, _TCC_Sends, "Only A's admitted initial/retry sends and B's new initial send may occur")
+		AssertEqual("B", _TapCopyPending["source"], "The retired retry must not clear B on its refused return")
+		AssertEqual(1, _TCC_Timers.Length, "Only B's actual timer must remain")
+		AssertEqual(0, _TCC_Warnings, "A retired retry refusal must not notify the user")
+		_TCC_Counter += 1
+		_TCC_Fire()
+		AssertFalse(IsObject(_TapCopyPending))
+		AssertEqual(3, _TCC_Sends)
+		AssertEqual(0, _TCC_Warnings)
+	} finally Restore()
+}
+Test("tap-hold copy: a newer copy inside retry preserves its timer and receipt (tap-copy-owner)", _TCC_RetryReplacesOwner)
+
+_TCC_ReportReplacesOwner() {
+	global _LOGGER_TEST_SINK, _LOGGER_WARN_ENABLED, _TapCopyPending, _TCC_Sends, _TCC_Counter, _TCC_Warnings, _TCC_Timers
+	Restore := _TCC_Install(Map()), SavedSink := _LOGGER_TEST_SINK, SavedWarn := _LOGGER_WARN_ENABLED, Replaced := false
+	Observe(Line) {
+		if !Replaced && InStr(Line, "not_copied after") {
+			Replaced := true
+			TapCopySend("B", _TCC_Send)
+		}
+	}
+	try {
+		_LOGGER_TEST_SINK := Observe, _LOGGER_WARN_ENABLED := true
+		TapCopySend("A-report-" . A_TickCount, _TCC_Send)
+		_TCC_Fire()
+		_TCC_Fire()
+		AssertTrue(Replaced, "The real failure logger must deliver the exact controlled callout")
+		AssertEqual("B", _TapCopyPending["source"])
+		AssertEqual(1, _TCC_Timers.Length)
+		AssertEqual(0, _TCC_Warnings, "A failure notice revoked during logging must not be delivered afterward")
+		_TCC_Counter += 1
+		_TCC_Fire()
+		AssertFalse(IsObject(_TapCopyPending))
+	} finally {
+		_LOGGER_TEST_SINK := SavedSink, _LOGGER_WARN_ENABLED := SavedWarn
+		Restore()
+	}
+}
+Test("tap-hold copy: a report callout cannot notify after owner replacement (tap-copy-owner)", _TCC_ReportReplacesOwner)

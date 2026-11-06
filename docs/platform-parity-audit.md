@@ -162,7 +162,7 @@ product intent. The JSON companion preserves the same audit-snapshot data.
 The deep pass produced 30 OS-scoped actionable entries, including a guarded
 unfinished capability and a conditional account-context scenario. These are not
 30 native-reproduced bugs. Per-entry severity, confidence and reproduction
-basis are in the [Windows](audits/ahk/2026_11_04/report.md),
+basis are in the [Windows](audits/platform-parity/2026-11-04-deep/windows-envelope/report.md),
 [macOS](audits/hammerspoon/2026_11_04/report.md) and
 [Linux](audits/linux/2026_11_04/report.md) envelopes. The same restart-reporting
 root cause affects two OSes. Policy candidates and refuted hypotheses are kept

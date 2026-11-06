@@ -3,9 +3,10 @@
 ; ==============================================================================
 ; MODULE: Personal Information Raw Decoder Compatibility Tests
 ; DESCRIPTION:
-; AFTER-only qualification of the source-byte decoder against native FileRead.
-; Every oracle decodes the same private file, including malformed encodings and
-; embedded NUL. This does not establish a BEFORE failure against an absent helper.
+; All27 original byte vectors remain. Valid native UTF-8/UTF-16LE protocols
+; retain exact FileRead unit parity; malformed/NUL/unpaired inputs must now
+; refuse instead of certifying native replacement/truncation as source data.
+; The historical test identity remains reachable; this is after-only coverage.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -72,20 +73,34 @@ _PIRD_One(Root, Vector) {
 	for Index, Byte in Octets
 		NumPut("UChar", Byte, Bytes, Index - 1)
 	Path := Root . "\" . Name . ".bin"
-	File := FileOpen(Path, "w", "UTF-8-RAW")
-	AssertTrue(IsObject(File), Name . ": the private raw file must open")
+	FileHandle := FileOpen(Path, "w", "UTF-8-RAW")
+	AssertTrue(IsObject(FileHandle), Name . ": the private raw file must open")
 	try {
 		if Bytes.Size
-			AssertEqual(Bytes.Size, File.RawWrite(Bytes, Bytes.Size),
+			AssertEqual(Bytes.Size, FileHandle.RawWrite(Bytes, Bytes.Size),
 				Name . ": the real writer must persist the complete byte vector")
-	} finally File.Close()
+	} finally FileHandle.Close()
 	AssertEqual(Octets.Length, FileGetSize(Path), Name . ": no BOM or terminator is introduced")
 	Raw := FileRead(Path, "RAW")
 	_PIRD_CheckBytes(Raw, Octets, Name . " before decode")
 	RawPtr := Raw.Ptr
-	NativeText := FileRead(Path, "UTF-8")
-	Decoded := _PersonalInfoDecodeSourceBytes(Raw)
-	_PIRD_CheckText(NativeText, Decoded, Name)
+	ValidProtocols := Map("empty", true, "ascii-crlf", true, "utf8-nonascii", true,
+		"utf8-astral", true, "utf8-bom-only", true, "utf8-bom-mixed", true,
+		"one-byte-ascii", true, "utf16le-bom-only", true, "utf16le-mixed-even", true)
+	Reject := !ValidProtocols.Has(Name)
+	Failure := 0, Decoded := ""
+	try Decoded := _PersonalInfoDecodeSourceBytes(Raw)
+	catch as ErrorCaught
+		Failure := ErrorCaught
+	_TestPrint("# personal-raw-decoder vector=" . Name . " expected-refusal=" . Reject . " rejected=" . (Failure is Error))
+	if Reject {
+		AssertTrue(Failure is ValueError, Name . ": the real source decoder must explicitly refuse the malformed/unrepresentable image")
+	} else {
+		if Failure is Error
+			throw Failure
+		NativeText := FileRead(Path, "UTF-8")
+		_PIRD_CheckText(NativeText, Decoded, Name)
+	}
 	AssertEqual(RawPtr, Raw.Ptr, Name . ": decoding must not replace or resize its input")
 	_PIRD_CheckBytes(Raw, Octets, Name . " after decode")
 	_PIRD_CheckBytes(FileRead(Path, "RAW"), Octets, Name . " after native oracle")
@@ -98,8 +113,9 @@ _PIRD_MatchesNativeFileRead() {
 	SavedEncoding := A_FileEncoding
 	Completed := 0
 	try {
-		FSCreateDirectoryExclusiveStrict(Root)
-		Owned := true
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Owned := (Creation is Integer) && Creation == 1
+		AssertTrue(Owned, "only the exact acknowledged native directory creation grants fixture cleanup authority")
 		FileEncoding("CP1252")
 		Ambient := A_FileEncoding
 		Vectors := _PIRD_Vectors()
@@ -109,7 +125,7 @@ _PIRD_MatchesNativeFileRead() {
 			Completed += 1
 			AssertEqual(Ambient, A_FileEncoding, "neither decoder nor explicit FileRead may change thread encoding")
 		}
-		AssertEqual(27, Completed, "all native oracles, including malformed and BOM edge cases, must be reached")
+		AssertEqual(27, Completed, "all27 source admission/unchanged-byte checks, including malformed and BOM edges, must be reached")
 	} finally {
 		FileEncoding(SavedEncoding)
 		if Owned

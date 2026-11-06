@@ -65,7 +65,18 @@ _KLRTR_DeleteRequiresCommittedEOF() {
     Resume := _KLRTR_Body("_KL_RolloverResume")
     PreparePos := InStr(Body, "_KL_RolloverPrepare(Scope.Token, new_date)")
     ResumePos := InStr(Body, "_KL_RolloverResume(Scope.Token)")
-    DeletePos := InStr(Resume, "FileDelete(Keystats.today_log_path)")
+    DeletePos := InStr(Resume, "FSDeleteVerified(Keystats.today_log_path, _KL_RolloverSnapshotMatches.Bind(Expected))")
+    Match := _KLRTR_Body("_KL_RolloverSnapshotMatches")
+    ExpectedPos := InStr(Resume, 'Expected := Receipt["snapshot"].Clone()')
+    Assert(ExpectedPos > 0 && DeletePos > ExpectedPos,
+        "deletion must retain a clone of the original persisted consumed receipt")
+    Assert(InStr(Match, "Observed := FSReadRange(Candidate, 0, 0)") > 0
+        && InStr(Match, 'if !Observed.Get("ok", false) || !Snapshot.Get("ok", false)') > 0
+        && InStr(Match, 'for Name in ["volume", "index_high", "index_low", "write_high", "write_low", "size"]') > 0
+        && InStr(Match, "if Snapshot[Name] != Expected[Name]") > 0,
+        "the verified deletion must compare every fresh native receipt field with the original proof")
+    Assert(!InStr(Resume, "FileDelete("),
+        "no final deletion by pathname may bypass the exact verified file handle")
 
     Assert(IngestPos > 0 && OkPos > IngestPos && EofPos > OkPos,
         "KL_DayRollover must loop over forced batches and reject failed commits before accepting EOF")

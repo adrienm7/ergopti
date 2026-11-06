@@ -63,15 +63,86 @@ _ProxyOverride_DefaultPorts() {
 		"info", (Title, Text) => Ui_MsgBox(Text, Title, "Iconi"))
 }
 
-_ProxyOverride_Store(Value) {
+_ProxyOverride_Store(Value, BootSource := 0) {
 	global ConfigurationFile
 	Stored := ProxyOverride_Seal(Value)
 	if !(Stored is String)
 		return false
+	Publication := _ProxyOverride_PreparePublication(Stored)
+	if !Publication.usable
+		return false
 	Declaration := ProxyOverride_Declaration()
-	Updates := [{ Section: Declaration["section"], Key: Declaration["key"], Value: Stored }]
-	return ConfigCommitUpdates(ConfigurationFile, Updates, "the proxy override", 0, 0,
-		(*) => ProxyOverride_Publish(Stored))
+	Section := Declaration["section"], Key := Declaration["key"]
+	if !_ProxyOverride_FeatureTargetReady(Section, Key)
+		return ConfigReportPersistenceFailure("the proxy override", 0,
+			"the native proxy feature state is unavailable")
+	Updates := [{ Section: Section, Key: Key, Value: Stored }]
+	if !IsObject(BootSource)
+		return ConfigCommitUpdates(ConfigurationFile, Updates, "the proxy override", 0, 0,
+			_ProxyOverride_PublishStored.Bind(Publication, Section, Key))
+	Path := BootSource.Path
+	Lease := _ConfigWriteLeaseTryAcquire(Path, "proxy-boot-seal")
+	if !(Lease is Object)
+		return _ConfigReportPathPersistenceFailure(Path, "the proxy override", 0,
+			"another configuration transaction is already in progress")
+	try return ConfigCommitBuilt(Path, "the proxy override",
+		_ProxyOverride_BuildBootSeal.Bind(BootSource, Lease, Path, Updates, Publication, Section, Key),
+		_ProxyOverride_WriteBootSource.Bind(BootSource, Lease), 0, Lease)
+	finally _ConfigWriteLeaseRelease(Lease)
+}
+
+_ProxyOverride_FeatureTargetReady(Section, Key) {
+	global Features
+	return IsSet(Features) && Features is Map && Features.Has(Section)
+		&& Features[Section] is Map && Features[Section].Has(Key) && Features[Section][Key] is String
+}
+
+; Rebase only the acknowledged leaf onto the current native Features owner.
+; Its stored form, including DPAPI, is what the later full-save collector owns.
+_ProxyOverride_PublishStored(Publication, Section, Key) {
+	global Features
+	if !_ProxyOverride_FeatureTargetReady(Section, Key)
+		throw Error("The native proxy feature state was withdrawn before live publication.")
+	Features[Section][Key] := Publication.config
+	return _ProxyOverride_ApplyPublication(Publication)
+}
+
+; This predicate contains only retained RAM/source identity checks. The native
+; writer calls it again at its own final admission boundary while leased.
+_ProxyOverride_BootSourceCurrent(Source) {
+	global _ProxyOverrideBootSealSource, _ProxyOverrideStored, _ProxyOverrideSealed, ConfigurationFile
+	return IsObject(Source) && _ProxyOverrideBootSealSource == Source
+		&& !_ProxyOverrideSealed && Source.Stored is String
+		&& StrCompare(Source.Stored, _ProxyOverrideStored, true) == 0
+		&& StrCompare(Source.Path, ConfigurationFile, true) == 0
+}
+
+_ProxyOverride_BootSourceOwned(Source, Lease, Path) {
+	return _ConfigWriteLeaseOwns(Lease, Path) && _ProxyOverride_BootSourceCurrent(Source)
+		&& StrCompare(Path, Source.Path, true) == 0
+}
+
+_ProxyOverride_BuildBootSeal(Source, Lease, Path, Updates, Publication, Section, Key) {
+	if !_ProxyOverride_BootSourceOwned(Source, Lease, Path) || !_ProxyOverride_FeatureTargetReady(Section, Key)
+		return 0
+	; A bound custom writer carries its own exact-source/native-lease admission.
+	; The gateway's default admission keeps its original issuer fence intact.
+	return {updates: Updates, publish: _ProxyOverride_PublishBootSource.Bind(Source, Lease, Path, Publication, Section, Key)}
+}
+
+_ProxyOverride_PublishBootSource(Source, Lease, Path, Publication, Section, Key) {
+	; ConfigCommitBuilt invokes this under its publication Critical span. A lost
+	; source after durable ACK must report a partial failure, never publish stale RAM.
+	if !_ProxyOverride_BootSourceOwned(Source, Lease, Path)
+		throw Error("The automatic proxy sealing source was withdrawn before live publication.")
+	return _ProxyOverride_PublishStored(Publication, Section, Key)
+}
+
+_ProxyOverride_WriteBootSource(Source, Lease, Path, Updates) {
+	if !_ProxyOverride_BootSourceOwned(Source, Lease, Path)
+		return false
+	return TOML_ConfigBatchWrite(Path, Updates, [], _ProxyOverride_BootSourceOwned.Bind(Source, Lease, Path),
+		Source.Content, Source.Present)
 }
 
 /**
@@ -92,12 +163,15 @@ ProxyOverride_ScheduleSealAtStart(ScheduleFn := 0) {
  * @returns {Boolean} Whether the value was sealed now.
  */
 ProxyOverride_SealStoredAtStart(*) {
-	global _ProxyOverrideSealed
+	global _ProxyOverrideSealed, _ProxyOverrideBootSealSource
+	Source := _ProxyOverrideBootSealSource
 	Choice := ProxyOverride_Current()
 	if !(Choice is Map) || Choice["mode"] != "relay" || _ProxyOverrideSealed
 			|| !ProxyOverride_CarriesCredentials(Choice["relay"])
 		return false
-	if _ProxyOverride_Store(Choice["relay"]) != true {
+	if !_ProxyOverride_BootSourceCurrent(Source)
+		return false
+	if _ProxyOverride_Store(Choice["relay"], Source) != true {
 		LoggerError("ProxyOverride", "The stored proxy credentials could not be sealed: they stay in the file until the next start.")
 		return false
 	}

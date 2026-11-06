@@ -441,6 +441,11 @@ _WS_CommitCandidate(BuildFn, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0) {
 		}
 
 		StartEpoch := _WS_StateEpoch
+		SourceReceipt := _WS_CurrentSourceReceipt(BoundPath)
+		if !IsObject(SourceReceipt) || !_FSSourceIsUnchanged(BoundPath, SourceReceipt.source) {
+			try LoggerError("WrapSymbols", "The wrap-symbol source changed since load; reload before retrying.")
+			return false
+		}
 		CandidateDisabled := _WS_Disabled.Clone()
 		CandidateCustom := _WS_CloneCustom(_WS_Custom)
 		if !(CandidateCustom is Array) {
@@ -463,7 +468,7 @@ _WS_CommitCandidate(BuildFn, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0) {
 			return false
 		}
 		return _WS_Save(CandidateDisabled, CandidateCustom, CandidateActive,
-			OwnerToken, BoundPath, StartEpoch, WriterFn, ReplaceFn, DeleteFn)
+			OwnerToken, BoundPath, StartEpoch, WriterFn, ReplaceFn, DeleteFn, 0, SourceReceipt)
 	} finally _ConfigWriteLeaseRelease(OwnerToken)
 }
 
@@ -558,115 +563,196 @@ _WS_PublishCandidate(Disabled, Custom, Active, StartEpoch) {
 ; ===========================================================
 ; ===========================================================
 
-; Parse the TOML persistence file and populate _WS_Disabled + _WS_Custom.
+; Adapt the owner's legacy semicolon comments with the canonical lexical owner.
+; Its quote/container state spans multiline values, so cited semicolons never
+; become comments. The returned text is read-only input, never written to disk.
+_WS_CanonicalTomlSource(Content) {
+	Result := "", Position := 1, Length := StrLen(Content)
+	while Position <= Length {
+		Start := Position
+		_TOML_DocumentToken(Content, &Position, ";", &Separated)
+		if !Separated {
+			Result .= SubStr(Content, Start)
+			break
+		}
+		Semicolon := Position - 1
+		Result .= SubStr(Content, Start, Semicolon - Start) . "#"
+		NextLine := InStr(Content, "`n", true, Position)
+		End := NextLine ? NextLine + 1 : Length + 1
+		Result .= SubStr(Content, Position, End - Position)
+		Position := End
+	}
+	return Result
+}
+
+_WS_ProjectDisabled(Entry, Disabled) {
+	if !(Entry is Map)
+		throw ValueError("A wrap-symbol disabled entry must be a table.")
+	if Entry.Has("char") {
+		Character := Entry["char"]
+		if !(Character is String) || Character == ""
+			throw ValueError("A disabled wrap symbol must be nonempty text.")
+		; Built-in spaced guillemets can contain several UTF-16 units.
+		Disabled[Character] := true
+	}
+	if Entry.Has("chars") {
+		if !(Entry["chars"] is String)
+			throw ValueError("Legacy disabled wrap symbols must be comma-separated text.")
+		for Character in StrSplit(Entry["chars"], ",") {
+			Character := Trim(Character, " `t")
+			if Character != ""
+				Disabled[Character] := true
+		}
+	}
+}
+
+_WS_ProjectCustom(Entry, Custom) {
+	if !(Entry is Map)
+		throw ValueError("A custom wrap-symbol entry must be a table.")
+	if !Entry.Has("left") {
+		if Entry.Has("right")
+			throw ValueError("A custom wrap-symbol entry has no opening symbol.")
+		return
+	}
+	Left := Entry["left"], Right := Entry.Get("right", "")
+	if !(Left is String) || !(Right is String) || Left == ""
+		throw ValueError("Custom wrap symbols must be nonempty text.")
+	; The legacy reader treats an absent/empty right side as a symmetric pair.
+	Right := Right == "" ? Left : Right
+	if StrLen(Left) != 1 || StrLen(Right) != 1
+		throw ValueError("Custom wrap symbols must fit the native single-symbol domain.")
+	Custom.Push(Map("left", Left, "right", Right))
+}
+
+
+; A receipt belongs to the two actual parsed/published objects, never a clone.
+; The metadata has no backreference to its Array or Map and needs no ledger.
+_WS_BindSourceReceipt(Custom, Disabled, Path, Source) {
+	if !(Custom is Array) || !(Disabled is Map) || !(Source is Map)
+		throw TypeError("A wrap source receipt needs a complete projection")
+	Status := Source.Get("status", "")
+	if (Status != "ok" && Status != "absent") || !(Source.Get("content", 0) is String)
+		throw ValueError("An unreadable wrap source cannot issue write permission")
+	Receipt := {custom: ObjPtr(Custom), disabled: ObjPtr(Disabled),
+		path: _ConfigWriteLeaseKey(Path), source: Map("status", Status, "content", Source["content"])}
+	Custom.DefineProp("_WS_SourceReceipt", {Value: Receipt})
+	return Receipt
+}
+_WS_CurrentSourceReceipt(Path) {
+	global _WS_Custom, _WS_Disabled
+	if !(_WS_Custom is Array) || !(_WS_Disabled is Map)
+		return 0
+	if !Object.Prototype.HasOwnProp.Call(_WS_Custom, "_WS_SourceReceipt")
+		return 0
+	Receipt := Object.Prototype.GetOwnPropDesc.Call(_WS_Custom, "_WS_SourceReceipt").Value
+	return _WS_SourceReceiptCurrent(Receipt, Path) ? Receipt : 0
+}
+_WS_SourceReceiptCurrent(Receipt, Path) {
+	global _WS_Custom, _WS_Disabled
+	if !IsObject(Receipt) || !(_WS_Custom is Array) || !(_WS_Disabled is Map)
+		return false
+	if !Object.Prototype.HasOwnProp.Call(_WS_Custom, "_WS_SourceReceipt")
+		return false
+	return Object.Prototype.GetOwnPropDesc.Call(_WS_Custom, "_WS_SourceReceipt").Value == Receipt
+		&& Receipt.custom == ObjPtr(_WS_Custom) && Receipt.disabled == ObjPtr(_WS_Disabled)
+		&& Receipt.path == _ConfigWriteLeaseKey(Path)
+}
+_WS_FinalSourceAdmission(OwnerToken, Path, Epoch, Receipt) {
+	return _WS_AuthorizeCommit(OwnerToken, Path, Epoch)
+		&& _WS_SourceReceiptCurrent(Receipt, Path)
+}
+
+; Parse into detached state, then publish only a complete admitted projection.
+; Unknown roots retain the previous owner's ignored-root policy; malformed or
+; unprojectable owned leaves latch so a later save cannot erase their data.
 _WS_Load() {
-		global _WS_Config_Path, _WS_Disabled, _WS_Custom, _WS_LoadFailed
-		if (!FileExist(_WS_Config_Path)) {
-				; A genuinely absent file is not a failure: a fresh install must still be
-				; able to save. Only an existing-but-unreadable one blocks persistence.
-				return
+	global _WS_Config_Path, _WS_Disabled, _WS_Custom, _WS_LoadFailed
+	try {
+		Source := FSReadWithStatus(_WS_Config_Path)
+		if Source["status"] == "absent" {
+			_WS_BindSourceReceipt(_WS_Custom, _WS_Disabled, _WS_Config_Path, Source)
+			return
 		}
-		try {
-				InDisabled := false
-				InCustom   := false
-				CurLeft    := ""
-				CurRight   := ""
-				; _WS_Save writes UTF-8 without a BOM. Loop Read would decode it with
-				; the ANSI code page, so a disabled guillemet came back mangled (and
-				; enabled) after every reload.
-				Content := FileRead(_WS_Config_Path, "UTF-8")
-				loop parse, Content, "`n", "`r" {
-						Line := Trim(A_LoopField, " `t")
-						if (Line == "" or SubStr(Line, 1, 1) == ";") {
-								continue
-						}
-						if (Line == "[disabled]" or Line == "[[disabled]]") {
-								; Flush a pending custom entry first. This branch predates the flush
-								; logic the [[custom]] and generic [ branches already perform, so a
-								; [[custom]] block immediately followed by [[disabled]] silently lost
-								; the user's wrap pair. It is masked today only because _WS_Save happens
-								; to emit disabled blocks before custom ones — a hand-edited or
-								; reordered file loses data.
-								if (InCustom and CurLeft != "") {
-										R := (CurRight != "") ? CurRight : CurLeft
-										_WS_Custom.Push(Map("left", CurLeft, "right", R))
-								}
-								InDisabled := true
-								InCustom   := false
-								CurLeft    := ""
-								CurRight   := ""
-								continue
-						}
-						if (Line == "[[custom]]") {
-								; Flush the previous custom entry when entering a new block
-								if (CurLeft != "") {
-										R := (CurRight != "") ? CurRight : CurLeft
-										_WS_Custom.Push(Map("left", CurLeft, "right", R))
-								}
-								InDisabled := false
-								InCustom   := true
-								CurLeft    := ""
-								CurRight   := ""
-								continue
-						}
-						if (SubStr(Line, 1, 1) == "[") {
-								; Flush pending custom entry on any new section
-								if (InCustom and CurLeft != "") {
-										R := (CurRight != "") ? CurRight : CurLeft
-										_WS_Custom.Push(Map("left", CurLeft, "right", R))
-										CurLeft := ""
-										CurRight := ""
-								}
-								InDisabled := false
-								InCustom   := false
-								continue
-						}
-						if InDisabled {
-								; Modern format: [[disabled]] char = "..."
-								if RegExMatch(Line, '^char\s*=\s*"(.*)"', &M) {
-										_WS_Disabled[_WS_UnescapeToml(M[1])] := true
-								}
-								; Legacy format: [disabled] chars = "a,b,c"
-								else if RegExMatch(Line, '^chars\s*=\s*"(.*)"', &M) {
-										for _, Ch in StrSplit(M[1], ",") {
-												Trimmed := Trim(Ch, " `t")
-												if (Trimmed != "") {
-														_WS_Disabled[Trimmed] := true
-												}
-										}
-								}
-						} else if InCustom {
-								if RegExMatch(Line, '^left\s*=\s*"(.*)"', &M) {
-										CurLeft := _WS_UnescapeToml(M[1])
-								} else if RegExMatch(Line, '^right\s*=\s*"(.*)"', &M) {
-										CurRight := _WS_UnescapeToml(M[1])
-								}
-						}
-				}
-				; Flush the last custom block
-				if (InCustom and CurLeft != "") {
-						R := (CurRight != "") ? CurRight : CurLeft
-						_WS_Custom.Push(Map("left", CurLeft, "right", R))
-				}
-				try LoggerDebug("WrapSymbols", "Loaded: {1} disabled, {2} custom.", _WS_Disabled.Count, _WS_Custom.Length)
-		} catch as Err {
-				; Latch the failure. The maps above are now EMPTY, and empty is exactly
-				; what "the user has disabled nothing and defined no custom pair" looks
-				; like — so the next toggle would serialize that emptiness over the real
-				; file: every disabled built-in silently re-enabled, every custom pair
-				; permanently gone. Same class as the config.toml boot read, and the same
-				; cure: an unreadable file must be distinguishable from an empty one.
-				_WS_LoadFailed := true
-				try LoggerError("WrapSymbols", "Could not read wrap_symbols.toml: {1}. Persistence is now BLOCKED for this session so the settings in that file are not overwritten with an empty set; restart the driver once it is readable.", Err.Message)
+		if Source["status"] != "ok"
+			throw Error("The wrap source cannot be read as exact UTF-8")
+		Content := Source["content"]
+		; FileRead(UTF-8) previously consumed a BOM; keep that decoder boundary
+		; while retaining its exact bytes in the source receipt.
+		if SubStr(Content, 1, 1) == Chr(0xFEFF)
+			Content := SubStr(Content, 2)
+		Document := TOML_ParseDocument(_WS_CanonicalTomlSource(Content), &Records, &Physical)
+		for Record in Physical
+			if Record.Kind == "opaque"
+				throw ValueError("The wrap-symbol source contains an uninterpreted record.")
+		Disabled := Map(), Custom := []
+		if Document.Has("disabled") {
+			Entries := Document["disabled"]
+			if Entries is Map
+				_WS_ProjectDisabled(Entries, Disabled)
+			else if Entries is Array {
+				for Entry in Entries
+					_WS_ProjectDisabled(Entry, Disabled)
+			} else
+				throw ValueError("The disabled wrap-symbol source has an unsupported shape.")
 		}
+		if Document.Has("custom") {
+			if !(Document["custom"] is Array)
+				throw ValueError("Custom wrap symbols require a table array.")
+			for Entry in Document["custom"]
+				_WS_ProjectCustom(Entry, Custom)
+		}
+		_WS_Disabled := Disabled, _WS_Custom := Custom
+		_WS_BindSourceReceipt(Custom, Disabled, _WS_Config_Path, Source)
+		try LoggerDebug("WrapSymbols", "Loaded: {1} disabled, {2} custom.", _WS_Disabled.Count, _WS_Custom.Length)
+	} catch as Err {
+		; Only Init may clear this latch. Never serialize an incomplete view.
+		_WS_LoadFailed := true
+		try LoggerError("WrapSymbols", "Could not read or interpret wrap_symbols.toml: {1}. Persistence is now BLOCKED for this session so source data cannot be overwritten by an incomplete projection; restart once the file is readable and valid.", Err.Message)
+	}
 }
 
 ; Serialize, stage and commit one detached state. The no-argument form remains
 ; for internal compatibility, but acquires the same global lease before cloning
 ; live state instead of bypassing the transaction gateway.
+; A reader may inspect the native cutpoint, but no other writer/deleter may
+; replace the stage while its original exclusive-create handle is retained.
+_WS_CreateReadableHeldStage(Folder, Name, Attributes) {
+	return _FSCreateHeldStage(Folder, Name, Attributes, 1) ; FILE_SHARE_READ only
+}
+
+_WS_BeforeHeldPublication(OwnerToken, BoundPath, StartEpoch, ExpectedSource, BeforeNativeFn) {
+	PreviousCritical := Critical("On")
+	try Authorized := _WS_AuthorizeCommit(OwnerToken, BoundPath, StartEpoch)
+	finally Critical(PreviousCritical)
+	if !(Authorized is Integer) || Authorized != 1
+		return false
+	if HasMethod(BeforeNativeFn, "Call")
+		BeforeNativeFn.Call()
+	else if !((BeforeNativeFn is Integer) && BeforeNativeFn == 0)
+		throw TypeError("The private native cutpoint is not callable")
+	; Exact source I/O precedes the pure final admission/held rename wrapper.
+	; This is not a kernel compare-and-swap of another process's source edits.
+	return _FSSourceIsUnchanged(BoundPath, ExpectedSource.source)
+}
+
+; A visible native replacement without its durability ACK is not unchanged.
+; Fence only this still-current old projection; never poison a newer reload.
+_WS_LatchUnacknowledgedPublication(ExpectedSource, BoundPath, StartEpoch) {
+	global _WS_LoadFailed, _WS_StateEpoch, _WS_Config_Path
+	PreviousCritical := Critical("On")
+	try {
+		if _WS_StateEpoch == StartEpoch && _WS_SourceReceiptCurrent(ExpectedSource, BoundPath)
+				&& _ConfigWriteLeaseKey(_WS_Config_Path) == _ConfigWriteLeaseKey(BoundPath) {
+			_WS_LoadFailed := true
+			return true
+		}
+		return false
+	} finally Critical(PreviousCritical)
+}
+
 _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 		ActiveCandidate := unset, OwnerToken := 0, BoundPath := unset,
-		StartEpoch := unset, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0) {
+		StartEpoch := unset, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0, BeforeNativeFn := 0, ExpectedSource := 0) {
 	global _WS_Config_Path, _WS_Disabled, _WS_Custom, _WS_LoadFailed
 	global _WS_StateEpoch
 	BorrowedOwner := OwnerToken is Object
@@ -683,9 +769,10 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 			return false
 		}
 		try {
+			CompatibilitySource := _WS_CurrentSourceReceipt(CompatibilityPath)
 			return _WS_Save(unset, unset, unset, CompatibilityOwner,
 				CompatibilityPath, _WS_StateEpoch,
-				WriterFn, ReplaceFn, DeleteFn)
+				WriterFn, ReplaceFn, DeleteFn, BeforeNativeFn, CompatibilitySource)
 		} finally _ConfigWriteLeaseRelease(CompatibilityOwner)
 	}
 
@@ -706,6 +793,12 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 	}
 	if _WS_LoadFailed {
 		try LoggerError("WrapSymbols", "Refusing to save wrap_symbols.toml: it could not be read at load, so the live state is untrustworthy. Restart the driver once the file is readable.")
+		return false
+	}
+
+	if !_WS_SourceReceiptCurrent(ExpectedSource, BoundPath)
+			|| !_FSSourceIsUnchanged(BoundPath, ExpectedSource.source) {
+		try LoggerError("WrapSymbols", "Refusing to reconstruct a wrap-symbol source no longer owned by this loaded projection.")
 		return false
 	}
 
@@ -747,7 +840,11 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 		return false
 	}
 
-	Content := _WS_SerializeCandidate(DisabledCandidate, CustomCandidate)
+	try Content := _WS_SerializeCandidate(DisabledCandidate, CustomCandidate)
+	catch ValueError as Err {
+		try LoggerError("WrapSymbols", "Refusing to serialize a wrap-symbol candidate outside the native text domain.")
+		return false
+	}
 	if !(Content is String) {
 		try LoggerError("WrapSymbols", "Refusing to serialize malformed wrap-symbol state.")
 		return false
@@ -758,57 +855,107 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 	finally Critical(PreviousCritical)
 	StagePath := BoundPath . "." . A_ScriptHwnd . "-" . LocalSequence . ".tmp"
 
-	Written := false
-	WriteError := ""
-	try Written := HasMethod(WriterFn, "Call")
-		? WriterFn.Call(StagePath, Content) : FSWriteDurable(StagePath, Content)
-	catch as Err {
+	NativeAdapters := (WriterFn is Integer) && WriterFn == 0
+		&& (ReplaceFn is Integer) && ReplaceFn == 0
+		&& (DeleteFn is Integer) && DeleteFn == 0
+	if NativeAdapters {
+		; Retain the exclusively created stage and its parent through the actual
+		; rename and cleanup; never reopen or retire an unowned stage pathname.
+		BeforePublish := _WS_BeforeHeldPublication.Bind(OwnerToken, BoundPath,
+			StartEpoch, ExpectedSource, BeforeNativeFn)
+		FinalAdmission := _WS_FinalSourceAdmission.Bind(OwnerToken, BoundPath, StartEpoch, ExpectedSource)
+		StageSuffix := SubStr(StagePath, StrLen(BoundPath) + 1)
+		if !FSWriteReplaceOwned(BoundPath, Content, StageSuffix, &StageDetail,
+				_WS_CreateReadableHeldStage, BeforePublish, FinalAdmission,
+				ExpectedSource.source["status"] != "absent", &Publication) {
+			if Publication.renamed && !Publication.durable {
+				Latched := _WS_LatchUnacknowledgedPublication(ExpectedSource, BoundPath, StartEpoch)
+				PartialDetail := "the file was replaced but durable completion was not acknowledged; "
+					. (Latched ? "the old live projection was fenced pending a reload. "
+						: "this superseded completion no longer owns the current live state. ")
+				return ConfigReportPersistenceFailure("wrap-symbol publication", 0,
+					PartialDetail . StageDetail, false)
+			}
+			try LoggerError("WrapSymbols", "Owned wrap-symbol publication at '{1}' was refused: {2}.", BoundPath, StageDetail)
+			return false
+		}
+	} else {
 		Written := false
-		WriteError := Err.Message
-	}
-	Written := (Written is Integer) && Written == 1
-	if !Written {
-		if (WriteError != "") {
-			try LoggerError("WrapSymbols", "Writing staging file for '{1}' failed: {2}. The previous contents are intact.", BoundPath, WriteError)
-		} else {
-			try LoggerError("WrapSymbols", "Writing staging file for '{1}' was refused. The previous contents are intact.", BoundPath)
+		WriteError := ""
+		try Written := HasMethod(WriterFn, "Call")
+			? WriterFn.Call(StagePath, Content) : FSWriteDurable(StagePath, Content)
+		catch as Err {
+			Written := false
+			WriteError := Err.Message
 		}
-		_WS_CleanupStage(StagePath, DeleteFn)
-		return false
-	}
+		Written := (Written is Integer) && Written == 1
+		if !Written {
+			if (WriteError != "") {
+				try LoggerError("WrapSymbols", "Writing staging file for '{1}' failed: {2}. The previous contents are intact.", BoundPath, WriteError)
+			} else {
+				try LoggerError("WrapSymbols", "Writing staging file for '{1}' was refused. The previous contents are intact.", BoundPath)
+			}
+			_WS_CleanupStage(StagePath, DeleteFn)
+			return false
+		}
 
-	Authorized := false
-	PreviousCritical := Critical("On")
-	try {
-		Authorized := _WS_AuthorizeCommit(OwnerToken, BoundPath, StartEpoch)
-		Authorized := (Authorized is Integer) && Authorized == 1
-	} finally Critical(PreviousCritical)
+		Authorized := false
+		PreviousCritical := Critical("On")
+		try {
+			Authorized := _WS_AuthorizeCommit(OwnerToken, BoundPath, StartEpoch)
+			Authorized := (Authorized is Integer) && Authorized == 1
+		} finally Critical(PreviousCritical)
 
-	if !Authorized {
-		try LoggerError("WrapSymbols", "Authorization before publishing '{1}' was refused. The previous contents are intact.", BoundPath)
-		_WS_CleanupStage(StagePath, DeleteFn)
-		return false
-	}
+		if !Authorized {
+			try LoggerError("WrapSymbols", "Authorization before publishing '{1}' was refused. The previous contents are intact.", BoundPath)
+			_WS_CleanupStage(StagePath, DeleteFn)
+			return false
+		}
 
-	; Atomic replacement can block in filesystem filters or antivirus code.
-	; Keep the exact global owner, but never keep Critical, across this OS call.
-	Replaced := false
-	ReplaceError := ""
-	try Replaced := HasMethod(ReplaceFn, "Call")
-		? ReplaceFn.Call(StagePath, BoundPath)
-		: FSAtomicMoveReplace(StagePath, BoundPath)
-	catch as Err {
+		; Keep source reads and staging outside Critical. Only the native wrapper
+		; protects the final memory admission and its immediately following rename.
 		Replaced := false
-		ReplaceError := Err.Message
-	}
-	Replaced := (Replaced is Integer) && Replaced == 1
-	if !Replaced {
-		if (ReplaceError != "") {
-			try LoggerError("WrapSymbols", "Atomic replacement of '{1}' failed: {2}. The previous contents are intact.", BoundPath, ReplaceError)
-		} else {
-			try LoggerError("WrapSymbols", "Atomic replacement of '{1}' was refused. The previous contents are intact.", BoundPath)
+		ReplaceError := ""
+		try {
+			; Optional observation of the final native cutpoint, internal to this
+			; helper; the public two-argument replace adapter keeps its existing ABI.
+			if HasMethod(BeforeNativeFn, "Call")
+				BeforeNativeFn.Call()
+			else if !((BeforeNativeFn is Integer) && BeforeNativeFn == 0)
+				throw TypeError("The private native cutpoint is not callable")
+			; Complete the exact source read outside Critical. The immediately
+			; following native wrapper rechecks only memory ownership under Critical.
+			; This is not a cross-process kernel compare-and-swap of file contents.
+			if !_FSSourceIsUnchanged(BoundPath, ExpectedSource.source)
+				throw Error("The wrap-symbol source changed before native publication")
+			FinalAdmission := _WS_FinalSourceAdmission.Bind(OwnerToken, BoundPath, StartEpoch, ExpectedSource)
+			if HasMethod(ReplaceFn, "Call") {
+				; Preserve the existing adapter ABI, but never grant it a stale source.
+				Replaced := FinalAdmission.Call() && ReplaceFn.Call(StagePath, BoundPath)
+			} else if ExpectedSource.source["status"] == "absent"
+				Replaced := FSConfigAtomicMoveCreate(StagePath, BoundPath, FinalAdmission)
+			else
+				Replaced := FSConfigAtomicMoveReplace(StagePath, BoundPath, &NativeError, FinalAdmission)
 		}
-		_WS_CleanupStage(StagePath, DeleteFn)
+		catch as Err {
+			Replaced := false
+			ReplaceError := Err.Message
+		}
+		Replaced := (Replaced is Integer) && Replaced == 1
+		if !Replaced {
+			if (ReplaceError != "") {
+				try LoggerError("WrapSymbols", "Atomic replacement of '{1}' failed: {2}. The previous contents are intact.", BoundPath, ReplaceError)
+			} else {
+				try LoggerError("WrapSymbols", "Atomic replacement of '{1}' was refused. The previous contents are intact.", BoundPath)
+			}
+			_WS_CleanupStage(StagePath, DeleteFn)
+			return false
+		}
+	}
+
+	PublishedSource := FSReadWithStatus(BoundPath)
+	if PublishedSource["status"] != "ok" || PublishedSource["content"] !== Content {
+		try LoggerError("WrapSymbols", "The durable wrap-symbol source did not match its candidate; reload before retrying.")
 		return false
 	}
 
@@ -818,8 +965,16 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 	PublishError := ""
 	PreviousCritical := Critical("On")
 	try {
-		try Published := _WS_PublishCandidate(DisabledCandidate,
-			CustomCandidate, ActiveCandidate, StartEpoch)
+		try {
+			; Durability is already acknowledged. A later pause cannot revoke
+			; this memory projection, but a replacement source owner still can.
+			if _WS_SourceReceiptCurrent(ExpectedSource, BoundPath)
+					&& _ConfigWriteLeaseKey(_WS_Config_Path) == _ConfigWriteLeaseKey(BoundPath) {
+				_WS_BindSourceReceipt(CustomCandidate, DisabledCandidate, BoundPath, PublishedSource)
+				Published := _WS_PublishCandidate(DisabledCandidate,
+					CustomCandidate, ActiveCandidate, StartEpoch)
+			}
+		}
 		catch as Err {
 			Published := false
 			PublishError := Err.Message

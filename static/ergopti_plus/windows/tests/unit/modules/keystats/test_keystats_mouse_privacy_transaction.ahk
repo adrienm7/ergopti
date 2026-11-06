@@ -515,3 +515,17 @@ _KLMS_ParkPrivacyFailure() {
 	}
 }
 Test("mouse-privacy-query-failure: park polling fails closed", _KLMS_ParkPrivacyFailure)
+
+
+_KLMS_CompensatedBurst(Recorder) {
+	_KLMS_Flush(1500, Recorder)
+	AssertEqual(0, KLMouse.scroll_start, "zero-net scroll must retire its start timestamp")
+	AssertEqual(0, KLMouse.scroll_last, "zero-net scroll must retire its last timestamp")
+	AssertEqual(0, Recorder.Calls.Length, "zero-net scroll must not query context or append an event")
+	_KLMS_Accumulate("vertical", 2000, Recorder)
+	_KLMS_Flush(2100, Recorder)
+	AssertEqual(1, Recorder.Events.Length)
+	AssertEqual(100, Recorder.Events[1]["duration_ms"], "the next burst measures only its own interval")
+}
+Test("scroll: compensated burst retires timing (scroll-zero-net-lifecycle)",
+	_KLMS_WithState.Bind(0, 0, 1000, 1100, _KLMS_CompensatedBurst))

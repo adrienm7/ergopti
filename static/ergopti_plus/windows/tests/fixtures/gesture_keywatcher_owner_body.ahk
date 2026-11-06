@@ -46,6 +46,8 @@ _GKO_Snapshot(Phase) {
 		"a", IsObject(_GKO.OwnerA) ? ObjPtr(_GKO.OwnerA) : 0,
 		"b", IsObject(_GKO.OwnerB) ? ObjPtr(_GKO.OwnerB) : 0,
 		"b_in_progress", IsObject(_GKO.OwnerB) ? _GKO.OwnerB.InProgress : false,
+		"b_end_reason", IsObject(_GKO.OwnerB) ? _GKO.OwnerB.EndReason : "",
+		"b_input", IsObject(_GKO.OwnerB) ? _GKO.OwnerB.Input : "", "refused", _GKO.Refused,
 		"stops", _GKO.Stops.Clone(), "events", _GKO.Events.Clone(), "suspended", A_IsSuspended,
 		"native_left_model", _GKO.NativeHeld["Left"], "native_right_model", _GKO.NativeHeld["Right"], "logs", _GKO.Logs.Clone())
 }
@@ -150,6 +152,11 @@ _GKO_Replacement() {
 	_GKO.OwnerA := _GKO_Acquire(First)
 	_GKO.CallbackA := _GKO.OwnerA.OnKeyDown
 	_GKO_Require(_GKO.CallbackA is Func, "the original owner's actual callback must be retained before replacement")
+	_GKO_Require(GestureStartKeyboardWatcher() && GestureKeyboardHook == _GKO.OwnerA
+		&& _GKO.OwnerA.InProgress && _GKO.Stops.Length == 0,
+		"a live watcher must be reused without disturbing the existing held button")
+	; Create a genuinely retired generation explicitly for the stale callback probe.
+	_GKO_Require(GestureStopKeyboardWatcher(), "the first generation must retire before replacement")
 	_GKO.OwnerB := _GKO_Acquire(Second)
 	_GKO.CallbackB := _GKO.OwnerB.OnKeyDown
 	_GKO_Require(_GKO.OwnerA != _GKO.OwnerB && GestureKeyboardHook == _GKO.OwnerB, "the actual second acquisition must publish a distinct replacement")
@@ -202,9 +209,92 @@ _GKO_PausedRefusal() {
 		&& _GKO.Stops[1] == ObjPtr(_GKO.OwnerB), "retry while still paused must discharge only its own debt")
 }
 
+; This mode explicitly sends keys only into a verified Edit owned by this child.
+; Mouse edges remain passive and every actual InputHook callback is native-delivered.
+_GKO_NativeRetry() {
+	global _GKO, GestureKeyboardHook, GestureLeftClickHeld
+	_GKO_Require(A_Args.Length == 5 && A_Args[5] == "--allow-explicit-owned-edit-sendevent",
+		"native keyboard delivery requires the explicit owned-Edit opt-in")
+	Window := Gui(, "Ergopti native gesture recovery probe")
+	Editor := Window.AddEdit("w320 r3")
+	PreviousLevel := A_SendLevel, PreviousDelay := A_KeyDelay, PreviousDuration := A_KeyDuration
+	PreviousCritical := Critical("Off")
+	AdmittedTarget() {
+		_GKO_Require(DllCall("GetForegroundWindow", "Ptr") == Window.Hwnd
+			&& DllCall("GetFocus", "Ptr") == Editor.Hwnd
+			&& WinGetPID("ahk_id " . Window.Hwnd) == DllCall("GetCurrentProcessId", "UInt"),
+			"native input is confined to this child's verified foreground Edit")
+		for Modifier in ["Ctrl", "Alt", "Shift", "LWin", "RWin"]
+			_GKO_Require(!GetKeyState(Modifier, "P"), "physical modifiers must be released before native delivery")
+	}
+	try {
+		Window.Show()
+		WinActivate("ahk_id " . Window.Hwnd)
+		_GKO_Require(WinWaitActive("ahk_id " . Window.Hwnd, , 2), "the private native target must acquire focus")
+		Editor.Focus()
+		AdmittedTarget()
+		_GKO.OwnerB := _GKO_Acquire("Left")
+		_GKO_Require(_GKO.OwnerB.MinSendLevel == 0, "both physical and level-zero synthetic keys must retain their cancellation rights")
+		_GKO.RefuseUp := "Left"
+		SendLevel(0)
+		SetKeyDelay(0, 0)
+		Keys := _GKO.Mode == "native-retry-long" ? "abcdefgh" : (_GKO.Mode == "native-retry-three" ? "abc" : "a")
+		Typed := "", TextStayedEmpty := true
+		for Key in StrSplit(Keys) {
+			Before := _GKO.Refused
+			AdmittedTarget()
+			SendEvent(Key)
+			Typed .= Key
+			Started := A_TickCount
+			while _GKO.Refused == Before && _GKO.OwnerB.InProgress && A_TickCount - Started < 1500
+				Sleep(5)
+			; A native length completion can retire capture before its final
+			; OnKeyDown notification is posted. That is the candidate transition,
+			; not a missing acquisition prerequisite: witness the exact input and
+			; continue to the independent next-key recovery assertion below.
+			CompletedAtLimit := _GKO.Mode != "native-retry-one" && Typed == "abc"
+				&& !_GKO.OwnerB.InProgress && _GKO.OwnerB.EndReason == "Max" && _GKO.OwnerB.Input == Typed
+			_GKO.Logs.Push("typed=" . Typed . " refused_before=" . Before . " refused_after=" . _GKO.Refused
+				. " in_progress=" . _GKO.OwnerB.InProgress . " end_reason=" . _GKO.OwnerB.EndReason . " input=" . _GKO.OwnerB.Input)
+			TextStayedEmpty := TextStayedEmpty && _GKO.OwnerB.Input == ""
+			if StrLen(Typed) <= 3 || Typed == Keys
+				_GKO_Observe("native-key-observed-" . StrLen(Typed))
+			_GKO_Require(_GKO.Refused > Before || CompletedAtLimit,
+				"each sent key must reach its native notification or complete the exact three-character capture")
+			if CompletedAtLimit
+				break
+		}
+		Retained := _GKO.OwnerB.InProgress
+		_GKO.Logs.Push("before-retry in_progress=" . Retained . " end_reason=" . _GKO.OwnerB.EndReason . " input=" . _GKO.OwnerB.Input)
+		_GKO_Observe("native-refusals-before-retry")
+		_GKO.RefuseUp := ""
+		AdmittedTarget()
+		SendEvent("d")
+		Started := A_TickCount
+		while GestureLeftClickHeld && A_TickCount - Started < 1500
+			Sleep(5)
+		_GKO_Observe("native-next-key-returned")
+		_GKO_Require(!GestureLeftClickHeld && GestureKeyboardHook == 0,
+			"the key after refused releases must still reach the live watcher and discharge its held-button debt")
+		_GKO_Require(Retained, "the actual watcher must stay armed while any refused Button Up remains owed")
+		_GKO_Require(Typed == Keys && TextStayedEmpty && _GKO.OwnerB.Input == "",
+			"the native observer must keep release recovery alive without collecting any typed text")
+		Started := A_TickCount
+		while Editor.Value != Keys . "d" && A_TickCount - Started < 500
+			Sleep(5)
+		_GKO_Require(Editor.Value == Keys . "d", "all observed native keys must pass through normally to the owned Edit")
+		_GKO_Released()
+	} finally {
+		SendLevel(PreviousLevel)
+		SetKeyDelay(PreviousDelay, PreviousDuration)
+		Window.Destroy()
+		Critical(PreviousCritical)
+	}
+}
+
 _GKO_Main() {
 	global _GKO, _GKO_ActualOwnerHash
-	_GKO_Require(A_Args.Length == 4, "the exact child ABI must be retained")
+	_GKO_Require(A_Args.Length == (InStr(_GKO.Mode, "native-retry-") == 1 ? 5 : 4), "the exact child ABI and explicit native opt-in must be retained")
 	_GKO_Require(A_Args[2] == _GKO_ActualOwnerHash, "the bound production owner hash must match the parent")
 	_GKO_Require(CryptoSha256Bytes(FileRead(A_ScriptFullPath, "RAW")) == A_Args[3], "the actual child source must match its provenance")
 	_GKO_Require(CryptoSha256Bytes(FileRead(A_AhkPath, "RAW")) == A_Args[4], "the actual native runtime must match its provenance")
@@ -213,7 +303,9 @@ _GKO_Main() {
 	LoggerSetTestSink(_GKO_Log)
 	try {
 		Suspend(false)
-		if InStr(_GKO.Mode, "paused-", true) == 1
+		if InStr(_GKO.Mode, "native-retry-") == 1
+			_GKO_NativeRetry()
+		else if InStr(_GKO.Mode, "paused-", true) == 1
 			_GKO_PausedRefusal()
 		else if InStr(_GKO.Mode, "assignment-", true) == 1
 			_GKO_Assignment()
@@ -244,7 +336,8 @@ _GKO_Main() {
 		throw Cleanup
 	FileAppend("RECEIPT " . KL_JsonEncode(Map("pid", DllCall("GetCurrentProcessId", "UInt"), "mode", _GKO.Mode,
 		"source_sha256", A_Args[3], "runtime_sha256", A_Args[4], "click_owner_sha256", _GKO_ActualOwnerHash,
-		"callback_delivery", "controlled", "mouse_injected", false, "hooks_retired", true,
+		"callback_delivery", InStr(_GKO.Mode, "native-retry-") == 1 ? "native-sendevent-level0" : "controlled",
+		"keyboard_injected", InStr(_GKO.Mode, "native-retry-") == 1, "mouse_injected", false, "hooks_retired", true,
 		"subscriptions_retired", true, "suspended", A_IsSuspended)) . "`n", "*")
 }
 

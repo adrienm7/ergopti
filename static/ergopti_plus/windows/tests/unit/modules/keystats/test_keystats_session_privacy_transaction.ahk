@@ -213,7 +213,11 @@ _KLSPT_ZeroTickScope(Run) {
 	SavedAccept := _KLSPT_Sink.accept
 	SavedApp := KLHook.app_entered_at
 	SavedTitle := KLHook.title_entered_at
+	SavedTransition := KLHook.context_transition, SavedStop := KLHook.context_stop
+	SavedObservations := KLHook.context_observations, SavedObservationHead := KLHook.context_observation_head
 	try {
+		KLHook.context_transition := false, KLHook.context_stop := false
+		KLHook.context_observations := [], KLHook.context_observation_head := 1
 		_KLSPT_ResetWatcher()
 		KLHook.app_entered_at := 0
 		KLHook.title_entered_at := 0
@@ -225,6 +229,8 @@ _KLSPT_ZeroTickScope(Run) {
 		_KLSPT_Sink.accept := SavedAccept
 		KLHook.app_entered_at := SavedApp
 		KLHook.title_entered_at := SavedTitle
+		KLHook.context_transition := SavedTransition, KLHook.context_stop := SavedStop
+		KLHook.context_observations := SavedObservations, KLHook.context_observation_head := SavedObservationHead
 	}
 }
 

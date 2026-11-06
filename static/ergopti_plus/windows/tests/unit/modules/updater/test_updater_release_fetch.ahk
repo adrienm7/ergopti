@@ -199,6 +199,9 @@ _UpdaterTest_ManualUrlAllowlistPrecedesRunner() {
 		RepoRoot . "/../other", RepoRoot . "/%2e%2e/other", RepoRoot . "/%2e%2e%2fother",
 		RepoRoot . "/%5c../other", RepoRoot . "/%00other",
 		RepoRoot . ".invalid/releases",
+		RepoRoot . "/../../attacker/repo",
+		RepoRoot . "/%2e%2e/%2E%2e/attacker/repo",
+		RepoRoot . "\..\..\attacker\repo",
 		"https://github.com/" . UPDATER_GH_OWNER . "/other/releases"
 	] {
 		AssertFalse(_Updater_IsAllowedManualUrl(Url),
@@ -681,3 +684,5 @@ Test("Updater: the release list and its ETag survive a restart (#95)", _UpdaterT
 #Include test_updater_latest_json_utf8.ahk
 #Include test_updater_latest_async_json_utf8.ahk
 #Include test_updater_list_async_json_utf8.ahk
+
+#Include test_updater_list_cache_stage_custody.ahk

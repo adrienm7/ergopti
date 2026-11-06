@@ -10,11 +10,10 @@
 ; and lost the freshness race, so the cache was served STALE and a legitimate
 ; TOML edit was silently ignored until a later boot where the mtimes differed.
 ;
-; The fix flips the comparison to `>=` (a TOML whose mtime equals the .tsv's is
-; treated as stale, forcing a rebuild - the safe direction). This test creates a
-; temp shared tree with one bundled TOML and the cache .tsv, forces both mtimes to
-; the identical second via FileSetTime, and asserts _HotstringsCacheIsFresh returns
-; false (rebuild). Before the fix the strict `>` returned true (served stale).
+; The cache now verifies captured source receipts. Reproduce a real source
+; edit while retaining an equal timestamp: timestamp equality alone neither
+; admits stale rows nor invalidates unchanged rows. Both fixtures publish their
+; initial candidate through the genuine source builder and durable TSV writer.
 ;
 ; Behavioural: _HotstringsCacheIsFresh / _HotstringsCacheTomlPath /
 ; _HotstringsCacheTsvPath live in hotstrings_cache.ahk (in the run_all.ahk include
@@ -34,8 +33,8 @@
 
 _FreshSameSec_TieIsStale() {
 	; Build an isolated temp shared tree so the real bundled TOMLs are untouched.
-	; Only magickey.toml exists here; _HotstringsCacheIsFresh skips the
-	; other bundled categories via FileExist, so one TOML controls the verdict.
+	; Only magickey.toml exists here; the genuine builder captures every other
+	; declared source as absent in the same canonical inventory.
 	Base := A_Temp . "\ergopti_freshness_samesecond_test"
 	HsDir := Base . "\modules\hotstrings"
 	try DirCreate(HsDir)
@@ -56,9 +55,13 @@ _FreshSameSec_TieIsStale() {
 	try {
 		try FileDelete(TsvPath)
 		try FileDelete(TomlPath)
-		FileAppend("# temp toml`n", TomlPath, "UTF-8")
-		FileAppend("# temp tsv`n", TsvPath, "UTF-8")
+		FileAppend('[[ct]]`n"beforeprobe" = { output = "Before", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = true }`n', TomlPath, "UTF-8")
+		_HotstringsCacheWriteTsv(TsvPath, _HotstringsCacheBuildRows())
 
+		; Physically edit the source after its old rule has entered the real cache.
+		AssertTrue(_HotstringsCacheIsFresh(TsvPath), "the initial complete receipt must admit its unchanged source")
+		AssertTrue(FSWriteDurable(TomlPath,
+			'[[ct]]`n"afterprobe" = { output = "After", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = true }`n'))
 		; Force both files to the EXACT same modification second (YYYYMMDDHH24MISS).
 		SameSecond := "20240101120000"
 		FileSetTime(SameSecond, TomlPath, "M")
@@ -67,7 +70,7 @@ _FreshSameSec_TieIsStale() {
 		; A same-second TOML edit must NOT be served from the (equally old) cache:
 		; the verdict must be "not fresh" so HotstringsCacheEnsure rebuilds.
 		AssertFalse(_HotstringsCacheIsFresh(TsvPath),
-			"a bundled TOML mtime equal to the .tsv mtime must be judged stale (rebuild) - the strict > comparison served a same-second edit stale")
+			"a changed authoritative source must invalidate its real earlier cache even when the timestamps are equal")
 	} finally {
 		_SharedDir := _FreshSameSec_PrevShared
 		try FileDelete(TsvPath)
@@ -109,8 +112,8 @@ _FreshSameSec_NewerTsvStillFresh() {
 	try {
 		try FileDelete(TsvPath)
 		try FileDelete(TomlPath)
-		FileAppend("# temp toml`n", TomlPath, "UTF-8")
-		FileAppend("# temp tsv`n", TsvPath, "UTF-8")
+		FileAppend('[[ct]]`n"beforeprobe" = { output = "Before", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = true }`n', TomlPath, "UTF-8")
+		_HotstringsCacheWriteTsv(TsvPath, _HotstringsCacheBuildRows())
 
 		FileSetTime("20240101120000", TomlPath, "M")   ; older
 		FileSetTime("20240101120005", TsvPath, "M")     ; 5 s newer

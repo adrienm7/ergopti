@@ -166,7 +166,8 @@ try {
             # another origin. Cross-origin GETs lose all caller headers; unsafe
             # method-preserving redirects refuse before contacting that origin.
             if ($Next.GetLeftPart([UriPartial]::Authority) -cne $OriginalOrigin) {
-                if ($Method -cne 'GET' -and $Metrics.status -ne 303) { throw 'A cross-origin payload redirect was refused.' }
+                if ($Metrics.status -ne 303 -and ($Method -cne 'GET' -or
+                    ($SendBody -and $InputValue.body.Length -gt 0))) { throw 'A cross-origin payload redirect was refused.' }
                 $SendHeaders = $false
             }
             if ($Metrics.status -eq 303 -or ($Method -ceq 'POST' -and $Metrics.status -in @(301, 302))) {

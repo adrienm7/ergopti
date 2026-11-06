@@ -519,6 +519,9 @@ _LifecycleStopUIAWorkerForSuspend() {
 }
 
 Ergopti_OnSuspendEnter() {
+	; Retire RAM-only note continuations before any suspend step can yield.
+	if IsSet(TakeNoteRevokePending)
+		TakeNoteRevokePending()
 	global _SpaceHoldInputHook
 	global _MagicKeyEditorInputHook
 	Transition := LifecycleTransitionBegin("suspend")

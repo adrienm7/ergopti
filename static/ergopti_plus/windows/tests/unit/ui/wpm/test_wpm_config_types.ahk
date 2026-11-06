@@ -127,3 +127,271 @@ TestWPMConfigValidatesSavedPositionAgainstEveryMonitor() {
 }
 Test("WPM config: saved surfaces remain reachable after monitor changes (AHK-104)",
 	TestWPMConfigValidatesSavedPositionAgainstEveryMonitor)
+
+; A single negative-one coordinate is a real screen position, not the sentinel.
+TestWPMAutoPositionRequiresBothCoordinates() {
+	AssertTrue(_WPMWidget_IsAutoPosition(-1, -1), "the legacy sentinel selects the default")
+	AssertFalse(_WPMWidget_IsAutoPosition(-1, 100), "a left-edge position must survive")
+	AssertFalse(_WPMWidget_IsAutoPosition(100, -1), "a top-edge position must survive")
+	AssertFalse(_WPMWidget_IsAutoPosition(100, 100), "a saved position must survive")
+	SavedX := WPMWidget.pos_x, SavedY := WPMWidget.pos_y
+	SavedVisible := WPMWidget.visible, SavedColors := WPMWidget.use_colors, SavedGraph := WPMWidget.show_graph
+	SavedStoreX := WPMWidgetConst.STORE_X, SavedStoreY := WPMWidgetConst.STORE_Y
+	try {
+		WPMWidgetConst.STORE_X := "test.pos_x", WPMWidgetConst.STORE_Y := "test.pos_y"
+		for Pair in [[-1, 100], [100, -1]] {
+			WPMWidget_LoadConfig(Map("metrics", Map(WPMWidgetConst.CFG_GRAPH, false)),
+				_TWCT_Areas, _TWCT_StoredPosition.Bind(Pair[1], Pair[2]))
+			AssertEqual(Pair[1], WPMWidget.pos_x, "the saved X reaches the surface anchor")
+			AssertEqual(Pair[2], WPMWidget.pos_y, "the saved Y reaches the surface anchor")
+			AssertFalse(_WPMWidget_IsAutoPosition(WPMWidget.pos_x, WPMWidget.pos_y))
+		}
+	} finally {
+		WPMWidget.pos_x := SavedX, WPMWidget.pos_y := SavedY
+		WPMWidget.visible := SavedVisible, WPMWidget.use_colors := SavedColors, WPMWidget.show_graph := SavedGraph
+		WPMWidgetConst.STORE_X := SavedStoreX, WPMWidgetConst.STORE_Y := SavedStoreY
+	}
+}
+Test("WPM config: one negative-one coordinate is a position (wpm-anchor-sentinel)",
+	TestWPMAutoPositionRequiresBothCoordinates)
+
+_WPMCO_RefusedConfig(Kind, Successor, SamePosition := false) {
+	global ConfigurationFile, STORAGE_REG_BASE, _SharedDir
+	SavedAuthority := _WPMWidget_PositionAuthority()
+	Saved := {path: ConfigurationFile, store: STORAGE_REG_BASE, x: WPMWidget.pos_x,
+		y: WPMWidget.pos_y, graph: WPMWidget.show_graph, colors: WPMWidget.use_colors,
+		keyX: WPMWidgetConst.STORE_X, keyY: WPMWidgetConst.STORE_Y}
+	Nonce := A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Subkey := "Software\Ergopti_WpmCompensationAudit_" . Nonce
+	RegistryPath := "HKCU\" . Subkey
+	Root := A_Temp . "\ergopti_wpm_compensation_" . Nonce
+	Path := Root . "\config.toml"
+	Handle := 0, OwnedKey := false, CreatedRoot := false, FileHold := 0, ProbeOwned := false
+	SuccessorX := SamePosition ? (Kind == "graph-toggle" ? -1 : 30) : 700
+	SuccessorY := SamePosition ? (Kind == "graph-toggle" ? -1 : 40) : 800
+	State := {notices: 0, bCalls: 0, bAck: false, bX: "unset", bY: "unset"}
+	Notify(Message, Options) {
+		State.notices += 1
+		if Successor {
+			State.bCalls += 1
+			State.bAck := WPMWidget_SavePosition(SuccessorX, SuccessorY, 0, (*) => 0)
+			State.bX := ST_Get(WPMWidgetConst.STORE_X, "missing")
+			State.bY := ST_Get(WPMWidgetConst.STORE_Y, "missing")
+		}
+	}
+	try {
+		_WPMWidget_PositionAuthority({active: 0, published: 0})
+		AssertFalse(A_IsSuspended)
+		Disposition := 0
+		Status := DllCall("Advapi32\RegCreateKeyExW", "Ptr", -2147483647,
+			"Str", Subkey, "UInt", 0, "Ptr", 0, "UInt", 0, "UInt", 3,
+			"Ptr", 0, "Ptr*", &Handle, "UInt*", &Disposition, "UInt")
+		OwnedKey := Status == 0 && Disposition == 1
+		AssertTrue(OwnedKey, "acquire a genuinely new private storage key before any value write")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		CreatedRoot := (Creation is Integer) && Creation == 1
+		AssertTrue(CreatedRoot)
+		Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n[metrics]`nwpm_widget_graph = false`n"
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		ConfigurationFile := Path
+		Boot := ConfigMigrateBoot(Path)
+		AssertEqual("current", Boot["status"])
+		STORAGE_REG_BASE := RegistryPath
+		Canon := ParseTomlFile(_SharedDir . "\modules\wpm_widget\constants.toml")
+		WPMWidgetConst.STORE_X := Canon["position"]["storage_x"]
+		WPMWidgetConst.STORE_Y := Canon["position"]["storage_y"]
+		AssertTrue(WPMWidgetConst.STORE_X != WPMWidgetConst.STORE_Y)
+		WPMWidget.show_graph := false, WPMWidget.use_colors := false
+		AssertTrue(WPMWidget_SavePosition(10, 20, 0, (*) => 0))
+		AssertEqual(10, ST_Get(WPMWidgetConst.STORE_X, "missing"))
+		AssertEqual(20, ST_Get(WPMWidgetConst.STORE_Y, "missing"))
+		; A genuine unrelated Windows reader allows ordinary source reads but
+		; withholds delete sharing, so the actual default replacement refuses.
+		FileHold := DllCall("Kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
+			"UInt", 3, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+		AssertTrue(FileHold != 0 && FileHold != -1, "acquire the genuine no-delete-share handle")
+		ProbeStage := Root . "\native-sharing-probe.tmp"
+		ProbeOwned := FSWriteCreateDurable(ProbeStage, Source)
+		AssertTrue(ProbeOwned, "acquire the exact probe artifact before the contention witness")
+		AssertFalse(FSAtomicMoveReplace(ProbeStage, Path, &LockError))
+		AssertTrue(LockError == 5 || LockError == 32,
+			"the blocked rename must return a native access/sharing refusal, verified inversely after closing this exact hold")
+		AssertTrue(FSStrictExists(ProbeStage), "a refused native rename must retain this exact owned probe for the inverse control")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "the native lock probe never replaced its private config source")
+		AssertFalse(MenuCommandConfigBusy(), "no pre-existing config owner can prevent the actual menu action from entering")
+		if Kind == "graph-toggle"
+			Result := WPMWidget_ToggleGraphConfig(0, Notify)
+		else
+			Result := WPMWidget_SaveConfig(false, true, 30, 40, 0, Notify)
+		ActualX := ST_Get(WPMWidgetConst.STORE_X, "missing")
+		ActualY := ST_Get(WPMWidgetConst.STORE_Y, "missing")
+		_TestPrint("# wpm-compensation kind=" . Kind . " successor=" . Successor
+			. " notices=" . State.notices . " b_calls=" . State.bCalls . " b_ack=" . State.bAck
+			. " b_stored_x=" . State.bX . " b_stored_y=" . State.bY
+			. " a_result=" . Result . " ram_x=" . WPMWidget.pos_x . " ram_y=" . WPMWidget.pos_y
+			. " final_stored_x=" . ActualX . " final_stored_y=" . ActualY . " native_replace_error=" . LockError)
+		AssertFalse(Result, "the actual native sharing violation refuses A's configuration mutation")
+		AssertFalse(_ConfigWriteLeaseCurrent(Path) is Object, "the actual refused writer must release its native transaction owner")
+		AssertEqual(1, State.notices, "the real failure-notification boundary must run once")
+		AssertEqual(Successor ? 1 : 0, State.bCalls)
+		if Successor {
+			AssertTrue(State.bAck, "the independent public B position change must genuinely acknowledge native storage")
+			AssertEqual(SuccessorX, State.bX)
+			AssertEqual(SuccessorY, State.bY)
+		}
+		ExpectedX := Successor ? SuccessorX : 10, ExpectedY := Successor ? SuccessorY : 20
+		AssertEqual(ExpectedX, ActualX, "refused A cannot compensate over an acknowledged successor's durable X position")
+		AssertEqual(ExpectedY, ActualY)
+		AssertEqual(ExpectedX, WPMWidget.pos_x)
+		AssertEqual(ExpectedY, WPMWidget.pos_y)
+		AssertFalse(WPMWidget.show_graph, "A's refused graph change stays unpublished")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "the native sharing refusal leaves the real source unchanged")
+	} finally {
+		_WPMWidget_PositionAuthority(SavedAuthority)
+		try {
+			try {
+				if FileHold && FileHold != -1 {
+					ClosedHold := DllCall("Kernel32\CloseHandle", "Ptr", FileHold, "Int") != 0
+					if ClosedHold
+						FileHold := 0
+					AssertTrue(ClosedHold, "close this fixture's original exact no-delete-share handle")
+				}
+				if ProbeOwned {
+					; Run even when a business oracle above fails. Error5 alone never
+					; proves contention: this same stage/target/operation must now ACK.
+					AssertTrue(FSStrictExists(ProbeStage), "retain the exact refused probe until all business oracles finish")
+					Released := FSAtomicMoveReplace(ProbeStage, Path, &ReleasedError)
+					_TestPrint("# wpm-contention-inverse blocked-error=" . LockError
+						. " hold-closed=" . (FileHold == 0) . " released-ack=" . Released . " released-error=" . ReleasedError)
+					AssertTrue(Released, "the same actual native rename must succeed after this exact hold closes")
+					ProbeOwned := false
+					AssertFalse(FSStrictExists(ProbeStage), "the inverse ACK must consume the exact retained probe")
+					AssertEqual(Source, FSReadUtf8Exact(Path), "the inverse native control uses the original complete source image")
+				}
+			} finally {
+				ConfigurationFile := Saved.path, STORAGE_REG_BASE := Saved.store
+				WPMWidget.pos_x := Saved.x, WPMWidget.pos_y := Saved.y
+				WPMWidget.show_graph := Saved.graph, WPMWidget.use_colors := Saved.colors
+				WPMWidgetConst.STORE_X := Saved.keyX, WPMWidgetConst.STORE_Y := Saved.keyY
+				if CreatedRoot {
+					try _TOML_InvalidateParseCache(Path)
+					finally DirDelete(Root, true)
+				}
+			}
+		} finally {
+			if Handle
+				DllCall("Advapi32\RegCloseKey", "Ptr", Handle, "UInt")
+			if OwnedKey
+				AssertEqual(0, DllCall("Advapi32\RegDeleteKeyW", "Ptr", -2147483647,
+					"Str", Subkey, "UInt"), "delete only this exclusively created storage key")
+		}
+	}
+}
+for _WPMCO_Kind in ["save-config", "graph-toggle"] {
+	Test("WPM compensation ownership: " . _WPMCO_Kind . " successor", _WPMCO_RefusedConfig.Bind(_WPMCO_Kind, true))
+	Test("WPM compensation ownership: " . _WPMCO_Kind . " ordinary-refusal-control", _WPMCO_RefusedConfig.Bind(_WPMCO_Kind, false))
+}
+
+for _WPMCO_ABAKind in ["save-config", "graph-toggle"]
+	Test("WPM compensation opaque authority: " . _WPMCO_ABAKind . " same-coordinate successor (wpm-compensation-authority)",
+		_WPMCO_RefusedConfig.Bind(_WPMCO_ABAKind, true, true))
+
+; Native private Storage values, with a callout-only Store adapter to enter B at
+; individual acknowledged write/compensation boundaries that the native API does
+; not expose itself. No native/user-owned key or handle is retired.
+_WPMA_LocalStore(Mode) {
+	global STORAGE_REG_BASE, _SharedDir
+	Saved := {storagePath: STORAGE_REG_BASE, x: WPMWidget.pos_x, y: WPMWidget.pos_y,
+		keyX: WPMWidgetConst.STORE_X, keyY: WPMWidgetConst.STORE_Y,
+		authority: _WPMWidget_PositionAuthority(), critical: A_IsCritical}
+	Subkey := "Software\Ergopti_WpmLocalAuthorityAudit_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Handle := 0, Owned := false
+	State := {calls: 0, bCalls: 0, bAck: false, critical: []}
+	Successor() {
+		State.bCalls += 1
+		State.bAck := WPMWidget_SavePosition(700, 800, 0, (*) => 0)
+		; The public competing write must refuse before any native store effect.
+		; Its result is asserted after the complete A transaction metadata below.
+	}
+	Store(Key, Value) {
+		State.calls += 1
+		State.critical.Push(A_IsCritical)
+		if State.calls == 2 && (Mode == "rollback-contender" || Mode == "ordinary-refusal-control" || Mode == "failure-notifier-successor")
+			return false ; the adapter's existing refusal protocol, before any Y write
+		Ack := ST_Set(Key, Value)
+		if State.calls == 1 && (Mode == "first-write-refusal-contender" || Mode == "first-write-success-contender") {
+			Successor()
+			return Mode == "first-write-refusal-contender" ? false : Ack
+		}
+		if State.calls == 3 && Mode == "rollback-contender"
+			Successor()
+		return Ack
+	}
+	Notice(*) {
+		if Mode == "failure-notifier-successor"
+			Successor()
+	}
+	try {
+		Critical("Off")
+		Disposition := 0
+		Status := DllCall("Advapi32\RegCreateKeyExW", "Ptr", -2147483647, "Str", Subkey,
+			"UInt", 0, "Ptr", 0, "UInt", 0, "UInt", 3, "Ptr", 0,
+			"Ptr*", &Handle, "UInt*", &Disposition, "UInt")
+		Owned := Status == 0 && Disposition == 1
+		AssertTrue(Owned, "the test must affirmatively own the newly created private key")
+		STORAGE_REG_BASE := "HKCU\" . Subkey
+		Canon := ParseTomlFile(_SharedDir . "\modules\wpm_widget\constants.toml")
+		WPMWidgetConst.STORE_X := Canon["position"]["storage_x"]
+		WPMWidgetConst.STORE_Y := Canon["position"]["storage_y"]
+		_WPMWidget_PositionAuthority({active: 0, published: 0})
+		AssertTrue(WPMWidget_SavePosition(10, 20, 0, (*) => 0))
+		if Mode == "inherited-critical-control"
+			Critical("On")
+		Result := WPMWidget_SavePosition(30, 40, Store, Notice)
+		AfterCritical := A_IsCritical
+		Critical("Off")
+		ActualX := ST_Get(WPMWidgetConst.STORE_X, "missing")
+		ActualY := ST_Get(WPMWidgetConst.STORE_Y, "missing")
+		_TestPrint("# wpm-local-authority mode=" . Mode . " a_ack=" . Result . " calls=" . State.calls
+			. " b_calls=" . State.bCalls . " b_ack=" . State.bAck . " stored=" . ActualX . "," . ActualY
+			. " ram=" . WPMWidget.pos_x . "," . WPMWidget.pos_y . " restored-critical=" . AfterCritical)
+		if Mode == "inherited-critical-control" || Mode == "first-write-success-contender" {
+			AssertTrue(Result)
+			if Mode == "inherited-critical-control"
+				AssertTrue(AfterCritical, "the caller's original critical posture is restored")
+			AssertEqual(2, State.calls)
+			for CriticalState in State.critical
+				AssertFalse(CriticalState, "native Storage must never execute inside the publication Critical span")
+			ExpectedX := 30, ExpectedY := 40
+		} else {
+			AssertFalse(Result, "a superseded or refused pair must never receive A's publication ACK")
+			ExpectedX := Mode == "failure-notifier-successor" ? 700 : 10, ExpectedY := Mode == "failure-notifier-successor" ? 800 : 20
+		}
+		ContenderExpected := Mode != "ordinary-refusal-control" && Mode != "inherited-critical-control"
+		AssertEqual(ContenderExpected ? 1 : 0, State.bCalls)
+		if Mode == "failure-notifier-successor"
+			AssertTrue(State.bAck, "a completed local refusal must release authority before notifying its successor")
+		else if ContenderExpected
+			AssertFalse(State.bAck, "a pair already being written or restored must refuse a reentrant native contender")
+		AssertEqual(ExpectedX, ActualX)
+		AssertEqual(ExpectedY, ActualY)
+		AssertEqual(ExpectedX, WPMWidget.pos_x)
+		AssertEqual(ExpectedY, WPMWidget.pos_y)
+	} finally {
+		Critical("Off")
+		_WPMWidget_PositionAuthority(Saved.authority)
+		STORAGE_REG_BASE := Saved.storagePath
+		WPMWidget.pos_x := Saved.x, WPMWidget.pos_y := Saved.y
+		WPMWidgetConst.STORE_X := Saved.keyX, WPMWidgetConst.STORE_Y := Saved.keyY
+		try {
+			if Handle
+				DllCall("Advapi32\RegCloseKey", "Ptr", Handle, "UInt")
+			if Owned
+				AssertEqual(0, DllCall("Advapi32\RegDeleteKeyW", "Ptr", -2147483647,
+					"Str", Subkey, "UInt"), "delete only the exclusively acquired private storage key")
+		} finally Critical(Saved.critical)
+	}
+}
+for _WPMA_Mode in ["first-write-refusal-contender", "first-write-success-contender", "rollback-contender",
+	"ordinary-refusal-control", "inherited-critical-control", "failure-notifier-successor"]
+	Test("WPM position opaque authority: " . _WPMA_Mode . " (wpm-compensation-authority)", _WPMA_LocalStore.Bind(_WPMA_Mode))

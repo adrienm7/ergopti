@@ -64,7 +64,7 @@ class KLRRebuildConst {
 	; both that write volume and the work a killed worker can lose.
 	static CHECKPOINT_INTERVAL_MS := 60000
 	; Bump when the checkpoint tables or the meaning of their columns change.
-	static CHECKPOINT_FORMAT := "2"
+	static CHECKPOINT_FORMAT := "7"
 	; A peer rebuilding the same store is polled at this cadence.
 	static PEER_POLL_MS := 1000
 	static BATCH_MARKER := "`n-- === ingest batch "
@@ -267,9 +267,13 @@ _KLR_RebuildAcquire(md, logPath, &Waited) {
 	}
 	Waited := false
 	loop {
-		Guard := FSOpenExclusiveGuard(KLR_RebuildLockPath(md))
+		Guard := FSOpenExclusiveGuard(KLR_RebuildLockPath(md), &Contended)
 		if Guard
 			break
+		if !Contended {
+			try LoggerError("KLReader", "Metrics rebuild ownership was refused without a competing peer.")
+			return 0
+		}
 		if !Waited
 			KLR_PrefetchDebug(logPath, "KLR rebuild waits for a peer worker")
 		; The peer publishes the store's progress; this worker adds nothing to it.
@@ -417,6 +421,11 @@ _KLR_RebuildReadBytes(Ledger, Start, Count) {
 }
 
 _KLR_RebuildExecute(db, Sql) {
+	ResetSql := ""
+	for Name in _KLR_RebuildSeenTables(db)
+		ResetSql .= "DELETE FROM temp." . Name . ";"
+	if ResetSql == "" || !SQLite_Exec(db, ResetSql)
+		throw KLRRebuildRefusal("per-span first-copy ownership could not be reset")
 	Result := SQLite_ExecReturnCarry(db, Sql)
 	if !Result.Get("ok", false)
 		throw KLRRebuildRefusal("a ledger batch was rejected by SQLite")
@@ -464,20 +473,42 @@ _KLR_RebuildFirstWinsTables(db) {
 _KLR_RebuildInstallFirstWins(db) {
 	Sql := "CREATE TEMP TABLE IF NOT EXISTS klr_rebuild_displaced (date TEXT PRIMARY KEY) WITHOUT ROWID;"
 	for Table in _KLR_RebuildFirstWinsTables(db) {
-		Match := ""
-		for Key in Table["keys"]
+		Match := "", Keys := "", Values := ""
+		for Key in Table["keys"] {
 			Match .= (Match = "" ? "" : " AND ") . Key . "=NEW." . Key
+			Keys .= (Keys = "" ? "" : ",") . Key
+			Values .= (Values = "" ? "" : ",") . "NEW." . Key
+		}
 		Name := Table["name"]
+		Seen := "klr_rebuild_seen_" . Name
+		; Direct source columns retain their SQLite affinities; the unique index
+		; preserves ordinary nullable-key semantics, unlike WITHOUT ROWID.
+		Sql .= "CREATE TEMP TABLE " . Seen . " AS SELECT " . Keys . " FROM main." . Name . " WHERE 0;"
+			. "CREATE UNIQUE INDEX temp." . Seen . "_keys ON " . Seen . "(" . Keys . ");"
 		Sql .= "CREATE TEMP TRIGGER klr_rebuild_first_wins_" . Name
 			. " BEFORE INSERT ON main." . Name
-			. " WHEN EXISTS (SELECT 1 FROM " . Name . " WHERE " . Match . ") BEGIN "
+			. " WHEN EXISTS (SELECT 1 FROM " . Name . " WHERE " . Match . ")"
+			. " AND NOT EXISTS (SELECT 1 FROM " . Seen . " WHERE " . Match . ") BEGIN "
 			. "INSERT OR IGNORE INTO klr_rebuild_displaced(date) SELECT "
 			. (Table["dated"] ? "date" : "'*'") . " FROM " . Name . " WHERE " . Match . ";"
 			. (Name = "events_typing"
 				? "DELETE FROM klr_reader_typing_counts WHERE device_id=NEW.device_id AND event_id=NEW.id;" : "")
 			. "DELETE FROM " . Name . " WHERE " . Match . "; END;"
+		; Mark every successful first insert, including keys absent before this
+		; span. Later OR IGNORE copies in the same forward span must not replace it.
+		Sql .= "CREATE TEMP TRIGGER klr_rebuild_first_wins_seen_" . Name
+			. " AFTER INSERT ON main." . Name . " BEGIN INSERT OR IGNORE INTO " . Seen
+			. "(" . Keys . ") VALUES(" . Values . "); END;"
 	}
 	return SQLite_Exec(db, Sql)
+}
+
+_KLR_RebuildSeenTables(db) {
+	Names := []
+	for Row in SQLite_Query(db, "SELECT name FROM temp.sqlite_schema WHERE type='table' "
+			. "AND name LIKE 'klr\_rebuild\_seen\_%' ESCAPE '\';")
+		Names.Push(Row["name"])
+	return Names
 }
 
 _KLR_RebuildDropFirstWinsSql(db) {
@@ -485,6 +516,8 @@ _KLR_RebuildDropFirstWinsSql(db) {
 	for Row in SQLite_Query(db, "SELECT name FROM temp.sqlite_schema WHERE type='trigger' "
 			. "AND name LIKE 'klr\_rebuild\_first\_wins\_%' ESCAPE '\';")
 		Sql .= "DROP TRIGGER temp." . Row["name"] . ";"
+	for Name in _KLR_RebuildSeenTables(db)
+		Sql .= "DROP TABLE temp." . Name . ";"
 	return Sql . "DROP TABLE IF EXISTS temp.klr_rebuild_displaced;"
 }
 

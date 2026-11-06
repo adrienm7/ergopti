@@ -12,7 +12,7 @@
 ; the chain-of-thought fragment instead of the actual completion.
 ;
 ; The fix navigates the canonical JSON path per format with JsonParse
-; (anthropic: first content[] block with type=="text"; openai:
+; (anthropic: all content[] blocks with type=="text"; openai:
 ; choices[1].message.content; gemini: candidates[1].content.parts[].text) and
 ; only falls back to the legacy regex when the structured path misses. These
 ; tests feed adversarial bodies whose FIRST matching string is a decoy and
@@ -92,18 +92,15 @@ Test("_LLMRemoteParseResponse: openai canonical choice still resolves (remote-pa
 ; ===============================================================
 ; ===============================================================
 
-; Gemini: the first text part of the first candidate is the answer — the
-; cross-driver corpus contract (gemini_multipart_uses_first) takes the FIRST
-; part, consistent with the first-match policy this whole file verifies for the
-; anthropic/openai navigators. A later part is a continuation/decoy, not a
-; fragment to concatenate.
-_RPFCM_Gemini_UsesFirstPart() {
-	body := '{"candidates":[{"content":{"parts":[{"text":"foo"},{"text":"bar"}]}}]}'
+; All ordinary text parts of the first Gemini candidate belong to its answer.
+; Thinking parts and a different candidate cannot contribute text.
+_RPFCM_Gemini_JoinsFirstCandidateParts() {
+	body := '{"candidates":[{"content":{"parts":[{"thought":true,"text":"private thought"},{"text":"foo"},{"text":"bar"}]}},{"content":{"parts":[{"text":"other candidate decoy"}]}}]}'
 	result := _LLMRemoteParseResponse("gemini", body)
-	AssertEqual("foo", result,
-		"gemini parser must return the FIRST text part of the first candidate (remote-parse-first-content-match)")
+	AssertEqual("foobar", result,
+		"gemini parser must join ordinary text from only its first candidate (remote-parse-first-content-match)")
 }
-Test("_LLMRemoteParseResponse: gemini uses the first text part (remote-parse-first-content-match)", _RPFCM_Gemini_UsesFirstPart)
+Test("_LLMRemoteParseResponse: gemini joins first-candidate text parts (remote-parse-first-content-match)", _RPFCM_Gemini_JoinsFirstCandidateParts)
 
 
 ; Malformed body (HTTP error page) must still return "" via the regex fallback,

@@ -55,9 +55,11 @@ global _I18nCacheFrLoaded := false
 ; Keeps t() O(1) on misses (no re-entry into _I18nEnsureFallbacksLoaded).
 global _I18nFallbacksWarmed := false
 
-; Terminal record proving that a TSV cache reached the end of publication.
+; Terminal record proving a complete, globally validated String catalogue.
+; Version 3 also retires caches which serialized translation keys as delimiters.
+; Version 2 already retired caches which erased invalid JSON value types.
 ; The count also rejects a complete-looking file whose record prefix was lost.
-global _I18N_TSV_SENTINEL := "#!ergopti-i18n-cache-v1 count="
+global _I18N_TSV_SENTINEL := "#!ergopti-i18n-cache-v3 count="
 
 
 
@@ -92,6 +94,11 @@ _I18nUnescapeTSV(s) {
 				i += 2
 				continue
 			}
+			if (n == "t") {
+				out .= "`t"
+				i += 2
+				continue
+			}
 			if (n == "r") {
 				out .= "`r"
 				i += 2
@@ -123,16 +130,16 @@ _I18nParseTSV(Content, MagicKey, Status := unset) {
 		line := A_LoopField
 		if (line == "")
 			continue
-		if (InStr(line, _I18N_TSV_SENTINEL, true) == 1) {
+		p := InStr(line, "`t")
+		if (!p && InStr(line, _I18N_TSV_SENTINEL, true) == 1) {
 			RawCount := SubStr(line, StrLen(_I18N_TSV_SENTINEL) + 1)
 			if RegExMatch(RawCount, "^\d+$")
 				ExpectedCount := RawCount + 0
 			continue
 		}
-		p := InStr(line, "`t")
 		if (!p)
 			continue
-		k := SubStr(line, 1, p - 1)
+		k := _I18nUnescapeTSV(SubStr(line, 1, p - 1))
 		v := SubStr(line, p + 1)
 		if InStr(v, "\")
 			v := _I18nUnescapeTSV(v)
@@ -148,22 +155,29 @@ _I18nParseTSV(Content, MagicKey, Status := unset) {
 	return m
 }
 
-; True when the .tsv cache is at least as new as its .json source — i.e. it is
-; not stale after a .json edit or pull. FileGetTime's "M" form is YYYYMMDDHH24MISS,
-; which orders chronologically as a plain integer, so a direct >= comparison is
-; correct. Any stat failure returns false so the caller regenerates defensively.
+; FileGetTime exposes seconds only. Equality cannot prove that a cache follows
+; its source: an edit later in the same second must regenerate on a cold boot.
+; Any stat failure also returns false so JSON remains authoritative.
 _I18nTsvIsFresh(TsvPath, JsonPath) {
 	try {
-		return FileGetTime(TsvPath, "M") >= FileGetTime(JsonPath, "M")
+		return FileGetTime(TsvPath, "M") > FileGetTime(JsonPath, "M")
 	} catch {
 		return false
 	}
 }
 
+; Encode either field without lending record delimiters to its contents.
+_I18nEscapeTSV(Text) {
+	Text := StrReplace(Text, "\", "\\")
+	Text := StrReplace(Text, "`t", "\t")
+	Text := StrReplace(Text, "`r", "\r")
+	return StrReplace(Text, "`n", "\n")
+}
+
 ; (Re)write the flat key<TAB>value .tsv cache from a parsed locale map. The .tsv
 ; is a gitignored, self-healing cache the driver owns end-to-end — the .json is
-; the single tracked source of truth, never duplicated in git. Values are escaped
-; \\ then \r then \n (backslash FIRST so it can never collide), ★ placeholders are
+; the single tracked source of truth, never duplicated in git. Both keys and values
+; escape backslash FIRST, then record/field delimiters. ★ placeholders are
 ; PRESERVED (the reader substitutes the MagicKey at parse time, keeping the cache
 ; MagicKey-independent), LF line endings, UTF-8 without BOM. Best-effort: a
 ; read-only install directory simply means every boot keeps parsing the JSON.
@@ -171,16 +185,8 @@ _I18nWriteTsvCache(TsvPath, Parsed) {
 	global _I18N_TSV_SENTINEL
 	try {
 		Content := ""
-		for Key, Val in Parsed {
-			Esc := Val
-			if InStr(Esc, "\")
-				Esc := StrReplace(Esc, "\", "\\")
-			if InStr(Esc, "`r")
-				Esc := StrReplace(Esc, "`r", "\r")
-			if InStr(Esc, "`n")
-				Esc := StrReplace(Esc, "`n", "\n")
-			Content .= Key . "`t" . Esc . "`n"
-		}
+		for Key, Val in Parsed
+			Content .= _I18nEscapeTSV(Key) . "`t" . _I18nEscapeTSV(Val) . "`n"
 		Content .= _I18N_TSV_SENTINEL . Parsed.Count . "`n"
 		; Stage then rename. FileDelete + FileAppend is a two-step publication that
 		; leaves the LIVE cache absent or half-written between the two calls, and a
@@ -192,18 +198,15 @@ _I18nWriteTsvCache(TsvPath, Parsed) {
 		; is an atomic NTFS rename, so the cache is always either the old one or the
 		; new one, never a prefix of the new one (locale-tsv-non-atomic-write).
 		; Mirrors _HotstringsCacheWriteTsv, which was fixed first.
-		TmpPath := TsvPath . ".tmp"
-		if FileExist(TmpPath)
-			FileDelete(TmpPath)
-		FileAppend(Content, TmpPath, "UTF-8-RAW")
-		FileMove(TmpPath, TsvPath, 1)
+		if !FSWriteReplaceOwned(TsvPath, Content, ".tmp", &Detail)
+			throw Error("The locale cache could not be published: " . Detail)
 	} catch as err {
 		try LoggerWarn("i18n", "Could not write fast-cache '{1}' ({2}); JSON path stays active.", TsvPath, err.Message)
 	}
 }
 
 ; Load one locale's flat key→value Map using the self-healing .tsv cache: parse
-; the fast .tsv when it exists AND is at least as new as the .json; otherwise
+; the fast .tsv when it exists AND is strictly newer than the .json; otherwise
 ; parse the .json (the single source of truth), build the Map, and regenerate the
 ; .tsv beside it so the NEXT boot is fast. ★ is substituted with MagicKey on both
 ; paths. This is the ONLY site that reads or writes a locale .tsv, so the cache
@@ -246,6 +249,13 @@ _I18nLoadLocaleMap(JsonPath, MagicKey, AllowFast := true) {
 		if (StrLen(RawJson) && Ord(SubStr(RawJson, 1, 1)) = 0xFEFF)
 			RawJson := SubStr(RawJson, 2)
 		Parsed := JsonParse(RawJson)
+		; Validate the whole catalogue before substitution or TSV publication.
+		; Valid JSON can still be a scalar, array or nested translation value.
+		if !(Parsed is Map)
+			throw TypeError("A locale catalogue must be a flat String-to-String object.")
+		for Key, Val in Parsed
+			if !(Key is String) || !(Val is String)
+				throw TypeError("A locale catalogue must contain only String keys and values.")
 	} catch as err {
 		try LoggerWarn("i18n", "JSON parse error in '{1}': {2}", JsonPath, err.Message)
 		return { Cache: Map(), Ok: false, Fast: false }

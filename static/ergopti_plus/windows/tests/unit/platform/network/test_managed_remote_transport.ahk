@@ -19,13 +19,14 @@ global _ManagedRemoteFixtureCleanupExitRegistered := false
 ; restore the caller's exact timing state even when dispatch or assertions fail.
 _ManagedRemoteFixtureWithLlmTimings(Callback) {
 	global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS
-	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
+	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS, LLM_OLLAMA_DELETE_TIMEOUT_MS
 	Previous := [IsSet(LLM_OLLAMA_POLL_MS) ? LLM_OLLAMA_POLL_MS : unset,
 		IsSet(LLM_REMOTE_TIMEOUT_MS) ? LLM_REMOTE_TIMEOUT_MS : unset,
 		IsSet(LLM_REMOTE_POLL_MS) ? LLM_REMOTE_POLL_MS : unset,
 		IsSet(LLM_INSTALLED_CACHE_TTL_MS) ? LLM_INSTALLED_CACHE_TTL_MS : unset,
 		IsSet(LLM_DEPS_POLL_TIMEOUT_MS) ? LLM_DEPS_POLL_TIMEOUT_MS : unset,
-		IsSet(LLM_REMOTE_READY_PING_DEADLINE_MS) ? LLM_REMOTE_READY_PING_DEADLINE_MS : unset]
+		IsSet(LLM_REMOTE_READY_PING_DEADLINE_MS) ? LLM_REMOTE_READY_PING_DEADLINE_MS : unset,
+		IsSet(LLM_OLLAMA_DELETE_TIMEOUT_MS) ? LLM_OLLAMA_DELETE_TIMEOUT_MS : unset]
 	try {
 		LLMApiLoadTimings()
 		return Callback.Call()
@@ -36,6 +37,7 @@ _ManagedRemoteFixtureWithLlmTimings(Callback) {
 		LLM_INSTALLED_CACHE_TTL_MS := Previous.Has(4) ? Previous[4] : unset
 		LLM_DEPS_POLL_TIMEOUT_MS := Previous.Has(5) ? Previous[5] : unset
 		LLM_REMOTE_READY_PING_DEADLINE_MS := Previous.Has(6) ? Previous[6] : unset
+		LLM_OLLAMA_DELETE_TIMEOUT_MS := Previous.Has(7) ? Previous[7] : unset
 	}
 }
 

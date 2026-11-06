@@ -76,6 +76,9 @@ try {
 			&& !(A_Args.Length == 4 && A_Args[1] == "onboarding_recovery"))
         throw Error("expected exactly one startup fixture name")
     switch A_Args[1] {
+		case "raw_boot_category_signed_one", "raw_boot_category_true", "raw_boot_category_false",
+				"raw_boot_idle_boolean", "raw_boot_idle_zero", "raw_boot_idle_number":
+			_FeatureStateSmokeRawBootConfig(A_Args[1])
 		case "tap_binding_publication":
 			_FeatureStateSmokeTapBindingPublication()
 		case "onboarding_recovery":
@@ -1046,4 +1049,53 @@ _FeatureStateSmokeDetachedChords(Fixture) {
 		throw Error("The detached script chord candidate published an unexpected switch.")
 	if !ManifestValuesEqual(OriginalSlots, ScriptShortcutAssignments)
 		throw Error("A detached switch candidate cannot change the absent script slots.")
+}
+
+_FeatureStateSmokeRawBootConfig(Fixture) {
+	global ConfigurationFile, CategoryEnabled, HSE_IdleResetSeconds
+	Root := A_Temp . "\ergopti_feature_state_admission_" . DllCall("GetCurrentProcessId") . "_" . A_TickCount
+	Path := Root . "\config.toml", Created := false
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		if !Created
+			throw Error("The boot-admission fixture must exclusively own its native directory")
+		IsCategory := InStr(Fixture, "raw_boot_category_") == 1
+		if IsCategory {
+			Raw := Fixture == "raw_boot_category_signed_one" ? "+1" : Fixture == "raw_boot_category_true" ? "true" : "false"
+			Section := "category_enabled", Key := "layout"
+			Expected := Fixture == "raw_boot_category_true" ? true : ManifestDefaultFor("category_enabled.layout")
+		} else {
+			Raw := Fixture == "raw_boot_idle_boolean" ? "false" : Fixture == "raw_boot_idle_zero" ? "0" : "2"
+			Section := "hotstrings", Key := "idle_reset_seconds"
+			Expected := Fixture == "raw_boot_idle_boolean" ? ManifestDefaultFor("hotstrings.idle_reset_seconds") : Fixture == "raw_boot_idle_zero" ? 0 : 2
+		}
+		Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n[" . Section . "]`n" . Key . " = " . Raw . "`n"
+		if !FSWriteCreateDurable(Path, Source)
+			throw Error("The real boot-admission source was not created")
+		ConfigurationFile := Path
+		Boot := ConfigMigrateBoot(Path)
+		if !(Boot is Map) || Boot.Get("status", "") != "current"
+			throw Error("The real current-schema boot constructor did not admit the fixture")
+		Cache := ParseConfigTomlFile(Path)
+		Snapshot := ConfigTomlBootSnapshot(Cache)
+		if !IsObject(Snapshot)
+			throw Error("The actual early reader lost its published boot source owner")
+		ConfigTomlBootSnapshotValue(Snapshot, Section, Key, &Admitted)
+		_FeatureStateSmokeAssert(Expected, Admitted, "canonical source admission")
+		if IsCategory {
+			ReadCategoryEnabled(Cache)
+			_FeatureStateSmokeAssert(Expected, IsCategoryGated("Layout"), "the actual layout gate must retain admitted Boolean intent")
+		} else {
+			ReadScriptConfig(Cache)
+			_FeatureStateSmokeAssert(Expected, HSE_IdleResetSeconds, "the actual engine idle setting cannot consume a source Boolean as numeric zero")
+		}
+		if !FSUtf8ExactMatches(Path, Source)
+			throw Error("The early reader changed the authored source")
+	} finally {
+		if Created {
+			try _TOML_InvalidateParseCache(Path)
+			finally DirDelete(Root, true)
+		}
+	}
 }

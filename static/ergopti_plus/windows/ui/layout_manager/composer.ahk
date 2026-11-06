@@ -434,12 +434,16 @@ _LayoutComposer_Remove(Deps) {
 	}
 	if Deps["selected"].Call() == Id {
 		; Back to the system layout, then reload without the composed layout.
-		Reloaded(Accepted) {
+		Completed := false
+		Reloaded(Accepted, FailureDetail := "") {
+			if Completed
+				return
+			Completed := true
 			if Accepted
 				LoggerSuccess("LayoutComposer", "Removed the composed layout.")
 			else
 				LoggerError("LayoutComposer", "The driver could not reload after the removal.")
-			_LayoutComposer_Report(Deps, Action, Accepted, Accepted ? "" : LAYOUT_COMPOSER_FAILURE_USE)
+			_LayoutComposer_Report(Deps, Action, Accepted, Accepted ? "" : LAYOUT_COMPOSER_FAILURE_USE, FailureDetail)
 		}
 		try Started := Deps["after"].Call(Id, "uninstall", Reloaded)
 		catch as Err {
@@ -447,7 +451,7 @@ _LayoutComposer_Remove(Deps) {
 			Started := false
 		}
 		if !(Started is Integer) || Started != 1
-			_LayoutComposer_Report(Deps, Action, false, LAYOUT_COMPOSER_FAILURE_USE, "the driver could not reload")
+			Reloaded(false, "the driver could not reload")
 		return
 	}
 	LoggerSuccess("LayoutComposer", "Removed the composed layout.")

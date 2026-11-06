@@ -37,6 +37,7 @@ class OllamaInstallFilesPort {
 				throw TypeError("File port requires a callable native owner.", -1, Name)
 		this.Options := Options.Clone()
 		this.Record := 0
+		this.CallbacksRetired := false
 	}
 
 	/**
@@ -54,6 +55,8 @@ class OllamaInstallFilesPort {
 	}
 
 	_RunNonCritical(Action, Request, Authority, OnResult) {
+		if this.CallbacksRetired
+			return false
 		if !(Request is Map) || !(Authority is Map)
 				|| Action != "download" && Action != "prepare" && Action != "publish" && Action != "cleanup" && Action != "cleanup_partial" && Action != "inspect" && Action != "retire_runtime"
 				|| !HasMethod(OnResult, "Call")
@@ -68,7 +71,7 @@ class OllamaInstallFilesPort {
 		; native IO inside Critical. A timer cannot overwrite another exact owner.
 		PreviousCritical := Critical("On")
 		try {
-			if (this.Record is Map) || (!this._CleanupAction(Action) && A_IsSuspended)
+			if this.CallbacksRetired || (this.Record is Map) || (!this._CleanupAction(Action) && A_IsSuspended)
 				return false
 			this.Record := Record
 		} finally Critical(PreviousCritical)
@@ -170,6 +173,25 @@ class OllamaInstallFilesPort {
 	/** @returns {Boolean} Includes native task, interrupted build and file debt. */
 	HasOwner() {
 		return this.Record is Map
+	}
+
+	/**
+	 * Permanently closes an idle port and releases its logical observers.
+	 * @param Retired Optional receiver retaining callbacks through a caller's RAM claim.
+	 * @returns {Boolean} False while any exact native or file owner remains.
+	 */
+	RetireCallbacks(&Retired := unset) {
+		PreviousCritical := Critical("On")
+		try {
+			if this.HasOwner()
+				return false
+			PreviousRetired := IsSet(Retired) ? Retired : 0
+			Retired := [this.Options["on_physical"], this.Options["on_error"]]
+			this.CallbacksRetired := true
+			this.Options["on_physical"] := 0
+			this.Options["on_error"] := 0
+			return true
+		} finally Critical(PreviousCritical)
 	}
 
 	/** Invalidates logical publication; retirement may continue while paused. */

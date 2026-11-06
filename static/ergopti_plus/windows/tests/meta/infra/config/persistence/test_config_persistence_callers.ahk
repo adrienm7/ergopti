@@ -144,15 +144,16 @@ _CPC_ProfileSourceWriterContract(Body) {
 	Body := _DriverMaskBlockComments(&Body)
 	Body := _StripFullLineComments(Body)
 	Guard := RegExMatch(Body,
-		'if\s+!_LLM_Menu_ProfileSourceBound\(Source\)\s*\|\|\s*!\(Path\s*==\s*Source\["path"\]\)\s+return\s+false')
+		'if\s+!_LLM_Menu_ProfileSourceBound\(Source\)\s*\|\|\s*!_LLM_Menu_ProfileSourceProjectionMatches\(Source\)\s*\|\|\s*!\(Path\s*==\s*Source\["path"\]\)\s+return\s+false')
 	Publish := RegExMatch(Body,
-		'return\s+TOML_ConfigBatchWrite\(Path,\s*Updates,\s*\[\],\s*'
+		'Committed\s*:=\s*TOML_ConfigBatchWrite\(Path,\s*Updates,\s*\[\],\s*'
 		. '_LLM_Menu_ProfileSourceBound\.Bind\(Source\),\s*Source\["content"\],\s*Source\["present"\]\)')
 	Code := _DriverMaskNonCode(&Body)
 	CodeGuard := RegExMatch(Code, 'if\s+!_LLM_Menu_ProfileSourceBound\(Source\)')
-	CodePublish := RegExMatch(Code, 'return\s+TOML_ConfigBatchWrite\(')
+	CodePublish := RegExMatch(Code, 'Committed\s*:=\s*TOML_ConfigBatchWrite\(')
 	return Guard > 0 && Publish > Guard && CodeGuard == Guard && CodePublish == Publish
 		&& _CPC_CountOccurrences(Body, "TOML_ConfigBatchWrite(") == 1
+		&& RegExMatch(Body, 'if\s+Committed\s+is\s+Integer\s*&&\s*Committed\s*==\s*1\s+Source\["native_ack"\]\s*:=\s*1\s+return\s+Committed') > Publish
 }
 
 _CPC_ProfilePublisherRetainsOpeningImage() {
@@ -163,9 +164,11 @@ _CPC_ProfilePublisherRetainsOpeningImage() {
 	Quoted := 'Evidence := ' . Chr(34) . StrReplace(Body, Chr(34), Chr(96) . Chr(34)) . Chr(34)
 	AssertFalse(_CPC_ProfileSourceWriterContract(Quoted), "quoted documentation cannot stand in for an executable writer")
 	for Mutant in [StrReplace(Body, 'Source["content"]', '""'),
+		StrReplace(Body, "return Committed", "return true"),
 		StrReplace(Body, 'Source["present"]', "1"),
 		StrReplace(Body, "_LLM_Menu_ProfileSourceBound.Bind(Source)", "0"),
-		StrReplace(Body, 'if !_LLM_Menu_ProfileSourceBound(Source) || !(Path == Source["path"])', "if false")] {
+		StrReplace(Body, "_LLM_Menu_ProfileSourceProjectionMatches(Source)", "true"),
+		StrReplace(Body, "!_LLM_Menu_ProfileSourceBound(Source)", "false")] {
 		Assert(StrCompare(Body, Mutant, true) != 0, "each custody mutant must change the real writer")
 		AssertFalse(_CPC_ProfileSourceWriterContract(Mutant), "a lost retained image or owner fence cannot join the census")
 	}
@@ -178,8 +181,8 @@ _CPC_ProfilePublisherRetainsOpeningImage() {
 		Assert(_CPC_LineConsumesResult(Lines, Index), "the actual native receipt must be consumed")
 		for Replacement in ["", "Ignored := "] {
 			Mutant := Lines.Clone()
-			Mutant[Index] := StrReplace(Line, "return ", Replacement)
-			Assert(StrCompare(Line, Mutant[Index], true) != 0, "the receipt mutant must alter the actual return")
+			Mutant[Index] := StrReplace(Line, "Committed := ", Replacement)
+			Assert(StrCompare(Line, Mutant[Index], true) != 0, "the receipt mutant must alter the actual native assignment")
 			AssertFalse(_CPC_LineConsumesResult(Mutant, Index), "discarding or ignoring the actual ACK must fail")
 		}
 	}
@@ -446,25 +449,38 @@ Test("AHK-15-persistence: bulk mutations publish candidates only after commit",
 	_CPC_BulkMutationsStageBeforePublishing)
 
 _CPC_GestureAssignmentIsOneRelatedFieldBatch() {
-	Body := _StripFullLineComments(_DriverFuncBody("_GestureCommitAssignment"))
-	Assert(Body != "", "_GestureCommitAssignment must exist")
-	PersistPos := InStr(Body, "ConfigCommitUpdates(")
-	AssignmentPublish := InStr(Body, "AssignmentsTarget := CandidateAssignments")
-	ParameterPublish := InStr(Body, "ParametersTarget := CandidateParameters")
-	Assert(InStr(Body, "Section: AssignmentSection") > 0,
-		"the assignment update must be in the shared batch")
-	Assert(InStr(Body, 'Section: "action_parameters"') > 0,
-		"the related parameter update must be in the same shared batch")
-	AssertEqual(1, _CPC_CountOccurrences(Body, "ConfigCommitUpdates("),
-		"one logical assignment must perform one TOML batch")
-	Assert(PersistPos > 0 and PersistPos < AssignmentPublish and PersistPos < ParameterPublish,
-		"both detached Maps must be published only after the shared batch succeeds")
-	CriticalPos := InStr(Body, 'Critical("On")')
-	ReleasePos := InStr(Body, "Critical(PreviousCritical)")
-	Assert(CriticalPos > PersistPos and CriticalPos < AssignmentPublish
-		and ParameterPublish < ReleasePos,
-		"the two related Maps must be published in one short non-yielding window")
+	Parts := Map()
+	for Name in ["GestureSetActionParameter", "_GestureBuildActionParameterPlan", "_GesturePublishActionParameters",
+			"_GestureCommitAssignment", "_GestureBuildAssignmentPlan", "_GesturePublishAssignment"] {
+		Parts[Name] := _StripFullLineComments(_DriverFuncBody(Name))
+		Assert(Parts[Name] != "", Name . " must remain source-visible")
+	}
+	Entry := Parts["_GestureCommitAssignment"]
+	Builder := Parts["_GestureBuildAssignmentPlan"]
+	Publish := Parts["_GesturePublishAssignment"]
+	AssertEqual(1, _CPC_CountOccurrences(Entry, "ConfigCommitBuilt("),
+		"one related assignment must enter one path-owned builder")
+	Assert(InStr(Entry, "_GestureBuildAssignmentPlan.Bind(&AssignmentsTarget, &ParametersTarget,") > 0,
+		"the builder must keep both actual caller VarRefs")
+	Assert(InStr(Entry, "CandidateAssignments :=") == 0 && InStr(Entry, "CandidateParameters :=") == 0,
+		"candidate snapshots must not escape before builder admission")
+	Assert(InStr(Builder, "Section: AssignmentSection") > 0
+			&& InStr(Builder, 'Section: "action_parameters"') > 0,
+		"assignment and related parameter belong to the same durable update batch")
+	Assert(InStr(Builder, "_GesturePublishAssignment.Bind(&AssignmentsTarget, &ParametersTarget,") > 0,
+		"publication must retain the same two caller targets through the native gateway")
+	Assert(InStr(Publish, "AssignmentsTarget := CandidateAssignments") > 0
+			&& InStr(Publish, "ParametersTarget := CandidateParameters") > 0,
+		"the gateway publisher swaps both detached Maps in its existing atomic memory span")
+	AssertEqual(1, _CPC_CountOccurrences(Parts["GestureSetActionParameter"], "ConfigCommitBuilt("),
+		"the standalone parameter producer must use the same builder ownership")
+	Assert(InStr(Parts["GestureSetActionParameter"], "CandidateParameters :=") == 0,
+		"the standalone parameter candidate must also be cloned after admission")
+	Assert(InStr(Parts["_GestureBuildActionParameterPlan"], "_GestureCloneActionParameters(GestureActionParameters)") > 0
+			&& InStr(Parts["_GestureBuildActionParameterPlan"], "_GesturePublishActionParameters.Bind(CandidateParameters)") > 0,
+		"the standalone builder must bind its real snapshot into gateway publication")
 }
+
 Test("AHK-15-persistence: parameter and assignment share one commit",
 	_CPC_GestureAssignmentIsOneRelatedFieldBatch)
 

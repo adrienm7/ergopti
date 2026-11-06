@@ -137,7 +137,9 @@ class ProgramProviderSession {
 				|| !(Listed["truncated"] == 0 || Listed["truncated"] == 1)
 			return false
 		Seen := Map(), Names := []
-		Seen.CaseSense := "Off"
+		; NTFS can admit distinct exact-case names in a case-sensitive directory.
+		; Exact duplicate enumeration entries still invalidate the entire packet.
+		Seen.CaseSense := "On"
 		for Name in Listed["names"] {
 			if !ProgramProviderClean(Name) || Name == "" || Name == "." || Name == ".."
 					|| StrPut(Name, "UTF-8") - 1 > 4096 || RegExMatch(Name, "[\\/:*?]") || Seen.Has(Name)
@@ -346,7 +348,7 @@ ProgramProviderClean(Value) {
 
 ProgramProviderAbsolute(Value) {
 	return ProgramProviderClean(Value) && StrPut(Value, "UTF-8") - 1 <= ProgramProviderSession.MAX_PATH_BYTES
-		&& (RegExMatch(Value, "^[A-Za-z]:[/\\]") || RegExMatch(Value, "^\\\\[^\\/]+\\[^\\/]+\\."))
+		&& (RegExMatch(Value, "^[A-Za-z]:[/\\]") || RegExMatch(Value, "^\\\\[^\\/]+\\[^\\/]+(?:\\.*)?\z"))
 		&& !RegExMatch(Value, "^\\\\[?.]\\")
 }
 

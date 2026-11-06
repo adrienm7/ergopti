@@ -14,7 +14,7 @@ on:
       selection:
         description: Repository-relative replay selection JSON
         required: false
-        default: .github/ci/ahk-replay/windows-fixes.json
+        default: .github/ci/ahk-replay/windows-audit-20261104.json
         type: string
       child_timeout_ms:
         description: Maximum duration of each native replay child in milliseconds
@@ -164,9 +164,19 @@ jobs:
         if: ${{ !cancelled() && steps.entry_inputs.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 5
+        env:
+          ERGOPTI_REPLAY_SELECTION: ${{ inputs.selection || '.github/ci/ahk-replay/windows-audit-20261104.json' }}
         run: |
           $evidence = Join-Path $env:RUNNER_TEMP 'windows-full-entry-evidence'
           New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          $selection = Get-Content -LiteralPath $env:ERGOPTI_REPLAY_SELECTION -Raw | ConvertFrom-Json
+          $hotstringSelection = $selection.PSObject.Properties['native_hotstring_e2e']
+          if ($null -ne $hotstringSelection -and $hotstringSelection.Value -isnot [bool]) { throw 'The native hotstring E2E selector must be Boolean.' }
+          if ($null -ne $hotstringSelection -and -not $hotstringSelection.Value) {
+              [ordered]@{ source_sha = $env:GITHUB_SHA; scope = 'hotstrings-pure-and-native-edit'; status = 'not-selected'; selection_path = $env:ERGOPTI_REPLAY_SELECTION; full_suite_qualified = $false } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'e2e.receipt.json') -Encoding utf8
+              Write-Host 'Native hotstring E2E is outside this declared replay selection.'
+              return
+          }
           $runner = Join-Path $env:GITHUB_WORKSPACE 'static/ergopti_plus/windows/tests/e2e/run_e2e.ahk'
           $plan = Join-Path $evidence 'e2e.plan.tsv'
           $discoveryTap = Join-Path $evidence 'e2e-discovery.tap.txt'
@@ -238,13 +248,86 @@ jobs:
               $receipt | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $evidence 'e2e.receipt.json') -Encoding utf8
           }
 
+      - name: Validate the managed HTTP adapter through proxy overrides
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.navigation.outcome == 'success' && steps.entry_inputs.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 12
+        env:
+          ERGOPTI_REPLAY_SELECTION: ${{ inputs.selection || '.github/ci/ahk-replay/windows-audit-20261104.json' }}
+        run: |
+          $selection = Get-Content -LiteralPath $env:ERGOPTI_REPLAY_SELECTION -Raw | ConvertFrom-Json
+          $httpSelection = $selection.PSObject.Properties['native_http_client_e2e']
+          if ($null -ne $httpSelection -and $httpSelection.Value -isnot [bool]) { throw 'The native HTTP E2E selector must be Boolean.' }
+          if ($null -eq $httpSelection -or -not $httpSelection.Value) {
+              Write-Host 'Native HTTP adapter E2E is outside this declared replay selection.'
+              return
+          }
+          $env:ERGOPTI_AHK_EXE = $env:ERGOPTI_REPLAY_AHK
+          $proxyOutput = & node tools/test/test-windows-proxy-override-e2e.cjs --required '--only=http_client:' 2>&1
+          $proxyExit = $LASTEXITCODE
+          $proxyOutput | ForEach-Object { Write-Host $_ }
+          if ($proxyExit -ne 0) { exit $proxyExit }
+          if ($proxyOutput -notcontains '# 11 passed, 0 failed, 0 not executed') { throw 'The native HTTP override selection did not execute all eleven cases.' }
+
+      - name: Select native proxy relay owner E2E
+        id: relay_owner_selection
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.entry_inputs.outcome == 'success' }}
+        shell: pwsh
+        env:
+          ERGOPTI_REPLAY_SELECTION: ${{ inputs.selection || '.github/ci/ahk-replay/windows-audit-20261104.json' }}
+        run: |
+          $selection = Get-Content -LiteralPath $env:ERGOPTI_REPLAY_SELECTION -Raw | ConvertFrom-Json
+          $option = $selection.PSObject.Properties['native_proxy_relay_owner_e2e']
+          if ($null -ne $option -and $option.Value -isnot [bool]) { throw 'The native proxy relay owner E2E selector must be Boolean.' }
+          $selected = $null -ne $option -and $option.Value
+          "selected=$($selected.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          if ($selected) {
+              $contract = Get-Content -Raw static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json | ConvertFrom-Json
+              if ($contract.go_version -notmatch '^go\d+\.\d+\.\d+$') { throw 'The managed Go version is invalid.' }
+              "go_version=$($contract.go_version.Substring(2))" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Install the pinned managed Go compiler
+        if: ${{ steps.relay_owner_selection.outputs.selected == 'true' }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.relay_owner_selection.outputs.go_version }}
+          cache: false
+
+      - name: Validate the native proxy relay runtime owner
+        if: ${{ !cancelled() && steps.relay_owner_selection.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 12
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP 'windows-full-entry-evidence'
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          $log = Join-Path $evidence 'proxy-relay-owner.log'
+          $receipt = [ordered]@{ source_sha = $env:GITHUB_SHA; scope = 'native-proxy-relay-runtime-owner'; status = 'not-selected'; native_exit_code = $null; output_sha256 = $null; full_suite_qualified = $false }
+          try {
+              if ('${{ steps.relay_owner_selection.outputs.selected }}' -ne 'true') { return }
+              $receipt.status = 'failed'
+              & ./tools/build/build_windows_proxy_relay.ps1 -Publish
+              if (-not $?) { throw 'The pinned proxy relay build failed.' }
+              $env:ERGOPTI_AHK_EXE = $env:ERGOPTI_REPLAY_AHK
+              $output = & node tools/test/test-windows-proxy-relay-e2e.cjs --required '--only=regression c378cbe402: the real owner admits the real launcher receipt' 2>&1
+              $receipt.native_exit_code = $LASTEXITCODE
+              $output | ForEach-Object { Write-Host $_ }
+              $output | Set-Content -LiteralPath $log -Encoding utf8
+              $receipt.output_sha256 = (Get-FileHash -LiteralPath $log -Algorithm SHA256).Hash.ToLowerInvariant()
+              $lines = @($output | ForEach-Object { "$_" })
+              if ($receipt.native_exit_code -ne 0 -or @($lines | Where-Object { $_ -ceq '1..1' }).Count -ne 1 -or @($lines | Where-Object { $_ -ceq '# 1 passed, 0 failed.' }).Count -ne 1 -or @($lines | Where-Object { $_ -ceq 'ok 1 - regression c378cbe402: the real owner admits the real launcher receipt' }).Count -ne 1 -or @($lines | Where-Object { $_ -match '^(not ok|ok) ' }).Count -ne 1) { throw 'The exact native proxy relay owner case did not pass.' }
+              $receipt.status = 'passed'
+          } finally {
+              $receipt | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'proxy-relay-owner.receipt.json') -Encoding utf8
+          }
+
       - name: Replay every case alone and the selection in reverse
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.navigation.outcome == 'success' }}
         shell: pwsh
         env:
           ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE: LocalMachine
           ERGOPTI_REPLAY_CHILD_TIMEOUT_MS: "${{ inputs.child_timeout_ms || '120000' }}"
-          ERGOPTI_REPLAY_SELECTION: ${{ inputs.selection || '.github/ci/ahk-replay/windows-fixes.json' }}
+          ERGOPTI_REPLAY_SELECTION: ${{ inputs.selection || '.github/ci/ahk-replay/windows-audit-20261104.json' }}
         run: |
           $output = Join-Path $env:RUNNER_TEMP 'ahk-replay-evidence'
           Write-Host "Replay child timeout (ms): $env:ERGOPTI_REPLAY_CHILD_TIMEOUT_MS"

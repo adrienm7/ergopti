@@ -223,6 +223,7 @@ _LLM_Agent_MenuPromptModel(Key, *) {
 LLM_Agent_OpenAppPicker() {
 	AppPicker_Show(Map(
 		"owner",    "agent:disabled_apps",
+		"durable",  true,
 		"title",    StrReplace(t("menu.agent.disabled_apps"), "{1}",
 			LLM_Agent_Setting(ConfigLeaf.AGENT_DISABLED_APPS).Length),
 		"prompt",   t("dialog.llm.exclude_prompt"),
@@ -235,11 +236,22 @@ LLM_Agent_OpenAppPicker() {
 ; The picker's selection, stored through the AI menu's transaction.
 LLM_Agent_OnAppPickerSave(Selected, Receipt) {
 	global _LLM_Agent_CommitFn
-	Commit := HasMethod(_LLM_Agent_CommitFn, "Call") ? _LLM_Agent_CommitFn : LLM_Menu_CommitMutation
+	Outcome := Receipt is Map && Receipt.Get("durable_mode", false) ? AppPicker_BeginDurableSave(Receipt) : 0
 	Previous := LLM_Agent_Setting(ConfigLeaf.AGENT_DISABLED_APPS)
-	Committed := Commit.Call("the AI agent excluded applications",
-			_LLM_Agent_ApplyPickerSelection.Bind(Selected, Receipt),
-			_LLM_Agent_ApplyCommitted.Bind(ConfigLeaf.AGENT_DISABLED_APPS, Previous))
+	Mutate := _LLM_Agent_ApplyPickerSelection.Bind(Selected, Receipt)
+	Apply := _LLM_Agent_ApplyCommitted.Bind(ConfigLeaf.AGENT_DISABLED_APPS, Previous)
+	if HasMethod(_LLM_Agent_CommitFn, "Call") {
+		; The narrow injected commit port keeps its existing three-argument ABI.
+		; A false/throwing custom result has no native durability witness.
+		if Outcome is Map
+			Outcome["status"] := "unknown"
+		Committed := _LLM_Agent_CommitFn.Call("the AI agent excluded applications", Mutate, Apply)
+		if Outcome is Map && (Committed is Integer) && Committed == 1
+			Outcome["status"] := "committed", Outcome["committed"] := true, Outcome["applied"] := true
+	} else {
+		Committed := LLM_Menu_CommitMutation("the AI agent excluded applications", Mutate, Apply,
+			0, 0, 0, 0, 0, 0, 0, Outcome)
+	}
 	if !(Committed is Integer) || Committed != true
 		return false
 	LLM_Agent_RefreshTray()

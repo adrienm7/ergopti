@@ -15,17 +15,21 @@ local function bounded(full, corrected)
 	return result
 end
 
+-- The longest word the shared parser resource policy admits on every driver
+-- (_shared/modules/llm/parser_limits.json: (n + 1)^2 grid cells).
+local LONG_WORD = 500
+
 helpers.describe("prediction diff is bounded", function()
 	helpers.it("keeps a long identical word without quadratic comparison", function()
-		local word = ("a"):rep(2000)
+		local word = ("a"):rep(LONG_WORD)
 		local result = bounded(word, word)
 		helpers.assert_true(result ~= nil)
 		helpers.assert_eq(result.deletes, 0)
 		helpers.assert_eq(result.to_type, " merci")
 	end)
 	helpers.it("accepts a small correction to a long word", function()
-		local word = ("a"):rep(2000)
-		local result = bounded(word, ("a"):rep(1999) .. "b")
+		local word = ("a"):rep(LONG_WORD)
+		local result = bounded(word, ("a"):rep(LONG_WORD - 1) .. "b")
 		helpers.assert_true(result ~= nil)
 		helpers.assert_eq(result.deletes, 1)
 		helpers.assert_eq(result.to_type, "b merci")

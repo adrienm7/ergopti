@@ -247,3 +247,80 @@ _SIHO_ReadScalar(Hook, NamedKeys) {
 	}
 	return Result
 }
+
+; Custom AltGr is not in InputHook.EndMods. Its notifications precede the
+; terminating OnEnd in the native queue; no later Up is collected after EndKey.
+_SIHO_CustomModifierCapture(Hook, KeyName, SendKey) {
+	if SendKey == ""
+		return 0
+	Vk := GetKeyVK(SendKey), Sc := GetKeySC(KeyName)
+	if !Vk || !Sc
+		return 0
+	Receipt := {hook: Hook, key_name: KeyName, send_key: SendKey, vk: Vk, sc: Sc,
+		active: true, down: !!GetKeyState(SendKey), ended: false, held: false}
+	try {
+		Hook.OnKeyDown := _SIHO_CustomModifierKey.Bind(Receipt, true)
+		Hook.OnKeyUp := _SIHO_CustomModifierKey.Bind(Receipt, false)
+		Hook.OnEnd := _SIHO_CustomModifierEnd.Bind(Receipt)
+		Hook.KeyOpt("{" . KeyName . "}{" . SendKey . "}", "+N")
+		return Receipt
+	} catch {
+		_SIHO_CustomModifierRelease(Receipt, Hook)
+		throw
+	}
+}
+
+_SIHO_CustomModifierKey(Receipt, Down, Hook, Vk, Sc) {
+	PreviousCritical := Critical("On")
+	try {
+		if Receipt.active && !Receipt.ended && Receipt.hook == Hook
+			&& (Vk == Receipt.vk || Sc == Receipt.sc)
+			Receipt.down := Down
+	} finally Critical(PreviousCritical)
+}
+
+_SIHO_CustomModifierEnd(Receipt, Hook) {
+	PreviousCritical := Critical("On")
+	try {
+		if Receipt.active && !Receipt.ended && Receipt.hook == Hook {
+			Receipt.held := Receipt.down
+			Receipt.ended := true
+		}
+	} finally Critical(PreviousCritical)
+}
+
+; Wait reports native termination, not necessarily delivery of its queued End
+; callback. Keep the same suppressive owner until that exact receipt settles.
+_SIHO_CustomModifierSettle(Receipt, Hook, OwnerToken) {
+	PreviousCritical := Critical("Off")
+	try {
+		Started := A_TickCount
+		while !Receipt.ended {
+			if A_IsSuspended || !SIHO_IsOwned(OwnerToken, Hook) || A_TickCount - Started >= 100
+				return false
+			Sleep(-1)
+			if !Receipt.ended
+				Sleep(1)
+		}
+		return !A_IsSuspended && SIHO_IsOwned(OwnerToken, Hook)
+	} finally Critical(PreviousCritical)
+}
+
+_SIHO_CustomModifierRelease(Receipt, Hook) {
+	PreviousCritical := Critical("On")
+	try Receipt.active := false, Receipt.hook := 0
+	finally Critical(PreviousCritical)
+	Hook.OnKeyDown := ""
+	Hook.OnKeyUp := ""
+	Hook.OnEnd := ""
+}
+
+; The terminating receipt owns the original modifier, while the current tuple
+; proves that no different layout key was substituted before replay.
+_SIHO_CustomModifierReplay(Receipt, KeyName, SendKey, &Restore) {
+	Restore := false
+	if !Receipt.ended || Receipt.key_name != KeyName || Receipt.send_key != SendKey
+		return false
+	Restore := Receipt.held && !GetKeyState(Receipt.send_key)
+	return true
+}

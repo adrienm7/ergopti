@@ -43,6 +43,7 @@ if !_UNC_Allowed.Has(A_Args[2]) {
 global _SharedDir := A_Args[3], _TapHoldOneShotCache := 0
 global ScriptInformation := Map("MagicKey", Chr(0x2605))
 global OneShotShiftEnabled := false, InDeadKeySequence := false
+global _TH_SyntheticEpoch := 0
 global _MagicKeyEditorInputHook := "", _MagicKeyEditorStopDebt := false, _MagicKeyEditorGui := ""
 global _UNC := { Case: A_Args[2], Gui: 0, Edit: 0, Hwnd: 0, EditHwnd: 0, Thread: 0,
 	Pid: DllCall("GetCurrentProcessId", "UInt"), Guard: 0, Observer: 0, Target: 0, Token: 0,

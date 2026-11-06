@@ -33,6 +33,7 @@ _LRCC_Require(Condition, Message) {
 _LRCC_Exercise(Entry, Sc, Expected, UseNative) {
 	global _LRCC_Emits
 	_LRCC_Emits := []
+	NativeAdmitted := false
 	WasCritical := Critical("Off")
 	try {
 		if Entry["criterion"].Call(Entry["name"])
@@ -41,8 +42,14 @@ _LRCC_Exercise(Entry, Sc, Expected, UseNative) {
 			_LRCC_Require(_LayoutRowPassthroughCriterion(Sc, Entry["name"]),
 				"the genuine row producer must admit the physical key")
 			_LayoutRowPassthrough(Sc)
+			NativeAdmitted := true
 		}
 	} finally Critical(WasCritical)
+	if Expected is Array && Expected[1] == "native" {
+		_LRCC_Require(NativeAdmitted && _LRCC_Emits.Length == 0,
+			"the admitted native row must not synthesize a replacement key")
+		return
+	}
 	if Expected == "" {
 		_LRCC_Require(_LRCC_Emits.Length == 0, "an ineligible control context must emit nothing")
 		return
@@ -70,7 +77,7 @@ _LRCC_Check() {
 			Enabled := A_Index == 1 ? _LRCC_Row : !_LRCC_Row
 			Features["layout"]["emulate_" . Row] := Enabled
 			AdmittedHost := _LRCC_Index == 1 || (_LRCC_Index <= 3 ? !Microsoft : Microsoft)
-			Expected := !Enabled ? ["event", "{Blind}{" . Sc . "}"]
+			Expected := !Enabled ? ["native", Sc]
 				: (AdmittedHost ? [_LRCC_Index == 1 ? "event" : "final", Outputs[_LRCC_Index]] : "")
 			; For the wildcard zoom declarations the physical stroke includes
 			; Shift+Ctrl, where the less-specific row wildcard cannot win first.

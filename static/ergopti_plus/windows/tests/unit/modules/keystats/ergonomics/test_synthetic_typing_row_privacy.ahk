@@ -95,6 +95,9 @@ _STRP_WithCleanBuffer(Body) {
 	PrevInit    := Keystats.initialized
 	PrevEvents  := Keystats.buffer_events
 	PrevText    := Keystats.buffer_text
+	PrevScalarFragment := Keystats.scalar_fragment
+	PrevScalarHistory := Keystats.scalar_history
+	PrevScalarEpoch := Keystats.scalar_epoch
 	PrevDepth   := Keystats.synth_active
 	PrevType    := Keystats.synth_type
 	PrevOwners  := Keystats.synth_owners
@@ -112,6 +115,9 @@ _STRP_WithCleanBuffer(Body) {
 	Keystats.initialized   := true
 	Keystats.buffer_events := []
 	Keystats.buffer_text   := ""
+	Keystats.scalar_fragment := false
+	Keystats.scalar_history := false
+	Keystats.scalar_epoch += 1
 	Keystats.synth_active  := 0
 	Keystats.synth_type    := "none"
 	Keystats.synth_owners  := []
@@ -142,6 +148,9 @@ _STRP_WithCleanBuffer(Body) {
 		Keystats.initialized   := PrevInit
 		Keystats.buffer_events := PrevEvents
 		Keystats.buffer_text   := PrevText
+		Keystats.scalar_fragment := PrevScalarFragment
+		Keystats.scalar_history := PrevScalarHistory
+		Keystats.scalar_epoch := PrevScalarEpoch
 		Keystats.synth_active  := PrevDepth
 		Keystats.synth_type    := PrevType
 		Keystats.synth_owners  := PrevOwners
@@ -431,7 +440,7 @@ Test("meta hotstrings: a private fire raises the buffer-residue latch (personal-
 ; the real source, rather than assumed. If this test fails, section 1 has
 ; stopped testing the persisted row and must be re-pointed, never relaxed.
 _STRP_FlushPersistsTheBufferVerbatim() {
-	Body := _DriverFuncBody("KL_FlushBuffer")
+	Body := _DriverFuncBody("_KL_DetachBufferSnapshot")
 	Assert(RegExMatch(Body, "snap_text[ \t]*:=[ \t]*Keystats\.buffer_text"),
 		"KL_FlushBuffer must snapshot Keystats.buffer_text — the field this file asserts on")
 	Assert(RegExMatch(Body, "snap_events[ \t]*:=[ \t]*Keystats\.buffer_events"),

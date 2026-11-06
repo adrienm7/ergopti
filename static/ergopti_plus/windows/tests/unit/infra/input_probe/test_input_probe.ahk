@@ -257,3 +257,52 @@ Test("input probe: every text the checks show exists in English", _IPT_EveryShow
 #Include test_input_probe_entry_owner.ahk
 
 #Include test_input_probe_clipboard_owner.ahk
+
+
+_IPTest_RefuseHookRemoval(Hook) {
+	throw Error("simulated native removal failure")
+}
+
+_IPTest_HookCleanupOwnership() {
+	Hook := 101, Callback := 202, Removed := [], Freed := []
+	Remove := (Handle) => Removed.Push(Handle)
+	Free := (Address) => Freed.Push(Address)
+	_IP_RemoveOwnedHook(&Hook, Remove)
+	AssertEqual(0, Hook, "a successful removal clears the handle")
+	AssertTrue(_IP_ReleaseHookResources(&Hook, &Callback, Remove, Free))
+	AssertEqual(1, Removed.Length, "cleanup must not remove the old handle twice")
+	AssertEqual(1, Freed.Length, "the callback is freed after the hook is gone")
+	Hook := 303, Callback := 404
+	AssertFalse(_IP_ReleaseHookResources(&Hook, &Callback, _IPTest_RefuseHookRemoval, Free))
+	AssertEqual(303, Hook, "a refused removal retains the live hook")
+	AssertEqual(404, Callback, "a live hook retains its callback")
+	AssertEqual(1, Freed.Length, "the live callback must not be freed")
+}
+Test("input probe: hook cleanup retains live callbacks (input-probe-hook-ownership)",
+	_IPTest_HookCleanupOwnership)
+
+
+_IPT_AcquireAdmission() {
+	AssertTrue(A_IsCritical > 0, "admission must run without callback interruption")
+	return ""
+}
+
+_IPT_AtomicReservation() {
+	global _InputProbeBusy
+	SavedBusy := _InputProbeBusy
+	SavedCritical := A_IsCritical
+	try {
+		_InputProbeBusy := false
+		AssertEqual("paused", _IP_TryAcquire(() => "paused"))
+		AssertFalse(_InputProbeBusy, "a refused admission must not reserve the probe")
+		AssertEqual(SavedCritical, A_IsCritical, "refusal restores thread interruption mode")
+		AssertEqual("", _IP_TryAcquire(_IPT_AcquireAdmission))
+		AssertTrue(_InputProbeBusy, "successful admission reserves before returning")
+		AssertEqual("busy", _IP_TryAcquire(_IPT_AcquireAdmission))
+		AssertEqual(SavedCritical, A_IsCritical, "success restores thread interruption mode")
+	} finally {
+		_InputProbeBusy := SavedBusy
+		Critical(SavedCritical)
+	}
+}
+Test("input probe: admission reserves atomically (input-probe-atomic-admission)", _IPT_AtomicReservation)

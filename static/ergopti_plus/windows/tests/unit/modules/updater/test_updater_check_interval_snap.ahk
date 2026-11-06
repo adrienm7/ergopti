@@ -43,3 +43,56 @@ _UCIS_LoadSnapsSavedIntervalsToPresets() {
 	}
 }
 Test("Updater: a saved check interval snaps to the nearest shared preset", _UCIS_LoadSnapsSavedIntervalsToPresets)
+
+_UCIBOOT_ReadActualInterval(Mode) {
+	global ConfigurationFile, _ConfigBootReadFailed, _IniCache, UPDATER_CHECK_INTERVAL, UPDATER_DEFAULT_INTERVAL
+	SavedPath := ConfigurationFile, SavedFailed := _ConfigBootReadFailed
+	HadCache := IsSet(_IniCache)
+	if HadCache
+		SavedCache := _IniCache
+	SavedInterval := UPDATER_CHECK_INTERVAL
+	Root := A_Temp . "\ergopti_updater_interval_admission_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\config.toml", Created := false
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created, "the interval fixture must own the directory before any write")
+		Raw := Mode == "boolean-false" ? "false" : Mode == "quoted-zero" ? '"0"'
+			: Mode == "fraction-half" ? "0.5" : Mode == "zero-control" ? "0" : "3600"
+		Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n[updater]`ncheck_interval_seconds = " . Raw . "`n"
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		ConfigurationFile := Path
+		Boot := ConfigMigrateBoot(Path)
+		AssertEqual("current", Boot["status"])
+		_IniCache := ParseConfigTomlFile(Path)
+		Snapshot := ConfigTomlBootSnapshot(_IniCache)
+		AssertTrue(IsObject(Snapshot), "the interval reader receives the actual bootstrap cache")
+		Authored := Snapshot.Document["updater"]["check_interval_seconds"]
+		if Mode == "boolean-false"
+			AssertTrue(Authored is TOML_Bool && !Authored.Value, "the actual source owner retains a Boolean, never numeric zero")
+		else if Mode == "quoted-zero"
+			AssertTrue(Authored is String && Authored == "0", "the actual source owner retains a String, never numeric zero")
+		else if Mode == "fraction-half"
+			AssertTrue(Authored is Float && Authored == 0.5, "the actual source owner retains a non-integral number")
+		else
+			AssertTrue(Authored is Integer)
+		Expected := Mode == "zero-control" ? 0 : Mode == "number-control" ? 3600 : UPDATER_DEFAULT_INTERVAL
+		AssertTrue(UPDATER_DEFAULT_INTERVAL > 0, "the default must schedule checks so malformed zero has an observable effect")
+		Updater_LoadCheckInterval()
+		AssertEqual(Expected, UPDATER_CHECK_INTERVAL, "a non-number source must not silently disable the real updater check cadence")
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+	} finally {
+		ConfigurationFile := SavedPath, _ConfigBootReadFailed := SavedFailed
+		if HadCache
+			_IniCache := SavedCache
+		else
+			_IniCache := unset
+		UPDATER_CHECK_INTERVAL := SavedInterval
+		if Created {
+			try _TOML_InvalidateParseCache(Path)
+			finally DirDelete(Root, true)
+		}
+	}
+}
+for _UCIBOOT_Mode in ["boolean-false", "quoted-zero", "fraction-half", "zero-control", "number-control"]
+	Test("Updater actual boot interval admission: " . _UCIBOOT_Mode, _UCIBOOT_ReadActualInterval.Bind(_UCIBOOT_Mode))

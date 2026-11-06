@@ -186,18 +186,26 @@ _GestureScreenshotPublishClipboard(Stage, AdmissionFn) {
 }
 
 _GestureScreenshotCaptureStage(Job) {
-	PreviousCritical := Critical("On")
-	try {
-		if Job.Get("stage_captured", false)
-			return
+	if Job.Get("stage_captured", false)
+		return true
+	; A worker which never acquired its stage owns no pathname, even when a
+	; previous process left a file at the deterministic name.
+	if IsObject(GestureScreenshotWorkerState.cleanup_stage_fn) || !Job.Get("stage_acquired", false) {
+		Job["stage_snapshot"] := Map("absent", true)
 		Job["stage_captured"] := true
-		Job["stage_snapshot"] := 0
-	} finally Critical(PreviousCritical)
-	; Never re-adopt a path after a callback, failed probe, or cleanup retry.
-	if IsObject(GestureScreenshotWorkerState.cleanup_stage_fn)
-		return
-	try Job["stage_snapshot"] := FSStrictExists(Job["stage"])
-		? _GestureScreenshotFileSnapshot(Job["stage"]) : Map("absent", true)
+		return true
+	}
+	Lease := Job.Get("stage_lease", 0)
+	if !Lease
+		return false
+	; Retry a refused metadata observation only through the retained native
+	; handle. Never acquire cleanup authority by reopening its pathname.
+	Snapshot := FSHandleSnapshot(Lease)
+	if !(Snapshot is Map) || !Snapshot.Get("ok", false)
+		return false
+	Job["stage_snapshot"] := Snapshot
+	Job["stage_captured"] := true
+	return true
 }
 
 _GestureScreenshotCleanupStage(Job) {
@@ -213,7 +221,15 @@ _GestureScreenshotCleanupStage(Job) {
 	} finally Critical(PreviousCritical)
 	Acknowledged := false
 	try {
-		_GestureScreenshotCaptureStage(Job)
+		if !_GestureScreenshotCaptureStage(Job)
+			throw Error("The retained screenshot stage identity is unavailable.")
+		Lease := Job.Get("stage_lease", 0)
+		if Lease {
+			; The read lease denies DELETE until publication has finished. A
+			; refused close retains this exact reference as cleanup retry debt.
+			_GestureScreenshotCloseStageLease(Lease)
+			Job["stage_lease"] := 0
+		}
 		Fn := GestureScreenshotWorkerState.cleanup_stage_fn
 		Result := IsObject(Fn) ? Fn.Call(Job["stage"])
 			: _GestureScreenshotDefaultDeleteFile(Job["stage"], Job["stage_snapshot"])
@@ -228,6 +244,9 @@ _GestureScreenshotCleanupStage(Job) {
 			if Acknowledged && GestureScreenshotWorkerState.jobs.Has(Job["id"])
 					&& GestureScreenshotWorkerState.jobs[Job["id"]] == Job {
 				Job["cleanup_done"] := true
+				; The wrapper binds this Job. Drop its handle only once quiescent
+				; cleanup is acknowledged, breaking Job -> task -> capture -> Job.
+				Job["handle"] := 0
 				GestureScreenshotWorkerState.jobs.Delete(Job["id"])
 			}
 		} finally Critical(PreviousCritical)
@@ -370,16 +389,62 @@ _GestureScreenshotNativeRun(Task) {
 			Task["running"] := false
 		}
 	}
+	; A native capture is single-use; it may bind its exact worker Job.
+	; Release that closure before completion can retire the reverse handle.
+	Task["capture"] := 0
 	Task["done"].Call(ExitCode, "", ErrorText)
+}
+
+; NativeRun invokes this only after the exact job was published and started.
+; Filesystem acquisition stays in that deferred, interruptible worker, never
+; in GestureCaptureRegion's short Critical owner-admission section.
+_GestureScreenshotRunOwnedCapture(Job, Capture) {
+	PreviousCritical := Critical("On")
+	try {
+		if !GestureScreenshotWorkerState.jobs.Has(Job["id"])
+				|| GestureScreenshotWorkerState.jobs[Job["id"]] != Job
+				|| Job["cancel_requested"] || Job["worker_done"] || Job.Get("stage_acquired", false)
+			throw Error("Screenshot capture ownership is no longer current.")
+	} finally Critical(PreviousCritical)
+	; GENERIC_READ participates in native sharing. Access zero permits deletion
+	; despite FILE_SHARE_DELETE being absent and cannot retain path custody.
+	Lease := _GestureScreenshotAcquireStageLease(Job["stage"])
+	PreviousCritical := Critical("On")
+	try {
+		; NativeRun is still running: cancellation cannot claim quiescence or
+		; retire this job during acquisition. Retain custody even if cancelled.
+		Job["stage_lease"] := Lease
+		Job["stage_acquired"] := true
+		Current := GestureScreenshotWorkerState.jobs.Has(Job["id"])
+			&& GestureScreenshotWorkerState.jobs[Job["id"]] == Job && !Job["cancel_requested"] && !Job["worker_done"]
+	} finally Critical(PreviousCritical)
+	if !Current
+		throw Error("Screenshot capture was cancelled during stage acquisition.")
+	return Capture.Call()
 }
 
 _GestureScreenshotCreateWorker(Kind, OwnerEpoch, Stage, Capture, OwnerDone) {
 	PreviousCritical := Critical("On")
 	try WorkerId := ++GestureScreenshotWorkerState.generation
 	finally Critical(PreviousCritical)
+	Job := Map(
+		"id", WorkerId,
+		"kind", Kind,
+		"owner_epoch", OwnerEpoch,
+		"stage", Stage,
+		"handle", 0,
+		"stage_acquired", false,
+		"stage_lease", 0,
+		"on_done", OwnerDone,
+		"worker_done", false,
+		"start_attempted", false,
+		"quiescent", false,
+		"cancel_requested", false,
+		"terminate_requested", false,
+		"cleanup_claimed", false)
 	Spawn := IsObject(GestureScreenshotWorkerState.spawn_fn)
 		? GestureScreenshotWorkerState.spawn_fn : _GestureScreenshotSpawnNative
-	try Handle := Spawn.Call(Capture, GestureScreenshotWorkerDone.Bind(WorkerId))
+	try Handle := Spawn.Call(_GestureScreenshotRunOwnedCapture.Bind(Job, Capture), GestureScreenshotWorkerDone.Bind(WorkerId))
 	catch as Err {
 		LoggerError("gestures", "Screenshot worker construction failed ({1}): {2}.", Kind, Err.Message)
 		return 0
@@ -388,19 +453,8 @@ _GestureScreenshotCreateWorker(Kind, OwnerEpoch, Stage, Capture, OwnerDone) {
 		LoggerError("gestures", "Screenshot worker construction returned no handle ({1}).", Kind)
 		return 0
 	}
-	Job := Map(
-		"id", WorkerId,
-		"kind", Kind,
-		"owner_epoch", OwnerEpoch,
-		"stage", Stage,
-		"handle", Handle,
-		"on_done", OwnerDone,
-		"worker_done", false,
-		"start_attempted", false,
-		"quiescent", false,
-		"cancel_requested", false,
-		"terminate_requested", false,
-		"cleanup_claimed", false)
+	Job["handle"] := Handle
+
 	PreviousCritical := Critical("On")
 	try GestureScreenshotWorkerState.jobs[WorkerId] := Job
 	finally Critical(PreviousCritical)
@@ -510,6 +564,13 @@ GestureScreenshotWorkerDone(WorkerId, ExitCode, Stdout, Stderr) {
 	}
 	try {
 		_GestureScreenshotCaptureStage(Job)
+		if ExitCode == 0 && !IsObject(GestureScreenshotWorkerState.cleanup_stage_fn) {
+			Snapshot := Job.Get("stage_snapshot", 0)
+			if !(Snapshot is Map) || !Snapshot.Get("ok", false) {
+				ExitCode := 1
+				Stderr := "worker finished without an exclusively owned stage"
+			}
+		}
 		if !Job["cancel_requested"] && IsObject(Completion) {
 			try Completion.Call(WorkerId, Job, ExitCode, Stdout, Stderr)
 			catch as Err

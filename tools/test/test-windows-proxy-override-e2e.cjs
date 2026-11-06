@@ -13,7 +13,7 @@
  *
  * FEATURES & RATIONALE:
  * 1. http_client: the real adapter and its real managed worker, under AutoHotkey
- *    (tests/live/proxy_override_owner.ahk), with the value published as boot does.
+ *    (tests/live/proxy_override_owner.ahk), with a detached published route value.
  * 2. Updater: the real staging worker, in its production argument and environment
  *    shape, downloads through the real route owner.
  * 3. The Ollama launcher, the daemon and the sign-in relay are proven by the
@@ -685,21 +685,36 @@ async function main() {
 		);
 
 		await ahkCheck(
-			'a password clear in the file is sealed once and the next downloads still use it',
+			'a detached password refuses automatic sealing while real DPAPI downloads still work',
 			async () => {
 				const form = forms[forms.length - 1];
 				arm(form);
-				const first = await runOwner(work, { stored: form.value, seal_at_start: true });
-				assert.equal(first.sealed_now, 1, JSON.stringify(first.logs));
-				assert.equal(first.committed.length, 1, 'one write');
-				const [envelope] = first.committed;
+				const first = await runOwner(work, {
+					stored: form.value,
+					seal_at_start: true,
+					sample_envelope: true
+				});
+				assert.equal(
+					first.sealed_now,
+					0,
+					'direct publication cannot forge a boot migration receipt'
+				);
+				assert.deepEqual(first.committed, [], 'no write without an admitted boot source');
+				assert.equal(first.runtime_sealed, 0, 'refusal leaves the route unsealed');
+				assert.equal(
+					first.unchanged_unsealed,
+					1,
+					'refusal preserves the exact detached runtime value'
+				);
+				const envelope = first.sample_envelope;
 				assert.match(envelope, /^dpapi:/);
 				assert.ok(!envelope.includes(SECRET) && !envelope.includes(BASIC_CREDENTIAL.user));
 				assertTunnel(form, JSON.stringify(first.receipt));
 				arm(form);
 				const next = await runOwner(work, { stored: envelope, seal_at_start: true });
 				assert.equal(next.published, 1);
-				assert.equal(next.sealed_now, 0, 'the migration runs once');
+				assert.equal(next.sealed_now, 0, 'an already sealed value needs no migration');
+				assert.equal(next.runtime_sealed, 1, 'the real DPAPI envelope is published as sealed');
 				assert.deepEqual(next.committed, [], 'and writes nothing more');
 				assertTunnel(form, JSON.stringify(next.receipt));
 			}

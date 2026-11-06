@@ -18,6 +18,75 @@ const demand = (condition, message) => {
 const writeJson = (file, value) => fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 const digest = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
+function failureDiagnostic(file, limit = 16384) {
+	const descriptor = fs.openSync(file, 'r');
+	try {
+		const bytes = fs.fstatSync(descriptor).size;
+		const head = Buffer.alloc(Math.min(bytes, limit / 2));
+		fs.readSync(descriptor, head, 0, head.length, 0);
+		const tailOffset = Math.max(head.length, bytes - limit / 2);
+		const tail = Buffer.alloc(bytes - tailOffset);
+		fs.readSync(descriptor, tail, 0, tail.length, tailOffset);
+		return {
+			bytes,
+			omitted_bytes: tailOffset - head.length,
+			head: head.toString('utf8'),
+			tail: tail.toString('utf8')
+		};
+	} finally {
+		fs.closeSync(descriptor);
+	}
+}
+
+function failureManifest(file) {
+	// This optional console diagnostic must not exhaust memory on runaway output.
+	const bytes = fs.statSync(file).size;
+	if (bytes > 16 * 1024 * 1024) return { skipped: 'TAP exceeds diagnostic parse budget', bytes };
+	return validateAhkSuiteManifest(fs.readFileSync(file, 'utf8'));
+}
+
+function reportFailure(directory, label) {
+	for (const kind of ['tap', 'stdout', 'stderr']) {
+		const file = path.join(directory, `${label}.${kind}.txt`);
+		try {
+			if (kind === 'tap' && fs.existsSync(file)) {
+				const manifest = failureManifest(file);
+				const { executed = [], errors = [] } = manifest;
+				const counts = Object.fromEntries(
+					[
+						'complete',
+						'planned',
+						'executed_count',
+						'timed_count',
+						'passed',
+						'failed',
+						'not_executed',
+						'skipped',
+						'bytes'
+					]
+						.filter((key) => Object.hasOwn(manifest, key))
+						.map((key) => [key, manifest[key]])
+				);
+				console.log(
+					`Native failure manifest: ${JSON.stringify({ label, ...counts, errors: errors.slice(0, 20).map((error) => error.slice(0, 2048)), omitted_cases: Math.max(0, executed.length - 512) })}`
+				);
+				for (const entry of executed.slice(0, 512))
+					console.log(
+						`Native failure case: ${JSON.stringify({ label, ...entry, name: entry.name.slice(0, 2048) })}`
+					);
+			}
+			if (fs.existsSync(file))
+				console.log(
+					`Native failure diagnostic: ${JSON.stringify({ label, kind, ...failureDiagnostic(file) })}`
+				);
+		} catch (error) {
+			console.log(
+				`Native diagnostic unavailable: ${JSON.stringify({ label, kind, error: error.message })}`
+			);
+		}
+	}
+}
+
 function repositoryFile(relative) {
 	demand(
 		typeof relative === 'string' && !path.isAbsolute(relative) && !path.win32.isAbsolute(relative),
@@ -45,6 +114,21 @@ function parsePlan(source) {
 	});
 }
 function selectTests(plan, selection) {
+	if (Object.hasOwn(selection, 'native_proxy_relay_owner_e2e'))
+		demand(
+			typeof selection.native_proxy_relay_owner_e2e === 'boolean',
+			'native proxy relay owner E2E selection must be Boolean'
+		);
+	if (Object.hasOwn(selection, 'native_http_client_e2e'))
+		demand(
+			typeof selection.native_http_client_e2e === 'boolean',
+			'native HTTP E2E selection must be Boolean'
+		);
+	if (Object.hasOwn(selection, 'native_hotstring_e2e'))
+		demand(
+			typeof selection.native_hotstring_e2e === 'boolean',
+			'native hotstring E2E selection must be Boolean'
+		);
 	demand(
 		Number.isSafeInteger(selection.expected_count) && selection.expected_count > 0,
 		'invalid total expected_count'
@@ -107,6 +191,21 @@ function validateExecution(tap, expected) {
 	);
 	return manifest;
 }
+
+// Explicit numeric receipts stay useful when successful TAP artifacts cannot be downloaded.
+function numericObservations(tap) {
+	const records = [];
+	let omitted = 0;
+	const pattern =
+		/^# OBSERVATION ([a-z][a-z0-9-]{0,63}(?: [a-z][a-z0-9_]{0,63}=[0-9]{1,20}){1,16})\r?$/gm;
+	for (const match of tap.matchAll(pattern)) {
+		if (match[1].length > 1024) continue;
+		if (records.length < 16) records.push(match[1]);
+		else omitted += 1;
+	}
+	return { records, omitted };
+}
+
 async function nativeChild(command, args, context) {
 	const descriptors = [];
 	try {
@@ -212,6 +311,9 @@ async function replay(options) {
 				result.entry.manifest = validateAhkSuiteManifest(result.tap);
 				validateExecution(result.tap, expected);
 				result.entry.status = 'passed';
+				const observations = numericObservations(result.tap);
+				if (observations.records.length)
+					console.log(`Native observations: ${JSON.stringify({ label, ...observations })}`);
 			} catch (error) {
 				result.entry.status = 'failed';
 				result.entry.error = error.message;
@@ -253,6 +355,7 @@ async function replay(options) {
 			try {
 				await run(`case-${index + 1}`, [`--list=${list}`], [selected[index]]);
 			} catch (error) {
+				reportFailure(directory, `case-${index + 1}`);
 				failures.push(`case-${index + 1}: ${error.message}`);
 			}
 		}
@@ -261,6 +364,7 @@ async function replay(options) {
 		try {
 			await run('reverse', [`--list=${list}`, '--reverse'], [...selected].reverse());
 		} catch (error) {
+			reportFailure(directory, 'reverse');
 			failures.push(`reverse: ${error.message}`);
 		}
 		summary.failures = failures;
@@ -288,6 +392,27 @@ async function selfTest() {
 		]
 	};
 	assert.deepEqual(selectTests(plan, selection), ['Alpha (one)', 'Beta (two)']);
+	for (const selected of [true, false])
+		assert.deepEqual(selectTests(plan, { ...selection, native_proxy_relay_owner_e2e: selected }), [
+			'Alpha (one)',
+			'Beta (two)'
+		]);
+	for (const invalid of ['true', 'false', 0, 1, null, {}, []])
+		assert.throws(() => selectTests(plan, { ...selection, native_proxy_relay_owner_e2e: invalid }));
+	for (const selected of [true, false])
+		assert.deepEqual(selectTests(plan, { ...selection, native_http_client_e2e: selected }), [
+			'Alpha (one)',
+			'Beta (two)'
+		]);
+	for (const invalid of ['true', 1, null])
+		assert.throws(() => selectTests(plan, { ...selection, native_http_client_e2e: invalid }));
+	for (const selected of [true, false])
+		assert.deepEqual(selectTests(plan, { ...selection, native_hotstring_e2e: selected }), [
+			'Alpha (one)',
+			'Beta (two)'
+		]);
+	for (const invalid of ['false', 0, null])
+		assert.throws(() => selectTests(plan, { ...selection, native_hotstring_e2e: invalid }));
 	assert.deepEqual(
 		selectTests([...plan, ...parsePlan('core\ta\tUnselected\ncore\tb\tunselected\n')], selection),
 		['Alpha (one)', 'Beta (two)']
@@ -309,6 +434,27 @@ async function selfTest() {
 	);
 	validateExecution(tap(['Alpha', 'Beta']), ['Alpha', 'Beta']);
 	validateExecution(tap(['Beta', 'Alpha']), ['Beta', 'Alpha']);
+	const observed = 'sample input_bytes=65536 encoded_units=2147562052';
+	assert.deepEqual(numericObservations(`# OBSERVATION ${observed}\r\n`), {
+		records: [observed],
+		omitted: 0
+	});
+	assert.deepEqual(
+		numericObservations(
+			[
+				'# unrelated comment',
+				'# OBSERVATION sample units=secret',
+				'# OBSERVATION sample units=-1',
+				'# OBSERVATION sample units=1\u001b[31m',
+				`# OBSERVATION sample units=${'1'.repeat(21)}`,
+				`# OBSERVATION sample${(' ' + 'k'.repeat(64) + '=1').repeat(16)}`
+			].join('\n')
+		),
+		{ records: [], omitted: 0 }
+	);
+	const crowdedObservations = numericObservations(`# OBSERVATION ${observed}\n`.repeat(20));
+	assert.equal(crowdedObservations.records.length, 16);
+	assert.equal(crowdedObservations.omitted, 4);
 	const lines = tap(['Alpha', 'Beta']).split('\n');
 	const reordered = [lines[0], ...lines.slice(4, 7), ...lines.slice(1, 4), ...lines.slice(7)].join(
 		'\n'
@@ -331,6 +477,36 @@ async function selfTest() {
 		assert.throws(() => validateExecution(source, expected));
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ahk-replay-selftest-'));
 	try {
+		const diagnosticFile = path.join(directory, 'diagnostic.txt');
+		const diagnosticText = '::error::inert\n\u001b[31m' + 'x'.repeat(40000) + 'final assertion';
+		fs.writeFileSync(diagnosticFile, diagnosticText);
+		const diagnostic = failureDiagnostic(diagnosticFile);
+		assert.equal(diagnostic.bytes, Buffer.byteLength(diagnosticText));
+		assert.equal(diagnostic.omitted_bytes, diagnostic.bytes - 16384);
+		assert.equal(diagnostic.head, diagnosticText.slice(0, 8192));
+		assert.equal(diagnostic.tail, diagnosticText.slice(-8192));
+		assert(!/[\n\r\u001b]/.test(JSON.stringify(diagnostic)));
+		for (const text of ['', 'short receipt', 'a'.repeat(10000)]) {
+			fs.writeFileSync(diagnosticFile, text);
+			const complete = failureDiagnostic(diagnosticFile);
+			assert.equal(complete.omitted_bytes, 0);
+			assert.equal(complete.head + complete.tail, text);
+		}
+		const failedTap = tap(['Alpha', 'Beta'])
+			.replace('ok 1', 'not ok 1')
+			.replace('# 2 passed, 0 failed.', '# 1 passed, 1 failed.');
+		fs.writeFileSync(diagnosticFile, failedTap);
+		const failedManifest = failureManifest(diagnosticFile);
+		assert.equal(failedManifest.complete, true);
+		assert.deepEqual(
+			failedManifest.executed.map(({ name, status }) => [name, status]),
+			[
+				['Alpha', 'not ok'],
+				['Beta', 'ok']
+			]
+		);
+		fs.truncateSync(diagnosticFile, 16 * 1024 * 1024 + 1);
+		assert.equal(failureManifest(diagnosticFile).skipped, 'TAP exceeds diagnostic parse budget');
 		const fake = (mode) => async (_, args, context) => {
 			fs.writeFileSync(context.stdout, '');
 			fs.writeFileSync(context.stderr, '');

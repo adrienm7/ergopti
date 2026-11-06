@@ -835,3 +835,89 @@ for _TDC_KeySessionRow in [
 ]
 	Test("driver-control: private request " . _TDC_KeySessionRow[1] . " preserves the decoded key domain (driver-control-request-key-domain)",
 		_TDC_RequestKeySession.Bind(_TDC_KeySessionRow[2], _TDC_KeySessionRow[3]))
+
+
+; Stage ownership belongs to CREATE_NEW, not the session's deterministic suffix.
+; The endpoint is local to the fixture; no real reload or process is launched.
+_TDC_OwnedStageSnapshot(Path) {
+	File := FileOpen(Path, "r", "UTF-8-RAW")
+	if !IsObject(File)
+		throw Error("The driver-control fixture file could not be opened.")
+	try return FSHandleSnapshot(File.Handle)
+	finally File.Close()
+}
+
+_TDC_OwnedStageCase(Kind, Collision) {
+	static Sequence := 0
+	Sequence += 1
+	Folder := A_Temp . "\ergopti_driver_control_owned_stage_" . PLC_CurrentProcessId()
+		. "_" . A_TickCount . "_" . Sequence
+	FSCreateDirectoryExclusiveStrict(Folder)
+	Spec := _TDC_Spec(), Token := _TDC_Corpus()["token"]
+	State := {handler: 0, starts: 0, stops: 0}
+	Endpoint(Handler) {
+		State.handler := Handler
+		return {Start: (*) => State.starts += 1, Stop: (*) => State.stops += 1}
+	}
+	Session := DriverControlSession(Spec, Folder, 1000,
+		Map("token", (*) => Token, "endpoint", Endpoint, "reload", (*) => 0,
+			"pending", (*) => Map("successor", Map("pid", 4242)), "observe_refusal", (*) => true))
+	Target := Session.Path(Kind), Stage := Target . ".tmp-" . Session.Pid
+	Prior := "previous independently created control receipt`n"
+	Foreign := "foreign pending publication bytes: é😀`n"
+	Expected := Kind == "session" ? DriverControl_SessionText(Spec, Session.Pid, Token)
+		: DriverControl_ResultText(Spec, Map("request_id", "owned-stage", "state", "requested",
+			"driver_pid", Session.Pid, "successor_pid", 4242))
+	try {
+		if Kind == "result"
+			Session.Start()
+		AssertTrue(FSWriteCreateDurable(Target, Prior), "the previous target must be genuinely created")
+		if Collision {
+			AssertTrue(FSWriteCreateDurable(Stage, Foreign), "CREATE_NEW must acquire the actual reserved stage")
+			Before := _TDC_OwnedStageSnapshot(Stage)
+			AssertTrue(Before["ok"], "the foreign stage must have a native identity before publication")
+		}
+		Caught := 0
+		if Kind == "session" {
+			try Session.Start()
+			catch as Err
+				Caught := Err
+		} else {
+			Request := Format('{"schema":1,"token":"{1}","request_id":"owned-stage"}', Token)
+			AssertTrue(FSWriteCreateDurable(Session.Path("request"), Request))
+			AssertTrue(State.handler.Call(), "the genuine authenticated request must join the in-flight successor")
+			AssertEqual(1, Session.Handled, "the actual endpoint owner must consume exactly one request")
+		}
+		if Collision {
+			if Kind == "session"
+				AssertTrue(IsObject(Caught), "a foreign stage must refuse endpoint receipt publication")
+			AssertTrue(FileExist(Stage) != "", "publication cannot consume a foreign stage")
+			AssertEqual(Foreign, FSReadUtf8Exact(Stage), "the independently created stage bytes must survive")
+			After := _TDC_OwnedStageSnapshot(Stage)
+			AssertTrue(After["ok"], "the foreign stage must still have a readable native identity")
+			for Key in ["volume", "index_high", "index_low", "size", "write_high", "write_low"]
+				AssertEqual(Before[Key], After[Key], "the foreign stage retains its native " . Key)
+			AssertEqual(Prior, FSReadUtf8Exact(Target), "a refused stage cannot change the previous control receipt")
+		} else {
+			AssertEqual(0, Caught, "the same default publication must complete without a collision")
+			AssertEqual(Expected, FSReadUtf8Exact(Target), "the real public owner must publish its exact protocol bytes")
+			AssertFalse(FileExist(Stage), "a successfully published owned stage must leave no sibling")
+		}
+	} finally {
+		Session.Stop()
+		; The exclusively created flat fixture has only these known owned leaves.
+		for Name in ["session", "request", "result"] {
+			Path := Session.Path(Name)
+			if !FSDelete(Path) || !FSDelete(Path . ".tmp-" . Session.Pid)
+				throw Error("The private driver-control fixture could not retire an owned leaf.")
+		}
+		DirDelete(Folder, false)
+	}
+}
+
+for _TDC_StageKind in ["session", "result"] {
+	Test("driver-control: " . _TDC_StageKind . " preserves a foreign default stage (driver-control-owned-stage)",
+		_TDC_OwnedStageCase.Bind(_TDC_StageKind, true))
+	Test("driver-control: " . _TDC_StageKind . " publishes through its genuine default stage (driver-control-owned-stage)",
+		_TDC_OwnedStageCase.Bind(_TDC_StageKind, false))
+}

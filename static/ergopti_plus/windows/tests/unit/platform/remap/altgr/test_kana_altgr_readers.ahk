@@ -125,17 +125,21 @@ Test("kana altgr: the AltGr scan code comes from the layout's AltGr key (kana-al
 	_KAR_AltGrScanCodeIsTheLayoutKey)
 
 _KAR_KanaAltGrDoesNotCancelKeepAwake() {
-	global ActivitySimulation
+	global ActivitySimulation, AwakeInputHook
+	SavedActive := ActivitySimulation, SavedHook := AwakeInputHook
+	Hook := InputHook()
+	AwakeInputHook := Hook
 	ActivitySimulation := true
 	try {
 		; VK_OEM_8 is one of the virtual keys a Kana-style layout gives AltGr.
-		_KAR_WithLayout(true, () => AwakeCancelOnKeypress(InputHook(), 0xDF, 0x138))
+		_KAR_WithLayout(true, () => AwakeCancelOnKeypress(Hook, 0xDF, 0x138))
 		AssertTrue(ActivitySimulation,
 			"a bare AltGr press is a modifier and must not cancel keep-awake, whatever virtual key the layout gives it")
-		_KAR_WithLayout(true, () => AwakeCancelOnKeypress(InputHook(), 0x41, 0x1E))
+		_KAR_WithLayout(true, () => AwakeCancelOnKeypress(Hook, 0x41, 0x1E))
 		AssertFalse(ActivitySimulation, "a character key must still cancel keep-awake")
 	} finally {
-		ActivitySimulation := false
+		ActivitySimulation := SavedActive
+		AwakeInputHook := SavedHook
 	}
 }
 Test("kana altgr: a bare Kana AltGr press does not cancel keep-awake (kana-altgr-readers-2026-09-25)",

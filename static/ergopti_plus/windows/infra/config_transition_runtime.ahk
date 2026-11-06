@@ -179,8 +179,12 @@ ConfigTransitionNormalizeConfigDir(Path) {
 ; @param DefaultDir {String} Already-derived ordinary or isolated smoke default.
 ; @return {String} Exact selected directory; boot preserves separator handling.
 ConfigTransitionSelectBootConfigDir(Overrides, DefaultDir) {
-	if Overrides.Has("ConfigDirPath") && Overrides["ConfigDirPath"] != ""
-		return Overrides["ConfigDirPath"]
+	if Overrides.Has("ConfigDirPath") && Overrides["ConfigDirPath"] != "" {
+		Selected := Overrides["ConfigDirPath"]
+		if !(ConfigTransitionNormalizeConfigDir(Selected) is String)
+			throw ValueError("The selected explicit configuration directory is invalid.")
+		return Selected
+	}
 	if !(ConfigTransitionNormalizeConfigDir(DefaultDir) is String)
 		throw ValueError("The selected default configuration directory is invalid.")
 	return DefaultDir

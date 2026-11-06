@@ -16,6 +16,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Reproduce a process architecture that disagrees with the operating system.
+# Only this disposable worker inherits the misleading environment value.
+$env:PROCESSOR_ARCHITECTURE = if ([Environment]::Is64BitOperatingSystem) { "x86" } else { "AMD64" }
+
 function Get-CimInstance {
 	param([Parameter(Mandatory = $true, Position = 0)][string]$ClassName)
 	switch ($ClassName) {
@@ -27,10 +31,10 @@ function Get-CimInstance {
 			}
 		}
 		"Win32_Processor" {
-			return [pscustomobject]@{
-				Name = "CIM_SENTINEL_CPU"
-				NumberOfLogicalProcessors = 16
-			}
+			return @(
+				[pscustomobject]@{ Name = "CIM_SENTINEL_CPU"; NumberOfLogicalProcessors = 8 },
+				[pscustomobject]@{ Name = "CIM_SECOND_SOCKET"; NumberOfLogicalProcessors = 12 }
+			)
 		}
 		default { throw "Unexpected CIM class in crash fixture: $ClassName" }
 	}

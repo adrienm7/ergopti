@@ -14,7 +14,8 @@
 ;    answers false hands the key to the emulation, or to the OS.
 ; 2. No * and no ~: SC029:: fires only with no modifier held, which is exactly
 ;    "a plain tap" (Shift, Ctrl, Alt, Win and AltGr, which is Ctrl+Alt, all fall
-;    through), and it swallows the key.
+;    through), and it swallows the key. The predicate separately excludes a
+;    held Kana AltGr, whose ordinary virtual key AHK does not count as a modifier.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

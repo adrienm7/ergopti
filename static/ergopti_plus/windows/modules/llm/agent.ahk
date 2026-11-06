@@ -828,6 +828,7 @@ _LLM_Agent_IcsText(Text) {
 	Text := StrReplace(Text, ";", "\;")
 	Text := StrReplace(Text, ",", "\,")
 	Text := StrReplace(Text, "`r`n", "`n")
+	Text := StrReplace(Text, "`r", "`n")
 	return StrReplace(Text, "`n", "\n")
 }
 
@@ -870,7 +871,9 @@ _LLM_Agent_IcsTime(Value) {
 ; characters stay literal, and a line break is CRLF.
 _LLM_Agent_MailtoEncode(Text) {
 	global LLM_AGENT_MAILTO_LITERAL
-	Text := StrReplace(StrReplace(Text, "`r`n", "`n"), "`n", "`r`n")
+	Text := StrReplace(Text, "`r`n", "`n")
+	Text := StrReplace(Text, "`r", "`n")
+	Text := StrReplace(Text, "`n", "`r`n")
 	Size := StrPut(Text, "UTF-8")
 	Bytes := Buffer(Size)
 	StrPut(Text, Bytes, "UTF-8")

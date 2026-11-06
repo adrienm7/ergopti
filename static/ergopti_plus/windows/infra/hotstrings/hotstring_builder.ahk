@@ -338,7 +338,7 @@ IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds, NowTick 
 						return True
 				}
 				CharacterSentTime := LastSentCharacterKeyTime[PreviousCharacter]
-				if (TickElapsed(CharacterSentTime, Now) > ActivationDurationMs) {
+				if (TickElapsed64(CharacterSentTime, Now) > ActivationDurationMs) {
 						return True
 				}
 		}

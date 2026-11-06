@@ -100,6 +100,10 @@ _SIA_KeysAndShortcuts() {
 	AssertEqual("{PgDn}|critical", _SIA_FireKey("send_key", "pgdn"), "alias")
 	AssertEqual("{{}|critical", _SIA_FireKey("send_key", "{"), "a brace is braced, not read as a key name")
 	AssertEqual("{é}|critical", _SIA_FireKey("send_key", "é"), "a character key")
+	AssertEqual("{U+10000}|critical", _SIA_FireKey("send_key", Chr(0x10000)), "the first supplementary scalar uses AHK's explicit Unicode syntax")
+	AssertEqual("{U+1F44B}|critical", _SIA_FireKey("send_key", Chr(0x1F44B)), "an accepted emoji cannot become an unknown two-unit braced key name")
+	AssertEqual("{U+10FFFF}|critical", _SIA_FireKey("send_key", Chr(0x10FFFF)), "the final Unicode scalar retains every surrogate-pair bit")
+	AssertEqual("^{U+1F44B}|critical", _SIA_FireKey("send_shortcut", "ctrl+" . Chr(0x1F44B)), "shortcut character keys share the same scalar adapter")
 	AssertEqual("", _SIA_FireKey("send_shortcut", "a"), "an invalid stored value presses nothing")
 	AssertEqual("", _SIA_FireKey("send_key", ""), "an empty stored value presses nothing")
 }
@@ -150,3 +154,82 @@ _SIA_PickedValueSkipsThePrompt() {
 	AssertFalse(Left is Map, "the value answers one prompt only")
 }
 Test("send input: a value the picker's editor collected is used without a prompt (send-input-actions)", _SIA_PickedValueSkipsThePrompt)
+
+_SNK_ChildSource() {
+	global _DriverDir
+	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
+	Code .= "#Include " . _DriverDir . "\_generated\config_keys.ahk`n"
+	for Symbol in ["SendInputParse", "JsonParse", "HS_RunSyntheticInputTransaction", "_TextCompleteTailScalar"] {
+		Owner := _DriverProductionFileForSymbol(Symbol)
+		AssertTrue(Owner != "", "The actual scalar producer must have a canonical owner: " . Symbol)
+		Code .= "#Include " . Owner . "`n"
+	}
+	for Name in ["TextPressKey", "_TextSenderNormalizeModifierKey", "_TextSenderModifierPrefix", "_TextSenderKeystroke",
+		"_TextSenderModifierWords", "_TextSenderSustainedKey", "_TextSenderSendInput", "_TextSenderAtSendLevel",
+		"_SendVerdictSucceeded", "HSE_WordResetFlagCurrent", "HSE_FeedReset", "_PrefixHasIncompleteFragment",
+		"_PrefixCommitInputContext", "_PrefixSetBuffer", "_PrefixCaptureTooltipOwner", "_PrefixFinishInputContext",
+		"_PrefixInputCommitStillCurrent", "_PrefixTooltipOwnerStillCurrent", "_ResetPrefixBuffer", "_NotifySuggestionDismissed",
+		"TapHoldOwnsShortcut", "TapHoldTapInDispatch", "_TH_SyntheticKeyList", "_TH_HoldMakesShortcuts"] {
+		Body := _DriverFuncBody(Name)
+		AssertTrue(Body != "", "The complete real composition dependency must exist: " . Name)
+		Code .= Body . "`n"
+	}
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\send_key_native_scalar_body.ahk")
+}
+_SNK_Case(Mode) {
+	global _SharedDir
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unretired native sender prevents another probe.")
+	Root := A_Temp . "\ergopti_send_key_scalar_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Script := Root . "\subject.ahk"
+	AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _SNK_ChildSource()))
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}, Handle := 0, Primary := 0, Retired := false
+	PreviousCritical := Critical("Off")
+	try {
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-edit-send-key", Mode, _SharedDir], _SICS_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The exact native scalar child must start.")
+		Started := A_TickCount
+		while !State.Calls && TickElapsed(Started) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, State.Calls, "The exact native scalar child must settle.")
+		_TestPrint("# send-key-native-scalar " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+		AssertEqual(0, State.Code, "Native send-key scalar emission failed: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText)
+		AssertContains(State.Output, "PASS send-key-native-scalar " . Mode)
+	} catch as Err {
+		Primary := Err
+	}
+	try {
+		if !IsObject(Handle)
+			Retired := true
+		else {
+			Started := A_TickCount
+			loop {
+				Accepted := Handle.terminate()
+				Retired := Accepted is Integer && Accepted == 1
+				if Retired || TickElapsed(Started) >= 5000
+					break
+				_SR_TreePoll()
+				Sleep(10)
+			}
+		}
+	} catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	try {
+		if !Retired
+			RetirementDebt := Handle
+		else if !IsObject(Primary)
+			DirDelete(Root, true)
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The native sender must physically retire.")
+}
+for _SNK_Mode in ["ascii", "bmp", "astral"]
+	Test("Send key native scalar: " . _SNK_Mode . " reaches the receiving Edit (send-key-native-scalar)", _SNK_Case.Bind(_SNK_Mode))

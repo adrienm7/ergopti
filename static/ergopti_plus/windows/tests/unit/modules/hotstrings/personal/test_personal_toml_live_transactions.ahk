@@ -535,22 +535,34 @@ Test("personal-toml-live-transaction: deferred reload failure is visible and ret
 ; Guard the sibling call sites as a class: a correct gateway is inert if one
 ; editor returns to the old write-then-reload split sequence.
 _PTIOCR_AllEditorsUseTheDurableLiveGateway() {
-	for FunctionName in ["_SaveData", "_HsEdWeb_Save"] {
+	; Native _SaveData now owns only the detached-model handoff. Its qualified
+	; receipt helper owns the actual durable/live gateway and deferred callback.
+	WrapperBody := _DriverFuncBody("_SaveData")
+	Assert(WrapperBody != "", "the native save wrapper must exist")
+	Assert(InStr(WrapperBody, "return _PersonalEditorSaveEntryCandidate(") > 0,
+		"the native wrapper must return its qualified receipt owner's result")
+	Assert(InStr(WrapperBody, "_PersonalTomlCloneDetached(Data)") > 0,
+		"the native wrapper must hand off a detached complete model")
+	for FunctionName in ["_SaveData", "_PersonalEditorSaveEntryCandidate", "_HsEdWeb_Save"] {
 		Body := _DriverFuncBody(FunctionName)
 		Assert(Body != "", FunctionName . " must exist in the driver source")
-		Assert(InStr(Body, "PersonalTomlCommitAndReload(") > 0,
-			FunctionName . " must delegate durable and live publication to the shared gateway")
+		if FunctionName != "_SaveData"
+			Assert(InStr(Body, "PersonalTomlCommitAndReload(") > 0,
+				FunctionName . " must delegate durable and live publication to the shared gateway")
 		Assert(InStr(Body, "WritePersonalToml(") == 0,
 			FunctionName . " must not release path ownership before its live reload")
 		Assert(InStr(Body, "ReloadPersonalSection(") == 0,
 			FunctionName . " must not own a second, reentrant reload loop")
 	}
-	NativeBody := _DriverFuncBody("_SaveData")
-	Assert(InStr(NativeBody, "CompletionFn") > 0,
-		"the native editor must receive a terminal result after DEFERRED")
+	NativeBody := _DriverFuncBody("_PersonalEditorSaveEntryCandidate")
+	Assert(InStr(NativeBody, "_PersonalEditorEntryCompleted.Bind(Request)") > 0,
+		"the native gateway must bind its exact request for the DEFERRED terminal callback")
 	Assert(InStr(NativeBody, "PERSONAL_TOML_COMMIT_DEFERRED") > 0
 			&& InStr(NativeBody, "return false") > 0,
-		"the native editor must not report a DEFERRED admission as saved")
+		"the native owner must not report a DEFERRED admission as saved")
+	NativeCompletion := _DriverFuncBody("_PersonalEditorEntryCompleted")
+	Assert(NativeCompletion != "" && InStr(NativeCompletion, "editor.hotstrings.err_write") > 0,
+		"the bound native completion must keep a terminal refusal visibly unsaved")
 	WebBody := _DriverFuncBody("_HsEdWeb_Save")
 	Assert(InStr(WebBody, "_HsEdWeb_DeferredSaveCompleted") > 0,
 		"the WebView editor must receive a terminal result after DEFERRED")
@@ -702,19 +714,26 @@ _PT102_Commit(Context, Data, Deferred := false) {
 	return PersonalTomlCommitAndReload(Args*)
 }
 
-_PT102_WithCase(Mode, Body) {
+_PT102_WithCase(Mode, Body, OwnDirectory := false) {
 	global ScriptInformation, _ReadPersonalTomlCache, _TomlUnreadableFiles
 	global _PersonalEditorGui, _PersonalEditorData, _PersonalEditorSection, _PersonalEditorPrioCtrl
 	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch
+	global _PersonalEditorEntryCohort, _PersonalEditorEntryBusy
 	global _HsEdWeb_Gui, _HsEdWeb_OpeningSource, _HsEdWeb_SessionEpoch
 	static Sequence := 0, RetainedHandles := Map()
 	if RetainedHandles.Count
 		throw Error("controlled native handle debt blocks successor fixture")
 	Sequence += 1
 	Path := A_Temp . "\ergopti_opening_source_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Sequence . ".toml"
+	Root := "", CreatedRoot := false
+	if OwnDirectory {
+		Root := A_Temp . "\ergopti_opening_owned_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Sequence
+		Path := Root . "\personal_hotstrings.toml"
+	}
 	Names := ["_ReadPersonalTomlCache", "_TomlUnreadableFiles", "_PersonalEditorGui",
 		"_PersonalEditorData", "_PersonalEditorSection", "_PersonalEditorPrioCtrl",
 		"_PersonalEditorOpeningSource", "_PersonalEditorSessionEpoch",
+		"_PersonalEditorEntryCohort", "_PersonalEditorEntryBusy",
 		"_HsEdWeb_Gui", "_HsEdWeb_OpeningSource", "_HsEdWeb_SessionEpoch"]
 	Saved := Map()
 	for Name in Names {
@@ -734,7 +753,13 @@ _PT102_WithCase(Mode, Body) {
 		lock_acquired: false, lock_closed: false, lock_handle: 0, handle_owner: RetainedHandles,
 		live: Map(), fail_remaining: 0, queue_pending: false, queued_result: "unreached"}
 	try {
+		if OwnDirectory {
+			Creation := FSCreateDirectoryExclusiveStrict(Root)
+			CreatedRoot := (Creation is Integer) && Creation == 1
+			AssertTrue(CreatedRoot, "The native partial-effect fixture owns its private directory exclusively")
+		}
 		Suspend(false)
+		_PersonalEditorEntryCohort := 0, _PersonalEditorEntryBusy := false
 		ScriptInformation["PersonalTomlPath"] := Path
 		_TomlUnreadableFiles := _TomlUnreadableFiles.Clone()
 		_ReadPersonalTomlCache := false
@@ -797,10 +822,12 @@ _PT102_WithCase(Mode, Body) {
 				CleanupDebt := true
 		}
 		try Window.Destroy()
-		for StagePath in Context.stage_paths
-			try FileDelete(StagePath)
-		try FileDelete(Path)
-		try _ParseTomlGroupConfig_InvalidatePath(Path)
+		if !OwnDirectory || CreatedRoot {
+			for StagePath in Context.stage_paths
+				try FileDelete(StagePath)
+			try FileDelete(Path)
+			try _ParseTomlGroupConfig_InvalidatePath(Path)
+		}
 		ScriptInformation["PersonalTomlPath"] := OldPath
 		_PersonalTomlLiveCommitState(OldState)
 		for Name, State in Saved {
@@ -811,6 +838,8 @@ _PT102_WithCase(Mode, Body) {
 		}
 		Suspend(OldSuspended)
 		Critical(OldCritical)
+		if CreatedRoot && !CleanupDebt
+			DirDelete(Root, true)
 		if CleanupDebt
 			throw Error("controlled native handle cleanup debt retained")
 	}
@@ -975,3 +1004,308 @@ _PT102_KnownOverrides(Context) {
 }
 Test("personal-opening-source: own image preserves all four file and section metadata neighbors",
 	_PT102_WithCase.Bind("metadata", _PT102_KnownOverrides))
+
+; Append to test_personal_toml_live_transactions.ahk. Existing _PT102_WithCase
+; owns the real private personal file, native Gui identity and global cleanup.
+; Callbacks record facts only: assertions happen after the actual transaction.
+_PTA_FinalHotstring(Context) {
+	global ScriptInformation
+	Original := FSReadBytesStrict(Context.path)
+	Candidate := FSReadUtf8Exact(Context.path) . "`n# final native admission candidate`n"
+	Owner := _PersonalTomlWriteLeaseTryAcquire(Context.path, "final-admission-regression")
+	AssertTrue(Owner is Object)
+	Facts := {hooks: 0, hook_critical: false, admitted_before: false, stage: "", published: 0, close_called: false}
+	Writer(Stage, Content) {
+		Facts.stage := Stage
+		return FSWriteDurable(Stage, Content)
+	}
+	Publish() {
+		Facts.published += 1
+		return true
+	}
+	BeforeNative() {
+		global ScriptInformation
+		Facts.hooks += 1
+		Facts.hook_critical := A_IsCritical
+		Facts.admitted_before := _PersonalTomlOpeningAuthority(Context.source, Context.path, Owner)
+		switch Context.mode {
+			case "close":
+				_PersonalEditorWindowClose(Context.window, Context.source["epoch"])
+				Facts.close_called := true
+			case "pause": Suspend(true)
+			case "released": _PersonalTomlWriteLeaseRelease(Owner)
+			case "relocated": ScriptInformation["PersonalTomlPath"] := Context.path . ".other"
+		}
+	}
+	try {
+		Result := _PersonalTomlWriteAtomic(Context.path, Candidate, Writer, 0, 0,
+			_PersonalTomlAuthorizeOwnedWrite.Bind(Owner, Context.path), Publish,
+			Context.source, Owner, Context.source, BeforeNative)
+		AssertEqual(1, Facts.hooks, "the genuine native cutpoint follows all earlier admission checks")
+		AssertFalse(Facts.hook_critical, "revocation must execute outside the protected native span")
+		AssertTrue(Facts.admitted_before, "the live genuine session must pass before the cutpoint revokes it")
+		AssertTrue(Facts.stage != "")
+		AssertFalse(FileExist(Facts.stage), "success consumes the stage; refusal cleans it")
+		if Context.mode == "live" {
+			AssertTrue(Result)
+			AssertTrue(FSUtf8ExactMatches(Context.path, Candidate))
+			AssertEqual(1, Facts.published)
+		} else {
+			AssertFalse(Result)
+			AssertTrue(_PersonalInfoSourceBytesEqual(Original, FSReadBytesStrict(Context.path)),
+				"a late withdrawal must preserve the entire original native file")
+			AssertEqual(0, Facts.published, "a refused native rename cannot publish the candidate")
+		}
+		if Context.mode == "close"
+			AssertTrue(Facts.close_called)
+	} finally {
+		_PersonalTomlWriteLeaseRelease(Owner)
+	}
+}
+for _PTA_Mode in ["live", "close", "pause", "released", "relocated"]
+	Test("personal native final admission: " . _PTA_Mode,
+		_PT102_WithCase.Bind(_PTA_Mode, _PTA_FinalHotstring))
+
+; Metadata shares the same atomic producer but may target an additional personal
+; source. Do not impose the primary file's configured-path identity on this API.
+_PTA_FinalMetadata(Context) {
+	Original := FSReadBytesStrict(Context.path)
+	Candidate := FSReadUtf8Exact(Context.path) . "`n# late metadata candidate`n"
+	Facts := {hooks: 0, hook_critical: false, leased: false, stage: ""}
+	Build(Content) {
+		return Candidate
+	}
+	Writer(Stage, Content) {
+		Facts.stage := Stage
+		return FSWriteDurable(Stage, Content)
+	}
+	BeforeNative() {
+		Facts.hooks += 1
+		Facts.hook_critical := A_IsCritical
+		Unexpected := _PersonalTomlWriteLeaseTryAcquire(Context.path, "late-probe")
+		Facts.leased := !IsObject(Unexpected)
+		if Unexpected is Object
+			_PersonalTomlWriteLeaseRelease(Unexpected)
+		if Context.mode == "pause"
+			Suspend(true)
+	}
+	Result := _PersonalTomlCommitPatch(Context.path, Build, 0, Writer, 0, 0, 0, BeforeNative)
+	AssertEqual(1, Facts.hooks)
+	AssertFalse(Facts.hook_critical)
+	AssertTrue(Facts.leased, "the genuine patch holds its existing owner through the cutpoint")
+	AssertFalse(FileExist(Facts.stage))
+	if Context.mode == "live" {
+		AssertTrue(Result)
+		AssertTrue(FSUtf8ExactMatches(Context.path, Candidate))
+	} else {
+		AssertFalse(Result)
+		AssertTrue(_PersonalInfoSourceBytesEqual(Original, FSReadBytesStrict(Context.path)))
+	}
+	Probe := _PersonalTomlWriteLeaseTryAcquire(Context.path, "after-final-patch")
+	AssertTrue(Probe is Object)
+	try AssertTrue(_PersonalTomlWriteLeaseOwns(Probe, Context.path))
+	finally _PersonalTomlWriteLeaseRelease(Probe)
+}
+for _PTA_Mode in ["live", "pause"]
+	Test("personal metadata native final admission: " . _PTA_Mode,
+		_PT102_WithCase.Bind(_PTA_Mode, _PTA_FinalMetadata))
+
+; Separate private fixture for personal_info.toml. Its actual public loader
+; captures the original byte receipt and actual editor-source owner. The outer
+; atomic helper dispatches its ordinary injected ReplaceFn ABI; that callback
+; delegates to the real _PersonalInfoReplaceUnchanged DEFAULT native branch.
+_PTA_FinalInformation(Mode) {
+	global ScriptInformation, PersonalInformation, PersonalInformationLetters
+	global _ReadPersonalInfoTomlCache, _TomlUnreadableFiles
+	Directory := A_Temp . "\ergopti_info_final_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Directory)
+	Path := Directory . "\personal_info.toml"
+	Saved := {had_path: ScriptInformation.Has("PersonalInfoTomlPath"), path: ScriptInformation.Get("PersonalInfoTomlPath", ""),
+		had_info: IsSet(PersonalInformation), had_letters: IsSet(PersonalInformationLetters), cache: _ReadPersonalInfoTomlCache,
+		suspended: A_IsSuspended, critical: A_IsCritical}
+	Saved.info := Saved.had_info ? PersonalInformation : 0
+	Saved.letters := Saved.had_letters ? PersonalInformationLetters : 0
+	Owner := 0
+	Facts := {hooks: 0, hook_critical: false, admitted_before: false, stage: "", published: 0, replace_critical: false}
+	try {
+		Critical("Off")
+		Suspend(false)
+		ScriptInformation["PersonalInfoTomlPath"] := Path
+		PersonalInformation := Map("first_name", "Default", "last_name", "Default")
+		PersonalInformationLetters := Map("p", "first_name")
+		_ReadPersonalInfoTomlCache := false
+		OriginalText := '[info]`nfirst_name = "Alice"`nlast_name = "Original"`n[letters]`np = "first_name"`n'
+		Candidate := StrReplace(OriginalText, '"Original"', '"Changed"')
+		AssertTrue(FSWriteDurable(Path, OriginalText))
+		ReadPersonalInfoToml(Path)
+		Editor := _PersonalInfoCaptureEditorSource(Path)
+		AssertTrue(_PersonalInfoEditorSourceCurrent(Editor, Path))
+		Owner := _PersonalTomlWriteLeaseTryAcquire(Path, "information-final-admission")
+		AssertTrue(Owner is Object)
+		Source := _PersonalInfoReadWriteSource(Path)
+		Source["editor_owner"] := Editor
+		AssertTrue(_PersonalInfoWriteSourceCurrent(Source, Owner, Path))
+		Original := FSReadBytesStrict(Path)
+		Writer(Stage, Content) {
+			Facts.stage := Stage
+			return FSWriteDurable(Stage, Content)
+		}
+		Publish() {
+			Facts.published += 1
+			return true
+		}
+		BeforeNative() {
+			global ScriptInformation, PersonalInformation
+			Facts.hooks += 1
+			Facts.hook_critical := A_IsCritical
+			Facts.admitted_before := _PersonalInfoWriteSourceCurrent(Source, Owner, Path)
+			switch Mode {
+				case "pause": Suspend(true)
+				case "released": _PersonalTomlWriteLeaseRelease(Owner)
+				case "relocated": ScriptInformation["PersonalInfoTomlPath"] := Path . ".other"
+				case "retired-editor": Editor["active"] := false
+				case "new-resident": PersonalInformation := PersonalInformation.Clone()
+			}
+		}
+		Replace(Stage, Target) {
+			Facts.replace_critical := A_IsCritical
+			return _PersonalInfoReplaceUnchanged(Source, Owner, 0, Stage, Target, BeforeNative)
+		}
+		Result := _PersonalTomlWriteAtomic(Path, Candidate, Writer, Replace, 0,
+			_PersonalTomlAuthorizeOwnedWrite.Bind(Owner, Path), Publish)
+		AssertEqual(1, Facts.hooks, "the real source bytes and pure precheck must pass before revocation")
+		AssertFalse(Facts.hook_critical)
+		AssertFalse(Facts.replace_critical, "the existing arbitrary two-argument ReplaceFn ABI stays outside Critical")
+		AssertTrue(Facts.admitted_before)
+		AssertFalse(FileExist(Facts.stage))
+		if Mode == "live" {
+			AssertTrue(Result)
+			AssertTrue(FSUtf8ExactMatches(Path, Candidate))
+			AssertEqual(1, Facts.published)
+		} else {
+			AssertFalse(Result)
+			AssertTrue(_PersonalInfoSourceBytesEqual(Original, FSReadBytesStrict(Path)))
+			AssertEqual(0, Facts.published)
+		}
+	} finally {
+		if Owner is Object
+			_PersonalTomlWriteLeaseRelease(Owner)
+		PersonalInformation := Saved.had_info ? Saved.info : unset
+		PersonalInformationLetters := Saved.had_letters ? Saved.letters : unset
+		_ReadPersonalInfoTomlCache := Saved.cache
+		if Saved.had_path
+			ScriptInformation["PersonalInfoTomlPath"] := Saved.path
+		else
+			ScriptInformation.Delete("PersonalInfoTomlPath")
+		if IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(Path)
+			_TomlUnreadableFiles.Delete(Path)
+		Suspend(Saved.suspended)
+		try DirDelete(Directory, true)
+		finally Critical(Saved.critical)
+	}
+}
+for _PTA_Mode in ["live", "pause", "released", "relocated", "retired-editor", "new-resident"]
+	Test("personal information native final admission: " . _PTA_Mode,
+		_PTA_FinalInformation.Bind(_PTA_Mode))
+
+; Actual rename effects remain visible when a later logical/durability ACK refuses.
+_PTHP_Case(Mode, Context) {
+	Owner := 0, Original := Context.source["content"]
+	Data := _PTIOCR_Model("held-partial")
+	Order := _PersonalTomlCanonicalSectionOrder(Data, &Detail)
+	AssertTrue(Order is Array)
+	Content := _PersonalTomlPreserveModel(Original, Data, Order)
+	Facts := {owned_calls: 0, published_flushes: 0, actual_flush_ok: false,
+		publisher_calls: 0, saw_original: false, reports: [], receipt: 0}
+	WriteOwner := FSWriteReplaceOwned, ReportOwner := ConfigReportPersistenceFailure
+	HadWrite := WriteOwner.HasOwnProp("Call"), HadReport := ReportOwner.HasOwnProp("Call")
+	if HadWrite
+		OldWrite := WriteOwner.GetOwnPropDesc("Call")
+	if HadReport
+		OldReport := ReportOwner.GetOwnPropDesc("Call")
+	WriteInstalled := false, ReportInstalled := false
+	ObserveReport(This, Action, NotifyFn := 0, Message := "", Unchanged := true) {
+		if InStr(Action, "personal") == 1
+			Facts.reports.Push(Unchanged)
+		return Func.Prototype.Call.Call(This, Action, NotifyFn, Message, Unchanged)
+	}
+	ObserveWrite(This, Target, Text, Suffix, &StageDetail := "", StageFn := 0,
+			BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true,
+			&Publication := 0, FlushFn := 0) {
+		Mine := StrCompare(Target, Context.path, true) == 0
+		FlushOriginal := HasMethod(FlushFn, "Call") ? FlushFn : _FSFlushOwnedText
+		FlushOwned(Handle, Phase) {
+			Result := FlushOriginal.Call(Handle, Phase)
+			if Phase == "published" {
+				Facts.published_flushes += 1
+				Facts.actual_flush_ok := (Result is Integer) && Result == 1
+				; Explicit ACK refusal after the genuine flush, not a claimed
+				; native FlushFileBuffers failure. All real handles still close.
+				return false
+			}
+			return Result
+		}
+		if Mine
+			Facts.owned_calls += 1
+		Result := Func.Prototype.Call.Call(This, Target, Text, Suffix, &StageDetail,
+			StageFn, BeforePublishFn, AdmissionFn, ReplaceExisting, &Publication,
+			Mine && Mode == "published-flush-refused" ? FlushOwned : FlushFn)
+		if Mine
+			Facts.receipt := Publication
+		return Result
+	}
+	Publish() {
+		Facts.publisher_calls += 1
+		Facts.saw_original := StrCompare(Context.source["content"], Original, true) == 0
+		return Mode != "publisher-refused"
+	}
+	try {
+		Owner := _PersonalTomlWriteLeaseTryAcquire(Context.path, "held-partial-test")
+		AssertTrue(Owner is Object)
+		WriteOwner.DefineProp("Call", {Call: ObserveWrite}), WriteInstalled := true
+		ReportOwner.DefineProp("Call", {Call: ObserveReport}), ReportInstalled := true
+		Result := _PersonalTomlWriteAtomic(Context.path, Content, 0, 0, 0,
+			_PersonalTomlAuthorizeOwnedWrite.Bind(Owner, Context.path), Publish,
+			Context.source, Owner, Context.source)
+		AssertEqual(1, Facts.owned_calls, "The actual held writer must run once")
+		AssertTrue(Facts.receipt.renamed, "The real native rename must happen before the refused acknowledgement")
+		AssertTrue(FSUtf8ExactMatches(Context.path, Content), "The real rename's exact forward bytes remain at the target")
+		AssertFalse(Result)
+		AssertEqual(Original, Context.source["content"], "An unacknowledged live/durable effect cannot advance the reusable opening receipt")
+		AssertTrue(Facts.reports.Length > 0, "The actual error reporter must receive the partial effect")
+		for Unchanged in Facts.reports
+			AssertFalse(Unchanged, "A real rename cannot be described as unchanged source state")
+		if Mode == "publisher-refused" {
+			AssertTrue(Facts.receipt.durable)
+			AssertEqual(1, Facts.publisher_calls)
+			AssertTrue(Facts.saw_original, "The publisher must acknowledge before source lineage advances")
+		} else {
+			AssertEqual(1, Facts.published_flushes)
+			AssertTrue(Facts.actual_flush_ok)
+			AssertFalse(Facts.receipt.durable)
+			AssertEqual(0, Facts.publisher_calls, "Without complete durable ACK no live publisher may run")
+		}
+		BeforeRetry := FSReadBytesStrict(Context.path)
+		AssertFalse(WritePersonalToml(_PTIOCR_Model("old-opening-retry"), 0, 0, 0, 0, Owner, Context.source),
+			"The old opening cannot overwrite the forward image after a partial terminal effect")
+		AssertTrue(_PersonalInfoSourceBytesEqual(BeforeRetry, FSReadBytesStrict(Context.path)))
+	} finally {
+		if ReportInstalled {
+			if HadReport
+				ReportOwner.DefineProp("Call", OldReport)
+			else
+				ReportOwner.DeleteProp("Call")
+		}
+		if WriteInstalled {
+			if HadWrite
+				WriteOwner.DefineProp("Call", OldWrite)
+			else
+				WriteOwner.DeleteProp("Call")
+		}
+		if Owner is Object
+			_PersonalTomlWriteLeaseRelease(Owner)
+	}
+}
+for _PTHP_Mode in ["publisher-refused", "published-flush-refused"]
+	Test("personal held publication: " . _PTHP_Mode . " retains truthful forward effects (personal-held-partial)",
+		_PT102_WithCase.Bind("held-partial", _PTHP_Case.Bind(_PTHP_Mode), true))

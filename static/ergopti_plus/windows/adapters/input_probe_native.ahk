@@ -112,5 +112,6 @@ InputProbeNativeHookInstall(Callback) {
  * @param {Integer} Hook - The hook handle.
  */
 InputProbeNativeHookRemove(Hook) {
-	DllCall("UnhookWindowsHookEx", "Ptr", Hook)
+	if !DllCall("UnhookWindowsHookEx", "Ptr", Hook, "Int")
+		throw OSError(A_LastError, "UnhookWindowsHookEx")
 }

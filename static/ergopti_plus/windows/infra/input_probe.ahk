@@ -293,6 +293,22 @@ _IP_Admission() {
 	return ""
 }
 
+; Admission and reservation share one short non-interruptible section. Restore
+; the caller's thread mode before any window construction or diagnostic I/O.
+_IP_TryAcquire(AdmissionFn := 0) {
+	global _InputProbeBusy
+	PreviousCritical := Critical("On")
+	try {
+		if _InputProbeBusy
+			return "busy"
+		Reason := IsObject(AdmissionFn) ? AdmissionFn.Call() : _IP_Admission()
+		if Reason == ""
+			_InputProbeBusy := true
+		return Reason
+	} finally
+		Critical(PreviousCritical)
+}
+
 ; Opens the window the check types into and makes it the foreground window.
 ; @returns {Map|Integer} { gui, edit, owner }, 0 when native target admission failed.
 _IP_OpenTarget() {
@@ -645,13 +661,12 @@ InputProbe_RunSendComparison(Reps := 0) {
 	Result := Map("state", "aborted", "reason", "", "rows", [], "pass", false)
 	if (Reps < 1)
 		Reps := INPUT_PROBE_REPS
-	Reason := _IP_Admission()
+	Reason := _IP_TryAcquire()
 	if (Reason != "") {
 		Result["reason"] := Reason
 		try LoggerWarn(INPUT_PROBE_TAG, "Send comparison not run: {1}.", Reason)
 		return Result
 	}
-	_InputProbeBusy := true
 	Target := 0
 	try {
 		try LoggerStart(INPUT_PROBE_TAG, "Send comparison started ({1} repetition(s) per scenario).", Reps)
@@ -819,18 +834,46 @@ _IP_HookInject(Target, Mode) {
 	return Map("seen", _InputProbeHookSeen, "fired", _InputProbeHookFired, "reason", Reason)
 }
 
+; Clear ownership only after the native hook is actually removed.
+_IP_RemoveOwnedHook(&Hook, RemoveFn := 0) {
+	if !Hook
+		return
+	if IsObject(RemoveFn)
+		RemoveFn.Call(Hook)
+	else
+		InputProbeNativeHookRemove(Hook)
+	Hook := 0
+}
+
+; A live hook must never retain a pointer to a freed callback. A refused native
+; removal leaves both resources alive; the process owns them until it exits.
+_IP_ReleaseHookResources(&Hook, &Callback, RemoveFn := 0, FreeFn := 0) {
+	try _IP_RemoveOwnedHook(&Hook, RemoveFn)
+	catch as Err {
+		try LoggerError("InputProbe", "Hook removal failed; retaining its callback: {1}.", Err.Message)
+		return false
+	}
+	if Callback {
+		if IsObject(FreeFn)
+			FreeFn.Call(Callback)
+		else
+			CallbackFree(Callback)
+		Callback := 0
+	}
+	return true
+}
+
 ; Records which hook runs first before and after a SendInput.
 ; @returns {Map} state = done | aborted, reason, verdict, record, pass.
 InputProbe_RunHookOrder() {
 	global _InputProbeBusy, INPUT_PROBE_TAG, INPUT_PROBE_HOOK_HOTKEY
 	Result := Map("state", "aborted", "reason", "", "verdict", Map(), "record", "", "pass", false)
-	Reason := _IP_Admission()
+	Reason := _IP_TryAcquire()
 	if (Reason != "") {
 		Result["reason"] := Reason
 		try LoggerWarn(INPUT_PROBE_TAG, "Hook order check not run: {1}.", Reason)
 		return Result
 	}
-	_InputProbeBusy := true
 	Target := 0
 	Callback := 0
 	Hook := 0
@@ -877,7 +920,7 @@ InputProbe_RunHookOrder() {
 		}
 		; Control: the test hook installed again is the newest and must run first,
 		; or the whole method (suppression seen from a newer hook) is unsound.
-		InputProbeNativeHookRemove(Hook)
+		_IP_RemoveOwnedHook(&Hook)
 		Reason := _IP_TargetAdmission(Target)
 		if Reason != "" {
 			Result["reason"] := Reason
@@ -909,16 +952,15 @@ InputProbe_RunHookOrder() {
 		}
 		return Result
 	} finally {
-		if Hook
-			InputProbeNativeHookRemove(Hook)
-		if Callback
-			CallbackFree(Callback)
+		ReleaseOk := _IP_ReleaseHookResources(&Hook, &Callback)
 		if HotkeyOn {
 			InputProbeNativeHotkeyOff(INPUT_PROBE_HOOK_HOTKEY)
 		}
 		if IsObject(Target)
 			_IP_DestroyTarget(Target)
 		_InputProbeBusy := false
+		if !ReleaseOk
+			throw Error("Input probe hook removal failed; callback retained")
 	}
 }
 

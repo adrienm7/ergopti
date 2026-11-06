@@ -121,8 +121,8 @@ _GPO_Current() {
 	Second := GestureKeyboardHook
 	_GPO_Require(Second is InputHook && Second.InProgress && GestureRightClickHeld && GestureLeftClickHeld,
 		"the actual current right route must preserve both accepted holds")
-	_GPO.Hooks.Push(Second)
-	_GPO_Require(First != Second && !First.InProgress && _GPO.Events.Length == 2, "actual replacement must retire A before B is published")
+	_GPO_Require(First == Second && First.InProgress && _GPO.Events.Length == 2 && _GPO.Stops.Length == 0,
+		"both actual holds must retain the shared active watcher without a release-path gap")
 	Callback := Second.OnKeyDown
 	Callback.Call(Second, 0x41, 0x1E)
 	_GPO_Observe("current-callback-returned")
