@@ -144,6 +144,12 @@ function M.list_groups()
 	return Groups.list_groups()
 end
 
+--- The enabled groups a TOML file declares, sorted by name.
+--- @return table Array of group names.
+function M.list_toml_groups()
+	return Groups.list_toml_groups()
+end
+
 --- Registers a programmatic (non-file) group with an optional metadata block.
 --- Used by Lua modules that call M.add() directly instead of loading a file.
 --- @param name string Group identifier.

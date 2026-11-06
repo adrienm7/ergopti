@@ -1088,6 +1088,19 @@ function M.list_groups()
 	return out
 end
 
+--- The enabled groups a TOML file declares, sorted by name: the categories
+--- whose metadata a preview reads (hotstrings_config.prewarm_meta).
+--- @return table Array of group names.
+function M.list_toml_groups()
+	if not _state then return {} end
+	local out = {}
+	for name, g in pairs(_state.groups) do
+		if g.kind == "toml" and g.enabled then out[#out + 1] = name end
+	end
+	table.sort(out)
+	return out
+end
+
 --- Registers a programmatic (non-file) group with an optional metadata block.
 --- Used by Lua modules that call M.add() directly instead of loading a file.
 --- @param name string Group identifier.

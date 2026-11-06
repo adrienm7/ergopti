@@ -870,6 +870,7 @@ M.set_post_load_hook    = Registry.set_post_load_hook
 M.disable_group         = preview_fenced_registry_mutation(Registry.disable_group, true)
 M.is_group_enabled      = Registry.is_group_enabled
 M.list_groups           = Registry.list_groups
+M.list_toml_groups      = Registry.list_toml_groups
 M.register_lua_group    = preview_fenced_registry_mutation(Registry.register_lua_group, true)
 M.registry_transaction = preview_fenced_registry_mutation(Registry.registry_transaction)
 M.with_hotstring_delays = preview_fenced_registry_mutation(Registry.with_hotstring_delays)

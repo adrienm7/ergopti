@@ -2194,6 +2194,11 @@ do
 end
 Boot.sub("choice catalogue and cache stats")
 Boot.mark("Hotstring groups registered (personal + dynamic + common)")
+-- Read each category's TOML metadata on run-loop turns from now on, so the
+-- first preview of a category reads memory instead of its file on the keystroke
+if require("modules.hotstrings.hotstrings_config").prewarm_meta(keymap.list_toml_groups()) ~= true then
+	Logger.error(LOG, "The hotstring category metadata is read on each category's first preview this session.")
+end
 Boot.stage("Final mapping sort + tail-index rebuild")
 
 -- Single final sort covering personal + dynamic + common TOML groups.
