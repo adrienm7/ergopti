@@ -110,8 +110,16 @@ DeadKey(Mapping) {
 		; Re-send EndKeys (Enter, BackSpace, Delete) consumed by the InputHook.
 		; Without the "V" option the hook swallows them; the user's newline,
 		; delete or erase would disappear silently after a dead-key sequence.
-		if Capture.Kind == "control"
-			Send("{" . Capture.Name . "}")
+		; The modifiers held with it are replayed too (OSW-001): Ctrl+Backspace
+		; must still erase a word, not one character.
+		if Capture.Kind == "control" {
+			CapturedPrefix := ""
+			for Symbol in ["^", "!", "+", "#"] {
+				if InStr(ih.EndMods, Symbol)
+					CapturedPrefix .= Symbol
+			}
+			SendNewResult(CapturedPrefix . "{" . Capture.Name . "}", False, False)
+		}
 	} finally {
 		InDeadKeySequence := false
 	}
