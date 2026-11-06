@@ -4763,6 +4763,10 @@ description_key = "onboarding.page.tap_holds.description"
 master = { ahk = "category_enabled.tap_holds" }
 state = { hs = "tap_holds.enabled", linux = "tap_holds.enabled" }
 checklist = "tap_holds"
+# Karabiner cannot decide from release order: macOS says how its typing keys
+# ([tap_hold.rollover] in _shared/tap_hold/defaults.toml) differ, without
+# promising the Windows/Linux hold semantics.
+hint_key = { hs = "onboarding.page.tap_holds.rollover_note" }
 
 [onboarding.pages.shortcuts]
 title_key = "menu.shortcuts.title"
@@ -4813,8 +4817,9 @@ note_key = { hs = "onboarding.page.keyboard_layout.system_note", linux = "onboar
 # base and Shift levels) and the number-row ordering, drawn on the page rather
 # than in its checklist. Each starts at the value in force and changes only
 # when the user changes it, so a new installation emulates no layout and
-# reorders nothing; a change redraws the controls alone. Layout emulation and the ordering are
-# Windows-only today: macOS and Linux draw the controls greyed with why.
+# reorders nothing; a change redraws the controls alone. Layout emulation is
+# Windows-only today: macOS and Linux draw those controls greyed with why. The
+# ordering runs on the three OS, live where a layout of ours types.
 [[onboarding.pages.keyboard_layout.controls]]
 id = "emulated_layout"
 label_key = "onboarding.layout.emulated_layout"
@@ -4842,12 +4847,14 @@ label_key = "menu.layout.number_row"
 path = "layout.direct_access_digits"
 choice_label_prefix = "menu.layout.number_row_"
 # Windows emulates the layout and always applies it. Linux applies it live to the
-# layout of the running X11 session when one of ours is installed; the host says so
-# (capability number_row_live) and gives the reason when it cannot. macOS keeps the system row.
-platforms = ["ahk", "linux"]
-reason_key = "platform_reason.number_row_override_unsupported"
+# layout of the running X11 session when one of ours is installed, and macOS
+# rebuilds the installed .keylayout of ours typing now, as their menu rows do; the
+# host says so (capability number_row_live) and gives the reason when it cannot.
+platforms = ["ahk", "linux", "hs"]
+# Shown when the host does not say why it lacks the capability.
+reason_key = "platform_reason.number_row_live_no_layout"
 capability = "number_row_live"
-capability_platforms = ["linux"]
+capability_platforms = ["linux", "hs"]
 
 [onboarding.pages.hotstrings]
 title_key = "menu.hotstrings.title"

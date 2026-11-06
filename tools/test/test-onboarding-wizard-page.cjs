@@ -1079,6 +1079,13 @@ function recommendedTapHoldKeys(driver) {
 			undefined,
 			`${driver}: the page asks instead of pointing away`
 		);
+		// Karabiner cannot decide from release order: only macOS says how its
+		// typing keys differ (macos-rollover-hint).
+		assert.equal(
+			described.hint_key,
+			driver === 'macos' ? 'onboarding.page.tap_holds.rollover_note' : undefined,
+			`${driver}: the typing-priority rollover is stated where it applies`
+		);
 		const page = openWizard({ platform: driver });
 		next(page, 2);
 		assert.equal(page.el('page-question').classList.contains('hidden'), false, `${driver} asks`);
@@ -2712,21 +2719,23 @@ function pick(page, id, value) {
 		assert.ok(!written.includes(path), path + ' stays as configured');
 })();
 
-// macOS emulates no layout and keeps the native number row: the same controls are drawn
-// greyed with why, and its host accepts none of their paths.
-(function macosShowsWhyItLacksTheControls() {
+// macOS emulates no layout: the three emulation controls are drawn greyed with why, and
+// its host accepts none of their paths. The number-row order follows its host's
+// capability, as on Linux (number-row-order-macos, below).
+(function macosShowsWhyItLacksTheEmulationControls() {
 	for (const platform of ['macos']) {
 		const page = openWizard({ platform });
 		page.platform = platform;
 		goToPage(page, 'keyboard_layout');
 		const layout = pageOf(page, 'keyboard_layout');
+		const emulation = layout.controls.filter((control) => control.id !== 'number_row_order');
 		assert.ok(
-			layout.controls.every((control) => !control.available),
-			platform + ': no control applies'
+			emulation.every((control) => !control.available),
+			platform + ': no emulation control applies'
 		);
 		const groups = controlGroups(page);
 		assert.equal(groups.size, 4, platform + ': the four controls are drawn');
-		for (const control of layout.controls) {
+		for (const control of emulation) {
 			const group = groups.get(control.id);
 			const reason = group.children[group.children.length - 1];
 			assert.equal(
@@ -2735,80 +2744,81 @@ function pick(page, id, value) {
 				platform + ': ' + control.id + ' says why'
 			);
 		}
-		assert.ok(
-			!cataloguePaths(platform).has('layout.direct_access_digits'),
-			platform + ': the host accepts no ordering answer'
-		);
 	}
 })();
 
-// Linux emulates no layout either, but applies the number-row order live to the layout of
-// an X11 session that has one of ours installed. The catalogue offers that control; the host
-// says at run time whether it holds the capability, and why not otherwise
-// (number-row-order-linux).
-(function linuxNumberRowOrderFollowsWhatTheHostCanApply() {
-	const openLinux = (capabilities) => {
-		const page = openWizard({
-			platform: 'linux',
-			capabilities: Object.assign({ gesture_registration: false }, capabilities)
-		});
-		page.platform = 'linux';
-		goToPage(page, 'keyboard_layout');
-		return page;
-	};
-	const reasonOf = (page) => {
-		const group = controlGroups(page).get('number_row_order');
-		return group.children[group.children.length - 1];
-	};
-	const unavailable = ['emulated_layout', 'alt_gr_emulation', 'number_row_emulation'];
+// Linux and macOS emulate no layout, but apply the number-row order live to a layout of
+// ours (an X11 or GNOME/KDE session on Linux, the installed .keylayout typing now on
+// macOS). The catalogue offers that control; the host says at run time whether it holds
+// the capability, and why not otherwise (number-row-order-linux, number-row-order-macos).
+for (const platform of ['linux', 'macos'])
+	(function numberRowOrderFollowsWhatTheHostCanApply() {
+		const openLinux = (capabilities) => {
+			const page = openWizard({
+				platform,
+				capabilities: Object.assign({ gesture_registration: false }, capabilities)
+			});
+			page.platform = platform;
+			goToPage(page, 'keyboard_layout');
+			return page;
+		};
+		const reasonOf = (page) => {
+			const group = controlGroups(page).get('number_row_order');
+			return group.children[group.children.length - 1];
+		};
+		const unavailable = ['emulated_layout', 'alt_gr_emulation', 'number_row_emulation'];
 
-	// The host holds the capability: the choices follow the question and are written.
-	let page = openLinux({ number_row_live: true });
-	let layout = pageOf(page, 'keyboard_layout');
-	assert.deepEqual(
-		layout.controls.filter((control) => control.available).map((control) => control.id),
-		['number_row_order'],
-		'only the number-row order applies on Linux'
-	);
-	for (const id of unavailable)
-		assert.equal(layout.controls.find((control) => control.id === id).available, false, id);
-	answer(page, true);
-	assert.equal(
-		controlRadios(controlGroups(page).get('number_row_order')).get('digits').disabled,
-		false
-	);
-	assert.ok(
-		!reasonOf(page).classList || !reasonOf(page).classList.contains('hint'),
-		'no reason is drawn when the control applies'
-	);
-	pick(page, 'number_row_order', 'symbols');
-	const written = new Map(
-		finish(page).answers.operations.map((operation) => [operation.path, operation.value])
-	);
-	assert.equal(written.get('layout.direct_access_digits'), 'symbols');
+		// The host holds the capability: the choices follow the question and are written.
+		let page = openLinux({ number_row_live: true });
+		let layout = pageOf(page, 'keyboard_layout');
+		assert.deepEqual(
+			layout.controls.filter((control) => control.available).map((control) => control.id),
+			['number_row_order'],
+			'only the number-row order applies on ' + platform
+		);
+		for (const id of unavailable)
+			assert.equal(layout.controls.find((control) => control.id === id).available, false, id);
+		answer(page, true);
+		assert.equal(
+			controlRadios(controlGroups(page).get('number_row_order')).get('digits').disabled,
+			false
+		);
+		assert.ok(
+			!reasonOf(page).classList || !reasonOf(page).classList.contains('hint'),
+			'no reason is drawn when the control applies'
+		);
+		pick(page, 'number_row_order', 'symbols');
+		const written = new Map(
+			finish(page).answers.operations.map((operation) => [operation.path, operation.value])
+		);
+		assert.equal(written.get('layout.direct_access_digits'), 'symbols');
 
-	// The host cannot apply it now: greyed, the reason it gives, nothing written.
-	page = openLinux({ number_row_live: 'platform_reason.number_row_live_session' });
-	answer(page, true);
-	for (const radio of controlRadios(controlGroups(page).get('number_row_order')).values())
-		assert.equal(radio.disabled, true);
-	assert.equal(reasonOf(page).textContent, locale('en')['platform_reason.number_row_live_session']);
-	assert.ok(
-		!finish(page).answers.operations.some(
-			(operation) => operation.path === 'layout.direct_access_digits'
-		)
-	);
+		// The host cannot apply it now: greyed, the reason it gives, nothing written.
+		const given =
+			platform === 'linux'
+				? 'platform_reason.number_row_live_session'
+				: 'platform_reason.number_row_live_no_layout';
+		page = openLinux({ number_row_live: given });
+		answer(page, true);
+		for (const radio of controlRadios(controlGroups(page).get('number_row_order')).values())
+			assert.equal(radio.disabled, true);
+		assert.equal(reasonOf(page).textContent, locale('en')[given]);
+		assert.ok(
+			!finish(page).answers.operations.some(
+				(operation) => operation.path === 'layout.direct_access_digits'
+			)
+		);
 
-	// A host that says nothing gets the catalogue's own reason.
-	page = openLinux({});
-	answer(page, true);
-	for (const radio of controlRadios(controlGroups(page).get('number_row_order')).values())
-		assert.equal(radio.disabled, true);
-	assert.equal(
-		reasonOf(page).textContent,
-		locale('en')['platform_reason.number_row_override_unsupported']
-	);
-})();
+		// A host that says nothing gets the catalogue's own reason.
+		page = openLinux({});
+		answer(page, true);
+		for (const radio of controlRadios(controlGroups(page).get('number_row_order')).values())
+			assert.equal(radio.disabled, true);
+		assert.equal(
+			reasonOf(page).textContent,
+			locale('en')['platform_reason.number_row_live_no_layout']
+		);
+	})();
 
 console.log(
 	'Onboarding folder edits: delayed locale delivery, raw input, source admission and Finish passed.'

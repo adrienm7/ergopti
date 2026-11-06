@@ -2536,6 +2536,7 @@
 	"onboarding.layout.emulated_ergopti_plus": "Ergopti➕",
 	"onboarding.layout.number_row_emulation": "模拟数字行（基础层和 Shift 层）",
 	"onboarding.page.keyboard_layout.system_note": "在此系统上，Ergopti 作为系统键盘布局安装，因此这里无需启用任何内容。稍后请在“键盘布局”菜单中安装或选择它。",
+	"onboarding.page.tap_holds.rollover_note": "在 macOS 上，空格、回车、Tab、Esc、退格和 Delete 优先输入：在按住延迟之前按下的键会输入该键本身，只有更长的按压才会触发其按住功能。Windows 和 Linux 根据松开按键的顺序判断，因此在这些键上非常快速的组合键在那里会成为按住，在这里则可能直接输入。",
 	"onboarding.page.llm.description": "AI 预测会在您输入时建议句子的结尾。模型稍后从“人工智能”菜单下载；现在不会下载任何内容。",
 	"onboarding.page.shortcuts.description": "执行 Ergopti 操作的键盘快捷键：更改所选文本的大小写、为其加上包围符号、截图、切换窗口等。下方列表包含 Ergopti 推荐的快捷键。",
 	"onboarding.page.tap_holds.description": "轻按-长按让一个键拥有两种作用：轻按时输入一种内容，长按时充当另一个键。例如，Caps Lock 轻按时可输入 Enter，长按时可作为修饰键。下方列表包含 Ergopti 推荐的按键：每个勾选的按键都会获得推荐的轻按和长按操作，之后可在“点按/长按”菜单中更改。",
