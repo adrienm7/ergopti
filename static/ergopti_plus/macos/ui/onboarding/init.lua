@@ -472,7 +472,12 @@ local function inject_init_data(owner, view, config_path)
 		platform           = CATALOGUE_DRIVER,
 		-- Gesture registration with the system is a Windows host action only. The
 		-- number-row order is rebuilt live into the layout of ours typing now.
-		capabilities       = { gesture_registration = false, number_row_live = M._number_row_capability() },
+		capabilities       = {
+			gesture_registration = false,
+			-- A Unix path is read literally: a trailing space is part of a valid name.
+			literal_absolute_paths = true,
+			number_row_live = M._number_row_capability(),
+		},
 		locale             = current_locale,
 		strings            = strings,
 		-- One locale order for the wizard and every tray language menu.
