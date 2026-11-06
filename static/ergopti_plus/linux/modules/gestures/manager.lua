@@ -486,7 +486,9 @@ local OPEN_PATH = {
 	["open_config"]             = function(Paths) return Paths.config("config.toml") end,
 	["open_personal_info"]      = function(Paths) return Paths.config("personal_info.toml") end,
 	["open_personal_hotstrings"] = function(Paths) return Paths.config("personal_hotstrings.toml") end,
-	["open_personal_shortcuts"] = function(Paths) return Paths.config("personal_shortcuts.toml") end,
+	-- The programmable personal source, created from its template when absent,
+	-- as Windows and macOS create theirs before opening it.
+	["open_personal_shortcuts"] = function() return require("infra.personal_shortcuts").path_for_editing() end,
 }
 
 --- The three log actions, by ui/log_openers function: shared with the tray, so

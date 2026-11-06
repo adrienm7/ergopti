@@ -202,6 +202,9 @@ function M.run(options)
 				observed.field_run = field_options
 				return { stop = function() return true end }
 			end }
+		elseif name == "infra.personal_shortcuts" then
+			-- The user's personal source runs once, at the end of the services.
+			return { load = function() record("personal_shortcuts"); return true end }
 		elseif name == "luv" then
 			return { os_getpid = function() return 4242 end }
 		elseif name == "infra.input_access" then

@@ -3086,6 +3086,10 @@ local function main()
 		-- the check runs at the first evaluation after resuming).
 		updater.init({ on_available = on_available, is_paused = script_actions.is_paused })
 	end
+	-- The user's programmable personal source runs last among the services,
+	-- once everything it may require is initialised (Windows includes its
+	-- personal .ahk, macOS runs its personal_shortcuts.lua, the same way).
+	if not opts.dry_run then require("infra.personal_shortcuts").load() end
 	BootProfiler.stage_done("services")
 	if not privacy_owners.startup_checkpoint() then return end
 
