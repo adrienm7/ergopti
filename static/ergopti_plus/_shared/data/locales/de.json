@@ -4123,5 +4123,13 @@
 	"inventory.behavior.dead_windows_lifetime": "Die integrierten Tabellen warten höchstens 2 Sekunden; der Totzustand des Registers hat kein Zeitlimit. Ablauf und Pause verwerfen eine wartende Tottaste.",
 	"inventory.behavior.dead_native_lifetime": "Das native System verwaltet ausstehende Komposition; Erfassungs- und Rücksetzregeln sind von einem gemeinsamen Treiberzeitlimit getrennt.",
 	"platform_reason.menu_container_rows_are_built_per_driver": "Jeder Treiber baut diesen Teil des Menüs aus eigenen Eltern-, Rahmen- und Unterzeilen auf, weil sich die nativen Menü-Toolkits unterscheiden (AutoHotkey-Menüs, Hammerspoon-Menüleistentabellen, Linux-Tray). Die anderen Treiber führen dieselben Bedienelemente unter eigenen Zeilen: ein Unterschied der Menüstruktur, kein fehlendes Bedienelement.",
-	"platform_reason.menu_control_rows_are_laid_out_per_driver": "Die anderen Treiber führen dieses Bedienelement als eigene Zeile: Jeder Treiber stellt Wert, Zurücksetzen oder Varianten einer Einstellung in einer eigenen Zeile dar, weil sich die nativen Menü-Toolkits unterscheiden. Ein Darstellungsunterschied, kein fehlendes Bedienelement."
+	"platform_reason.menu_control_rows_are_laid_out_per_driver": "Die anderen Treiber führen dieses Bedienelement als eigene Zeile: Jeder Treiber stellt Wert, Zurücksetzen oder Varianten einer Einstellung in einer eigenen Zeile dar, weil sich die nativen Menü-Toolkits unterscheiden. Ein Darstellungsunterschied, kein fehlendes Bedienelement.",
+	"apps.encryptor.btn_reveal_folder": "Im Ordner anzeigen",
+	"apps.encryptor.err_cipher_unavailable": "Die Verschlüsselungskomponente fehlt. Installieren Sie Ergopti neu.",
+	"apps.cloner.msg_clone_name_launcher": "Name im Anwendungsmenü und in der Taskleiste.",
+	"apps.cloner.msg_open_optional_portable": "Optional: eine URL, eine Datei oder ein Ordner, die der Klon beim Start öffnet. Leer lassen, um die Anwendung einfach zu starten. Mit einem Webbrowser öffnet sich eine Webadresse in einem eigenen Anwendungsfenster.",
+	"apps.cloner.msg_icon_style_portable": "Das eigene Symbol der Anwendung behalten oder ein Bild für den Klon wählen?",
+	"apps.cloner.btn_original_icon": "Originalsymbol",
+	"apps.cloner.msg_created": "„{1}“ ist in Ihrem Anwendungsmenü bereit. Es behält sein eigenes Profil in {2}.",
+	"apps.cloner.err_source_unreadable": "Diese Anwendung kann nicht geklont werden: Ihr Starter nennt kein Programm."
 }

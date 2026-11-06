@@ -4123,5 +4123,13 @@
 	"inventory.behavior.dead_windows_lifetime": "Yerleşik tablolar en fazla 2 saniye bekler; kayıt defterinin ölü tuş durumunun zaman aşımı yoktur. Süre dolması ve duraklatma bekleyen ölü tuşu iptal eder.",
 	"inventory.behavior.dead_native_lifetime": "Bekleyen birleştirmeyi yerel işletim sistemi yönetir; yakalama ve sıfırlama kuralları ortak sürücü zaman aşımından ayrıdır.",
 	"platform_reason.menu_container_rows_are_built_per_driver": "Her sürücü menünün bu bölümünü kendi üst, çerçeve ve alt satırlarından kurar, çünkü yerel menü araç takımları farklıdır (AutoHotkey menüleri, Hammerspoon menü çubuğu tabloları, Linux tepsisi). Diğer sürücüler aynı denetimleri kendi satırları altında taşır: bu bir menü yapısı farkıdır, eksik bir denetim değildir.",
-	"platform_reason.menu_control_rows_are_laid_out_per_driver": "Diğer sürücüler bu denetimi kendi satırı olarak taşır: her sürücü bir ayarın değerini, sıfırlamasını veya varyantlarını kendi satırında gösterir, çünkü yerel menü araç takımları farklıdır. Bu bir sunum farkıdır, eksik bir denetim değildir."
+	"platform_reason.menu_control_rows_are_laid_out_per_driver": "Diğer sürücüler bu denetimi kendi satırı olarak taşır: her sürücü bir ayarın değerini, sıfırlamasını veya varyantlarını kendi satırında gösterir, çünkü yerel menü araç takımları farklıdır. Bu bir sunum farkıdır, eksik bir denetim değildir.",
+	"apps.encryptor.btn_reveal_folder": "Klasörde göster",
+	"apps.encryptor.err_cipher_unavailable": "Şifreleme bileşeni eksik. Ergopti'yi yeniden yükleyin.",
+	"apps.cloner.msg_clone_name_launcher": "Uygulamalar menüsünde ve görev çubuğunda gösterilen ad.",
+	"apps.cloner.msg_open_optional_portable": "İsteğe bağlı: klonun açılışta açacağı bir URL, dosya veya klasör. Uygulamayı yalnızca başlatmak için boş bırakın. Bir web tarayıcısıyla web adresi kendi uygulama penceresinde açılır.",
+	"apps.cloner.msg_icon_style_portable": "Uygulamanın kendi simgesi korunsun mu, yoksa klon için bir görüntü mü seçilsin?",
+	"apps.cloner.btn_original_icon": "Orijinal simge",
+	"apps.cloner.msg_created": "“{1}” uygulamalar menünüzde hazır. Kendi profilini {2} içinde tutar.",
+	"apps.cloner.err_source_unreadable": "Bu uygulama klonlanamaz: başlatıcısı herhangi bir program belirtmiyor."
 }

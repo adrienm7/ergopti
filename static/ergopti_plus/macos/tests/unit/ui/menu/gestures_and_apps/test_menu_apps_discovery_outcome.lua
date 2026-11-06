@@ -390,7 +390,7 @@ helpers.describe("Apps parent declaration admission", function()
 		return assert(parent)
 	end
 
-	helpers.it("(apps-parent-native) owns every actual caption and the existing platform absence", function()
+	helpers.it("(apps-parent-native) owns every actual caption and the declared platform presence", function()
 		with_native_apps_parent("en", function(_, renderer)
 			local file = assert(io.open(helpers.shared("tests/corpus/menus/apps_parent.json"), "rb"))
 			local expected = assert(require("adapters.json_codec").decode(file:read("*a"))); assert(file:close())
@@ -402,7 +402,7 @@ helpers.describe("Apps parent declaration admission", function()
 				helpers.assert_eq(locale["menu.apps.title"], caption); count = count + 1
 			end
 			helpers.assert_eq(count, 21)
-			helpers.assert_eq(expected.platform_presence, { hs = true, ahk = false, linux = false })
+			helpers.assert_eq(expected.platform_presence, { hs = true, ahk = false, linux = true })
 		end)
 	end)
 

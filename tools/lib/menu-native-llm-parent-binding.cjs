@@ -2055,6 +2055,7 @@ function declaredLinuxNativeTray(unit, builder) {
 		["shortcuts"]       = _build_shortcuts,
 		["tap_holds"]       = _build_tap_holds,
 		["gestures"]        = _build_gestures,
+		["apps"]            = _build_apps,
 		["configuration"]   = _build_configuration,
 		["language"]        = _build_language,
 		["about"]           = _build_about,

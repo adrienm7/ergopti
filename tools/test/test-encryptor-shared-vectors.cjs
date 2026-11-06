@@ -170,6 +170,20 @@ scenario(
 	}
 );
 
+scenario(
+	'(encryptor-linux-reads-format) the Linux Encryptor reads every constant from the format',
+	() => {
+		const code = fs.readFileSync(path.join(plus, 'linux/apps/encryptor_core.lua'), 'utf8');
+		assert.ok(
+			code.includes('shared("data/encryptor/format.json")'),
+			'Linux no longer reads the format'
+		);
+		for (const literal of [String(format.iterations), format.cipher, '".enc"']) {
+			assert.ok(!code.includes(literal), 'Linux repeats the format constant ' + literal);
+		}
+	}
+);
+
 const openssl = spawnSync('/bin/sh', ['-c', 'command -v openssl'], { encoding: 'utf8' });
 if (process.platform !== 'win32' && openssl.status === 0) {
 	const work = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-encryptor-vectors-'));

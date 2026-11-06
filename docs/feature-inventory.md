@@ -769,12 +769,10 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 
 ## linux — restricted menu entries
 
-- [ ] `top_level.apps` (hide): Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.
 - [ ] `top_level.reload` (hide): Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.
 - [ ] `top_level.quit` (hide): Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.
 - [ ] `llm_menu.llm_generation_settings` (hide): Not a submenu on Linux: the Linux driver lists the models and the generation settings (suggestion count, word limits, temperature, context) straight in this menu, through its own row below.
 - [ ] `agent_menu.agent_disabled_apps` (hide): Each driver builds this part of the menu from its own parent, frame and child rows, because the native menu toolkits differ (AutoHotkey menus, Hammerspoon menubar tables, the Linux tray). The other drivers carry the same controls under rows of their own: this is a menu-structure difference, not a missing control.
-- [ ] `apps_menu.apps_installed` (hide): Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.
 - [ ] `debug_menu.window_spy` (hide): Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 - [ ] `debug_menu.list_vars` (hide): Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 - [ ] `debug_menu.key_history` (hide): Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.

@@ -9,6 +9,9 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.apps.test_bundled_apps_launcher",
+	"tests.unit.apps.test_app_cloner_core",
+	"tests.unit.apps.test_encryptor_core",
 	"tests.unit.modules.keystats.storage.test_metrics_ledger",
 	"tests.unit.modules.keystats.storage.test_ledger_import",
 	"tests.unit.modules.keystats.core.test_network_metrics",

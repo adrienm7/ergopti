@@ -344,6 +344,9 @@ h.describe("native caption consumer inventory", function()
 			["ui.field_check.window"] = 1,
 			-- The list prompt's caption is proven by the choice prompt case.
 			["ui.choice_prompt"] = 1,
+			-- The bundled apps' entry, question, message and file dialogs compose
+			-- their caption; test_bundled_apps_launcher proves each one.
+			["apps.dialogs"] = 4,
 		}
 		local observed = {}
 		local root = h.driver_root()

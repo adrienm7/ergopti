@@ -42,8 +42,8 @@
  *    whole top_level through a builder table is read here the way Linux is:
  *    an id declared and missing from the table renders nothing, and an id in
  *    the table the manifest does not declare is dead code.
- * 4. The manifest declares the approved top-level order, and Applications for
- *    macOS only. Every driver builds whatever the manifest declares, so this is
+ * 4. The manifest declares the approved top-level order, and Applications
+ *    (App Cloner, Encryptor) on every driver that ships the two apps. Every driver builds whatever the manifest declares, so this is
  *    where a reordering is held to the product decision. It also marks the rows
  *    a pause greys: every feature row, and no row of the tail.
  *
@@ -393,6 +393,9 @@ for (const [driver, spec] of Object.entries(DRIVER_ROOTS)) {
 // manifest declares, so this is the one place a reordering of the manifest is
 // held to the decision rather than silently shipped. Changing the order means
 // changing this list, in the same commit and on purpose.
+// The drivers that ship the bundled apps (App Cloner, Encryptor).
+const APPS_DRIVERS = ['hs', 'linux'];
+
 const APPROVED_TOP_LEVEL = [
 	'tap_holds',
 	'shortcuts',
@@ -434,7 +437,7 @@ for (const [driver, ids] of Object.entries(projections)) {
 	const approved = APPROVED_TOP_LEVEL.filter(
 		(id) =>
 			id !== SEPARATOR &&
-			(id !== 'apps' || driver === 'hs') &&
+			(id !== 'apps' || APPS_DRIVERS.includes(driver)) &&
 			(id !== 'suspend' || driver === 'ahk')
 	);
 	if (ids.join(',') !== approved.join(',')) {
@@ -444,11 +447,13 @@ for (const [driver, ids] of Object.entries(projections)) {
 	}
 }
 
-// Applications lists the applications bundled with the macOS app; the other
-// two drivers ship none.
+// Applications lists the bundled App Cloner and Encryptor: macOS ships them as
+// bundles, Linux as apps/*.lua (decided 2026-11-06: Windows and Linux follow).
 const appsRow = (topLevel || []).find((row) => row.id === 'apps');
-if (!appsRow || JSON.stringify(appsRow.platforms) !== JSON.stringify(['hs'])) {
-	errors.push('the Applications row must be declared for macOS only (platforms = ["hs"]).');
+if (!appsRow || JSON.stringify(appsRow.platforms) !== JSON.stringify(APPS_DRIVERS)) {
+	errors.push(
+		`the Applications row must be declared for ${APPS_DRIVERS.join(', ')} (platforms = ${JSON.stringify(APPS_DRIVERS)}).`
+	);
 }
 
 // « Pause = tout éteint »: a pause greys every feature row and leaves the tail

@@ -4123,5 +4123,13 @@
 	"inventory.behavior.dead_windows_lifetime": "De indbyggede tabeller venter højst 2 sekunder; registrets dødtastetilstand har ingen tidsgrænse. Udløb og pause annullerer en ventende dødtast.",
 	"inventory.behavior.dead_native_lifetime": "Det native system styrer afventende komposition; registrering og nulstilling er adskilt fra en fælles tidsgrænse i driveren.",
 	"platform_reason.menu_container_rows_are_built_per_driver": "Hver driver bygger denne del af menuen af sine egne forælder-, ramme- og børnerækker, fordi de native menuværktøjer er forskellige (AutoHotkey-menuer, Hammerspoons menulinjetabeller, Linux’ systembakke). De andre drivere har de samme kontroller under egne rækker: en forskel i menustruktur, ikke en manglende kontrol.",
-	"platform_reason.menu_control_rows_are_laid_out_per_driver": "De andre drivere har denne kontrol som en egen række: hver driver viser værdi, nulstilling eller varianter af en indstilling i sin egen række, fordi de native menuværktøjer er forskellige. En forskel i præsentation, ikke en manglende kontrol."
+	"platform_reason.menu_control_rows_are_laid_out_per_driver": "De andre drivere har denne kontrol som en egen række: hver driver viser værdi, nulstilling eller varianter af en indstilling i sin egen række, fordi de native menuværktøjer er forskellige. En forskel i præsentation, ikke en manglende kontrol.",
+	"apps.encryptor.btn_reveal_folder": "Vis i mappen",
+	"apps.encryptor.err_cipher_unavailable": "Krypteringskomponenten mangler. Geninstaller Ergopti.",
+	"apps.cloner.msg_clone_name_launcher": "Navn, der vises i programmenuen og på proceslinjen.",
+	"apps.cloner.msg_open_optional_portable": "Valgfrit: en URL, fil eller mappe, som klonen åbner ved start. Lad feltet være tomt for blot at starte programmet. Med en webbrowser åbnes en webadresse i sit eget programvindue.",
+	"apps.cloner.msg_icon_style_portable": "Beholde programmets eget ikon eller vælge et billede til klonen?",
+	"apps.cloner.btn_original_icon": "Originalikon",
+	"apps.cloner.msg_created": "“{1}” er klar i programmenuen. Den har sin egen profil i {2}.",
+	"apps.cloner.err_source_unreadable": "Programmet kan ikke klones: dets starter angiver intet program."
 }

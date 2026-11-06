@@ -4123,5 +4123,13 @@
 	"inventory.behavior.dead_windows_lifetime": "Vestavěné tabulky čekají nejvýše 2 sekundy; stav mrtvé klávesy z registru nemá časový limit. Vypršení a pozastavení zruší čekající mrtvou klávesu.",
 	"inventory.behavior.dead_native_lifetime": "Nativní systém řídí čekající skládání; zachytávání a resetování jsou oddělené od společného časového limitu ovladače.",
 	"platform_reason.menu_container_rows_are_built_per_driver": "Každý ovladač staví tuto část nabídky z vlastních nadřazených, rámcových a podřízených řádků, protože nativní sady nabídek se liší (nabídky AutoHotkey, tabulky lišty nabídek Hammerspoon, oznamovací oblast Linuxu). Ostatní ovladače mají stejné ovladače pod vlastními řádky: jde o rozdíl ve struktuře nabídky, ne o chybějící ovládací prvek.",
-	"platform_reason.menu_control_rows_are_laid_out_per_driver": "Ostatní ovladače mají tento ovládací prvek jako vlastní řádek: každý ovladač zobrazuje hodnotu, reset nebo varianty nastavení ve vlastním řádku, protože nativní sady nabídek se liší. Jde o rozdíl v prezentaci, ne o chybějící ovládací prvek."
+	"platform_reason.menu_control_rows_are_laid_out_per_driver": "Ostatní ovladače mají tento ovládací prvek jako vlastní řádek: každý ovladač zobrazuje hodnotu, reset nebo varianty nastavení ve vlastním řádku, protože nativní sady nabídek se liší. Jde o rozdíl v prezentaci, ne o chybějící ovládací prvek.",
+	"apps.encryptor.btn_reveal_folder": "Zobrazit ve složce",
+	"apps.encryptor.err_cipher_unavailable": "Chybí šifrovací součást. Přeinstalujte Ergopti.",
+	"apps.cloner.msg_clone_name_launcher": "Název zobrazený v nabídce aplikací a na hlavním panelu.",
+	"apps.cloner.msg_open_optional_portable": "Volitelné: adresa URL, soubor nebo složka, kterou klon otevře při spuštění. Ponechte prázdné, chcete-li aplikaci jen spustit. S webovým prohlížečem se webová adresa otevře ve vlastním okně aplikace.",
+	"apps.cloner.msg_icon_style_portable": "Ponechat vlastní ikonu aplikace, nebo vybrat obrázek pro klon?",
+	"apps.cloner.btn_original_icon": "Původní ikona",
+	"apps.cloner.msg_created": "„{1}“ je připraven v nabídce aplikací. Má vlastní profil v {2}.",
+	"apps.cloner.err_source_unreadable": "Tuto aplikaci nelze klonovat: její spouštěč neuvádí žádný program."
 }

@@ -4123,5 +4123,13 @@
 	"inventory.behavior.dead_windows_lifetime": "Builtin maps wait up to 2 seconds; registry dead-key state has no timeout. Expiry and pause cancel a pending dead key.",
 	"inventory.behavior.dead_native_lifetime": "The native OS owns pending composition; capture and reset rules are separate from a shared driver timeout.",
 	"platform_reason.menu_container_rows_are_built_per_driver": "Each driver builds this part of the menu from its own parent, frame and child rows, because the native menu toolkits differ (AutoHotkey menus, Hammerspoon menubar tables, the Linux tray). The other drivers carry the same controls under rows of their own: this is a menu-structure difference, not a missing control.",
-	"platform_reason.menu_control_rows_are_laid_out_per_driver": "The other drivers carry this control as a row of their own: each driver lays out the value, reset or variants of a setting through its own row, because the native menu toolkits differ. This is a presentation difference, not a missing control."
+	"platform_reason.menu_control_rows_are_laid_out_per_driver": "The other drivers carry this control as a row of their own: each driver lays out the value, reset or variants of a setting through its own row, because the native menu toolkits differ. This is a presentation difference, not a missing control.",
+	"apps.encryptor.btn_reveal_folder": "Show in folder",
+	"apps.encryptor.err_cipher_unavailable": "The encryption component is missing. Reinstall Ergopti.",
+	"apps.cloner.msg_clone_name_launcher": "Name shown in the applications menu and on the taskbar.",
+	"apps.cloner.msg_open_optional_portable": "Optional: a URL, file or folder the clone opens at launch. Leave empty to simply start the application. With a web browser, a web address opens in its own application window.",
+	"apps.cloner.msg_icon_style_portable": "Keep the application's own icon, or choose an image for the clone?",
+	"apps.cloner.btn_original_icon": "Original icon",
+	"apps.cloner.msg_created": "“{1}” is ready in your applications menu. It keeps its own profile in {2}.",
+	"apps.cloner.err_source_unreadable": "This application cannot be cloned: its launcher names no program."
 }
