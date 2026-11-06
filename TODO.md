@@ -894,6 +894,7 @@ Account and tester actions (maintainer, from the PC):
       number stays legible.
 - [ ] Branch `layout/system-switch-parity` (2026-11-06, AHK unrun on Linux): run the AHK suite
 - [ ] Branch `wave3/input-policies` (2026-11-06, AHK unrun on Linux): run `test_tap_hold_one_shot_timeout.ahk`,
+- [ ] Branch `layout/windows-klc-installer` (2026-11-06, built on Linux only: no MSVC run, AHK unit tests under Wine):
 
 ## To confirm on Linux
 

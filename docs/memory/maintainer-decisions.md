@@ -47,14 +47,18 @@ Layout > « Input sources » (`active_layouts`) is declared for every driver: th
 active layout ticked, a pick switching the system (macOS TIS, Windows
 `KLS_Select` on the user's installed layouts, Linux GNOME gsettings, the KDE
 Plasma keyboard daemon over D-Bus, or setxkbmap; other Wayland compositors show
-`menu.layout.active_layouts_unsupported_desktop`). The Ergopti install rows
-(`layout_bundle`) stay macOS-only with
-`platform_reason.layout_install_is_the_macos_bundle`: the Windows installer is
-the unsigned `Ergopti_windows.exe` release asset that must run elevated, which
-the driver never starts (macOS refuses its unverified system scope likewise),
-and Linux installs Ergopti for the user from the layout manager. Action: a new
-layout feature lands on the three drivers or names its blocker in the row's
-reason; installing on Windows from the menu needs a signed layout asset first.
+`menu.layout.active_layouts_unsupported_desktop`). Installing Ergopti into the
+system is on every OS: macOS from the `.bundle` rows (`layout_bundle`), Linux
+for the user from the layout manager (install.sh on Xorg), and Windows from
+Layout > « Install the Ergopti system layout » (`layout_system_install`,
+`windows/modules/keymap/system_layout_install.ahk`). The Windows installer is
+UNSIGNED by decision (2026-11-06): the driver starts it through UAC only after a
+dialog that says so, and the row's label says it too. Its keyboard DLL is
+generated from the registry `.keylayout` (`codegen-windows-keyboard-layout.cjs`,
+kalamine's approach, no MSKLC) and built in CI
+(`docs/tooling/windows-keyboard-layout.md`). Action: a new layout feature lands
+on the three drivers or names its blocker in the row's reason; change the
+Windows layout through the `.keylayout` and its generator, never the DLL.
 
 ## Dead keys: one lifecycle contract, macOS output for the magic key (2026-11-06)
 
