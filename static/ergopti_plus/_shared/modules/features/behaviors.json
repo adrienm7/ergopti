@@ -29,7 +29,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 			"symbol": "hotstrings.shortcut_resets_word",
-			"sha256": "a44f81fbe76d87e9143bc1204b8788f48e9fa036d8632d437d03dc3890645927"
+			"sha256": "9f2018fd721bcedd92d669d7b5093748a3af8f588b13cce9f95a053261985646"
 		},
 		{
 			"id": "linux-repeat",
@@ -64,7 +64,7 @@
 			"platform": "macos",
 			"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 			"symbol": "local chars = e:getCharacters(false)",
-			"sha256": "a44f81fbe76d87e9143bc1204b8788f48e9fa036d8632d437d03dc3890645927"
+			"sha256": "9f2018fd721bcedd92d669d7b5093748a3af8f588b13cce9f95a053261985646"
 		},
 		{
 			"id": "linux-dead-capture",
