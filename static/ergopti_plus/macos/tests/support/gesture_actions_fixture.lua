@@ -92,6 +92,8 @@ local OWNERS = {
 	"modules.gestures.engine",
 	"infra.gesture_frame_evidence",
 	"modules.gestures.sticky_modifiers",
+	-- The engine bounds incremental tab steps through the sensitivity owner.
+	"modules.gestures.sensitivity",
 	"modules.shortcuts",
 	"modules.shortcuts.actions.apps",
 	"modules.shortcuts.actions.screenshot_save",
@@ -103,6 +105,8 @@ local OWNERS = {
 	"modules.shortcuts.script_control",
 	"send_input",
 	"text_utils",
+	-- text_utils builds its case tables from this generated data at require time.
+	"unicode_case.data",
 	"toml_codec.basic_string",
 	"toml_codec.bom",
 	"toml_codec.key_path",
