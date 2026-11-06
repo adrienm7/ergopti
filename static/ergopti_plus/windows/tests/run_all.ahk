@@ -1634,6 +1634,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/shortcuts/test_wrap_symbols_gate.ahk
 #Include meta/modules/shortcuts/test_wrap_symbols_catalogue.ahk
 #Include unit/modules/shortcuts/test_wrap_symbols_global_transaction.ahk
+#Include unit/modules/shortcuts/test_wrap_symbols_single_symbol.ahk
 ; ── Cross-driver corpus consumers ──
 #Include support/toml_corpus_values.ahk
 #Include meta/corpus/test_corpus_hotstrings.ahk

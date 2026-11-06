@@ -482,7 +482,7 @@ _WS_MenuAddCustom() {
 		return
 	}
 	LeftChar := Trim(IB1.Value, " `t")
-	if (StrLen(LeftChar) != 1) {
+	if !WrapSymbols_IsSingleSymbol(LeftChar) {
 		Ui_MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_title"), "Icon!")
 		return
 	}
@@ -493,7 +493,7 @@ _WS_MenuAddCustom() {
 		return
 	}
 	RightChar := Trim(IB2.Value, " `t")
-	if (RightChar != "" and StrLen(RightChar) != 1) {
+	if (RightChar != "" and !WrapSymbols_IsSingleSymbol(RightChar)) {
 		Ui_MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_close_title"), "Icon!")
 		return
 	}
