@@ -783,7 +783,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `top_level.apps` (hide): Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.
 - [ ] `top_level.reload` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `top_level.quit` (hide): Review the platform-specific presentation and equivalent.
-- [ ] `llm_menu.llm_generation_settings` (hide): Not on Linux: these rows configure the inference backend, the profile, the trigger and how predictions are displayed and navigated. The Linux driver talks to one local backend and offers none of those surfaces, so each row would open an empty submenu.
+- [ ] `llm_menu.llm_generation_settings` (hide): Not a submenu on Linux: the Linux driver lists the models and the two generation settings straight in this menu, through its own row below.
 - [ ] `agent_menu.agent_disabled_apps` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `apps_menu.apps_installed` (hide): Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.
 - [ ] `debug_menu.window_spy` (hide): Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.

@@ -5293,6 +5293,27 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		assert.equal(rows.length, 1, 'the complete fixed parent has one genuine identity');
 		assert.equal(rows[0].type, 'group', 'the migrated complete child is a shared native group');
 	}
+	// Linux owns these settings as its inline `llm_generation` provider, so the
+	// absent submenu row must explain that placement, not deny the surface.
+	{
+		const [settings] = menu.llm_menu.filter((row) => row.id === 'llm_generation_settings');
+		const inline = menu.llm_menu.filter((row) => row.id === 'llm_generation');
+		assert.deepEqual(inline.map((row) => row.platforms), [['linux']]);
+		assert.equal(
+			settings.reason_key,
+			'platform_reason.llm_generation_settings_are_inline_on_linux'
+		);
+		const localeDir = resolve(SHARED, 'data/locales');
+		for (const file of readdirSync(localeDir).filter((name) => name.endsWith('.json'))) {
+			const strings = JSON.parse(readSourceFile(resolve(localeDir, file)));
+			assert.ok(strings[settings.reason_key]?.trim(), `${file}: the Linux placement is explained`);
+			assert.equal(
+				Object.hasOwn(strings, 'platform_reason.llm_configuration_surface_is_not_on_linux'),
+				false,
+				`${file}: no stale claim that Linux lacks the AI configuration surface`
+			);
+		}
+	}
 
 	function hasSequence(source, extension, values) {
 		const tokens = scriptTokens(source, extension);

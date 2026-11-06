@@ -136,9 +136,12 @@ for (const id of ['open_metrics_typing', 'open_metrics_apps']) {
 }
 for (const file of files) {
 	const strings = JSON.parse(fs.readFileSync(path.join(locales, file), 'utf8'));
-	const key = 'platform_reason.metrics_extras_are_not_on_linux';
-	assert.equal(typeof strings[key], 'string');
-	assert.ok(strings[key].length > 10, `${file}: the exclusion-list refusal is explained`);
+	// Linux implements the per-application metrics exclusion list (menu_metrics.lua
+	// and keystats.lua), so a refusal claiming otherwise must not return.
+	assert.ok(
+		!Object.hasOwn(strings, 'platform_reason.metrics_extras_are_not_on_linux'),
+		`${file}: no stale claim that Linux lacks the metrics exclusion list`
+	);
 	assert.ok(
 		!Object.keys(strings).some(
 			(id) => id.startsWith('menu.metrics.shortcut_') || id.startsWith('metrics.shortcut_')
