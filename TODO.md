@@ -8,32 +8,43 @@ the field-run step or the hand action that proves it and the commits it confirms
 [workflow and verification memory](docs/memory/workflow-and-verification.md). Finished items are in Git
 (`git show 2a0083cb11:TODO.md` is the long form before this shrink).
 
-## Layout generator from a `.keylayout` source (maintainer request, 2026-11-06)
+## Layout generator from an Ergopti TOML source (maintainer request, 2026-11-06)
 
-Large project: an Ergopti equivalent of [kalamine](https://github.com/OneDeadKey/kalamine). Kalamine starts from a
-TOML file; Ergopti starts from a macOS `.keylayout` file, the single source of truth for a layout.
-Take ideas from kalamine, never its code: write every generator from the formats' own documentation, so that no
-MIT notice has to ship and the design can go further (one `.keylayout` source, golden vectors, live emulation).
+Large project: an Ergopti equivalent of [kalamine](https://github.com/OneDeadKey/kalamine), going further. Take
+ideas from kalamine and KbdEdit, never their code: write every generator from the formats' own documentation, so
+that no MIT notice has to ship.
 
-- [ ] **One generator, every target.** From one `.keylayout`, generate the macOS bundle, the Linux XKB files, the
-      Windows `.klc` plus the keyboard DLL and its unsigned installer, the AutoHotkey emulation tables, the
-      Hammerspoon and Linux emulation tables, and the web emulation used by the site and the composer. Reuse the
-      existing bricks: `static/ergopti/linux/xkb_generation/keylayout_to_xkb.py`, `_shared/lua/layouts/composer.lua`
-      and `composer_check`, `_shared/ui/layout_composer/`, the composer corpus vectors, and the Windows installer from
-      `layout/windows-klc-installer`. Each target gets a golden-vector test against the same corpus.
+Decided 2026-11-06: the source of truth is an Ergopti layout file in TOML, a superset of every target. A macOS
+`.keylayout` cannot hold extra modifiers (Kana, Roya, Loya, a held key as a layer), lock layers other than Caps
+Lock, physical key remapping, shortcuts that send another key than the typed character (Ctrl+A giving Ctrl+B),
+KbdEdit's special functions and Windows flags, export settings, nor Ergopti's own features (tap-hold, emulated
+layers). The `.keylayout` stays a first-class format: imported without loss and exported. No custom element goes
+into an exported `.keylayout`, since macOS may refuse to load it.
+
+- [ ] **The TOML format.** Specify it (schema, version field, comments allowed): layers and modifiers including
+      user-defined ones, held or locked, per-key Caps Lock mode, dead keys with chaining and multi-character
+      results, ligatures, physical remapping, per-modifier alternative keys, key names, ISO base and ANSI rule,
+      export metadata. Lossless round trip `.keylayout` → TOML → `.keylayout` for everything the `.keylayout` holds.
+- [ ] **One generator, every target.** From the TOML, generate the macOS bundle, the Linux XKB files, the Windows
+      `.klc` plus the keyboard DLL and its unsigned installer, the AutoHotkey emulation tables, the Hammerspoon and
+      Linux emulation tables, and the web emulation used by the site and the composer. Each export reports per
+      target what is native, emulated by the ErgoptiPlus driver, or impossible; nothing is dropped silently. Reuse
+      the existing bricks: `static/ergopti/linux/xkb_generation/keylayout_to_xkb.py`,
+      `_shared/lua/layouts/composer.lua` and `composer_check` (whose `composition.json` beside `composed.keylayout`
+      already shows the superset idea), `_shared/ui/layout_composer/`, the composer corpus vectors, and the Windows
+      installer from `layout/windows-klc-installer`. Each target gets a golden-vector test against the same corpus.
 - [ ] **macOS export: bundle by default, ISO and ANSI.** A macOS layout can be one `.keylayout` file, but the
-      default export is a `.bundle` holding both physical variants, ISO and ANSI (as
-      `Ergopti_v2.2.0.bundle` does today). The export dialog has a drop-down: « Bundle ISO + ANSI » (default),
-      « ISO only » or « ANSI only », the last two giving a single `.keylayout`.
-      Decided 2026-11-06: the user edits one ISO `.keylayout`; the ANSI variant is derived from it by a fixed rule that
-      moves the extra ISO key, and the editor can change where that key goes.
+      default export is a `.bundle` holding both physical variants, ISO and ANSI (as `Ergopti_v2.2.0.bundle` does
+      today). The export dialog has a drop-down: « Bundle ISO + ANSI » (default), « ISO only » or « ANSI only », the
+      last two giving a single `.keylayout`. Decided 2026-11-06: the user edits the ISO layout; the ANSI variant is
+      derived by a fixed rule that moves the extra ISO key, and the editor can change where that key goes.
 - [ ] **KbdEdit parity, or better.** The editor offers every KbdEdit capability (extra modifier levels such as Kana,
       Ctrl/Alt shortcuts that send another key than the typed character, Caps Lock modes, chained dead keys and
       compose, ligatures, numpad and media keys, key remapping, sticker printing, Unicode palette, live preview),
-      for free and on all three OS, emulating what a target format cannot express and never dropping a mapping
-      silently. Inventory and design: [layout-generator-kbdedit-parity.md](docs/design/layout-generator-kbdedit-parity.md).
-- [ ] **Layout editor on the Svelte site.** A new tab where a user configures their own layout and edits it as a
-      `.keylayout`, then downloads every generated target.
+      for free and on all three OS. Inventory and design:
+      [layout-generator-kbdedit-parity.md](docs/design/layout-generator-kbdedit-parity.md).
+- [ ] **Layout editor on the Svelte site.** A new tab where a user configures their own layout, opens or saves the
+      Ergopti TOML, imports a `.keylayout`, and downloads every generated target.
 - [ ] **The same UI inside ErgoptiPlus.** The editor page runs locally in the app's webview on Windows, macOS and
       Linux. It installs or emulates the result and switches to it from the menu.
 
