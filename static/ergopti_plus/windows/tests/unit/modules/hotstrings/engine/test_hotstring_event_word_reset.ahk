@@ -270,6 +270,21 @@ _HEWR_CtrlBackspaceAlwaysForgets() {
 	AssertEqual("", _HEWR_Run(Off, AltEvent, "r"), "and promises no word start")
 }
 
+; WRSW-001: a synthetic Alt/Win/AltGr Backspace promises no word start, as its
+; physical twin does; a synthetic Ctrl Backspace still starts one.
+_HEWR_SyntheticBackspaceBoundary() {
+	Off := Map("arrow_resets_word", false, "shortcut_resets_word", false, "tap_hold_resets_word", false)
+	AssertEqual("r", _HEWR_Run(Off, () => TextPressKey("BackSpace", ["Ctrl"]), "r"),
+		"a sent Ctrl+Backspace starts a word (positive control)")
+	AssertEqual("", _HEWR_Run(Off, () => TextPressKey("BackSpace", ["Alt"]), "x"),
+		"a sent Alt+Backspace forgets the « a »")
+	AssertEqual("", _HEWR_Run(Off, () => TextPressKey("BackSpace", ["Alt"]), "r"),
+		"and promises no word start")
+	AssertEqual("", _HEWR_Run(Off, () => TextPressKey("BackSpace", ["Win"]), "r"),
+		"a sent Win+Backspace promises no word start either")
+}
+
+Test("event word reset: a sent Alt/Win+Backspace promises no word start (WRSW-001)", _HEWR_SyntheticBackspaceBoundary)
 Test("event word reset: the probe without any event", _HEWR_ProbeUnaffectedWithoutEvent)
 Test("event word reset: physical arrows, on and off", _HEWR_PhysicalArrows)
 Test("event word reset: navigation-layer and sent arrows, on and off", _HEWR_SyntheticArrows)
