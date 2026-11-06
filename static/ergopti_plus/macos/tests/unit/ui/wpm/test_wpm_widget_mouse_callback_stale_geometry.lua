@@ -45,6 +45,12 @@ helpers.describe("wpm_widget: mouseCallback reads live geometry across a graph-m
 				return s._frame
 			end
 			function self.mouseCallback(s, fn) captured.mouse_cb = fn; return s end
+			-- hs.canvas starts with every tracking class off; keep that default so a
+			-- widget that never opts in receives no native callback (WPMM-001).
+			function self.canvasMouseEvents(s, down, up, enter_exit, move)
+				s.tracking = { down = down, up = up, enter_exit = enter_exit, move = move }
+				return s
+			end
 			captured.canvas = self
 			return self
 		end
@@ -154,6 +160,17 @@ helpers.describe("wpm_widget: mouseCallback reads live geometry across a graph-m
 			"mouseUp must convert the drop frame using the CURRENT (graph-mode) canvas_width/compact_w, not a stale compact-mode value")
 		helpers.assert_eq(pos_y, expected_y,
 			"mouseUp must convert the drop frame using the CURRENT (graph-mode) canvas_height/compact_h, not a stale compact-mode value")
+	end)
+
+	helpers.it("opts the canvas into down, up and move delivery so a drag reaches the callback (WPMM-001)", function()
+		local Widget, captured = load_widget()
+		Widget.start(false)
+		helpers.assert_true(captured.canvas.tracking ~= nil,
+			"the widget must call canvasMouseEvents; native defaults deliver no mouse callback")
+		helpers.assert_eq(captured.canvas.tracking.down, true, "mouse-down tracking enabled")
+		helpers.assert_eq(captured.canvas.tracking.up, true, "mouse-up tracking enabled")
+		helpers.assert_eq(captured.canvas.tracking.move, true, "mouse-move tracking enabled")
+		Widget.stop()
 	end)
 end)
 
