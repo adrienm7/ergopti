@@ -90,7 +90,12 @@ local function run_with_stubs(script, stubs)
 	local fh = assert(io.open(script_file, "w"))
 	fh:write(script .. "\n")
 	fh:close()
-	os.execute("PATH='" .. dir .. ":/usr/bin:/bin' STUBS='" .. dir .. "' sh '" .. script_file .. "' </dev/null >/dev/null 2>&1")
+	-- install/launch.sh creates the session lock folder the serialized toggles
+	-- flock in; the test provides it rather than depending on the host's home.
+	local session = os.execute("mkdir '" .. dir .. "/ergopti'")
+	helpers.assert_true(session == true or session == 0, "the session lock folder must be created")
+	os.execute("PATH='" .. dir .. ":/usr/bin:/bin' STUBS='" .. dir .. "' XDG_RUNTIME_DIR='" .. dir
+		.. "' sh '" .. script_file .. "' </dev/null >/dev/null 2>&1")
 	local log_fh = io.open(dir .. "/calls.log", "r")
 	local log = log_fh and log_fh:read("*a") or ""
 	if log_fh then log_fh:close() end
