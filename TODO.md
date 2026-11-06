@@ -8,6 +8,22 @@ the field-run step or the hand action that proves it and the commits it confirms
 [workflow and verification memory](docs/memory/workflow-and-verification.md). Finished items are in Git
 (`git show 2a0083cb11:TODO.md` is the long form before this shrink).
 
+## Layout generator from a `.keylayout` source (maintainer request, 2026-11-06)
+
+Large project: an Ergopti equivalent of [kalamine](https://github.com/OneDeadKey/kalamine). Kalamine starts from a
+TOML file; Ergopti starts from a macOS `.keylayout` file, the single source of truth for a layout.
+
+- [ ] **One generator, every target.** From one `.keylayout`, generate the macOS bundle, the Linux XKB files, the
+      Windows `.klc` plus the keyboard DLL and its unsigned installer, the AutoHotkey emulation tables, the
+      Hammerspoon and Linux emulation tables, and the web emulation used by the site and the composer. Reuse the
+      existing bricks: `static/ergopti/linux/xkb_generation/keylayout_to_xkb.py`, `_shared/lua/layouts/composer.lua`
+      and `composer_check`, `_shared/ui/layout_composer/`, the composer corpus vectors, and the Windows installer from
+      `layout/windows-klc-installer`. Each target gets a golden-vector test against the same corpus.
+- [ ] **Layout editor on the Svelte site.** A new tab where a user configures their own layout and edits it as a
+      `.keylayout`, then downloads every generated target.
+- [ ] **The same UI inside ErgoptiPlus.** The editor page runs locally in the app's webview on Windows, macOS and
+      Linux. It installs or emulates the result and switches to it from the menu.
+
 ## Parity audit pause and resumption
 
 The [coverage and remaining-work register](docs/platform-parity-audit.md#review-status-at-pause--november-5-2026)
@@ -373,7 +389,7 @@ Audited source and immutable evidence: [18-scope review](docs/audits/platform-pa
     previous window of the app; macOS 5 fingers ↑ Mission Control / ↓ App Exposé; tap 3 left click held; tap 4
     `alt_tab_monitor`; macOS greys a slot whose system gesture is on (suffix about 20 characters, « — pris par macOS »)
     and suspends it until the system gesture is None; never write the macOS prefs.
-  - `wip/layout-composer-responsive` (agent running) — the layout composer page reflows when the window is resized and
+  - `wip/layout-composer-responsive` (landed on dev, branch archived 2026-11-04) — the layout composer page reflows when the window is resized and
     no button sits behind the preview, same page on the three OS; Layout menu: « Couches émulées » header, the four
     rows in a « Rangées émulées (apprentissage progressif) » submenu.
   - `wip/windows-boot-time` (agent running) — boot measured at 7.8 s (parse 1.7, layout 1.2, hotstrings 1.0, tray 1.0);
@@ -392,7 +408,7 @@ Audited source and immutable evidence: [18-scope review](docs/audits/platform-pa
       already resized their view. Gates: `npm run test:browser:layout-composer`, `test_webview_fit_to_window.ahk`.
 - [x] **Layout menu: layers and rows apart.** Header « Couches émulées » above the two layer rows, the four row
       switches in the submenu « Rangées émulées (apprentissage progressif) »; decision in maintainer-decisions.md.
-- [ ] **Next: land on `dev`** by rebase and fast-forward when the maintainer asks (never push `dev` or `main` from
+- [x] **Next: land on `dev`** (done; tag `archive/2026-11-04/wip-layout-composer-responsive`) by rebase and fast-forward when the maintainer asks (never push `dev` or `main` from
       here). Branch rebased on dev 41e2888d08; CI run 41742438444 green except Linux alpine integration
       (`test_sqlite_first_open.lua` system-event capture, metrics, untouched here) and the macOS 26 build still
       running when noted. Chromium and WebKit ran the composer gate: 24 cases.
