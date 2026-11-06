@@ -39,6 +39,20 @@ end
 """
 
 
+def bind_unix_socket(sock, path):
+    """Bind by name from the parent directory: sun_path holds 108 bytes.
+
+    The distribution jobs nest TMPDIR several levels deep, and the longest
+    asset endpoint then overflowed the absolute path the kernel accepts.
+    """
+    previous = os.getcwd()
+    os.chdir(path.parent)
+    try:
+        sock.bind(path.name)
+    finally:
+        os.chdir(previous)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--runtime", required=True)
@@ -113,7 +127,7 @@ def main():
                     endpoint.mkdir()
                 else:
                     sock = socket.socket(socket.AF_UNIX)
-                    sock.bind(str(endpoint))
+                    bind_unix_socket(sock, endpoint)
                 before = endpoint.lstat()
                 env = dict(
                     os.environ,
