@@ -221,6 +221,36 @@ helpers.describe("tap-hold engine: tap sentinels and the one-shot Shift", functi
 		helpers.assert_nil(e:process(KEY_A, DOWN, 300), "only once")
 	end)
 
+	-- Caps Lock plus Shift gives the lowercase: the same-key Shift would type
+	-- "a" for "A" and spend the arm (OSL-001). Locked, the capital is typed with
+	-- the lock released around it, as the injector types text, and put back.
+	helpers.it("types the capital with Caps Lock released when it is locked (OSL-001)", function()
+		local RSHIFT = 54
+		for _, held in ipairs({ false, SHIFT, RSHIFT }) do
+			local e = Engine.new({ keys = { right_ctrl = DEFAULTS.right_ctrl }, tap_min_ms = 50, lone_tap_max_ms = 0,
+				one_shot_timeout_ms = 2000, key_text = Fixture.us_text, plan_text = Fixture.us_plan,
+				one_shot_result = one_shot_result, caps_locked = function() return true end })
+			e:process(RCTRL, DOWN, 0)
+			e:process(RCTRL, UP, 100)
+			if held then helpers.assert_nil(e:process(held, DOWN, 150), "the hand's Shift passes") end
+			local out, tap = e:process(KEY_A, DOWN, 200)
+			local expected = "58↓ 58↑ 42↓ 30↓ 30↑ 42↑ 58↓ 58↑"
+			if held then expected = string.format("%d↑ %s %d↓", held, expected, held) end
+			helpers.assert_eq(trail(out), expected, "Caps Lock off around Shift+A, then back on")
+			helpers.assert_nil(tap)
+			helpers.assert_eq(trail(e:process(KEY_A, UP, 250) or {}), "", "the typed capital left nothing down")
+			if held then e:process(held, UP, 260) end
+			helpers.assert_nil(e:process(KEY_A, DOWN, 300), "spent once")
+		end
+		-- Unlocked, the same key under Shift stays a real keystroke that repeats.
+		local e = Engine.new({ keys = { right_ctrl = DEFAULTS.right_ctrl }, tap_min_ms = 50, lone_tap_max_ms = 0,
+			one_shot_timeout_ms = 2000, key_text = Fixture.us_text, plan_text = Fixture.us_plan,
+			one_shot_result = one_shot_result, caps_locked = function() return false end })
+		e:process(RCTRL, DOWN, 0)
+		e:process(RCTRL, UP, 100)
+		helpers.assert_eq(trail((e:process(KEY_A, DOWN, 200))), "42↓ 30↓")
+	end)
+
 	helpers.it("expires the one-shot Shift", function()
 		local e = engine()
 		e:process(RCTRL, DOWN, 0)
