@@ -344,6 +344,12 @@ jobs:
       - name: Test shared layout composer rendering
         run: npm run test:browser:layout-composer
 
+      - name: Test shared prompt editor initialization
+        run: npm run test:browser:prompt-editor-initialization
+
+      - name: Test shared personal info editor rendering
+        run: npm run test:browser:personal-info-editor
+
       - name: Plan both production site targets
         id: site-plan
         run: node tools/ci/site-matrix.cjs plan

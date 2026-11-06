@@ -110,6 +110,12 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Actual Chromium/WebKit rendering runs separately in mandatory Core / js;
 	// test-ci-pipeline-wiring.cjs rejects missing or redirected browser execution.
 	'tools/test/browser/physical-shortcuts.playwright.cjs',
+	// Real Chromium checks delayed host initialization of the prompt editor; the
+	// shared UI browser lane of Core / js runs it as its own step.
+	'tools/test/browser/prompt-editor-initialization.playwright.cjs',
+	// Real Chromium checks multiline values in the personal information editor;
+	// the shared UI browser lane of Core / js runs it as its own step.
+	'tools/test/browser/personal-info-editor.playwright.cjs',
 	// A manual launcher that serves the fake corporate network until stdin
 	// closes; test-fake-network.cjs runs the library it starts inside the suite.
 	'tools/test/fake-network.cjs'
