@@ -1808,6 +1808,8 @@
 	"menu.layout.pause_layout_enabled": "تغيير التخطيط عند الإيقاف / الاستئناف",
 	"menu.layout.pause_layout_section": "التخطيط عند الإيقاف / الاستئناف",
 	"menu.layout.pause_layout_unsupported_desktop": "التخطيط عند الإيقاف المؤقت / الاستئناف: غير متاح على سطح المكتب هذا (GNOME أو KDE أو X11 فقط)",
+	"menu.layout.select_failed": "تعذّر تغيير تخطيط لوحة المفاتيح. راجع السجلات لمزيد من التفاصيل.",
+	"menu.layout.active_layouts_unsupported_desktop": "غير متاح على سطح المكتب هذا (GNOME أو KDE أو X11 فقط)",
 	"menu.layout.replace": "تحويل مفتاح إلى مفتاح ★",
 	"menu.layout.magic_key_source": "المفتاح الفعلي للمفتاح السحري",
 	"menu.layout.magic_key_source.auto": "تلقائي (مفتاح التخطيط)",

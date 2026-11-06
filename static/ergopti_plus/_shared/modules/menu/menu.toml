@@ -2211,22 +2211,24 @@ reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
 [[menu.layout_menu]]
 type = "---"
-platforms = ["hs"]
-unavailable = "hide"
 
-# The input sources macOS has enabled, under a header of their own (« Sources
-# de saisie »): without it the list read as more Ergopti settings.
+# The system's keyboard layouts, under a header of their own (« Sources de
+# saisie »): without it the list read as more Ergopti settings. The active one
+# is ticked and choosing another switches the system layout, on every driver
+# (maintainer, 2026-11-06): macOS selects the input source through TIS, Windows
+# requests the user's installed layout (WM_INPUTLANGCHANGEREQUEST) and Linux
+# asks the desktop's own owner (GNOME gsettings, the KDE keyboard daemon or
+# setxkbmap).
 [[menu.layout_menu]]
 type = "section_header"
 i18n = "menu.layout.active_layouts"
-platforms = ["hs"]
-reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
+# A Linux desktop with no way to change its layout says why, as the pause
+# switch does.
 [[menu.layout_menu]]
 type = "list"
 id = "active_layouts"
-platforms = ["hs"]
-reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
+status_rows.unsupported_desktop = [{ type = "label", i18n = "menu.layout.active_layouts_unsupported_desktop" }]
 
 [[menu.layout_menu]]
 type = "---"
@@ -3340,12 +3342,12 @@ type = "---"
 
 # The empty native Input Sources list still offers macOS Keyboard preferences.
 # The native owner retains its URL and launch behavior; the shared command owns presentation.
+# Shown when the system lists no layout: opens the system's keyboard settings
+# (macOS System Settings, Windows Settings > Language, GNOME or KDE settings).
 [[menu.layout_active_source_empty_commands]]
 type = "command"
 id = "layout_open_preferences"
 i18n = "menu.layout.open_prefs"
-platforms = ["hs"]
-unavailable = "hide"
 
 # A custom profile's child menu is shared; native ports own the exact transactions.
 # Windows retains its existing profile row click/dialog instead of a nested menu.

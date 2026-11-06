@@ -1808,6 +1808,8 @@
 	"menu.layout.pause_layout_enabled": "Cambiar disposición al pausar / reanudar",
 	"menu.layout.pause_layout_section": "Disposición al pausar / reanudar",
 	"menu.layout.pause_layout_unsupported_desktop": "Disposición al pausar / reanudar: no disponible en este escritorio (solo GNOME, KDE o X11)",
+	"menu.layout.select_failed": "No se pudo cambiar la disposición del teclado. Consulta los registros para más detalles.",
+	"menu.layout.active_layouts_unsupported_desktop": "No disponible en este escritorio (solo GNOME, KDE o X11)",
 	"menu.layout.replace": "Transformar una tecla en la tecla ★",
 	"menu.layout.magic_key_source": "Tecla mágica física",
 	"menu.layout.magic_key_source.auto": "Automática (la tecla de la distribución)",

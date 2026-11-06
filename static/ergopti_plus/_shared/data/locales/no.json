@@ -1808,6 +1808,8 @@
 	"menu.layout.pause_layout_enabled": "Bytt layout ved pause / gjenopptakelse",
 	"menu.layout.pause_layout_section": "Layout ved pause / gjenopptakelse",
 	"menu.layout.pause_layout_unsupported_desktop": "Oppsett ved pause / gjenopptak: ikke tilgjengelig på dette skrivebordet (kun GNOME, KDE eller X11)",
+	"menu.layout.select_failed": "Kunne ikke bytte tastaturoppsett. Se loggene for detaljer.",
+	"menu.layout.active_layouts_unsupported_desktop": "Ikke tilgjengelig på dette skrivebordet (kun GNOME, KDE eller X11)",
 	"menu.layout.replace": "Gjøre en tast om til ★-tasten",
 	"menu.layout.magic_key_source": "Fysisk magisk tast",
 	"menu.layout.magic_key_source.auto": "Automatisk (oppsettets tast)",

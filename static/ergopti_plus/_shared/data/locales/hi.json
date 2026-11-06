@@ -1808,6 +1808,8 @@
 	"menu.layout.pause_layout_enabled": "विराम / पुनः आरंभ पर लेआउट बदलें",
 	"menu.layout.pause_layout_section": "विराम / पुनः आरंभ पर लेआउट",
 	"menu.layout.pause_layout_unsupported_desktop": "विराम / पुनः आरंभ पर लेआउट: इस डेस्कटॉप पर उपलब्ध नहीं (केवल GNOME, KDE या X11)",
+	"menu.layout.select_failed": "कीबोर्ड लेआउट नहीं बदला जा सका। विवरण के लिए लॉग देखें।",
+	"menu.layout.active_layouts_unsupported_desktop": "इस डेस्कटॉप पर उपलब्ध नहीं (केवल GNOME, KDE या X11)",
 	"menu.layout.replace": "एक कुंजी को ★ कुंजी में बदलें",
 	"menu.layout.magic_key_source": "भौतिक जादुई कुंजी",
 	"menu.layout.magic_key_source.auto": "स्वचालित (लेआउट की कुंजी)",

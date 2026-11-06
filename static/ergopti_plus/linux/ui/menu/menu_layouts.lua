@@ -4,8 +4,9 @@
 --- MODULE: Linux Menu Keyboard Layout Submenu
 --- DESCRIPTION:
 --- Builds the tray's keyboard layout submenu: the installed layouts with the
---- active one ticked, the custom layouts, the number-row policy and the pause
---- layout rows, with the notices a layout switch shows.
+--- active one ticked, the custom layouts, the desktop's input sources, the
+--- number-row policy and the pause layout rows, with the notices a layout
+--- switch shows.
 --- ==============================================================================
 
 local M = {}
@@ -236,6 +237,22 @@ local function _build_layouts(ctx)
 				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			end,
 			preferences = require("infra.pause_layout_preferences"),
+			switch = ctx.pause_layout,
+		})
+	end
+	-- Input sources: the desktop's layouts, the active one ticked; choosing one
+	-- switches the desktop (ui/menu/active_layout_rows.lua), as macOS does.
+	providers["active_layouts"] = function()
+		if type(ctx.pause_layout) ~= "table" then
+			Logger.error(LOG, "No layout switch in the menu context — the input sources cannot be listed.")
+			return {}
+		end
+		return require("ui.menu.active_layout_rows").rows({
+			t = i18n_safe,
+			show_error = show_error,
+			on_changed = function()
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end,
 			switch = ctx.pause_layout,
 		})
 	end

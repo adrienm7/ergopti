@@ -1808,6 +1808,8 @@
 	"menu.layout.pause_layout_enabled": "Mudar layout ao pausar / retomar",
 	"menu.layout.pause_layout_section": "Layout ao pausar / retomar",
 	"menu.layout.pause_layout_unsupported_desktop": "Layout na pausa / retoma: indisponível neste ambiente de trabalho (apenas GNOME, KDE ou X11)",
+	"menu.layout.select_failed": "Não foi possível mudar o layout do teclado. Consulte os registos para mais detalhes.",
+	"menu.layout.active_layouts_unsupported_desktop": "Indisponível neste ambiente de trabalho (apenas GNOME, KDE ou X11)",
 	"menu.layout.replace": "Transformar uma tecla na tecla ★",
 	"menu.layout.magic_key_source": "Tecla mágica física",
 	"menu.layout.magic_key_source.auto": "Automática (a tecla do layout)",
