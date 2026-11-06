@@ -604,12 +604,35 @@ end
 function M.preview_candidates(buffer, start_is_boundary)
 	local rows = {}
 	if not M.is_enabled() then return rows end
-	if not require("dynamic_hotstrings").match_buffer(buffer, DYNAMIC_GROUP, M.is_rule_enabled, start_is_boundary) then
-		local user = UserCode.preview(buffer)
-		if user then
-			rows[#rows + 1] = { trigger = user.suffix .. _trigger_char, replacement = user.preview,
-				group = DYNAMIC_GROUP, section = require("config_keys").LEAF.USER_CODE, fires = true }
+	-- A registered rule (a single-letter @-tag or a date) wins at fire time over
+	-- the combo and the programmable source, so it is the one row offered. The
+	-- static matcher never holds these rules: without this row "@p" and "td"
+	-- expanded on the magic key with no bubble at all.
+	local match = require("dynamic_hotstrings").match_buffer(buffer, DYNAMIC_GROUP, M.is_rule_enabled,
+		start_is_boundary)
+	if match then
+		local suffix = match.rule.suffix
+		if match.rule.section == PERSONAL_SECTION then
+			-- `field` is what the preview masks the value against; the alias letter
+			-- follows the "@" of the registered suffix. A row without it would be
+			-- shown unmasked, so none is offered.
+			local field = _letters[suffix:sub(2)]
+			if type(field) ~= "string" then
+				Logger.error(LOG, "Personal preview withheld: a registered @-tag names no field.")
+				return rows
+			end
+			rows[1] = { trigger = suffix .. _trigger_char, replacement = match.result,
+				field = field, group = PERSONAL_PREVIEW_GROUP, section = PERSONAL_SECTION, fires = true }
+		else
+			rows[1] = { trigger = suffix .. _trigger_char, replacement = match.result,
+				group = DYNAMIC_GROUP, section = match.rule.section, fires = true }
 		end
+		return rows
+	end
+	local user = UserCode.preview(buffer)
+	if user then
+		rows[#rows + 1] = { trigger = user.suffix .. _trigger_char, replacement = user.preview,
+			group = DYNAMIC_GROUP, section = require("config_keys").LEAF.USER_CODE, fires = true }
 	end
 	if not M.is_rule_enabled(DYNAMIC_GROUP, PERSONAL_SECTION) then return rows end
 
@@ -619,8 +642,8 @@ function M.preview_candidates(buffer, start_is_boundary)
 	local fields = M.resolve_combo(tag)
 	if #fields == 0 then return rows end
 
-	-- A single-letter tag is a registered rule and reaches the bubble through the
-	-- ordinary path; offering it here too would draw the same row twice.
+	-- A single-letter tag that resolves here is one no registered rule offered
+	-- above (its rule is absent or declined), and the fire path refuses it too.
 	if #fields < 2 then return rows end
 	-- Builtin personal combinations have the same precedence at preview and fire.
 	rows = {}

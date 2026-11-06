@@ -186,12 +186,14 @@ helpers.describe("personal-info @-combo resolver", function()
 		end)
 	end)
 
-	helpers.it("offers nothing the resolver would refuse", function()
+	helpers.it("offers only what the resolver would deliver", function()
 		with_fixture(function()
 			helpers.assert_eq(#dh.preview_candidates("@npz"), 0,
 				"a bubble offering an expansion the magic key will not deliver is worse than no bubble")
-			helpers.assert_eq(#dh.preview_candidates("@n"), 0,
-				"and a single-letter tag is a REGISTERED rule that reaches the bubble by the ordinary path — offering it here too would draw the row twice")
+			local single = dh.preview_candidates("@n")
+			helpers.assert_eq(#single, 1,
+				"a single-letter tag is a REGISTERED rule the static matcher never holds, so this is its only row (single-field-preview)")
+			helpers.assert_eq(single[1].field, "last_name", "and it names the field that masks it")
 			helpers.assert_eq(#dh.preview_candidates("bonjour"), 0,
 				"ordinary typing offers nothing")
 		end)
