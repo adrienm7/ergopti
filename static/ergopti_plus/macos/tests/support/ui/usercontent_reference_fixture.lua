@@ -49,16 +49,24 @@ local function with_picker(scenario)
 			return controller
 		end
 		h.native_new = new_controller
-		_G.hs = { webview = { usercontent = { new = new_controller } }, json = { encode = Json.encode } }
+		_G.hs = { webview = { usercontent = { new = new_controller } }, json = { encode = function(value)
+			if h.encode_throws then error("native encoder refused the payload") end
+			return Json.encode(value)
+		end } }
 		package.loaded["ui.ui_builder"] = {
 			get_app_geometry = function() return { width = 600, height = 400 } end,
 			get_centered_frame = function(width, height) return { x = 0, y = 0, w = width, h = height } end,
 			show_webview = function(options)
 				if h.factory_refuses then return nil end
-				local view = { options = options, deleted = false, evaluations = {} }
-				function view:evaluateJavaScript(script)
+				local view = { options = options, deleted = false, evaluations = {}, completions = {} }
+				-- h.eval_mode models the native submission: nil accepts and returns the
+				-- view, "throw" raises, "refuse" returns nil.
+				function view:evaluateJavaScript(script, completion)
 					assert(not self.deleted, "retired window cannot receive JavaScript")
 					self.evaluations[#self.evaluations + 1] = script
+					self.completions[#self.completions + 1] = completion
+					if h.eval_mode == "throw" then error("native evaluation raised") end
+					if h.eval_mode == "refuse" then return nil end
 					return self
 				end
 				function view:delete()
