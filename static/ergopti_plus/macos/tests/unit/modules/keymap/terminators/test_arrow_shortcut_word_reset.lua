@@ -557,4 +557,46 @@ helpers.describe("erasing what was typed (bs-word-start)", function()
 	end)
 end)
 
+-- A Backspace pressed right after an expansion brings the trigger back, as on
+-- Linux (bs-undo): the Backspace is consumed, the replacement erased and the
+-- trigger typed again. Anything typed in between voids it.
+helpers.describe("immediate Backspace restores the trigger (bs-undo)", function()
+	helpers.it("restores z after z gave Z (bs-undo)", function()
+		with_keymap(function(f)
+			f.press("z", nil, KEYCODE_Z)
+			f.settle()
+			helpers.assert_eq(table.concat(f.effects.emitted), "Z", "control: the expansion fires")
+			f.effects.emitted = {}
+			helpers.assert_true(f.press("", NO_FLAGS, KEYCODE_BACKSPACE) == true, "the Backspace is consumed")
+			f.settle()
+			helpers.assert_eq(table.concat(f.effects.emitted), "z", "the trigger is typed back")
+			helpers.assert_eq(f.state.buffer, "", "the restored trigger is out of the buffer")
+		end)
+	end)
+
+	helpers.it("does nothing once another key was typed (bs-undo)", function()
+		with_keymap(function(f)
+			f.press("z", nil, KEYCODE_Z)
+			f.settle()
+			f.press("a")
+			f.effects.emitted = {}
+			helpers.assert_true(f.press("", NO_FLAGS, KEYCODE_BACKSPACE) ~= true, "an ordinary Backspace passes")
+			f.settle()
+			helpers.assert_eq(table.concat(f.effects.emitted), "", "nothing is typed back")
+		end)
+	end)
+
+	helpers.it("leaves Option+Backspace to the application (bs-undo)", function()
+		with_keymap(function(f)
+			f.press("z", nil, KEYCODE_Z)
+			f.settle()
+			f.effects.emitted = {}
+			helpers.assert_true(f.press("", { cmd = false, ctrl = false, alt = true, shift = false }, KEYCODE_BACKSPACE) ~= true,
+				"Option+Backspace deletes a word, not the expansion")
+			f.settle()
+			helpers.assert_eq(table.concat(f.effects.emitted), "")
+		end)
+	end)
+end)
+
 return true

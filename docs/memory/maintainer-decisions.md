@@ -596,3 +596,11 @@ with the shared results, magic-key and title rules; system StickyKeys is not
 its equivalent. Key-combination chords keep refusing it on every OS. Linux
 still offers it on tap-holds and tap keys only (`platform_reason.action_sticky_keys_are_the_systems`)
 until a non-keyboard origin can arm the engine.
+
+## An immediate Backspace restores the trigger on every OS (6 November 2026)
+
+Aligned on Linux: a Backspace pressed right after a literal expansion erases
+it and types the trigger back, outside the matcher. Anything else first
+(another key, a click, a focus change) voids it, and Ctrl/Cmd/Option+Backspace
+stay the application's. Owners: Linux `_undoable` in `ergopti_hotstrings.lua`,
+macOS `Expander.undo_on_backspace`; Windows is still to build.
