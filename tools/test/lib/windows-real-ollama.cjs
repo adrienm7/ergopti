@@ -285,24 +285,21 @@ async function runRealDaemonCases({
 			}
 		});
 
-		await check(
-			'real daemon: blob bytes are fetched outside the proxy (known, upstream)',
-			async () => {
-				// Ollama 0.40.4: transfer.checkedClient has no Proxy, so after the 307 the
-				// storage URL is dialed directly whatever HTTPS_PROXY says. This row fails
-				// the day a release honours the proxy, which then needs re-reading.
-				const rows = registry.requests.filter((row) => row.path.startsWith('/storage/'));
-				assert.ok(rows.length > 0, 'the bytes were read from the storage URL');
-				assert.ok(
-					rows.every((row) => !row.proxied),
-					JSON.stringify(rows)
-				);
-				const redirects = registry.requests.filter(
-					(row) => row.path.includes('/blobs/') && row.method === 'GET'
-				);
-				assert.ok(redirects.length > 0 && redirects.every((row) => row.proxied));
-			}
-		);
+		await check('real daemon: blob bytes come through the proxy too', async () => {
+			// Ollama 0.40.4 dialed the storage URL after the 307 directly whatever
+			// HTTPS_PROXY said (transfer.checkedClient had no Proxy); 0.40.6 picks the
+			// proxy per request for every checked transfer (#19065).
+			const rows = registry.requests.filter((row) => row.path.startsWith('/storage/'));
+			assert.ok(rows.length > 0, 'the bytes were read from the storage URL');
+			assert.ok(
+				rows.every((row) => row.proxied),
+				JSON.stringify(rows)
+			);
+			const redirects = registry.requests.filter(
+				(row) => row.path.includes('/blobs/') && row.method === 'GET'
+			);
+			assert.ok(redirects.length > 0 && redirects.every((row) => row.proxied));
+		});
 
 		await check(
 			'real daemon: a digest mismatch is named, retried from clean, and heals',

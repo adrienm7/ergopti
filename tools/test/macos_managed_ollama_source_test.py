@@ -15,13 +15,13 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 UPSTREAM = None
 # These vectors were frozen from the reviewed upstream commit, before applying
 # any product hook. They must not be regenerated from patched candidate files.
-# Ollama v0.40.4 is commit 45e6011815c74acde6a346512856b69dd79dd22b.
+# Ollama v0.40.6 is commit 2476d5ead197abe04629651028f83d48dc75d2b2.
 FROZEN = {
-    "server/download.go": "d9299dd65146ba3dd5f4a5c7efe012795c763dcaa04ee6915086a2ac68665f0b",
-    "server/routes.go": "23b3202e270e8f3dba0c716c128529432db02e8b1e40e6d73c94345abf6cfde4",
+    "server/download.go": "e8e13bdcfc40962ce9f776c8ee12369adc5978d869c916750118746670425a4f",
+    "server/routes.go": "47c0bce03da44ba50c65e436f61538c67457282b9504a1ecc11d090461120855",
     "server/images.go": "41903a5408026cf30b4c07ce84c9365c8fa504d523e946d644131d095b22220f",
     "transfer/download.go": "1eb5c3782d9b19b68bffa047d53ff96533ba8f9b94f6f6499c2ac1d6a97547b8",
-    "transfer/redirect.go": "fe3ed501f8cc2779c681dbe24ca9efb4e2f3db7fed46c94f87aa0d873fe71fc4",
+    "transfer/redirect.go": "28d6b5a6d54d7027f6cfbd6fb66de23776a2722729a218a3bfb728ded901f609",
     "go.mod": "c8330ba5f762c4bded1401cc8ecadbe85ebe8e5d159fd81da122da986b26cda5",
     "go.sum": "d9a0e2f1149951068ff200abac695a8fc6d6711b7cbf59c5aefb5e0a0340caae",
     "auth/auth.go": "ac4c269cb812edc01e2386fce0a7753871851edf76ec46ad26329016dc6f7841",
@@ -145,7 +145,7 @@ class Hooks(unittest.TestCase):
             self.assertNotIn(seam, contract["upstream_preimages"])
             self.assertNotIn(seam, contract["request_hook_paths"])
         self.assertEqual(contract["upstream_preimages"], FROZEN)
-        self.assertEqual(contract["source_commit"], "45e6011815c74acde6a346512856b69dd79dd22b")
+        self.assertEqual(contract["source_commit"], "2476d5ead197abe04629651028f83d48dc75d2b2")
 
     def test_changed_preimages_refuse_before_any_source_edit(self):
         path = self.candidate / "transfer/download.go"

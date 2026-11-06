@@ -560,7 +560,13 @@ three-OS CI is green on the final source. See the handoff above for the current 
       `_shared/lua/config_defaults.lua`; empty-config boots pinned by Linux `test_empty_config_neutral.lua`, macOS
       `test_empty_config_defaults.lua` and Windows `test_features_manifest.ahk`. Not a single every-row reader-level
       proof per driver: those tests sample the readers.
-- [ ] **Keep Ollama behind a proxy.** 0.40.4 downloads blobs outside the proxy; 0.40.6 fixes it, shared pin needs a Mac rebuild.
+- [x] **Keep Ollama behind a proxy.** 0.40.4 downloads blobs outside the proxy; 0.40.6 fixes it, shared pin needs a Mac rebuild.
+      Done: the shared pin is 0.40.6 (`ollama_release.json`, `managed_ollama_runtime.json` with commit 2476d5ea and
+      the three changed preimages; every asset digest checked by streaming). The hooks apply unchanged and the hooked
+      tree vets with Go 1.26 here. Its checked client is now upstream's own transport, so `WrapChecked` gives the
+      explicit relay hop a plain transfer transport (bootstrap relay and TLS kept), and `publicAddress` copies the
+      widened special-use lists (the Mac receiver's fake registry moved off TEST-NET-3 to 8.8.8.8). The Mac rebuild
+      is under « To confirm on the Mac ».
 - [ ] **Before publishing.** Whole AHK suite on a quiet machine with no resident driver, `npm run test:ahk-tray-rows-read-as-text`,
       all live checks including `quit-over-a-log-flush`, JS, macOS and Linux suites, Windows field report with a driver.
 
@@ -577,6 +583,9 @@ red step with its `proves` line in `static/ergopti_plus/macos/data/field_run.jso
 
 Field run, no person needed (read the next report):
 
+- [ ] Managed Ollama 0.40.6: rebuild the managed runtime (`tools/build/build-macos-managed-ollama.py`, Go and macOS
+      cells), then `field_ai_local` pulls a model behind a PAC-only or explicit proxy with no direct route, and the
+      native receiver passes with its registry at 8.8.8.8.
 - [ ] AI inline auto-type: switch on « Inline auto-type » in the trigger menu; a finished prediction is typed into a
       text editor without Tab, a correction that rewrites typed words stays in the bubble.
 - [ ] Backup of the API entries: add a remote API entry, install a release from the Versions window, delete the entry,

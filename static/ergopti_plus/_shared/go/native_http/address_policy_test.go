@@ -14,29 +14,45 @@ import (
 	"time"
 )
 
-// These vectors were transcribed from Ollama v0.40.4 transfer/redirect.go
-// (isPublicIP and its blocked CGNAT/benchmark networks), not from this port.
+// These vectors were transcribed from Ollama v0.40.6 transfer/redirect.go and
+// its TestIsPublicIPRejectsSpecialUseRanges, not from this port.
 func TestDestinationPolicyIndependentUpstreamVectors(t *testing.T) {
 	for value, expected := range map[string]bool{
-		"8.8.8.8":           true,
-		"203.0.113.10":      true,
-		"2606:4700::1111":   true,
-		"10.1.2.3":          false,
-		"172.16.0.1":        false,
-		"192.168.1.1":       false,
-		"127.0.0.1":         false,
-		"169.254.169.254":   false,
-		"100.64.0.1":        false,
-		"100.100.2.148":     false,
-		"198.18.0.1":        false,
-		"198.19.255.255":    false,
-		"0.0.0.0":           false,
-		"224.0.0.1":         false,
-		"::1":               false,
-		"fe80::1":           false,
-		"fc00::1":           false,
-		"::ffff:100.64.0.1": false,
-		"::ffff:10.0.0.1":   false,
+		"8.8.8.8":              true,
+		"1.1.1.1":              true,
+		"2606:4700::1111":      true,
+		"10.1.2.3":             false,
+		"172.16.0.1":           false,
+		"192.168.1.1":          false,
+		"127.0.0.1":            false,
+		"169.254.169.254":      false,
+		"100.64.0.1":           false,
+		"100.100.2.148":        false,
+		"198.18.0.1":           false,
+		"198.19.255.255":       false,
+		"0.0.0.0":              false,
+		"224.0.0.1":            false,
+		"::1":                  false,
+		"fe80::1":              false,
+		"fc00::1":              false,
+		"::ffff:100.64.0.1":    false,
+		"::ffff:10.0.0.1":      false,
+		"0.0.0.1":              false,
+		"192.0.0.8":            false,
+		"192.0.2.1":            false,
+		"192.88.99.1":          false,
+		"198.51.100.1":         false,
+		"203.0.113.1":          false,
+		"240.0.0.1":            false,
+		"::ffff:0.0.0.1":       false,
+		"64:ff9b::a9fe:a9fe":   false,
+		"100::1":               false,
+		"2001::1":              false,
+		"2001:db8::1":          false,
+		"2002::1":              false,
+		"3ffe::1":              false,
+		"3fff::1":              false,
+		"2606:4700:4700::1111": true,
 	} {
 		if publicAddress(net.ParseIP(value)) != expected {
 			t.Fatalf("%s public=%v diverges from the upstream checked dialer", value, !expected)
@@ -104,7 +120,7 @@ func TestDestinationPolicyRefusesNonPublicBeforeNativeWorker(t *testing.T) {
 
 func TestDestinationPolicyExplicitProxyHopBypassesCheckedDialer(t *testing.T) {
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Host != "203.0.113.10" {
+		if r.URL.Host != "1.1.1.1" {
 			http.Error(w, "refused", http.StatusBadGateway)
 			return
 		}
@@ -116,7 +132,7 @@ func TestDestinationPolicyExplicitProxyHopBypassesCheckedDialer(t *testing.T) {
 	transport, reached := checkedPeerlessTransport(t, "", false)
 	transport.Fallback = original
 	transport.Environment = func() map[string]string { return map[string]string{"http_proxy": proxy.URL} }
-	response, err := (&http.Client{Transport: transport, Timeout: 3 * time.Second}).Get("http://203.0.113.10/blob")
+	response, err := (&http.Client{Transport: transport, Timeout: 3 * time.Second}).Get("http://1.1.1.1/blob")
 	if err != nil {
 		t.Fatalf("A private enterprise relay was refused by the checked dialer: %v", err)
 	}
@@ -129,6 +145,38 @@ func TestDestinationPolicyExplicitProxyHopBypassesCheckedDialer(t *testing.T) {
 	if _, err := transport.RoundTrip(request); !errors.Is(err, errDestinationNotPublic) {
 		t.Fatalf("An explicit relay forwarded a non-public destination: %v", err)
 	}
+}
+
+// Since Ollama 0.40.6 the transfer client's transport is upstream's own
+// checkedTransport, not an *http.Transport. The explicit relay the bootstrap
+// selected must still carry the request instead of that transport, which
+// would pick a relay from the process environment without the bootstrap TLS.
+func TestWrapCheckedRelaysThroughBootstrapOverOpaqueUpstreamTransport(t *testing.T) {
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "relayed")
+	}))
+	defer proxy.Close()
+	upstreamReached := false
+	transport, reached := checkedPeerlessTransport(t, "", false)
+	transport.Fallback = opaqueRoundTripper{reached: &upstreamReached}
+	checkTransport(transport, "", false)
+	transport.Environment = func() map[string]string { return map[string]string{"http_proxy": proxy.URL} }
+	response, err := (&http.Client{Transport: transport, Timeout: 3 * time.Second}).Get("http://1.1.1.1/blob")
+	if err != nil {
+		t.Fatalf("The bootstrap relay did not carry the request: %v", err)
+	}
+	body, err := io.ReadAll(response.Body)
+	response.Body.Close()
+	if err != nil || string(body) != "relayed" || upstreamReached || *reached {
+		t.Fatal("The opaque upstream transport carried the request instead of the bootstrap relay")
+	}
+}
+
+type opaqueRoundTripper struct{ reached *bool }
+
+func (o opaqueRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	*o.reached = true
+	return nil, errors.New("upstream checked transport reached")
 }
 
 func TestWrapCheckedKeepsOriginalCheckedDialerWithoutCapability(t *testing.T) {
@@ -155,7 +203,7 @@ func TestValidateRedirectTargetLeavesUnresolvedHostToTheCarrier(t *testing.T) {
 	for target, accepted := range map[string]bool{
 		"https://cdn.example/blob":       true,
 		"https://pac-only.example/blob":  true,
-		"https://203.0.113.10/blob":      true,
+		"https://1.1.1.1/blob":           true,
 		"https://internal.example/blob":  false,
 		"https://10.0.0.1/blob":          false,
 		"https://127.0.0.1/blob":         false,

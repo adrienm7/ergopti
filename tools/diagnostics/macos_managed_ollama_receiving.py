@@ -39,16 +39,17 @@ INFERENCE_TOKENS = 2
 # <model>/<tag> and removes the legacy manifests/ entry after the write
 # (manifest/paths.go and writeManifestData in manifest/manifest.go).
 MANIFEST_STORE = "manifests-v2"
-# Ollama 0.40.4 validates each blob redirect target (transfer.ValidateRedirectTarget
+# Ollama validates each blob redirect target (transfer.ValidateRedirectTarget
 # in server/download.go); the port replaces it (address_policy.go): an IP literal
 # must pass isPublicIP, a name that resolves locally must resolve to public
 # addresses, and a name this machine cannot resolve is left to the proxy or the
-# native worker. The registry is this TEST-NET-3 literal rather than the
-# fixture's .test name so the real check runs and accepts it (it is an upstream
-# public vector in address_policy_test.go), no DNS is involved, and the address is never
-# routed, so any request that bypassed the fixture proxies fails rather than
-# reaching a real host.
-REGISTRY_ADDRESS = "203.0.113.10"
+# native worker. The registry is an IP literal rather than the fixture's .test
+# name so the real check runs and accepts it, with no DNS involved. Since 0.40.6
+# isPublicIP refuses every documentation block (TEST-NET-3 included), so the
+# literal is upstream's own public vector 8.8.8.8 (also in address_policy_test.go).
+# A request that bypassed the fixture proxies would reach that host on the
+# fixture's random port and fail TLS against the fixture CA; it never succeeds.
+REGISTRY_ADDRESS = "8.8.8.8"
 
 
 def require(condition, reason):
@@ -1171,7 +1172,7 @@ class Receiver:
                 with opener.open(
                     f"http://127.0.0.1:{self.port}/api/version", timeout=1
                 ) as response:
-                    require(json.load(response)["version"] == "0.40.4", "actual_daemon_version")
+                    require(json.load(response)["version"] == "0.40.6", "actual_daemon_version")
                     with patch.dict(os.environ, self.api_environment, clear=True):
                         self.owner()
                     self.verify_alias_source(deadline)

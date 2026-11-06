@@ -72,7 +72,7 @@ REQUIRED = [
     "TestManagedRedirectKeepsOriginalVeto",
     "TestManagedRedirectReturnToOriginDoesNotRestoreHeaderOrJarSecrets",
 ]
-# Literal identities of the destination policy that replaces Ollama 0.40.4's
+# Literal identities of the destination policy that replaces Ollama 0.40.6's
 # checked dialer on native routes; neither frozen receipt can qualify them.
 ADDRESS_POLICY_IDENTITIES = [
     "TestDestinationPolicyIndependentUpstreamVectors",
@@ -81,6 +81,7 @@ ADDRESS_POLICY_IDENTITIES = [
     "TestValidateRedirectTargetLeavesUnresolvedHostToTheCarrier",
     "TestRedirectPolicyStopsAfterTenHops",
     "TestWrapCheckedKeepsOriginalCheckedDialerWithoutCapability",
+    "TestWrapCheckedRelaysThroughBootstrapOverOpaqueUpstreamTransport",
 ]
 # Literal identities of the shared serve environment (OLLAMA_NO_CLOUD) the
 # managed server applies before it reads its configuration.
@@ -177,7 +178,7 @@ class NativeGoEvidenceTests(unittest.TestCase):
             self.fail("The frozen original failure-stage subtests must be explicitly enrolled")
         self.assertEqual(POLICY["required_passes"], subjects)
         self.assertEqual(
-            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (92, 51, 41)
+            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (93, 52, 41)
         )
         self.assertEqual((fact["failed"], fact["skipped"], fact["package_completed"]), (0, 0, True))
         for name in added + ADDED_IDENTITIES + added_304:

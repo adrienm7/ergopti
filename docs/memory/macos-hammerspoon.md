@@ -181,7 +181,11 @@ that refuses non-public addresses. The native worker and an explicit relay
 never reach that dialer, so both transfer seams use
 `nativehttp.WrapChecked`, which repeats the decision in `address_policy.go`;
 `transfer/redirect.go` is a preimage so an upstream policy change stops the
-build. Upstream's own `ValidateRedirectTarget` also refuses any redirect host
+build, and `publicAddress` copies its special-use lists. Since 0.40.6 the
+checked client's transport is upstream's own `checkedTransport`, not an
+`*http.Transport`: `WrapChecked` then gives the explicit relay hop a plain
+transfer transport, or the relay would come from the process environment
+without the bootstrap's TLS anchors. Upstream's own `ValidateRedirectTarget` also refuses any redirect host
 this machine cannot resolve, which broke every pull where only the proxy (a
 PAC) resolves the download host, so the recipe replaces it and the redirect
 `CheckRedirect` with `nativehttp.ValidateRedirectTarget`/`RedirectPolicy`: an
