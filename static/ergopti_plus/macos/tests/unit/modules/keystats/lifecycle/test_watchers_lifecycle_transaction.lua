@@ -91,6 +91,7 @@ local function with_fixture(options, scenario)
 		watchers = {},
 		system_events = {},
 		log_entries = {},
+		passive_periods = {},
 		timers = {},
 		cancel_calls = {},
 		capture_calls = 0,
@@ -227,7 +228,10 @@ local function with_fixture(options, scenario)
 		end,
 		day_rollover = function() return true end,
 		log_app_switch = noop,
-		log_passive_period = function(kind, duration) fixture.passive_period = { kind = kind, duration = duration } end,
+		log_passive_period = function(kind, duration)
+			fixture.passive_period = { kind = kind, duration = duration }
+			fixture.passive_periods[#fixture.passive_periods + 1] = fixture.passive_period
+		end,
 		log_system_event = function(kind, payload)
 			fixture.system_events[#fixture.system_events + 1] = {
 				kind = kind,
@@ -715,6 +719,67 @@ helpers.describe("keystats wake refresh is lifecycle-owned", function()
 			wake_timer.callback()
 			helpers.assert_eq(fixture.capture_calls, 1,
 				"lifecycle fencing must preserve the intended post-wake refresh")
+		end)
+	end)
+end)
+
+
+
+
+
+-- =============================================================
+-- =============================================================
+-- ======= 3/ User Metrics Pause (HS-004 / MM-001) =============
+-- =============================================================
+-- =============================================================
+
+helpers.describe("keystats sensors stay silent during the user's metrics pause (HS-004)", function()
+	helpers.it("records no space change while collection is suspended", function()
+		with_fixture({}, function(watchers, fixture, state)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			local spaces = fixture.watchers.spaces
+			state.collection_suspended = true
+			spaces.callback(7)
+			helpers.assert_eq(#fixture.system_events, 0,
+				"a paused collection must not log identifying space changes")
+			state.collection_suspended = false
+			spaces.callback(8)
+			helpers.assert_eq(#fixture.system_events, 1)
+			helpers.assert_eq(fixture.system_events[1].kind, "space_change")
+		end)
+	end)
+
+	helpers.it("never credits pointer travel made during the pause after resume", function()
+		with_fixture({}, function(watchers, fixture, state)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			fixture.mouse_position = { x = 0, y = 0 }
+			watchers.perform_maintenance()
+			state.collection_suspended = true
+			fixture.mouse_position = { x = 600, y = 800 }
+			watchers.perform_maintenance()
+			helpers.assert_eq(state.mouse_distance_px, 0)
+			state.collection_suspended = false
+			watchers.perform_maintenance()
+			helpers.assert_eq(state.mouse_distance_px, 0,
+				"the first sample after resume reseeds instead of crediting paused travel")
+			fixture.mouse_position = { x = 603, y = 804 }
+			watchers.perform_maintenance()
+			helpers.assert_eq(state.mouse_distance_px, 5)
+		end)
+	end)
+
+	helpers.it("opens no passive interval that spans the pause", function()
+		with_fixture({}, function(watchers, fixture, state)
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			state.collection_suspended = true
+			fixture.now_ms = 1000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.screensDidLock)
+			state.collection_suspended = false
+			fixture.now_ms = 9000
+			watchers.caffeinate_cb(hs.caffeinate.watcher.screensDidUnlock)
+			helpers.assert_eq(#fixture.passive_periods, 0)
+			helpers.assert_eq(#fixture.system_events, 1,
+				"only the post-pause unlock edge is recorded")
 		end)
 	end)
 end)

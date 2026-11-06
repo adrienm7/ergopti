@@ -116,6 +116,7 @@ local function hardware_callback_allowed(generation)
 		and generation == _hardware_generation
 		and _state ~= nil
 		and _state.is_enabled == true
+		and _state.collection_suspended ~= true
 		and not _is_paused()
 end
 
@@ -156,6 +157,13 @@ end
 --- Polls mouse position and accumulates the physical travel distance.
 --- Called every second via the maintenance timer.
 local function poll_mouse_distance()
+	-- The user's metrics pause owns every sensor, not only typing. Forgetting the
+	-- last sample makes the first sample after resume a fresh seed, so travel made
+	-- while paused is never credited to the next admitted entry.
+	if _state.collection_suspended == true then
+		_state.last_mouse_pos = nil
+		return
+	end
 	local current_pos = hs.mouse.absolutePosition()
 	if _state.last_mouse_pos then
 		local dx   = current_pos.x - _state.last_mouse_pos.x
@@ -611,6 +619,12 @@ function M.caffeinate_cb(event)
 	if not require_state("caffeinate_cb") then return false end
 	local callback_ok, result_or_err = xpcall(function()
 		if _state.is_enabled ~= true or _hardware_watchers_enabled ~= true or _is_paused() then
+			return true
+		end
+		-- A passive interval must not straddle the user's metrics pause: the edge
+		-- that would close it later would credit time that was never collected.
+		if _state.collection_suspended == true then
+			_state.passive_started_at, _state.passive_kind = nil, nil
 			return true
 		end
 		local now = hs.timer.absoluteTime() / 1000000

@@ -1382,7 +1382,12 @@ end
 --- any modifier hold in progress is retired like any other exclusion.
 function M.suspend_collection()
 	if CoreState.collection_suspended then return end
-	if CoreState.is_enabled then LogManager.flush_buffer() end
+	if CoreState.is_enabled then
+		LogManager.flush_buffer()
+		-- Window and app activity are collection too: close the foreground
+		-- interval owned before the pause so no paused time is credited to it.
+		ContextTracker.suspend_collection_context()
+	end
 	CoreState.collection_suspended = true
 	assert(settle_context_modifiers(), "Metrics pause modifier settlement remains pending")
 	Logger.info(LOG, "Metrics collection suspended by the user.")
@@ -1392,6 +1397,7 @@ end
 function M.resume_collection()
 	if not CoreState.collection_suspended then return end
 	CoreState.collection_suspended = false
+	if CoreState.is_enabled then ContextTracker.resume_collection_context() end
 	assert(settle_context_modifiers(), "Metrics resume modifier settlement remains pending")
 	Logger.info(LOG, "Metrics collection resumed by the user.")
 end
