@@ -13,6 +13,9 @@ local with_fixture = require("tests.support.remap_transaction_fixture")
 
 local KEY, COMBO = "left_shift", "left_shift+right_shift"
 local SOURCE = '[tap_holds]\nenabled = false\n[future]\nkeep = true\n'
+-- The configuration folder of this fixture's private disk, without layers.toml.
+local CONFIG_DIR = "/remap"
+local LAYERS = CONFIG_DIR .. "/layers.toml"
 
 --- Loads an enabled remap whose persistence and backup file are observable.
 --- @param fixture table remap_transaction_fixture constructors.
@@ -41,6 +44,7 @@ local function scoped_remap(fixture)
 		assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
 		return "/remap/config_karabiner.toml"
 	end
+	package.loaded["infra.config_paths"].get_config_dir = function() return CONFIG_DIR end
 	local files = require("adapters.file_system")
 	files.remove_exact = function(path)
 		disk.files[path] = nil
@@ -84,8 +88,6 @@ local function request(remap, scope, mode, backup_path)
 	return accepted, settled
 end
 
-
-local LAYERS = "tests/unit/platform/remap/no-layers-toml/layers.toml"
 
 local function preset()
 	local fh = assert(io.open(helpers.shared("keymap/layers.recommended.toml"), "rb"))
