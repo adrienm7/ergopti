@@ -462,8 +462,11 @@ helpers.describe("word reset: the daemon wiring", function()
 		local start = assert(text:find("execute_action = function(action, binding)", 1, true)) + #"execute_action = "
 		local finish = assert(text:find("\n\t\tend,\n", start, true)) + #"\n\t\tend" - 1
 		local resets, result = 0, false
-		local env = { action_catalogue = { execute_action = function() return result end },
-			WordReset = { apply_tap_action = function() resets = resets + 1; return "word_start" end },
+		-- Copy presses Ctrl+C, no arrow: the tap-hold word option decides.
+		local env = { action_catalogue = { execute_action = function() return result end,
+				emit_combo_for = function() return "ctrl+c" end },
+			WordReset = { apply_tap_action = function() resets = resets + 1; return "word_start" end,
+				is_arrow_combo = require("modules.hotstrings.word_reset").is_arrow_combo },
 			Logger = { debug = function() end }, tostring = tostring, error = error, engine = {}, LOG = "test" }
 		local chunk = assert(loadstring("return " .. text:sub(start, finish)))
 		setfenv(chunk, env)
