@@ -139,11 +139,10 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.keys.wrap_text_if_selected` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keys.cmd_star` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 
-## macos — 55 paths not declared
+## macos — 54 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `hotstrings.magic_key_source_char` (setting; declared: windows; reason: `platform_reason.magic_key_detection_is_windows`)
-- [ ] `hotstrings.tap_hold_resets_word` (setting; declared: windows, linux; reason: `platform_reason.tap_hold_word_reset_not_on_macos`)
 - [ ] `llm.onboarding_seen` (setting; declared: windows; reason: `platform_reason.ai_menu_bookkeeping_is_windows`)
 - [ ] `shortcuts.wrap_text_if_selected` (feature; declared: windows, linux; reason: `platform_reason.wrap_selection_is_a_shortcut_key_on_macos`)
 - [ ] `shortcuts.search.search_engine` (setting; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -668,7 +667,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `accented_letters_group.e_acute` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C.
 - [ ] `accented_letters_group.a_grave` (hide): Not on macOS: a macOS layout file carries its own Command and Control layer, so Cmd+é already acts as the shortcut that file gives it. On Windows and Linux this remaps Ctrl, Alt and Super chords on a key that types an accented letter directly to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C.
 - [ ] `hotstrings_menu.hotstrings_reload` (hide): Linux only: its daemon watches the hotstring files, so they can change while it runs, and this row reloads the catalogue from disk. Windows and macOS load the catalogue at launch and reload it with the Reload row.
-- [ ] `hotstrings_params_group.tap_hold_resets_word` (grey): Not on macOS: Karabiner-Elements runs the tap-holds there, and what they send arrives like keys typed on the keyboard, so a shortcut sent by a tap-hold follows the shortcut option.
 - [ ] `gestures_menu.auto_configure` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.
 - [ ] `gestures_menu.manual_tutorial` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.
 - [ ] `gestures_menu.gesture_slots_ahk` (hide): Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.

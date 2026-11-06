@@ -44,7 +44,7 @@ two disagree in either direction.
 | `hotstrings.click_resets_word`                                | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.arrow_resets_word`                                | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.shortcut_resets_word`                             | —               | `evdev`, `uinput`                      | —                    |
-| `hotstrings.tap_hold_resets_word`                             | n/a             | `evdev`, `uinput`                      | —                    |
+| `hotstrings.tap_hold_resets_word`                             | `karabiner`     | `evdev`, `uinput`                      | —                    |
 | `hotstrings.cascade_max_arrows`                               | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.expansion_delay`                                  | —               | `evdev`, `uinput`                      | —                    |
 | `hotstrings.preview_ai_enabled`                               | —               | `evdev`, `uinput`, `xdotool`           | —                    |

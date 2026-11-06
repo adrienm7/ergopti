@@ -109,6 +109,7 @@ M.DEFAULT_STATE = {
 	click_resets_word           = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_CLICK_RESETS_WORD),
 	arrow_resets_word           = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_ARROW_RESETS_WORD),
 	shortcut_resets_word        = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_SHORTCUT_RESETS_WORD),
+	tap_hold_resets_word        = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_TAP_HOLD_RESETS_WORD),
 	delays                      = {},     -- Per-group overrides; empty = use DELAYS_DEFAULT
 	trigger_char                = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR),
 	preview_star_enabled        = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED),
@@ -604,6 +605,53 @@ function M.set_shortcut_resets_word(enabled)
 	return true
 end
 
+--- Returns whether a tap-hold command, or a shortcut under a tap-hold or
+--- navigation-layer hold, starts a new word.
+--- @return boolean
+function M.is_tap_hold_resets_word_enabled()
+	return CoreState.tap_hold_resets_word == true
+end
+
+--- Sets whether a tap-hold command, or a shortcut under a tap-hold or
+--- navigation-layer hold, starts a new word.
+--- @param enabled boolean hotstrings.tap_hold_resets_word.
+--- @return boolean committed False for a non-boolean value.
+function M.set_tap_hold_resets_word(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Tap-hold reset refused: '%s' is not a boolean.", tostring(enabled))
+		return false
+	end
+	CoreState.tap_hold_resets_word = enabled
+	Logger.debug(LOG, "Tap-hold command starts a new word: %s.", tostring(enabled))
+	return true
+end
+
+--- Applies one Karabiner marker to the word state. A tap-hold command applies
+--- its option at once (its keys may be no shortcut at all) and lends it to the
+--- shortcut that carries it; the navigation layer lends it to every shortcut
+--- struck while it is on. A Ctrl, Cmd or Option hold carries no marker (it
+--- would lift the hand's modifiers), so its shortcuts follow shortcut_resets_word.
+--- Runs inside the eventtap that claimed the marker: in-memory work only.
+--- @param signal string A control sentinel signal.
+function M.observe_tap_hold_signal(signal)
+	if signal == ControlSentinels.TAP_HOLD_COMMAND then
+		if CoreState.tap_hold_resets_word == true then
+			CoreState.buffer = ""
+			CoreState.start_is_word_boundary = true
+			CoreState.start_is_line_start = false
+		end
+		CoreState.tap_hold_command_pending = true
+	elseif signal == ControlSentinels.NAV_LAYER_ENTERED then
+		CoreState.nav_layer_active = true
+	elseif signal == ControlSentinels.NAV_LAYER_EXITED then
+		CoreState.nav_layer_active = false
+	end
+end
+
+-- In-memory flags only, so the keyed slot is taken at load: a reload replaces
+-- it, and the sentinels it reads are claimed whether or not the tap runs.
+ControlSentinels.set_listener("keymap.tap_hold_word_reset", M.observe_tap_hold_signal)
+
 -- The word-reset policy is neutral in state.lua; this module owns it and seeds
 -- it from the features manifest through its own setters, which refuse an
 -- invalid default with an ERROR and keep the neutral policy.
@@ -612,6 +660,7 @@ M.set_cascade_max_arrows(M.DEFAULT_STATE.cascade_max_arrows)
 M.set_click_resets_word(M.DEFAULT_STATE.click_resets_word)
 M.set_arrow_resets_word(M.DEFAULT_STATE.arrow_resets_word)
 M.set_shortcut_resets_word(M.DEFAULT_STATE.shortcut_resets_word)
+M.set_tap_hold_resets_word(M.DEFAULT_STATE.tap_hold_resets_word)
 
 --- Returns the side of the last shift key pressed.
 --- @return string|nil "left", "right", or nil if Shift is not held.
@@ -1852,12 +1901,19 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- Cmd+A outside a terminal and Cmd+L in a browser select the whole text of
 	-- the field: once a Backspace or a character replaces it the field is empty,
 	-- and a further Backspace deletes nothing (start_is_line_start).
+	-- A chord a tap-hold sent, or struck while the navigation layer is on,
+	-- follows hotstrings.tap_hold_resets_word instead, as on Windows and
+	-- Linux; Karabiner's markers say which (observe_tap_hold_signal).
+	local from_tap_hold = CoreState.tap_hold_command_pending == true or CoreState.nav_layer_active == true
+	CoreState.tap_hold_command_pending = false
 	if (flags.cmd or flags.ctrl) and not ARROW_KEYCODES[keyCode] then
+		local resets = CoreState.shortcut_resets_word == true
+		if from_tap_hold then resets = CoreState.tap_hold_resets_word == true end
 		if keyCode == Keycodes.BACKSPACE or UNOBSERVED_JUMP_KEYCODES[keyCode] then
 			CoreState.buffer = ""
 			CoreState.start_is_word_boundary = false
 			CoreState.start_is_line_start = false
-		elseif CoreState.shortcut_resets_word == true then
+		elseif resets then
 			CoreState.buffer = ""
 			CoreState.start_is_word_boundary = true
 			CoreState.start_is_line_start = flags.cmd == true and not flags.ctrl and not flags.alt

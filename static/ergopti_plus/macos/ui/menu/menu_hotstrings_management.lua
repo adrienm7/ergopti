@@ -726,8 +726,8 @@ function M.build_management(ctx)
 	params_ctx.commands[require("config_keys").COMMAND.CLICK_RESETS_WORD] = function()
 		return commit_word_reset(require("config_keys").LEAF.CLICK_RESETS_WORD, "set_click_resets_word", not click_enabled)
 	end
-	-- The arrow and shortcut checkboxes (tap_hold_resets_word is greyed by the
-	-- manifest on macOS: Karabiner owns tap-hold, so it has no command here).
+	-- The arrow, shortcut and tap-hold checkboxes. Karabiner runs the tap-holds
+	-- and marks their output for the keymap (observe_tap_hold_signal).
 	local arrow_enabled = ctx.keymap and type(ctx.keymap.is_arrow_resets_word_enabled) == "function"
 		and ctx.keymap.is_arrow_resets_word_enabled()
 	params_ctx.commands[require("config_keys").COMMAND.ARROW_RESETS_WORD] = function()
@@ -738,6 +738,11 @@ function M.build_management(ctx)
 	params_ctx.commands[require("config_keys").COMMAND.SHORTCUT_RESETS_WORD] = function()
 		return commit_word_reset(require("config_keys").LEAF.SHORTCUT_RESETS_WORD, "set_shortcut_resets_word", not shortcut_enabled)
 	end
+	local tap_hold_enabled = ctx.keymap and type(ctx.keymap.is_tap_hold_resets_word_enabled) == "function"
+		and ctx.keymap.is_tap_hold_resets_word_enabled()
+	params_ctx.commands[require("config_keys").COMMAND.TAP_HOLD_RESETS_WORD] = function()
+		return commit_word_reset(require("config_keys").LEAF.TAP_HOLD_RESETS_WORD, "set_tap_hold_resets_word", not tap_hold_enabled)
+	end
 	params_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do params_ctx.state_getters[key] = value end
 	params_ctx.state_getters["hotstrings_repeat_enabled"] = function() return repeat_enabled end
@@ -746,6 +751,7 @@ function M.build_management(ctx)
 	params_ctx.state_getters["hotstrings_click_resets_word"] = function() return click_enabled == true end
 	params_ctx.state_getters["hotstrings_arrow_resets_word"] = function() return arrow_enabled == true end
 	params_ctx.state_getters["hotstrings_shortcut_resets_word"] = function() return shortcut_enabled == true end
+	params_ctx.state_getters["hotstrings_tap_hold_resets_word"] = function() return tap_hold_enabled == true end
 
 	-- The manifest's rows for this group, dispatched by id, and then the two rows
 	-- it does not describe.

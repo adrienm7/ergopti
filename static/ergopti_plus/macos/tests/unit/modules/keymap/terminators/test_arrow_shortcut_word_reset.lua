@@ -599,4 +599,67 @@ helpers.describe("immediate Backspace restores the trigger (bs-undo)", function(
 	end)
 end)
 
+-- The tagged F20 Karabiner sends before a tap-hold's own command, and the
+-- untagged F20/F19 it sends when the navigation layer turns on and off
+-- (_shared/lua/keymap/control_signals.lua, modules/keymap/control_sentinels.lua).
+local KEYCODE_F20 = 90
+local KEYCODE_F19 = 80
+local TAP_HOLD_TAG = { cmd = true, ctrl = true, alt = true, shift = true }
+local CMD_V = { cmd = true, ctrl = false, alt = false, shift = false }
+
+local TAP_HOLD_EVENTS = {
+	{ name = "a tap-hold's own Cmd+V", fn = function(f)
+		f.press("", TAP_HOLD_TAG, KEYCODE_F20, KARABINER_PID)
+		f.press("v", CMD_V, KEYCODE_V, KARABINER_PID)
+	end },
+	{ name = "Cmd+V under the navigation layer", fn = function(f)
+		f.press("", NO_FLAGS, KEYCODE_F20, KARABINER_PID)
+		f.press("v", CMD_V, KEYCODE_V, KARABINER_PID)
+		f.press("", NO_FLAGS, KEYCODE_F19, KARABINER_PID)
+	end },
+}
+
+helpers.describe("hotstrings.tap_hold_resets_word (macos-tap-hold-word-reset)", function()
+	helpers.it("ships the option on, from the manifest", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.is_tap_hold_resets_word_enabled(), true)
+			helpers.assert_eq(f.keymap.set_tap_hold_resets_word("yes"), false)
+		end)
+	end)
+
+	for _, event in ipairs(TAP_HOLD_EVENTS) do
+		helpers.it(event.name .. " starts a new word when on, with shortcuts off: aR", function()
+			with_keymap(function(f)
+				helpers.assert_eq(f.keymap.set_shortcut_resets_word(false), true)
+				helpers.assert_eq(a_event_then(f, event.fn), "R")
+			end)
+		end)
+
+		helpers.it(event.name .. " continues the word when off, with shortcuts on: ar", function()
+			with_keymap(function(f)
+				helpers.assert_eq(f.keymap.set_tap_hold_resets_word(false), true)
+				helpers.assert_eq(a_event_then(f, event.fn), "")
+			end)
+		end)
+	end
+
+	helpers.it("the user's own Cmd+V after a tap-hold command follows the shortcut option", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.set_shortcut_resets_word(false), true)
+			helpers.assert_eq(a_event_then(f, function()
+				f.press("", TAP_HOLD_TAG, KEYCODE_F20, KARABINER_PID)
+				f.press("v", CMD_V, KEYCODE_V, KARABINER_PID)
+				f.press("b")
+				f.press("v", CMD_V, KEYCODE_V)
+			end), "", "the marker lends its option to one chord only")
+		end)
+	end)
+
+	helpers.it("the marker never reaches the application", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.press("", TAP_HOLD_TAG, KEYCODE_F20, KARABINER_PID), true)
+		end)
+	end)
+end)
+
 return true

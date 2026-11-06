@@ -82,7 +82,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "hotstrings.shortcut_resets_word",
-					"sha256": "ed280563dbe333fca89abfc4baeb6b8525e97be212bc4e7e91340797f1864aed"
+					"sha256": "df9dc50253b5bc91ed2b342e10de539cbf862ad84634a66ed042df5d3d9e69a4"
 				}
 			],
 			"linux": [
@@ -132,7 +132,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "hotstrings.shortcut_resets_word",
-					"sha256": "ed280563dbe333fca89abfc4baeb6b8525e97be212bc4e7e91340797f1864aed"
+					"sha256": "df9dc50253b5bc91ed2b342e10de539cbf862ad84634a66ed042df5d3d9e69a4"
 				}
 			],
 			"linux": [
@@ -184,7 +184,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "ed280563dbe333fca89abfc4baeb6b8525e97be212bc4e7e91340797f1864aed"
+					"sha256": "df9dc50253b5bc91ed2b342e10de539cbf862ad84634a66ed042df5d3d9e69a4"
 				}
 			],
 			"linux": [
@@ -239,7 +239,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "ed280563dbe333fca89abfc4baeb6b8525e97be212bc4e7e91340797f1864aed"
+					"sha256": "df9dc50253b5bc91ed2b342e10de539cbf862ad84634a66ed042df5d3d9e69a4"
 				}
 			],
 			"linux": [
@@ -286,7 +286,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "ed280563dbe333fca89abfc4baeb6b8525e97be212bc4e7e91340797f1864aed"
+					"sha256": "df9dc50253b5bc91ed2b342e10de539cbf862ad84634a66ed042df5d3d9e69a4"
 				}
 			],
 			"linux": [
@@ -338,7 +338,7 @@
 				{
 					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
 					"symbol": "local chars = e:getCharacters(false)",
-					"sha256": "ed280563dbe333fca89abfc4baeb6b8525e97be212bc4e7e91340797f1864aed"
+					"sha256": "df9dc50253b5bc91ed2b342e10de539cbf862ad84634a66ed042df5d3d9e69a4"
 				}
 			],
 			"linux": [
