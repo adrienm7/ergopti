@@ -68,11 +68,18 @@ end
 
 --- The field check.
 --- ports.tap_hold_threshold_facts() -> { enabled, config (decoded table or nil),
---- reason (why config is nil), expected (as M.compare), tag }.
+--- reason (why config is nil: owned_runtime_not_ready, not_deployed, unreadable
+--- or not_json), expected (as M.compare), tag }.
 function M.tap_hold_thresholds(ports, report, finish)
 	local facts = ports.tap_hold_threshold_facts()
 	if facts.enabled ~= true then
 		report.step("thresholds_config", SKIP, "integration_off")
+		return finish()
+	end
+	-- No deployed file while the owned runtime waits for its install or start:
+	-- the owned_* steps fail for that; nothing here can be judged.
+	if facts.reason == "owned_runtime_not_ready" then
+		report.step("thresholds_config", SKIP, facts.reason)
 		return finish()
 	end
 	if type(facts.config) ~= "table" then
