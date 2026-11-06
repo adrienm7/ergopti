@@ -587,3 +587,12 @@ complex-key widening included, on every OS. Linux gates it in Main's
 character callback (`RepeatKey.WINDOW_CATEGORY`), Windows through the
 dispatcher's time gate (`HSE_RepeatWindowSeconds`). An expired registered
 candidate must not mask the repeat (macOS and Linux); Windows still lets it.
+
+## One-shot Shift is a generic action on every OS (6 November 2026)
+
+Aligned on Windows (`one_shot_shift`) and macOS (`sticky_shift`): the one-shot
+Shift is a catalogue action any origin can run (gesture, keyboard slot, tap),
+with the shared results, magic-key and title rules; system StickyKeys is not
+its equivalent. Key-combination chords keep refusing it on every OS. Linux
+still offers it on tap-holds and tap keys only (`platform_reason.action_sticky_keys_are_the_systems`)
+until a non-keyboard origin can arm the engine.
