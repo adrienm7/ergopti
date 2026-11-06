@@ -55,6 +55,7 @@ class _SysActionsFake {
 		this.Pointer := { X: 0, Y: 0 }
 		this.MonitorList := []
 		this.ClipboardWritable := true
+		this.RefusedCloses := Map()
 	}
 	_Log(Name, Args*) {
 		Entry := [Name]
@@ -64,7 +65,7 @@ class _SysActionsFake {
 	}
 	Launch(Target, WorkingDir := "", Options := "") => (this._Log("Launch", Target, WorkingDir, Options), 1)
 	PostBroadcast(Msg, WParam, LParam) => this._Log("PostBroadcast", Msg, WParam, LParam)
-	PostClose(Hwnd) => this._Log("PostClose", Hwnd)
+	PostClose(Hwnd) => (this._Log("PostClose", Hwnd), !this.RefusedCloses.Has(Hwnd))
 	BroadcastSettingChange(Area) => this._Log("BroadcastSettingChange", Area)
 	ReadDword(Key, Name) => this.Registry.Get(Name, "")
 	WriteDword(Key, Name, Value) => (this._Log("WriteDword", Key, Name, Value), this.Registry[Name] := Value)
@@ -343,6 +344,59 @@ _SysActions_QuitSharedHosts() {
 	AssertEqual(1500, _SysActions_CallsNamed(Fake, "CloseProcess")[1][2])
 }
 Test("system actions: quit and force quit act on the active app, never the shell or the frame host", _SysActions_QuitSharedHosts)
+
+; SystemControl.PostClose returns the Win32 receipt instead of throwing, so a
+; WM_CLOSE refused for every window (an elevated application, a window gone
+; meanwhile) was summed into a zero count and logged as INFO: the errors-only
+; diagnostic channel never saw the failed quit (WDS-001).
+_SysActions_QuitRefusedCloses(Case) {
+	Fake := _SysActionsFake()
+	Fake.Active := { Hwnd: 0x100, Pid: 812, Class: "Notepad" }
+	switch Case {
+	case "all-refused":
+		Fake.Windows := [0x100, 0x200]
+		Fake.RefusedCloses := Map(0x100, true, 0x200, true)
+		Expected := "[ERROR]"
+	case "partial":
+		Fake.Windows := [0x100, 0x200]
+		Fake.RefusedCloses := Map(0x200, true)
+		Expected := "[WARNING]"
+	case "no-window":
+		Fake.Windows := []
+		Expected := "[WARNING]"
+	case "all-accepted":
+		Fake.Windows := [0x100, 0x200]
+		Expected := ""
+	default:
+		throw ValueError("Unknown quit receipt case: " . Case)
+	}
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try GestureSysQuitFrontmostApp(Fake)
+	finally LoggerClearTestSink()
+	AssertEqual(Fake.Windows.Length, _SysActions_CallsNamed(Fake, "PostClose").Length,
+		"every window of the process is still asked, whatever an earlier receipt said")
+	Reported := false
+	for Line in Lines {
+		if !(InStr(Line, "quit_frontmost_app") || InStr(Line, "process 812"))
+			continue
+		if Expected == "" {
+			; INFO repeats may be collapsed, so the control asserts the absence of
+			; a failure diagnostic instead of the presence of the progress line.
+			AssertFalse(InStr(Line, "[ERROR]") || InStr(Line, "[WARNING]"),
+				"accepted closes raise no failure diagnostic: " . Line)
+			continue
+		}
+		if InStr(Line, Expected)
+			Reported := true
+		AssertFalse(InStr(Line, "close its"), "a refused close is not reported as an ordinary request")
+	}
+	if Expected != ""
+		AssertTrue(Reported, "the quit outcome is logged at " . Expected . " for " . Case)
+}
+for _SysActionsQuitCase in ["all-refused", "partial", "no-window", "all-accepted"]
+	Test("system actions: quit_frontmost_app reports refused close receipts: " . _SysActionsQuitCase . " (wds-001)",
+		_SysActions_QuitRefusedCloses.Bind(_SysActionsQuitCase))
 
 _SysActions_EmptyTrashAndEject() {
 	Fake := _SysActionsFake()
