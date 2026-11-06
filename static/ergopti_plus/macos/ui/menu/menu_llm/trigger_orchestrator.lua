@@ -44,7 +44,7 @@ local function valid_modifiers(mods)
 	for index, value in pairs(mods) do
 		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length
 			or type(value) ~= "string" then return false end
-		local modifier = value:match("^%s*(.-)%s*$"):lower()
+		local modifier = require("infra.text_utils").trim(value):lower()
 		if not VALID_MODIFIERS[modifier] then return false end
 		count = count + 1
 	end

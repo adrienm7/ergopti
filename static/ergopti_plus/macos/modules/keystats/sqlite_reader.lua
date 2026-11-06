@@ -672,10 +672,7 @@ local function _ngram_days(db, start_date, end_date)
 		end)
 		if accepted ~= true then complete = false end
 	end
-	local days = {}
-	for day in pairs(found) do days[#days + 1] = day end
-	table.sort(days)
-	return days, complete
+	return require("table_util").sorted_keys(found), complete
 end
 
 --- Adds one date window of every n-gram table into `out`. The row handlers are
