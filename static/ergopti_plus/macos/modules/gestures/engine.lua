@@ -443,6 +443,18 @@ local function dispatchAction(method_name, action, ...)
 	return "invalid", tostring(verdict)
 end
 
+--- Whether macOS runs its own gesture on this slot while it is on in the
+--- Trackpad settings: firing Ergopti's too would be a double action. Swipes and
+--- taps both ask it before any dispatch.
+--- @param slot string|nil Gesture slot provenance.
+--- @param action string Action that would fire.
+--- @return boolean held
+local function system_holds(slot, action)
+	if not slot or type(_state.system_held) ~= "function" or not _state.system_held(slot) then return false end
+	Logger.debug(LOG, "Gesture %s -> %s held back: macOS uses this gesture.", tostring(slot), tostring(action))
+	return true
+end
+
 --- Executes an action by trying the single registry before the axis fallback.
 --- @param action string The action ID.
 --- @param sign number The direction sign (1 for next, -1 for prev).
@@ -450,12 +462,7 @@ end
 --- @return boolean dispatched True only when one exact dispatcher accepted.
 local function triggerAction(action, sign, slot)
 	if not action or action == "none" then return false end
-	-- macOS runs its own gesture on this slot while it is on in the Trackpad
-	-- settings: firing Ergopti's too would be a double action.
-	if slot and type(_state.system_held) == "function" and _state.system_held(slot) then
-		Logger.debug(LOG, "Gesture %s -> %s held back: macOS uses this gesture.", tostring(slot), action)
-		return false
-	end
+	if system_holds(slot, action) then return false end
 	-- An AI action is unarmed while the AI is off, as for the keys.
 	if require("modules.shortcuts.ai_actions").blocked(action) then
 		Logger.debug(LOG, "Gesture %s -> %s held back: the AI is off.", tostring(slot), action)
@@ -713,7 +720,9 @@ local function commitGesture(now)
 			elseif mf >= 5 then slot = "tap_5" end
 
 			local tap_action = slot and _state.ga[slot] or nil
-			if tap_action and tap_action ~= "none" and require("modules.shortcuts.ai_actions").blocked(tap_action) then
+			if tap_action and tap_action ~= "none" and system_holds(slot, tap_action) then
+				Logger.debug(LOG, "commitGesture: tap %s not fired, macOS owns it.", tostring(slot))
+			elseif tap_action and tap_action ~= "none" and require("modules.shortcuts.ai_actions").blocked(tap_action) then
 				Logger.debug(LOG, "commitGesture: tap %s -> %s held back: the AI is off.", tostring(slot), tap_action)
 			elseif tap_action and tap_action ~= "none" then
 				local status, detail = dispatchAction("execute_single", tap_action, slot)
