@@ -170,6 +170,7 @@ const complete = {
 	},
 	virtual_hid_device: {
 		version: '8.5.0',
+		extension_version: '1.8.0',
 		team_identifier: 't',
 		file_name: 'f',
 		source_url: 'u',

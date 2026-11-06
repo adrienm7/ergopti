@@ -379,7 +379,7 @@ local function owned_readiness(callback)
 		local OwnerPorts = require("adapters.runtime_owner_ports")
 		local readiness = {
 			unpinned = OwnerPorts.unpinned_count(),
-			virtual_hid_version = OwnerPorts.virtual_hid_version(),
+			virtual_hid_version = OwnerPorts.virtual_hid_extension_version(),
 			artifact = OwnerPorts.artifact_receipt_state(),
 			source = source_available == true,
 			helper_present = facts.helper_present,
@@ -435,7 +435,7 @@ local function owned_activation()
 		end,
 		driver_active = function(callback)
 			exec("/usr/bin/systemextensionsctl", { "list" }, 5, function(code, output)
-				local version = require("adapters.runtime_owner_ports").virtual_hid_version()
+				local version = require("adapters.runtime_owner_ports").virtual_hid_extension_version()
 				if code ~= 0 or type(version) ~= "string" then return callback(nil) end
 				local Vhid = require("platform.remap.runtime_vhid")
 				callback(Vhid.assess(Vhid.parse(output), version).ok == true)

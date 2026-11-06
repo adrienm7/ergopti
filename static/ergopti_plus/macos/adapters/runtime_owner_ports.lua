@@ -72,12 +72,21 @@ function M.unpinned_count()
 	return #require("platform.remap.runtime_manifest").unpinned(manifest)
 end
 
---- The VirtualHIDDevice version the shipped manifest pins.
+--- The VirtualHIDDevice package version the shipped manifest pins.
 --- @return string|nil version Nil when unreadable or not pinned.
 function M.virtual_hid_version()
 	local manifest = load_manifest()
 	if not manifest then return nil end
 	return require("platform.remap.runtime_manifest").virtual_hid_version(manifest)
+end
+
+--- The driver extension version the pinned package installs, the one the
+--- system extension listing reports and runtime_vhid.assess compares.
+--- @return string|nil version Nil when unreadable or not pinned.
+function M.virtual_hid_extension_version()
+	local manifest = load_manifest()
+	if not manifest then return nil end
+	return require("platform.remap.runtime_manifest").virtual_hid_extension_version(manifest)
 end
 
 --- Whether the pinned artifact was downloaded and verified: its receipt names
@@ -206,7 +215,7 @@ local function approval()
 		cancel = function(handle) return require("adapters.timer_scheduler").cancel(handle) end,
 		open_settings = function(url) return hs.urlevent.openURL(url) end,
 		reload = function() hs.reload() end,
-		version = M.virtual_hid_version,
+		version = M.virtual_hid_extension_version,
 	})
 	return approval_watch
 end

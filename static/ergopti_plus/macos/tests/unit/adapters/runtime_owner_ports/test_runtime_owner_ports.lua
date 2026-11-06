@@ -135,11 +135,13 @@ helpers.describe("owned runtime ports", function()
 		assert(ok, failure)
 	end)
 
-	helpers.it("hands the owner the shipped pin: the driver version and the capture declaration", function()
+	-- The owner judges the system extension listing, which reports the driver
+	-- extension's version (1.8.0), never pqrs' package version (8.5.0).
+	helpers.it("hands the owner the shipped pin: the driver extension version and the capture declaration", function()
 		local ports = load_ports(function() return 0, "" end)
 		local pinned, reason = ports.artifact.pinned()
 		helpers.assert_nil(reason)
-		helpers.assert_eq(pinned.virtual_hid_version, "8.5.0")
+		helpers.assert_eq(pinned.virtual_hid_version, "1.8.0")
 		helpers.assert_contains(pinned.capture.requirement, 'identifier "com.ergoptiplus.app"')
 		helpers.assert_true(pinned.capture.batch_limit >= 1)
 	end)
@@ -148,6 +150,7 @@ helpers.describe("owned runtime ports", function()
 		load_ports(function() return 0, "" end)
 		local Ports = package.loaded["adapters.runtime_owner_ports"]
 		helpers.assert_eq(Ports.virtual_hid_version(), "8.5.0")
+		helpers.assert_eq(Ports.virtual_hid_extension_version(), "1.8.0")
 		helpers.assert_eq(Ports.unpinned_count(), 0)
 	end)
 end)
