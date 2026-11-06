@@ -399,7 +399,9 @@ helpers.describe("Conflicts — the macOS settings read is started", function()
 		package.loaded["adapters.shell_runner"] = {
 			spawn = function(_, _, callback)
 				local settled = false
+				-- The real ShellRunner handle contract: start, isSettled and terminate.
 				local handle = { isSettled = function() return settled end }
+				handle.terminate = function() settled = true; return true end
 				handle.start = function()
 					started = started + 1
 					pending[#pending + 1] = function()
