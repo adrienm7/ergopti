@@ -545,7 +545,7 @@ _LLM_Menu_ProfileProjectionValueMatches(Path, Physical, Live, Document, MenuStat
 		LiveModifiers := _LLM_Menu_ModifiersArrayToString(Live)
 		return PhysicalModifiers is String && LiveModifiers is String && PhysicalModifiers == LiveModifiers
 	}
-	if Path == "llm.app_profile_overrides" {
+	if Path == ConfigKey.LLM_APP_PROFILE_OVERRIDES {
 		; Compare the complete JSON, retaining unknown fields which the runtime
 		; app-map decoder intentionally cannot carry into its reduced Map.
 		PhysicalRows := _LLM_Menu_ProfileOverrideEnvelope(Physical)
