@@ -387,6 +387,26 @@ helpers.describe("exclusive file publication", function()
 		helpers.assert_eq(written, true)
 		helpers.assert_eq(bytes, "owned bytes")
 	end)
+	helpers.it("keeps the FFI descriptor fallback after the uinput backend declares its statx (ffi-statx-alias)", function()
+		-- ffi.C is shared by the whole process. The uinput kernel-node ports once
+		-- declared a typed global statx, which turned this writer's void*
+		-- declaration into a no-op and made every later metadata call raise.
+		if not pcall(require, "ffi") then return end
+		local Uinput, uv = helpers.load_module("adapters.uinput_writer"), package.loaded.luv
+		helpers.assert_true(Uinput.use_ffi_backend(), "the production uinput backend binds without a device")
+		Uinput._reset_backend()
+		local path = os.tmpname(); os.remove(path)
+		package.loaded.luv = {}
+		local ok, written = pcall(fs.write_new, path, "owned bytes")
+		package.loaded.luv = uv
+		local file = io.open(path, "rb")
+		local bytes = file and file:read("*a") or nil
+		if file then file:close() end
+		os.remove(path)
+		helpers.assert_true(ok)
+		helpers.assert_eq(written, true, "the writer's own statx record must still reach the kernel")
+		helpers.assert_eq(bytes, "owned bytes")
+	end)
 	helpers.it("refuses a successor with identical bytes after exclusive creation", function()
 		local native = require("infra.regular_file_writer")
 		local open = native.open
