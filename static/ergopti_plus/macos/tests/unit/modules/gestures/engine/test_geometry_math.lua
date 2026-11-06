@@ -28,6 +28,20 @@ helpers.describe("gesture geometry", function()
 		helpers.assert_eq(least, 0)
 	end)
 
+	-- A resting thumb turned a two-finger swipe into a three-finger one; each
+	-- accepted count logs every contact's position and size to calibrate the
+	-- refusal of a far or oversized contact (field report 2026-11-05).
+	helpers.it("describes each contact's position and major axis for the join log", function()
+		local thumb = touch(62.4, 10)
+		thumb.majorAxis = 14.256
+		local pair = { touch(30, 40), thumb, touch(10.04, 41) }
+		pair[1].majorAxis = 8
+		helpers.assert_eq(Geometry.describeContacts(pair),
+			"(10.0, 41.0 major ?) (30.0, 40.0 major 8.00) (62.4, 10.0 major 14.26)")
+		helpers.assert_eq(Geometry.describeContacts({}), "none")
+		helpers.assert_eq(Geometry.describeContacts(nil), "none")
+	end)
+
 	helpers.it("refuses unmatched contacts and leaves an unmoved centroid undecided", function()
 		local start = { { x = 1, y = 1 }, { x = 2, y = 2 } }
 		local accepted, share = Geometry.movedTogether(start, { start[1] }, "vert")
