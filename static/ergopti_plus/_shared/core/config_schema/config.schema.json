@@ -58,7 +58,11 @@
 			"type": "object",
 			"additionalProperties": false,
 			"properties": {
-				"schema_version": { "type": "integer", "minimum": 1 }
+				"schema_version": { "type": "integer", "minimum": 1 },
+				"linux_legacy_storage_imported": {
+					"description": "Linux only: true once the hotstring choices of storage.json were committed to this file. The legacy keys are removed afterwards; when that removal fails, this mark keeps them from being imported again over a later choice.",
+					"type": "boolean"
+				}
 			}
 		},
 
