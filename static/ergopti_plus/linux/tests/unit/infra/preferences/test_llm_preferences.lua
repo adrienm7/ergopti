@@ -100,6 +100,81 @@ helpers.describe("canonical Linux AI settings", function()
 		end)
 	end)
 
+	helpers.it("refuses a minimum that exceeds the current saved maximum", function()
+		with_config('[llm.generation]\nmin_words = 1\nmax_words = 10\n', function(path)
+			local settings = require("modules.llm.settings")
+			helpers.assert_eq(settings.get("max_words"), 10)
+			local successor = '[llm.generation]\nmin_words = 1\nmax_words = 3\n'
+			local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
+			helpers.assert_eq(settings.set("min_words", 5), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), successor)
+		end)
+	end)
+
+	helpers.it("refuses a bound read from a different image than the retained source", function()
+		local first = '[llm.generation]\nmax_words = 3\n'
+		local interim = '[llm.generation]\nmax_words = 10\n'
+		with_config(first, function(path)
+			local preferences = require("infra.llm_preferences")
+			local _, expected = preferences.get_many({ "llm.generation.max_words" })
+			local file = assert(io.open(path, "wb")); assert(file:write(interim)); assert(file:close())
+			local original = preferences.get_many
+			preferences.get_many = function(...)
+				local values, source, revision = original(...)
+				local restore = assert(io.open(path, "wb")); assert(restore:write(first)); assert(restore:close())
+				return values, source, revision
+			end
+			local settings = require("modules.llm.settings")
+			local ok, accepted = pcall(settings.set, "min_words", 5, expected, function() return true end)
+			preferences.get_many = original
+			helpers.assert_true(ok)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(Sandbox.read_bytes(path), first)
+		end)
+	end)
+
+	helpers.it("accepts generation bounds against the retained matching image", function()
+		with_config('[llm.generation]\nmax_words = 3\n', function(path)
+			local preferences = require("infra.llm_preferences")
+			local _, expected = preferences.get_many({ "llm.generation.max_words" })
+			local settings = require("modules.llm.settings")
+			helpers.assert_true(settings.set("min_words", 2, expected, function() return true end))
+			local document = Codec.decode(Sandbox.read_bytes(path))
+			helpers.assert_eq(document.llm.generation.max_words, 3)
+			helpers.assert_eq(document.llm.generation.min_words, 2)
+		end)
+	end)
+
+	helpers.it("refuses generation bounds when the source changes before publication", function()
+		with_config('[llm.generation]\nmax_words = 10\n', function(path)
+			local settings = require("modules.llm.settings")
+			local writer = require("toml_codec.writer")
+			local original = writer.batch_write
+			local successor = '[llm.generation]\nmax_words = 3\n'
+			writer.batch_write = function(...)
+				local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
+				return original(...)
+			end
+			local ok, result = pcall(settings.set, "min_words", 5)
+			writer.batch_write = original
+			helpers.assert_true(ok)
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(Sandbox.read_bytes(path), successor)
+		end)
+	end)
+
+	helpers.it("refreshes neighboring generation settings after an external edit", function()
+		with_config('[llm.generation]\ntemperature = 0.2\n', function(path)
+			local settings = require("modules.llm.settings")
+			helpers.assert_eq(settings.get("temperature"), 0.2)
+			local file = assert(io.open(path, "wb"))
+			assert(file:write('[llm.generation]\ntemperature = 0.9\n')); assert(file:close())
+			helpers.assert_true(settings.set("context_length", 600))
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).llm.generation.temperature, 0.9)
+			helpers.assert_eq(settings.get("temperature"), 0.9)
+		end)
+	end)
+
 	helpers.it("writes sparse settings and reloads from disk while preserving unknown neighbors", function()
 		with_config('[llm.generation]\nfuture = "keep"\n[other]\nvalue = 42\n', function(path)
 			local settings = require("modules.llm.settings")
