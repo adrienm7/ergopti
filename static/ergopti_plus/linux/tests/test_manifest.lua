@@ -78,6 +78,7 @@ return {
 	"tests.unit.ui.update_check.test_update_check_async_admission",
 	"tests.unit.ui.update_check.test_changelog_accepted_async",
 	"tests.unit.modules.updater.install.test_install_owned_pre_reader_refusal",
+	"tests.unit.modules.updater.install.test_install_owned_smoke_deadline",
 	"tests.unit.infra.native_artifacts.test_native_artifact_registry",
 	"tests.unit.infra.native_artifacts.test_native_artifact_cleanup_retry",
 	"tests.unit.infra.native_artifacts.test_native_install_admission",
