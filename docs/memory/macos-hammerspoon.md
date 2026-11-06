@@ -1962,6 +1962,28 @@ Developer ID, team G43BCU2T37; maintainer's Mac 2026-10-27, ledger L43).
 trusted bundle whose only strict failure is that detritus as
 `info strict_only:finder_detritus`, not a failure. Action: treat any other
 strict cause as a real signature failure; do not widen the benign list.
+The owned runtime's administrator shell copies the downloaded installer helper
+with `ditto --noqtn --noacl --noextattr --norsrc` before its strict
+`codesign --verify`: the plain copy kept such detritus and the install failed
+with a bare "administrator shell status 1" in two field runs (2026-11-05,
+2026-11-06). Each step of that shell names itself on stderr
+(`ergopti-step=<step> status=<n>`), and the launcher logs the shell's stderr
+and relays the step in its answer line. Action: keep both when changing the
+staged program; a status without a step is a regression.
+
+### project-macos-vhid-extension-version-is-not-the-package-version
+
+pqrs' VirtualHIDDevice package and its driver extension carry different
+versions: package 8.5.0 installs extension `1.8.0`, and
+`systemextensionsctl list` reports only the extension's
+(`org.pqrs.Karabiner-DriverKit-VirtualHIDDevice (1.8.0/1.8.0)`). Judging the
+listing by the package version called the pinned driver itself
+`virtual_hid_incompatible` (field report 2026-11-06). The manifest pins both:
+`virtual_hid_device.version` names the download and the update dialog,
+`virtual_hid_device.extension_version` is the only value
+`runtime_vhid.assess` compares. Action: when bumping the driver pin, read the
+new extension version from the package's
+`.dext/Info.plist` (`CFBundleShortVersionString`) and pin it too.
 
 ### project-macos-privacy-grants-read-through-the-launcher
 
