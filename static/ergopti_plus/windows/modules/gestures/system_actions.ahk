@@ -53,8 +53,9 @@ global GESTURE_SYS_PERSONALIZE_KEY := "HKCU\Software\Microsoft\Windows\CurrentVe
 global GESTURE_SYS_COLOR_SETTING_AREA := "ImmersiveColorSet"
 
 ; Empties every drive's Recycle Bin in a hidden PowerShell, never in the
-; driver's own thread: a large bin takes seconds.
-global GESTURE_SYS_EMPTY_TRASH_COMMAND := 'powershell.exe -NoProfile -NonInteractive -Command "Clear-RecycleBin -Force -ErrorAction Stop"'
+; driver's own thread: a large bin takes seconds. -ErrorAction Stop turns a
+; refused deletion into a nonzero exit, which the completion observer reports.
+global GESTURE_SYS_EMPTY_TRASH_SCRIPT := "Clear-RecycleBin -Force -ErrorAction Stop"
 
 ; The shell namespace of "This PC", whose drive items carry the Eject verb.
 global GESTURE_SYS_CSIDL_DRIVES := 17
@@ -492,15 +493,34 @@ GestureSysForceQuitFrontmost(Sys := 0, ConfirmedTarget := 0) {
 }
 
 ; Empties the Recycle Bin of every drive. Confirmed by GestureInvokeAction.
+; The worker stays asynchronous, but its exit is observed: a launch PID alone
+; says nothing about whether the deletion later failed.
 GestureSysEmptyTrash(Sys := 0) {
-	global GESTURE_SYS_EMPTY_TRASH_COMMAND
+	global GESTURE_SYS_EMPTY_TRASH_SCRIPT
 	Sys := _GestureSys(Sys)
 	try {
-		Sys.Launch(GESTURE_SYS_EMPTY_TRASH_COMMAND, "", "Hide")
-		LoggerInfo("gestures", "Emptying the Recycle Bin.")
+		Started := Sys.SpawnObserved(ShellRunner_WinPsPath(),
+			ShellRunner_WinPsArgs("-Command", GESTURE_SYS_EMPTY_TRASH_SCRIPT), _GestureSysEmptyTrashDone)
 	} catch as Err {
 		LoggerError("gestures", "The Recycle Bin could not be emptied: {1}", Err.Message)
+		return false
 	}
+	if !Started {
+		LoggerError("gestures", "The Recycle Bin could not be emptied: its PowerShell worker did not start.")
+		return false
+	}
+	LoggerInfo("gestures", "Emptying the Recycle Bin.")
+	return true
+}
+
+; Terminal observer of the Recycle Bin worker; its output carries stderr too.
+_GestureSysEmptyTrashDone(ExitCode, Output := "", *) {
+	if (ExitCode == 0) {
+		LoggerInfo("gestures", "Recycle Bin emptied.")
+		return
+	}
+	LoggerError("gestures", "The Recycle Bin could not be emptied: its PowerShell worker exited with {1}: {2}",
+		ExitCode, Trim(Output, " `t`r`n"))
 }
 
 ; Ejects every removable drive through its Eject verb, as Explorer does.

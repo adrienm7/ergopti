@@ -17,7 +17,8 @@
 ; 1. Thin on purpose: each method is one native call with the arguments the
 ;    module chose, so the module's suite pins the exact message numbers,
 ;    command lines and paths through a recording double of this class.
-; 2. Launch() does not wait for the program. Defer() only lets the hotkey or
+; 2. Launch() and SpawnObserved() do not wait for the program; the second
+;    reports the worker's exit to a callback. Defer() only lets the hotkey or
 ;    gesture thread that dispatched an action return first: the deferred
 ;    action still runs on the script's one OS thread, so while a COM call or
 ;    BroadcastSettingChange waits (at most its timeout per window), remapped
@@ -118,6 +119,15 @@ class SystemControl {
 		Pid := 0
 		Run(Target, WorkingDir, Options, &Pid)
 		return Pid
+	}
+
+	; Starts a hidden worker without waiting for it, and observes its exit.
+	; @param {String} Executable Absolute path of the program.
+	; @param {Array} Args Its single-line arguments.
+	; @param {Func} OnDone Called once with (ExitCode, Output) when it exits.
+	; @returns {Boolean} Whether the worker started.
+	SpawnObserved(Executable, Args, OnDone) {
+		return ShellRunner_Spawn(Executable, Args, OnDone).start()
 	}
 
 	; Posts one message to every top-level window, without waiting.
