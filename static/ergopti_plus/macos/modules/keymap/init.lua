@@ -2823,6 +2823,23 @@ function M.tap_copy_statistics()
 end
 
 --- Starts the eventtap listeners and attaches them to the OS event queue.
+--- Starts the layout emulation owner (modules/keymap/layout_emulation.lua) once
+--- per Lua VM, before the keymap tap: the tap rewrites key-downs through it. The
+--- boot calls it; a layout that cannot be emulated is logged by its owner and
+--- leaves the system layout typing.
+--- @return boolean ok The emulation's first reload answer.
+function M.start_layout_emulation()
+	if _layout_emulation_started then error("the layout emulation is already started", 2) end
+	_layout_emulation_started = true
+	return LayoutEmulation.start({
+		is_paused = function() return CoreState.processing_paused == true end,
+		magic_code = function()
+			if MagicKeySource.keycode() == nil or not magic_key_replace_on() then return nil end
+			return MagicKeySource.get()
+		end,
+	})
+end
+
 function M.start()
 	_user_hotstring_lifecycle = {}
 	if _started and _watchdog_committed == true
@@ -2850,19 +2867,7 @@ function M.start()
 	if not _one_shot_shift then
 		_one_shot_shift = require("adapters.one_shot_shift").new({ magic = M.get_trigger_char })
 	end
-	if not _layout_emulation_started then
-		_layout_emulation_started = true
-		-- A layout that cannot be emulated is logged by its owner and leaves the
-		-- system layout typing; it never stops the keymap.
-		local started, emulation_err = pcall(LayoutEmulation.start, {
-			is_paused = function() return CoreState.processing_paused == true end,
-			magic_code = function()
-				if MagicKeySource.keycode() == nil or not magic_key_replace_on() then return nil end
-				return MagicKeySource.get()
-			end,
-		})
-		if not started then Logger.error(LOG, "Layout emulation start failed: %s.", tostring(emulation_err)) end
-	end
+
 	if not _tap_copy then _tap_copy = build_tap_copy() end
 	ControlSentinels.set_listener("keymap.one_shot_shift", function(signal)
 		if signal == ControlSentinels.ONE_SHOT_SHIFT then M.arm_one_shot_shift() end

@@ -132,8 +132,8 @@ local function _build_layouts(ctx)
 	-- change is stored, then the emulation reloads it at once.
 	local function emulation_changed(committed)
 		if not committed then show_error(i18n_safe("menu.layout.emulation_not_saved")) end
-		local reloaded = require("modules.keymap.layout_emulation").reload()
-		if committed and not reloaded then show_error(i18n_safe("menu.layout.emulation_failed")) end
+		local reloaded = require("modules.keymap.layout_emulation").reload_if_started()
+		if committed and reloaded == false then show_error(i18n_safe("menu.layout.emulation_failed")) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
 	local EmulationRows = require("layouts.emulation_menu")
@@ -227,6 +227,8 @@ local function _build_layouts(ctx)
 				Logger.error(LOG, "Keyboard layout scope '%s' was not applied: %s.", mode, tostring(detail))
 				show_error(i18n_safe("layouts.linux_rows_not_applied"))
 			end
+			-- The scope holds the emulation's rows too: it types what was restored.
+			require("modules.keymap.layout_emulation").reload_if_started()
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end)
 		-- The session may answer later: a dispatched request is accepted now and
@@ -251,7 +253,7 @@ local function _build_layouts(ctx)
 		-- The choice is stored first; a refusal after that is told, except the two the
 		-- greyed row already explains.
 		local function applied(ok, code)
-			if emulating then require("modules.keymap.layout_emulation").reload() end
+			if emulating then require("modules.keymap.layout_emulation").reload_if_started() end
 			if not ok and code ~= "session_unsupported" and code ~= "no_source_layout" then
 				show_error(i18n_safe("layouts.linux_rows_not_applied"))
 			end

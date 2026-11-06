@@ -329,7 +329,7 @@ local function number_row_rows(state, save_prefs, update_menu, render_ctx)
 			return false
 		end
 		Logger.info(LOG, "Number-row option %s set to %s.", key, tostring(value))
-		if emulating then require("modules.keymap.layout_emulation").reload() end
+		if emulating then require("modules.keymap.layout_emulation").reload_if_started() end
 		Live.apply(stored(), function(applied, code)
 			if not applied and code ~= Live.REASON_NO_SOURCE then
 				pcall(notifications.notify, i18n.get("layouts.rows_not_applied"), nil, "error")
@@ -833,7 +833,10 @@ function M.build(ctx)
 	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
 		render_ctx.commands[command] = function()
 			if ctx.paused == true or type(ctx.apply_preference_scope) ~= "function" then return false end
-			return ctx.apply_preference_scope("keyboard_layout", mode)
+			local applied = ctx.apply_preference_scope("keyboard_layout", mode)
+			-- The scope holds the emulation's rows too: it types what was restored.
+			require("modules.keymap.layout_emulation").reload_if_started()
+			return applied
 		end
 	end
 	-- Native-only status never acquires a preference or forced-input writer.
@@ -870,8 +873,8 @@ function M.build(ctx)
 	local EmulationRows = require("layouts.emulation_menu")
 	local function emulation_changed(committed)
 		if not committed then pcall(notifications.notify, i18n.get("menu.layout.emulation_not_saved"), nil, "error") end
-		local reloaded = require("modules.keymap.layout_emulation").reload()
-		if committed and not reloaded then
+		local reloaded = require("modules.keymap.layout_emulation").reload_if_started()
+		if committed and reloaded == false then
 			pcall(notifications.notify, i18n.get("menu.layout.emulation_failed"), nil, "error")
 		end
 		schedule_menu_refresh(update_menu)
@@ -879,8 +882,8 @@ function M.build(ctx)
 	local function emulation_switch(path, label_key)
 		local Preferences = require("infra.layout_emulation_preferences")
 		return EmulationRows.switch_row({
-			t = i18n.get, label_key = label_key, checked = Preferences.switch(path),
-			toggle = function(value) emulation_changed(Preferences.set_switch(path, value)) end,
+			t = i18n.get, label_key = label_key, checked = Preferences.switch(state, path),
+			toggle = function(value) emulation_changed(Preferences.set_switch(state, save_prefs, path, value)) end,
 		})
 	end
 	render_ctx.feature_rows = {}
@@ -896,10 +899,10 @@ function M.build(ctx)
 			local Preferences = require("infra.layout_emulation_preferences")
 			return EmulationRows.choice_rows({
 				t = i18n.get,
-				settings = Preferences.settings(),
+				settings = Preferences.settings(state),
 				status = require("modules.keymap.layout_emulation").status(),
 				snapshot = require("modules.keymap.layout_registry").snapshot(),
-				choose = function(choice) emulation_changed(Preferences.choose(choice)) end,
+				choose = function(choice) emulation_changed(Preferences.choose(state, save_prefs, choice)) end,
 			})
 		end,
 		["layout_features_base"] = function()
