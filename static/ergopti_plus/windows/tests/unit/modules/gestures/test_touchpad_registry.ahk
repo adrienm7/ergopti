@@ -121,7 +121,7 @@ _TPR_RestoreSeams() {
 }
 
 _TPR_Apply() {
-	return TouchpadRegistryApply(_TPR_Write, _TPR_Snapshot, _TPR_Create, _TPR_Exists, _TPR_Path())
+	return TouchpadRegistryApply(_TPR_Write, _TPR_Snapshot, _TPR_Create, _TPR_Exists, _TPR_Path(), _TPR_Read)
 }
 
 _TPR_Count(Prefix) {
@@ -336,6 +336,42 @@ _TPR_UnprovableBackupIsRefused() {
 }
 Test("touchpad registry: an unprovable or failed restore keeps the backup (touchpad-restore-refusal)",
 	_TPR_UnprovableBackupIsRefused)
+
+; Regression (AHK-008 / WG-002): an existing backup that Restore would refuse
+; must not authorize the destructive apply.
+_TPR_UnrestorableExistingBackupBlocksApply() {
+	global _TPR_Files
+	Header := TouchpadRegistryBackupHeader() . "`
+key " . TouchpadRegistryData()["key"] . "`
+"
+	for _, Text in ["garbage", Header, Header . "UnknownValue dword 1`
+"] {
+		_TPR_Reset(Map("kept", 1))
+		_TPR_Files[_TPR_Path()] := Text
+		AssertFalse(_TPR_Apply(), "an unrestorable existing backup refuses the apply")
+		AssertEqual(0, _TPR_Count("write "), "no value is written over unrecoverable originals")
+		AssertEqual(Text, _TPR_Files[_TPR_Path()], "the existing backup is never replaced")
+	}
+}
+Test("touchpad registry: an existing unrestorable backup blocks every write (WG-002)",
+	_TPR_UnrestorableExistingBackupBlocksApply)
+
+; Regression (AHK-007 / WG-001): the onboarding worker must not report success
+; when the device restart is absent or refused, like the tray restart worker.
+_TPR_OnboardingWorkerFailsWithoutRestart() {
+	Script := _Onboarding_BuildGesturePsScript(A_Temp . "\ergopti_tpr.result")
+	AssertContains(Script, "$devs.Count -eq 0", "no matching device is a failure")
+	AssertFalse(InStr(Script, "PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction SilentlyContinue"),
+		"PnP operations must not swallow their failures")
+	AssertContains(Script, "Disable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop")
+	AssertContains(Script, "Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop")
+	AssertContains(Script, "finally {", "a disabled device is re-enabled when a later step fails")
+	Restart := _GestureRestartBuildPsScript(A_Temp . "\ergopti_tpr.result")
+	for Needle in ["$devs.Count -eq 0", "-ErrorAction Stop", "finally {"]
+		AssertContains(Restart, Needle, "the sibling restart worker keeps the same contract")
+}
+Test("touchpad registry: onboarding worker fails when the device restart is absent or refused (WG-001)",
+	_TPR_OnboardingWorkerFailsWithoutRestart)
 
 
 
