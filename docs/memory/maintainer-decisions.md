@@ -482,3 +482,8 @@ it ends. Every other failure keeps the shared retry policy (extra tokens,
 higher temperature). One verdict serves the drivers: `llm/failure_class.lua`
 for macOS and Linux, `LLM_ApiCommon_IsAuthenticationFailure` for Windows, both
 replaying `_shared/tests/corpus/llm/auth_failure_vectors.json`.
+
+rule and `test_gesture_axis_slots.lua` pins it from evdev frames. macOS applies the same rule
+(`resolveSwipeSlot` in `macos/modules/gestures/engine.lua`, on the commit and
+live paths; `test_gesture_axis_slots.lua`). Windows has no axis slots: the OS
+recognises its gestures. No `swipe_N_vert` slot exists on any OS.

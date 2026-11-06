@@ -153,6 +153,10 @@ local function stopScrollBlock()
 end
 
 -- All directional slot suffixes a finger count can resolve to.
+-- The horizontal axis slot of each finger count that offers one: the binding of
+-- both horizontal directions. Two fingers have none (a two-finger left swipe
+-- belongs to macOS).
+local AXIS_SLOT_HORIZ = { [3] = "swipe_3_horiz", [4] = "swipe_4_horiz", [5] = "swipe_5_horiz" }
 local SLOT_DIRS_ALL   = { "left", "right", "up", "down", "left_up", "right_up", "left_down", "right_down" }
 local SLOT_DIRS_HORIZ = { "left", "right" }
 local SLOT_DIRS_VERT  = { "up", "down" }
@@ -188,6 +192,13 @@ local function finger_count_is_inert(mf, axis)
 	for _, dir in ipairs(dirs) do
 		local action = _state.ga["swipe_" .. fc .. "_" .. dir]
 		if action and action ~= "none" then return false end
+	end
+	-- An axis slot binds both horizontal directions, so it makes a horizontal
+	-- (or unknown-axis) gesture of its finger count live.
+	local axis_slot = AXIS_SLOT_HORIZ[math.min(mf, 5)]
+	if axis_slot and (axis == nil or axis == "horiz") then
+		local axis_action = _state.ga[axis_slot]
+		if axis_action and axis_action ~= "none" then return false end
 	end
 	-- Tap only matters when direction is not yet known — a moving gesture
 	-- past lockedDir cannot become a tap.
@@ -416,6 +427,30 @@ local function signedDistAxis(pos, axis)
 		local sign = (dx + dy > 0) and 1 or -1
 		return sign * dist
 	end
+end
+
+--- Resolves the slot a classified swipe runs. The explicit direction slot wins;
+--- a straight left or right swipe whose own slot is unbound runs the horizontal
+--- axis slot of its finger count, so one gesture never runs two actions. This is
+--- the rule Linux applies (maintainer decision of 2026-11-06). Diagonals and
+--- vertical swipes have no axis slot.
+--- @param mf number Finger count.
+--- @param dir string Axis the swipe travelled on: "horiz", "vert" or "diag".
+--- @param dx number Horizontal displacement.
+--- @param dy number Vertical displacement.
+--- @return string|nil slot The slot to fire, or the unbound direction slot.
+local function resolveSwipeSlot(mf, dir, dx, dy)
+	local slot = Geometry.slotForDir(mf, dir, dx, dy)
+	local action = slot and _state.ga[slot]
+	if action and action ~= "none" then return slot end
+	if dir ~= "horiz" then return slot end
+	local axis_slot = AXIS_SLOT_HORIZ[math.min(mf, 5)]
+	local axis_action = axis_slot and _state.ga[axis_slot]
+	if axis_action and axis_action ~= "none" then
+		Logger.debug(LOG, "%s is unbound: the horizontal axis slot %s answers.", tostring(slot), axis_slot)
+		return axis_slot
+	end
+	return slot
 end
 
 --- Calls one action dispatcher and preserves its exact boolean contract.
@@ -766,7 +801,7 @@ local function commitGesture(now)
 		return
 	end
 
-	local slot = Geometry.slotForDir(mf, dir, dx, dy)
+	local slot = resolveSwipeSlot(mf, dir, dx, dy)
 	Logger.debug(LOG, "commitGesture: slotForDir(%d, %s, %.2f, %.2f) → %s", mf, dir, dx, dy, tostring(slot))
 	if not slot or _state.ga[slot] == "none" then
 		Logger.debug(LOG, "commitGesture: slot=%s action=%s — skip",
@@ -1303,7 +1338,7 @@ function M.process_frame(touches, frame_stamp)
 					local axis = gs.lockedDir
 					local dx = pos.x - gs.startPos.x
 					local dy = pos.y - gs.startPos.y
-					local slot = Geometry.slotForDir(gs.maxFingers, axis, dx, dy)
+					local slot = resolveSwipeSlot(gs.maxFingers, axis, dx, dy)
 
 					if slot and _state.ga[slot] and _state.ga[slot] ~= "none" then
 						triggerLiveAxisIfNeeded(slot, pos, now, axis)
