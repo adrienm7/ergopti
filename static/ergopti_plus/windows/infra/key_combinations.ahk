@@ -1287,7 +1287,8 @@ KeyCombinationChordIsBusy() {
 ; Exact batch identity prevents an old callback from mutating resumed input.
 _KeyCombinationChordIsCurrent(Owner) {
 	global _KeyCombinationChordOwner
-	return IsObject(Owner) && _KeyCombinationChordOwner == Owner
+	; A roll-key #HotIf reaches this through KeyCombinationChordIsBusy at boot.
+	return IsObject(Owner) && IsSet(_KeyCombinationChordOwner) && _KeyCombinationChordOwner == Owner
 		&& TapHoldOwnerCurrent(Owner) && !A_IsSuspended
 }
 

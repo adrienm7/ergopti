@@ -606,7 +606,8 @@ TapHoldNewOwner() {
 
 TapHoldOwnerCurrent(Owner) {
 	global _TH_SyntheticEpoch
-	return IsObject(Owner) && Owner.Epoch == _TH_SyntheticEpoch
+	; A roll-key #HotIf can ask before the epoch's assignment runs at boot.
+	return IsObject(Owner) && IsSet(_TH_SyntheticEpoch) && Owner.Epoch == _TH_SyntheticEpoch
 }
 
 ; Publishing the name and its authority is one bounded RAM transaction.

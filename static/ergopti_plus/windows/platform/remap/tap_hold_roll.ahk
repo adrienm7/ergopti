@@ -105,7 +105,6 @@ TapHoldKeyRolls(KeyId) {
 ; the block of hotkeys in tap_hold_roll_keys.ahk.
 ; @returns {Boolean}
 TapHoldRollUndecided() {
-	global _KeyCombinationChordBusy
 	; A key waiting for its chord partner holds the next characters the same way.
 	State := _TapHoldRollState()
 	return KeyCombinationChordIsBusy()

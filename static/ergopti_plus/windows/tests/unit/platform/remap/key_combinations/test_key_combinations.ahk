@@ -672,7 +672,7 @@ Test("key combinations: the menu lists every ordered pair by hand, with its two 
 _KCT_EveryKeyHasItsPairHotkeys() {
 	Path := A_ScriptDir . "\..\platform\remap\key_combination_keys.ahk"
 	Src := _StripFullLineComments(FileRead(Path, "UTF-8"))
-	Start := InStr(Src, "#HotIf KeyCombinationOwnsHotkey()`n")
+	Start := InStr(Src, "#HotIf IsSet(Features) && KeyCombinationOwnsHotkey()`n")
 	Assert(Start > 0, "the pair hotkeys stand under the criterion that reads the key from the hotkey's name")
 	Finish := InStr(Src, "`n#HotIf`n", , Start + 1)
 	Assert(Finish > Start, "the criterion must be closed")

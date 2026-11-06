@@ -38,7 +38,9 @@
 ; ===================================
 ; ===================================
 
-#HotIf KeyCombinationOwnsHotkey()
+; Cold until Features is published after Bundle_Init: no pair exists before it,
+; and a key pressed during the extraction must not reach the chord owners.
+#HotIf IsSet(Features) && KeyCombinationOwnsHotkey()
 *SC001::
 SC001::
 ^SC001::
