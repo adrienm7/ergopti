@@ -13,7 +13,8 @@
 ; FEATURES & RATIONALE:
 ; 1. Armed per Activation: ToggleCapsWord arms the listeners with the policy of
 ;    that moment and DisableCapsWord disarms them, so nothing listens while
-;    CapsWord is off. Every handler also checks CapsWordEnabled first: a path
+;    CapsWord is off. A menu change re-arms an active CapsWord with the new
+;    policy, so it applies from the next event, as on macOS and Linux. Every handler also checks CapsWordEnabled first: a path
 ;    that clears the flag without DisableCapsWord (the fatal error net) leaves
 ;    inert listeners that disarm themselves on their next event.
 ; 2. Typed Delimiters: the HookDispatcher InputHook (I1) sees what the user
@@ -268,9 +269,10 @@ CapsWordAutoOffValues() {
 		? CapsWordAutoOff.Values : CapsWordAutoOffReadValues(Map()))
 }
 
-; Stores one [shortcuts.caps_word] setting and publishes it to the next
-; activation, without a reload: no hotkey is registered from these settings.
-; An active CapsWord keeps the settings it was armed with.
+; Stores one [shortcuts.caps_word] setting and publishes it without a reload:
+; no hotkey is registered from these settings. An active CapsWord is re-armed
+; with the new policy, so the change applies from its next event (decision of
+; 2026-11-06, as on macOS and Linux) and its delay restarts from the change.
 ; @param Path {String} "shortcuts.caps_word.idle_timeout_seconds",
 ;   "shortcuts.caps_word.terminators" or "shortcuts.caps_word.pointer.<kind>".
 ; @param Value {Any} The new value, in its stored shape.
@@ -288,8 +290,23 @@ CapsWordAutoOffStore(Path, Value, ConfigPath := "") {
 		; Logging describes this acknowledged commit after its owner has retired;
 		; failure to log cannot turn a durable memory publication into a refusal.
 		try _CapsWordAutoOffLog(Outcome.candidate.values, Outcome.candidate.policy, "changed (" . Path . ")")
+		_CapsWordAutoOffRearmActive()
 	}
 	return Saved
+}
+
+; Re-arms the active CapsWord with the published policy: its subscriptions,
+; idle timer and motion poll then follow the new settings. Runs after the
+; configuration owner has retired, so it reads the latest acknowledged policy.
+; @returns {Boolean} True when an active CapsWord was re-armed.
+_CapsWordAutoOffRearmActive() {
+	global CapsWordEnabled
+	if !(CapsWordAutoOff.Armed is Map) || !IsSet(CapsWordEnabled) || !CapsWordEnabled
+		return false
+	EndFn := CapsWordAutoOff.EndFn
+	if !HasMethod(EndFn, "Call")
+		throw Error("CapsWord auto-off: an armed CapsWord has no end function.")
+	return CapsWordAutoOffArm(EndFn)
 }
 
 ; The detached next-activation policy is captured and published while the same

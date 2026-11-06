@@ -347,6 +347,34 @@ _CWAO_StoreWritesAndPublishes() {
 }
 Test("capsword auto-off: a menu change is written and used by the next activation", _CWAO_StoreWritesAndPublishes)
 
+; A change made while CapsWord is on reaches it from its next event, as on
+; macOS and Linux (capsword-live-settings). Before, the armed policy stayed in
+; force until the next activation.
+_CWAO_StoreAppliesLive() {
+	_CWAO_WithDefaultSettings(Body)
+	Body(Fixture) {
+		global CapsWordEnabled, _CWAO_Ended
+		try {
+			_CWAO_Ended := []
+			CapsWordEnabled := true
+			AssertTrue(CapsWordAutoOffStore("shortcuts.caps_word.pointer.pointer_motion", false, Fixture.path))
+			AssertTrue(CapsWordAutoOffArm(_CWAO_Recorder()), "CapsWord is armed with the defaults")
+			AssertTrue(CapsWordAutoOffStore("shortcuts.caps_word.terminators", ["nbsp"], Fixture.path))
+			_CWAO_Char(" ")
+			AssertTrue(CapsWordEnabled, "a Space unchecked while CapsWord is on no longer ends it")
+			AssertTrue(CapsWordAutoOffStore("shortcuts.caps_word.pointer.middle_click", false, Fixture.path))
+			HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_MDOWN)
+			AssertTrue(CapsWordEnabled, "a middle click unchecked while CapsWord is on no longer ends it")
+			AssertTrue(CapsWordAutoOffStore("shortcuts.caps_word.terminators", ["space"], Fixture.path))
+			AssertTrue(CapsWordAutoOffStore("shortcuts.caps_word.idle_timeout_seconds", 0.2, Fixture.path))
+			Sleep(400)
+			AssertFalse(CapsWordEnabled, "a delay set while CapsWord is on runs at once")
+			AssertEqual(1, _CWAO_Ended.Length, "the re-armed CapsWord ends exactly once")
+		} finally _CWAO_Reset()
+	}
+}
+Test("capsword auto-off: a menu change applies to the active CapsWord (capsword-live-settings)", _CWAO_StoreAppliesLive)
+
 _CWAO_StoreRefusals() {
 	_CWAO_WithDefaultSettings(Body)
 	Body(Fixture) {
