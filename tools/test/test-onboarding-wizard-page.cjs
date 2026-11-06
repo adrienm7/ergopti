@@ -307,8 +307,8 @@ const CATALOGUE = catalogue();
 // only the Windows host registers gestures with the system.
 const HOST_CAPABILITIES = {
 	windows: { gesture_registration: true },
-	macos: { gesture_registration: false },
-	linux: { gesture_registration: false }
+	macos: { gesture_registration: false, literal_absolute_paths: true },
+	linux: { gesture_registration: false, literal_absolute_paths: true }
 };
 
 /**

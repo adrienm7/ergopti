@@ -234,7 +234,12 @@ local function build_init_data(state)
 		platform = CATALOGUE_DRIVER,
 		-- Gesture registration with the system is a Windows host action only. The number-row
 		-- order is applied live when the session loads a layout and one of ours is installed.
-		capabilities = { gesture_registration = false, number_row_live = number_row_capability(state) },
+		capabilities = {
+			gesture_registration = false,
+			-- A Unix path is read literally: a trailing space is part of a valid name.
+			literal_absolute_paths = true,
+			number_row_live = number_row_capability(state),
+		},
 		locale = current_locale,
 		strings = strings,
 		default_config_dir = default_dir,

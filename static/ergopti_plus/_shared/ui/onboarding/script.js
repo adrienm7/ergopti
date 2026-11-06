@@ -1098,7 +1098,7 @@ window.setGestureRegisterStatus = function (ok) {
 /** Reads an absolute Unix path literally: trailing spaces are valid names. */
 function _configInputValue() {
 	var value = document.getElementById('config-input').value || '';
-	if ((_platform === 'macos' || _platform === 'linux') && value.charAt(0) === '/') return value;
+	if (_capabilities.literal_absolute_paths === true && value.charAt(0) === '/') return value;
 	return value.trim();
 }
 
