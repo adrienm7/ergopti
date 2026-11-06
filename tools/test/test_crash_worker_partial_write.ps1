@@ -20,7 +20,7 @@ foreach ($Name in @('Write-CrashStagingFile', 'Write-CrashDocument')) {
 	. ([scriptblock]::Create($Definitions[0].Extent.Text))
 }
 $Stamp = '2026-11-05T10:20:30Z'
-$Stem = '2026-11-05T10-20-30'
+$Stem = '2026-11-05T10-20-30Z'
 function Get-Entries { @(Get-ChildItem -LiteralPath $Directory -Force | ForEach-Object { $_.Name } | Sort-Object) }
 $Large = '{"pad":"' + ('x' * 16384) + '"}'
 
@@ -30,7 +30,7 @@ if ($Mode -ceq 'FileSizeLimit') {
 	$Failure = $null
 	try { Write-CrashDocument -Directory $Directory -Timestamp $Stamp -Document $Large | Out-Null } catch { $Failure = $_ }
 	if ($null -eq $Failure) { throw 'A write refused by the file-size limit must throw.' }
-	$Left = Get-Entries
+	$Left = @(Get-Entries)
 	if ($Left.Count -ne 0) { throw ('A refused write must leave no file, found: ' + ($Left -join ',')) }
 	Write-Output 'PASS: kernel-refused crash write left no partial file'
 	exit 0
