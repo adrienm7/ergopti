@@ -40,6 +40,15 @@ an additive `+refs/heads/dev:refs/remotes/origin/dev` mapping and dev upstream
 `git ls-remote origin refs/heads/dev` before integration. Preserve other fetch
 mappings; never infer current dev from a main-only upstream.
 
+### feedback-archive-finished-cloud-sessions
+
+The maintainer asked (2026-11-06) that every cloud session or container an
+agent starts (`create_session`, worktree agents) is archived as soon as its
+work is finished and its result collected, to keep the session list clean.
+Action: once a child session has reported and its branch is pushed or
+integrated, call `archive_session` on it in the same turn; never leave a
+finished child idle.
+
 ### feedback-test-before-merge
 
 Live-driver fixes stay on their branch until the maintainer has exercised them
