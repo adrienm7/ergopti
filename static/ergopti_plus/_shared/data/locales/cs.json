@@ -1977,6 +1977,7 @@
 	"menu.llm.profile_recommended_title": "Doporučený prompt",
 	"menu.llm.profile_change_msg": "Model: %s\n%s\n\nAktuální výzva:\n%s\n\nDoporučená výzva:\n%s\n\nPotvrďte pro použití doporučené výzvy.",
 	"menu.llm.profile_power_warning": "⚠️  Výkonný profil\n\nDoporučeno:  %s\nVybráno:  %s\n\nModel nemusí být dostatečně výkonný.",
+	"menu.llm.profiles": "Profily",
 	"menu.llm.remove_model_body": "Chcete odebrat vlastní model \"%s\" ze svého seznamu? Model nebude ze systému odinstalován.",
 	"menu.llm.remove_model_title": "Odebrat tento model?",
 	"menu.llm.remove_user_model": "🗑️ Odebrat z mých modelů",

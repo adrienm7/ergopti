@@ -1977,6 +1977,7 @@
 	"menu.llm.profile_recommended_title": "권장 프롬프트",
 	"menu.llm.profile_change_msg": "모델: %s\n%s\n\n현재 프롬프트:\n%s\n\n권장 프롬프트:\n%s\n\n권장 프롬프트를 적용하려면 확인하세요.",
 	"menu.llm.profile_power_warning": "⚠️  강력한 프로필\n\n권장:  %s\n선택됨:  %s\n\n모델 성능이 부족할 수 있습니다.",
+	"menu.llm.profiles": "프로필",
 	"menu.llm.remove_model_body": "목록에서 사용자 지정 모델 \"%s\"를 제거하시겠습니까? 모델은 시스템에서 제거되지 않습니다.",
 	"menu.llm.remove_model_title": "이 모델을 제거하시겠습니까?",
 	"menu.llm.remove_user_model": "🗑️ 내 모델에서 제거",

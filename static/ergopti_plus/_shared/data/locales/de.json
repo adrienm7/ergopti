@@ -1977,6 +1977,7 @@
 	"menu.llm.profile_recommended_title": "Empfohlener Prompt",
 	"menu.llm.profile_change_msg": "Modell: %s\n%s\n\nAktueller Prompt:\n%s\n\nEmpfohlener Prompt:\n%s\n\nBestätigen, um den empfohlenen Prompt anzuwenden.",
 	"menu.llm.profile_power_warning": "⚠️  Starkes Profil\n\nEmpfohlen:  %s\nAusgewählt:  %s\n\nDas Modell ist möglicherweise nicht leistungsfähig genug.",
+	"menu.llm.profiles": "Profile",
 	"menu.llm.remove_model_body": "Möchten Sie das benutzerdefinierte Modell «%s» aus Ihrer Liste entfernen? Das Modell wird nicht vom System deinstalliert.",
 	"menu.llm.remove_model_title": "Dieses Modell entfernen?",
 	"menu.llm.remove_user_model": "🗑️ Aus meinen Modellen entfernen",

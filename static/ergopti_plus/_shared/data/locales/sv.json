@@ -1977,6 +1977,7 @@
 	"menu.llm.profile_recommended_title": "Rekommenderad prompt",
 	"menu.llm.profile_change_msg": "Modell: %s\n%s\n\nAktuell prompt:\n%s\n\nRekommenderad prompt:\n%s\n\nBekräfta för att tillämpa den rekommenderade prompten.",
 	"menu.llm.profile_power_warning": "⚠️  Kraftfull profil\n\nRekommenderad:  %s\nVald:  %s\n\nModellen kanske inte är kraftfull nog.",
+	"menu.llm.profiles": "Profiler",
 	"menu.llm.remove_model_body": "Vill du ta bort den anpassade modellen \"%s\" från din lista? Modellen kommer inte att avinstalleras från systemet.",
 	"menu.llm.remove_model_title": "Ta bort den här modellen?",
 	"menu.llm.remove_user_model": "🗑️ Ta bort från mina modeller",

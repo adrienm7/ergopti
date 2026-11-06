@@ -1977,6 +1977,7 @@
 	"menu.llm.profile_recommended_title": "Prompt recomendado",
 	"menu.llm.profile_change_msg": "Modelo: %s\n%s\n\nPrompt actual:\n%s\n\nPrompt recomendado:\n%s\n\nConfirmar para aplicar el prompt recomendado.",
 	"menu.llm.profile_power_warning": "⚠️  Perfil potente\n\nRecomendado:  %s\nSeleccionado:  %s\n\nEl modelo puede no ser suficientemente potente.",
+	"menu.llm.profiles": "Perfiles",
 	"menu.llm.remove_model_body": "¿Desea quitar el modelo personalizado «%s» de su lista? El modelo no se desinstalará del sistema.",
 	"menu.llm.remove_model_title": "¿Quitar este modelo?",
 	"menu.llm.remove_user_model": "🗑️ Quitar de mis modelos",

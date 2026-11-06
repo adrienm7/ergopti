@@ -1977,6 +1977,7 @@
 	"menu.llm.profile_recommended_title": "פרומפט מומלץ",
 	"menu.llm.profile_change_msg": "מודל: %s\n%s\n\nPrompt נוכחי:\n%s\n\nPrompt מומלץ:\n%s\n\nאשר כדי להחיל את ה-prompt המומלץ.",
 	"menu.llm.profile_power_warning": "⚠️  פרופיל חזק\n\nמומלץ:  %s\nנבחר:  %s\n\nייתכן שהמודל אינו חזק מספיק.",
+	"menu.llm.profiles": "פרופילים",
 	"menu.llm.remove_model_body": "האם ברצונך להסיר את המודל המותאם \"%s\" מהרשימה שלך? המודל לא יוסר מהמערכת.",
 	"menu.llm.remove_model_title": "להסיר מודל זה?",
 	"menu.llm.remove_user_model": "🗑️ הסר מהמודלים שלי",

@@ -2033,6 +2033,7 @@
 	"menu.llm.profile_recommended_title": "Profil recommandé",
 	"menu.llm.profile_change_msg": "Modèle : %s\n%s\n\nPrompt actuel :\n%s\n\nPrompt conseillé :\n%s\n\nValider pour appliquer le prompt conseillé.",
 	"menu.llm.profile_power_warning": "⚠️  Profil puissant\n\nRecommandé :  %s\nSélectionné :  %s\n\nLe modèle peut ne pas être assez puissant.",
+	"menu.llm.profiles": "Profils",
 	"menu.llm.remove_model_body": "Voulez-vous retirer le modèle personnalisé « %s » de votre liste ? Le modèle ne sera pas désinstallé du système.",
 	"menu.llm.remove_model_title": "Retirer ce modèle ?",
 	"menu.llm.remove_user_model": "🗑️ Retirer de mes modèles",
