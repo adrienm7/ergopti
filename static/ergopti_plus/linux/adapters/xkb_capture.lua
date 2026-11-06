@@ -114,7 +114,8 @@ local MODIFIER_ROLE_OF_KEYSYM = {
 --   key_utf8(session, xkb_keycode) -> string|nil
 --   sym_utf8(session, keysym) -> string|nil
 --   update_key(session, xkb_keycode, XKB_KEY_{UP,DOWN})
---   compose_feed/status/utf8/reset(session, ...)
+--   compose_feed/status/utf8/reset(session, ...); compose_feed returns false
+--     only for a keysym Compose ignores (a modifier)
 local _backend = nil
 local _session = nil
 local _keymap_text = nil
@@ -545,8 +546,9 @@ local function bind_ffi_backend()
 		return rows
 	end
 
+	-- enum xkb_compose_feed_result: IGNORED (0) leaves the sequence untouched.
 	function backend.compose_feed(session, sym)
-		lib.xkb_compose_state_feed(session.compose_state, sym or 0)
+		return tonumber(lib.xkb_compose_state_feed(session.compose_state, sym or 0)) ~= 0
 	end
 
 	function backend.compose_status(session)
@@ -1303,13 +1305,36 @@ end
 -- =========================================
 -- =========================================
 
+-- The keysyms of the pending Compose sequence, kept on the session so a new
+-- session starts empty. A consumer that keeps a press from the application
+-- restores the sequence that preceded it (M.restore_compose): resetting would
+-- also forget a dead key the application did receive.
+local EMPTY_COMPOSE = {}
+
+--- Records one fed keysym in the session's pending sequence.
+--- @param session table Capture session.
+--- @param sym integer|nil Fed keysym.
+--- @param accepted boolean|nil False when Compose ignored the keysym.
+--- @param status string Compose status after the feed.
+local function track_compose(session, sym, accepted, status)
+	if accepted == false then return end
+	if status ~= "composing" then session.compose_pending = EMPTY_COMPOSE; return end
+	local pending = session.compose_pending or EMPTY_COMPOSE
+	local extended = {}
+	for index = 1, #pending do extended[index] = pending[index] end
+	extended[#extended + 1] = sym or 0
+	session.compose_pending = extended
+end
+
 local function resolve_press(keycode)
 	local sym = _backend.key_sym(_session, keycode)
 	local identity = sym and _backend.sym_utf8(_session, sym) or nil
 	local text = _backend.key_utf8(_session, keycode)
 
-	_backend.compose_feed(_session, sym)
+	local mark = { session = _session, pending = _session.compose_pending or EMPTY_COMPOSE }
+	local accepted = _backend.compose_feed(_session, sym)
 	local status = _backend.compose_status(_session)
+	track_compose(_session, sym, accepted, status)
 	if status == "composing" then
 		text = nil
 	elseif status == "composed" then
@@ -1326,16 +1351,36 @@ local function resolve_press(keycode)
 	-- during pending Compose does not cancel or reset the Compose owner.
 	local control = status ~= "composed" and (text == nil or text == "")
 		and SEMANTIC_CONTROL_OF_KEYSYM[sym] or nil
-	return text, identity, control
+	return text, identity, control, mark
 end
 
---- Ends a pending Compose sequence, leaving the key state as it is. For a press
---- the application never received: the dead key it fed must not compose with
---- the next key here while the application types that key plain.
+--- Withdraws one press from Compose, leaving the key state as it is. For a
+--- press the application never received: Compose returns to the sequence that
+--- preceded it, so a dead key the application did receive still composes with
+--- the next key, and a dead key it did not receive composes with nothing.
+--- @param mark table The Compose mark M.process returned for that press.
 --- @return boolean ok, string|nil error
-function M.cancel_compose()
+function M.restore_compose(mark)
 	if not _session then return false, "XKB capture state is not ready" end
-	local ok, err = pcall(_backend.compose_reset, _session)
+	if type(mark) ~= "table" or type(mark.pending) ~= "table" then
+		return false, "a Compose mark from XkbCapture.process is required"
+	end
+	-- A mark of a replaced session describes a sequence the new state never fed.
+	local pending = mark.session == _session and mark.pending or EMPTY_COMPOSE
+	local ok, err = pcall(function()
+		_backend.compose_reset(_session)
+		local status = "nothing"
+		for index = 1, #pending do
+			_backend.compose_feed(_session, pending[index])
+			status = _backend.compose_status(_session)
+		end
+		local expected = #pending > 0 and "composing" or "nothing"
+		if status ~= expected then
+			_backend.compose_reset(_session)
+			error("the restored Compose sequence reads " .. tostring(status) .. ", not " .. expected)
+		end
+	end)
+	_session.compose_pending = ok and pending or EMPTY_COMPOSE
 	if not ok then return false, tostring(err) end
 	return true, nil
 end
@@ -1379,6 +1424,8 @@ end
 --- @param evdev_code integer Linux input-event keycode.
 --- @param value integer 0 release, 1 press, 2 repeat.
 --- @return string|nil text, string|nil identity, string|nil error, string|nil control
+--- @return table|nil compose_mark For a press or repeat: the Compose sequence
+---   before it, for M.restore_compose.
 function M.process(evdev_code, value)
 	_physical_probe_epoch = _physical_probe_epoch + 1
 	if not _session then return nil, nil, "XKB capture state is not ready" end
@@ -1397,7 +1444,7 @@ function M.process(evdev_code, value)
 		return nil, nil, nil
 	end
 
-	local ok_resolve, text, identity, control = pcall(resolve_press, keycode)
+	local ok_resolve, text, identity, control, compose_mark = pcall(resolve_press, keycode)
 	if not ok_resolve then return nil, nil, tostring(text) end
 	if value == VALUE_DOWN then
 		local ok_update, update_err = pcall(
@@ -1405,7 +1452,7 @@ function M.process(evdev_code, value)
 		if not ok_update then return nil, nil, tostring(update_err) end
 		capture_identity()
 	end
-	return text, identity, nil, control
+	return text, identity, nil, control, compose_mark
 end
 
 M.EVDEV_TO_XKB_OFFSET = EVDEV_TO_XKB_OFFSET
@@ -1512,10 +1559,11 @@ local function build_row_commit(rows, backend, session, capture_current, physica
 		local direct = observed.text ~= "" and observed.text or nil
 		local result
 		if emitted then
-			feed(session, sym)
+			local accepted = feed(session, sym)
 			if not current() then return false end
 			local phase = status(session)
 			if not current() then return false end
+			track_compose(session, sym, accepted, phase)
 			result = direct
 			if phase == "composing" then result = nil
 			elseif phase == "composed" then
