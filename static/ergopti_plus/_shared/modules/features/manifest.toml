@@ -1929,7 +1929,7 @@ description_key = "menu.metrics.wpm_widget_graph"
 [[features.metrics]]
 id = "wpm_menubar_visible"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev"], windows = [] }
+requires = { macos = ["karabiner"], linux = ["evdev"], windows = ["webview2"] }
 default = false
 recommended = false
 family = "setting"
@@ -1939,7 +1939,7 @@ description_key = "menu.metrics.show_wpm_menubar"
 [[features.metrics]]
 id = "wpm_menubar_colors"
 platforms = ["ahk", "hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev"], windows = [] }
+requires = { macos = ["karabiner"], linux = ["evdev"], windows = ["webview2"] }
 default = true
 recommended = true
 family = "setting"
