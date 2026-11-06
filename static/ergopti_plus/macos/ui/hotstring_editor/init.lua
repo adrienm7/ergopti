@@ -428,6 +428,9 @@ local function handle_message(msg, owner)
 	end
 
 	if action == "save" then
+		-- The page's automatic close follows its save without waiting for an
+		-- answer: until these bytes are committed, the draft lives only in the page.
+		owner.save_refused = true
 		local valid, reason = SaveValidation.validate(data)
 		if not valid then
 			if not owner.invalid_save_reported then
@@ -463,6 +466,7 @@ local function handle_message(msg, owner)
 		
 		if ok_write and written == true and type(committed_content) == "string" then
 			_source_snapshot = { status = "ok", content = committed_content }
+			owner.save_refused = false
 			local reload_ok, reloaded, reload_cause = xpcall(function()
 				if type(_keymap) ~= "table" or type(_keymap.reload_toml) ~= "function" then
 					return false, "the keymap reload API is unavailable"
@@ -521,8 +525,15 @@ local function handle_message(msg, owner)
 		return
 	end
 
-	if action == "close" then 
-		M.close() 
+	if action == "close" then
+		-- Only the shortcut auto-close sends this, right after its save. Closing on
+		-- a refused save would destroy the only copy of the draft (audit MVB-002):
+		-- the window stays open with the entry the user can save again.
+		if owner.save_refused then
+			Logger.warn(LOG, "Hotstring editor kept open: its last save was refused, the draft would be lost.")
+			return false
+		end
+		M.close()
 	end
 end
 
