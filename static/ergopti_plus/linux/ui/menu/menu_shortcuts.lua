@@ -236,9 +236,11 @@ local function _build_shortcuts(ctx)
 	-- `pairs` would give the user a different order on every rebuild.
 	local wrap_items = {}
 	local opening = {}
-	for ch, pair in pairs(sc.get_wrap_pairs()) do
-		-- Only the opening character: each pair is stored under both of its ends.
-		if ch == pair.left then opening[#opening + 1] = { ch = ch, pair = pair } end
+	-- The ordered catalogue, not the alias map: two pairs can share an endpoint
+	-- (the curly pair's opener is the lower pair's closer), and the map keeps
+	-- only one owner of such a key.
+	for _, pair in ipairs(sc.get_wrap_pair_list()) do
+		opening[#opening + 1] = { ch = pair.left, pair = pair }
 	end
 	table.sort(opening, function(a, b) return a.ch < b.ch end)
 	for _, entry in ipairs(opening) do

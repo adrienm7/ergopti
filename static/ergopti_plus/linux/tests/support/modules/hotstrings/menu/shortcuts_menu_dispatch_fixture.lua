@@ -28,6 +28,9 @@ local function fake_shortcuts(log)
 		select_line         = function() log.line = true end,
 		paste_plain         = function() log.paste = true end,
 		wrap_selection      = function(l, r) log.wrapped = l .. r end,
+		get_wrap_pair_list  = function()
+			return { { left = "(", right = ")" }, { left = "«", right = "»" } }
+		end,
 		get_wrap_pairs      = function()
 			return {
 				["("] = { left = "(", right = ")" },

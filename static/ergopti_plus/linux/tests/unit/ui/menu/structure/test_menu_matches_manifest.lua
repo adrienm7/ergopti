@@ -375,6 +375,7 @@ local function full_context()
 			paste_plain         = noop,
 			wrap_selection      = noop,
 			get_wrap_pairs      = function() return { ["("] = { left = "(", right = ")" } } end,
+			get_wrap_pair_list  = function() return { { left = "(", right = ")" } } end,
 		},
 		gestures = {
 			-- The cached native status producer already consumed these collaborators.
