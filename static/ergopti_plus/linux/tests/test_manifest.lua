@@ -590,6 +590,7 @@ return {
 	"tests.unit.modules.dynamic_hotstrings.test_dynamic_expansion_log_privacy",
 	"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger",
 	"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_count_idempotence",
+	"tests.unit.modules.dynamic_hotstrings.test_personal_info_first_boot",
 	"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families",
 	"tests.unit.modules.dynamic_hotstrings.test_dynamic_unicode_suffix",
 	"tests.unit.modules.hotstrings.engine.test_expansion_delay",
