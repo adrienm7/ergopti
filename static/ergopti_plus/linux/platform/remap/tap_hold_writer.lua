@@ -65,6 +65,7 @@ local LONE_TAP_FIELD = require("platform.remap.tap_hold_loader").LONE_TAP_FIELD
 
 -- The manifest rows under tap_holds that tap_hold.toml's [tap_hold] owns.
 local SCOPE_ROW_FIELDS = { enabled = true, [LONE_TAP_FIELD] = true }
+local ONE_SHOT_TIMEOUT_FIELD = require("platform.remap.tap_hold_loader").ONE_SHOT_TIMEOUT_FIELD
 
 local HEADER = {
 	"# tap_hold.toml — written by the Ergopti+ tray menu.",
@@ -596,6 +597,22 @@ function M.set_lone_tap_max_ms(ms, guard)
 	end, guard)
 end
 
+--- Sets how long a one-shot Shift waits for its key, in milliseconds
+--- ([tap_hold] sticky_timeout_ms, macOS's tap_holds.sticky_timeout_ms).
+--- @param ms number A positive whole number of milliseconds.
+--- @param guard function|nil Original deferred editor, strict true required.
+--- @return boolean
+function M.set_one_shot_timeout_ms(ms, guard)
+	if not require("platform.remap.tap_hold_loader").valid_one_shot_timeout_ms(ms) then
+		Logger.error(LOG, "set_one_shot_timeout_ms: %s is not a positive whole number of milliseconds — nothing written.",
+			tostring(ms))
+		return false
+	end
+	return commit("one-shot timeout = " .. tostring(ms) .. " ms", function(document, shapes)
+		section(document, shapes)[ONE_SHOT_TIMEOUT_FIELD] = ms
+	end, guard)
+end
+
 --- Switches the feature on or off in the file ([tap_hold] enabled).
 --- @param enabled boolean
 --- @return boolean
@@ -635,6 +652,7 @@ function M.render_scope(mode, document, rows, preset, shapes)
 	tap_hold.inherit_defaults = nil
 	-- The recommendation sets no delay: the user's global one goes with the keys'.
 	tap_hold.time_activation_seconds = nil
+	tap_hold[ONE_SHOT_TIMEOUT_FIELD] = nil
 	clear_owned_keys(tap_hold, preset, shapes)
 	for _, row in ipairs(rows) do
 		if row.section ~= ConfigKeys.KEY.TAP_HOLDS or not SCOPE_ROW_FIELDS[row.key] then

@@ -2976,6 +2976,16 @@ id = "tap_hold_global_delay"
 platforms = ["ahk", "linux"]
 unavailable = "hide"
 
+# How long a one-shot Shift waits for its key on Windows and Linux (macOS
+# draws its sticky delay among its own timing rows): a positive whole number of
+# milliseconds, 2000 until the user changes it. The maintainer's decision of
+# 2026-11-06 (align on macOS).
+[[menu.tap_holds_menu]]
+type = "list"
+id = "tap_hold_one_shot_delay"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
 # How long a modifier key pressed alone still taps (tap_holds.
 # lone_modifier_tap_max_ms): one row captioned with the value, opening its
 # choices, Off (the strict tap-hold) to 1500 ms.

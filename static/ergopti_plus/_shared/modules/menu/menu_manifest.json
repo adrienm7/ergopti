@@ -3347,6 +3347,15 @@
 		},
 		{
 			"type": "list",
+			"id": "tap_hold_one_shot_delay",
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "list",
 			"id": "tap_hold_lone_tap",
 			"platforms": [
 				"ahk",
