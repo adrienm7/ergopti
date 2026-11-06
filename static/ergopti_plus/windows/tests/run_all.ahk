@@ -1231,6 +1231,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/test_keystats_sql.ahk
 #Include unit/modules/keystats/test_keystats_sql_literal_controls.ahk
 #Include unit/modules/keystats/test_keystats_text_cipher.ahk
+#Include unit/modules/keystats/test_keystats_journal_sealing.ahk
 #Include unit/modules/keystats/test_keystats_text_migration.ahk
 #Include unit/infra/config/migration/test_migration_native_write.ahk
 #Include unit/infra/config/migration/test_migration_open_refusal.ahk

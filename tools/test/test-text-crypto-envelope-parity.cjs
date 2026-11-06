@@ -144,6 +144,37 @@ for (const rel of [
 	}
 }
 
+// ── The journal seals the same typing fields on every driver ──────────────────
+// "Encrypt logs on disk" must cover the today.log copy too (audit WM-002). The
+// shared Lua list is the source; the AutoHotkey mirror must seal the same fields
+// under the same flag, or one driver's journal keeps typed text in clear.
+
+const seal = read('_shared/lua/keystats/journal_seal.lua');
+const journal = read('windows/modules/keystats/keystats_journal.ahk');
+if (seal && journal) {
+	const luaFields = (seal.match(/M\.FIELDS\s*=\s*\{([^}]*)\}/) || [])[1];
+	const ahkFields = (journal.match(/KL_JOURNAL_SEALED_FIELDS\s*:=\s*\[([^\]]*)\]/) || [])[1];
+	const names = (list) => (list ? list.match(/"[^"]*"/g).join(',') : undefined);
+	if (!luaFields || !ahkFields) {
+		errors.push('journal sealing: M.FIELDS or KL_JOURNAL_SEALED_FIELDS could not be parsed.');
+	} else if (names(luaFields) !== names(ahkFields)) {
+		errors.push(
+			`journal sealing: Windows seals [${names(ahkFields)}] but the shared list is [${names(luaFields)}].`
+		);
+	}
+	const luaMark = luaConst(seal, 'MARK');
+	if (!luaMark || !journal.includes(`"${luaMark}"`)) {
+		errors.push(`journal sealing: keystats_journal.ahk does not use the shared flag "${luaMark}".`);
+	}
+	const rotation = read('macos/modules/keystats/rotation.lua');
+	if (
+		rotation &&
+		!(rotation.includes('JournalSeal.seal(') && rotation.includes('JournalSeal.unseal('))
+	) {
+		errors.push('macos rotation.lua: today.log must seal on append and unseal on read.');
+	}
+}
+
 // ── Report ───────────────────────────────────────────────────────────────────
 
 if (errors.length > 0) {

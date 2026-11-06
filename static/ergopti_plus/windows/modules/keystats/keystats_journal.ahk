@@ -80,7 +80,63 @@ _KL_JournalOpenDefault(Token, *) {
 }
 
 _KL_JournalEncodeDefault(Entry) {
-	return KL_JsonEncode(Entry)
+	return KL_JsonEncode(KL_JournalSealEntry(Entry))
+}
+
+; Typing-row fields that hold what the user literally typed. Under at-rest
+; encryption today.log must not keep the readable copy that data.sql seals.
+global KL_JOURNAL_SEALED_FIELDS := ["text", "rich_text", "events"]
+
+; Returns the journal form of an accepted entry. With encryption on, a typing
+; row's literal fields become envelopes keyed like their data.sql columns, and
+; "_sealed" tells the reader to open them: a content prefix proves nothing,
+; since typed text may copy an envelope. The RAM entry is never mutated.
+; @param Entry {Map} Accepted event carrying its stable identity.
+; @returns {Map} The entry itself, or a sealed clone.
+; @throws {Error} When encryption is on but cannot seal a field; the caller
+;   keeps the batch rather than writing the plaintext.
+KL_JournalSealEntry(Entry) {
+	if !KL_Enc_IsEnabled() || !(Entry is Map) || Entry.Get("type", "") != "typing"
+		return Entry
+	Id := Entry["_event_id"]
+	Sealed := Entry.Clone()
+	for Name in KL_JOURNAL_SEALED_FIELDS {
+		if !Entry.Has(Name)
+			continue
+		Plain := Name = "events" ? KL_JsonEncode(Entry[Name]) : String(Entry[Name])
+		Envelope := KL_Enc_Encrypt(Keystats.device_id, _KL_JournalSealIvId(Id, Name), Plain)
+		if (Plain != "" && !KL_Enc_IsEncrypted(Envelope))
+			throw Error("At-rest encryption could not seal journal field " . Name . ".")
+		Sealed[Name] := Envelope
+	}
+	Sealed["_sealed"] := 1
+	return Sealed
+}
+
+; Reopens a sealed journal row read back from today.log. A plaintext row from
+; before encryption was enabled is returned unchanged.
+; @param Entry {Any} Decoded JSONL record.
+; @returns {Any} The record with its literal fields in clear.
+; @throws {Error} When a sealed field cannot be opened on this machine.
+KL_JournalUnsealEntry(Entry) {
+	if !(Entry is Map) || !Entry.Has("_sealed")
+		return Entry
+	for Name in KL_JOURNAL_SEALED_FIELDS {
+		if !Entry.Has(Name) || !KL_Enc_IsEncrypted(Entry[Name])
+			continue
+		Plain := KL_Enc_Decrypt(Entry[Name])
+		if (Plain = "")
+			throw Error("Sealed journal field " . Name . " cannot be opened on this machine.")
+		Entry[Name] := Name = "events" ? KL_JsonDecode(Plain) : Plain
+	}
+	Entry.Delete("_sealed")
+	return Entry
+}
+
+; The data.sql builder seals text under the event id and events_json under
+; id . "j"; the journal reuses those IV inputs for the same plaintext.
+_KL_JournalSealIvId(Id, Name) {
+	return Name = "text" ? Id : Name = "events" ? Id . "j" : Id . "r"
 }
 
 _KL_JournalRollbackAppend(Fh, Boundary, FlushFn := 0) {
@@ -155,14 +211,24 @@ _KL_JournalDecodeIdentity(Refusal, Line) {
 				Refusal["invalid"] := true
 		}
 	}
-	return Entry
+	; A sealed row that cannot be opened is complete but unreadable: skipping it
+	; as malformed would acknowledge typed text that never reached data.sql.
+	try return KL_JournalUnsealEntry(Entry)
+	catch as Err {
+		Refusal["sealed"] := Err.Message
+		return Entry
+	}
 }
 
 _KL_ReadJournalEvents(Path, Offset, MaxLines) {
-	Refusal := Map("invalid", false)
+	Refusal := Map("invalid", false, "sealed", "")
 	Read := _KL_JournalReadLines(Path, Offset, MaxLines, _KL_JournalDecodeIdentity.Bind(Refusal))
 	if Refusal["invalid"] {
 		LoggerError("Keystats", "Journal reserved event identity is not a JSON number; checkpoint unchanged.")
+		return Map("ok", false, "offset", Offset, "entries", [], "eof", false)
+	}
+	if (Refusal["sealed"] != "") {
+		LoggerError("Keystats", "{1} Checkpoint unchanged.", Refusal["sealed"])
 		return Map("ok", false, "offset", Offset, "entries", [], "eof", false)
 	}
 	return Read
