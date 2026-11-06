@@ -14,7 +14,8 @@ import Security
 /// - `OWNED_RUNTIME_INSTALL|1|<result>` relays the helper's own closed line (exit 0);
 /// - `OWNED_RUNTIME_INSTALL_REQUEST|1|refused|<reason>` before any prompt (exit 77);
 /// - `OWNED_RUNTIME_INSTALL_REQUEST|1|cancelled` when the prompt was closed (exit 1);
-/// - `OWNED_RUNTIME_INSTALL_REQUEST|1|failed|<status>` when the administrator shell failed (exit 75).
+/// - `OWNED_RUNTIME_INSTALL_REQUEST|1|failed|<status>[|<step>]` when the administrator shell failed (exit 75),
+///   with the staged program's failing step when it named one.
 enum OwnedRuntimeInstallMainOperation {
 	static let flag = "--request-owned-runtime-install"
 	/// The helper's two closed result values (OwnedRuntimeIdleServiceEntry.Result).
@@ -69,6 +70,22 @@ enum OwnedRuntimeInstallMainOperation {
 			+ hex(Insecure.SHA1.hash(data: leaf)) + "\" and (" + codeHashes + ")"
 	}
 
+	/// The step the staged program names on stderr (OwnedVirtualHIDDaemonReportMainOperation.failedStepMarker),
+	/// which `do shell script` returns as the error message of a failed shell.
+	/// - Parameter message: The AppleScript error message.
+	/// - Returns: The step, lower-case letters and underscores only, or nil when none is named.
+	static func failedStep(_ message: String) -> String? {
+		guard let range = message.range(of: OwnedVirtualHIDDaemonReportMainOperation.failedStepMarker, options: .backwards) else { return nil }
+		let step = message[range.upperBound...].prefix { $0 == "_" || ("a"..."z").contains($0) }
+		return step.isEmpty || step.count > 32 ? nil : String(step)
+	}
+	/// The shell's stderr on one bounded log line: codesign and ditto say there why they refused.
+	static func oneLine(_ message: String) -> String {
+		let flat = message.split(whereSeparator: { $0.isNewline }).map { $0.trimmingCharacters(in: .whitespaces) }
+			.filter { !$0.isEmpty }.joined(separator: " | ")
+		return flat.count > 600 ? String(flat.prefix(600)) + "…" : flat
+	}
+
 	/// Writes the one answer line, then returns the exit status.
 	private static func answer(_ line: String, _ status: Int32) -> Int32 {
 		do { try FileHandle.standardOutput.write(contentsOf: Data((line + "\n").utf8)) } catch { return 75 }
@@ -87,7 +104,7 @@ enum OwnedRuntimeInstallMainOperation {
 	/// copy, then /usr/sbin/installer; the same checks as the driver-only update's administrator shell.
 	static func driverProgram(_ package: OwnedRuntimeDownloadedHelper.DriverPackage) -> String {
 		let quote = OwnedVirtualHIDDaemonReportMainOperation.quote
-		return "task_work=$(/usr/bin/mktemp -d /private/tmp/ergoptiplus-vhid.XXXXXX); "
+		return "task_step=driver_package; task_work=$(/usr/bin/mktemp -d /private/tmp/ergoptiplus-vhid.XXXXXX); "
 			+ "/bin/cp -X " + quote(package.path) + " \"$task_work/driver.pkg\"; "
 			+ "task_sum=$(/usr/bin/shasum -a 256 \"$task_work/driver.pkg\"); task_sum=${task_sum%% *}; "
 			+ "[ \"$task_sum\" = " + quote(package.sha256) + " ] || { /bin/rm -rf \"$task_work\"; exit \(driverDigestStatus); }; "
@@ -143,7 +160,7 @@ enum OwnedRuntimeInstallMainOperation {
 			program = OwnedVirtualHIDDaemonReportMainOperation.stagedHelperProgram(source: helper.path, stage: stage,
 				requirement: requirement, digest: hex(SHA256.hash(data: bytes))) { executable in
 				// The helper retires its own stage on success; any other exit leaves a copy only this shell can remove.
-				driverStep + "task_status=0; task_line=$(/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin "
+				driverStep + "task_step=helper; task_status=0; task_line=$(/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin "
 					+ OwnedVirtualHIDDaemonReportMainOperation.quote(executable) + " --owned-install-first) || task_status=$?; "
 					+ "if [ -d \(directory) ] && [ ! -L \(directory) ]; then /bin/rm -rf \(directory); fi; "
 					+ "printf '%s\\n' \"$task_line\"; exit \"$task_status\""
@@ -165,8 +182,11 @@ enum OwnedRuntimeInstallMainOperation {
 				LauncherLog.write("owned runtime install: the administrator prompt was cancelled.")
 				return answer("OWNED_RUNTIME_INSTALL_REQUEST|1|cancelled", 1)
 			}
-			LauncherLog.write("owned runtime install: the administrator shell failed with status \(number).")
-			return answer("OWNED_RUNTIME_INSTALL_REQUEST|1|failed|" + String(number), 75)
+			let message = error[NSAppleScript.errorMessage] as? String ?? ""
+			let step = failedStep(message)
+			LauncherLog.write("owned runtime install: the administrator shell failed with status \(number) at step "
+				+ (step ?? "unnamed") + ": " + oneLine(message) + ".")
+			return answer("OWNED_RUNTIME_INSTALL_REQUEST|1|failed|" + String(number) + (step.map { "|" + $0 } ?? ""), 75)
 		}
 		let line = (output.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
 		let prefix = "OWNED_RUNTIME_INSTALL|1|"
