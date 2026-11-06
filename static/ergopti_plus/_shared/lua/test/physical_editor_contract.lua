@@ -14,7 +14,7 @@ return function(helpers, Editor, Window, Model)
 			 commit=function(rows,source)eq(source,state.receipt,'Commit carries exact native receipt');if state.refused then return false,'collision' end;state.writes=state.writes+1
 			 for _,row in ipairs(rows) do local map=row.section=='shortcuts.keyboard' and state.inventory.assignments or state.inventory.parameters;if row.delete then map[row.key]=nil else map[row.key]=row.value end end
 			 state.receipt={};return true end,picker=function(binding,action,callback)state.callback=callback;state.binding=binding;return true end,
-			 emit=function(data)state.selected[#state.selected+1]=data;return true end,translate=function(k)return k end,page_current=function()return state.page end,
+			 emit=function(data)state.selected[#state.selected+1]=data;return true end,translate=function(k)return k end,platform='macos',page_current=function()return state.page end,
 			 send=function(name,data)state.sent={name=name,data=data};return true end,close=function()return state.close_ack end}
 			 state.options=options;state.owner=Editor.new(options);return state
 			end
@@ -30,7 +30,7 @@ return function(helpers, Editor, Window, Model)
 			local s=fixture();s.owner.open();s.owner.choose({code='KeyJ',mods={},request_id=1});local old=s.callback;s.owner.choose({code='KeyK',mods={},request_id=2});eq(old('copy'),false,'Late old picker cannot replace draft');eq(s.callback('copy'),true,'Current picker acknowledged');s.receipt={};eq(s.owner.save(s.selected[1].token).committed,false,'Foreign source blocks publication');eq(s.writes,0,'Foreign source never overwritten')
 			s=fixture();s.owner.open();s.owner.choose({code='KeyJ',mods={},request_id=1});s.owner.close();eq(s.callback('copy'),false,'Closed page picker cannot mutate');eq(s.writes,0,'Closed page never publishes')
 			s=fixture();s.owner.open();s.owner.choose({code='KeyJ',mods={},request_id=1});s.callback('copy');s.options.capture=function()return nil end;local result=s.owner.save(s.selected[1].token);eq(result.committed,true,'Committed success survives refresh failure');eq(result.refreshed,false,'Failed refresh truthful')
-			s=fixture();local w=Window.new(s.options);eq(w.receive({action='save',token=1}),false,'Before ready no write');eq(w.receive({action='ready'}),true,'Actual closed window protocol opens form');eq(s.sent.name,'init','Native init pushed');eq(s.sent.data.capture,false,'Browser event capture not offered');eq(w.receive({action='choose',request={code='KeyJ',mods={},request_id=1},path='/foreign'}),false,'Browser source authority rejected');eq(w.receive({action='choose',request={code='KeyJ',mods={},request_id=1}}),true,'Native protocol chooses without persistence');eq(s.writes,0,'Window choose preserves source');eq(s.callback('copy'),true,'Window actual controller picker callback');eq(s.sent.name,'selected','Picker selected event emitted');s.close_ack=false;eq(w.close(),false,'Native close refusal retains owner');s.close_ack=true;eq(w.close(),true,'Same native close retried');eq(w.receive({action='save',token=1}),false,'Retired window cannot write')
+			s=fixture();local w=Window.new(s.options);eq(w.receive({action='save',token=1}),false,'Before ready no write');eq(w.receive({action='ready'}),true,'Actual closed window protocol opens form');eq(s.sent.name,'init','Native init pushed');eq(s.sent.data.names.positions.KeyJ,'J','Init names the position, not its code');eq(s.sent.data.names.modifiers.super,require('keycodes.key_names').i18n('super','macos'),'Init names the modifier from the key name table');eq(s.sent.data.capture,false,'Browser event capture not offered');eq(w.receive({action='choose',request={code='KeyJ',mods={},request_id=1},path='/foreign'}),false,'Browser source authority rejected');eq(w.receive({action='choose',request={code='KeyJ',mods={},request_id=1}}),true,'Native protocol chooses without persistence');eq(s.writes,0,'Window choose preserves source');eq(s.callback('copy'),true,'Window actual controller picker callback');eq(s.sent.name,'selected','Picker selected event emitted');s.close_ack=false;eq(w.close(),false,'Native close refusal retains owner');s.close_ack=true;eq(w.close(),true,'Same native close retried');eq(w.receive({action='save',token=1}),false,'Retired window cannot write')
 			s=fixture();s.captured=false;w=Window.new(s.options);eq(w.receive({action='ready'}),true,'Unreadable source receives an explicit readonly form');eq(s.sent.data.readonly,true,'Capture refusal makes form readonly');eq(s.sent.data.reason,'source_changed','Capture reason visible');eq(w.receive({action='choose',request={code='KeyJ',mods={},request_id=1}}),false,'Readonly frame cannot edit');eq(s.writes,0,'No source acknowledgement no write')
 			s=fixture();s.owner.open();s.owner.choose({code='KeyJ',mods={},request_id=1});s.callback('copy');eq(s.owner.save(s.selected[1].token+1).committed,false,'Foreign opaque draft token refused');eq(s.writes,0,'Foreign token cannot publish')
 			s=fixture();s.owner.open();s.receipt={};eq(s.owner.choose({code='KeyJ',mods={},request_id=1}),false,'Foreign native source refuses opening picker');eq(s.callback,nil,'No stale-source picker or draft admitted')
@@ -52,7 +52,7 @@ return function(helpers, Editor, Window, Model)
 				commit = function() writes = writes + 1; return false end, picker = function() return false end,
 				emit = function() return true end, page_current = function() return page end,
 				send = function(name, packet) messages[#messages + 1] = { name, packet }; return true end,
-				translate = function(key) return key end, close = function() return true end,
+				translate = function(key) return key end, platform = "linux", close = function() return true end,
 				position_available = function() return true end, position_field = "evdev" }
 			options.capture_position = function(current, receive)
 				active = {}; callbacks[#callbacks + 1] = { current = current, receive = receive, token = active }
@@ -130,7 +130,7 @@ return function(helpers, Editor, Window, Model)
 				end,
 				commit = function() error("no writer authorized") end, picker = function() return false end,
 				emit = function() return true end, page_current = function() return true end,
-				send = function() return true end, translate = function(k) return k end, close = function() return true end,
+				send = function() return true end, translate = function(k) return k end, platform = "macos", close = function() return true end,
 				position_available = function() return true end, position_field = "evdev",
 				capture_position = function(current, receive)
 					active = {}; callbacks[#callbacks + 1] = { current = current, receive = receive, token = active }
@@ -174,7 +174,7 @@ return function(helpers, Editor, Window, Model)
 				end,
 				commit = function() error("no writer authorized") end, picker = function() return false end,
 				emit = function() return true end, page_current = function() return true end,
-				send = function(name) if name == "captured" then captured = captured + 1 end; return true end, translate = function(k) return k end, close = function() return true end,
+				send = function(name) if name == "captured" then captured = captured + 1 end; return true end, translate = function(k) return k end, platform = "macos", close = function() return true end,
 				position_available = function() return true end, position_field = "evdev",
 				capture_position = function(current, receive)
 					active = {}; callbacks[#callbacks + 1] = { current = current, receive = receive, token = active }
@@ -325,7 +325,7 @@ return function(helpers, Editor, Window, Model)
 				end,
 				picker = function(_, _, callback) state.callback = callback; return true end,
 				label = function(action) if state.on_label then state.on_label() end; return action end,
-				page_current = function() return true end, translate = function(key) return key end,
+				page_current = function() return true end, translate = function(key) return key end, platform = "linux",
 				close = function() return true end }
 			local function selected(packet)
 				state.emitted, state.packet = state.emitted + 1, packet
@@ -450,7 +450,7 @@ return function(helpers, Editor, Window, Model)
 					return "label:" .. action
 				end,
 				emit = function(packet) state.selected = packet; return true end,
-				page_current = function() return true end, translate = function(key) return key end,
+				page_current = function() return true end, translate = function(key) return key end, platform = "linux",
 				send = function(name, packet)
 					state.messages[#state.messages + 1] = { name = name, packet = packet }
 					if name == "selected" then state.selected = packet end
@@ -660,7 +660,7 @@ return function(helpers, Editor, Window, Model)
 				commit = function() s.writes = s.writes + 1; return true end,
 				picker = function() s.picker_calls = s.picker_calls + 1; return true end,
 				emit = function() return true end, send = function() return true end,
-				translate = function(key) return key end, position_field = "evdev",
+				translate = function(key) return key end, platform = "linux", position_field = "evdev",
 				position_available = function() return true end,
 				page_current = function()
 					if s.on_page then s.on_page(s) end
@@ -798,7 +798,7 @@ return function(helpers, Editor, Window, Model)
 				get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
 				split_action_parameter_key = function(key) return key:match("^(keyboard__.+)__(.+)$") end }
 			state.window = Window.new({ model = Model, catalogue = actions, parameter_section = "gesture_parameters",
-				positions = {}, label = function(action) return action end, translate = function(key) return key end,
+				positions = {}, label = function(action) return action end, translate = function(key) return key end, platform = "linux",
 				capture = function() return { assignments = clone(state.assignments), parameters = clone(state.parameters) }, state.receipt end,
 				current = function(receipt) return rawequal(receipt, state.receipt) end,
 				page_current = function() return state.page end,

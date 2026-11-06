@@ -6,6 +6,8 @@
  */
 const post = makeHostBridge('physical_shortcuts_bridge');
 let strings = {};
+// The host names each modifier and position from the shared key name table.
+let names = { modifiers: {}, positions: {} };
 let entries = [];
 let previous = null;
 let token = null;
@@ -15,6 +17,19 @@ let writable = true;
 let captureAvailable = false;
 const modifierNames = ['ctrl', 'alt', 'shift', 'super'];
 const node = (id) => document.getElementById(id);
+
+/**
+ * Reads one name the host sent; a missing one is a host defect, never an id.
+ * @param {object} table Id to translated name.
+ * @param {string} id Modifier id or physical code.
+ * @returns {string} The translated name.
+ */
+function named(table, id) {
+	const name = table[id];
+	if (typeof name !== 'string' || name === '')
+		throw new Error('physical shortcuts: no name for ' + id);
+	return name;
+}
 
 function status(key) {
 	node('status').textContent = strings[key] || '';
@@ -62,7 +77,8 @@ function render() {
 		label.textContent =
 			modifierNames
 				.filter((name) => record.mods[name])
-				.concat(record.code)
+				.map((name) => named(names.modifiers, name))
+				.concat(named(names.positions, record.code))
 				.join(' + ') +
 			' → ' +
 			record.label;
@@ -86,6 +102,7 @@ function render() {
 // Called only by the actual page owner after canonical/native capture.
 function init(data) {
 	strings = data.strings;
+	names = data.names;
 	entries = data.entries;
 	for (const id of [
 		'title',
@@ -108,7 +125,7 @@ function init(data) {
 	for (const position of data.positions) {
 		const option = document.createElement('option');
 		option.value = position.code;
-		option.textContent = position.code;
+		option.textContent = named(names.positions, position.code);
 		option.disabled = position.available !== true;
 		if (position.reason) option.textContent += ' — ' + position.reason;
 		node('position').appendChild(option);
@@ -122,7 +139,7 @@ function init(data) {
 		input.id = 'mod-' + name;
 		input.type = 'checkbox';
 		input.addEventListener('change', changed);
-		label.append(input, document.createTextNode(name));
+		label.append(input, document.createTextNode(named(names.modifiers, name)));
 		node('modifiers').appendChild(label);
 	}
 	writable = data.readonly !== true;
