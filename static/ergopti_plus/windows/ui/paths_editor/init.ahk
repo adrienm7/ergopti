@@ -664,7 +664,7 @@ _PathsEdWeb_BeginBareHost(Window, Epoch) {
 ; Only a different AHK owner or native absence proves this HWND was retired.
 ; An extant HWND without a resolvable AHK owner stays debt rather than being adopted.
 _PathsEdWeb_BareWindowRetired(Host) {
-	if !DllCall("User32\IsWindow", "Ptr", Host.hwnd, "Int")
+	if !WMHandleExists(Host.hwnd)
 		return true
 	Other := GuiFromHwnd(Host.hwnd)
 	return IsObject(Other) && Other != Host.gui

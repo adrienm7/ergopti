@@ -245,11 +245,11 @@ _LLM_ModelBrowser_RetryFailedNativeWindows() {
 			if Window.HasOwnProp("ListView") && Window.ListView != Host.listview
 				throw Error("The failed native constructor no longer owns its ListView reference.")
 			if IsObject(Host.timer)
-				SetTimer(Host.timer, 0)
+				TimerSetCallback(Host.timer, 0)
 			if Window.HasOwnProp("FilterDebounce")
 				Window.DeleteProp("FilterDebounce")
 			Window.Destroy()
-			if Host.hwnd && DllCall("IsWindow", "Ptr", Host.hwnd, "Int") {
+			if Host.hwnd && WMHandleExists(Host.hwnd) {
 				Remaining := GuiFromHwnd(Host.hwnd)
 				if !IsObject(Remaining) || Remaining == Window
 					throw Error("The failed native constructor window has not retired.")
@@ -550,7 +550,7 @@ _LLM_ModelBrowser_VisibilityClaim(Window, Visible, Owner := 0) {
 		_LLM_ModelBrowser_Visibility := Ticket, _LLM_ModelBrowser_VisibilityTimer := 0
 	} finally Critical(PreviousCritical)
 	if IsObject(OldTimer)
-		try SetTimer(OldTimer, 0)
+		try TimerSetCallback(OldTimer, 0)
 	return Ticket
 }
 
@@ -573,7 +573,7 @@ _LLM_ModelBrowser_VisibilityPerform(Window, Ticket) {
 	; already returned. Reconcile the actual last intent, not the old caller.
 	_LLM_ModelBrowser_VisibilityReconcile(Window)
 	return _LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
-		&& !!DllCall("IsWindowVisible", "Ptr", Window.Hwnd, "Int") == Ticket.visible
+		&& WMHandleVisible(Window.Hwnd) == Ticket.visible
 }
 
 _LLM_ModelBrowser_VisibilityReconcile(Window) {
@@ -584,7 +584,7 @@ _LLM_ModelBrowser_VisibilityReconcile(Window) {
 		Ticket := _LLM_ModelBrowser_Visibility
 		if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
 			return false
-		Visible := !!DllCall("IsWindowVisible", "Ptr", Window.Hwnd, "Int")
+		Visible := WMHandleVisible(Window.Hwnd)
 		if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
 			continue
 		if Visible == Ticket.visible
@@ -597,7 +597,7 @@ _LLM_ModelBrowser_VisibilityReconcile(Window) {
 	Ticket := _LLM_ModelBrowser_Visibility
 	if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
 		return false
-	if !!DllCall("IsWindowVisible", "Ptr", Window.Hwnd, "Int") == Ticket.visible
+	if WMHandleVisible(Window.Hwnd) == Ticket.visible
 		return _LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
 	_LLM_ModelBrowser_VisibilitySchedule(Ticket, Window)
 	return false
@@ -613,7 +613,7 @@ _LLM_ModelBrowser_VisibilitySchedule(Ticket, Window) {
 		Timer := _LLM_ModelBrowser_VisibilityResume.Bind(Ticket, _LLM_ModelBrowser_VisibilityTimerRevision)
 		_LLM_ModelBrowser_VisibilityTimer := Timer
 	} finally Critical(PreviousCritical)
-	try SetTimer(Timer, -1)
+	try TimerSetCallback(Timer, -1)
 	catch as Failure {
 		PreviousCritical := Critical("On")
 		try {
@@ -655,7 +655,7 @@ _LLM_ModelBrowser_VisibilityRetire(Ticket, Window) {
 		_LLM_ModelBrowser_Visibility := 0, _LLM_ModelBrowser_VisibilityTimer := 0, _LLM_ModelBrowser_Gui := unset
 	} finally Critical(PreviousCritical)
 	if IsObject(OldTimer)
-		try SetTimer(OldTimer, 0)
+		try TimerSetCallback(OldTimer, 0)
 	return true
 }
 

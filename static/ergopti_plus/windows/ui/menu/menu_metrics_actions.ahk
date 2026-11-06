@@ -161,7 +161,7 @@ _MET_WpmRetirePending() {
 		Done := false
 		try {
 			Window := Record.window, Hwnd := Record.hwnd
-			if Hwnd && !DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")
+			if Hwnd && !WMHandleExists(Hwnd)
 				Done := true
 			else if Hwnd && (Other := GuiFromHwnd(Hwnd)) is Gui && Other != Window
 				Done := true
@@ -171,7 +171,7 @@ _MET_WpmRetirePending() {
 					Window.Destroy()
 					Destroyed := true
 				}
-				if (!Hwnd && Destroyed) || (Hwnd && !DllCall("User32\IsWindow", "Ptr", Hwnd, "Int"))
+				if (!Hwnd && Destroyed) || (Hwnd && !WMHandleExists(Hwnd))
 					Done := true
 				else if Hwnd && (Other := GuiFromHwnd(Hwnd)) is Gui && Other != Window
 					Done := true

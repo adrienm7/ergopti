@@ -10,20 +10,24 @@
 #Requires AutoHotkey v2.0
 
 _HCRDM_Durable(Body) {
-	Resolve := InStr(Body, 'ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteDurable')
+	Resolve := InStr(Body, 'ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteCreateNewDurable')
 	if !Resolve
 		return false
 	Write := InStr(Body, 'Written := ResolvedWriter.Call(Path, Text)', true, Resolve)
 	if !Write
 		return false
-	Guard := InStr(Body, 'if !(Written is Integer) || Written != 1', true, Write)
+	Guard := InStr(Body, 'if (Written is Integer) && Written == 1', true, Write)
 	if !Guard
 		return false
-	Refuse := InStr(Body, 'throw Error("The complete diagnostics attachment could not be written.")', true, Guard)
-	if !Refuse
+	ReturnAt := InStr(Body, 'return Path', true, Guard)
+	if !ReturnAt
 		return false
-	ReturnAt := InStr(Body, 'return Path', true, Refuse)
-	return Resolve > 0 && Write > Resolve && Guard > Write && Refuse > Guard && ReturnAt > Refuse
+	; Only a name collision may try the next name; any other receipt refuses.
+	Collision := InStr(Body, 'if Written != "exists"', true, ReturnAt)
+	if !Collision
+		return false
+	Refuse := InStr(Body, 'throw Error("The complete diagnostics attachment could not be written.")', true, Collision)
+	return Resolve > 0 && Write > Resolve && Guard > Write && ReturnAt > Guard && Collision > ReturnAt && Refuse > Collision
 }
 
 _HCRDM_ActualRoute() {
@@ -41,12 +45,13 @@ _HCRDM_ActualRoute() {
 		"the real report route opens its browser after attachment completion")
 	AssertTrue(_HCRDM_Durable(Body), "the actual attachment default requires complete UTF-8 bytes and flush")
 	AssertFalse(_HCRDM_Durable(""), "a missing writer is refused without an invalid search offset")
-	AssertFalse(_HCRDM_Durable('ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteDurable'),
+	AssertFalse(_HCRDM_Durable('ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteCreateNewDurable'),
 		"a truncated route is refused before its dependent search")
 	for Mutation in [
-		['ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteDurable', 'ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWrite'],
+		['ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteCreateNewDurable', 'ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWrite'],
 		['Written := ResolvedWriter.Call(Path, Text)', 'Ignored := ResolvedWriter.Call(Path, Text)'],
-		['if !(Written is Integer) || Written != 1', 'if !Written'],
+		['if (Written is Integer) && Written == 1', 'if Written'],
+		['if Written != "exists"', 'if false'],
 		['throw Error("The complete diagnostics attachment could not be written.")', 'return Path']] {
 		Changed := StrReplace(Body, Mutation[1], Mutation[2], true, &Count)
 		AssertEqual(1, Count, "each mutation withdraws one actual native completion fact")
