@@ -43,7 +43,7 @@ helpers.describe("absolute pointer motion tracker", function()
 
 	helpers.it("the hook publishes a changed coordinate, and CapsWord's motion switch decides (CWL-001)", function()
 		local hook = assert(helpers.read_driver_unit("local function hold_owner("))
-		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "absolute_motion", ev.code, ev.value)')
+		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "absolute_motion", ev.code, ev.value, slot)')
 		helpers.assert_contains(hook, "_absolute_motion.lift(slot)")
 		helpers.assert_contains(hook, "_absolute_motion.reset()")
 	end)
