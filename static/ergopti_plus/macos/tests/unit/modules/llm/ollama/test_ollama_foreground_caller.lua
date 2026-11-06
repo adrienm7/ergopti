@@ -117,14 +117,15 @@ helpers.describe("Owned Ollama foreground API caller", function()
 		end)
 	end)
 
-	helpers.it("(daemon-caller-debt) cannot free a physically closed task missing its RETIRED frame", function()
+	helpers.it("(daemon-caller-debt) releases an exited, never-published task missing its RETIRED frame", function()
 		with_api("native_managed", function(api, shell)
 			helpers.assert_true(api.ensure_running())
 			local task = shell.tasks[1]
 			task.complete(78, "")
-			helpers.assert_eq(api.startup_idle(), false)
-			helpers.assert_eq(api.ensure_running(), false)
-			helpers.assert_eq(#shell.tasks, 1)
+			-- MAINTAINER DECISION 2026-11-06: a dead daemon that never published
+			-- its port holds nothing, so its cleanup releases it and the pause proceeds.
+			helpers.assert_true(api.startup_idle())
+			helpers.assert_true(api.pause_warmup())
 		end)
 	end)
 

@@ -99,6 +99,14 @@ function M.new(original, nonce, ports, callbacks)
 		end
 		reconcile()
 		if joined then return true, "settled" end
+		-- Dead and never published: nothing holds a port, so the pause proceeds.
+		local released, why = receipt.release_unpublished(original)
+		if released == true then
+			joined = true
+			if type(callbacks.on_released) == "function" then pcall(callbacks.on_released, handle, why) end
+			notify()
+			return true, "settled"
+		end
 		return ok == true and accepted == true, "pending"
 	end
 
