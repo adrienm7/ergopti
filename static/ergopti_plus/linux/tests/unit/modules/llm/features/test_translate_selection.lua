@@ -416,6 +416,26 @@ helpers.describe("selected translations require a known stable native focus", fu
 		end)
 	end)
 
+	helpers.it("a translation whose dispatch is refused retires its own loading offer (ll-002)", function()
+		scenario({ selection = SELECTION }, function(world)
+			local transport = package.loaded["adapters.http_client"]
+			local cancel = transport.cancel
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			transport.cancel = function() return false end
+			local ok, err = pcall(function()
+				world.handlers.llm_translate_selection("tap_3", "en")
+				helpers.assert_eq(#world.posts, 1, "the refused cancellation admits no second request")
+				helpers.assert_eq(world.engine.is_predicting(), false, "no dispatched request owns the loading state")
+				helpers.assert_true(world.shown == nil or world.shown.meta.loading ~= true)
+				world.respond(1, "TRANSLATION: original reply")
+				helpers.assert_eq(world.engine.is_predicting(), false)
+				helpers.assert_eq(#world.engine.get_suggestions(), 0, "the superseded answer publishes nothing")
+			end)
+			transport.cancel = cancel
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("sends a second translation at once, without waiting for the request interval (explicit-never-held)", function()
 		scenario({ selection = SELECTION }, function(world)
 			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
