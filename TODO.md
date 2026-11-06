@@ -223,14 +223,14 @@ Evidence: [six-scope recovery/lifecycle audit](docs/audits/platform-parity/2026-
 - [ ] **[CODE] MFM-001:** Refused bootstrap rewrite leaves a backup that blocks automatic restart recovery. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md).
 - [ ] **[CODE] MFM-002:** Refused configuration move still publishes a locator to the absent new folder. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md).
 - [ ] **[CODE] MFM-003:** Valid explicit configuration locators become dangling after their containing folder migrates. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md).
-- [ ] **[CODE] MFM-004:** Destination check followed by POSIX rename can overwrite a newer concurrently published file. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md).
+- [x] **[CODE] MFM-004:** Destination check followed by POSIX rename can overwrite a newer concurrently published file. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md). Native rename never replaces (mkdir reservation or hard link); a late arrival sends the old entry to its backup.
 - [ ] **[CODE] MFM-005:** Native directory listing refusal escapes migration and aborts driver initialization. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md).
 - [ ] **[CODE] MFM-006:** Legacy log alias archives active files from the current destination root. [Physical identity proof and immutable post-discovery controls](docs/audits/platform-parity/2026-11-04-recovery/macos-migration/report.md).
 - [ ] **[CODE] MUR-001:** Refused restart reports a retained armed installation as failed and idle. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/macos-updater/report.md).
 
 ### Linux
 
-- [ ] **[CODE] LFM-001:** Concurrent migration destination arrival is overwritten by native replacing rename. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md).
+- [x] **[CODE] LFM-001:** Concurrent migration destination arrival is overwritten by native replacing rename. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md). Native rename is renameat2 RENAME_NOREPLACE; a late arrival sends the old entry to its backup.
 - [ ] **[CODE] LFM-002:** Newline-bearing legacy filenames are split and silently skipped. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md).
 - [ ] **[CODE] LFM-003:** Relocated configuration directory retains its obsolete native bootstrap locator. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md).
 - [ ] **[CODE] LFM-004:** Native directory enumeration failure is accepted as an empty successful scan. [Reproduction, limits and regression direction](docs/audits/platform-parity/2026-11-04-recovery/linux-migration/report.md).

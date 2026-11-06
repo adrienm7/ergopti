@@ -15,7 +15,8 @@
 ---    folders it moves. Its report is logged once the logger is ready.
 --- 2. Shared Rules: what moves and what is refused is _shared/lua/
 ---    legacy_folder_migration.lua; this module only resolves the folders and
----    owns the shell effects (POSIX test, ls, mkdir, rmdir and os.rename).
+---    owns the shell effects (POSIX test, ls, mkdir, rmdir) and the no-replace
+---    rename of infra/no_replace_move.
 --- 3. Maintainer Machines Only: no Linux build was published with the old
 ---    folders; this exists for the maintainer's own installs and goes once they
 ---    are moved (docs/tooling/one-folder-name-handoff.md).
@@ -25,6 +26,7 @@ local M = {}
 
 local AppDirs = require("app_dirs")
 local Core = require("legacy_folder_migration")
+local NoReplaceMove = require("infra.no_replace_move")
 local quote = require("text_utils").shell_quote
 
 local LOG = "infra.legacy_folder_migration"
@@ -63,7 +65,9 @@ function M.native_ports()
 			pipe:close()
 			return names
 		end,
-		rename = function(from, to) return os.rename(from, to) end,
+		-- os.rename replaces an existing destination, so a file published after
+		-- the core's check would be lost; renameat2 RENAME_NOREPLACE never does.
+		rename = function(from, to) return NoReplaceMove.move(from, to) end,
 		make_dir = function(path) return succeeds("mkdir -p -- " .. quote(path) .. " 2>/dev/null") end,
 		remove_empty_dir = function(path) return succeeds("rmdir -- " .. quote(path) .. " 2>/dev/null") end,
 	}
