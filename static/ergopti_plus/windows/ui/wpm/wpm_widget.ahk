@@ -306,7 +306,17 @@ WPMWidget_RenderGraph(Label, AccentHex, Native := _WPMGdipFrameNative) {
 						if !FrameResult["ok"]
 								throw Error("WPM GDI+ frame failed: " . FrameResult["error"])
 				}
-				GR_DrawBitmap(g.Hwnd, DrawFn)
+				; The adapter answers false when the native upload refuses (and has
+				; already settled its own GDI cleanup). Report it: the previous bitmap
+				; is still on screen, or nothing was ever uploaded, so the caller must
+				; not reveal the surface or count the frame as presented.
+				if GR_DrawBitmap(g.Hwnd, DrawFn) != true {
+						if !WPMWidget._graph_upload_refused
+								try LoggerError("WPMWidget", "Graph frame upload refused by the native bitmap owner; the surface is not revealed.")
+						WPMWidget._graph_upload_refused := true
+						return false
+				}
+				WPMWidget._graph_upload_refused := false
 				return true
 		} finally {
 				PreviousCritical := Critical("On")

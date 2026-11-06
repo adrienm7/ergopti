@@ -144,6 +144,9 @@ class WPMWidget {
     static _gdip_font        := 0
     static _gdip_fmt         := 0
     static _gdip_frame_rendering := false
+    ; True while the last graph frame upload was refused by the native bitmap owner,
+    ; so a persistent refusal is logged once instead of on every 200 ms tick.
+    static _graph_upload_refused := false
     static _gdip_frame_cleanup_debt := 0
 
     ; Visibility + position.
@@ -501,8 +504,10 @@ WPMWidget_PrewarmGraph() {
         ; content. GR_Hide leaves it in the clean SW_HIDE resting state.
         _WPMWidget_ApplySurfaceGeometry(g)
         WPMWidget_EnsureGdip()
-        GR_DrawBitmap(g.Hwnd, _WPMWidget_WarmDrawTransparent)
+        Uploaded := GR_DrawBitmap(g.Hwnd, _WPMWidget_WarmDrawTransparent)
         GR_Hide(g.Hwnd)
+        if Uploaded != true
+            throw Error("the native bitmap upload was refused")
         LoggerDone("WPMWidget", "Graph window pre-warmed (transparent surface), off the typing path.")
     } catch as e {
         LoggerError("WPMWidget", "Graph pre-warm failed: {1}", e.Message)
