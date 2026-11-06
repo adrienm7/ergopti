@@ -5,7 +5,7 @@ local REPLACEMENT = "EP79_PRIVATE_REPLACEMENT_CANARY"
 local SELECTED = "EP79_PRIVATE_SELECTED_CANARY"
 local URI = "file:///owned/EP79_PRIVATE_URI_CANARY\n"
 
-local function with_snapshot(saved, body, targets)
+local function with_snapshot(saved, body, targets, owner)
 	local loaded, globals = {}, {}
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local old_cpath, old_ffi_preload = package.cpath, package.preload.ffi
@@ -43,6 +43,19 @@ local function with_snapshot(saved, body, targets)
 		local validate, run, checked, exact = shell.validate_spawn_args, shell.run, shell.exec_checked, shell.with_exact_stdin
 		local s = { value = saved, writes = {}, reads = {}, settles = {}, emits = {}, transforms = 0, layout_calls = 0,
 			listings = 0, targets = targets or "TARGETS\nTIMESTAMP\nUTF8_STRING\ntext/plain;charset=utf-8\n" }
+		-- The native multi-format owner is a child process; this fixture stands
+		-- in for its receipt and serves what it was handed as the clipboard.
+		s.target_bytes, s.owner_writes, s.target_reads = owner and owner.bytes or {}, {}, {}
+		package.loaded["adapters.clipboard_owner"] = {
+			available = function() return owner ~= nil and owner.available == true end,
+			write = function(saved_targets)
+				s.owner_writes[#s.owner_writes + 1] = saved_targets
+				for _, target in ipairs(saved_targets) do
+					if target.name == "UTF8_STRING" then s.value = target.data end
+				end
+				return true
+			end,
+		}
 		package.loaded["adapters.keyboard_layout"] = {
 			shortcut_keycode = function(char, fallback)
 				s.layout_calls = s.layout_calls + 1
@@ -59,6 +72,13 @@ local function with_snapshot(saved, body, targets)
 			if command == "timeout 1 xclip -selection clipboard -t TARGETS -o 2>/dev/null" then
 				s.listings = s.listings + 1
 				return { ok = true, output = s.targets }
+			end
+			local target = command:match("^timeout 1 xclip %-selection clipboard %-t '([^']+)' %-o 2>/dev/null$")
+			if target then
+				s.target_reads[#s.target_reads + 1] = target
+				local bytes = target == "UTF8_STRING" and s.value or s.target_bytes[target]
+				if bytes == nil then return { ok = false, output = "" } end
+				return { ok = true, output = bytes }
 			end
 			if command == clipboard or command == primary or command == uri then
 				s.reads[#s.reads + 1] = command
@@ -182,6 +202,35 @@ helpers.describe("clipboard snapshot restorability", function()
 				end, targets)
 			end)
 		end
+	end
+	-- LCP-001 follow-up: with the native owner, every advertised format is
+	-- saved byte for byte and handed back, NUL bytes included.
+	for _, owner in ipairs(owners) do
+		helpers.it("multi-format restore: " .. owner .. " hands every saved format to the native owner", function()
+			local html, png = "<b>EP79_PRIVATE_HTML</b>", "\137PNG\0\1EP79_PRIVATE_IMAGE"
+			local targets = "TARGETS\nTIMESTAMP\nUTF8_STRING\ntext/html\nimage/png\n"
+			with_snapshot("EP79_PRIVATE_RICH_TEXT", function(_, s)
+				local accepted = s.invoke(owner)
+				helpers.assert_eq(accepted, true)
+				helpers.assert_eq(s.target_reads, { "UTF8_STRING", "text/html", "image/png" })
+				helpers.assert_eq(#s.owner_writes, 1, "the restore goes through the multi-format owner once")
+				local restored = {}
+				for _, target in ipairs(s.owner_writes[1]) do restored[#restored + 1] = { target.name, target.data } end
+				helpers.assert_eq(restored, { { "UTF8_STRING", "EP79_PRIVATE_RICH_TEXT" }, { "text/html", html },
+					{ "image/png", png } })
+				helpers.assert_eq(s.value, "EP79_PRIVATE_RICH_TEXT")
+				for _, written in ipairs(s.writes) do
+					helpers.assert_true(written ~= "EP79_PRIVATE_RICH_TEXT", "the text writer must not restore a rich clipboard")
+				end
+			end, targets, { available = true, bytes = { ["text/html"] = html, ["image/png"] = png } })
+		end)
+		helpers.it("multi-format restore: " .. owner .. " refuses when one advertised format cannot be read", function()
+			local targets = "TARGETS\nUTF8_STRING\ntext/html\nimage/png\n"
+			with_snapshot("EP79_PRIVATE_RICH_TEXT", function(_, s)
+				helpers.assert_eq(s.invoke(owner), false)
+				helpers.assert_eq({ #s.writes, #s.owner_writes, #s.emits }, { 0, 0, 0 })
+			end, targets, { available = true, bytes = { ["text/html"] = "<i>x</i>" } })
+		end)
 	end
 	for _, method in ipairs({ "read_checked", "read_primary" }) do
 		helpers.it("snapshot preflight: raw " .. method .. " retains NUL without writes", function()

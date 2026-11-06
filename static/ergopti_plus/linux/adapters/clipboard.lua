@@ -112,6 +112,11 @@ local function backend()
 				-- Every MIME type the owner offers, one per line: a borrower
 				-- checks it before replacing formats it could not put back.
 				list_types = string.format("timeout %d wl-paste --list-types 2>/dev/null", IO_TIMEOUT_S),
+				-- One advertised type's exact bytes, for a multi-format snapshot.
+				read_target = function(target)
+					return string.format("timeout %d wl-paste --no-newline --type %s 2>/dev/null", IO_TIMEOUT_S,
+						Shell.quote(target))
+				end,
 			}
 		end
 		return nil
@@ -128,6 +133,10 @@ local function backend()
 				-- The ICCCM TARGETS answer: every target the owner can convert to.
 				list_types = string.format(
 					"timeout %d xclip -selection clipboard -t TARGETS -o 2>/dev/null", IO_TIMEOUT_S),
+				read_target = function(target)
+					return string.format("timeout %d xclip -selection clipboard -t %s -o 2>/dev/null", IO_TIMEOUT_S,
+						Shell.quote(target))
+				end,
 			}
 		end
 		if Shell.has_command("xsel") then
@@ -223,33 +232,90 @@ local function formats_lost_by_text_restore(selected_backend)
 	return true, lost
 end
 
---- Accepts a saved snapshot only when the writer can restore it whole.
+-- ICCCM bookkeeping an owner answers itself; it carries no saved payload.
+local BOOKKEEPING_TARGETS = {
+	["TARGETS"] = true, ["TIMESTAMP"] = true, ["MULTIPLE"] = true, ["SAVE_TARGETS"] = true,
+	["DELETE"] = true, ["INSERT_SELECTION"] = true, ["INSERT_PROPERTY"] = true,
+}
+
+-- Bytes a multi-format snapshot may hold in all; a larger clipboard (a raw
+-- screenshot in several encodings) is refused rather than held in memory.
+local MAX_RICH_SNAPSHOT_BYTES = 64 * 1024 * 1024
+
+--- Reads every advertised format's bytes for the multi-format owner.
+--- @param selected_backend table
+--- @return table|nil targets Ordered { { name, data } }, nil when one read failed.
+local function read_all_targets(selected_backend)
+	local ok, listing = Shell.exec_checked(selected_backend.list_types)
+	if not ok then return nil end
+	local targets, seen, total = {}, {}, 0
+	for line in listing:gmatch("[^\r\n]+") do
+		local name = require("text_utils").trim(line)
+		if name ~= "" and not BOOKKEEPING_TARGETS[name] and not seen[name] then
+			seen[name] = true
+			local read_ok, data = Shell.exec_checked(selected_backend.read_target(name))
+			if not read_ok then
+				Logger.warn(LOG, "The clipboard owner refused its %s format; borrowing refused.", name)
+				return nil
+			end
+			total = total + #data
+			if total > MAX_RICH_SNAPSHOT_BYTES then
+				Logger.warn(LOG, "Clipboard formats exceed %d bytes; borrowing refused.", MAX_RICH_SNAPSHOT_BYTES)
+				return nil
+			end
+			targets[#targets + 1] = { name = name, data = data }
+		end
+	end
+	if #targets == 0 then return nil end
+	return targets
+end
+
+--- Accepts a saved snapshot only when it can be restored whole.
 --- Raw readers may return NUL, but the literal sh -c writer cannot carry it.
---- The writers also offer a single text type: a clipboard holding HTML, an
---- image or copied files next to its text would come back as text alone,
---- which Windows (ClipboardAll) and macOS (readAllData) never do. Refuse
---- before an owner acquires restoration debt or mutates the clipboard.
+--- The text writers offer a single type: a clipboard holding HTML, an image
+--- or copied files next to its text is saved format by format and restored
+--- by the native multi-format owner (adapters/clipboard_owner.lua), as
+--- Windows (ClipboardAll) and macOS (readAllData) restore it. Where that
+--- owner cannot run, refuse before an owner acquires restoration debt or
+--- mutates the clipboard.
+--- @return boolean ok
+--- @return table snapshot { text, targets|nil } targets set for a multi-format restore.
+--- @return string|nil reason
 local function read_restorable_snapshot(selected_backend)
 	local ok, contents, reason = read_backend_checked(selected_backend)
-	if not ok then return false, "", reason end
-	if contents:find("\0", 1, true) then
-		Logger.warn(LOG, "Clipboard snapshot cannot be restored through the text writer.")
-		return false, "", "clipboard_snapshot_not_restorable"
-	end
+	if not ok then return false, nil, reason end
 	local listed, lost = formats_lost_by_text_restore(selected_backend)
 	if not listed then
 		-- xsel cannot ask for TARGETS: nothing proves the text is all there is.
 		Logger.warn(LOG, "Clipboard formats cannot be listed via %s; borrowing refused (install %s).",
 			selected_backend.name, DisplayServer.is_wayland() and "wl-clipboard" or "xclip")
-		return false, "", "clipboard_formats_unknown"
+		return false, nil, "clipboard_formats_unknown"
 	end
-	if #lost > 0 then
-		-- Format names only: they describe the clipboard, not its content.
-		Logger.warn(LOG, "Clipboard also holds %s, which the text writer cannot restore; borrowing refused.",
+	if #lost == 0 then
+		if contents:find("\0", 1, true) then
+			Logger.warn(LOG, "Clipboard snapshot cannot be restored through the text writer.")
+			return false, nil, "clipboard_snapshot_not_restorable"
+		end
+		return true, { text = contents }, nil
+	end
+	-- Format names only: they describe the clipboard, not its content.
+	if not require("adapters.clipboard_owner").available() then
+		Logger.warn(LOG, "Clipboard also holds %s, and no multi-format owner runs on this session; borrowing refused.",
 			table.concat(lost, ", "))
-		return false, "", "clipboard_snapshot_not_restorable"
+		return false, nil, "clipboard_snapshot_not_restorable"
 	end
-	return true, contents, nil
+	local targets = read_all_targets(selected_backend)
+	if not targets then return false, nil, "clipboard_snapshot_not_restorable" end
+	return true, { text = contents, targets = targets }, nil
+end
+
+--- Restores a snapshot through the writer that can carry all of it.
+--- @param selected_backend table
+--- @param snapshot table From read_restorable_snapshot.
+--- @return boolean
+local function restore_snapshot(selected_backend, snapshot)
+	if snapshot.targets then return require("adapters.clipboard_owner").write(snapshot.targets) end
+	return write_backend_checked(selected_backend, snapshot.text)
 end
 
 --- Whether the clipboard may be restored over the text Ergopti put there. A
@@ -460,12 +526,12 @@ function M.new_paste_stage(text, sleep_ms, key_v, admission)
 			-- do not identify either our payload or the saved snapshot.
 			local read_ok, current = read_backend_checked(b)
 			if not read_ok then return false end
-			if current ~= text and current ~= saved then
+			if current ~= text and current ~= saved.text then
 				if written and not restore_attempted then return true end
 				return false
 			end
 			restore_attempted = true
-			return write_backend_checked(b, saved)
+			return restore_snapshot(b, saved)
 		end)
 		busy = false
 		if ok and restored == true then restore_required, saved = false, nil end
@@ -486,9 +552,9 @@ function M.new_paste_stage(text, sleep_ms, key_v, admission)
 			if not current() then return false end
 			b = backend()
 			if not b or not current() then return false end
-			local read_ok, bytes = read_restorable_snapshot(b)
+			local read_ok, snapshot = read_restorable_snapshot(b)
 			if not read_ok then return false end
-			saved = bytes
+			saved = snapshot
 			if not current() then return false end
 			-- A failed/throwing setter may already have changed the clipboard.
 			restore_required = true
@@ -565,7 +631,7 @@ function M.paste_text(text, uinput, sleep_ms, admission)
 		-- A failed launcher may already have transferred ownership, or another
 		-- application may have copied. Restore only identifiable contents.
 		local read_ok, current = read_backend_checked(b)
-		local restored = read_ok and (current == text or current == saved) and write_backend_checked(b, saved)
+		local restored = read_ok and (current == text or current == saved.text) and restore_snapshot(b, saved)
 		Logger.error(LOG, "paste_text(): could not set the clipboard via %s.", b.name)
 		if not restored then return false, "clipboard restoration failed" end
 		return false
@@ -585,7 +651,7 @@ function M.paste_text(text, uinput, sleep_ms, admission)
 	-- clipboard as the user left it, and skipping the restore on an empty save
 	-- would leave our replacement sitting there.
 	local held = holds_pasted_text(b, text)
-	if held == nil or (held and not write_backend_checked(b, saved)) then
+	if held == nil or (held and not restore_snapshot(b, saved)) then
 		Logger.warn(LOG, "paste_text(): the previous clipboard content could not be restored.")
 		return false, "clipboard restoration failed"
 	end
@@ -662,7 +728,7 @@ function M.read_selection(emit_combo, sleep_ms)
 	if not copied and probe ~= nil then
 		local ok, current = read_backend_checked(b)
 		if not ok then return false, "", "clipboard_ownership_unknown" end
-		if current ~= probe and current ~= saved then return false, "", selected end
+		if current ~= probe and current ~= saved.text then return false, "", selected end
 	end
 	if copied then
 		-- A later copy must not be replaced with the old snapshot.
@@ -670,7 +736,7 @@ function M.read_selection(emit_combo, sleep_ms)
 		if not read_ok then return false, "", "clipboard_ownership_unknown" end
 		if current ~= selected then return true, selected, nil end
 	end
-	if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
+	if not restore_snapshot(b, saved) then return false, "", "clipboard_restore_failed" end
 	if not copied then return false, "", selected end
 	Logger.debug(LOG, "Read a %d-byte selection via %s.", #selected, b.name)
 	return true, selected, nil
@@ -697,8 +763,8 @@ function M.read_selection_uri_list(emit_combo, sleep_ms)
 	if not write_backend_checked(b, sentinel) then
 		local ok, current = read_backend_checked(b)
 		if not ok then return false, "", "clipboard_ownership_unknown" end
-		if current ~= sentinel and current ~= saved then return false, "", "clipboard_probe_write_failed" end
-		if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
+		if current ~= sentinel and current ~= saved.text then return false, "", "clipboard_probe_write_failed" end
+		if not restore_snapshot(b, saved) then return false, "", "clipboard_restore_failed" end
 		return false, "", "clipboard_probe_write_failed"
 	end
 	local copy_ok, copied = pcall(emit_combo, "ctrl+c")
@@ -714,9 +780,9 @@ function M.read_selection_uri_list(emit_combo, sleep_ms)
 	else
 		local ok, current = read_backend_checked(b)
 		if not ok then return false, "", "clipboard_ownership_unknown" end
-		if current ~= sentinel and current ~= saved then return false, "", "clipboard_ownership_unknown" end
+		if current ~= sentinel and current ~= saved.text then return false, "", "clipboard_ownership_unknown" end
 	end
-	if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
+	if not restore_snapshot(b, saved) then return false, "", "clipboard_restore_failed" end
 	if not settled then return false, "", "copy_chord_failed" end
 	if not read_ok or uri_list == "" or uri_list == sentinel then return false, "", "no_file_selection" end
 	Logger.debug(LOG, "Read a %d-byte uri-list selection via %s.", #uri_list, b.name)
@@ -749,7 +815,7 @@ function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 
 	local owned, previous_owned
 	local function restore()
-		return write_backend_checked(b, saved)
+		return restore_snapshot(b, saved)
 	end
 	local function fail(reason)
 		-- Before the sentinel is written we own no clipboard change to undo.
@@ -764,7 +830,7 @@ function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 	if not current() then return fail("destination_changed") end
 	local copied, selected, probe = copy_selection(b, emit_combo, sleep_ms, publication)
 	if not copied then
-		owned, previous_owned = probe, saved
+		owned, previous_owned = probe, saved.text
 		return fail(selected)
 	end
 	owned = selected
