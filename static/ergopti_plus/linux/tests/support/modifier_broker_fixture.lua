@@ -70,7 +70,7 @@ function M.new(options)
 		reset_state = function() capture_down = {}; return true end,
 		modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code] end,
 		caps_locked = function() return false end,
-		cancel_compose = function() return true end,
+		restore_compose = function() return true end,
 		process = function(code, value)
 			session.captures[#session.captures + 1] = { code, value }
 			if value == 1 then capture_down[code] = true elseif value == 0 then capture_down[code] = nil end

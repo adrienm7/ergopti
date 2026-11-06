@@ -124,7 +124,7 @@ function M.with_session(options, body)
 			return true
 		end,
 		modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code] end,
-		caps_locked = function() return false end, cancel_compose = function() return true end,
+		caps_locked = function() return false end, restore_compose = function() return true end,
 		peek_text = function(code)
 			if options.on_text then options.on_text(s) end
 			return code == 30 and "a" or nil

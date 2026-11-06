@@ -509,14 +509,17 @@ local function _xkb_answered()
 	Logger.info(LOG, "XKB answers again: the keys' roles and text come from the layout.")
 end
 
---- Forgets a dead key the capture state holds for a key press a consumer kept
+--- Withdraws from the capture state's Compose a key press a consumer kept
 --- from the application: the application's own Compose never saw it, so the
---- next key must read here as it types there, not composed with it.
-local function _cancel_capture_compose()
-	if _test_capture_event then return true end
-	local ok, err = XkbCapture.cancel_compose()
+--- next key must read here as it types there. The sequence before that press
+--- comes back, a dead key the application received included (DKL-001); a
+--- press XKB never read (mark nil) left nothing to withdraw.
+--- @param mark table|nil The Compose mark _capture returned for the press.
+local function _withdraw_capture_compose(mark)
+	if _test_capture_event or mark == nil then return true end
+	local ok, err = XkbCapture.restore_compose(mark)
 	if not ok then
-		_xkb_failed("XKB Compose could not be cancelled after a consumed key (%s) — the next key may read composed.",
+		_xkb_failed("XKB Compose could not withdraw a consumed key (%s) — the next key may read composed.",
 			tostring(err))
 	end
 	return ok == true
@@ -1720,11 +1723,13 @@ local function _dispatch_post_remap(ev, source)
 		or (ev.value == InputEvent.VALUE_DOWN and not aggregate_before and aggregate_after)
 		or (ev.value == InputEvent.VALUE_UP and aggregate_before and not aggregate_after)
 		or (ev.value == InputEvent.VALUE_REPEAT and held_role ~= nil)
-	local char, identity, capture_err, captured_control
+	local char, identity, capture_err, captured_control, compose_mark
 	local row_plan = not is_modifier and _number_row.preview(ev, source) or nil
 	if not is_modifier and not row_plan and not _capture_wire_transition(ev, source) then capture_transition = false end
 	if row_plan then char, identity = row_plan.text, row_plan.identity
-	elseif capture_transition then char, identity, capture_err, captured_control = _capture(ev.code, ev.value) end
+	elseif capture_transition then
+		char, identity, capture_err, captured_control, compose_mark = _capture(ev.code, ev.value)
+	end
 
 	if capture_err then
 		_xkb_failed("XKB capture failed (code=%d value=%d) — %s.", ev.code, ev.value, tostring(capture_err))
@@ -1811,7 +1816,7 @@ local function _dispatch_post_remap(ev, source)
 		else
 			-- XKB read each auto-repeat of the consumed press too, a dead key's
 			-- included, and the application saw none of them.
-			local compose_cancelled = _cancel_capture_compose()
+			local compose_cancelled = _withdraw_capture_compose(compose_mark)
 			local repeat_callback = _consumed_down[consumed_key]
 			if ev.value == InputEvent.VALUE_REPEAT and type(repeat_callback) == "function" then
 				local called, acknowledged = false, false
@@ -1852,7 +1857,7 @@ local function _dispatch_post_remap(ev, source)
 			_consumed_down[consumed_key] = repeat_callback or true
 			-- A dead key consumed here (a tap key or the physical magic key on
 			-- a French ^ or a US-international ') would otherwise stay pending.
-			if not _cancel_capture_compose() then
+			if not _withdraw_capture_compose(compose_mark) then
 				-- Its first output is already consumed; a refused retirement
 				-- cannot leave optional repeats alive for this held press.
 				_consumed_down[consumed_key] = true
