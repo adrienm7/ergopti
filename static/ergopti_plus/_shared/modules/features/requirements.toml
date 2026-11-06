@@ -179,6 +179,8 @@ content = [
 ]
 "modules/hotstrings/injector.lua" = ["hotstrings.**", "llm.**"]
 "modules/shortcuts/manager.lua" = ["shortcuts.**"]
+# Ctrl+é as Ctrl+C: decided in the keyboard hook's consumption callback.
+"modules/shortcuts/accented_shortcuts.lua" = ["shortcuts.a_grave.*", "shortcuts.e_acute.*", "shortcuts.e_circ.*", "shortcuts.e_grave.*"]
 "platform/remap/tap_hold_manager.lua" = ["tap_holds.*", "mod_combos.*", "shortcuts.key_combination_taps.*", "category_enabled.key_combinations"]
 "modules/keystats/" = ["metrics.**"]
 # The touchpad reader and the gesture actions.

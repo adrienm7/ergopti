@@ -99,7 +99,8 @@ M.REQUIREMENT_STATE_FEATURES = {
 	tap_holds_enabled         = { "tap_holds.enabled" }, -- config-key-literal-ok: a manifest feature selector
 	-- The per-key bindings and the tap timeout belong to the Tap-Holds switch;
 	-- they live in config_karabiner.toml and have no manifest row of their own.
-	tap_hold_config           = { "tap_holds.enabled" }, -- config-key-literal-ok: a manifest feature selector
+	-- A tap's command is led by the word-reset marker (tap_hold_marker).
+	tap_hold_config           = { "tap_holds.enabled", "hotstrings.tap_hold_resets_word" }, -- config-key-literal-ok: a manifest feature selector
 	tap_hold_timeout_ms       = { "tap_holds.enabled" }, -- config-key-literal-ok: a manifest feature selector
 	lone_modifier_tap_max_ms  = { "tap_holds.lone_modifier_tap_max_ms" }, -- config-key-literal-ok: a manifest feature selector
 	mod_combos_enabled        = { "mod_combos.*" },
