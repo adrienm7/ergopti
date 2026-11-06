@@ -266,6 +266,12 @@ AltGrFamilyStartFollowing() {
 
 _AltGrFamilyOnForeground(HWinEventHook, Event, Hwnd, IdObject, IdChild, IdEventThread, EventTime) {
 	AltGrFamilyFollow(GetForegroundKeyboardLayout())
+	; This hook is the driver's one foreground-change owner: switching window is
+	; user activity, so a pending AI prediction stops (2026-11-06).
+	if IsSet(LLM_Bridge_OnUserActivity)
+		try LLM_Bridge_OnUserActivity("foreground window changed")
+		catch as Err
+			LoggerError("AltGrDetect", "Prediction activity cancel on foreground change failed: {1}.", Err.Message)
 }
 
 ; Stops following the foreground window at shutdown: unhooks the WinEvent hook

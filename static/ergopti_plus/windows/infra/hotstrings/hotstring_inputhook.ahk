@@ -1765,6 +1765,12 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	; private InputHook is fully silent during suspend.
 	if A_IsSuspended
 		return
+	; A key the prediction tooltip does not own is user activity: the pending
+	; prediction stops before this key's typing arms the next pause.
+	if IsSet(LLM_Bridge_OnKeyActivity)
+		try LLM_Bridge_OnKeyActivity(VK)
+		catch as Err
+			LoggerError("PrefixWatcher", "Prediction activity cancel failed for VK {1}: {2}.", VK, Err.Message)
 	; This press belongs to the expansion it completes (HotstringEndKeyClaim).
 	if (VK == _PrefixEndKeyClaim) {
 		_PrefixEndKeyClaim := 0

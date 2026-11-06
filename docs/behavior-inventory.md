@@ -23,7 +23,7 @@ Edit `_shared/modules/features/behaviors.json` after reviewing the named owners,
 
 ## hotstrings.backspace_restore
 
-- windows: [static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk](../static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk) — `_OnPrefixKeyDown`, SHA-256 `efc8707f603d26cbdfb0934cc72e43627356123ebf3f5420519a24c8fac2e6ad`.
+- windows: [static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk](../static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk) — `_OnPrefixKeyDown`, SHA-256 `4cd2d7f8218564f39c55161a008e29301bb2563a1ed1e8c05ba3a85f4e6f97d6`.
 - macos: [static/ergopti_plus/macos/modules/keymap/init.lua](../static/ergopti_plus/macos/modules/keymap/init.lua) — `hotstrings.shortcut_resets_word`, SHA-256 `ca58752f4bff750256caf387a7be1e49f554a61e57261bbb88f993ba1d956f5f`.
 - linux: [static/ergopti_plus/linux/ergopti_hotstrings.lua](../static/ergopti_plus/linux/ergopti_hotstrings.lua) — `local undo = _undoable`, SHA-256 `384b795d4183874b9dfaee926740939d92889948ce9376f62bf8b52013bc3803`.
 

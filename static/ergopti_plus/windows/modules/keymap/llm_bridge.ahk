@@ -86,16 +86,6 @@ global _LLM_PointerWatch_LastY     := unset
 global _LLM_PointerWatch_MoveFn    := unset
 global _LLM_PointerWatch_ActivityFn := unset
 global _LLM_POINTER_POLL_MS        := 50
-; Cursor travel (px, per axis) FROM THE ORIGIN where the prediction appeared,
-; before pointer movement counts as a DELIBERATE dismiss. It must clear two kinds
-; of incidental motion that the user considers "rien touché": optical-sensor
-; jitter / slow drift (1-3 px), AND the ~30-50 px lurch the mouse makes when a
-; hand lifts off it and it settles. A real relocation to click/use something else
-; crosses far more (200+ px across the screen), and a click dismisses regardless.
-; Measured against a FIXED origin (total displacement), not per tick, so a slow
-; deliberate move still accumulates past it; drift cannot reach it within the
-; prediction's ~20 s lifetime. Tunable — raise it if a mouse lurches further.
-global _LLM_POINTER_MOVE_THRESHOLD_PX := 100
 ; Mirrors macOS llm_bridge.lua HOTSTRING_CHAIN_OFFSET_SEC — prediction fires
 ; just after the hotstring tooltip would normally close.
 global _LLM_HOTSTRING_CHAIN_OFFSET_SEC := 0.05
@@ -1290,6 +1280,7 @@ _LLM_Bridge_OnDispatcherKey(ih, vk, sc) {
 	if (KS_IsContextResetKey(vk) && vk != 0x20)
 		|| (!_PrefixIsModifierVK(vk) && _PrefixShortcutModifierHeld())
 		_PrefixRevokeIncompleteFragments()
+	LLM_Bridge_OnKeyActivity(vk)
 	LLM_Bridge_FeedKeyDownIfActive(vk)
 }
 
@@ -2161,19 +2152,54 @@ LLM_Bridge_ResetPredictions() {
  * before it is seen — the loading spinner has no grace, so it cancels immediately.
  */
 LLM_Bridge_OnPointerActivity(reason := "?") {
-	if !LLM_Bridge_HasActivePredictionWork()
-		return
-	; Minimum-display window: ignore stray pointer drift in the first moments after a
-	; real prediction renders so it cannot vanish before the user perceives it.
-	; InGracePeriod is false during loading, so the spinner stays fully cancellable.
-	if (IsSet(LLM_Tooltip_InGracePeriod) && LLM_Tooltip_InGracePeriod())
-		return
 	; ``reason`` names the exact trigger: a mouse-button / wheel hotkey passes its
 	; own name (e.g. "~LButton"), the move-tick passes "move dx=.. dy=..". This is
 	; the lens for "it vanished while I sat still" — the log says whether it was a
 	; real click, a wheel event, or pointer travel, and by how much.
-	try LoggerDebug("LLM.tt", "DISMISS: pointer activity ({1}) — cancelling in-progress generation + tooltip.", reason)
-	LLM_Bridge_ResetPredictions()
+	LLM_Bridge_OnUserActivity("pointer " . reason)
+}
+
+/**
+ * Cancels every pending prediction because the user did something: moved the
+ * pointer, clicked, scrolled, switched window, or pressed a key the tooltip does
+ * not own. Predictions run only while the user does nothing (maintainer decision
+ * 2026-11-06): no minimum-display shield applies, the request in flight and its
+ * debounce go, a late answer is dropped by the engine's cancellation, and the
+ * tooltip hides at once. The AI context stays: activity is not navigation (a
+ * click resets it separately through _OnMouseClickReset).
+ * @param {String} Reason The activity, for the debug log.
+ * @returns {Boolean} True when pending prediction work was cancelled.
+ */
+LLM_Bridge_OnUserActivity(Reason := "?") {
+	if !LLM_Bridge_HasActivePredictionWork()
+		return false
+	try LoggerDebug("LLM.tt", "DISMISS: user activity ({1}) — cancelling in-progress generation + tooltip.", Reason)
+	try LLM_Tooltip_MarkChainTimingOnly(A_TickCount)
+	LLM_Engine_StopGeneration()
+	if ((IsSet(LLM_Tooltip_IsVisible) && LLM_Tooltip_IsVisible())
+			or (IsSet(LLM_Tooltip_IsLoading) && LLM_Tooltip_IsLoading()))
+		LLM_Bridge_DeferTooltipHide()
+	return true
+}
+
+; True for the keys that act on a shown prediction without being consumed by
+; the cycle hotkeys first: Tab (accept, or flush when nothing is shown), the
+; digits of the validation chord, and the modifiers every chord starts with.
+_LLM_Bridge_KeyOperatesTooltip(VK) {
+	return VK == 0x09 || (VK >= 0x30 && VK <= 0x39) || (VK >= 0x60 && VK <= 0x69)
+		|| _PrefixIsModifierVK(VK)
+}
+
+/**
+ * Physical key-down observer: any key the tooltip does not own cancels the
+ * pending prediction before the typing path arms the next pause.
+ * @param {Integer} VK Virtual key code of a physical (I1-filtered) key-down.
+ * @returns {Boolean} True when pending prediction work was cancelled.
+ */
+LLM_Bridge_OnKeyActivity(VK) {
+	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active) || _LLM_Bridge_KeyOperatesTooltip(VK)
+		return false
+	return LLM_Bridge_OnUserActivity("key vk=" . Format("0x{:02X}", VK))
 }
 
 _LLM_PointerWatch_Start(Port := 0) {
@@ -2342,13 +2368,11 @@ _LLM_PointerWatch_Stop(Port := 0) {
 	return true
 }
 
-; True when the cursor has travelled far enough from its origin to count as a
-; deliberate move rather than sensor jitter / a hand resting on the mouse. Pure,
-; so the threshold logic is unit-testable without a real pointer.
-_LLM_PointerMovedEnough(x, y, ox, oy) {
-	global _LLM_POINTER_MOVE_THRESHOLD_PX
-	return (Abs(x - ox) > _LLM_POINTER_MOVE_THRESHOLD_PX
-			or Abs(y - oy) > _LLM_POINTER_MOVE_THRESHOLD_PX)
+; True when the cursor moved at all since the previous sample: predictions run
+; only while the user does nothing (2026-11-06), so any non-zero travel counts and
+; only a zero-distance sample does not. Pure, so it is unit-testable.
+_LLM_PointerMoved(x, y, ox, oy) {
+	return x != ox || y != oy
 }
 
 _LLM_PointerWatch_OnMoveTick(*) {
@@ -2362,39 +2386,31 @@ _LLM_PointerWatch_OnMoveTick(*) {
 	; guard is the cheap, local safety net.
 	if A_IsSuspended
 		return
-	; Dismiss-on-move applies whenever LLM work is active — the loading spinner, an
-	; in-flight generation, or a shown prediction (any input cancels). While NO work
-	; is active we drop the origin so the next cycle captures a fresh one; the grace
-	; branch below still shields a just-rendered prediction during its window.
+	; Dismiss-on-move applies whenever LLM work is active — the debounce, the loading
+	; spinner, an in-flight generation, or a shown prediction. While NO work is
+	; active the baseline is dropped, so the next cycle samples a fresh one.
 	if !LLM_Bridge_HasActivePredictionWork() {
 		_LLM_PointerWatch_LastX := unset
 		_LLM_PointerWatch_LastY := unset
 		return
 	}
-	; During the minimum-display window, ignore pointer movement entirely and keep
-	; the origin unset, so motion that happened while the prediction was settling in
-	; cannot dismiss it the instant the window opens.
-	if (IsSet(LLM_Tooltip_InGracePeriod) && LLM_Tooltip_InGracePeriod()) {
-		_LLM_PointerWatch_LastX := unset
-		_LLM_PointerWatch_LastY := unset
-		return
-	}
 	MouseGetPos(&x, &y)
-	; First tick past the window: capture the ORIGIN once and never dismiss on it.
+	; First tick with work active: capture the baseline and never dismiss on it.
 	if !IsSet(_LLM_PointerWatch_LastX) {
 		_LLM_PointerWatch_LastX := x
 		_LLM_PointerWatch_LastY := y
 		return
 	}
-	; Measure TOTAL displacement from that fixed origin and dismiss only once it
-	; clears the threshold — a deliberate relocation of the cursor. The origin is
-	; never reassigned, so a hand lifting off the mouse (a ~50 px settle) and any
-	; jitter/drift stay below it and keep the prediction up; only travelling well
-	; away from where the prediction appeared counts as "the user moved on". This is
-	; the "arrêté, rien touché" fix. A click still dismisses via its own hotkeys.
+	; Any travel since the previous sample is user activity (maintainer decision
+	; 2026-11-06: predictions run only while the user does nothing); a sample at the
+	; same position is not. The baseline follows the cursor so every tick compares
+	; against the one before it.
 	dx := Abs(x - _LLM_PointerWatch_LastX)
 	dy := Abs(y - _LLM_PointerWatch_LastY)
-	if _LLM_PointerMovedEnough(x, y, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY)
+	Moved := _LLM_PointerMoved(x, y, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY)
+	_LLM_PointerWatch_LastX := x
+	_LLM_PointerWatch_LastY := y
+	if Moved
 		LLM_Bridge_OnPointerActivity("move dx=" . dx . " dy=" . dy)
 	} finally {
 		Critical(_c)

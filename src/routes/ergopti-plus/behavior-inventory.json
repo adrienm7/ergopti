@@ -75,7 +75,7 @@
 				{
 					"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
 					"symbol": "_OnPrefixKeyDown",
-					"sha256": "efc8707f603d26cbdfb0934cc72e43627356123ebf3f5420519a24c8fac2e6ad"
+					"sha256": "4cd2d7f8218564f39c55161a008e29301bb2563a1ed1e8c05ba3a85f4e6f97d6"
 				}
 			],
 			"macos": [

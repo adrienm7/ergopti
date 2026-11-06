@@ -6,17 +6,14 @@ SetWorkingDir(A_ScriptDir)
 ; ==============================================================================
 ; MODULE: LLM Pointer-Dismiss Tests
 ; DESCRIPTION:
-; Behavioural guard for the "génération en cours" spinner that lingered through
-; user input. Per macOS parity (mouse_tap -> reset_predictions on any click in
-; any phase; a keystroke cancels generation via stop_timer) ANY input — keystroke,
-; click, or pointer move — must cancel an in-progress generation and hide the
-; tooltip. So pointer dismissal gates on LLM_Bridge_HasActivePredictionWork()
-; (loading spinner, in-flight generation, OR a shown prediction), NOT only a shown
-; prediction. The only protection retained is the minimum-display grace window: a
-; REAL prediction in its first 600 ms is shielded so an incidental click / drift
-; the instant it renders cannot kill it before the user perceives it (the loading
-; spinner has no grace, so it is cancellable immediately). The move watcher still
-; dismisses only past the deliberate-move threshold, never on sensor jitter.
+; Predictions run only while the user does nothing (maintainer decision
+; 2026-11-06). ANY activity — a click, a wheel turn, any non-zero pointer move, a
+; window switch or a key the tooltip does not own — cancels the in-progress
+; generation and hides the tooltip at once. Dismissal gates on
+; LLM_Bridge_HasActivePredictionWork() (debounce, loading spinner, in-flight
+; generation, OR a shown prediction). The minimum-display grace window no longer
+; shields a prediction from activity, and the move watcher no longer waits for a
+; 100 px travel: only a zero-distance sample is not activity.
 ; ==============================================================================
 
 #Include test_framework.ahk
@@ -72,6 +69,12 @@ TooltipHide(DbgTag := "?", Force := false, ExpectedGeneration := unset,
 }
 
 #Include ../modules/keymap/llm_bridge.ahk
+
+; The prefix watcher owns the modifier predicate; this isolated suite keeps its
+; production membership (Shift, Ctrl, Alt, Win in every sided form).
+_PrefixIsModifierVK(VK) {
+	return (VK >= 0x10 && VK <= 0x12) || (VK >= 0xA0 && VK <= 0xA5) || VK == 0x5B || VK == 0x5C
+}
 
 ; The include re-declares ``global _LLM_Bridge_Active := false`` at load, which
 ; overwrites the pre-include value — restore the active state the tests need.
@@ -171,18 +174,53 @@ _MMP_DismissWhenPredictionShown() {
 }
 Test("pointer-dismiss: pointer activity dismisses a shown prediction", _MMP_DismissWhenPredictionShown)
 
-_MMP_GraceShieldsShownPrediction() {
+_MMP_GraceNoLongerShields() {
 	global _MMP_HideHits, _MMP_StopHits
-	; A real prediction inside its minimum-display window is shielded: an incidental
-	; click / drift the instant it renders must not kill it before the user sees it.
-	; (The loading spinner has no grace — see _MMP_DismissDuringLoading.)
+	; A prediction inside its minimum-display window is hidden all the same: the
+	; user moved, so the answer is no longer wanted (2026-11-06).
 	_MMP_SetState(true, false, true)
-	LLM_Bridge_OnPointerActivity()
-	_MMP_WaitDismiss(0)
-	AssertEqual(0, _MMP_StopHits, "generation cancellation must respect active work and grace")
-	AssertEqual(0, _MMP_HideHits, "a shown prediction in its grace window must NOT be dismissed by pointer activity")
+	_MMP_DispatchDeferred()
+	_MMP_WaitDismiss(1)
+	AssertEqual(1, _MMP_StopHits, "activity cancels generation even inside the grace window")
+	AssertEqual(1, _MMP_HideHits, "activity hides a freshly shown prediction at once")
 }
-Test("pointer-dismiss: grace window shields a freshly-shown prediction", _MMP_GraceShieldsShownPrediction)
+Test("pointer-dismiss: the grace window does not shield a prediction from activity", _MMP_GraceNoLongerShields)
+
+_MMP_KeyOutsideTooltipCancels() {
+	global _MMP_HideHits, _MMP_StopHits
+	; F5 and a letter act on nothing the tooltip owns: the prediction goes.
+	for VK in [0x74, 0x41] {
+		_MMP_SetState(true, false, false)
+		PreviousCritical := Critical("On")
+		try AssertTrue(LLM_Bridge_OnKeyActivity(VK), "a key outside the tooltip is activity")
+		finally Critical(PreviousCritical)
+		_MMP_WaitDismiss(1)
+		AssertEqual(1, _MMP_StopHits, "the request in flight is cancelled")
+	}
+}
+Test("key-activity: a key the tooltip does not own cancels and hides", _MMP_KeyOutsideTooltipCancels)
+
+_MMP_TooltipKeysDoNotCancel() {
+	global _MMP_HideHits, _MMP_StopHits
+	; Tab accepts, the digits select, the modifiers start every chord.
+	for VK in [0x09, 0x31, 0x39, 0x61, 0xA0, 0xA2, 0xA4, 0x5B] {
+		_MMP_SetState(true, false, false)
+		AssertFalse(LLM_Bridge_OnKeyActivity(VK), "a key that operates the tooltip is not activity")
+		_MMP_WaitDismiss(0)
+		AssertEqual(0, _MMP_StopHits, "accepting or cycling keeps the prediction")
+	}
+}
+Test("key-activity: accept, select and modifier keys keep the prediction", _MMP_TooltipKeysDoNotCancel)
+
+_MMP_IdleKeepsPrediction() {
+	global _MMP_HideHits, _MMP_StopHits
+	; Nothing happens: the shown prediction stays.
+	_MMP_SetState(true, false, false)
+	_MMP_WaitDismiss(0)
+	AssertEqual(0, _MMP_StopHits, "an idle user keeps the request")
+	AssertTrue(LLM_Tooltip_IsVisible(), "an idle user keeps the prediction on screen")
+}
+Test("idle: a prediction stays while the user does nothing", _MMP_IdleKeepsPrediction)
 
 _MMP_NoWorkNoDismiss() {
 	global _MMP_HideHits, _MMP_StopHits
@@ -213,9 +251,10 @@ _MMP_MoveTickGatesOnActiveWork() {
 		"move-tick must gate on active prediction work (incl. loading), not only a shown prediction")
 	AssertContains(body, "_LLM_PointerWatch_LastX := unset",
 		"move-tick must reset the baseline while no prediction work is active")
-	; And it must dismiss only past the deliberate-move threshold, never on raw jitter.
-	AssertContains(body, "_LLM_PointerMovedEnough(x, y, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY)",
-		"move-tick must dismiss only when the cursor moved past the jitter threshold")
+	; Any non-zero travel since the previous sample dismisses; no grace shield.
+	AssertContains(body, "_LLM_PointerMoved(x, y, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY)",
+		"move-tick must dismiss on any travel since the previous sample")
+	AssertFalse(InStr(body, "InGracePeriod"), "move-tick must not shield a prediction in its grace window")
 	; The retired _LLM_Bridge_PredictionShown predicate must be fully gone — both the
 	; click handler and the move-tick now gate on HasActivePredictionWork (no dead code).
 	Source := _DriverSourceNoComments()
@@ -229,49 +268,21 @@ Test("pointer-dismiss: move-tick gates on active work + resets baseline", _MMP_M
 
 
 ; =========================================================
-; ======= 3/ Movement threshold (no dismiss on jitter) ====
+; ======= 3/ Any non-zero movement is activity ============
 ; =========================================================
 
-_MMP_JitterDoesNotDismiss() {
-	; A still mouse drifts a pixel or two from optical-sensor noise — must NOT count.
-	AssertFalse(_LLM_PointerMovedEnough(503, 401, 500, 400),
-		"a 3 px drift must not count as a deliberate move (regression: prediction vanished while the user sat still)")
-	AssertFalse(_LLM_PointerMovedEnough(500, 400, 500, 400),
-		"no movement must not dismiss")
+_MMP_ZeroDistanceIsNotActivity() {
+	AssertFalse(_LLM_PointerMoved(500, 400, 500, 400),
+		"a sample at the same position is not activity")
 }
-Test("pointer-threshold: small jitter does not dismiss", _MMP_JitterDoesNotDismiss)
+Test("pointer-move: a zero-distance sample does not dismiss", _MMP_ZeroDistanceIsNotActivity)
 
-_MMP_HandLiftDoesNotDismiss() {
-	; Logged in the wild: lifting a hand off the mouse lurched it dx=12 dy=48 and
-	; dismissed an idle prediction the user was reading. A settle of a few dozen px
-	; must NOT count — it is "rien touché" from the user's point of view.
-	AssertFalse(_LLM_PointerMovedEnough(512, 448, 500, 400),
-		"a ~50 px hand-lift settle must not dismiss the prediction")
-	AssertFalse(_LLM_PointerMovedEnough(500, 480, 500, 400),
-		"an 80 px settle must not dismiss either")
+_MMP_AnyTravelIsActivity() {
+	AssertTrue(_LLM_PointerMoved(501, 400, 500, 400), "one pixel horizontally is activity")
+	AssertTrue(_LLM_PointerMoved(500, 399, 500, 400), "one pixel vertically is activity")
+	AssertTrue(_LLM_PointerMoved(720, 650, 500, 400), "a relocation is activity")
 }
-Test("pointer-threshold: a hand lifting off the mouse does not dismiss", _MMP_HandLiftDoesNotDismiss)
-
-_MMP_DeliberateMoveDismisses() {
-	; Relocating the cursor to click/use something else crosses the screen — far past
-	; the threshold on either axis.
-	AssertTrue(_LLM_PointerMovedEnough(720, 400, 500, 400),
-		"a 220 px horizontal relocation is deliberate and must dismiss")
-	AssertTrue(_LLM_PointerMovedEnough(500, 650, 500, 400),
-		"a 250 px vertical relocation is deliberate and must dismiss")
-}
-Test("pointer-threshold: a deliberate relocation dismisses", _MMP_DeliberateMoveDismisses)
-
-_MMP_ThresholdBoundary() {
-	global _LLM_POINTER_MOVE_THRESHOLD_PX
-	; Exactly at the threshold does not dismiss (strict greater-than); one past does.
-	t := _LLM_POINTER_MOVE_THRESHOLD_PX
-	AssertFalse(_LLM_PointerMovedEnough(500 + t, 400, 500, 400),
-		"movement exactly at the threshold must not dismiss")
-	AssertTrue(_LLM_PointerMovedEnough(500 + t + 1, 400, 500, 400),
-		"movement one pixel past the threshold must dismiss")
-}
-Test("pointer-threshold: boundary is strict greater-than", _MMP_ThresholdBoundary)
+Test("pointer-move: any non-zero travel dismisses", _MMP_AnyTravelIsActivity)
 
 _MMP_StaleHideKeepsReplacement() {
 	global _MMP_ExactHits
