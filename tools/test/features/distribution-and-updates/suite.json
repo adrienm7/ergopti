@@ -633,6 +633,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-builder-boundaries.cjs"],
 			"repro": "node tools/test/test-windows-builder-boundaries.cjs"
+		},
+		{
+			"id": "js-macos-owned-runtime-code-hash-rule",
+			"ordinal": 595,
+			"name": "macOS owned runtime install and report paths admit the helper's code hashes through one rule",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-owned-runtime-code-hash-rule.cjs"],
+			"repro": "node tools/test/test-macos-owned-runtime-code-hash-rule.cjs"
 		}
 	]
 }
