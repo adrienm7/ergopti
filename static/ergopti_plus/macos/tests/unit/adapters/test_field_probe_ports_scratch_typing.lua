@@ -46,7 +46,13 @@ local function run(world, keys, options)
 		package.loaded["adapters.own_window"] = { for_webview = function() return { id = function() return SCRATCH_WINDOW end } end }
 		-- The shared chrome is its own owner's concern; the steps are recorded only
 		package.loaded["ui.ui_builder"] = {
-			force_focus = function() world.refocused = (world.refocused or 0) + 1 end,
+			-- macOS tells the window it has the focus, unless the world scripts silence
+			force_focus = function()
+				world.refocused = (world.refocused or 0) + 1
+				if world.window_callback and world.report_focus ~= false then
+					world.window_callback("focusChange", nil, true)
+				end
+			end,
 			window_chrome_steps = function()
 				world.chrome_applied = true
 				return {}
@@ -174,7 +180,21 @@ helpers.describe("field run scratch typing", function()
 	helpers.it("refuses the first key when Accessibility does not show the scratch window focused", function()
 		local world = run({ taps = "enabled", focus = function() return false end }, { "w", "k" })
 		helpers.assert_eq(#world.emitted, 0)
-		helpers.assert_eq(world.outcome.aborted, "window_unfocused")
+		helpers.assert_eq(world.outcome.aborted, "ax_window_mismatch", "distinct from the window's own focus report")
+	end)
+
+	-- Field report 2026-11-05: the first key asked Accessibility once, and a
+	-- 523 ms main-thread hold made it miss; the two refusals shared one token.
+	helpers.it("waits for the window's own focus report before asking Accessibility (scratch-focus-report)", function()
+		local world = { taps = "enabled", report_focus = false }
+		world.focus = function()
+			world.ax_reads = (world.ax_reads or 0) + 1
+			return true
+		end
+		run(world, { "w" })
+		helpers.assert_eq(#world.emitted, 0)
+		helpers.assert_eq(world.outcome.aborted, "focus_unreported")
+		helpers.assert_nil(world.ax_reads, "no Accessibility read before the window's focus report")
 	end)
 
 	-- Field reports 2026-11-05 and 2026-11-06: one focus look 0.6 s after show
