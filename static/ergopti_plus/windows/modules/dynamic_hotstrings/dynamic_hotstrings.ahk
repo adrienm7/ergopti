@@ -115,6 +115,21 @@ _DateIso(*) {
 
 
 
+; ========================================
+; ===== 1.2) International phone =====
+; ========================================
+
+; The "+33" form of a French number. Only a leading national trunk "0" is
+; dropped, as on macOS and Linux: a number that does not start with 0 keeps
+; every digit (cutting whatever came first would corrupt it).
+; @param Phone {String} The stored phone number.
+; @returns {String}
+_DynHS_InternationalPhone(Phone) {
+	return "+33" . (SubStr(Phone, 1, 1) == "0" ? SubStr(Phone, 2) : Phone)
+}
+
+
+
 ; ==========================================
 ; ==========================================
 ; ======= 2/ Registration ==================
@@ -172,15 +187,16 @@ _DynHS_RegisterAll() {
 	IbanRaw := RegExReplace(Iban, "[\s" . Chr(0xA0) . Chr(0x202F) . "]", "")
 
 	if Features["hotstrings"]["dynamic"][ConfigLeaf.PHONE_PREFIXES]["enabled"] {
+		IntlPhone := _DynHS_InternationalPhone(Phone)
 		; Mirrors HS: phone[1:2]+★, +33+phone[1:2], phone[1:4], +33+phone[2:4], phone[2:5], fphone[1:5]
 		MK := ScriptInformation["MagicKey"]
 		if StrLen(Phone) >= 2 {
 			CreateHotstring("*C", SubStr(Phone, 1, 2) . MK, (*) => Phone, _DynPrivateOpts)
-			CreateHotstring("*C", "+33" . SubStr(Phone, 1, 2), (*) => "+33" . SubStr(Phone, 2), _DynPrivateOpts)
+			CreateHotstring("*C", "+33" . SubStr(Phone, 1, 2), (*) => IntlPhone, _DynPrivateOpts)
 		}
 		if StrLen(Phone) >= 4 {
 			CreateHotstring("*C", SubStr(Phone, 1, 4), (*) => Phone, _DynPrivateOpts)
-			CreateHotstring("*C", "+33" . SubStr(Phone, 2, 3), (*) => "+33" . SubStr(Phone, 2), _DynPrivateOpts)
+			CreateHotstring("*C", "+33" . SubStr(Phone, 2, 3), (*) => IntlPhone, _DynPrivateOpts)
 		}
 		if StrLen(Phone) >= 6 {
 			CreateHotstring("*C", SubStr(Phone, 2, 4), (*) => Phone, _DynPrivateOpts)

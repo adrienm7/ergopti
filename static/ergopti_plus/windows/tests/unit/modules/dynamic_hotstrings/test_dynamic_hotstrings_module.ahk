@@ -406,6 +406,14 @@ _DynHSTest_PhoneReplacementsBody() {
 Test("dynamic hotstrings: every phone trigger expands to its national, international or spaced number",
 	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_PhoneReplacementsBody))
 
+_DynHSTest_InternationalPhoneDropsOnlyTheTrunkZero() {
+	AssertEqual("+33612345678", _DynHS_InternationalPhone("0612345678"), "a leading national 0 is dropped after +33")
+	AssertEqual("+33712345678", _DynHS_InternationalPhone("712345678"), "a number without the trunk 0 keeps its first digit (macOS and Linux parity)")
+	AssertEqual("+33", _DynHS_InternationalPhone(""), "an empty number yields the bare dial prefix without throwing")
+}
+Test("dynamic hotstrings: the +33 form drops only a leading 0, never another first digit",
+	_DynHSTest_InternationalPhoneDropsOnlyTheTrunkZero)
+
 _DynHSTest_SsnAndIbanReplacementsBody() {
 	AssertEqual("199999999999999", _DynHSTest_ExpandsTo("19999"), "the raw SSN trigger types the SSN without spaces")
 	AssertEqual("1 99 99 99 999 999 99", _DynHSTest_ExpandsTo("1 99 99"), "the spaced SSN trigger types the SSN with spaces")
