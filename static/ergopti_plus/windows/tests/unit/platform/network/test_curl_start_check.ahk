@@ -56,7 +56,9 @@ _CSC_RealFileAndEntry() {
 	AssertTrue(HTTP_CheckCurlAtStart(), "this machine is supported, so no dialog opens")
 	Entry := _DriverSourceConcat()
 	AssertContains(Entry, "SetTimer(HTTP_CheckCurlAtStart, -1)", "a dialog must not freeze the boot")
-	Assert(RegExMatch(Entry, 's)_DriverBootPhase := "ready".*\RHTTP_ScheduleCurlCheck\(_LLM_Menu\.Get\("enabled", false\)\)'),
+	; Positional search: a dot-all regex over the whole driver exceeds PCRE's limit.
+	ReadyPos := InStr(Entry, '_DriverBootPhase := "ready"')
+	Assert(ReadyPos > 0 && RegExMatch(Entry, 'm)^HTTP_ScheduleCurlCheck\(_LLM_Menu\.Get\("enabled", false\)\)', , ReadyPos) > ReadyPos,
 		"the entry schedules the check after ready, following the AI's own state")
 }
 Test("curl-start-check: the file reading and the entry's scheduling", _CSC_RealFileAndEntry)
