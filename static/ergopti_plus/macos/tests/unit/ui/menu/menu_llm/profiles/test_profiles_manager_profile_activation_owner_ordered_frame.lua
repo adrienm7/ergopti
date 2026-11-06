@@ -27,7 +27,15 @@ helpers.describe("complete ordered profile frame: actual macOS owner", function(
 	end
 	local oracle = read("tests/corpus/menus/profile_ordered_frame.json")
 	-- Explicit V3 presentation policy; preserve the original independent frame oracle bytes.
-	oracle.sections.llm_profile_lua_frame[5].on_refusal = "omit_presentation"
+	-- Found by section, not position: retiring the recommendation rows (4c0197d2)
+	-- moved the builtin heading from the fifth entry to the third.
+	local function include_of(frame, section)
+		for _, entry in ipairs(frame) do
+			if entry.type == "include" and entry.section == section then return entry end
+		end
+		error("the frame oracle declares no include of " .. section)
+	end
+	include_of(oracle.sections.llm_profile_lua_frame, "llm_profile_builtin_heading").on_refusal = "omit_presentation"
 	oracle.sections.llm_profile_windows_frame[1].on_refusal = "omit_presentation"
 	oracle.sections.llm_profile_custom_section[1].on_refusal = "omit_presentation"
 	local function with_frame(options, body)
