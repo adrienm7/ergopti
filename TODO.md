@@ -509,6 +509,11 @@ three-OS CI is green on the final source. See the handoff above for the current 
       (161 keyboard slots) and lazy dbusmenu children need a desktop check; macOS `menu_keyboard_layout.sources`
       re-reads the bundle variants from disk per rebuild (57-415 ms spikes) and needs a proven cache contract;
       hs.menubar has no per-row update, so a macOS toggle still rebuilds the root.
+      macOS, 6 November (wave 3): no cache: the build was repeating work with one answer. Both Keyboard Layouts
+      scopes were listed up to four times per rebuild (input-source map, active version, bundles stage, version
+      row) and the bundle's Info.plist and variant stats twice; one per-build snapshot now feeds every reader
+      (2 listings, 1 plist read; `test_layout_bundle_external_refresh`, `test_input_sources_version_gt`). Not timed
+      on a Mac: the next field report's `menu_keyboard_layout.sources` phase says whether the spikes are gone.
 - [x] **AI menu.** "Test a prediction" under the profile row: group model, profile, test, never two separators in a row.
       The test uses a high temperature, bypasses the cache, never a fixed string, and shows the generation time.
 - [x] **Generation parameters submenu.** Predictions count, min and max words with no separator; one separator; all the

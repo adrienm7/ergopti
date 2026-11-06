@@ -147,13 +147,21 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				end
 
 				local install = require("modules.keymap.layout_install")
+				-- Each reader of the installed bundles gets the build's one snapshot.
+				local snapshots = {}
 				package.loaded["modules.keymap.input_sources"] = {
 					list_active_keyboard_layouts = function() return {} end,
-					build_kl_name_to_tis_id = function() return {} end,
-					resolve_installed_ergopti_version = function() return nil end,
-					ergopti_in_active_layouts = function() return false end,
+					build_kl_name_to_tis_id = function(installed) snapshots.map = installed; return {} end,
+					resolve_installed_ergopti_version = function(installed) snapshots.version = installed; return nil end,
+					ergopti_in_active_layouts = function(_, installed) snapshots.active = installed; return false end,
 					set_active_layouts_cache = function() end,
 				}
+				local user_listings = 0
+				local list_directory = hs_stub.fs.dir
+				hs_stub.fs.dir = function(path)
+					if path == user_dir then user_listings = user_listings + 1 end
+					return list_directory(path)
+				end
 				package.loaded["adapters.storage"] = {
 					get = function() return nil end,
 					set = function() return true end,
@@ -192,6 +200,12 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				local row = user_row()
 				helpers.assert_eq(row.label, "user update v2.2.1 to v2.2.2")
 				helpers.assert_true(row.disabled ~= true)
+				helpers.assert_true(type(snapshots.map) == "table" and snapshots.map.user ~= nil,
+					"the input-source map reads the build's snapshot")
+				helpers.assert_true(snapshots.version == snapshots.map and snapshots.active == snapshots.map,
+					"every reader shares one snapshot instead of listing both scopes again")
+				helpers.assert_eq(snapshots.map.user.name, "Ergopti_v2.2.1.bundle")
+				helpers.assert_eq(user_listings, 1, "one listing of the user scope per build")
 
 				installed_user = { "Ergopti_v2.2.2.bundle" }
 				revisions.user = revisions.user + 1

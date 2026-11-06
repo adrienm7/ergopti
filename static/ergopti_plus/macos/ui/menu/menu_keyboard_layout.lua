@@ -370,6 +370,10 @@ function M.build(ctx)
 	-- phase list can say which stage the slow ones spend it in.
 	local stage_started = PhaseStats.now()
 	local records    = list_active_keyboard_layouts()
+	-- Both Keyboard Layouts scopes, listed once for the whole build: four
+	-- readers below each listed both again (eight directory scans and their
+	-- plist probes per rebuild), all with the same answer.
+	local installed  = { system = highest_installed(SYSTEM_LAYOUTS_DIR), user = highest_installed(USER_LAYOUTS_DIR) }
 	-- Build the active-Ergopti set directly from records — the same source used
 	-- to display the i18n.get("menu.layout.active_layouts") list below. If an entry appears there
 	-- it is truly active; no need to read HIToolbox separately.
@@ -378,7 +382,8 @@ function M.build(ctx)
 	-- NOT a TIS ID. We map it to a stable TIS ID via the installed bundle's keylayout files.
 	-- Records whose KeyboardLayout Name doesn't match any installed variant are orphan entries
 	-- (old bundle, different version) — we flag them so the menu can offer an upgrade.
-	local kl_name_to_tis = build_kl_name_to_tis_id() or {}
+	local kl_name_to_tis, installed_variants = build_kl_name_to_tis_id(installed)
+	kl_name_to_tis = kl_name_to_tis or {}
 	local active_id_set_pre = {}
 	local legacy_active     = {}
 	for _, r in ipairs(records) do
@@ -394,7 +399,7 @@ function M.build(ctx)
 			end
 		end
 	end
-	local list_state = ergopti_in_active_layouts(records)
+	local list_state = ergopti_in_active_layouts(records, installed)
 	PhaseStats.stop("menu_keyboard_layout.sources", stage_started)
 
 	stage_started = PhaseStats.now()
@@ -403,8 +408,8 @@ function M.build(ctx)
 	-- TIS can't enable an input source whose .bundle isn't installed.
 	-- user_best and system_best are declared here so they remain in scope for the
 	-- "Ajouter" submenu closures below (which live outside the `if latest then` block).
-	local user_best   = highest_installed(USER_LAYOUTS_DIR)
-	local system_best = highest_installed(SYSTEM_LAYOUTS_DIR)
+	local user_best   = installed.user
+	local system_best = installed.system
 	local latest_installed_anywhere = false
 	if latest then
 		local latest_ver  = parse_version(latest)
@@ -469,7 +474,9 @@ function M.build(ctx)
 	stage_started = PhaseStats.now()
 	local bundle_full_path = (installed_dir and installed_name) and
 		(NativePath.without_trailing_separators(installed_dir) .. "/" .. installed_name) or ""
-	local variants = bundle_full_path ~= "" and install.bundle_variants(bundle_full_path) or {}
+	-- The same bundle (system scope first) the input-source map read above.
+	local variants = installed_variants
+		or (bundle_full_path ~= "" and install.bundle_variants(bundle_full_path)) or {}
 	local all_variants_active = #variants > 0
 	local active_variant_count = 0
 	for _, var in ipairs(variants) do
@@ -590,7 +597,7 @@ function M.build(ctx)
 	-- names, which can collide across languages). Ergopti entries get the
 	-- bundle's actual installed version appended to their localised name
 	-- so a stable-id row no longer shows up as a bare "Ergopti+".
-	local resolved_ergopti_v = resolve_installed_ergopti_version()
+	local resolved_ergopti_v = resolve_installed_ergopti_version(installed)
 	local function display_for_record(r)
 		local id = r.id or ""
 		if id:lower():find("ergopti", 1, true) then

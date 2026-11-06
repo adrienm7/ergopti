@@ -44,14 +44,14 @@ helpers.describe("input_sources: build_kl_name_to_tis_id forward-declared (ui-me
 		local call_pos = src:find("build_kl_name_to_tis_id()", 1, true)
 		-- Definition assigns the upvalue (function keyword without 'local')
 		-- Match exactly "^function build_kl_name_to_tis_id" in the source
-		local def_pos  = src:find("\nfunction build_kl_name_to_tis_id()", 1, true)
+		local def_pos  = src:find("\nfunction build_kl_name_to_tis_id(", 1, true)
 
 		helpers.assert_true(fwd_pos ~= nil,
 			"input_sources.lua must have a 'local build_kl_name_to_tis_id' forward declaration")
 		helpers.assert_true(call_pos ~= nil,
 			"input_sources.lua must still contain a call to build_kl_name_to_tis_id()")
 		helpers.assert_true(def_pos ~= nil,
-			"input_sources.lua must assign the function via 'function build_kl_name_to_tis_id()' (not 'local function')")
+			"input_sources.lua must assign the function via 'function build_kl_name_to_tis_id(' (not 'local function')")
 		helpers.assert_true(fwd_pos < call_pos,
 			"the forward declaration must appear before the call site")
 		helpers.assert_true(call_pos < def_pos,

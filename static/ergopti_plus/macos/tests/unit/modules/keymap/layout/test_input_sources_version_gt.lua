@@ -75,4 +75,40 @@ helpers.describe("input_sources.resolve_installed_ergopti_version", function()
 		helpers.assert_true(type(result) == "table" and result[3] == 2,
 			"expected highest installed version {2,2,2}, got " .. tostring(result))
 	end)
+
+	-- The layout menu listed both Keyboard Layouts scopes up to four times per
+	-- rebuild (57-415 ms stage spikes on a field Mac); it now reads them once
+	-- and hands that snapshot to every reader, which must then list nothing.
+	helpers.it("reads no folder when the caller hands both scopes in", function()
+		helpers.load_with_stubs("infra.logger")
+		local listings = 0
+		package.loaded["modules.keymap.layout_install"] = {
+			USER_LAYOUTS_DIR   = "/Users/x/Library/Keyboard Layouts/",
+			SYSTEM_LAYOUTS_DIR = "/Library/Keyboard Layouts/",
+			highest_installed  = function() listings = listings + 1; return nil end,
+			path_exists = function() return true end,
+			version_gt = function(a, b) return a[3] > b[3] end,
+			bundle_variants = function(path)
+				helpers.assert_eq(path, "/Library/Keyboard Layouts/Ergopti_v2.2.2.bundle", "system scope first")
+				return { { name = "Ergopti_v2_2_2_plus", tis_id = "com.apple.keylayout.ergopti.plus" } }
+			end,
+		}
+		package.loaded["modules.keymap.input_sources"] = nil
+		local input_sources = require("modules.keymap.input_sources")
+		local installed = {
+			system = { name = "Ergopti_v2.2.2.bundle", version = { 2, 2, 2 } },
+			user   = { name = "Ergopti_v2.2.1.bundle", version = { 2, 2, 1 } },
+		}
+		local map, variants = input_sources.build_kl_name_to_tis_id(installed)
+		helpers.assert_eq(map.Ergopti_v2_2_2_plus, "com.apple.keylayout.ergopti.plus")
+		helpers.assert_eq(#variants, 1, "the variants the map was built from are handed back for reuse")
+		helpers.assert_eq(input_sources.resolve_installed_ergopti_version(installed)[3], 2)
+		local state = input_sources.ergopti_in_active_layouts({ { id = "com.apple.keylayout.ergopti.plus", name = "Ergopti+" } },
+			installed)
+		helpers.assert_eq(state.version[3], 2)
+		helpers.assert_eq(input_sources.build_kl_name_to_tis_id({}), nil, "an empty snapshot means no bundle")
+		helpers.assert_eq(listings, 0, "a snapshot must never be listed again")
+		input_sources.resolve_installed_ergopti_version()
+		helpers.assert_eq(listings, 2, "without a snapshot both scopes are still read")
+	end)
 end)
