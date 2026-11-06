@@ -168,8 +168,8 @@ two disagree in either direction.
 | `metrics.wpm_widget_visible`                                  | `karabiner`     | `evdev`                                | `webview2`           |
 | `metrics.wpm_widget_colors`                                   | `karabiner`     | `evdev`                                | `webview2`           |
 | `metrics.wpm_widget_graph`                                    | `karabiner`     | `evdev`                                | `webview2`           |
-| `metrics.wpm_menubar_visible`                                 | `karabiner`     | `evdev`                                | —                    |
-| `metrics.wpm_menubar_colors`                                  | `karabiner`     | `evdev`                                | —                    |
+| `metrics.wpm_menubar_visible`                                 | `karabiner`     | `evdev`                                | `webview2`           |
+| `metrics.wpm_menubar_colors`                                  | `karabiner`     | `evdev`                                | `webview2`           |
 | `shortcuts.enabled`                                           | —               | `evdev`, `uinput`                      | n/a                  |
 | `shortcuts.chatgpt_url`                                       | —               | `evdev`, `uinput`                      | —                    |
 | `shortcuts.wrap_text_if_selected`                             | n/a             | `evdev`, `uinput`                      | —                    |
