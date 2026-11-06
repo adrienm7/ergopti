@@ -7,9 +7,9 @@
 ; MODULE: Precision Touchpad Registry Data (Windows)
 ; DESCRIPTION:
 ; Every registry value Ergopti writes so each gesture slot sends its
-; Ctrl + Win + Shift + Fn shortcut, in write order. The in-process writer and
-; the first-run wizard's elevated PowerShell script both read this data, and
-; modules/gestures/touchpad_registry.ahk backs it up and restores it, or
+; Ctrl + Win + Shift + Fn shortcut, in write order. The tray action and the
+; first-run wizard both write it in process, through
+; modules/gestures/touchpad_registry.ahk, which backs it up and restores it, or
 ; writes factory_defaults back (and deletes every other name) when no
 ; backup exists.
 ; ==============================================================================
@@ -20,7 +20,6 @@
 TouchpadRegistryData() {
 	return Map(
 		"key", "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad",
-		"powershell_key", "HKCU:\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad",
 		"custom_value", 65535,
 		"custom_tap_value", 7,
 		"family_enables", ["ThreeFingerSlideEnabled", "ThreeFingerTapEnabled", "FourFingerSlideEnabled", "FourFingerTapEnabled"],

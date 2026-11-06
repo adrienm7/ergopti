@@ -5,11 +5,11 @@
 # Settings > Bluetooth & devices > Touchpad > Advanced gestures.
 #
 # ONE SOURCE. tools/codegen/codegen-touchpad-registry.cjs turns this file into
-# windows/_generated/touchpad_registry.ahk, and both writers read that data:
-# the in-process registry writer (modules/gestures/config.ahk) and the elevated
-# PowerShell script of the first-run wizard
-# (ui/onboarding/gesture_registration.ahk).
-# modules/gestures/touchpad_registry.ahk owns every write: it backs up the
+# windows/_generated/touchpad_registry.ahk. The tray action
+# (modules/gestures/config.ahk) and the first-run wizard
+# (ui/onboarding/gesture_registration.ahk) both write it in the resident
+# process, so the values land in the signed-in user's hive; only the touchpad
+# restart is elevated. modules/gestures/touchpad_registry.ahk owns every write: it backs up the
 # prior values before the first one, and restores them (or, without a backup,
 # the factory defaults below) when the Gestures scope is cleared.
 #
@@ -17,7 +17,6 @@
 # in Windows Settings. Every value is a REG_DWORD.
 
 key = 'HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad'
-powershell_key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad'
 
 # "Custom keyboard shortcut" for the family and direction enables, and "off"
 # for the new-system *Action values, so the older KeyParams take precedence.

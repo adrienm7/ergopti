@@ -5,13 +5,13 @@
  * MODULE: Precision Touchpad Registry Codegen
  * DESCRIPTION:
  * Emits windows/modules/gestures/precision_touchpad_registry.toml as the data
- * both Windows touchpad writers read: the in-process registry writer and the
- * elevated PowerShell script of the first-run wizard.
+ * the one Windows touchpad writer reads (modules/gestures/touchpad_registry.ahk),
+ * for the tray action and the first-run wizard alike.
  *
  * WHY THIS EXISTS:
- * The wizard's PowerShell script carried its own hand-typed copy of every value
- * name and every KeyParams number, "kept in sync" by a comment with the maps in
- * modules/gestures/init.ahk. Two copies of a registry contract drift, and the
+ * The wizard's PowerShell script once carried its own hand-typed copy of every
+ * value name and every KeyParams number, "kept in sync" by a comment with the
+ * maps in modules/gestures/init.ahk. Two copies of a registry contract drift, and the
  * one Ergopti writes first is the one a restore must undo. A compiled AHK build
  * has no TOML reader at include time, so it gets a generated copy; the TOML file
  * stays the only place a value is written by hand. The KeyParams numbers are
@@ -32,9 +32,8 @@ const SOURCE = path.join(SP, 'windows', 'modules', 'gestures', 'precision_touchp
 const AHK_OUTPUT = path.join(SP, 'windows', '_generated', 'touchpad_registry.ahk');
 const RUN_HINT = 'npm run codegen:touchpad-registry';
 
-// The registry root the key must live under, and its PowerShell drive spelling.
+// The registry root the key must live under.
 const REGISTRY_ROOT = 'HKEY_CURRENT_USER\\';
-const POWERSHELL_ROOT = 'HKCU:\\';
 // F1 is virtual key 0x70, so function key n is 0x6F + n.
 const VK_BEFORE_F1 = 0x6f;
 const MAX_FUNCTION_KEY = 24;
@@ -70,9 +69,6 @@ function valueName(value, where) {
 function buildContract(data) {
 	if (typeof data.key !== 'string' || !data.key.startsWith(REGISTRY_ROOT))
 		throw new Error(`key must live under ${REGISTRY_ROOT}`);
-	const relative = data.key.slice(REGISTRY_ROOT.length);
-	if (data.powershell_key !== POWERSHELL_ROOT + relative)
-		throw new Error('powershell_key must name the same key as key');
 	const customValue = dword(data.custom_value, 'custom_value');
 	const customTapValue = dword(data.custom_tap_value, 'custom_tap_value');
 	const modifiers = dword(data.key_params_modifiers, 'key_params_modifiers');
@@ -141,7 +137,6 @@ function buildContract(data) {
 	if (slots.length === 0) throw new Error('at least one gesture slot is required');
 	return {
 		key: data.key,
-		powershellKey: data.powershell_key,
 		customValue,
 		customTapValue,
 		familyEnables: [...families.values()],
@@ -204,9 +199,9 @@ function emitAhk(contract) {
 		'; MODULE: Precision Touchpad Registry Data (Windows)\n' +
 		'; DESCRIPTION:\n' +
 		'; Every registry value Ergopti writes so each gesture slot sends its\n' +
-		'; Ctrl + Win + Shift + Fn shortcut, in write order. The in-process writer and\n' +
-		"; the first-run wizard's elevated PowerShell script both read this data, and\n" +
-		'; modules/gestures/touchpad_registry.ahk backs it up and restores it, or\n' +
+		'; Ctrl + Win + Shift + Fn shortcut, in write order. The tray action and the\n' +
+		'; first-run wizard both write it in process, through\n' +
+		'; modules/gestures/touchpad_registry.ahk, which backs it up and restores it, or\n' +
 		'; writes factory_defaults back (and deletes every other name) when no\n' +
 		'; backup exists.\n' +
 		'; ==============================================================================\n' +
@@ -217,7 +212,6 @@ function emitAhk(contract) {
 		'TouchpadRegistryData() {\n' +
 		'\treturn Map(\n' +
 		`\t\t"key", ${ahkStr(contract.key)},\n` +
-		`\t\t"powershell_key", ${ahkStr(contract.powershellKey)},\n` +
 		`\t\t"custom_value", ${contract.customValue},\n` +
 		`\t\t"custom_tap_value", ${contract.customTapValue},\n` +
 		`\t\t"family_enables", [${contract.familyEnables.map(ahkStr).join(', ')}],\n` +

@@ -341,7 +341,7 @@ Audited source and immutable evidence: [18-scope review](docs/audits/platform-pa
 - [x] **AHK-006 / WM-003:** Explicit dashboard cache Reset preserves and reuses its durable reader image. [windows-metrics evidence](docs/audits/platform-parity/2026-11-04-deep/windows-metrics/report.md). Implement the stated boundary regression before claiming closure. Fixed: explicit cache Reset now retires the durable reader image (KLR_CacheRetire) before the successor build; regression tests added.
 - [x] **AHK-007 / WG-001:** Onboarding publishes success when Precision Touchpad restart is absent or fails. [windows-gestures evidence](docs/audits/platform-parity/2026-11-04-deep/windows-gestures/report.md). Implement the stated boundary regression before claiming closure. Fixed: onboarding PnP worker now fails on no device or refused disable/enable and re-enables disabled devices (same contract as the tray restart worker); regression test added.
 - [x] **AHK-008 / WG-002:** Existing invalid touchpad backup authorizes destructive registry configuration. [windows-gestures evidence](docs/audits/platform-parity/2026-11-04-deep/windows-gestures/report.md). Implement the stated boundary regression before claiming closure. Fixed: an existing touchpad backup must parse as restorable before any apply or onboarding elevation; regression test added.
-- [ ] **AHK-009 / WG-003:** Onboarding cross-account UAC writes elevated administrator HKCU instead of original user hive (conditional two-account UAC scenario; native confirmation still required). [windows-gestures evidence](docs/audits/platform-parity/2026-11-04-deep/windows-gestures/report.md). Implement the stated boundary regression before claiming closure.
+- [x] **AHK-009 / WG-003:** Onboarding cross-account UAC writes elevated administrator HKCU instead of original user hive (conditional two-account UAC scenario; native confirmation still required). [windows-gestures evidence](docs/audits/platform-parity/2026-11-04-deep/windows-gestures/report.md). Implement the stated boundary regression before claiming closure. Fixed: the wizard writes the values in the resident process through `TouchpadRegistryApply` (as the tray action does) and elevates only the registry-free touchpad restart (`_GestureRestartBuildPsScript`); the elevated registry writer and its PowerShell table are gone. Regressions in `test_touchpad_registry.ahk` (WG-003) and the path-encoding child (unrun on Linux), plus `test-touchpad-registry-single-source.cjs`. The real two-account UAC check is under « To confirm on the Windows PC ».
 
 ### macOS
 
@@ -781,6 +781,9 @@ Account and tester actions (maintainer, from the PC):
 - [ ] Branch `wave3/windows-deep` (2026-11-06, AHK unrun on Linux): run `test_keystats_journal_sealing.ahk`; then
       enable Metrics > « Encrypt logs on disk », type a unique marker in Notepad, wait for the ingest and check that
       `by_device\<id>\today.log` holds no readable marker while the dashboard still counts it.
+- [ ] WG-003 two-account check: as a standard user, run the first-run wizard's gesture registration and answer UAC
+      with a different administrator account; the standard user's PrecisionTouchPad values change (and its backup is
+      theirs), the administrator's hive is untouched, and the touchpad restart still reports success.
 
 ## To confirm on Linux
 
