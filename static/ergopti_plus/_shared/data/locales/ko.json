@@ -3845,7 +3845,7 @@
 	"platform_reason.proxy_override_is_native_settings": "macOS와 Linux에서는 이 설정이 config.toml이 아니라 드라이버의 자체 설정 저장소에 보관됩니다.",
 	"platform_reason.chord_families_are_each_platforms": "드라이버가 묶는 조합 계열은 그 플랫폼의 것입니다. Windows는 AltGr과 CapsLock 조합을 묶고 개인 단축키 파일을 두며, macOS는 Ctrl과 Cmd 단축키를 묶습니다. 각 드라이버는 자신이 묶는 계열만 나열합니다.",
 	"platform_reason.touchpad_stack_is_per_driver": "각 드라이버는 서로 다른 방식으로 터치패드를 읽습니다 — Windows는 정밀 터치패드 API, macOS는 Hammerspoon의 제스처 이벤트, Linux는 evdev. 그래서 각자 제공할 수 있는 슬롯과 필요한 설정이 저마다 다릅니다.",
-	"platform_reason.tray_top_level_rows_are_each_drivers": "각 드라이버의 트레이에는 그 플랫폼이 가진 최상위 항목이 들어갑니다. macOS의 애플리케이션 도구, Linux의 내장 업데이터, Windows의 일시 중지 스위치. 나머지는 같은 일을 다른 곳에서 하거나 아예 하지 않습니다.",
+	"platform_reason.tray_top_level_rows_are_each_drivers": "각 드라이버의 트레이에는 그 플랫폼이 가진 최상위 항목이 들어갑니다. Linux의 내장 업데이터, Windows의 일시 중지 스위치. 나머지는 같은 일을 다른 곳에서 하거나 아예 하지 않습니다.",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Windows 제외: 그 드라이버는 각 언어 항목에 국기 아이콘을 그리지만, 공용 메뉴 항목이 갖는 것은 라벨과 체크, 동작, 하위 메뉴이며 아이콘은 아닙니다. 그쪽에 이 항목을 선언하면 국기를 공용 설명과 맞바꾸는 셈입니다.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Linux 전용: 이 드라이버는 커널에서 원시 키코드를 읽고 어떤 물리 배열이 그것을 만들었는지 알아야 하므로, 해독에 쓸 표를 고릅니다. macOS는 시스템에 입력 소스를 묻고 Windows는 키보드 배열을 설치합니다. 둘 다 고를 해독 표가 없습니다.",
 	"platform_reason.shortcuts_restore_is_composed_on_macos": "macOS 아직 제외: macOS에서는 키 조합이 Karabiner 설정에 저장되며, 다른 단축키 설정과 함께 되돌리는 것은 ‘설정’ 메뉴의 복원뿐입니다.",
@@ -4131,5 +4131,7 @@
 	"apps.cloner.msg_icon_style_portable": "응용 프로그램 고유의 아이콘을 유지할까요, 아니면 클론용 이미지를 선택할까요?",
 	"apps.cloner.btn_original_icon": "원본 아이콘",
 	"apps.cloner.msg_created": "“{1}”이(가) 응용 프로그램 메뉴에 준비되었습니다. 자체 프로필을 {2}에 보관합니다.",
-	"apps.cloner.err_source_unreadable": "이 응용 프로그램은 복제할 수 없습니다. 실행기에 프로그램이 지정되어 있지 않습니다."
+	"apps.cloner.err_source_unreadable": "이 응용 프로그램은 복제할 수 없습니다. 실행기에 프로그램이 지정되어 있지 않습니다.",
+	"apps.encryptor.drop_hint": "암호화할 파일이나 복호화할 .enc 파일을 여기에 놓으세요.",
+	"apps.cloner.msg_no_isolation": "이 프로그램에는 별도 프로필 옵션이 없습니다. Windows에서 클론은 같은 설정으로 같은 프로그램을 시작하는 두 번째 바로 가기입니다."
 }

@@ -9057,7 +9057,7 @@ console.log(
 		menu.top_level.filter((row) => row.id === 'apps'),
 		[hand.row]
 	);
-	assert.deepEqual(hand.platform_presence, { hs: true, ahk: false, linux: true });
+	assert.deepEqual(hand.platform_presence, { hs: true, ahk: true, linux: true });
 	assert.equal(Object.keys(hand.captions).length, 21);
 	for (const [code, caption] of Object.entries(hand.captions)) {
 		assert.equal(

@@ -3845,7 +3845,7 @@
 	"platform_reason.proxy_override_is_native_settings": "在 macOS 和 Linux 上，此设置保存在驱动程序自己的设置存储中，而不是 config.toml。",
 	"platform_reason.chord_families_are_each_platforms": "驱动所绑定的组合键族属于它的平台：Windows 归拢 AltGr 和 CapsLock 组合并保有一份个人快捷键文件，macOS 归拢 Ctrl 和 Cmd 快捷键。每个驱动只列出自己绑定的那一族。",
 	"platform_reason.touchpad_stack_is_per_driver": "每个驱动读取触控板的方式不同——Windows 通过精确式触控板 API，macOS 通过 Hammerspoon 的手势事件，Linux 通过 evdev——因此各自能提供的槽位和所需的设置都是自己的。",
-	"platform_reason.tray_top_level_rows_are_each_drivers": "每个驱动的托盘承载其平台拥有的顶层项：macOS 上的应用工具、Linux 上的内置更新程序、Windows 上的暂停开关。其余的驱动要么从别处到达同样的地方，要么根本没有。",
+	"platform_reason.tray_top_level_rows_are_each_drivers": "每个驱动的托盘承载其平台拥有的顶层项：Linux 上的内置更新程序、Windows 上的暂停开关。其余的驱动要么从别处到达同样的地方，要么根本没有。",
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Windows 上没有：该驱动在每个语言项上绘制国旗图标，而共享的菜单项承载的是标签、勾选、动作和子菜单，并不包含图标。在那里声明这一项，等于用国旗换一份共享描述。",
 	"platform_reason.base_layout_is_the_linux_decode_table": "仅限 Linux：该驱动从内核读取原始键码，需要知道是哪种物理布局产生的，因此它要选择用来解码的对照表。macOS 向系统询问输入源，Windows 安装键盘布局，两者都没有可选的解码表。",
 	"platform_reason.shortcuts_restore_is_composed_on_macos": "暂不适用于 macOS：在那里，组合键保存在 Karabiner 的设置中，只有「配置」菜单中的恢复才会将它们与其他快捷键设置一起恢复。",
@@ -4131,5 +4131,7 @@
 	"apps.cloner.msg_icon_style_portable": "保留应用程序自身的图标，还是为克隆选择一张图片？",
 	"apps.cloner.btn_original_icon": "原始图标",
 	"apps.cloner.msg_created": "“{1}”已出现在应用程序菜单中。它在 {2} 中保留自己的配置文件。",
-	"apps.cloner.err_source_unreadable": "无法克隆此应用程序：其启动器未指定任何程序。"
+	"apps.cloner.err_source_unreadable": "无法克隆此应用程序：其启动器未指定任何程序。",
+	"apps.encryptor.drop_hint": "将文件拖放到此处进行加密，或拖放 .enc 文件进行解密。",
+	"apps.cloner.msg_no_isolation": "此程序没有单独配置文件的选项：在 Windows 上，其克隆是以相同设置启动同一程序的第二个快捷方式。"
 }

@@ -104,6 +104,7 @@ const WINDOWS_MECHANICS = {
 		'the startup receipt identity owner reports its executable and compiled flag',
 	'modules/keymap/uia_selection_worker.ahk': 'how a worker process is spawned',
 	'modules/keystats/keystats_prefetch.ahk': 'how a worker process is spawned',
+	'ui/menu/menu_apps.ahk': 'how a bundled app process is spawned',
 	'modules/dynamic_hotstrings/user_code.ahk':
 		'launch an owned personal-code worker with the bundled interpreter /script mode',
 	'adapters/program_providers.ahk':

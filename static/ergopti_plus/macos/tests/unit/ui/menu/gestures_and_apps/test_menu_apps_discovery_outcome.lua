@@ -402,7 +402,7 @@ helpers.describe("Apps parent declaration admission", function()
 				helpers.assert_eq(locale["menu.apps.title"], caption); count = count + 1
 			end
 			helpers.assert_eq(count, 21)
-			helpers.assert_eq(expected.platform_presence, { hs = true, ahk = false, linux = true })
+			helpers.assert_eq(expected.platform_presence, { hs = true, ahk = true, linux = true })
 		end)
 	end)
 

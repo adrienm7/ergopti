@@ -12,26 +12,14 @@
 		}
 	},
 	{
-		"path": "top_level.apps",
-		"visibility": "hide",
-		"labels": { "fr": "🛠️ Applications", "en": "🛠️ Applications" },
-		"platforms": { "windows": false, "macos": true, "linux": true },
-		"reasons": {
-			"windows": {
-				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
-				"fr": "La zone de notification de chaque pilote porte les lignes de premier niveau que sa plateforme possède : les outils d'application sur macOS, le programme de mise à jour intégré sur Linux, l'interrupteur de suspension sur Windows. Les autres atteignent le même terrain ailleurs, ou pas du tout."
-			}
-		}
-	},
-	{
 		"path": "top_level.reload",
 		"visibility": "hide",
 		"labels": { "fr": "🔄 Recharger", "en": "🔄 Reload" },
 		"platforms": { "windows": true, "macos": false, "linux": true },
 		"reasons": {
 			"macos": {
-				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
-				"fr": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
+				"en": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
+				"fr": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
 			}
 		}
 	},
@@ -42,12 +30,12 @@
 		"platforms": { "windows": false, "macos": true, "linux": false },
 		"reasons": {
 			"windows": {
-				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
-				"fr": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
+				"en": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
+				"fr": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
 			},
 			"linux": {
-				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
-				"fr": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
+				"en": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
+				"fr": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
 			}
 		}
 	},
@@ -58,8 +46,8 @@
 		"platforms": { "windows": true, "macos": false, "linux": true },
 		"reasons": {
 			"macos": {
-				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
-				"fr": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
+				"en": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
+				"fr": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
 			}
 		}
 	},
@@ -70,12 +58,12 @@
 		"platforms": { "windows": false, "macos": true, "linux": false },
 		"reasons": {
 			"windows": {
-				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
-				"fr": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
+				"en": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
+				"fr": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
 			},
 			"linux": {
-				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
-				"fr": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
+				"en": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
+				"fr": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
 			}
 		}
 	},
@@ -168,18 +156,6 @@
 			"linux": {
 				"en": "Each driver builds this part of the menu from its own parent, frame and child rows, because the native menu toolkits differ (AutoHotkey menus, Hammerspoon menubar tables, the Linux tray). The other drivers carry the same controls under rows of their own: this is a menu-structure difference, not a missing control.",
 				"fr": "Each driver builds this part of the menu from its own parent, frame and child rows, because the native menu toolkits differ (AutoHotkey menus, Hammerspoon menubar tables, the Linux tray). The other drivers carry the same controls under rows of their own: this is a menu-structure difference, not a missing control."
-			}
-		}
-	},
-	{
-		"path": "apps_menu.apps_installed",
-		"visibility": "hide",
-		"labels": { "fr": "apps_installed", "en": "apps_installed" },
-		"platforms": { "windows": false, "macos": true, "linux": true },
-		"reasons": {
-			"windows": {
-				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
-				"fr": "La zone de notification de chaque pilote porte les lignes de premier niveau que sa plateforme possède : les outils d'application sur macOS, le programme de mise à jour intégré sur Linux, l'interrupteur de suspension sur Windows. Les autres atteignent le même terrain ailleurs, ou pas du tout."
 			}
 		}
 	},
@@ -1203,7 +1179,12 @@
 		"visibility": "hide",
 		"labels": { "fr": "tap_hold_one_shot_delay", "en": "tap_hold_one_shot_delay" },
 		"platforms": { "windows": true, "macos": false, "linux": true },
-		"reasons": { "macos": { "en": "", "fr": "" } }
+		"reasons": {
+			"macos": {
+				"en": "Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.",
+				"fr": "Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's."
+			}
+		}
 	},
 	{
 		"path": "llm_api_add_provider_group.api_add_entry",
@@ -3193,12 +3174,12 @@
 		"platforms": { "windows": true, "macos": false, "linux": false },
 		"reasons": {
 			"macos": {
-				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
-				"fr": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
+				"en": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
+				"fr": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
 			},
 			"linux": {
-				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
-				"fr": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
+				"en": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
+				"fr": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
 			}
 		}
 	},
@@ -3221,12 +3202,12 @@
 		"platforms": { "windows": false, "macos": false, "linux": true },
 		"reasons": {
 			"windows": {
-				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
-				"fr": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
+				"en": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
+				"fr": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
 			},
 			"macos": {
-				"en": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
-				"fr": "Each driver's tray carries the top-level rows its platform has: the application tools on macOS, the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
+				"en": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all.",
+				"fr": "Each driver's tray carries the top-level rows its platform has: the in-app updater on Linux, the suspend switch on Windows. The others reach the same ground elsewhere or not at all."
 			}
 		}
 	},

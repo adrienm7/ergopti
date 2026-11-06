@@ -181,6 +181,7 @@ graph TD
     subgraph WINDOWS_Adapters["Windows (AutoHotkey) Adapters — windows/adapters/"]
         WINDOWS_app_launcher["AppLauncher.ahk"]
         WINDOWS_boot_clock["BootClock.ahk"]
+        WINDOWS_bundled_apps_native["BundledAppsNative.ahk"]
         WINDOWS_clipboard["Clipboard.ahk"]
         WINDOWS_console_window["ConsoleWindow.ahk"]
         WINDOWS_crash_report_worker["CrashReportWorker.ahk"]
