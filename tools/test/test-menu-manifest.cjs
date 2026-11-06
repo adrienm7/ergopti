@@ -3299,7 +3299,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			for (const row of section.rows)
 				if (row.id)
 					assert.ok(
-						body.includes('[Keys.' + row.id.toUpperCase() + ']'),
+						body.includes('[COMMAND.' + row.id.toUpperCase() + ']'),
 						'Linux command binding: ' + row.id
 					);
 		assert.ok(
