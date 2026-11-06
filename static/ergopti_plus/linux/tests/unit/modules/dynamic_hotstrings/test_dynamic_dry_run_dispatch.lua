@@ -42,7 +42,11 @@ end
 --- Runs one actual Main route and restores all acquired fixture ownership.
 --- @param kind string Dynamic route under test.
 --- @param dry_run boolean Main command-line posture.
-local function exercise(kind, dry_run)
+--- @param options table|nil `preview` (fake preview owner), `delay` (seconds the
+---   category cascade resolves), `pause_ms` (gap before the magic key) and
+---   `observe(report)` (receives the offers, suggestions, delay reads, document).
+local function exercise(kind, dry_run, options)
+	options = options or {}
 	local previous = {}
 	for name, value in pairs(package.loaded) do previous[name] = value end
 	for name in pairs(previous) do
@@ -145,7 +149,9 @@ local function exercise(kind, dry_run)
 				assert(dynamic.set_user_code_time_activation(0.5))
 				assert(dynamic.set_user_code_enabled(true))
 				h.assert_eq(user.count(), 1, "the original source loader admits the actual private callback")
+				local suggestions, delay_reads, clock = 0, {}, 0
 				local metrics = setmetatable({ on_keydown = function() end,
+					record_suggestion = function() suggestions = suggestions + 1 end,
 					record_hotstring = function() commits = commits + 1 end }, { __index = policy })
 				local environment = setmetatable({ secure_focus_guard = guard, script_actions = scripts,
 					-- Bare keys: the shared expansion delay reads the held modifiers per key.
@@ -155,8 +161,19 @@ local function exercise(kind, dry_run)
 					MagicKey = require("modules.hotstrings.magic_key"), opts = { dry_run = dry_run },
 					_cached_app_id = "owned-editor", keystats = metrics, engine_mod = engine_mod, engine = engine,
 					dyn_hotstrings = dynamic, injector = injector, Logger = require("logger.shim"), user_hotstring_native = native,
-					keyboard_hook = session.hook,
+					keyboard_hook = session.hook, tooltip_preview = options.preview,
 				}, { __index = _G })
+				if options.delay ~= nil then
+					environment.ExpansionDelay = require("modules.hotstrings.expansion_delay")
+					environment.hotstrings_config = { resolve = function(group, section)
+						delay_reads[#delay_reads + 1] = { group = group, section = section }
+						return { delay = options.delay }
+					end }
+				end
+				if options.pause_ms ~= nil then
+					-- The daemon stamps each key from its monotonic clock, not the event.
+					environment.Monotonic = { now_ms = function() return clock end, resolution_ms = function() return 0 end }
+				end
 				local main = assert(io.open(root .. "/ergopti_hotstrings.lua", "rb"))
 				local source = main:read("*a"); assert(main:close())
 				local first = assert(source:find("\tlocal function handle_char(", 1, true))
@@ -188,6 +205,7 @@ local function exercise(kind, dry_run)
 				local position = 0
 				for char in routes[kind].trigger:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
 					position = position + 1
+					clock = clock + (char == "★" and options.pause_ms or 10)
 					local code = assert(inverse[char]).keycode
 					session.edge("a", code, 1, 1000 + position * 10)
 					session.edge("a", code, 0, 1001 + position * 10)
@@ -195,6 +213,12 @@ local function exercise(kind, dry_run)
 				drain()
 				debug.sethook()
 				resume_jit()
+				if options.observe then
+					options.observe({ suggestions = suggestions, delay_reads = delay_reads,
+						document = document, commits = commits })
+					assert(user.stop()); drain()
+					return
+				end
 				h.assert_eq(calls.manager, dry_run and 0 or #routes[kind].trigger:gsub("[\128-\191]", ""), "Main gates before dynamic dispatch")
 				if dry_run then
 					h.assert_eq(calls, { manager = 0, inject = 0, fields = 0, user = 0, source = 0 }, "no output or programmable source I/O is dispatched")
@@ -244,6 +268,46 @@ h.describe("dynamic dry-run Main dispatch", function()
 			h.it("dynamic dry-run " .. kind .. " posture " .. tostring(dry_run), function() exercise(kind, dry_run) end)
 		end
 	end
+end)
+
+--- A preview owner that answers `show` with the given verdicts and records offers.
+--- @param verdicts table Booleans returned by successive `show` calls; the last repeats.
+--- @return table preview
+--- @return table offers One `{ rows = {...}, shown = boolean }` per `show` call.
+local function recording_preview(verdicts)
+	local offers = {}
+	local preview = {
+		is_visible = function() return false end, is_showing = function() return false end,
+		hide = function() end,
+		show = function(candidates)
+			local rows = {}
+			for index, candidate in ipairs(candidates) do rows[index] = candidate end
+			local shown = verdicts[math.min(#offers + 1, #verdicts)]
+			offers[#offers + 1] = { rows = rows, shown = shown }
+			return shown
+		end,
+	}
+	return preview, offers
+end
+
+-- invisible-offer-metrics (LIN-002): the bubble refused by a toggle, a category or
+-- a missing renderer was still counted as a suggestion the user saw.
+h.describe("Main counts only the offers the preview drew (invisible-offer-metrics)", function()
+	h.it("invisible-offer-metrics refused previews count no suggestion", function()
+		local preview, offers = recording_preview({ false })
+		exercise("fields", false, { preview = preview, observe = function(report)
+			h.assert_true(#offers > 0, "the actual Main handler offers the @-combo row")
+			h.assert_eq(report.suggestions, 0, "an offer the renderer refused was never seen")
+		end })
+	end)
+
+	h.it("invisible-offer-metrics drawn previews still count", function()
+		local preview, offers = recording_preview({ true })
+		exercise("fields", false, { preview = preview, observe = function(report)
+			h.assert_true(#offers > 0, "the positive control draws the @-combo row")
+			h.assert_eq(report.suggestions, #offers, "each distinct drawn row counts once")
+		end })
+	end)
 end)
 
 return true
