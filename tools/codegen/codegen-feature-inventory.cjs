@@ -28,6 +28,13 @@ const OUT_BEHAVIORS = 'src/routes/ergopti-plus/behavior-inventory.json';
 const OUT_BEHAVIOR_MD = 'docs/behavior-inventory.md';
 const OS = { windows: 'ahk', macos: 'hs', linux: 'linux' };
 
+const OUT_HIDDEN_REASONS = 'static/ergopti_plus/_shared/modules/menu/hidden_row_reasons.json';
+
+// The reason of every hidden restricted menu row, keyed by `section` or `section.row`.
+function loadHiddenReasons() {
+	return JSON.parse(fs.readFileSync(path.join(ROOT, OUT_HIDDEN_REASONS), 'utf8'));
+}
+
 // A section reason applies only when it describes precisely the same drivers.
 function withSectionReasons(features, sections) {
 	return features.map((feature) => {
@@ -56,7 +63,8 @@ function render(
 	menu,
 	layers = {},
 	tapHolds = {},
-	behaviors = loadBehaviors(ROOT, locales)
+	behaviors = loadBehaviors(ROOT, locales),
+	hiddenReasons = loadHiddenReasons()
 ) {
 	if (features.length < 300) throw new Error('Feature inventory unexpectedly small');
 	const seen = new Set();
@@ -152,6 +160,7 @@ function render(
 	}
 	if (actionRows.length < 200) throw new Error('Action inventory unexpectedly small');
 	const menuRows = [];
+	const usedHiddenReasons = new Set();
 	for (const [section, entries] of Object.entries(menu)) {
 		if (!Array.isArray(entries)) continue;
 		for (const entry of entries) {
@@ -173,8 +182,22 @@ function render(
 				continue;
 			if (entry.platforms.some((key) => !Object.values(OS).includes(key)))
 				throw new Error(`Invalid menu platforms: ${section}`);
-			if (entry.unavailable === 'grey' && (!entry.reason_key || !locales.en[entry.reason_key]))
-				throw new Error(`Invalid unavailable menu entry: ${section}`);
+			// A hidden row carries no reason_key in the menu (its validator forbids one), so its
+			// reason lives in the hidden-row registry, by row identity then by section.
+			const reasonKey =
+				entry.reason_key ||
+				hiddenReasons[`${section}.${entry.id || entry.path}`] ||
+				hiddenReasons[section];
+			if (!reasonKey || !locales.en[reasonKey] || !locales.fr[reasonKey])
+				throw new Error(
+					`Restricted menu entry has no translated reason: ${section}.${entry.id || entry.path}`
+				);
+			if (!entry.reason_key)
+				usedHiddenReasons.add(
+					hiddenReasons[`${section}.${entry.id || entry.path}`]
+						? `${section}.${entry.id || entry.path}`
+						: section
+				);
 			const id = entry.id || entry.path;
 			if (!id) throw new Error(`Unavailable menu entry has no identity: ${section}`);
 			menuRows.push({
@@ -192,8 +215,8 @@ function render(
 						.map(([os]) => [
 							os,
 							{
-								en: locales.en[entry.reason_key] || '',
-								fr: locales.fr[entry.reason_key] || locales.en[entry.reason_key] || ''
+								en: locales.en[reasonKey],
+								fr: locales.fr[entry.reason_key] || locales.en[reasonKey]
 							}
 						])
 				)
@@ -201,6 +224,8 @@ function render(
 		}
 	}
 	if (!menuRows.length) throw new Error('Unavailable menu inventory unexpectedly empty');
+	for (const key of Object.keys(hiddenReasons))
+		if (!usedHiddenReasons.has(key)) throw new Error(`Stale hidden-row reason: ${key}`);
 	const inputRows = (tapHolds.tap_hold?.catalog?.keys || []).map((entry) => ({
 		path: `tap_hold.${entry.id}`,
 		labels: Object.fromEntries(
@@ -252,9 +277,7 @@ function render(
 	for (const os of Object.keys(OS)) {
 		lines.push(`## ${os} — restricted menu entries`, '');
 		for (const row of menuRows.filter((entry) => !entry.platforms[os]))
-			lines.push(
-				`- [ ] \`${row.path}\` (${row.visibility}): ${row.reasons[os].en || 'Review the platform-specific presentation and equivalent.'}`
-			);
+			lines.push(`- [ ] \`${row.path}\` (${row.visibility}): ${row.reasons[os].en}`);
 		lines.push('');
 	}
 	lines.push(

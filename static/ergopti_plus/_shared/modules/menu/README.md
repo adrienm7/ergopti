@@ -20,6 +20,7 @@ Adding, removing or renaming a row happens in `menu.toml`, never in a driver.
 | `startup_tray_projection.ahk` | Generated Windows recovery tray, written by the same build                |
 | `row_order.json`              | Shared row-order rules some native menus apply                            |
 | `section_header.json`         | The one frame of every section header (`npm run gen` projects it)         |
+| `hidden_row_reasons.json`     | Why each hidden platform-restricted row is absent on the other drivers    |
 
 ## Row types
 
