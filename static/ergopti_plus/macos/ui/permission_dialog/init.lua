@@ -53,13 +53,15 @@ M.BRIDGE = "permission_dialog_bridge"
 
 -- Permissions this dialog explains. Each owns the locale keys under its prefix
 -- and lists its steps in order; the first names the button that opens the
--- pane. `names_bundle` adds the + step quoting the runtime path, and
+-- pane. `names_copies` formats its second step with the other copies of the
+-- app, `names_bundle` adds the + step quoting the runtime path, and
 -- `floating` marks the one kind shown before Accessibility is granted (see
 -- ui_builder.PERMISSION_DIALOG_CHROME); every other kind is focused instead.
 M.KINDS = {
-	accessibility = {
-		prefix       = "permission_dialog.accessibility",
-		steps        = { "step_opened", "step_toggle" },
+	accessibility_copies = {
+		prefix       = "permission_dialog.accessibility_copies",
+		steps        = { "step_opened", "step_other_copies", "step_toggle" },
+		names_copies = true,
 		names_bundle = true,
 		floating     = true,
 	},
@@ -99,6 +101,9 @@ local function validate(spec)
 	if M.KINDS[spec.kind].names_bundle
 		and (type(spec.bundle_path) ~= "string" or spec.bundle_path == "") then
 		error("permission_dialog.show: bundle_path must be a non-empty string", 3)
+	end
+	if M.KINDS[spec.kind].names_copies and (type(spec.copies) ~= "table" or #spec.copies == 0) then
+		error("permission_dialog.show: copies must be a non-empty list", 3)
 	end
 	if spec.on_closed ~= nil and type(spec.on_closed) ~= "function" then
 		error("permission_dialog.show: on_closed must be a function when given", 3)
@@ -165,8 +170,9 @@ end
 --- @param kind string Permission kind.
 --- @param bundle_path string|nil Path of the runtime the grant belongs to, for
 ---        a kind that names it.
+--- @param copies table|nil Paths of the other copies, for a kind that names them.
 --- @return table content { locale, window_title, title, body, steps, open_label, later_label }
-function M.content(kind, bundle_path)
+function M.content(kind, bundle_path, copies)
 	local spec = M.KINDS[kind]
 	local prefix = spec.prefix
 	local open_label = i18n.get("permission_dialog.open_settings")
@@ -176,6 +182,8 @@ function M.content(kind, bundle_path)
 			-- The dialog opens before the pane does, and the pane may not open
 			-- at all, so this step names the button that opens it again.
 			steps[index] = i18n.format(prefix .. "." .. name, open_label)
+		elseif index == 2 and spec.names_copies then
+			steps[index] = i18n.format(prefix .. "." .. name, table.concat(copies, ", "))
 		else
 			steps[index] = i18n.get(prefix .. "." .. name)
 		end
@@ -377,7 +385,7 @@ function M.show(spec)
 			on_action(session, type(body) == "table" and body.action or nil)
 		end)
 		if not bound then error("Permission dialog callback binding did not commit: " .. tostring(detail)) end
-		local content = M.content(spec.kind, spec.bundle_path)
+		local content = M.content(spec.kind, spec.bundle_path, spec.copies)
 		return ui_builder.show_webview({
 			frame         = dialog_frame(geometry),
 			title         = content.window_title,
@@ -450,33 +458,36 @@ function M.close(kind)
 	return true
 end
 
---- Shows the Accessibility dialog for the boot wait. Never raises and never
---- blocks: the wait keeps polling whatever happens here, with the Settings
---- pane already open, so a dialog failure costs the steps, not the boot.
+--- Names the other copies of the app that can hold the Accessibility switch,
+--- for the boot wait. Never raises and never blocks: the wait keeps polling
+--- whatever happens here, with the Settings pane already open and macOS's
+--- prompt shown, so a dialog failure costs the paths, not the boot.
 --- @param permission table Accessibility permission adapter
 ---        { bundle_path(), open_settings() }.
+--- @param copies table Paths of the other copies, at least one.
 --- @return function close Closes the dialog; the wait calls it on the grant.
-function M.guide_accessibility(permission)
+function M.name_other_copies(permission, copies)
 	local function close_dialog()
-		local ok, err = xpcall(M.close, debug.traceback, "accessibility")
-		if not ok then Logger.error(LOG, "The Accessibility dialog close raised: %s.", tostring(err)) end
+		local ok, err = xpcall(M.close, debug.traceback, "accessibility_copies")
+		if not ok then Logger.error(LOG, "The Accessibility copies dialog close raised: %s.", tostring(err)) end
 	end
 	local ok, shown = xpcall(function()
 		local bundle_path, path_err = permission.bundle_path()
 		if bundle_path == nil then
-			Logger.error(LOG, "The Accessibility dialog cannot name the app: %s.", tostring(path_err))
+			Logger.error(LOG, "The Accessibility copies dialog cannot name the app: %s.", tostring(path_err))
 			return false
 		end
 		return M.show({
-			kind          = "accessibility",
+			kind          = "accessibility_copies",
 			open_settings = permission.open_settings,
 			bundle_path   = bundle_path,
+			copies        = copies,
 		})
 	end, debug.traceback)
 	if not ok then
-		Logger.error(LOG, "The Accessibility dialog raised while opening: %s.", tostring(shown))
+		Logger.error(LOG, "The Accessibility copies dialog raised while opening: %s.", tostring(shown))
 	elseif shown ~= true then
-		Logger.warn(LOG, "The Accessibility dialog is not shown; the Settings pane and the macOS prompt remain.")
+		Logger.warn(LOG, "The Accessibility copies dialog is not shown; the Settings pane and the macOS prompt remain.")
 	end
 	return close_dialog
 end

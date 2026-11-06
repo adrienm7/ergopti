@@ -22,12 +22,15 @@
 ---    in System Settings while refusing the new binary, and the user sees a
 ---    permission that looks granted but is not. Resetting this app's own entry
 ---    lets the next prompt add a switch that matches the running binary.
---- 5. Bounded waits: every Accessibility call runs on the main thread, where
+--- 5. Other copies: a second copy signed differently shares the bundle
+---    identifier and can hold the one switch; the wait asks for them before
+---    any reset (adapters/accessibility_copies.lua).
+--- 6. Bounded waits: every Accessibility call runs on the main thread, where
 ---    the keyboard event taps also run. macOS lets a call to an application
 ---    that does not answer wait six seconds; the taps then time out, macOS
 ---    disables them and every key typed meanwhile comes out late, held or lost
 ---    (issues #99 and #100). One process-wide messaging timeout bounds them all.
---- 6. Unanswering applications: the bound still holds the main thread for the
+--- 7. Unanswering applications: the bound still holds the main thread for the
 ---    whole timeout on each unanswered read, and a caller that asks several
 ---    reads in a row multiplies it (2515 ms for the tooltip caret, 1512 ms for
 ---    the post-wake context capture of loginwindow, field run 2026-10-31). The
@@ -218,6 +221,22 @@ function M.bundle_path()
 		return nil, "hs.processInfo.bundlePath is unavailable"
 	end
 	return path
+end
+
+--- Finds the other registered copies of this app whose signature differs: the
+--- Accessibility switch the user turns on can be theirs.
+--- @param on_done function fn(paths|nil, detail) once the probe has exited.
+--- @return boolean started True when the probe was started.
+--- @return string|nil detail Exact reason when started is false.
+function M.other_copies(on_done)
+	local bundle_id, id_err = M.bundle_id()
+	if bundle_id == nil then return false, id_err end
+	local path, path_err = M.bundle_path()
+	if path == nil then return false, path_err end
+	if require("adapters.accessibility_copies").find(bundle_id, path, on_done) ~= true then
+		return false, "the copy probe could not be started"
+	end
+	return true
 end
 
 --- Removes this app's Accessibility entry so a stale grant cannot mask a refusal.

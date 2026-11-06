@@ -38,7 +38,7 @@ local LOG = "login_items_guide"
 
 -- The dialog kinds this guide shows, and the one it must wait behind.
 local KIND = "login_items"
-local ACCESSIBILITY = "accessibility"
+local ACCESSIBILITY = "accessibility_copies"
 
 -- Guardian states read from platform.remap.guardian_state(): the one the steps
 -- are for, and the one a failed or superseded probe leaves while it lasts.
