@@ -315,6 +315,11 @@ _ConfigPublicationHasRecoveryDebt(Path) {
 _ConfigWriteTerminalIsActive() {
 	return false
 }
+; The optional boot-source capture reads the retained boot snapshot from disk;
+; this inert child retains none, as after any boot that rewrote its config.
+_ConfigFullSaveCaptureOptionalBootSource(Path) {
+	return 0
+}
 FileReadActivityBusy(Path) {
 	return false
 }

@@ -43,7 +43,11 @@ _WCCV_ColorIsValidated() {
 _WCCV_TickCatchSelfHeals() {
 	Body := _DriverFuncBody("WPMWidget_Tick")
 	Assert(Body != "", "WPMWidget_Tick( must exist in ui/wpm/")
-	Assert(InStr(Body, "WPMWidget_BuildCompact") > 0,
+	; Both modes rebuild through one surface owner, which builds the compact widget.
+	Rebuild := _DriverFuncBody("_WPMWidget_RebuildSurface")
+	CompactCatch := InStr(Body, "Compact mode tick threw")
+	Assert(CompactCatch > 0 && InStr(SubStr(Body, CompactCatch, 300), "_WPMWidget_RebuildSurface()") > 0
+		&& InStr(Rebuild, "WPMWidget_BuildCompact()") > 0,
 		"WPMWidget_Tick compact-mode catch must rebuild the widget via WPMWidget_BuildCompact so a bad-color throw does not disable it permanently (MEDIUM-01)")
 }
 

@@ -24,6 +24,6 @@ _TPOSS_DuplicateHeaderRaises() {
 	try _TPOSS_Parse("twice", Header . 'delay = 1`n' . Header . 'delay = 2`n')
 	catch ValueError as Err
 		Raised := Err.Message
-	AssertContains(Raised, "Duplicate table", "a repeated header must raise rather than clobber the earlier values")
+	AssertContains(Raised, "Duplicate or closed TOML table namespace", "a repeated header must raise rather than clobber the earlier values")
 }
 Test("hotstrings_config: _ParseOverrides raises on a duplicate section header", _TPOSS_DuplicateHeaderRaises)

@@ -79,7 +79,7 @@ Test("tap_holds: _TapHoldFireAction has A_IsSuspended guard before dispatch (sus
 
 _THFASG_LaltAltTabMonitorHasSuspendGuard() {
 	Src := _THFASG_ReadSource("lalt.ahk")
-	Assert(InStr(Src, 'TapHoldDispatchTap("left_alt", AltTabMonitor)') > 0,
+	Assert(InStr(Src, 'TapHoldDispatchTap("left_alt", () => (TapHoldOwnerCurrent(Owner) ? AltTabMonitor() : false))') > 0,
 		"lalt.ahk: delayed AltTabMonitor tap must use the central suspend/activity gate")
 }
 Test("tap_holds: lalt.ahk AltTabMonitor tap has A_IsSuspended guard (suspend-guard-pattern-1)",
@@ -97,7 +97,7 @@ Test("tap_holds: lalt.ahk AltTabMonitor tap has A_IsSuspended guard (suspend-gua
 
 _THFASG_TabAltTabMonitorHasSuspendGuard() {
 	Src := _THFASG_ReadSource("tab.ahk")
-	Assert(InStr(Src, 'TapHoldDispatchTap("tab", AltTabMonitor)') > 0,
+	Assert(InStr(Src, 'TapHoldDispatchTap("tab", () => (TapHoldOwnerCurrent(Owner) ? AltTabMonitor() : false))') > 0,
 		"tab.ahk: delayed AltTabMonitor tap must use the central suspend/activity gate")
 }
 Test("tap_holds: tab.ahk AltTabMonitor tap has A_IsSuspended guard (suspend-guard-pattern-1)",
@@ -105,7 +105,7 @@ Test("tap_holds: tab.ahk AltTabMonitor tap has A_IsSuspended guard (suspend-guar
 
 _THFASG_TabAltAltShortcutHasSuspendGuard() {
 	Src := _THFASG_ReadSource("tab.ahk")
-	Assert(InStr(Src, 'TapHoldDispatchTap("tab", TextPressKey.Bind("Tab", "Alt"))') > 0,
+	Assert(InStr(Src, 'TapHoldDispatchTap("tab", () => (TapHoldOwnerCurrent(Owner) ? TextPressKey("Tab", "Alt") : false))') > 0,
 		"tab.ahk: delayed Tab+Alt output must use the central suspend/activity gate")
 }
 Test("tap_holds: tab.ahk Tab+Alt (LAlt physically held) branch has A_IsSuspended guard (suspend-guard-pattern-1)",

@@ -22,7 +22,7 @@ _WRC_RemapReadsSavedPair() {
 	Assert(Body != "", "WrapTextIfSelected must exist in the keymap layout module")
 	GatePos := InStr(Body, "WrapSymbols_IsEnabled(LeftSymbol)")
 	LookupPos := InStr(Body, "WrapSymbols_CustomPairFor(Symbol)")
-	SendPos := InStr(Body, "SendInstant(LeftSymbol Selection RightSymbol)")
+	SendPos := InStr(Body, "SendInstant(LeftSymbol Selection RightSymbol,")
 	Assert(GatePos > 0, "the built-in disable gate must stay in place")
 	Assert(LookupPos > GatePos,
 		"the saved custom pair must be resolved after the enable gate")

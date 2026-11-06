@@ -18,7 +18,8 @@
 
 _RFC_ResolverNormalisesRepeat() {
 	Body := _DriverFuncBody("_ResolveFireCategory")
-	Assert(InStr(Body, "IsRepeat") > 0 and InStr(Body, "MenuCommand.REPEAT_KEY") > 0,
+	; The source scan reads generated constants as the literal they stand for.
+	Assert(InStr(Body, "IsRepeat") > 0 and InStr(Body, "return " . _DriverResolveConstants("MenuCommand.REPEAT_KEY")) > 0,
 		"_ResolveFireCategory must map an IsRepeat Spec to MenuCommand.REPEAT_KEY")
 	Assert(InStr(Body, "Category") > 0,
 		"_ResolveFireCategory must keep a registered Spec's own Category (real repeat corrections stay coloured)")

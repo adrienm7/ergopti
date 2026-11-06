@@ -235,7 +235,13 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	; 51: the one-shot Shift timeout writer (_TH_CommitOneShotTimeoutMs) returns
 	; false and skips its reload on a refusal, driven for real by
 	; test_tap_hold_one_shot_timeout.ahk.
-	AssertEqual(51, Calls,
+	; 52-53: the proxy override's boot-source seal (_ProxyOverride_Store with a
+	; boot source) returns ConfigCommitBuilt's answer, and its native writer
+	; (_ProxyOverride_WriteBootSource) returns TOML_ConfigBatchWrite's receipt
+	; behind the same lease and source-ownership predicate.
+	; 54: the model browser's backend writer (_LLM_ModelBrowser_BackendWriter)
+	; returns TOML_ConfigBatchWrite's receipt behind its owned lease.
+	AssertEqual(54, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",

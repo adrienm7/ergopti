@@ -64,7 +64,8 @@ _MetaCheckInputCancelsGeneration() {
 	; loading spinner and in-flight generation, not only a shown prediction.
 	PaBody := _DriverFuncBody("LLM_Bridge_OnPointerActivity")
 	Assert(PaBody != "", "llm_bridge.ahk must define LLM_Bridge_OnPointerActivity()")
-	Assert(InStr(PaBody, "LLM_Bridge_HasActivePredictionWork("),
+	; The gate lives in the shared activity owner it delegates to, checked in (4).
+	Assert(InStr(PaBody, "LLM_Bridge_HasActivePredictionWork(") || InStr(PaBody, "LLM_Bridge_OnUserActivity("),
 		"LLM_Bridge_OnPointerActivity must gate on HasActivePredictionWork (incl. loading), "
 		. "so a click cancels the spinner — macOS mouse_tap dismisses in any phase")
 	Assert(!InStr(PaBody, "_LLM_Bridge_PredictionShown"),

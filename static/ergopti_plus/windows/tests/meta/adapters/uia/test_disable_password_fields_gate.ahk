@@ -87,7 +87,12 @@ _DPFG_CheckSFDClassGuard() {
 _DPFG_CheckSfdUnknownFailsClosed() {
 	GateBody := _DriverFuncBody("SFD_IsSecureField")
 	UiaBody := _DriverFuncBody("SFD_ProbeFocusedUia")
-	Assert(InStr(GateBody, "SFD_DetectNative") > 0 and InStr(GateBody, "if !Conclusive") > 0,
+	; A conclusive native verdict returns at once; everything after it is the unknown case.
+	ConclusivePos := InStr(GateBody, "if Conclusive {")
+	NativeReturnPos := InStr(GateBody, "return Secure", true, Max(1, ConclusivePos))
+	UnknownPos := InStr(GateBody, "Secure := true", true, Max(1, NativeReturnPos))
+	Assert(InStr(GateBody, "SFD_DetectNative") > 0 and ConclusivePos > 0
+		and NativeReturnPos > ConclusivePos and UnknownPos > NativeReturnPos,
 		"privacy gate must distinguish a native non-password verdict from an unknown focused control")
 	Assert(InStr(GateBody, "Secure := true") > 0 and InStr(GateBody, "SFD_ScheduleUiaProbe") > 0,
 		"an unknown focused control must fail closed and schedule UIA confirmation rather than leaking the first prediction")
