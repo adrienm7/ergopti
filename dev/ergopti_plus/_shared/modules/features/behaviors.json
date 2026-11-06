@@ -1,0 +1,212 @@
+{
+	"schema_version": 1,
+	"audited_sha": "c3f261cdaa8fbc3f3c880f87e335aa5db5aed62d",
+	"reviewed_at": "2026-11-05",
+	"owners": [
+		{
+			"id": "windows-repeat",
+			"platform": "windows",
+			"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
+			"symbol": "HSE_TryRepeatKey(MagicKey)",
+			"sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70"
+		},
+		{
+			"id": "windows-control",
+			"platform": "windows",
+			"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
+			"symbol": "_OnPrefixKeyDown",
+			"sha256": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503"
+		},
+		{
+			"id": "macos-repeat",
+			"platform": "macos",
+			"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+			"symbol": "function M.try_repeat_feature",
+			"sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887"
+		},
+		{
+			"id": "macos-control",
+			"platform": "macos",
+			"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"symbol": "hotstrings.shortcut_resets_word",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56"
+		},
+		{
+			"id": "linux-repeat",
+			"platform": "linux",
+			"file": "static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
+			"symbol": "function M.resolve",
+			"sha256": "b479068f12b908edd9034442313848c7bd4363031141e07ee9c32418d8a35d13"
+		},
+		{
+			"id": "linux-control",
+			"platform": "linux",
+			"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+			"symbol": "local undo = _undoable",
+			"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9"
+		},
+		{
+			"id": "windows-dead-legacy",
+			"platform": "windows",
+			"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
+			"symbol": "DeadKey(Mapping)",
+			"sha256": "edfbf6d0f4633915217cf03bd0490092613d3c9cf474914ee423f535ca0e0661"
+		},
+		{
+			"id": "windows-dead-registry",
+			"platform": "windows",
+			"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
+			"symbol": "KeylayoutEmulation_PressNative",
+			"sha256": "64741afe52a81b9086e246487dbd347fca485c2730b79913e5830ca1f17a74df"
+		},
+		{
+			"id": "macos-dead-native",
+			"platform": "macos",
+			"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"symbol": "local chars = e:getCharacters(false)",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56"
+		},
+		{
+			"id": "linux-dead-capture",
+			"platform": "linux",
+			"file": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
+			"symbol": "local function resolve_press(keycode)",
+			"sha256": "cb6b98f7a76e7b47d8ddfacc546a058c3c83961050ff4d8716d04aaa2b028de6"
+		},
+		{
+			"id": "linux-dead-consume",
+			"platform": "linux",
+			"file": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+			"symbol": "local function _dispatch_post_remap(ev, source)",
+			"sha256": "fe64d1d6985da694281e21d3b09614fc7f346947dbfb24a2a136a05e98c455b7"
+		}
+	],
+	"behaviors": [
+		{
+			"id": "hotstrings.repeat_fallback",
+			"label_key": "menu.hotstrings.repeat_key_toggle",
+			"platforms": {
+				"windows": {
+					"declared": true,
+					"note_key": "inventory.behavior.repeat_condition",
+					"owners": ["windows-repeat"]
+				},
+				"macos": {
+					"declared": true,
+					"note_key": "inventory.behavior.repeat_condition",
+					"owners": ["macos-repeat"]
+				},
+				"linux": {
+					"declared": true,
+					"note_key": "inventory.behavior.repeat_linux",
+					"owners": ["linux-repeat", "linux-control"]
+				}
+			}
+		},
+		{
+			"id": "hotstrings.backspace_restore",
+			"label_key": "inventory.behavior.backspace_restore",
+			"platforms": {
+				"windows": {
+					"declared": false,
+					"note_key": "inventory.behavior.backspace_other",
+					"owners": ["windows-control"]
+				},
+				"macos": {
+					"declared": false,
+					"note_key": "inventory.behavior.backspace_other",
+					"owners": ["macos-control"]
+				},
+				"linux": {
+					"declared": true,
+					"note_key": "inventory.behavior.backspace_linux",
+					"owners": ["linux-control"]
+				}
+			}
+		},
+		{
+			"id": "hotstrings.repeat_activation_window",
+			"label_key": "inventory.behavior.repeat_activation_window",
+			"platforms": {
+				"windows": {
+					"declared": false,
+					"note_key": "inventory.behavior.repeat_window_untimed",
+					"owners": ["windows-repeat"]
+				},
+				"macos": {
+					"declared": true,
+					"note_key": "inventory.behavior.repeat_window_macos",
+					"owners": ["macos-repeat", "macos-control"]
+				},
+				"linux": {
+					"declared": false,
+					"note_key": "inventory.behavior.repeat_window_untimed",
+					"owners": ["linux-repeat", "linux-control"]
+				}
+			}
+		},
+		{
+			"id": "deadkeys.composition",
+			"label_key": "inventory.behavior.dead_composition",
+			"platforms": {
+				"windows": {
+					"declared": true,
+					"note_key": "inventory.behavior.dead_windows_composition",
+					"owners": ["windows-dead-legacy", "windows-dead-registry"]
+				},
+				"macos": {
+					"declared": true,
+					"note_key": "inventory.behavior.dead_macos_composition",
+					"owners": ["macos-dead-native"]
+				},
+				"linux": {
+					"declared": true,
+					"note_key": "inventory.behavior.dead_linux_composition",
+					"owners": ["linux-dead-capture", "linux-dead-consume"]
+				}
+			}
+		},
+		{
+			"id": "deadkeys.unmapped_continuation",
+			"label_key": "inventory.behavior.dead_fallback",
+			"platforms": {
+				"windows": {
+					"declared": true,
+					"note_key": "inventory.behavior.dead_windows_fallback",
+					"owners": ["windows-dead-legacy", "windows-dead-registry"]
+				},
+				"macos": {
+					"declared": true,
+					"note_key": "inventory.behavior.dead_macos_fallback",
+					"owners": ["macos-dead-native"]
+				},
+				"linux": {
+					"declared": true,
+					"note_key": "inventory.behavior.dead_linux_fallback",
+					"owners": ["linux-dead-capture"]
+				}
+			}
+		},
+		{
+			"id": "deadkeys.pending_lifetime",
+			"label_key": "inventory.behavior.dead_lifetime",
+			"platforms": {
+				"windows": {
+					"declared": true,
+					"note_key": "inventory.behavior.dead_windows_lifetime",
+					"owners": ["windows-dead-legacy", "windows-dead-registry"]
+				},
+				"macos": {
+					"declared": true,
+					"note_key": "inventory.behavior.dead_native_lifetime",
+					"owners": ["macos-dead-native"]
+				},
+				"linux": {
+					"declared": true,
+					"note_key": "inventory.behavior.dead_native_lifetime",
+					"owners": ["linux-dead-capture", "linux-dead-consume"]
+				}
+			}
+		}
+	]
+}

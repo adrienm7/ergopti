@@ -15,6 +15,7 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"infra.logger", "adapters.field_probe_ports", "adapters.timer_scheduler", "adapters.own_window",
 	"adapters.synthetic_input", "ui.ui_builder", "modules.keymap", "infra.field_run_selftest",
+	"modules.keymap.utils",
 }
 
 local OWN_PID = 1234
@@ -59,9 +60,21 @@ local function run(world, keys, options)
 		package.loaded["infra.field_run_selftest"] = nil
 		local Selftest = require("infra.field_run_selftest")
 		world.selftest = Selftest
+		-- The keymap's classification of the published window, when the world scripts one
+		if world.context then
+			world.polls = 0
+			package.loaded["modules.keymap.utils"] = {
+				selftest_window_context = function()
+					world.polls = world.polls + 1
+					world.published_at_poll = world.published_at_poll or Selftest.window_id()
+					return world.context(world.polls)
+				end,
+			}
+		end
 		package.loaded["adapters.synthetic_input"] = {
 			emit_selftest_key_stroke = function(modifiers, key)
 				world.emitted[#world.emitted + 1] = key
+				world.polls_at_first_key = world.polls_at_first_key or world.polls
 				if world.on_key then world.on_key(#world.emitted, view) end
 				world.published_at_key[#world.published_at_key + 1] = Selftest.window_id()
 				return true
@@ -109,6 +122,25 @@ local function run(world, keys, options)
 end
 
 helpers.describe("field run scratch typing", function()
+	-- Field report 2026-11-05: typing into a window the keymap had not classified
+	-- dropped the leading space and the trigger's word start.
+	helpers.it("types only once the keymap classifies the published window with one generation", function()
+		local world = run({ taps = "enabled", context = function(poll)
+			if poll <= 2 then return nil, 4 end
+			if poll == 3 then return false, 5 end
+			return false, 6
+		end }, { " ", "w" })
+		helpers.assert_eq(world.published_at_poll, SCRATCH_WINDOW, "the window is published before it is classified")
+		helpers.assert_eq(world.polls_at_first_key, 7, "three repeated polls of generation 6 before the first key")
+		helpers.assert_eq(table.concat(world.emitted, ","), " ,w")
+	end)
+
+	helpers.it("types nothing into a published window the keymap ignores", function()
+		local world = run({ taps = "enabled", context = function() return true, 1 end }, { "w" })
+		helpers.assert_eq(#world.emitted, 0)
+		helpers.assert_eq(world.outcome.aborted, "scratch_ignored")
+	end)
+
 	helpers.it("types selftest keys only while its published window has the focus", function()
 		local world = run({ taps = "enabled" }, { "w", "k" })
 		helpers.assert_eq(table.concat(world.emitted, ","), "w,k", tostring(world.outcome and world.outcome.aborted))

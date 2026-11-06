@@ -119,6 +119,17 @@ final class LauncherEnvironmentTests: XCTestCase {
 		XCTAssertNil(environment["ERGOPTI_LOG_TOKEN"])
 	}
 
+	/// A bundled Python helper must never write a __pycache__ into the signed bundle.
+	func testChildPythonHelpersWriteNoBytecode() {
+		for inherited in [nil, "", "0"] as [String?] {
+			var base = ["UNRELATED": "preserved"]
+			base["PYTHONDONTWRITEBYTECODE"] = inherited
+			let environment = launcherChildEnvironment(
+				base: base, launcherPid: 4242, launcherBundleId: Identifiers.BundleIds.launcher)
+			XCTAssertEqual(environment["PYTHONDONTWRITEBYTECODE"], "1", String(describing: inherited))
+		}
+	}
+
 	/// Private bootstrap selection must come from the original Fresh issuer,
 	/// never an ancestor's empty or stale control route on ordinary/default boot.
 	func testOrdinaryChildRejectsInheritedInstalledCaptureRoute() {
