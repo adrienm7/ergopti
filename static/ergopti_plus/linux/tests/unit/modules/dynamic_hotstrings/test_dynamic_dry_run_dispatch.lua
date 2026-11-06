@@ -44,7 +44,8 @@ end
 --- @param dry_run boolean Main command-line posture.
 --- @param options table|nil `preview` (fake preview owner), `delay` (seconds the
 ---   category cascade resolves), `pause_ms` (gap before the magic key) and
----   `observe(report)` (receives the offers, suggestions, delay reads, document).
+---   `observe(report)` (receives the offers, suggestions, delay reads, document) and
+---   `disable_section` (a family switched off before typing).
 local function exercise(kind, dry_run, options)
 	options = options or {}
 	local previous = {}
@@ -86,6 +87,7 @@ local function exercise(kind, dry_run, options)
 			assert(dynamic.init({ trigger_char = "★", personal_info_path = info_path }))
 			assert(dynamic.set_enabled(true))
 			require("tests.support.dynamic_hotstrings_fixture").prefer_families(dynamic)
+			if options.disable_section then assert(dynamic.set_rule_enabled(options.disable_section, false)) end
 			local repeat_key = require("modules.hotstrings.repeat_key")
 			assert(repeat_key.set_enabled(false))
 			local glyphs = { [30] = "@", [25] = "p", [49] = "n", [20] = "t", [32] = "d", [22] = "u",
@@ -306,6 +308,58 @@ h.describe("Main counts only the offers the preview drew (invisible-offer-metric
 		exercise("fields", false, { preview = preview, observe = function(report)
 			h.assert_true(#offers > 0, "the positive control draws the @-combo row")
 			h.assert_eq(report.suggestions, #offers, "each distinct drawn row counts once")
+		end })
+	end)
+end)
+
+--- The rows offered for one exact trigger across every drawn preview.
+--- @param offers table Records from recording_preview.
+--- @param trigger string Exact row trigger.
+--- @return table rows
+local function rows_for(offers, trigger)
+	local found = {}
+	for _, offer in ipairs(offers) do
+		for _, row in ipairs(offer.rows) do
+			if row.trigger == trigger then found[#found + 1] = row end
+		end
+	end
+	return found
+end
+
+-- single-field-preview (LIN-001): "@p" and "td" expanded on the magic key and
+-- previewed nothing, because the registered dynamic rules reached no candidate
+-- source of the daemon's preview.
+h.describe("Main previews registered single-field expansions (single-field-preview)", function()
+	h.it("single-field-preview personal alias offers its masked field row", function()
+		local preview, offers = recording_preview({ true })
+		exercise("personal", false, { preview = preview, observe = function(report)
+			local rows = rows_for(offers, "@p★")
+			h.assert_eq(#rows, 1, "one row for @p before the magic key")
+			h.assert_eq(rows[1].field, "first_name", "the field names the classification that masks it")
+			h.assert_eq(rows[1].group, "personal")
+			h.assert_eq(rows[1].section, "personal_info")
+			h.assert_eq(rows[1].replacement, "ok")
+			h.assert_true(rows[1].fires == true)
+			h.assert_eq(report.document, "ok", "the previewed expansion still fires")
+		end })
+	end)
+
+	h.it("single-field-preview date offers its row", function()
+		local preview, offers = recording_preview({ true })
+		exercise("date", false, { preview = preview, observe = function()
+			local rows = rows_for(offers, "td★")
+			h.assert_eq(#rows, 1, "one row for td before the magic key")
+			h.assert_eq(rows[1].section, "date")
+			h.assert_eq(rows[1].replacement, os.date("%Y_%m_%d"))
+			h.assert_nil(rows[1].field, "a date is not a personal field and is never masked")
+		end })
+	end)
+
+	h.it("single-field-preview disabled family offers nothing", function()
+		local preview, offers = recording_preview({ true })
+		exercise("date", false, { preview = preview, disable_section = "date", observe = function(report)
+			h.assert_eq(#rows_for(offers, "td★"), 0, "a switched-off family is not offered")
+			h.assert_eq(report.document, "td★", "and does not fire")
 		end })
 	end)
 end)
