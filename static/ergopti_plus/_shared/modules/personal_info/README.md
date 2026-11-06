@@ -112,11 +112,11 @@ from the working, translated tray caption; it does not affect the mask.
 The `[letters]` table maps one alias key to an `[info]` field. What a key may
 be, and so what a combo such as `@np` can name, is not yet the same everywhere:
 
-| Driver  | Accepted alias key                                          | Owner                                                   |
-| ------- | ----------------------------------------------------------- | ------------------------------------------------------- |
-| macOS   | one lowercase ASCII letter, `[a-z]`; anything else is refused at load | `parse_toml_section` in `dynamic_hotstrings/personal_info.lua` |
-| Linux   | exactly one valid UTF-8 code point (a precomposed `é` is accepted, a decomposed spelling is refused, no normalisation) | `strict_codepoint_length` in `dynamic_hotstrings/manager.lua` |
-| Windows | one cased letter, ASCII or accented (`@tél` ships), tested by distinct upper and lower forms | `_PIPreviewIsTagChar` in `infra/personal_info_preview.ahk` |
+| Driver  | Accepted alias key                                                                                                     | Owner                                                          |
+| ------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| macOS   | one lowercase ASCII letter, `[a-z]`; anything else is refused at load                                                  | `parse_toml_section` in `dynamic_hotstrings/personal_info.lua` |
+| Linux   | exactly one valid UTF-8 code point (a precomposed `é` is accepted, a decomposed spelling is refused, no normalisation) | `strict_codepoint_length` in `dynamic_hotstrings/manager.lua`  |
+| Windows | one cased letter, ASCII or accented (`@tél` ships), tested by distinct upper and lower forms                           | `_PIPreviewIsTagChar` in `infra/personal_info_preview.ahk`     |
 
 The three agree on the shipped thirteen aliases and on every lowercase ASCII key,
 so a file that sticks to `[a-z]` behaves identically. An accented or non-Latin
