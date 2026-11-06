@@ -60,6 +60,19 @@ replaced nothing. Windows has no such state: a refused exit makes the updater
 cancel its swap worker (`_Updater_FailSwapTransaction`), so its failure is
 true and its reason set leaves out the two macOS swap-only reasons.
 
+## A published owned runtime gets « Réparer le service » (2026-11-06, MRT-004)
+
+An already published macOS owned runtime whose service needs recovery
+(`runtime_job_not_loaded`, or a first install that ended
+`files-published-service-cleanup-pending`) is to get its own localized repair
+action, not the install row: `--owned-install-first` refuses an existing
+`Runtime` by design. Not built yet (TODO MRT-004). The native half must adopt an existing exact Core and
+VirtualHIDDevice plist and decide how the first-start `core.json` absence
+fence applies to a runtime that already ran; today's provision owners refuse
+both, so it is a new authenticated helper role that needs a Swift build and
+native macOS qualification. Windows and Linux run no installed privileged
+remap service, so they have no counterpart.
+
 ## The layout menu keeps layers and rows apart (2026-11-03)
 
 The Windows Keyboard layout menu read as a duplicate: the Base/Shift and AltGr
