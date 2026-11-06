@@ -94,6 +94,18 @@ local function publish(signal)
 end
 
 
+--- Publishes a navigation-layer transition that no sentinel key carried.
+--- A Lua catalogue action (layer_on/layer_off on a gesture or an action slot)
+--- writes the Karabiner layer variable directly, so no F20/F19 reaches the
+--- keymap tap; its settled write must still move the wheel bindings with it.
+--- @param active boolean True when the layer was entered, false when left.
+function M.publish_nav_layer(active)
+	assert(type(active) == "boolean",
+		"keymap.control_sentinels.publish_nav_layer: active must be a boolean")
+	publish(active and M.NAV_LAYER_ENTERED or M.NAV_LAYER_EXITED)
+end
+
+
 --- Returns whether a keycode is a reserved Karabiner control sentinel.
 --- @param keycode number Quartz keycode.
 --- @return boolean

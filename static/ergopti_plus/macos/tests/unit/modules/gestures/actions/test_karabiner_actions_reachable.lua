@@ -201,6 +201,61 @@ helpers.describe("Karabiner catalogue actions: engine variables", function()
 		helpers.assert_eq(seen.variables[1].value, 0)
 	end)
 
+	--- Records the navigation-layer signals the real sentinel owner publishes.
+	--- @return table signals Ordered published signal names.
+	--- @return table Sentinels Real control-sentinel owner.
+	local function record_layer_signals()
+		local Sentinels = require("modules.keymap.control_sentinels")
+		local signals = {}
+		Sentinels.set_listener("test.layer_wheel", function(signal) signals[#signals + 1] = signal end)
+		return signals, Sentinels
+	end
+
+	helpers.it("(layer-action-wheel-sync) layer_on enters the wheel layer only after the write settles", function()
+		local Actions, seen = fresh_registry()
+		local signals, Sentinels = record_layer_signals()
+		helpers.assert_true(Actions.execute_single("layer_on"))
+		helpers.assert_eq(#signals, 0, "a queued write is not a layer transition")
+		seen.complete(1, true)
+		Sentinels.set_listener("test.layer_wheel", nil)
+		helpers.assert_eq(#signals, 1,
+			"the wheel bindings follow the layer only through this signal; without it a "
+			.. "catalogue layer_on leaves the wheel scrolling (HS-002 / MI-001)")
+		helpers.assert_eq(signals[1], Sentinels.NAV_LAYER_ENTERED)
+	end)
+
+	helpers.it("(layer-action-wheel-sync) layer_off leaves the wheel layer only after the write settles", function()
+		local Actions, seen = fresh_registry()
+		local signals, Sentinels = record_layer_signals()
+		helpers.assert_true(Actions.execute_single("layer_off"))
+		seen.complete(1, true)
+		Sentinels.set_listener("test.layer_wheel", nil)
+		helpers.assert_eq(#signals, 1)
+		helpers.assert_eq(signals[1], Sentinels.NAV_LAYER_EXITED)
+	end)
+
+	helpers.it("(layer-action-wheel-sync) refused, failed and superseded writes publish nothing", function()
+		local Actions, seen = fresh_registry(false)
+		local signals, Sentinels = record_layer_signals()
+		helpers.assert_true(Actions.execute_single("layer_on"))
+		helpers.assert_eq(#signals, 0, "a refused write has no settlement to publish")
+
+		Actions, seen = fresh_registry()
+		helpers.assert_true(Actions.execute_single("layer_on"))
+		seen.complete(1, false, "nonzero-exit")
+		helpers.assert_eq(#signals, 0, "a failed write did not change the engine layer")
+
+		Actions, seen = fresh_registry()
+		helpers.assert_true(Actions.execute_single("layer_on"))
+		helpers.assert_true(Actions.execute_single("layer_off"))
+		seen.complete(1, true)
+		helpers.assert_eq(#signals, 0, "an older success must not re-enter after a newer layer_off")
+		seen.complete(2, true)
+		Sentinels.set_listener("test.layer_wheel", nil)
+		helpers.assert_eq(#signals, 1)
+		helpers.assert_eq(signals[1], Sentinels.NAV_LAYER_EXITED)
+	end)
+
 	helpers.it("capsword locks CapsLock only after the variable write settles", function()
 		local Actions, seen = fresh_registry()
 		helpers.assert_true(Actions.execute_single("capsword"))
