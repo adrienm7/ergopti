@@ -373,7 +373,7 @@
 		{
 			"id": "js-0448",
 			"ordinal": 427,
-			"name": "Ollama release pin parity (one 0.40.4 pin, no retired 0.24.0 pin or upstream seam)",
+			"name": "Ollama release pin parity (one 0.40.6 pin, no retired 0.24.0 or 0.40.4 pin or upstream seam)",
 			"cmd": "node",
 			"args": ["tools/test/test-ollama-release-pin-parity.cjs"],
 			"repro": "npm run test:ollama-release-pin-parity"

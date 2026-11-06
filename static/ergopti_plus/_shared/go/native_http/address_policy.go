@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // Ollama's transfer client refuses registry-named downloads that resolve to a
@@ -19,9 +20,34 @@ import (
 
 var errDestinationNotPublic = errors.New("destination is not a public address")
 
-// CGNAT (RFC 6598) carries real internal services such as cloud metadata, and
-// the benchmarking block (RFC 2544) is never routed; net.IP classifies neither.
-var blockedIPv4Networks = []*net.IPNet{mustParseNetwork("100.64.0.0/10"), mustParseNetwork("198.18.0.0/15")}
+// net.IP.IsGlobalUnicast accepts special-use ranges that are not globally
+// reachable. These are upstream's lists (Ollama 0.40.6 transfer/redirect.go,
+// from the IANA special-purpose registries): CGNAT carries real internal
+// services such as cloud metadata, the others are never routed publicly.
+var blockedIPv4Networks = []*net.IPNet{
+	mustParseNetwork("0.0.0.0/8"),
+	mustParseNetwork("100.64.0.0/10"),
+	mustParseNetwork("192.0.0.0/24"),
+	mustParseNetwork("192.0.2.0/24"),
+	mustParseNetwork("192.88.99.0/24"),
+	mustParseNetwork("198.18.0.0/15"),
+	mustParseNetwork("198.51.100.0/24"),
+	mustParseNetwork("203.0.113.0/24"),
+	mustParseNetwork("240.0.0.0/4"),
+}
+
+// Global IPv6 unicast is 2000::/3; its special-purpose and transition blocks
+// stay refused.
+var (
+	publicIPv6Network   = mustParseNetwork("2000::/3")
+	blockedIPv6Networks = []*net.IPNet{
+		mustParseNetwork("2001::/23"),
+		mustParseNetwork("2001:db8::/32"),
+		mustParseNetwork("2002::/16"),
+		mustParseNetwork("3ffe::/16"),
+		mustParseNetwork("3fff::/20"),
+	}
+)
 
 func mustParseNetwork(value string) *net.IPNet {
 	_, network, err := net.ParseCIDR(value)
@@ -46,6 +72,15 @@ func publicAddress(address net.IP) bool {
 			if network.Contains(v4) {
 				return false
 			}
+		}
+		return true
+	}
+	if !publicIPv6Network.Contains(address) {
+		return false
+	}
+	for _, network := range blockedIPv6Networks {
+		if network.Contains(address) {
+			return false
 		}
 	}
 	return true
@@ -159,6 +194,31 @@ func WrapChecked(original http.RoundTripper, baseURL string, allowPrivate bool) 
 	if !ok {
 		return wrapped
 	}
-	transport.Destination = newDestinationPolicy(baseURL, allowPrivate, transport.Policy).check
+	checkTransport(transport, baseURL, allowPrivate)
 	return transport
+}
+
+// checkTransport gives a wrapped transport the checked dialer's destination
+// decision and a relay hop that keeps the bootstrap's relay and TLS anchors.
+func checkTransport(transport *Transport, baseURL string, allowPrivate bool) {
+	transport.Destination = newDestinationPolicy(baseURL, allowPrivate, transport.Policy).check
+	if _, plain := transport.Fallback.(*http.Transport); !plain {
+		// Since 0.40.6 upstream's checked client is its own RoundTripper,
+		// which picks a relay from the process environment and drops the
+		// bootstrap's relay and TLS anchors. The destination is decided
+		// above, so the explicit relay hop uses upstream's transfer transport
+		// settings on a plain dialer instead.
+		transport.Fallback = transferTransport()
+	}
+}
+
+// transferTransport repeats upstream newTransferTransport's settings.
+func transferTransport() *http.Transport {
+	return &http.Transport{
+		DialContext:         (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 3 * time.Minute}).DialContext,
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 100,
+		IdleConnTimeout:     90 * time.Second,
+		ForceAttemptHTTP2:   true,
+	}
 }

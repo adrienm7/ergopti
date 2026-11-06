@@ -13,7 +13,7 @@ import subprocess
 import tarfile
 import zipfile
 
-SOURCE_COMMIT = "45e6011815c74acde6a346512856b69dd79dd22b"
+SOURCE_COMMIT = "2476d5ead197abe04629651028f83d48dc75d2b2"
 SOURCE_FILES = (
     "tools/build/build-macos-managed-ollama.py",
     "static/ergopti_plus/_shared/go/native_http/transport.go",
@@ -44,7 +44,7 @@ SOURCE_FILES = (
     "static/ergopti_plus/_shared/go/native_http/listener_event_test.go",
     "static/ergopti_plus/_shared/go/native_http/failure_stage_test.go",
 )
-VERSION = "0.40.4"
+VERSION = "0.40.6"
 CAPABILITY = "ERGOPTI_OLLAMA_NATIVE_HTTP_V1"
 REPOSITORY = "adrienm7/ergopti"
 CATALOGUE = "managed_ollama_release.json"

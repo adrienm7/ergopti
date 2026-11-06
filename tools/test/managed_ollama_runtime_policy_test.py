@@ -36,8 +36,8 @@ class RuntimePolicyTests(unittest.TestCase):
             "url": "",
             "sha256": "a" * 64,
             "bytes": 100,
-            "version": "0.40.4",
-            "source_commit": "45e6011815c74acde6a346512856b69dd79dd22b",
+            "version": "0.40.6",
+            "source_commit": "2476d5ead197abe04629651028f83d48dc75d2b2",
             "capability": "ERGOPTI_OLLAMA_NATIVE_HTTP_V1",
             "native_http_capability": 1,
             "binary_sha256": hashlib.sha256(self.binary).hexdigest(),
@@ -48,7 +48,7 @@ class RuntimePolicyTests(unittest.TestCase):
         }
         self.catalogue = {
             "schema_version": 1,
-            "version": "0.40.4",
+            "version": "0.40.6",
             "source_commit": self.asset["source_commit"],
             "capability": self.asset["capability"],
             "native_http_capability": 1,

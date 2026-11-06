@@ -90,9 +90,8 @@ Two limits come from the daemon, not from the test:
   over plain http through HTTP_PROXY, by the API or by `ollama pull --insecure`. So no
   complete pull has gone through the relay, which accepts CONNECT only, and the real
   pull worker has only run to that refusal.
-- **Ollama 0.40.4 fetches blob bytes outside the proxy.** The manifest and the first
-  blob request honour the proxy, but after the 307 `transfer.checkedClient` has no
-  `Proxy`, so the storage URL is resolved and dialed directly. On a network whose only
-  way out is the proxy, a managed pull gets its manifest and then fails. Ollama fixed
-  this in 0.40.6 (#19065). The row `blob bytes are fetched outside the proxy` pins the
-  behaviour and fails the day the pin moves past it; retire it then.
+- **Ollama 0.40.4 fetched blob bytes outside the proxy.** After the 307 its
+  `transfer.checkedClient` had no `Proxy`, so on a network whose only way out is the
+  proxy a managed pull got its manifest and then failed. The pin is 0.40.6, which picks
+  the proxy per request (#19065); the row `blob bytes come through the proxy too` now
+  requires the storage bytes to be proxied.

@@ -171,8 +171,8 @@ function validateManual(root) {
 	const py = fs.readFileSync(path.join(root, MANUAL_FIXTURES[1]), 'utf8');
 	const lua = fs.readFileSync(path.join(root, MANUAL_FIXTURES[0]), 'utf8');
 	for (const source of [py, lua]) {
-		assert(source.includes('15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a'));
-		assert(source.includes('1436408810'));
+		assert(source.includes('c164ab8b1b28e2a247c29719b8e404c423c5b83ae64c3ab4e59d50c7ff7fc5e0'));
+		assert(source.includes('1438364593'));
 		assert(source.includes('granite4:350m-h'));
 		assert.doesNotMatch(source, /ergopti-validation|\/workspace\/|--managed-data/);
 	}
@@ -638,7 +638,7 @@ function main() {
 		const luaPath = path.join(scratch, MANUAL_FIXTURES[0]);
 		const luaSource = fs.readFileSync(luaPath, 'utf8');
 		for (const [from, to] of [
-			['15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a', '0'.repeat(64)],
+			['c164ab8b1b28e2a247c29719b8e404c423c5b83ae64c3ab4e59d50c7ff7fc5e0', '0'.repeat(64)],
 			['pull_operation:is_settled() == true', 'true'],
 			['Engine.shutdown_runtime', 'Engine.stop_runtime']
 		]) {

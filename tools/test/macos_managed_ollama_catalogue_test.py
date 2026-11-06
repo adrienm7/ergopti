@@ -35,12 +35,12 @@ REVIEWED_PREIMAGES = {
     "cmd/cmd.go": "749cd910c303a7b7189e8a6c309dafd8d0aa55afe87620db3bac36410eaff56c",
     "server/images.go": "41903a5408026cf30b4c07ce84c9365c8fa504d523e946d644131d095b22220f",
     "transfer/download.go": "1eb5c3782d9b19b68bffa047d53ff96533ba8f9b94f6f6499c2ac1d6a97547b8",
-    "transfer/redirect.go": "fe3ed501f8cc2779c681dbe24ca9efb4e2f3db7fed46c94f87aa0d873fe71fc4",
+    "transfer/redirect.go": "28d6b5a6d54d7027f6cfbd6fb66de23776a2722729a218a3bfb728ded901f609",
     "go.mod": "c8330ba5f762c4bded1401cc8ecadbe85ebe8e5d159fd81da122da986b26cda5",
     "go.sum": "d9a0e2f1149951068ff200abac695a8fc6d6711b7cbf59c5aefb5e0a0340caae",
     "auth/auth.go": "ac4c269cb812edc01e2386fce0a7753871851edf76ec46ad26329016dc6f7841",
-    "server/routes.go": "23b3202e270e8f3dba0c716c128529432db02e8b1e40e6d73c94345abf6cfde4",
-    "server/download.go": "d9299dd65146ba3dd5f4a5c7efe012795c763dcaa04ee6915086a2ac68665f0b",
+    "server/routes.go": "47c0bce03da44ba50c65e436f61538c67457282b9504a1ecc11d090461120855",
+    "server/download.go": "e8e13bdcfc40962ce9f776c8ee12369adc5978d869c916750118746670425a4f",
 }
 # These vectors are literal independent protocol inputs, not native binaries.
 ARM64_HEADER = bytes.fromhex("cffaedfe0c000001000000000200000000000000000000000000000000000000")
@@ -105,9 +105,9 @@ class PortableCatalogue(unittest.TestCase):
         ).strip()
         self.receipt = {
             "schema_version": 1,
-            "version": "0.40.4",
+            "version": "0.40.6",
             "capability": CAPABILITY,
-            "source_commit": "45e6011815c74acde6a346512856b69dd79dd22b",
+            "source_commit": "2476d5ead197abe04629651028f83d48dc75d2b2",
             "go_version": "go1.26.8",
             "architecture": "arm64",
             "platform": "darwin",
@@ -166,8 +166,8 @@ class PortableCatalogue(unittest.TestCase):
         self.receipt["bytes"] = self.asset.stat().st_size
 
     def test_source_contract_has_reviewed_pins_and_no_future_asset_identity(self):
-        self.assertEqual(self.contract["version"], "0.40.4")
-        self.assertEqual(self.contract["source_commit"], "45e6011815c74acde6a346512856b69dd79dd22b")
+        self.assertEqual(self.contract["version"], "0.40.6")
+        self.assertEqual(self.contract["source_commit"], "2476d5ead197abe04629651028f83d48dc75d2b2")
         self.assertEqual(self.contract["go_version"], "go1.26.8")
         self.assertEqual(self.contract["native_http_capability"], 1)
         self.assertEqual(self.contract["upstream_preimages"], REVIEWED_PREIMAGES)
@@ -584,8 +584,8 @@ class NativeCatalogue(unittest.TestCase):
         data = json.loads(output.read_text())
         receipt = json.loads(NATIVE.producer_receipt.read_text())
         asset = data["assets"]["macos-" + receipt["architecture"]]
-        self.assertEqual(data["version"], "0.40.4")
-        self.assertEqual(data["source_commit"], "45e6011815c74acde6a346512856b69dd79dd22b")
+        self.assertEqual(data["version"], "0.40.6")
+        self.assertEqual(data["source_commit"], "2476d5ead197abe04629651028f83d48dc75d2b2")
         self.assertEqual(asset["sha256"], sha_bytes(NATIVE.archive.read_bytes()))
         self.assertEqual(asset["bytes"], NATIVE.archive.stat().st_size)
         self.assertEqual(asset["binary_sha256"], receipt["binary_sha256"])

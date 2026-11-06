@@ -35,29 +35,39 @@ const RUNTIME = 'static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.
 const PRODUCER = 'tools/build/build-macos-managed-ollama.py';
 const BRIDGE = 'static/ergopti_plus/_shared/go/native_http';
 
-// Independent transcription of the official v0.40.4 release (GitHub asset
-// digests, cross-checked against its sha256sum.txt) and of its tag commit.
+// Independent transcription of the official v0.40.6 release (its sha256sum.txt,
+// cross-checked by streaming each asset through SHA-256) and of its tag commit.
 const PINNED = {
-	version: '0.40.4',
-	source_commit: '45e6011815c74acde6a346512856b69dd79dd22b',
+	version: '0.40.6',
+	source_commit: '2476d5ead197abe04629651028f83d48dc75d2b2',
 	assets: {
 		'macos-universal': [
-			'a4ceae4b2aaf18df37ebcbfb56ba3a37a87838631112d66c2be07268693c8d58',
-			167884528
+			'b2b55434865a668decb494110d7fd970eed3ecc8837be2872f672ccbb95df974',
+			174459907
 		],
-		'linux-amd64': ['15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a', 1436408810],
-		'linux-arm64': ['1a314ac530d2c23bf6d2aaaf4a4aba8cc0b2a4ee8bc8fae3f3aa88bff7f7177b', 1555988008],
+		'linux-amd64': ['c164ab8b1b28e2a247c29719b8e404c423c5b83ae64c3ab4e59d50c7ff7fc5e0', 1438364593],
+		'linux-arm64': ['0a279d9428ad17b06fdb7dddf3b059b2c148433585fa3b30676a102fc459bb9f', 1560414226],
 		'windows-amd64': [
-			'7485a1172f8527db4342a63521b9342fc466185ff0855da378cc864ecf6354cf',
-			1469916992
+			'e359637575302f288d76c0007c408a4be9c7376d59c4f28684d63b232a44b427',
+			1471164488
 		],
-		'windows-arm64': ['1fe50fb62ddcfc5fe102322e4a35043ccbf4e821adfa4ef41eee21af0aa158a7', 210017261]
+		'windows-arm64': ['82cace1a134f88e7e7092dcf79304eff5950b88dbfabc03f19be09f8be20ee65', 210482819]
 	}
 };
 
-// Every 0.24.0 asset digest, its tag commit and the preimages of seams that
-// 0.40.4 changed or removed. None may survive anywhere a driver or gate reads.
+// Every 0.24.0 and 0.40.4 asset digest, their tag commits and the preimages of
+// seams a later release changed or removed (0.40.4 fetched blob bytes outside
+// the proxy). None may survive anywhere a driver or gate reads.
 const RETIRED = [
+	'a4ceae4b2aaf18df37ebcbfb56ba3a37a87838631112d66c2be07268693c8d58',
+	'15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a',
+	'1a314ac530d2c23bf6d2aaaf4a4aba8cc0b2a4ee8bc8fae3f3aa88bff7f7177b',
+	'7485a1172f8527db4342a63521b9342fc466185ff0855da378cc864ecf6354cf',
+	'1fe50fb62ddcfc5fe102322e4a35043ccbf4e821adfa4ef41eee21af0aa158a7',
+	'45e6011815c74acde6a346512856b69dd79dd22b',
+	'fe3ed501f8cc2779c681dbe24ca9efb4e2f3db7fed46c94f87aa0d873fe71fc4',
+	'23b3202e270e8f3dba0c716c128529432db02e8b1e40e6d73c94345abf6cfde4',
+	'd9299dd65146ba3dd5f4a5c7efe012795c763dcaa04ee6915086a2ac68665f0b',
 	'e6d5e8b4bc0cb2a35ff7901c58d81ca2170403a819c4726f58798155fa682e38',
 	'15c5f8d66ba06e0d3b4719df8868612dbd66e14e82760929bb3552e1657cdcdb',
 	'6e9a3ce5f64e93312902e39c420ec336255f078a368ca25e99b339d08a6dfa4b',
@@ -122,7 +132,7 @@ check('Windows and Linux read the catalogue at runtime instead of a copy', () =>
 	);
 });
 
-check('no tracked driver, tool or workflow keeps a retired 0.24.0 pin', () => {
+check('no tracked driver, tool or workflow keeps a retired 0.24.0 or 0.40.4 pin', () => {
 	const tracked = execFileSync(
 		'git',
 		['ls-files', '-z', '--', 'static', 'tools', '.github', 'package.json'],
