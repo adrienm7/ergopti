@@ -167,7 +167,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 ### windows-webview
 
-- [ ] **[CODE] WVB-001:** Personal editor save refusal emits invalid JavaScript and leaves Saved visible. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/windows-webview/report.md).
+- [x] **[CODE] WVB-001:** Personal editor save refusal emits invalid JavaScript and leaves Saved visible. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/windows-webview/report.md). Done: the refusal toast splices the JSON literal bare through a tested script builder.
 - [ ] **[CODE] WVB-002:** Hotstring settings replace an unlimited zero delay with the default in the displayed control. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/windows-webview/report.md).
 
 ### windows-diagnostics
