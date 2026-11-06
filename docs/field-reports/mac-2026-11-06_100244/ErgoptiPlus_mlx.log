@@ -1,0 +1,220 @@
+2026-11-06 09:44:21:755 [START] [llm.prediction_engine] LLM request — request=18 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:44:21:758 [DEBUG] [llm.api_remote] [mlx-community--Qwen3.5-4B-MLX-4bit] #1 POST -> http://127.0.0.1:8181/v1/chat/completions (provider=openai, 24 chars prompt)
+2026-11-06 09:44:23:574 [START] [llm.prediction_engine] LLM request — request=24 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:44:24:202 [START] [llm.prediction_engine] LLM request — request=26 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:44:25:173 [START] [llm.prediction_engine] LLM request — request=28 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:44:25:902 [START] [llm.prediction_engine] LLM request — request=32 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:44:26:735 [START] [llm.prediction_engine] LLM request — request=37 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:48:32:046 [START] [llm.prediction_engine] LLM request — request=98 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:48:32:714 [START] [llm.prediction_engine] LLM request — request=103 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:48:33:513 [START] [llm.prediction_engine] LLM request — request=108 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:48:33:928 [START] [llm.prediction_engine] LLM request — request=112 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:48:34:430 [START] [llm.prediction_engine] LLM request — request=118 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:48:35:345 [START] [llm.prediction_engine] LLM request — request=122 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:48:36:041 [START] [llm.prediction_engine] LLM request — request=129 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:48:36:910 [START] [llm.prediction_engine] LLM request — request=134 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:02:859 [START] [llm.prediction_engine] LLM request — request=150 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:03:448 [START] [llm.prediction_engine] LLM request — request=155 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:04:321 [START] [llm.prediction_engine] LLM request — request=162 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:05:184 [START] [llm.prediction_engine] LLM request — request=167 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:05:535 [START] [llm.prediction_engine] LLM request — request=169 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:07:943 [START] [llm.prediction_engine] LLM request — request=173 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:08:552 [START] [llm.prediction_engine] LLM request — request=177 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:09:212 [START] [llm.prediction_engine] LLM request — request=183 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:09:815 [START] [llm.prediction_engine] LLM request — request=188 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:12:808 [START] [llm.prediction_engine] LLM request — request=195 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:13:197 [START] [llm.prediction_engine] LLM request — request=199 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:15:064 [DEBUG] [llm.api_remote] [mlx-community--Qwen3.5-4B-MLX-4bit] #25 PARSED -> 3 result(s) in 1861ms
+2026-11-06 09:49:15:097 [SUCCESS] [llm.streaming_handler] 3 prediction(s) received in 1867ms from 'mlx-community--Qwen3.5-4B-MLX-4bit'.
+2026-11-06 09:49:17:201 [START] [llm.prediction_engine] LLM request — request=207 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:17:788 [START] [llm.prediction_engine] LLM request — request=210 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:18:116 [START] [llm.prediction_engine] LLM request — request=214 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:18:849 [START] [llm.prediction_engine] LLM request — request=221 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:19:392 [START] [llm.prediction_engine] LLM request — request=225 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:20:434 [START] [llm.prediction_engine] LLM request — request=233 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:20:867 [START] [llm.prediction_engine] LLM request — request=239 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:21:475 [START] [llm.prediction_engine] LLM request — request=244 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:22:548 [START] [llm.prediction_engine] LLM request — request=250 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:23:158 [START] [llm.prediction_engine] LLM request — request=256 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:24:347 [START] [llm.prediction_engine] LLM request — request=260 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:24:936 [START] [llm.prediction_engine] LLM request — request=266 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:25:696 [START] [llm.prediction_engine] LLM request — request=269 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:26:685 [START] [llm.prediction_engine] LLM request — request=275 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:27:966 [START] [llm.prediction_engine] LLM request — request=286 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:28:278 [START] [llm.prediction_engine] LLM request — request=289 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:29:184 [START] [llm.prediction_engine] LLM request — request=297 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:29:575 [START] [llm.prediction_engine] LLM request — request=301 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:30:340 [START] [llm.prediction_engine] LLM request — request=308 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:30:707 [START] [llm.prediction_engine] LLM request — request=312 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:32:098 [START] [llm.prediction_engine] LLM request — request=319 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:32:850 [START] [llm.prediction_engine] LLM request — request=322 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:33:713 [START] [llm.prediction_engine] LLM request — request=328 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:34:019 [START] [llm.prediction_engine] LLM request — request=332 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:35:365 [START] [llm.prediction_engine] LLM request — request=343 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:35:759 [START] [llm.prediction_engine] LLM request — request=348 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:36:088 [START] [llm.prediction_engine] LLM request — request=351 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:37:392 [START] [llm.prediction_engine] LLM request — request=360 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:37:810 [START] [llm.prediction_engine] LLM request — request=364 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:38:309 [START] [llm.prediction_engine] LLM request — request=369 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:38:995 [START] [llm.prediction_engine] LLM request — request=375 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:39:393 [START] [llm.prediction_engine] LLM request — request=378 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:39:971 [START] [llm.prediction_engine] LLM request — request=384 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:49:40:921 [START] [llm.prediction_engine] LLM request — request=388 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:20:098 [START] [llm.prediction_engine] LLM request — request=407 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:20:591 [START] [llm.prediction_engine] LLM request — request=411 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:22:862 [START] [llm.prediction_engine] LLM request — request=417 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:23:726 [START] [llm.prediction_engine] LLM request — request=423 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:24:863 [START] [llm.prediction_engine] LLM request — request=429 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:26:138 [START] [llm.prediction_engine] LLM request — request=439 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:27:115 [START] [llm.prediction_engine] LLM request — request=448 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:27:980 [START] [llm.prediction_engine] LLM request — request=453 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:29:048 [START] [llm.prediction_engine] LLM request — request=463 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:30:127 [START] [llm.prediction_engine] LLM request — request=472 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:30:545 [START] [llm.prediction_engine] LLM request — request=476 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:32:562 [START] [llm.prediction_engine] LLM request — request=488 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:33:210 [START] [llm.prediction_engine] LLM request — request=495 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:34:283 [START] [llm.prediction_engine] LLM request — request=504 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:34:600 [START] [llm.prediction_engine] LLM request — request=508 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:35:442 [START] [llm.prediction_engine] LLM request — request=514 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:36:232 [START] [llm.prediction_engine] LLM request — request=521 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:36:874 [START] [llm.prediction_engine] LLM request — request=526 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:37:203 [START] [llm.prediction_engine] LLM request — request=530 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:57:295 [START] [llm.prediction_engine] LLM request — request=552 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:57:852 [START] [llm.prediction_engine] LLM request — request=554 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:58:670 [START] [llm.prediction_engine] LLM request — request=557 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:51:59:504 [START] [llm.prediction_engine] LLM request — request=565 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:00:015 [START] [llm.prediction_engine] LLM request — request=568 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:04:772 [START] [llm.prediction_engine] LLM request — request=590 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:05:331 [START] [llm.prediction_engine] LLM request — request=596 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:05:655 [START] [llm.prediction_engine] LLM request — request=600 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:07:579 [START] [llm.prediction_engine] LLM request — request=603 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:08:557 [START] [llm.prediction_engine] LLM request — request=605 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:09:077 [START] [llm.prediction_engine] LLM request — request=611 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:09:772 [START] [llm.prediction_engine] LLM request — request=617 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:10:779 [START] [llm.prediction_engine] LLM request — request=623 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:11:182 [START] [llm.prediction_engine] LLM request — request=627 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:11:497 [START] [llm.prediction_engine] LLM request — request=631 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:11:801 [START] [llm.prediction_engine] LLM request — request=633 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:12:581 [START] [llm.prediction_engine] LLM request — request=638 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:14:379 [START] [llm.prediction_engine] LLM request — request=650 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:14:688 [START] [llm.prediction_engine] LLM request — request=652 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:17:231 [START] [llm.prediction_engine] LLM request — request=666 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:17:752 [START] [llm.prediction_engine] LLM request — request=672 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:18:560 [START] [llm.prediction_engine] LLM request — request=679 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:19:987 [START] [llm.prediction_engine] LLM request — request=686 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:22:230 [START] [llm.prediction_engine] LLM request — request=702 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:22:832 [START] [llm.prediction_engine] LLM request — request=708 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:23:475 [START] [llm.prediction_engine] LLM request — request=714 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:24:185 [START] [llm.prediction_engine] LLM request — request=720 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:24:490 [START] [llm.prediction_engine] LLM request — request=723 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:24:795 [START] [llm.prediction_engine] LLM request — request=727 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:25:401 [START] [llm.prediction_engine] LLM request — request=732 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:25:896 [START] [llm.prediction_engine] LLM request — request=735 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:26:481 [START] [llm.prediction_engine] LLM request — request=742 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:26:864 [START] [llm.prediction_engine] LLM request — request=746 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:27:911 [START] [llm.prediction_engine] LLM request — request=751 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:32:867 [START] [llm.prediction_engine] LLM request — request=762 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:33:634 [START] [llm.prediction_engine] LLM request — request=766 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:34:128 [START] [llm.prediction_engine] LLM request — request=772 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:34:436 [START] [llm.prediction_engine] LLM request — request=775 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:35:725 [START] [llm.prediction_engine] LLM request — request=782 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:36:698 [START] [llm.prediction_engine] LLM request — request=790 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:38:112 [START] [llm.prediction_engine] LLM request — request=795 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:39:360 [START] [llm.prediction_engine] LLM request — request=802 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:39:712 [START] [llm.prediction_engine] LLM request — request=807 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:40:408 [START] [llm.prediction_engine] LLM request — request=814 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:52:40:715 [START] [llm.prediction_engine] LLM request — request=818 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:21:879 [DEBUG] [llm.api_remote] ↑ "[%s] #%d POST -> %s (provider=%s, %d chars prompt)" repeated 122 more times between 2026-11-06 09:44:23:575 and 2026-11-06 09:52:40:715 (last: [mlx-community--Qwen3.5-4B-MLX-4bit] #123 POST -> http://127.0.0.1:8181/v1/chat/completions (provider=openai, 100 chars prompt)).
+2026-11-06 09:54:30:340 [START] [llm.prediction_engine] LLM request — request=844 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:30:341 [DEBUG] [llm.api_remote] [mlx-community--Qwen3.5-4B-MLX-4bit] #124 POST -> http://127.0.0.1:8181/v1/chat/completions (provider=openai, 24 chars prompt)
+2026-11-06 09:54:31:002 [START] [llm.prediction_engine] LLM request — request=850 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:31:711 [START] [llm.prediction_engine] LLM request — request=857 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:32:158 [START] [llm.prediction_engine] LLM request — request=860 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:33:127 [START] [llm.prediction_engine] LLM request — request=867 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:34:045 [START] [llm.prediction_engine] LLM request — request=874 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:35:202 [START] [llm.prediction_engine] LLM request — request=878 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:35:740 [START] [llm.prediction_engine] LLM request — request=884 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:36:047 [START] [llm.prediction_engine] LLM request — request=888 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:56:185 [START] [llm.prediction_engine] LLM request — request=901 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:56:529 [START] [llm.prediction_engine] LLM request — request=905 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:57:222 [START] [llm.prediction_engine] LLM request — request=913 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:57:893 [START] [llm.prediction_engine] LLM request — request=919 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:58:728 [START] [llm.prediction_engine] LLM request — request=922 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:59:298 [START] [llm.prediction_engine] LLM request — request=928 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:54:59:603 [START] [llm.prediction_engine] LLM request — request=930 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:00:746 [START] [llm.prediction_engine] LLM request — request=933 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:01:056 [START] [llm.prediction_engine] LLM request — request=936 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:01:843 [START] [llm.prediction_engine] LLM request — request=944 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:03:778 [START] [llm.prediction_engine] LLM request — request=957 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:09:513 [START] [llm.prediction_engine] LLM request — request=967 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:10:008 [START] [llm.prediction_engine] LLM request — request=971 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:10:703 [START] [llm.prediction_engine] LLM request — request=979 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:11:353 [START] [llm.prediction_engine] LLM request — request=985 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:12:626 [START] [llm.prediction_engine] LLM request — request=990 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:17:953 [START] [llm.prediction_engine] LLM request — request=1008 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:19:335 [START] [llm.prediction_engine] LLM request — request=1013 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:19:642 [START] [llm.prediction_engine] LLM request — request=1017 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:20:515 [START] [llm.prediction_engine] LLM request — request=1020 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:21:882 [START] [llm.prediction_engine] LLM request — request=1030 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:22:352 [START] [llm.prediction_engine] LLM request — request=1035 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:23:653 [START] [llm.prediction_engine] LLM request — request=1041 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:23:969 [START] [llm.prediction_engine] LLM request — request=1045 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:26:252 [START] [llm.prediction_engine] LLM request — request=1048 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:26:564 [START] [llm.prediction_engine] LLM request — request=1051 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:26:983 [START] [llm.prediction_engine] LLM request — request=1053 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:27:723 [START] [llm.prediction_engine] LLM request — request=1058 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:28:495 [START] [llm.prediction_engine] LLM request — request=1062 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:29:161 [START] [llm.prediction_engine] LLM request — request=1067 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:29:468 [START] [llm.prediction_engine] LLM request — request=1070 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:29:930 [START] [llm.prediction_engine] LLM request — request=1075 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:30:621 [START] [llm.prediction_engine] LLM request — request=1079 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:31:977 [START] [llm.prediction_engine] LLM request — request=1086 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:32:559 [START] [llm.prediction_engine] LLM request — request=1090 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:33:253 [START] [llm.prediction_engine] LLM request — request=1097 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:55:34:113 [START] [llm.prediction_engine] LLM request — request=1101 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:58:22:227 [START] [llm.prediction_engine] LLM request — request=1124 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:58:22:763 [START] [llm.prediction_engine] LLM request — request=1129 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:58:23:108 [START] [llm.prediction_engine] LLM request — request=1133 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:58:23:705 [START] [llm.prediction_engine] LLM request — request=1140 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:58:24:807 [START] [llm.prediction_engine] LLM request — request=1150 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:58:25:848 [START] [llm.prediction_engine] LLM request — request=1157 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:59:10:887 [START] [llm.prediction_engine] LLM request — request=1181 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:59:11:901 [START] [llm.prediction_engine] LLM request — request=1183 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 09:59:14:291 [START] [llm.prediction_engine] LLM request — request=1191 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 10:00:35:685 [START] [llm.prediction_engine] LLM request — request=1235 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 10:00:36:270 [START] [llm.prediction_engine] LLM request — request=1239 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 10:00:39:348 [START] [llm.prediction_engine] LLM request — request=1253 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 10:00:40:021 [START] [llm.prediction_engine] LLM request — request=1257 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 10:00:40:340 [START] [llm.prediction_engine] LLM request — request=1259 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 10:00:42:007 [START] [llm.prediction_engine] LLM request — request=1264 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 10:00:42:683 [START] [llm.prediction_engine] LLM request — request=1266 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 10:00:43:337 [START] [llm.prediction_engine] LLM request — request=1270 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 10:00:46:210 [START] [llm.prediction_engine] LLM request — request=1282 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 10:03:54:741 [DEBUG] [llm.warmup_controller] Scheduling warmup for 'mlx-community--Qwen3.5-4B-MLX-4bit' in 2s (from set_llm_enabled, gen=1).
+2026-11-06 10:03:56:920 [DEBUG] [llm.warmup_controller] [WARMUP-LOOP] Warmup attempt for 'mlx-community--Qwen3.5-4B-MLX-4bit' (backend: api, next retry: 10s).
+2026-11-06 10:03:56:920 [DEBUG] [llm.core] warmup_model: dispatching to backend 'api' for model 'mlx-community--Qwen3.5-4B-MLX-4bit'.
+2026-11-06 10:03:57:068 [INFO] [llm.api_remote] Remote API ready (provider=omlx, model=mlx-community--Qwen3.5-4B-MLX-4bit).
+2026-11-06 10:04:30:813 [DEBUG] [llm.warmup_controller] Scheduling warmup for 'mlx-community--Qwen3.5-4B-MLX-4bit' in 2s (from set_llm_enabled, gen=1).
+2026-11-06 10:04:33:012 [DEBUG] [llm.warmup_controller] [WARMUP-LOOP] Warmup attempt for 'mlx-community--Qwen3.5-4B-MLX-4bit' (backend: api, next retry: 10s).
+2026-11-06 10:04:33:012 [DEBUG] [llm.core] warmup_model: dispatching to backend 'api' for model 'mlx-community--Qwen3.5-4B-MLX-4bit'.
+2026-11-06 10:04:33:176 [INFO] [llm.api_remote] Remote API ready (provider=omlx, model=mlx-community--Qwen3.5-4B-MLX-4bit).
+2026-11-06 10:05:49:376 [START] [llm.prediction_engine] LLM request — request=19 | model: 'mlx-community--Qwen3.5-4B-MLX-4bit' | temp: 0.30 | 3 pred(s) | max tokens: 100.
+2026-11-06 10:05:49:377 [DEBUG] [llm.api_remote] [mlx-community--Qwen3.5-4B-MLX-4bit] #1 POST -> http://127.0.0.1:8181/v1/chat/completions (provider=openai, 43 chars prompt)
+2026-11-06 10:05:51:214 [DEBUG] [llm.api_remote] [mlx-community--Qwen3.5-4B-MLX-4bit] #1 PARSED -> 3 result(s) in 1836ms
+2026-11-06 10:05:51:245 [SUCCESS] [llm.streaming_handler] 3 prediction(s) received in 1837ms from 'mlx-community--Qwen3.5-4B-MLX-4bit'.
+2026-11-06 10:08:52:582 [INFO] [mlx_deps] MLX backend selected; bootstrap authorized if the runtime is absent.
+2026-11-06 10:08:52:582 [INFO] [mlx_deps] MLX runtime already installed (~/Library/Application Support/Ergopti/mlx-venv/bin/python); reusing it.
+2026-11-06 10:08:56:733 [INFO] [llm.api_mlx] Endpoint discovery state reset; awaiting the new server's PGID.
+2026-11-06 10:08:56:733 [DEBUG] [llm.api_mlx] Model HF path set to 'mlx-community/Qwen3.5-2B-4bit'.
+2026-11-06 10:08:56:733 [INFO] [menu_llm.mlx] Starting MLX server process for model Qwen3.5-2B — output prefixed [MLX-SERVER] in ~/perso/ergopti/ergopti_plus/Ergopti/ErgoptiPlus_2026-11-06.log
+2026-11-06 10:08:56:735 [DEBUG] [menu_llm.mlx] MLX server bash_cmd: export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"; export HF_HUB_DISABLE_XET=1; export HF_HUB_OFFLINE=1; export TRANSFORMERS_OFFLINE=1; export PYTHONUNBUFFERED=1; PYTHON_BIN="~/Library/Application Support/Ergopti/mlx-venv/bin/python"; if [ ! -x "$PYTHON_BIN" ]; then echo "[MLX] ❌ venv introuvable : $PYTHON_BIN"; exit 1; fi; echo "[MLX] Python utilisé: $PYTHON_BIN"; MLX_PID_FILE=/tmp/mlx_server.pid; MLX_PGID_FILE=/tmp/mlx_server.pgid; if [ -f "$MLX_PGID_FILE" ]; then OLD_PGID=$(cat "$MLX_PGID_FILE" 2>/dev/null | tr -d '[:space:]'); echo "[MLX] Skipping PGID-kill of $OLD_PGID — PID-based kill is safer on macOS."; rm -f "$MLX_PGID_FILE"; fi; if [ -f "$MLX_PID_FILE" ]; then OLD_PID=$(cat "$MLX_PID_FILE" 2>/dev/null | tr -d '[:space:]'); if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then OLD_COMM=$(ps -o ucomm= -p "$OLD_PID" 2>/dev/null | tr -d '[:space:]'); OLD_ARGS=$(ps -o args= -p "$OLD_PID" 2>/dev/null); if echo "$OLD_COMM" | grep -qi python && echo "$OLD_ARGS" | grep -q mlx_lm; then echo "[MLX] Killing previous server PID $OLD_PID (verified python+mlx_lm)…"; kill -9 "$OLD_PID" 2>/dev/null || true; else echo "[MLX] ⚠️  PID $OLD_PID is alive but not a python+mlx_lm process (comm='$OLD_COMM') — refusing to kill (PID was recycled, likely Hammerspoon)."; fi; else echo "[MLX] PID file stale (PID $OLD_PID not running)."; fi; rm -f "$MLX_PID_FILE"; fi; PGREP_PIDS=$(ps -axo pid=,ucomm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}' || true); if [ -n "$PGREP_PIDS" ]; then echo "[MLX] mlx_lm process(es) still alive (PIDs: $PGREP_PIDS) — killing…"; echo "$PGREP_PIDS" | xargs kill -9 2>/dev/null || true; sleep 1; fi; sleep 3; LSOF_ATTEMPTS=0; while true; do STALE_PIDS=$(lsof -ti TCP:3460 2>/dev/null || true); if [ -z "$STALE_PIDS" ]; then echo "[MLX] Port 3460 free — starting server."; break; fi; LSOF_ATTEMPTS=$((LSOF_ATTEMPTS + 1)); echo "[MLX] Port 3460 still occupied attempt $LSOF_ATTEMPTS (PIDs: $STALE_PIDS) — killing…"; echo "$STALE_PIDS" | xargs kill -9 2>/dev/null || true; if [ "$LSOF_ATTEMPTS" -ge 10 ]; then echo "[MLX] ❌ Port 3460 still occupied after 10 attempts — giving up."; exit 1; fi; sleep 0.5; done; MLX_FIFO=$(mktemp -u /tmp/mlx_out.XXXXXX); mkfifo "$MLX_FIFO"; MLX_PID=''; MLX_PGID=''; MLX_STOP_PENDING=0; MLX_CLEANED=0; OWN_PGID=$(ps -o pgid= -p $$ 2>/dev/null | tr -d '[:space:]'); PARENT_PGID=$(ps -o pgid= -p $PPID 2>/dev/null | tr -d '[:space:]'); cleanup_mlx_child() { if [ "$MLX_CLEANED" -eq 1 ]; then return 0; fi; MLX_CLEANED=1; trap '' TERM INT HUP; if [ -n "$MLX_PID" ] && kill -0 "$MLX_PID" 2>/dev/null; then KILL_TARGET="$MLX_PID"; if [ -n "$MLX_PGID" ] && [ "$MLX_PGID" != "$OWN_PGID" ] && [ "$MLX_PGID" != "$PARENT_PGID" ]; then KILL_TARGET="-$MLX_PGID"; fi; kill -TERM -- "$KILL_TARGET" 2>/dev/null || true; STOP_ATTEMPTS=0; while kill -0 -- "$KILL_TARGET" 2>/dev/null && [ "$STOP_ATTEMPTS" -lt 20 ]; do STOP_ATTEMPTS=$((STOP_ATTEMPTS + 1)); sleep 0.1; done; if kill -0 -- "$KILL_TARGET" 2>/dev/null; then kill -KILL -- "$KILL_TARGET" 2>/dev/null || true; fi; wait "$MLX_PID" 2>/dev/null || true; fi; rm -f "$MLX_FIFO"; }; trap 'MLX_STOP_PENDING=1' TERM INT HUP; set -m; REPO_ID="mlx-community/Qwen3.5-2B-4bit"; CACHE_NAME="models--$(echo "$REPO_ID" | sed 's|/|--|g')"; CACHE_ROOT="$HOME/.cache/huggingface/hub/$CACHE_NAME"; SNAPSHOT_DIR=$(ls -dt "$CACHE_ROOT/snapshots/"*/ 2>/dev/null | head -1); if [ -n "$SNAPSHOT_DIR" ] && [ -d "$SNAPSHOT_DIR" ]; then MODEL_ARG="${SNAPSHOT_DIR%/}"; echo "[MLX] Using local snapshot path: $MODEL_ARG"; printf '%s\n' "$MODEL_ARG" > '<config>/hammerspoon/mlx_active_model.txt'; REVISION=$(basename "$MODEL_ARG"); mkdir -p "$CACHE_ROOT/refs"; if [ ! -f "$CACHE_ROOT/refs/main" ]; then echo "$REVISION" > "$CACHE_ROOT/refs/main"; echo "[MLX] Wrote refs/main = $REVISION (was missing — required by HF offline mode)."; fi; else MODEL_ARG="$REPO_ID"; echo "[MLX] No local snapshot found for $REPO_ID — falling back to repo id."; printf '%s\n' "$REPO_ID" > '<config>/hammerspoon/mlx_active_model.txt'; fi; "$PYTHON_BIN" -m mlx_lm server --model "$MODEL_ARG" --port 3460 --decode-concurrency 1 --prompt-concurrency 1 > "$MLX_FIFO" 2>&1 & MLX_PID=$!; trap 'cleanup_mlx_child' EXIT; trap 'cleanup_mlx_child; exit 15' TERM INT HUP; if [ "$MLX_STOP_PENDING" -eq 1 ]; then cleanup_mlx_child; exit 15; fi; set +m; MLX_PGID=$(ps -o pgid= -p $MLX_PID 2>/dev/null | tr -d ' ' || echo ''); echo "[MLX] Server started with PID $MLX_PID PGID $MLX_PGID."; echo "$MLX_PID" > "$MLX_PID_FILE"; if [ -n "$MLX_PGID" ] && [ "$MLX_PGID" != "$OWN_PGID" ] && [ "$MLX_PGID" != "$PARENT_PGID" ]; then echo "$MLX_PGID" > "$MLX_PGID_FILE"; echo "[MLX] Persisted PGID $MLX_PGID (isolated from Hammerspoon group $PARENT_PGID)."; else echo "[MLX] ⚠️  set -m did not isolate python (MLX_PGID=$MLX_PGID, own=$OWN_PGID, parent=$PARENT_PGID) — NOT persisting PGID. Will rely on PID-only kill on next switch."; rm -f "$MLX_PGID_FILE"; fi; while IFS= read -r LINE; do OUT="$(date +%H:%M:%S) [MLX-SERVER] $LINE"; printf '%s\n' "$OUT"; printf '%s\n' "$OUT" >> ~/perso/ergopti/ergopti_plus/Ergopti/ErgoptiPlus_2026-11-06.log; done < "$MLX_FIFO"; wait "$MLX_PID"; MLX_STATUS=$?; rm -f "$MLX_FIFO"; exit "$MLX_STATUS"
+2026-11-06 10:09:00:078 [DEBUG] [llm.api_mlx] Active server PGID guard set to 38517.
+2026-11-06 10:09:00:078 [DEBUG] [llm.api_mlx] Sweeping zombie mlx_lm Python process(es) via ps+awk (excluding PGID 38517)…
+2026-11-06 10:09:00:255 [DEBUG] [llm.api_mlx] Zombie sweep found no stray mlx_lm process.
+2026-11-06 10:09:02:149 [INFO] [llm.api_mlx] Endpoint discovery state reset; no server launch follows.
+2026-11-06 10:09:05:834 [DEBUG] [llm.api_mlx] stop_warmup() — gen bumped to 3, self-retry chain stopped.
+2026-11-06 10:09:05:960 [DEBUG] [menu_llm.mlx] ↑ "MLX server: %s" repeated 9 more times between 2026-11-06 10:08:56:791 and 2026-11-06 10:09:02:137 (last: MLX server: 10:09:02 [MLX-SERVER] 2026-11-06 10:09:02,122 - INFO - Starting httpd at 127.0.0.1 on port 3460...).
+2026-11-06 10:09:08:077 [DEBUG] [llm.warmup_controller] Scheduling warmup for 'mlx-community--Qwen3.5-4B-MLX-4bit' in 2s (from set_llm_enabled, gen=1).
+2026-11-06 10:09:10:228 [DEBUG] [llm.warmup_controller] [WARMUP-LOOP] Warmup attempt for 'mlx-community--Qwen3.5-4B-MLX-4bit' (backend: api, next retry: 10s).
+2026-11-06 10:09:10:228 [DEBUG] [llm.core] warmup_model: dispatching to backend 'api' for model 'mlx-community--Qwen3.5-4B-MLX-4bit'.
+2026-11-06 10:09:10:382 [INFO] [llm.api_remote] Remote API ready (provider=omlx, model=mlx-community--Qwen3.5-4B-MLX-4bit).

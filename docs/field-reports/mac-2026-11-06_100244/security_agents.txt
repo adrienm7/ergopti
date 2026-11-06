@@ -1,0 +1,31 @@
+12 extension(s)
+enabled	active	teamID	bundleID (version)	name	[state]
+*	*	UBF8T346G9	com.microsoft.wdav.netext (101.26092.0012/101.26092.0012)	Microsoft Defender Network Extension	[activated enabled]
+*	*	DE8Y96K9QP	com.cisco.anyconnect.macos.acsockext (5.1.14.83/5.1.14.83)	Cisco Secure Client - Socket Filter Extension	[activated enabled]
+		UBF8T346G9	com.microsoft.wdav.netext (101.26092.0009/101.26092.0009)	Microsoft Defender Network Extension	[terminated waiting to uninstall on reboot]
+		UBF8T346G9	com.microsoft.wdav.netext (101.26082.0012/101.26082.0012)	Microsoft Defender Network Extension	[terminated waiting to uninstall on reboot]
+enabled	active	teamID	bundleID (version)	name	[state]
+*	*	2ZS8T6NYB8	com.beyondtrust.endpointsecurity (24.7.0.1/24.7.0.1)	BeyondTrust Endpoint Security Extension	[activated enabled]
+*	*	P2BNL68L2C	com.trellix.CMF.networkextension (10.7.10/1372)	Trellix Network Extension	[activated enabled]
+*	*	ZMCG7MLDV9	com.northpolesec.santa.daemon (2026.2/2026.2.185)	Santa Endpoint Security Extension	[activated enabled]
+*	*	UBF8T346G9	com.microsoft.wdav.epsext (101.26092.0012/101.26092.0012)	Microsoft Defender Endpoint Security Extension	[activated enabled]
+*	*	Y2CCP3S9W7	com.broadcom.mes.systemextension (9.9.0/9.9.0)	Symantec System Extension	[activated enabled]
+		UBF8T346G9	com.microsoft.wdav.epsext (101.26092.0009/101.26092.0009)	Microsoft Defender Endpoint Security Extension	[terminated waiting to uninstall on reboot]
+		UBF8T346G9	com.microsoft.wdav.epsext (101.26082.0012/101.26082.0012)	Microsoft Defender Endpoint Security Extension	[terminated waiting to uninstall on reboot]
+enabled	active	teamID	bundleID (version)	name	[state]
+*	*	G43BCU2T37	org.pqrs.Karabiner-DriverKit-VirtualHIDDevice (1.8.0/1.8.0)	org.pqrs.Karabiner-DriverKit-VirtualHIDDevice	[activated enabled]
+608 /Applications/Microsoft Defender.app/Contents/MacOS/tracer.app/Contents/MacOS/tracer --daemon
+645 /Library/SystemExtensions/F98ACBBE-753C-4B47-9BCA-0DE77DD54B72/com.northpolesec.santa.daemon.systemextension/Contents/MacOS/com.northpolesec.santa.daemon
+676 /Applications/Santa.app/Contents/MacOS/santametricservice --syslog
+2251 /Applications/Santa.app/Contents/MacOS/Santa --syslog
+2272 /Library/Application Support/JAMF/Jamf.app/Contents/MacOS/JamfAgent.app/Contents/MacOS/JamfAgent start
+35052 /usr/local/jamf/bin/jamf policy -stopConsoleLogs -runOnQueue -randomDelaySeconds 300
+35680 /Applications/Microsoft Defender.app/Contents/MacOS/dlp_agent.app/Contents/MacOS/dlp_agent JAAAAAAAAABjZDYxZmM0MS1lNTUwLTQ5NGItOTdlYS0zMTg5M2VjOWI4ZGRFAAAAAAAAADIwLjE5OTk5OS5tYWluLjIwMjYuMTAuMjQuMDItODU3NjI0YjkxYWY4MzY1OGJhNjdiZWEwODI1ZWE3ZTlhNTYyMDFmNQgHAAAeAAAAEwAAABUAAAAfAAAAAQAAADB1AAAAAAAACgAAAA==
+47608 /Applications/Microsoft Defender.app/Contents/MacOS/wdavdaemon privileged
+47713 /Applications/Microsoft Defender.app/Contents/MacOS/Microsoft Defender Helper.app/Contents/MacOS/Microsoft Defender Helper
+47775 /Applications/Microsoft Defender.app/Contents/MacOS/wdavdaemon_enterprise.app/Contents/MacOS/wdavdaemon_enterprise edr 9 8 --log_level info
+47889 /Applications/Microsoft Defender.app/Contents/MacOS/wdavdaemon_enterprise.app/Contents/Frameworks/telemetryd_v2 12 /Library/Logs/Microsoft/mdatp
+48505 /Library/SystemExtensions/EE46F46B-C79F-441E-995D-90FDE55C76C4/com.microsoft.wdav.netext.systemextension/Contents/MacOS/netext
+48678 /Library/SystemExtensions/427C8762-FF62-4AF6-B062-807A6E39AE51/com.microsoft.wdav.epsext.systemextension/Contents/MacOS/epsext
+51291 /Library/Application Support/JAMF/Jamf.app/Contents/MacOS/JamfDaemon.app/Contents/MacOS/JamfDaemon
+84732 /Applications/Microsoft Defender.app/Contents/MacOS/wdavdaemon_unprivileged.app/Contents/MacOS/wdavdaemon_unprivileged unprivileged 57 59 62 64 56 1 --log_level info

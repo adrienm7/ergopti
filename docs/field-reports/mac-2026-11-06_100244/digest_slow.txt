@@ -1,0 +1,17 @@
+2026-11-06 09:43:25:113 [WARNING] [keymap.utils] Slow ignored-window probe 501 ms (watchers=0 focused_window=501 ms).
+2026-11-06 09:43:25:113 [INFO] [runtime] Main-thread hold of 501 ms in an hs.timer.new callback (...urces/static/ergopti_plus/macos/modules/keymap/utils.lua:1567). Lua heap 41->41 MB.
+2026-11-06 09:43:25:597 [INFO] [runtime] Main-thread hold of 469 ms in an hs.timer.doAfter callback (...ources/static/ergopti_plus/macos/platform/remap/init.lua:3152). Lua heap 41->43 MB.
+2026-11-06 09:44:22:562 [WARNING] [HotPath] Slow preview.rebuild: 9.02 ms own, 9.02 ms total, parent keydown (0 similar since the last line).
+2026-11-06 09:44:29:407 [INFO] [runtime] Main-thread hold of 254 ms in an hs.timer.new callback (...urces/static/ergopti_plus/macos/ui/error_dialog/init.lua:489). Lua heap 59->34 MB.
+2026-11-06 09:48:32:952 [WARNING] [HotPath] Slow preview.rebuild: 5.70 ms own, 5.70 ms total, parent keydown (0 similar since the last line).
+2026-11-06 09:49:15:077 [WARNING] [HotPath] Slow tooltip.show_predictions: 12.02 ms own, 12.02 ms total, parent none (0 similar since the last line).
+2026-11-06 09:49:29:915 [WARNING] [HotPath] Slow preview.rebuild: 5.93 ms own, 5.93 ms total, parent keydown (0 similar since the last line).
+2026-11-06 09:51:29:215 [WARNING] [HotPath] Slow preview.rebuild: 9.29 ms own, 9.29 ms total, parent keydown (0 similar since the last line).
+2026-11-06 09:52:17:668 [WARNING] [HotPath] Slow preview.rebuild: 5.35 ms own, 5.35 ms total, parent keydown (0 similar since the last line).
+2026-11-06 09:52:36:396 [WARNING] [HotPath] Slow preview.rebuild: 5.82 ms own, 5.82 ms total, parent keydown (1 similar since the last line).
+2026-11-06 10:03:56:905 [INFO] [runtime] Main-thread hold of 376 ms in an hs.timer.new callback (...nts/Resources/static/ergopti_plus/macos/ui/menu/init.lua:1801). Phases inside the hold: menu.rebuild=103.7 ms, shell.find=43.6 ms, menu_item.shortcuts=33.3 ms, menu_item.metrics=18.3 ms, menu_item.keyboard_layout=10.6 ms. Lua heap 45->39 MB.
+2026-11-06 10:04:33:005 [INFO] [runtime] Main-thread hold of 328 ms in an hs.timer.new callback (...nts/Resources/static/ergopti_plus/macos/ui/menu/init.lua:1801). Phases inside the hold: menu.rebuild=97.3 ms, shell.find=41.0 ms, menu_item.shortcuts=33.4 ms, menu_item.keyboard_layout=10.3 ms, menu_keyboard_layout.rows=8.9 ms. Lua heap 35->30 MB.
+2026-11-06 10:05:48:492 [WARNING] [HotPath] Slow preview.rebuild: 7.75 ms own, 7.75 ms total, parent keydown (0 similar since the last line).
+2026-11-06 10:05:51:226 [WARNING] [HotPath] Slow tooltip.show_predictions: 10.99 ms own, 10.99 ms total, parent none (0 similar since the last line).
+2026-11-06 10:09:10:220 [INFO] [runtime] Main-thread hold of 324 ms in an hs.timer.new callback (...nts/Resources/static/ergopti_plus/macos/ui/menu/init.lua:1801). Phases inside the hold: menu.rebuild=84.1 ms, menu_item.shortcuts=33.0 ms, shell.find=28.9 ms, menu_item.keyboard_layout=10.9 ms, menu_keyboard_layout.rows=9.0 ms. Lua heap 34->29 MB.
+2026-11-06 10:12:36:167 [INFO] [runtime] Main-thread hold of 537 ms in an hs.timer.doAfter callback (...nts/Resources/static/ergopti_plus/macos/ui/menu/init.lua:1746). Phases inside the hold: menu.rebuild=495.2 ms, menu_item.shortcuts=341.9 ms, menu_item.keyboard_layout=116.1 ms, menu_keyboard_layout.rows=58.3 ms, menu_keyboard_layout.sources=57.1 ms. Lua heap 52->40 MB.

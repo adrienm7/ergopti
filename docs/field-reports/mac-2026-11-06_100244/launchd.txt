@@ -1,0 +1,7 @@
+2137	0	com.ergoptiplus.remap-guardian
+71765	0	application.com.ergoptiplus.app.124331474.124331479
+2253	0	org.pqrs.service.agent.karabiner_console_user_server
+2254	0	org.pqrs.service.agent.Karabiner-NotificationWindow
+71788	0	application.com.ergoptiplus.app.hammerspoon.124333202.124333208.CDE9C81B-BD44-4645-80A0-2DE0DE8CF731
+2247	0	org.pqrs.service.agent.karabiner_session_monitor
+2259	0	org.pqrs.service.agent.Karabiner-Core-Service-rev2

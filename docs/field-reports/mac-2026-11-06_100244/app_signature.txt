@@ -1,0 +1,3 @@
+
+codesign exit=0
+pycache_folders=0
