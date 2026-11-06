@@ -292,7 +292,9 @@ local function set(name, value, expected_source, admission, on_notice, publicati
 	end
 	local may_publish = not publication_guard or publication_guard()
 	if _values == values_owner and _values[name] == previous_value then
-		if may_publish then _values[name] = detached(name, value)
+		-- Other trigger leaves, including the exclusion policy, may have changed
+		-- in the source used by the committed write. Reclassify them on demand.
+		if may_publish then _values = { [name] = detached(name, value) }
 		else _values[name] = nil end
 	end
 	Logger.info(LOG, "%s: %s.", name, tostring(value))
