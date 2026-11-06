@@ -763,14 +763,16 @@ _ActPickWeb_OnClose(*) {
 _ActPickWeb_Close(ExpectedWindow := unset, ExpectedEpoch := unset) {
 	global _ActPickWeb_Gui
 	Window := IsSet(ExpectedWindow) ? ExpectedWindow : _ActPickWeb_Gui
-	if !IsObject(Window)
+	; A caller naming its window closes only that window. Closing the current
+	; session still retires its callbacks when it never got a native window.
+	if !IsObject(Window) && IsSet(ExpectedWindow)
 		return false
 	Host := 0
 	Accepted := IsSet(ExpectedEpoch) ? _ActPickWeb_Reset(true, Window, &Host, ExpectedEpoch)
 		: _ActPickWeb_Reset(true, Window, &Host)
 	if !Accepted
 		return false
-	if !IsObject(Host)
+	if IsObject(Window) && !IsObject(Host)
 		try Window.Destroy()
 	return true
 }
