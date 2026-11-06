@@ -24,6 +24,7 @@ local InputEvent = require("infra.input_event")
 local EV_KEY, EV_REL, EV_SYN = 1, 2, 0
 local LEFT_ALT, KEY_K, VOLUME_UP, VOLUME_DOWN = 56, 37, 115, 114
 local BTN_LEFT, REL_X, REL_WHEEL, REL_HWHEEL, REL_WHEEL_HI_RES = 0x110, 0, 8, 6, 11
+local BTN_MIDDLE, ESCAPE = 0x112, 1
 local EVIOCGRAB = 0x40044590
 
 local KEYS = { left_alt = { tap_action = "backspace", hold_layer = "nav", time_activation_seconds = 10 } }
@@ -53,6 +54,7 @@ local function wheel_layer()
 	local function key(name) return { kind = "keystroke", chords = { { mods = {}, key = name } } } end
 	return require("platform.remap.nav_layer").compile({
 		WheelUp = key("AudioVolumeUp"), WheelDown = key("AudioVolumeDown"), KeyJ = key("ArrowLeft"),
+		MouseMiddle = key("Escape"),
 	}, ctx.registry)
 end
 
@@ -183,6 +185,24 @@ end
 
 -- The layer key goes down at 1 ms and up at 9 ms; the pointer reports fall between.
 local HOLD = { { LEFT_ALT, 1, 1000 }, { LEFT_ALT, 0, 9000 } }
+
+helpers.describe("keyboard hook: the navigation layer's mouse buttons (layer-mouse-button-linux)", function()
+	helpers.it("(layer-mouse-button-linux) a bound button runs its binding and never clicks", function()
+		local emitted, grabs = drive("mouse", HOLD, {
+			{ EV_KEY, BTN_MIDDLE, 1, 3000 }, { EV_SYN, 0, 0, 3000 },
+			{ EV_KEY, BTN_MIDDLE, 0, 4000 }, { EV_SYN, 0, 0, 4000 },
+			{ EV_KEY, BTN_LEFT, 1, 5000 }, { EV_SYN, 0, 0, 5000 },
+			{ EV_KEY, BTN_LEFT, 0, 6000 }, { EV_SYN, 0, 0, 6000 },
+		})
+		helpers.assert_true(has(emitted, "key:" .. ESCAPE .. ":1") and has(emitted, "key:" .. ESCAPE .. ":0"),
+			"the middle button became Escape: " .. table.concat(emitted, " "))
+		helpers.assert_eq(count(emitted, "key:" .. BTN_MIDDLE .. ":1"), 0, "the bound button never reaches the desktop")
+		helpers.assert_eq(count(emitted, "key:" .. BTN_MIDDLE .. ":0"), 0)
+		helpers.assert_eq(count(emitted, "key:" .. BTN_LEFT .. ":1"), 1, "an unbound button still clicks")
+		helpers.assert_eq(grabs.on, 1, "the mouse is taken for the hold")
+		helpers.assert_eq(grabs.off, 1, "and given back after it")
+	end)
+end)
 
 helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux)", function()
 	helpers.it("ignores stale pointer reports until the sync boundary (pointer-dropped-stale)", function()

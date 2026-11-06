@@ -122,8 +122,9 @@ local _number_row = { retired = {}, suppressed = {}, mode = "native" }
 local _devices = {}
 local _pointer_devices = {}
 local _device = nil
--- The mice the navigation layer owns while it binds a wheel direction: grabbed
--- for the hold, every report forwarded but a bound notch (LayerPointer.sync).
+-- The mice the navigation layer owns while it binds a wheel direction or a
+-- mouse button: grabbed for the hold, every report forwarded but a bound notch
+-- or button (LayerPointer.sync).
 -- slots maps each taken reader slot to its path; buttons holds the forwarded
 -- buttons still down: the grab ends after them. emit_relative writes one
 -- relative report on the virtual device (onEmitRelative). One table: the
@@ -2635,13 +2636,14 @@ function LayerPointer.wants_sources()
 	return _on_click ~= nil or _on_pointer_event ~= nil or (_intercept and LayerPointer.emit_relative ~= nil)
 end
 
---- Whether the held navigation layer binds a wheel direction now.
+--- Whether the held navigation layer binds a wheel direction or a mouse
+--- button now, or a bound button is still down.
 function LayerPointer.wanted()
 	return _running and _intercept and LayerPointer.emit_relative ~= nil and _remapper ~= nil
-		and type(_remapper.wheel_bound) == "function" and _remapper:wheel_bound() == true
+		and type(_remapper.pointer_bound) == "function" and _remapper:pointer_bound() == true
 end
 
---- Takes the mice while the layer binds the wheel, gives them back once it does
+--- Takes the mice while the layer binds the wheel or a button, gives them back once it does
 --- not and no forwarded key is still down. Devices with absolute axes, switches,
 --- LEDs or other unsupported event types remain with the desktop.
 function LayerPointer.sync()
@@ -2676,13 +2678,13 @@ function LayerPointer.sync()
 							return
 						end
 					else
-						Logger.warn(LOG, "The navigation layer cannot take %s: its wheel keeps scrolling.", path)
+						Logger.warn(LOG, "The navigation layer cannot take %s: its wheel and buttons keep their own action.", path)
 					end
 				end
 			end
 			::next_pointer::
 		end
-		if grabbed then Logger.debug(LOG, "The navigation layer took the mouse wheel.") end
+		if grabbed then Logger.debug(LOG, "The navigation layer took the mouse.") end
 	elseif held and not wanted and next(LayerPointer.buttons) == nil then
 		for slot, path in pairs(LayerPointer.slots) do
 			if EvdevReader.is_open(slot) and EvdevReader.ungrab(slot) ~= true then
@@ -2734,6 +2736,9 @@ function LayerPointer.forward(ev, slot)
 		end
 	elseif ev.type == EVDEV_TYPE_KEY and ev.code >= 1 and ev.code <= 0x2ff
 		and (ev.value == InputEvent.VALUE_DOWN or ev.value == InputEvent.VALUE_UP or ev.value == InputEvent.VALUE_REPEAT) then
+		-- A button the layer binds runs its binding instead of clicking.
+		local rows = _remapper and type(_remapper.button) == "function" and _remapper:button(ev.code, ev.value)
+		if rows then LayerPointer.dispatch_rows(rows); return end
 		local key = source_key(slot, ev.code)
 		if ev.value == InputEvent.VALUE_DOWN then LayerPointer.buttons[key] = true
 		elseif ev.value == InputEvent.VALUE_UP then LayerPointer.buttons[key] = nil end

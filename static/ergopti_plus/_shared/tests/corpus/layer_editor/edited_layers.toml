@@ -80,6 +80,16 @@ schema_version = 1
 "WheelDown" = "vol_down"
 
 [layers.nav.linux]
+"Digit1" = "repeat_count:1"
+"Digit2" = "repeat_count:2"
+"Digit3" = "repeat_count:3"
+"Digit4" = "repeat_count:4"
+"Digit5" = "repeat_count:5"
+"Digit6" = "repeat_count:6"
+"Digit7" = "repeat_count:7"
+"Digit8" = "repeat_count:8"
+"Digit9" = "repeat_count:9"
+"Digit0" = "repeat_count:10"
 "KeyT" = "mute"
 "KeyG" = "keystroke:F12"
 "WheelUp" = "vol_up"

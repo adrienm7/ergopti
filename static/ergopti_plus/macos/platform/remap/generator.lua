@@ -624,7 +624,9 @@ end
 --- Idempotent: re-runs are safe because we skip actions whose first event is
 --- already the F20 sentinel.
 --- @param available_actions table List of action definitions (mutated in place).
-local function prepend_nav_layer_sentinel(available_actions)
+--- @param counts boolean Whether the layer binds a repeat count: entering the
+---   layer then also puts the count back to rest.
+local function prepend_nav_layer_sentinel(available_actions, counts)
 	local patched = 0
 	for _, action in ipairs(available_actions) do
 		local to_events = action.karabiner_to
@@ -638,6 +640,23 @@ local function prepend_nav_layer_sentinel(available_actions)
 				patched = patched + 1
 				Logger.debug(LOG, "Action '%s': prepended F20 sentinel to nav-layer activation.",
 					tostring(action.id))
+			end
+			-- Entering the layer starts the repeat count at rest, as Windows'
+			-- ActivateLayer does; set before layer_active, which stays the last
+			-- event Karabiner holds until the release.
+			local resets = not counts
+			for _, ev in ipairs(to_events) do
+				if type(ev) == "table" and type(ev.set_variable) == "table"
+					and ev.set_variable.name == NavLayer.REPEAT_COUNT_VAR_NAME then resets = true end
+			end
+			if not resets then
+				for index, ev in ipairs(to_events) do
+					if is_layer_activation_event(ev) then
+						table.insert(to_events, index, { set_variable = {
+							name = NavLayer.REPEAT_COUNT_VAR_NAME, value = NavLayer.REPEAT_COUNT_RESET_VALUE } })
+						break
+					end
+				end
 			end
 		end
 	end
@@ -1874,7 +1893,8 @@ function M.build_karabiner_json(
 	-- Inject the F20 and F19 sentinels into every action that turns the nav
 	-- layer on or off BEFORE indexing, so all downstream rule builders
 	-- (tap/hold, combo, etc.) inherit them.
-	prepend_nav_layer_sentinel(available_actions)
+	prepend_nav_layer_sentinel(available_actions,
+		state.nav_layer ~= nil and NavLayer.binds_repeat_count(state.nav_layer.bindings))
 	insert_nav_layer_exit_sentinel(available_actions)
 
 	local action_index, prepared_catalogue_err = ActionCatalogue.index_by_id(available_actions)

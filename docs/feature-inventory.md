@@ -412,7 +412,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `layers.actions.spotlight`: macOS only: this action opens Spotlight, the search of macOS. On Windows or Linux, bind your desktop's own search shortcut as a keystroke instead.
 - [ ] `layers.modifiers.fn`: macOS only: Fn is a modifier only on a Mac. A PC keyboard handles Fn inside the keyboard itself, so Windows and Linux never receive it and cannot send it.
 
-## macos — 33 actions not declared
+## macos — 32 actions not declared
 
 - [ ] `sg_actions.app_switcher`: Not on macOS: this steps through windows the Alt+Tab way of Windows and Linux. macOS switches applications with Cmd+Tab and cycles the windows of one application: use the equivalent action. Equivalent actions: `system_app_switcher`.
 - [ ] `sg_actions.app_window_previous`: Not on macOS: this steps through windows the Alt+Tab way of Windows and Linux. macOS switches applications with Cmd+Tab and cycles the windows of one application: use the equivalent action. Equivalent actions: `win_app_next`.
@@ -446,9 +446,8 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.open_window_spy`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 - [ ] `sg_actions.open_list_vars`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 - [ ] `sg_actions.open_key_history`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
-- [ ] `layers.parameters.repeat_count`: Windows only: a repeat count needs the layer to remember a number until the next key, which the Windows layer does itself. Karabiner-Elements on macOS and the Linux driver’s own tap-hold engine map each key press on its own and keep no count between two keys.
 
-## linux — 79 actions not declared
+## linux — 77 actions not declared
 
 - [ ] `sg_actions.lookup`: macOS only: Look Up opens the system dictionary panel on the word under the pointer. Windows and Linux have no system dictionary panel.
 - [ ] `sg_actions.system_app_switcher`: macOS only: macOS switches between applications, each holding its windows. Windows and Linux switch between windows with Alt+Tab: use the equivalent action. Equivalent actions: `app_switcher`.
@@ -527,8 +526,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `ax_actions.document`: macOS only: a continuous swipe follows the fingers while they move, which only the macOS driver reads. Windows gets finished gestures from its touchpad settings and Linux acts once a swipe ends: use the equivalent single-step actions. Equivalent actions: `doc_start`, `doc_end`.
 - [ ] `layers.actions.spotlight`: macOS only: this action opens Spotlight, the search of macOS. On Windows or Linux, bind your desktop's own search shortcut as a keystroke instead.
 - [ ] `layers.modifiers.fn`: macOS only: Fn is a modifier only on a Mac. A PC keyboard handles Fn inside the keyboard itself, so Windows and Linux never receive it and cannot send it.
-- [ ] `layers.source_kinds.mouse_button`: Not on Linux: the Linux hook watches the mouse without grabbing it, so it cannot cancel the button press that a layer binding would replace. Grabbing the mouse would take the pointer away from the desktop.
-- [ ] `layers.parameters.repeat_count`: Windows only: a repeat count needs the layer to remember a number until the next key, which the Windows layer does itself. Karabiner-Elements on macOS and the Linux driver’s own tap-hold engine map each key press on its own and keep no count between two keys.
 
 ## windows — restricted menu entries
 

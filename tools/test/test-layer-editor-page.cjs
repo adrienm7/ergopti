@@ -359,7 +359,10 @@ const DATA = (() => {
 		'a key the recommended layer binds and the empty file does not is custom'
 	);
 	page.key('KeyA').click();
-	check(page.el('repeat-apply').disabled === true, 'the repeat count cannot be picked on macOS');
+	check(
+		page.el('repeat-apply').disabled === false,
+		'the repeat count can be picked on macOS, as on Windows'
+	);
 	check(
 		page.row(EN['sg_actions.spotlight']) &&
 			!page.row(EN['sg_actions.spotlight']).classList.contains('disabled'),

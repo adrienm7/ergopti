@@ -14,6 +14,7 @@
 	},
 	"linux": {
 		"KeyT": "keystroke:AudioVolumeMute",
+		"Digit3": "repeat_count:3",
 		"KeyG": "keystroke:F12",
 		"KeyQ": "keystroke:ctrl+shift+Home",
 		"WheelUp": "keystroke:AudioVolumeUp@repeat"
