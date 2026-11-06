@@ -8,8 +8,7 @@
 ; have behavioural global-barrier coverage.
 class WPMWidgetConst {
 	static CFG_VISIBLE := "wpm_widget_visible"
-	static STORE_X := ""
-	static STORE_Y := ""
+	static STORE_PAIR := ""
 	static CFG_COLORS := "wpm_widget_colors"
 	static CFG_GRAPH := "wpm_widget_graph"
 }

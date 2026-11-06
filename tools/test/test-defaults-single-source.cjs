@@ -149,7 +149,8 @@ async function main() {
 	);
 	assert.deepEqual(wpmCanon.position, {
 		storage_x: 'wpm_widget.pos_x',
-		storage_y: 'wpm_widget.pos_y'
+		storage_y: 'wpm_widget.pos_y',
+		storage_pair: 'wpm_widget.pos'
 	});
 	for (const driver of ['windows', 'macos', 'linux']) {
 		(function walk(dir) {
@@ -159,7 +160,7 @@ async function main() {
 					if (!['tests', '_generated', 'vendor'].includes(entry.name)) walk(full);
 				} else if (/\.(lua|ahk)$/.test(entry.name)) {
 					assert(
-						!/wpm_widget\.pos_[xy]/.test(fs.readFileSync(full, 'utf8')),
+						!/wpm_widget\.pos(_[xy])?\b/.test(fs.readFileSync(full, 'utf8')),
 						`${full} restates a widget position key: read it from the shared canon`
 					);
 				}

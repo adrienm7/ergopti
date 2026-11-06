@@ -66,6 +66,14 @@ function modelKeys(src) {
 	for (const block of body.matchAll(/([a-z_]+) = \{([^}]*)\}/g)) {
 		for (const key of block[2].matchAll(/([a-z_]+) = "/g)) keys.add(`${block[1]}.${key[1]}`);
 	}
+	// The Storage key names live in REQUIRED_NAMES (`key = true`), read by
+	// macOS and Linux even where Windows reads only its one-value pair key.
+	const namesStart = src.indexOf('local REQUIRED_NAMES = {');
+	if (namesStart === -1) throw new Error('model.lua has no REQUIRED_NAMES table');
+	const names = src.slice(namesStart, src.indexOf('\n}\n', namesStart));
+	for (const block of names.matchAll(/([a-z_]+) = \{([^}]*)\}/g)) {
+		for (const key of block[2].matchAll(/([a-z_]+) = true/g)) keys.add(`${block[1]}.${key[1]}`);
+	}
 	return keys;
 }
 

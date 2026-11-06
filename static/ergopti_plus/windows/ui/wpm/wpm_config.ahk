@@ -108,8 +108,7 @@ WPMWidget_LoadSharedConst() {
 		WPMWidgetConst.NEUTRAL := Neutral
 
 		; [position]
-		WPMWidgetConst.STORE_X := _WPMWidget_Need(wpm_c, "position", "storage_x", Missing)
-		WPMWidgetConst.STORE_Y := _WPMWidget_Need(wpm_c, "position", "storage_y", Missing)
+		WPMWidgetConst.STORE_PAIR := _WPMWidget_Need(wpm_c, "position", "storage_pair", Missing)
 
 		; [transparency]
 		WPMWidgetConst.ALPHA_ACTIVE := Integer(_WPMWidget_Need(wpm_c, "transparency", "alpha_active", Missing))
@@ -191,8 +190,9 @@ WPMWidget_LoadConfig(Cache, WorkAreas := unset, StoreFn := 0) {
 		}
 		raw_vis    := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_VISIBLE)
 		Store      := HasMethod(StoreFn, "Call") ? StoreFn : _WPMWidget_StoreGet
-		raw_x      := Store.Call(WPMWidgetConst.STORE_X)
-		raw_y      := Store.Call(WPMWidgetConst.STORE_Y)
+		raw_pair   := Store.Call(WPMWidgetConst.STORE_PAIR)
+		raw_x      := (raw_pair is Array && raw_pair.Length == 2) ? raw_pair[1] : "_"
+		raw_y      := (raw_pair is Array && raw_pair.Length == 2) ? raw_pair[2] : "_"
 		raw_colors := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_COLORS)
 		raw_graph  := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_GRAPH)
 		Visible := _WPMWidget_ConfigBoolean(raw_vis, WPMWidgetConst.CFG_VISIBLE)
@@ -317,13 +317,13 @@ _WPMWidget_PositionOwnerIsCurrent(State, Token) {
 	global STORAGE_REG_BASE
 	PreviousCritical := Critical("On")
 	try return State == _WPMWidget_PositionAuthority() && State.active == Token
-		&& WPMWidgetConst.STORE_X == Token.keyX && WPMWidgetConst.STORE_Y == Token.keyY
+		&& WPMWidgetConst.STORE_PAIR == Token.key
 		&& (!Token.native || STORAGE_REG_BASE == Token.storagePath)
 	finally Critical(PreviousCritical)
 }
 
-; Stores both coordinates, publishing RAM only after both ACKs. A refused write
-; attempts compensation only while this exact in-flight owner remains current.
+; Stores both coordinates as one [x, y] value and publishes RAM only after its
+; ACK, so the stored pair is always one that some caller asked for (WCF-001).
 ; The optional publication receipt is used by the enclosing config operation.
 _WPMWidget_StorePosition(TargetX := unset, TargetY := unset, StoreFn := 0, NotifyFn := 0,
 		&PublishedReceipt := 0, ExpectedPublication := unset) {
@@ -340,15 +340,14 @@ _WPMWidget_StorePosition(TargetX := unset, TargetY := unset, StoreFn := 0, Notif
 	PreviousCritical := Critical("On")
 	try {
 		State := _WPMWidget_PositionAuthority()
-		; The two native Registry writes form one owned operation. A reentrant
-		; contender cannot splice its pair into this writer or its compensation.
+		; The native write and its publication form one owned operation. A
+		; reentrant contender cannot publish its pair under this writer's ACK.
 		if State.active != 0
 			return false
 		if IsSet(ExpectedPublication) && (!(ExpectedPublication is Object) || State.active != 0
 				|| State.published != ExpectedPublication
 				|| WPMWidget.pos_x != ExpectedPublication.x || WPMWidget.pos_y != ExpectedPublication.y
-				|| WPMWidgetConst.STORE_X != ExpectedPublication.keyX
-				|| WPMWidgetConst.STORE_Y != ExpectedPublication.keyY
+				|| WPMWidgetConst.STORE_PAIR != ExpectedPublication.key
 				|| (ExpectedPublication.native && STORAGE_REG_BASE != ExpectedPublication.storagePath))
 			return false
 		PreviousX := WPMWidget.pos_x, PreviousY := WPMWidget.pos_y
@@ -356,28 +355,20 @@ _WPMWidget_StorePosition(TargetX := unset, TargetY := unset, StoreFn := 0, Notif
 			TargetX := PreviousX
 		if !IsSet(TargetY)
 			TargetY := PreviousY
-		Token := {x: TargetX, y: TargetY, previousX: PreviousX, previousY: PreviousY, keyX: WPMWidgetConst.STORE_X,
-			keyY: WPMWidgetConst.STORE_Y, native: !HasMethod(StoreFn, "Call"), storagePath: STORAGE_REG_BASE}
+		Token := {x: TargetX, y: TargetY, previousX: PreviousX, previousY: PreviousY,
+			key: WPMWidgetConst.STORE_PAIR, native: !HasMethod(StoreFn, "Call"), storagePath: STORAGE_REG_BASE}
 		State.active := Token
 	} finally Critical(PreviousCritical)
 	try {
+		; One value holds the pair: the registry replaces it whole or not at all,
+		; so a refusal leaves the previous pair and needs no compensation.
 		Stored := false
-		try {
-			Stored := (Store.Call(Token.keyX, TargetX) == true)
-			if !_WPMWidget_PositionOwnerIsCurrent(State, Token)
-				return false
-			if Stored
-				Stored := (Store.Call(Token.keyY, TargetY) == true)
-		}
+		try Stored := (Store.Call(Token.key, [TargetX, TargetY]) == true)
 		if !_WPMWidget_PositionOwnerIsCurrent(State, Token)
 			return false
 		if !Stored {
-			; Each adapter can pump a successor; never resume a retired rollback.
-			try Store.Call(Token.keyX, PreviousX)
-			if _WPMWidget_PositionOwnerIsCurrent(State, Token)
-				try Store.Call(Token.keyY, PreviousY)
-			; Compensation has completed. Retire before diagnostics/notification,
-			; which may legitimately publish a new position and receive its ACK.
+			; Retire before diagnostics/notification, which may legitimately
+			; publish a new position and receive its ACK.
 			PreviousCritical := Critical("On")
 			try {
 				if State.active == Token

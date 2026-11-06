@@ -92,10 +92,10 @@ class WPMWidgetConst {
     ; window-allocation cost is not absorbed by a tooltip render when the widget
     ; first appears (it showed up as a ~110 ms Tooltip.Present blip).
     static PREWARM_DELAY_MS := 900
-    ; Storage keys of the saved position, from the shared canon ([position]
-    ; storage_x / storage_y): the same two keys the other drivers use.
-    static STORE_X            := ""
-    static STORE_Y            := ""
+    ; Storage key of the saved position, from the shared canon ([position]
+    ; storage_pair): one [x, y] value, so the registry publishes the pair in a
+    ; single atomic write (WCF-001).
+    static STORE_PAIR         := ""
     ; Config key names written to config.toml under [metrics].
     static CFG_VISIBLE        := ConfigLeaf.WPM_WIDGET_VISIBLE
     static CFG_COLORS         := ConfigLeaf.WPM_WIDGET_COLORS
