@@ -472,7 +472,7 @@
 			"id": "unavailable",
 			"kind": "items",
 			"columns": ["feature", "platforms", "reason"],
-			"platforms": ["macos"],
+			"platforms": ["windows", "macos", "linux"],
 			"collapsed": true
 		},
 		{

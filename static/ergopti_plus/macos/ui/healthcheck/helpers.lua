@@ -40,9 +40,6 @@ local GUARDIAN_PERMISSION = {
 	not_used          = "not_used",
 }
 
--- The manifest's platform codes, as the drivers are named
-local PLATFORM_NAMES = { ahk = "Windows", hs = "macOS", linux = "Linux" }
-
 -- The words a USB product name is classified by; the name itself is opt-in
 local DEVICE_KINDS = {
 	{ pattern = "keyboard", kind = "keyboard" },
@@ -375,25 +372,7 @@ end
 --- translates each reason key.
 --- @return table { items = { { feature, platforms, reason } } }
 function H.collect_unavailable()
-	local explained, silent = require("infra.manifest_reader").coverage_gaps()
-	local items = {}
-	for _, gaps in ipairs({ explained, silent }) do
-		for _, gap in ipairs(gaps) do
-			local names = {}
-			for _, code in ipairs(gap.platforms or {}) do
-				local name = PLATFORM_NAMES[code]
-				if not name then error("the manifest names an unknown platform: " .. tostring(code)) end
-				names[#names + 1] = name
-			end
-			items[#items + 1] = {
-				feature   = gap.path,
-				platforms = table.concat(names, ", "),
-				reason    = (type(gap.reason_key) == "string" and gap.reason_key ~= "") and gap.reason_key or nil,
-			}
-		end
-	end
-	table.sort(items, function(a, b) return a.feature < b.feature end)
-	return { items = items }
+	return require("healthcheck.unavailable").collect(require("infra.manifest_reader"))
 end
 
 --- The AI section: the switch, the backend, the model and the profile.
