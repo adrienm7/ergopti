@@ -2110,12 +2110,19 @@ i18n = "menu.layout.manage"
 # Both were built by hand in ui/menu/menu_keyboard_layout.lua and described
 # nowhere until 2026-08-07, so ten rows of a shared menu had no platforms field
 # and nothing to compare them against.
+# The Ergopti install rows stay macOS-only (maintainer request of 2026-11-06,
+# reviewed): the Windows layout installer is the separate, unsigned
+# Ergopti_windows.exe release asset, which must run elevated, and the driver
+# never starts an unsigned elevated installer (macOS refuses its own system
+# scope for the same reason). Linux already installs Ergopti for the user from
+# the layout manager above; an Xorg session needs the system installer
+# (install.sh). The reason text tells the user where to install from instead.
 [[menu.layout_menu]]
 type = "list"
 id = "layout_bundle"
 status_rows.no_bundle = [{ type = "label", i18n = "menu.layout.no_bundle" }]
 platforms = ["hs"]
-reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
+reason_key = "platform_reason.layout_install_is_the_macos_bundle"
 
 # Two axes of the emulation, kept apart (maintainer, 2026-11-03): which Ergopti
 # LAYERS it types, under this header, and which keyboard ROWS, in the submenu
