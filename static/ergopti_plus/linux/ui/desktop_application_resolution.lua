@@ -1,4 +1,4 @@
--- linux/ui/desktop_application_resolution.lua
+--- ui/desktop_application_resolution.lua
 
 --- Resolves a desktop-file ID in a fresh, bounded Gio process.
 local M = {}

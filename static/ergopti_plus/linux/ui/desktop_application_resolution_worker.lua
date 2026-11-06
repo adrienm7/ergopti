@@ -1,4 +1,4 @@
--- linux/ui/desktop_application_resolution_worker.lua
+--- ui/desktop_application_resolution_worker.lua
 
 --- One-shot Gio desktop ID lookup. Each invocation owns a fresh XDG cache.
 -- This entry point uses exact loadfile paths, not package.path templates, so
