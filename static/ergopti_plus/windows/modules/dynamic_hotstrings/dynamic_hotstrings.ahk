@@ -115,9 +115,9 @@ _DateIso(*) {
 
 
 
-; ========================================
+; ====================================
 ; ===== 1.2) International phone =====
-; ========================================
+; ====================================
 
 ; The "+33" form of a French number. Only a leading national trunk "0" is
 ; dropped, as on macOS and Linux: a number that does not start with 0 keeps
