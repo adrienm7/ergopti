@@ -1769,6 +1769,14 @@
 			"reason": "loanword-or-cognate",
 			"locales": ["es", "it"]
 		},
+		"remap.category.navigation": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr"]
+		},
+		"remap.category.special": {
+			"reason": "loanword-or-cognate",
+			"locales": ["sv"]
+		},
 		"sfbsreduction.bu": {
 			"reason": "loanword-or-cognate",
 			"locales": "*"
