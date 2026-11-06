@@ -23,14 +23,17 @@
 --- answers: PulseAudio (or PipeWire's pulse server) through pactl, PipeWire's
 --- own wpctl, then the ALSA mixer of a system with neither sound server.
 ---
---- WHAT IT DELIBERATELY LEAVES AT ZERO, AND WHY:
---- `space_switches` counts virtual-desktop changes, which X11 and each Wayland
---- compositor report differently and several do not report at all — there is no
---- reading that means the same thing on two machines. `passive_count` and
---- `night_wake_count` are derived on macOS from wake reasons the kernel exposes
---- there and not here. Reporting a zero is honest for those; inventing a number
---- that looks measured is not, and a column of plausible fiction is worse than a
---- column of nothing.
+--- PASSIVE PERIODS, LOAD AND DESKTOPS, AS ON macOS AND WINDOWS:
+--- A completed suspension and a completed screen lock are each one passive
+--- period (`passive_count`, and a `passive_period` event with its kind and
+--- duration, the macOS row). CPU and memory are sampled from /proc every
+--- system_load_poll_ms as a `system_load` event with the Windows fields
+--- (cpu_pct, ram_used_pct, ram_total_mb, ram_free_mb) and the macOS user share.
+--- `space_switches` counts changes of the EWMH current desktop the X server
+--- publishes, observed on the daemon's focus tick; Wayland exposes no current
+--- desktop to a client, so there the KPI is unavailable with its reason
+--- (space_change_availability) rather than a zero that looks measured.
+--- `night_wake_count` has no producer on any driver and stays zero.
 ---
 --- SAMPLING, NOT WATCHING:
 --- Every reading is a poll. Watching would mean a D-Bus subscription this driver
@@ -80,12 +83,26 @@ local _owner_database, _owner_device, _load_day = nil, nil, nil
 local _event_admit = nil
 
 -- What the previous sample saw, for the transitions.
-local function new_last() return { at_ms = nil, ssid = nil, ssid_source = nil, locked = nil, muted = nil } end
+local function new_last()
+	return { at_ms = nil, ssid = nil, ssid_source = nil, locked = nil, muted = nil, lock_started_ms = nil,
+		load_at_ms = nil, cpu = nil, desktop = nil }
+end
 local _last = new_last()
 
 -- The transitions seen since the collector last took them, for events_system:
 -- { action, metadata? } in order.
 local _events = {}
+
+-- The kernel files CPU and memory are read from: these, or a test's fixtures.
+local PROC_STAT_PATH, MEMINFO_PATH = "/proc/stat", "/proc/meminfo"
+local _proc = { stat = PROC_STAT_PATH, meminfo = MEMINFO_PATH }
+
+-- How often CPU and memory are sampled, the interval macOS and Windows use.
+local SYSTEM_LOAD_POLL_MS = require("infra.timings").ms("keystats", "system_load_poll_ms")
+
+-- The current-desktop source (read() -> integer|nil), or nil with the i18n
+-- key of why virtual-desktop changes are not measured.
+local _desktop = { read = nil, reason = "platform_reason.desktop_changes_need_x11" }
 
 
 
@@ -230,6 +247,69 @@ end
 
 
 
+--- Reads a whole small kernel file.
+--- @param path string
+--- @return string|nil
+local function read_proc(path)
+	local fh = io.open(path, "rb")
+	if not fh then return nil end
+	local ok, text = pcall(fh.read, fh, "*a")
+	pcall(fh.close, fh)
+	if not ok or type(text) ~= "string" then return nil end
+	return text
+end
+
+--- The aggregate CPU counters of /proc/stat's first line, in clock ticks.
+--- @return table|nil { total, idle, user }
+local function read_cpu()
+	local text = read_proc(_proc.stat)
+	local line = text and text:match("^cpu%s+([^\n]+)")
+	if not line then return nil end
+	local fields = {}
+	for value in line:gmatch("%d+") do fields[#fields + 1] = tonumber(value) end
+	if #fields < 4 then return nil end
+	-- user nice system idle iowait irq softirq steal: guest time is already
+	-- inside user and nice, so the first eight fields are the whole.
+	local total = 0
+	for index = 1, math.min(#fields, 8) do total = total + fields[index] end
+	return { total = total, idle = fields[4] + (fields[5] or 0), user = fields[1] + fields[2] }
+end
+
+--- Physical memory from /proc/meminfo, in kibibytes.
+--- @return number|nil total
+--- @return number|nil available
+local function read_memory()
+	local text = read_proc(_proc.meminfo)
+	if not text then return nil end
+	local total = tonumber(text:match("MemTotal:%s+(%d+) kB"))
+	local available = tonumber(text:match("MemAvailable:%s+(%d+) kB"))
+	if not total or total <= 0 or not available or available > total then return nil end
+	return total, available
+end
+
+--- One system-load sample: overall CPU since the previous one, and memory now.
+--- @param previous table|nil The previous CPU counters.
+--- @return table metadata Possibly empty.
+--- @return table|nil cpu The counters now.
+local function sample_load(previous)
+	local meta, cpu = {}, read_cpu()
+	if cpu and previous and cpu.total > previous.total then
+		local span = cpu.total - previous.total
+		meta.cpu_pct = math.max(0, math.min(100, math.floor((1 - (cpu.idle - previous.idle) / span) * 100 + 0.5)))
+		meta.cpu_user_percent = math.floor(math.max(0, math.min(100, (cpu.user - previous.user) / span * 100)) * 10 + 0.5) / 10
+	end
+	local total, available = read_memory()
+	if total then
+		meta.ram_used_pct = math.floor((1 - available / total) * 100 + 0.5)
+		meta.ram_total_mb = math.floor(total / 1024 + 0.5)
+		meta.ram_free_mb = math.floor(available / 1024 + 0.5)
+	end
+	return meta, cpu
+end
+
+
+
+
 -- =========================================
 -- =========================================
 -- ======= 2/ Accumulating =================
@@ -243,18 +323,16 @@ local function new_day(date)
 	return {
 		date = date,
 		wifi_changes = 0,
-		-- Left at zero deliberately: X11 and each Wayland compositor report
-		-- virtual-desktop changes differently and several not at all, so there is
-		-- no reading that means the same thing on two machines.
+		-- Changes of the X server's current desktop (observe_desktop).
 		space_switches = 0,
 		battery_sum = 0, battery_count = 0, battery_min = nil, battery_max = nil,
 		audio_muted_ms = 0,
 		locked_ms = 0,
 		sleep_ms = 0,
 		awake_ms = 0,
-		-- Derived on macOS from wake reasons the kernel exposes there and not
-		-- here. A zero is honest; a plausible number would not be.
+		-- Completed suspensions and screen locks.
 		passive_count = 0,
+		-- No driver has a producer for it yet.
 		night_wake_count = 0,
 	}
 end
@@ -397,6 +475,12 @@ function M.sample()
 		_events[#_events + 1] = { action = action, metadata = metadata, date = clock.date, ts = clock.ts }
 	end
 	if asleep then transition("wake", { asleep_ms = sleep_total }) end
+	-- A suspension inside a screen lock belongs to the lock's passive period, as
+	-- on macOS, where a lock owns any later sleep until unlock.
+	if asleep and _last.locked ~= true then
+		_day.passive_count = _day.passive_count + 1
+		transition("passive_period", { kind = "sleep", duration_ms = sleep_total })
+	end
 
 	local battery = read_battery()
 	if battery then
@@ -420,6 +504,19 @@ function M.sample()
 	-- Counted only between two answers, like the network.
 	if _last.locked ~= nil and locked ~= nil and locked ~= _last.locked then
 		transition(locked and "lock" or "unlock")
+		if locked then
+			_last.lock_started_ms = now_ms
+		elseif _last.lock_started_ms then
+			_day.passive_count = _day.passive_count + 1
+			transition("passive_period", { kind = "lock", duration_ms = now_ms - _last.lock_started_ms })
+			_last.lock_started_ms = nil
+		end
+	end
+
+	if not _last.load_at_ms or now_ms - _last.load_at_ms >= SYSTEM_LOAD_POLL_MS then
+		local load, cpu = sample_load(_last.cpu)
+		_last.load_at_ms, _last.cpu = now_ms, cpu
+		if next(load) ~= nil then transition("system_load", load) end
 	end
 
 	_last.at_ms, _last.clock = now_ms, clock
@@ -427,6 +524,46 @@ function M.sample()
 	_last.locked = locked
 	_last.muted = read_muted()
 	return _day
+end
+
+--- Binds the current-desktop reader, or none with the reason.
+--- @param read function|nil Returns the current desktop index, or nil.
+--- @param reason string|nil i18n key of why changes are not measured.
+function M.bind_desktop_source(read, reason)
+	assert(read == nil or type(read) == "function", "a desktop source is a function")
+	_desktop = { read = read, reason = read == nil and (reason or "platform_reason.desktop_changes_need_x11") or nil }
+	_last.desktop = nil
+end
+
+--- Whether virtual-desktop changes are measured.
+--- @return table { measured = boolean, reason = string|nil }
+function M.space_change_availability()
+	return { measured = _desktop.read ~= nil, reason = _desktop.reason }
+end
+
+--- Observes the current desktop; a change between two answers is one
+--- `space_switches` and a `space_change` event, the macOS row.
+--- @return boolean|nil changed nil when no source answered.
+function M.observe_desktop()
+	if not _desktop.read then return nil end
+	local called, desktop = pcall(_desktop.read)
+	if not called or type(desktop) ~= "number" then
+		-- An unanswered read breaks the chain: no change is counted across it.
+		_last.desktop = nil
+		return nil
+	end
+	local previous = _last.desktop
+	_last.desktop = desktop
+	if previous == nil or previous == desktop then return false end
+	local clock = Calendar.capture(true)
+	local day = retained_day(clock.date)
+	if not day then return nil end
+	day.space_switches = day.space_switches + 1
+	assert(type(_event_admit) == "function", "System transition capture has no recording-policy authority")
+	if _event_admit() == true then
+		_events[#_events + 1] = { action = "space_change", date = clock.date, ts = clock.ts }
+	end
+	return true
 end
 
 --- The accumulated day, or nil before the first sample.
@@ -468,6 +605,16 @@ function M._reset()
 	_last = new_last()
 	_wireless_path = WIRELESS_PATH
 	_audio_source = nil
+	_proc = { stat = PROC_STAT_PATH, meminfo = MEMINFO_PATH }
+	_desktop = { read = nil, reason = "platform_reason.desktop_changes_need_x11" }
+end
+
+--- Test seam: reads CPU and memory from fixture files instead of /proc.
+--- @param stat string Path standing for /proc/stat.
+--- @param meminfo string Path standing for /proc/meminfo.
+function M._set_proc_paths(stat, meminfo)
+	assert(type(stat) == "string" and type(meminfo) == "string", "the load fixtures need two paths")
+	_proc = { stat = stat, meminfo = meminfo }
 end
 
 --- Test seam: reads the wireless listing from `path` instead of the kernel's.

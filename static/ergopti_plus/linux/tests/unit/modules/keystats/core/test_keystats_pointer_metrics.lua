@@ -6,8 +6,10 @@
 --- events_typing has mouse_clicks, mouse_scrolls and mouse_distance_px, which
 --- macOS fills and Linux wrote as zeroes. The evdev reports the keyboard hook
 --- already forwards are measured by modules/keystats/pointer_metrics.lua and
---- carried to the focused application's next typing row. The pointer reports
---- are scripted; no physical mouse is read here.
+--- carried to the focused application's next typing row. The distance is the
+--- cursor's travel in screen pixels, the unit Windows and macOS store: a
+--- scripted cursor follows every relative report, as the desktop's does, and
+--- no physical mouse is read here.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -19,6 +21,21 @@ local PointerMetrics = require("modules.keystats.pointer_metrics")
 
 -- A code no pointer counts: the middle button
 local MIDDLE = EvdevCodes.BTN_MIDDLE
+
+-- The scripted cursor: every REL_X/REL_Y report moves it, delivered or not.
+local cursor = { x = 0, y = 0, now = 0 }
+local function read_cursor() return cursor.x, cursor.y end
+-- Each read is a frame apart, so no read is rate-limited away.
+local function tick() cursor.now = cursor.now + 100; return cursor.now end
+
+--- Wraps an observer so its relative reports move the scripted cursor first.
+local function following(observe)
+	return function(kind, code, value, source)
+		if kind == "motion" and code == InputEvent.REL_X then cursor.x = cursor.x + value end
+		if kind == "motion" and code == InputEvent.REL_Y then cursor.y = cursor.y + value end
+		return observe(kind, code, value, source)
+	end
+end
 
 --- Feeds one movement frame: its axes, then the SYN_REPORT closing it.
 local function move(observe, dx, dy)
@@ -60,11 +77,47 @@ helpers.describe("pointer metrics: what one evdev report adds", function()
 
 	helpers.it("measures each frame's movement once, as one vector", function()
 		local tracker = PointerMetrics.new()
-		local deltas = move(tracker.observe, 3, 4)
+		tracker.bind_position(read_cursor, tick)
+		local observe = following(tracker.observe)
+		tracker.reseed()
+		local deltas = move(observe, 3, 4)
 		helpers.assert_eq(#deltas, 1, "only the frame's SYN_REPORT reports the distance")
 		helpers.assert_eq(deltas[1].distance, 5)
 		helpers.assert_nil(tracker.observe("frame", InputEvent.SYN_REPORT, 0), "an empty frame adds nothing")
-		helpers.assert_eq(move(tracker.observe, -6, 0)[1].distance, 6)
+		helpers.assert_eq(move(observe, -6, 0)[1].distance, 6)
+	end)
+
+	helpers.it("pointer-distance-pixels: credits screen pixels, never the device units of the reports", function()
+		local tracker = PointerMetrics.new()
+		local position = { x = 100, y = 100 }
+		local now = 0
+		tracker.bind_position(function() return position.x, position.y end, function() now = now + 100; return now end)
+		tracker.reseed()
+		-- Acceleration: a 3-unit report moved the cursor 30 pixels.
+		tracker.observe("motion", InputEvent.REL_X, 3)
+		position.x = 130
+		helpers.assert_eq(tracker.observe("frame", InputEvent.SYN_REPORT, 0).distance, 30)
+		helpers.assert_eq(tracker.availability().unit, "px")
+	end)
+
+	helpers.it("pointer-distance-pixels: reads at most once per sample interval during a movement", function()
+		local tracker = PointerMetrics.new()
+		local reads, now = 0, 0
+		tracker.bind_position(function() reads = reads + 1; return reads * 10, 0 end, function() return now end)
+		tracker.reseed()
+		for _ = 1, 5 do move(tracker.observe, 1, 0) end
+		helpers.assert_eq(reads, 1, "frames inside the interval do not read the cursor")
+		now = PointerMetrics.POSITION_SAMPLE_MS
+		helpers.assert_eq(move(tracker.observe, 1, 0)[1].distance, 10, "the next read credits the whole line")
+	end)
+
+	helpers.it("pointer-distance-unavailable: without a cursor source no distance is invented", function()
+		local tracker = PointerMetrics.new()
+		tracker.bind_position(nil, nil, "platform_reason.pointer_distance_needs_cursor_position")
+		helpers.assert_nil(move(tracker.observe, 3, 4)[1])
+		local availability = tracker.availability()
+		helpers.assert_eq(availability.measured, false)
+		helpers.assert_eq(availability.reason, "platform_reason.pointer_distance_needs_cursor_position")
 	end)
 
 	helpers.it("refuses a kind the hook does not report", function()
@@ -91,12 +144,14 @@ local function recorded(script)
 	local previous_writer, previous_keystats = package.loaded[writer_name], package.loaded[keystats_name]
 	package.loaded[writer_name], package.loaded[keystats_name] = fake_writer, nil
 	local rows = {}
+	cursor.x, cursor.y = 0, 0
 	local ok, err = pcall(function()
 		local keystats = require(keystats_name)
 		keystats.init({ sqlite_path = "/tmp/ergopti_keystats_pointer_mock.sqlite" })
+		keystats.bind_pointer_position(read_cursor, tick)
 		require("tests.support.metrics_consent_fixture").enable(keystats)
 		keystats.reset_session()
-		script(keystats, fake_writer)
+		script(setmetatable({ record_pointer = following(keystats.record_pointer) }, { __index = keystats }), fake_writer)
 		keystats.flush()
 		for _, entry in ipairs(fake_writer.typing) do rows[#rows + 1] = entry.row end
 		keystats.flush()
@@ -251,8 +306,10 @@ helpers.describe("pointer metrics: the recorder writes them with the typing row"
 			keystats.record_pointer("motion", InputEvent.REL_Y, 2, "mouse-a")
 			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-a")
 		end)
+		-- The pause forgot the cursor; resuming focus seeds it at (0,0), and the
+		-- dropped frame's report still moved it before the read at (9,2).
 		helpers.assert_eq(#rows, 1)
-		helpers.assert_eq(rows[1].mouse_distance_px, 2)
+		helpers.assert_eq(rows[1].mouse_distance_px, math.floor(math.sqrt(85)))
 	end)
 
 	helpers.it("keeps interleaved device frames independent through the recorder", function()
@@ -263,8 +320,9 @@ helpers.describe("pointer metrics: the recorder writes them with the typing row"
 			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-a")
 			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-b")
 		end)
+		-- One cursor: the two devices moved it to (3, 4), five pixels away.
 		helpers.assert_eq(#rows, 1)
-		helpers.assert_eq(rows[1].mouse_distance_px, 7)
+		helpers.assert_eq(rows[1].mouse_distance_px, 5)
 	end)
 
 	helpers.it("discards a departed pointer's incomplete frame before reconnection", function()
@@ -280,8 +338,9 @@ helpers.describe("pointer metrics: the recorder writes them with the typing row"
 			keystats.record_pointer("motion", InputEvent.REL_Y, 4, "mouse-b")
 			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-b")
 		end)
+		-- The cursor still travelled with the discarded reports: (0,0) -> (6,4) -> (6,8).
 		helpers.assert_eq(#rows, 1)
-		helpers.assert_eq(rows[1].mouse_distance_px, 8)
+		helpers.assert_eq(rows[1].mouse_distance_px, math.floor(math.sqrt(52) + 4))
 	end)
 
 	helpers.it("discards a dropped pointer packet without affecting another device", function()
@@ -297,8 +356,9 @@ helpers.describe("pointer metrics: the recorder writes them with the typing row"
 			keystats.record_pointer("motion", InputEvent.REL_Y, 2, "mouse-a")
 			keystats.record_pointer("frame", InputEvent.SYN_REPORT, 0, "mouse-a")
 		end)
+		-- A dropped packet loses its click, not the cursor's travel: (0,0) -> (9,4) -> (9,6).
 		helpers.assert_eq(#rows, 1)
-		helpers.assert_eq(rows[1].mouse_distance_px, 8)
+		helpers.assert_eq(rows[1].mouse_distance_px, math.floor(math.sqrt(97) + 2))
 		helpers.assert_eq(rows[1].mouse_clicks, 0)
 	end)
 	helpers.it("carries clicks, scrolls and distance to the focused application's row", function()

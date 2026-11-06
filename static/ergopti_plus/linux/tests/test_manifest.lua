@@ -853,6 +853,7 @@ return {
 	"tests.unit.ui.menu.structure.test_menu_languages_and_global_separator",
 	"tests.unit.ui.menu.structure.test_menu_pause_greys_features",
 	"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity",
+	"tests.unit.ui.menu.structure.test_metrics_availability_rows",
 	"tests.unit.ui.menu.metrics.test_privacy_toggle_publication",
 	"tests.unit.ui.menu.hotstrings.test_personal_hotstring_frames",
 	"tests.unit.ui.menu.about.test_menu_uninstall",

@@ -502,6 +502,22 @@
 		}
 	},
 	{
+		"path": "metrics_menu.metrics_availability",
+		"visibility": "hide",
+		"labels": { "fr": "metrics_availability", "en": "metrics_availability" },
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Metrics this session cannot measure — Linux only",
+				"fr": "Métriques non mesurables dans cette session — propre à Linux"
+			},
+			"macos": {
+				"en": "Metrics this session cannot measure — Linux only",
+				"fr": "Métriques non mesurables dans cette session — propre à Linux"
+			}
+		}
+	},
+	{
 		"path": "metrics_menu.metrics_migration",
 		"visibility": "hide",
 		"labels": { "fr": "metrics_migration", "en": "metrics_migration" },

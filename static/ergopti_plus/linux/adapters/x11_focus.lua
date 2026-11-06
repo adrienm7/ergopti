@@ -49,6 +49,7 @@ M.RECONNECT_MS = 2000
 --   intern(name) -> atom|nil
 --   property(window, property_atom, type_atom, max_longs) -> { type, format, bytes }|nil
 --   root() -> window id
+--   pointer() -> root_x, root_y|nil (the cursor on the root window's screen)
 --   healthy() -> boolean
 --   disconnect()
 local _transport = nil
@@ -224,6 +225,35 @@ function M.query()
 	return tostring(window), title, window_pid(window)
 end
 
+--- The index of the current virtual desktop, the root window's EWMH
+--- _NET_CURRENT_DESKTOP (what wmctrl -d marks with a star).
+--- @return integer|nil desktop nil when the window manager publishes none, or with a reason on transport trouble.
+--- @return string|nil reason
+function M.current_desktop()
+	if not _transport then return nil, "no X transport" end
+	local connected, reason = ensure_connected()
+	if not connected then return nil, reason end
+	local property = atom("_NET_CURRENT_DESKTOP")
+	if not property then return nil, "the window manager publishes no current desktop" end
+	local reply = _transport.property(_transport.root(), property, ATOM_CARDINAL, 1)
+	if not reply or reply.format ~= 32 then return nil, "the window manager publishes no current desktop" end
+	return u32(reply.bytes)
+end
+
+--- The cursor position in screen pixels on the root window, as Windows reads
+--- GetCursorPos and macOS hs.mouse.absolutePosition.
+--- @return integer|nil x nil with a reason when unanswerable.
+--- @return integer|string|nil y_or_reason
+function M.pointer_position()
+	if not _transport then return nil, "no X transport" end
+	local connected, reason = ensure_connected()
+	if not connected then return nil, reason end
+	if type(_transport.pointer) ~= "function" then return nil, "this transport cannot read the pointer" end
+	local x, y = _transport.pointer()
+	if type(x) ~= "number" or type(y) ~= "number" then return nil, "the pointer is on another screen" end
+	return x, y
+end
+
 --- Lists the managed top-level windows from the root window's _NET_CLIENT_LIST,
 --- as wmctrl -lp does, but in this process and without forking.
 --- @return table|nil windows Array of { id, title, pid }; nil with a reason on transport trouble.
@@ -280,6 +310,9 @@ local function build_xcb_transport()
 		ergopti_xcb_property_reply_t *xcb_get_property_reply(ergopti_xcb_connection_t *connection, ergopti_xcb_cookie_t cookie, void **error);
 		void *xcb_get_property_value(const ergopti_xcb_property_reply_t *reply);
 		int xcb_get_property_value_length(const ergopti_xcb_property_reply_t *reply);
+		typedef struct { uint8_t response_type, same_screen; uint16_t sequence; uint32_t length, root, child; int16_t root_x, root_y, win_x, win_y; uint16_t mask; uint8_t pad0[2]; } ergopti_xcb_query_pointer_reply_t;
+		ergopti_xcb_cookie_t xcb_query_pointer(ergopti_xcb_connection_t *connection, uint32_t window);
+		ergopti_xcb_query_pointer_reply_t *xcb_query_pointer_reply(ergopti_xcb_connection_t *connection, ergopti_xcb_cookie_t cookie, void **error);
 		void free(void *pointer);
 	]])
 	if not defined and not tostring(define_error):find("redefin", 1, true) then
@@ -334,6 +367,17 @@ local function build_xcb_transport()
 		local value = tonumber(reply.atom)
 		ffi.C.free(reply)
 		return value
+	end
+
+	function transport.pointer()
+		local error_slot = ffi.new("void*[1]")
+		local reply = library.xcb_query_pointer_reply(connection, library.xcb_query_pointer(connection, root), error_slot)
+		if error_slot[0] ~= nil then ffi.C.free(error_slot[0]) end
+		if reply == nil then return nil end
+		local x, y, same = tonumber(reply.root_x), tonumber(reply.root_y), reply.same_screen ~= 0
+		ffi.C.free(reply)
+		if not same then return nil end
+		return x, y
 	end
 
 	function transport.property(window, property, type_atom, max_longs)

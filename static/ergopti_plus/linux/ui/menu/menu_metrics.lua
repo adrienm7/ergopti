@@ -50,6 +50,32 @@ local function _migration_row(k)
 	}
 end
 
+--- The metrics this session cannot measure, one inert row each with its reason.
+--- PROVIDER data for the `metrics_availability` list: a label naming the metric
+--- and why, so an empty dashboard column reads as unmeasured, not as zero.
+--- @param k table The keystats module.
+--- @return table rows Possibly empty.
+local function _availability_rows(k)
+	local rows = {}
+	local function add(name_key, availability)
+		if type(availability) == "table" and availability.measured == false then
+			rows[#rows + 1] = {
+				label = string.format(i18n_safe("menu.metrics.not_measured"), i18n_safe(name_key),
+					i18n_safe(assert(availability.reason, "an unmeasured metric names its reason"))),
+				disabled = true,
+			}
+		end
+	end
+	if type(k.pointer_distance_availability) == "function" then
+		add("menu.metrics.pointer_distance", k.pointer_distance_availability())
+	end
+	local ok, SystemMetrics = pcall(require, "modules.keystats.system_metrics")
+	if ok and type(SystemMetrics.space_change_availability) == "function" then
+		add("menu.metrics.space_changes", SystemMetrics.space_change_availability())
+	end
+	return rows
+end
+
 --- Renders the rows of the metrics submenu that the manifest describes.
 ---
 --- Defined BEFORE its caller: a `local function` is not hoisted, so calling it
@@ -317,6 +343,7 @@ local function _manifest_metrics_rows(ctx, k)
 	-- is the progress itself.
 	local providers = {
 		["metrics_migration"] = function() return { _migration_row(k) } end,
+		["metrics_availability"] = function() return _availability_rows(k) end,
 		-- The applications whose typing is never recorded: the same submenu the
 		-- other two drivers draw, over this driver's own keystats list.
 		["exclude_apps"] = function()

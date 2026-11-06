@@ -3098,6 +3098,24 @@ local function main()
 	-- The focus poll runs four times a second: on X11 it asks the server inside
 	-- this process (libxcb) instead of forking xdotool twice per poll.
 	if window_info and type(window_info.use_native_x11) == "function" then window_info.use_native_x11() end
+	-- Pointer distance and virtual-desktop changes are read from the X server:
+	-- the cursor's screen position (the pixels Windows and macOS store) and the
+	-- EWMH current desktop. Wayland grants neither to a client; the metrics then
+	-- say so instead of storing another unit or a zero that looks measured.
+	do
+		local sources = window_info and window_info.metrics_sources() or {}
+		keystats.bind_pointer_position(sources.pointer, sources.pointer and Monotonic.now_ms or nil,
+			not sources.pointer and "platform_reason.pointer_distance_needs_cursor_position" or nil)
+		if system_metrics then
+			system_metrics.bind_desktop_source(sources.desktop,
+				not sources.desktop and "platform_reason.desktop_changes_need_x11" or nil)
+		end
+		if not sources.pointer then
+			-- The diagnostics trail of the menu's « not measured » rows.
+			Logger.warn(LOG, "Metrics: pointer distance and desktop changes are not measured in this session "
+				.. "(no X11 cursor position or current desktop; Wayland exposes neither to a client).")
+		end
+	end
 
 	if process_lifecycle then
 		process_lifecycle.onFocusChange(function(appName, windowTitle)
@@ -3228,6 +3246,9 @@ local function main()
 			local owner = system_metrics
 			RuntimeGuard.call("system metrics sampler", function()
 				owner.sample()
+				-- A desktop change is an instant, not a state: it is read on every
+				-- tick, where a sample interval would miss most of them.
+				owner.observe_desktop()
 			end, function() system_metrics = nil end)
 		end
 

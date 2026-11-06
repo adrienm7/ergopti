@@ -1308,6 +1308,21 @@ function M.record_shortcut(app_id, key, timestamp_ms)  -- luacheck: ignore 212
 	}
 end
 
+--- Binds the cursor position the pointer distance is measured from, in the
+--- screen pixels Windows and macOS store, or no source with the reason.
+--- @param read function|nil Returns x, y, or nil with a reason.
+--- @param clock function|nil Monotonic milliseconds.
+--- @param reason string|nil i18n key of why the distance is not measured.
+function M.bind_pointer_position(read, clock, reason)
+	_pointer.bind_position(read, clock, reason)
+end
+
+--- Whether the pointer distance is measured, for the menu and diagnostics.
+--- @return table { measured, unit?, reason? }
+function M.pointer_distance_availability()
+	return _pointer.availability()
+end
+
 --- Records one report of an observed pointer for the mouse columns of
 --- events_typing. The clicks, wheel turns and distance accumulate under the
 --- focused application and are written with its next typing row, as macOS
@@ -1320,6 +1335,7 @@ end
 function M.record_pointer(kind, code, value, source)
 	if not may_record() or M.is_unrecorded_app(_focused_app_id) then
 		_pointer.discard_frames()
+		_pointer.forget_position()
 		-- Keep device lifecycle and queue-loss state in sync while collection is off.
 		if kind == "reset" or kind == "dropped" or kind == "frame" then
 			_pointer.observe(kind, code, value, source)
@@ -1408,7 +1424,7 @@ end
 --- @param timestamp_ms number|nil Monotonic transition timestamp in milliseconds.
 function M.on_app_focus(app_id, timestamp_ms)
 	if type(app_id) ~= "string" or app_id == "" then return end
-	if _focused_app_id ~= app_id then _pointer.discard_frames() end
+	if _focused_app_id ~= app_id then _pointer.discard_frames(); _pointer.reseed() end
 	M.observe_hold_focus(app_id)
 	local clock = observe_calendar()
 	-- Gated like every other recording entry point: focus time and app
@@ -1832,6 +1848,7 @@ settle_capture_policy = function()
 	if not may_record() then _capture_boundary = _capture_boundary + 1 end
 	if not may_record() or hold_password_app(_hold_focus_app) then
 		_pointer.discard_frames()
+		_pointer.forget_position()
 		retire_focus_prefix()
 		_hold_token = {}
 		-- Privacy can close while the same window stays focused. Retire its

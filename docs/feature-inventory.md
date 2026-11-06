@@ -558,6 +558,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `tap_hold_owned_install_rows.tap_hold_owned_install` (hide): Review the platform-specific presentation and equivalent.
 - [ ] `metrics_menu.wpm_menubar` (hide): Not on Windows: these rows govern the words-per-minute readout in the menu bar (macOS) or the notification area (Linux). Windows has no equivalent; its readout is the floating widget.
 - [ ] `metrics_menu.menubar_colors` (hide): Not on Windows: these rows govern the words-per-minute readout in the menu bar (macOS) or the notification area (Linux). Windows has no equivalent; its readout is the floating widget.
+- [ ] `metrics_menu.metrics_availability` (hide): Metrics this session cannot measure — Linux only
 - [ ] `metrics_menu.metrics_migration` (hide): Background encryption migration — Linux only
 - [ ] `layout_menu.layout_bundle` (hide): macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.
 - [ ] `layout_menu.virtual_keyboard` (hide): macOS only: Karabiner-Elements, which Ergopti uses on macOS to remap keys, has a virtual keyboard whose type decides which keycodes the two ISO-only keys reach. Windows and Linux name these keys by position and have no virtual keyboard.
@@ -693,6 +694,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts_menu.selection_operations` (hide): Linux only: this driver groups its selection operations — CapsWord, the case transforms, select word or line, paste without formatting — into one block. macOS reaches the same operations through its Ctrl shortcuts and Windows through its own key combinations, so a shared row would list them twice there.
 - [ ] `shortcuts_menu.personal_shortcuts` (hide): The chord families a driver binds belong to its platform: Windows groups its AltGr and CapsLock combinations and keeps a personal shortcuts file, macOS groups its Ctrl and Cmd shortcuts. Each driver lists only the family it binds.
 - [ ] `selection_caps_word_control.selection_caps_word` (hide): Review the platform-specific presentation and equivalent.
+- [ ] `metrics_menu.metrics_availability` (hide): Metrics this session cannot measure — Linux only
 - [ ] `metrics_menu.metrics_migration` (hide): Background encryption migration — Linux only
 - [ ] `layout_menu.layout_toggle` (hide): Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.
 - [ ] `layout_menu.layout_features_base` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.

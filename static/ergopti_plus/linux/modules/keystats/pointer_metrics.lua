@@ -15,11 +15,14 @@
 ---    a touch, not a click.
 --- 2. A wheel turn is one REL_WHEEL or REL_HWHEEL report. The high-resolution
 ---    axes repeat the same turn in finer units and would count it twice.
---- 3. Distance is the length of each evdev frame's REL_X/REL_Y vector, summed:
----    the axes of one movement arrive as separate reports closed by SYN_REPORT.
----    It is in device units, before the desktop's pointer acceleration. Linux
----    has no cursor position to poll under Wayland, so the screen pixels macOS
----    measures cannot be read here.
+--- 3. Distance is in screen pixels, the unit Windows (cursor positions) and
+---    macOS (absolute position polls) store. An evdev frame that moved the
+---    pointer triggers a read of the cursor position, at most once every
+---    POSITION_SAMPLE_MS, and the straight line from the previous read is
+---    credited. The REL_X/REL_Y device units are never credited: they precede
+---    the desktop's acceleration and summed beside pixels they would make the
+---    column mean two things. Without a cursor position (Wayland grants no
+---    global one) the distance is not measured; availability() says why.
 --- ==============================================================================
 
 local M = {}
@@ -32,6 +35,10 @@ local CLICK_BUTTONS = { [EvdevCodes.BTN_LEFT] = true, [EvdevCodes.BTN_RIGHT] = t
 
 -- The wheel axes counted as one scroll per report
 local SCROLL_AXES = { [InputEvent.REL_WHEEL] = true, [InputEvent.REL_HWHEEL] = true }
+
+-- Shortest interval between two cursor reads during a movement: a 60 Hz frame,
+-- the resolution at which a straight line between reads stays the travelled path.
+M.POSITION_SAMPLE_MS = 16
 
 -- The kinds the keyboard hook reports a pointer event as
 M.KIND_PRESS  = "press"
@@ -60,6 +67,47 @@ function M.new()
 	local tracker = {}
 	local frames, dropping, default_source = {}, {}, {}
 	local fractions, fraction_database, fraction_device = {}, nil, nil
+	-- The cursor position source: read() -> x, y | nil, reason; clock() -> ms.
+	local position = { read = nil, clock = nil, x = nil, y = nil, at = nil, reason = nil }
+
+	--- Binds the screen-pixel position source, or unbinds it with the reason
+	--- the distance cannot be measured.
+	--- @param read function|nil Returns x, y in screen pixels, or nil, reason.
+	--- @param clock function|nil Monotonic milliseconds.
+	--- @param reason string|nil Why there is no source when read is nil.
+	function tracker.bind_position(read, clock, reason)
+		assert(read == nil or (type(read) == "function" and type(clock) == "function"),
+			"a pointer position source needs its clock")
+		position = { read = read, clock = clock, x = nil, y = nil, at = nil, reason = read == nil and reason or nil }
+	end
+
+	--- Whether the distance is measured, and in which unit.
+	--- @return table { measured = boolean, unit = "px"|nil, reason = string|nil }
+	function tracker.availability()
+		if position.read then return { measured = true, unit = "px" } end
+		return { measured = false, reason = position.reason or "no cursor position source" }
+	end
+
+	--- The screen distance since the previous cursor read, when one is due.
+	local function travelled()
+		if not position.read then return 0 end
+		local now = position.clock()
+		if position.at and now - position.at < M.POSITION_SAMPLE_MS then return 0 end
+		local x, y = position.read()
+		position.at = now
+		if type(x) ~= "number" or type(y) ~= "number" then
+			-- A refused read seeds afresh: no line is drawn across the gap.
+			position.x, position.y = nil, nil
+			return 0
+		end
+		local distance = 0
+		if position.x then
+			local dx, dy = x - position.x, y - position.y
+			distance = math.sqrt(dx * dx + dy * dy)
+		end
+		position.x, position.y = x, y
+		return distance
+	end
 
 	--- A new storage owner must not inherit another database's remainder.
 	function tracker.bind_fractions(database, device)
@@ -94,6 +142,23 @@ function M.new()
 	--- Forgets uncommitted movement without admitting a dropped packet.
 	function tracker.discard_frames()
 		frames = {}
+	end
+
+	--- Forgets the cursor position: the next read seeds afresh, so travel made
+	--- while collection is closed is never credited.
+	function tracker.forget_position()
+		position.x, position.y, position.at = nil, nil, nil
+	end
+
+	--- Reads the cursor now without crediting the travel since the previous
+	--- read: a focus change starts the next application's path where it gets
+	--- the pointer, as discarding the open frame did for device units.
+	function tracker.reseed()
+		if not position.read then return end
+		position.at = position.clock()
+		local x, y = position.read()
+		if type(x) == "number" and type(y) == "number" then position.x, position.y = x, y
+		else position.x, position.y = nil, nil end
 	end
 
 	--- Observes one pointer report and returns what it adds to the metrics.
@@ -134,7 +199,8 @@ function M.new()
 		local frame = frames[key]
 		frames[key] = nil
 		if not frame or (frame.dx == 0 and frame.dy == 0) then return nil end
-		local distance = math.sqrt(frame.dx * frame.dx + frame.dy * frame.dy)
+		local distance = travelled()
+		if distance <= 0 then return nil end
 		return { clicks = 0, scrolls = 0, distance = distance }
 	end
 
