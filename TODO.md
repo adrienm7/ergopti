@@ -455,7 +455,7 @@ three-OS CI is green on the final source. See the handoff above for the current 
       The test uses a high temperature, bypasses the cache, never a fixed string, and shows the generation time.
 - [x] **Generation parameters submenu.** Predictions count, min and max words with no separator; one separator; all the
       context rows at the bottom (two separators become one).
-- [ ] **Prediction indentation default -3**, recommended -3, all drivers.
+- [x] **Prediction indentation default -3**, recommended -3, all drivers.
 - [x] **French punctuation.** Space before `:` in composed `label: value` rows and about 21 strings, with a gate.
       Done before 6 November: `common.label_value` (French « {1} : {2} ») through `LabelValue` / `locale.label_value`,
       fr.json clean, gate `test-french-punctuation.cjs` (no glued high punctuation, no hardcoded `" : "` join), and the
