@@ -6,8 +6,8 @@
 --- The three one-click Mac checks over scripted ports:
 --- 1. lease: a missing tool, a failed phase or guardian, lease failures and lost
 ---    key events each fail their own step and no other;
---- 2. owned_runtime: the dormant invariants (legacy source, raw stream not
----    loaded) fail when broken, and the install state is information only;
+--- 2. owned_runtime: the dormant credit source fails when broken; whether the
+---    raw stream owner is loaded and the install state are information only;
 --- 3. key_accounting: Quartz presses against ledger credits, with the HS-274
 ---    double count named when the legacy ledger credits;
 --- 4. every external command is read-only and bounded, and no step value can
@@ -353,11 +353,15 @@ helpers.describe("owned runtime check", function()
 		helpers.assert_eq(steps.dormant_source.value, "gap")
 	end)
 
-	helpers.it("fails when the raw stream owner was loaded", function()
+	-- Field report 2026-11-05: the owned runtime, now the default, loads the
+	-- raw stream owner on every boot, so this step failed every owned run.
+	helpers.it("reports a loaded raw stream owner as information (owned-capture-info)", function()
 		local ports = make_ports({ keystats_facts = function()
 			return { credit_source = "legacy", capture_loaded = true, ledger_drained = 0 }
 		end })
-		helpers.assert_eq(run("owned_runtime", ports).capture_unloaded.state, "fail")
+		local steps = run("owned_runtime", ports)
+		helpers.assert_eq(steps.capture_unloaded.state, "info")
+		helpers.assert_eq(steps.capture_unloaded.value, "no")
 	end)
 
 	helpers.it("parses the driver listing", function()
