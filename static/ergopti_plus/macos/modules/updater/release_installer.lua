@@ -75,7 +75,10 @@ local stage_path = Paths.shared("../macos/adapters/release_stage.sh")
 M.STAGE_SCRIPT = type(stage_path) == "string" and FileSystem.read(stage_path) or nil
 assert(type(M.STAGE_SCRIPT) == "string" and M.STAGE_SCRIPT ~= "", "The native release staging script is unavailable")
 
---- Replaces the installed app once the launcher has quit.
+--- Replaces the installed app once the launcher has quit, then keeps it only
+--- once its boot reports ready (the Windows swap's boot-ready and probation):
+--- a build that never reports within the wait, or exits during the probation,
+--- is stopped and moved aside, and the previous app is put back and opened.
 --- Arguments: launcher pid, installed app, verified app, previous-app path.
 M.SWAP_SCRIPT = table.concat({
 	"set -u",
@@ -115,10 +118,68 @@ M.SWAP_SCRIPT = table.concat({
 	'}',
 	'# Occupied destination admission ends',
 	'replacement_path_clear || exit 8',
+	'# Successor boot-ready receiving begins',
+	'stop_successor() {',
+	'	pids=$1',
+	"	[ -n \"$pids\" ] || pids=$(/bin/ps -axo pid=,command= | /usr/bin/awk -v root=\"$app/Contents/\" '",
+	"		{ pid = $1; $1 = \"\"; sub(/^ +/, \"\") }",
+	"		index($0, root) == 1 && index($0, \" " .. RENAME_FLAG .. " \") == 0 { print pid }')",
+	'	for p in $pids; do /bin/kill -TERM "$p" 2>/dev/null; done',
+	'	stop_ticks=0',
+	'	for p in $pids; do',
+	'		while /bin/kill -0 "$p" 2>/dev/null && [ "$stop_ticks" -lt 50 ]; do stop_ticks=$((stop_ticks + 1)); /bin/sleep 0.1; done',
+	'		/bin/kill -KILL "$p" 2>/dev/null',
+	'	done',
+	'	return 0',
+	'}',
+	'open_until_ready() {',
+	'	ready_dir=$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/ergopti-boot-ready.XXXXXX") || { failure="no ready folder"; return 1; }',
+	'	if ! /usr/bin/open --env "ERGOPTI_UPDATER_BOOT_READY=$ready_dir/ready" -- "$app"; then',
+	'		/bin/rm -rf "$ready_dir"',
+	'		failure="the app could not be opened"',
+	'		return 1',
+	'	fi',
+	'	ready_ticks=0',
+	'	while [ ! -s "$ready_dir/ready" ]; do',
+	'		ready_ticks=$((ready_ticks + 1))',
+	'		if [ "$ready_ticks" -gt 600 ]; then /bin/rm -rf "$ready_dir"; failure="no boot report"; return 1; fi',
+	'		/bin/sleep 0.1',
+	'	done',
+	'	successor=$(/bin/cat "$ready_dir/ready")',
+	'	/bin/rm -rf "$ready_dir"',
+	'	case "$successor" in ""|*[!0-9]*) successor=; failure="an invalid boot report"; return 1 ;; esac',
+	'	/bin/sleep 0.75',
+	'	/bin/kill -0 "$successor" 2>/dev/null || { failure="it quit during the probation"; return 1; }',
+	'	return 0',
+	'}',
+	'# Successor boot-ready receiving ends',
 	'if "$launcher" "$rename_flag" move "$staged" "$app"; then',
 	'	echo "Installed."',
-	'	/usr/bin/open -- "$app" || { echo "The installed app could not be opened."; exit 7; }',
-	"	exit 0",
+	'	# A build carrying its boot reporter (infra/updater_boot_ready.lua) is checked; an older one is only opened',
+	'	if [ ! -f "$app/Contents/Resources/static/ergopti_plus/macos/infra/updater_boot_ready.lua" ]; then',
+	'		/usr/bin/open -- "$app" || { echo "The installed app could not be opened."; exit 7; }',
+	'		exit 0',
+	'	fi',
+	'	successor=; failure=',
+	'	if open_until_ready; then echo "The installed app reported a healthy start."; exit 0; fi',
+	'	stop_successor "$successor"',
+	'	failed_app="$app.failed-$$"',
+	'	if [ -e "$failed_app" ] || [ -L "$failed_app" ]; then',
+	'		echo "The installed app did not start ($failure) and $failed_app is occupied: the previous app remains at $previous."',
+	'		exit 10',
+	'	fi',
+	'	if ! "$launcher" "$rename_flag" move "$app" "$failed_app"; then',
+	'		echo "The installed app did not start ($failure) and could not be moved aside: the previous app remains at $previous."',
+	'		exit 10',
+	'	fi',
+	'	replacement_path_clear || exit 8',
+	'	if ! "$launcher" "$rename_flag" move "$previous" "$app"; then',
+	'		echo "The previous app could not be restored: it remains at $previous, the new one at $failed_app."',
+	'		exit 8',
+	'	fi',
+	'	echo "The installed app did not start ($failure): the previous one is back and the new one is at $failed_app."',
+	'	/usr/bin/open -- "$app"',
+	'	exit 9',
 	"fi",
 	'replacement_path_clear || exit 8',
 	'if ! "$launcher" "$rename_flag" move "$previous" "$app"; then',
@@ -225,6 +286,12 @@ end
 M.SWAP_WAIT_TICKS = tonumber(M.SWAP_SCRIPT:match('%[ "%$waited" %-gt (%d+) %]'))
 assert(M.SWAP_WAIT_TICKS, "The release swap script names no launcher wait")
 M.SWAP_WAIT_SECONDS = M.SWAP_WAIT_TICKS / 10
+-- How long the swap waits for the opened build's boot report.
+M.SWAP_READY_TICKS = tonumber(M.SWAP_SCRIPT:match('%[ "%$ready_ticks" %-gt (%d+) %]'))
+assert(M.SWAP_READY_TICKS, "The release swap script names no boot-ready wait")
+-- The file a build carries when it reports its boot, read from the script.
+M.BOOT_READY_CAPABILITY = M.SWAP_SCRIPT:match('%[ ! %-f "%$app(/Contents/Resources/[^"]+)" %]')
+assert(M.BOOT_READY_CAPABILITY, "The release swap script names no boot-ready capability")
 
 --- Downloads and verifies one release into a fresh staging folder.
 --- @param asset table M.find_asset() result.

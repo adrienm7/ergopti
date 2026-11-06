@@ -1404,6 +1404,8 @@ do
 		boot_note("config.toml is absent at %s: opening the first-run wizard; the full boot follows it.",
 			tostring(cfg_path))
 		onboarding_mod.run(cfg_path)
+		-- The boot now waits for the user: a release swap keeps this build.
+		require("infra.updater_boot_ready").report("onboarding")
 		Boot.mark("First-launch guard (onboarding check)")
 		return
 	end
@@ -1527,7 +1529,10 @@ if accessibility_trusted ~= true then
 		emergency_exit_after_runtime_failure("accessibility",
 			"Accessibility wait could not start: " .. tostring(wait_err),
 			"startup.accessibility_required")
+		return
 	end
+	-- A new signature waits for the user's grant: a release swap keeps this build.
+	require("infra.updater_boot_ready").report("waiting for Accessibility")
 	return
 end
 Logger.info(LOG, "Accessibility permission is granted; arming input owners.")
@@ -2440,6 +2445,8 @@ end)
 
 Boot.mark("Boot complete (post-init deferrals scheduled)")
 Boot.complete()
+-- A release swap that opened this build keeps it only once it reports ready.
+require("infra.updater_boot_ready").report("boot complete")
 -- The reload this boot follows, from its reload call to this boot's end.
 if _reload_started_epoch_ms then
 	local reload_ms = TimerScheduler.now() * 1000 - _reload_started_epoch_ms

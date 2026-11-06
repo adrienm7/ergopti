@@ -395,9 +395,29 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 			assert(sh("ln -s missing " .. quote(previous)) == 0)
 		end
 
+		if opts.ready_capable then
+			local capability = staged .. Installer.BOOT_READY_CAPABILITY
+			assert(sh("mkdir -p " .. quote(capability:match("^(.*)/[^/]+$"))) == 0)
+			write(capability, "-- boot reporter\n")
+		end
+		-- The fake open records each launch; opened with a boot-ready token it
+		-- plays the successor: it reports the pid in successor_pid, or nothing.
 		local opened = dir .. "/opened"
-		local open = fake(dir, "open", 'echo "$2" >> ' .. quote(opened))
-		local script = Installer.SWAP_SCRIPT:gsub("/usr/bin/open", open)
+		local reported = dir .. "/successor_pid"
+		if opts.successor_pid then write(reported, opts.successor_pid) end
+		local open = fake(dir, "open", table.concat({
+			'if [ "$1" = --env ]; then',
+			'	echo "ready $4" >> ' .. quote(opened),
+			'	token=${2#ERGOPTI_UPDATER_BOOT_READY=}',
+			'	if [ -f ' .. quote(reported) .. ' ]; then cp ' .. quote(reported) .. ' "$token.tmp" && mv "$token.tmp" "$token"; fi',
+			'else',
+			'	echo "$2" >> ' .. quote(opened),
+			'fi',
+		}, "\n"))
+		local no_processes = fake(dir, "ps", "exit 0")
+		local script = Installer.SWAP_SCRIPT:gsub("/usr/bin/open", open):gsub("/bin/ps ", no_processes .. " ")
+		-- A wait of a few ticks keeps the silent successor case short.
+		script = script:gsub('%[ "%$ready_ticks" %-gt %d+ %]', '[ "$ready_ticks" -gt 3 ]')
 		script = require("tests.support.release_swap_ports").observe(script, dir)
 		if opts.publication_refused then
 			local move = fake(dir, "move", '[ "$2" = ' .. quote(staged) .. ' ] && exit 45\nexec ' .. require("tests.support.release_swap_ports").command() .. ' --release-rename move "$2" "$3"')
@@ -415,6 +435,7 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 			app = read(app .. "/marker"), previous = read(previous .. "/marker"), opened = read(opened) or "",
 			previous_file = read(previous), previous_link = sh("test -L " .. quote(previous)) == 0,
 			app_path = app,
+			failed = read(app .. ".failed-" .. (output:match("new one is at .-%.failed%-(%d+)") or "none") .. "/marker"),
 		}
 		sh("rm -rf " .. quote(dir))
 		return result
@@ -450,6 +471,64 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 			if kind == "symlink" then helpers.assert_true(result.previous_link) end
 			helpers.assert_true(result.output:find("Move the existing backup", 1, true) ~= nil)
 		end
+	end)
+
+	--- Runs one swap whose launcher has already quit and whose successor is the given process.
+	--- @param opts table swap() options.
+	--- @return table result
+	local function swap_with_live_pid(opts)
+		local producer = assert(io.popen([[sleep 3 >/dev/null 2>&1 & sleeper=$!; printf '%s\n' "$sleeper"; wait "$sleeper"]]))
+		local sleeper = producer:read("*l")
+		assert(sleeper and sleeper:match("^[1-9]%d*$"), "The successor double must publish its exact PID")
+		opts.successor_pid = opts.successor_pid or sleeper
+		local completed, result = pcall(swap, opts)
+		sh("kill " .. sleeper)
+		producer:close()
+		if not completed then error(result, 0) end
+		return result
+	end
+
+	-- The Windows swap keeps a new build only once it signals boot-ready and
+	-- survives its probation; the macOS swap only renamed and opened.
+	helpers.it("keeps the chosen app once its boot reports ready and survives the probation", function()
+		local result = swap_with_live_pid({ ready_capable = true })
+		helpers.assert_eq(result.status, 0, result.output)
+		helpers.assert_eq(result.app, "chosen")
+		helpers.assert_eq(result.previous, "installed")
+		helpers.assert_eq(result.opened, "ready " .. result.app_path .. "\n", "opened once, with the boot-ready token")
+		helpers.assert_contains(result.output, "reported a healthy start")
+	end)
+
+	helpers.it("puts the previous app back when the chosen one never reports its boot", function()
+		local result = swap({ ready_capable = true })
+		helpers.assert_eq(result.status, 9, result.output)
+		helpers.assert_eq(result.app, "installed", "the previous app is back in place")
+		helpers.assert_eq(result.failed, "chosen", "the build that did not start is kept aside, not deleted")
+		helpers.assert_eq(result.opened, "ready " .. result.app_path .. "\n" .. result.app_path .. "\n",
+			"the chosen app was opened with its token, then the previous one")
+		helpers.assert_contains(result.output, "did not start (no boot report)")
+	end)
+
+	helpers.it("puts the previous app back when the chosen one quits during the probation", function()
+		local result = swap({ ready_capable = true, successor_pid = "999999999" })
+		helpers.assert_eq(result.status, 9, result.output)
+		helpers.assert_eq(result.app, "installed")
+		helpers.assert_eq(result.failed, "chosen")
+		helpers.assert_contains(result.output, "quit during the probation")
+	end)
+
+	helpers.it("refuses an invalid boot report like a missing one", function()
+		local result = swap({ ready_capable = true, successor_pid = "12x" })
+		helpers.assert_eq(result.status, 9, result.output)
+		helpers.assert_eq(result.app, "installed")
+		helpers.assert_contains(result.output, "an invalid boot report")
+	end)
+
+	helpers.it("only opens a chosen release that predates the boot report", function()
+		local result = swap({})
+		helpers.assert_eq(result.status, 0, result.output)
+		helpers.assert_eq(result.app, "chosen", "an older build cannot report and is kept as before")
+		helpers.assert_eq(result.opened, result.app_path .. "\n")
 	end)
 
 	helpers.it("puts the previous app back and opens it when the chosen one cannot move in", function()
