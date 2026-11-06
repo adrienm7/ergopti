@@ -58,7 +58,7 @@ local function install_doubles(h)
 			return true
 		end,
 		is_open = function(kind)
-			if kind == "accessibility" then return h.accessibility_open end
+			if kind == "accessibility_copies" then return h.accessibility_open end
 			return h.open ~= nil and h.open.kind == kind
 		end,
 	}

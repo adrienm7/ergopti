@@ -1477,8 +1477,10 @@ Boot.stage_once("Accessibility permission")
 -- been asked; v0.0.0-dev.128 then died here with a generic pre-start refusal.
 -- Each ad hoc signed build also invalidates the previous grant while System
 -- Settings still shows it checked, so exiting with instructions left users
--- stuck. The wait clears that stale entry once per install, shows macOS's own
--- prompt, opens the pane, and runs this boot again once macOS trusts the process.
+-- stuck. The wait clears that stale entry once per install, unless another copy
+-- signed differently can hold the switch (it then names that copy), shows
+-- macOS's own prompt, opens the pane, and runs this boot again once macOS
+-- trusts the process.
 local accessibility_trusted, accessibility_err = AccessibilityPermission.is_trusted()
 if accessibility_trusted == nil then
 	emergency_exit_after_runtime_failure("accessibility",
@@ -1499,6 +1501,10 @@ if accessibility_trusted ~= true then
 		every = TimerScheduler.every,
 		cancel = TimerScheduler.cancel,
 		watch_reopen = watch_launcher_reopen,
+		-- Another copy signed differently can hold the one switch: its paths are named.
+		name_other_copies = function(paths)
+			return require("ui.permission_dialog").name_other_copies(AccessibilityPermission, paths)
+		end,
 		install_identity = install_identity,
 		reset_memory = {
 			get = function() return Storage.get(ACCESSIBILITY_RESET_STORAGE_KEY) end,

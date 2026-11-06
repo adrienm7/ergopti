@@ -175,7 +175,7 @@ helpers.describe("permission dialog controller cleanup", function()
 			h.release_refuses = true
 			helpers.assert_eq(h.dialog.close(), false)
 			h.release_refuses = false
-			helpers.assert_eq(h.dialog.show({ kind = "accessibility", bundle_path = "/Applications/Test.app",
+			helpers.assert_eq(h.dialog.show({ kind = "accessibility_copies", copies = { "/Applications/Other.app" }, bundle_path = "/Applications/Test.app",
 				open_settings = function() return true end }), false, "the owner's successor supersedes this request")
 			helpers.assert_eq(#h.windows, 2)
 			helpers.assert_eq(h.windows[2].deletes, 0)
