@@ -107,7 +107,7 @@ _CapsWordAutoOffNativeIdleMs(Seconds, &Reason := "") {
 ; Validates the Windows period before the shared compiler's arithmetic, then
 ; retains the portable delimiter/pointer policy with the admitted native delay.
 _CapsWordAutoOffCompileNativePolicy(Values, &Reason := "") {
-	Delay := _CapsWordAutoOffNativeIdleMs(Values.Get("idle_timeout_seconds", ""), &Reason)
+	Delay := _CapsWordAutoOffNativeIdleMs(Values.Get(ConfigLeaf.IDLE_TIMEOUT_SECONDS, ""), &Reason)
 	if !(Delay is Number)
 		return ""
 	Policy := CapsWordAutoOffCompile(Values, CapsWordAutoOffPointerKinds(), &Reason)
