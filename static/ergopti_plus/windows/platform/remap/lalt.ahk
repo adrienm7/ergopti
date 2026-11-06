@@ -62,7 +62,7 @@ _LAltIsBackspaceLayer() {
 _LAltIsSpecialTap() {
 	local action := TapHoldTapAction(TapHold, "left_alt")
 	return action == "one_shot_shift"
-		or action == "tab"
+		or (action == "tab" and TapHoldHoldLayer(TapHold, "left_alt") != "") ; Tab without a hold layer is a plain tap (generic tap-only branch)
 		or action == "alt_tab_monitor"
 		or action == "backspace"
 }
@@ -127,7 +127,7 @@ SC038:: {
 ; ==================================
 ; ==================================
 
-#HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and TapHoldHoldModifier(TapHold, "left_alt") == "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and TapHoldHoldModifier(TapHold, "left_alt") == "" and TapHoldHoldLayer(TapHold, "left_alt") != "" and not LayerEnabled
 *SC038::
 {
 	UpdateLastSentCharacter("LAlt")
