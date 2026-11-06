@@ -24,3 +24,10 @@ class WPMWidget {
 	static _gdip_fmt := 0
 }
 
+; The notification-area readout's two persisted choices, read by the same
+; full-save path (metrics.wpm_menubar_visible and wpm_menubar_colors).
+class WPMTrayReadout {
+	static running := false
+	static use_colors := false
+}
+

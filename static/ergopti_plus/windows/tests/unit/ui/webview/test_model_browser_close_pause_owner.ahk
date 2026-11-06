@@ -166,7 +166,8 @@ _MBPT_ChildSource(Directory) {
 		"LLM_Menu_ApplySharedDefaults", "LLM_Engine_Init", "HotstringsLanguageCategories", "ReadTomlFile", "MagicEditorPhysicalCatalogue", "NotifierSend", "MasterGateDesiredFeatures",
 		"MetricsFiltersApplyManifestDefaults", "MS_SaveBuiltToIni", "WPMWidget_Show",
 		"AppPicker_SelectionsEqual", "UpdateChannels_Ids", "UpdateSchedule_Timing",
-		"Updater_LoadChannel", "LLM_ModelBrowser_Show", "LLM_AuxInvalidate", "OllamaWV_Close", "LLM_Deps_Cancel"] {
+		"Updater_LoadChannel", "LLM_ModelBrowser_Show", "LLM_AuxInvalidate", "OllamaWV_Close", "LLM_Deps_Cancel",
+		"WMHandleExists", "WPMTrayReadout_LoadConfig"] {
 		Root := Symbol == "LLM_DisplayIndentValues" ? _DriverDir . "\..\_shared" : _DriverDir
 		Owner := _DriverProductionFileForSymbol(Symbol, Root)
 		AssertTrue(Owner != "", "The model-selection child requires its whole genuine owner: " . Symbol)
@@ -176,7 +177,7 @@ _MBPT_ChildSource(Directory) {
 		if Symbol == "LLM_Defaults_Load"
 			Code .= "LLM_Defaults_Load()`n"
 	}
-	AssertEqual(26, Owners.Count, "All native, data, configuration, menu and runtime owners must be included")
+	AssertEqual(28, Owners.Count, "All native, data, configuration, menu and runtime owners must be included")
 	; Dependency cancellation restores this genuine entry-point constant. Borrow
 	; its unchanged declaration without executing the driver's auto-start graph.
 	EntrySource := _DriverSourceConcat()
