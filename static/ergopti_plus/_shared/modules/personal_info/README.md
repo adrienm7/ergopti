@@ -91,12 +91,16 @@ every driver's suite.
 
 ---
 
-## Windows is not wired to this yet
+## Windows applies the mask through its AutoHotkey twin
 
-The fields this file classifies are not in the Windows preview index at all:
-`@iban★`, `@cb★` and `@ss★` are registered by direct `CreateHotstring` calls in
-AutoHotkey code, while the index is built exclusively from the TOML categories
-listed in `_PREFIX_WATCHER_CATEGORIES`. There is nothing on screen there for a
-mask to attach to, so making the requirement _observable_ on Windows is its own
-piece of work and is tracked separately. This file is written for three drivers
-because the answer must not differ between them once the third arrives.
+Windows is wired to this declaration. `windows/infra/personal_info_mask.ahk`
+reads the policy (which fields are secrets, how much of one stays visible) from
+`fields.toml` at runtime and masks the frozen field/value snapshot of an
+engine decision for the preview bubble (`PersonalInfoMaskForPreview`,
+`windows/infra/personal_info_preview.ahk`) and for persisted metrics. The
+direct-registered tags (`@iban★`, `@cb★`, `@ss★`) carry their field names in
+`PreviewFields`, so the same mask reaches them. The algorithm is pinned by
+`preview_vectors.toml`, replayed by every driver's suite.
+
+A missing localization key that exists only in metadata is audited separately
+from the working, translated tray caption; it does not affect the mask.
