@@ -668,7 +668,17 @@ function M.caffeinate_cb(event)
 
 		elseif event == hs.caffeinate.watcher.screensDidLock then
 			LogManager.log_system_event("lock")
-			_state.passive_started_at = passive_now
+			-- One owner at a time, and no lost segment: an open display or system
+			-- sleep is closed at the lock edge, and a repeated lock keeps its first
+			-- start. A lock owns any later sleep until unlock (see the wake branch).
+			if _state.passive_kind == "sleep" and _state.passive_started_at then
+				LogManager.log_passive_period("sleep",
+					math.floor(passive_now - _state.passive_started_at))
+				_state.passive_started_at = nil
+			end
+			if _state.passive_kind ~= "lock" or _state.passive_started_at == nil then
+				_state.passive_started_at = passive_now
+			end
 			_state.passive_kind       = "lock"
 			if _state.active_app_name then
 				LogManager.log_app_switch(

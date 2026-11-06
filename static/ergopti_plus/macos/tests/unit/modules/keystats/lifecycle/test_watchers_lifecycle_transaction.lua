@@ -783,3 +783,78 @@ helpers.describe("keystats sensors stay silent during the user's metrics pause (
 		end)
 	end)
 end)
+
+
+
+
+
+
+-- =============================================================
+-- =============================================================
+-- ======= 4/ Nested Passive Intervals (HS-007 / MM-004) =======
+-- =============================================================
+-- =============================================================
+
+--- Sums the measured passive intervals by kind.
+--- @param periods table Captured passive periods.
+--- @return table totals Milliseconds per kind plus the grand total.
+local function passive_totals(periods)
+	local totals = { sleep = 0, lock = 0, all = 0 }
+	for _, period in ipairs(periods) do
+		totals[period.kind] = (totals[period.kind] or 0) + period.duration
+		totals.all = totals.all + period.duration
+	end
+	return totals
+end
+
+helpers.describe("keystats passive intervals partition nested sleep and lock (HS-007)", function()
+	helpers.it("closes an open sleep segment when the screen locks", function()
+		with_fixture({}, function(watchers, fixture)
+			local w = hs.caffeinate.watcher
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			fixture.now_ms = 1000
+			watchers.caffeinate_cb(w.screensDidSleep)
+			fixture.now_ms = 6000
+			watchers.caffeinate_cb(w.screensDidLock)
+			fixture.now_ms = 10000
+			watchers.caffeinate_cb(w.screensDidWake)
+			fixture.now_ms = 13000
+			watchers.caffeinate_cb(w.screensDidUnlock)
+			local totals = passive_totals(fixture.passive_periods)
+			helpers.assert_eq(totals.sleep, 5000, "the display-off part before the lock is kept")
+			helpers.assert_eq(totals.lock, 7000)
+			helpers.assert_eq(totals.all, 12000, "the segments partition the whole interval")
+		end)
+	end)
+
+	helpers.it("keeps the first lock start across a repeated lock edge", function()
+		with_fixture({}, function(watchers, fixture)
+			local w = hs.caffeinate.watcher
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			fixture.now_ms = 1000
+			watchers.caffeinate_cb(w.screensDidLock)
+			fixture.now_ms = 4000
+			watchers.caffeinate_cb(w.screensDidLock)
+			fixture.now_ms = 9000
+			watchers.caffeinate_cb(w.screensDidUnlock)
+			helpers.assert_eq(#fixture.passive_periods, 1)
+			helpers.assert_eq(fixture.passive_periods[1].kind, "lock")
+			helpers.assert_eq(fixture.passive_periods[1].duration, 8000)
+		end)
+	end)
+
+	helpers.it("loses no time across lock, both sleeps, both wakes and unlock", function()
+		with_fixture({}, function(watchers, fixture)
+			local w = hs.caffeinate.watcher
+			helpers.assert_eq(watchers.init_hardware_watchers(), true)
+			local edges = { w.screensDidLock, w.screensDidSleep, w.systemWillSleep,
+				w.systemDidWake, w.screensDidWake, w.screensDidUnlock }
+			for index, edge in ipairs(edges) do
+				fixture.now_ms = index * 1000
+				watchers.caffeinate_cb(edge)
+			end
+			helpers.assert_eq(passive_totals(fixture.passive_periods).all, 5000,
+				"the measured segments cover lock to unlock exactly once")
+		end)
+	end)
+end)
