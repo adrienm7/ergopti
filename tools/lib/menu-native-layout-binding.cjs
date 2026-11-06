@@ -173,7 +173,7 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 			'local declared_bundle_rows = bundle_frame_rows()',
 			'local custom_rows = custom_layout_rows(update_menu, ManifestMenu)',
 			'local active_rows = active_layout_rows()',
-			'local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, {',
+			'local submenu = ManifestMenu.build("layout_menu", "Layout", nil, group_builders, render_ctx, {',
 			'return ManifestMenu.group_row("layout_native_parent", "layout_parent_content", submenu, {})'
 		])
 	)

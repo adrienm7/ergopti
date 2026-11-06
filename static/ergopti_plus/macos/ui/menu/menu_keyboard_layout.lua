@@ -894,7 +894,14 @@ function M.build(ctx)
 		local path = "layout.emulate_" .. row
 		render_ctx.feature_rows[path] = function() return emulation_switch(path, "menu.layout.emulate_" .. row) end
 	end
-	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, {
+	-- « Rangées émulées »: the four layout.emulate_<row> switches of the
+	-- manifest's layout_emulated_rows_group, as Windows builds them.
+	local group_builders = {
+		layout_emulated_rows = function()
+			return { items = ManifestMenu.build("layout_emulated_rows_group", "Layout", nil, nil, render_ctx, {}) or {} }
+		end,
+	}
+	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, group_builders, render_ctx, {
 		["layout_emulation"] = function()
 			local Preferences = require("infra.layout_emulation_preferences")
 			return EmulationRows.choice_rows({
