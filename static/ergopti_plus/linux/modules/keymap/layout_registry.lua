@@ -649,6 +649,7 @@ local function convert(deps, entry, layout_path, on_done, rows)
 	local result, convert_err = XkbConverter.convert(canonical, {
 		keycodes = keycodes,
 		keysyms = keysym_table.keysyms,
+		locale_extended_prefixes = keysym_table.locale_extended_prefixes,
 		template = template,
 		layout_id = entry.id,
 		display_name = entry.name,
