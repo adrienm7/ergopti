@@ -124,7 +124,7 @@ local function load_fixture(options)
 
 	local pasteboard = {
 		changeCount = function() return change_count end,
-		allContentTypes = function() return { {} } end,
+		allContentTypes = function() return clone(options.item_types or { {} }) end,
 		readAllData = function()
 			calls.read = calls.read + 1
 			local outcome = next_outcome(read_outcomes, calls.read)
@@ -256,6 +256,18 @@ helpers.describe("wrap_selection: atomic pre-commit contract", function()
 			f.fire(f.timers[1])
 			assert_deep_eq(f.clipboard(), f.initial,
 				"successful completion must restore every original pasteboard type")
+		end)
+	end)
+
+	helpers.it("refuses a multi-item pasteboard before any mutation instead of dropping later items (WSM-002)", function()
+		with_fixture({
+			item_types = { { "public.utf8-plain-text" }, { "public.png" } },
+		}, function(f)
+			helpers.assert_eq(f.wrap(), false, "a clipboard that cannot be restored whole must not be borrowed")
+			helpers.assert_eq(f.calls.write_text, 0, "no text may be written over the user's clipboard")
+			helpers.assert_eq(f.calls.emit_attempts, 0, "no paste may be emitted")
+			helpers.assert_eq(f.calls.restore, 0, "nothing was changed, so nothing is rewritten")
+			assert_deep_eq(f.clipboard(), f.initial)
 		end)
 	end)
 
