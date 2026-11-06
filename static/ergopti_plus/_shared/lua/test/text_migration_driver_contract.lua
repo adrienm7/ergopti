@@ -65,14 +65,21 @@ function M.register(helpers)
 		return store
 	end
 
-	--- A scheduler that queues callbacks and runs them on demand.
+	--- A scheduler that queues callbacks and runs them on demand. It answers
+	--- like the macOS TimerScheduler: a handle plus whether the timer is armed;
+	--- `refuse_from` makes that acquisition and every later one refuse.
 	local function scheduler()
 		local queue, cancelled = {}, 0
-		local double = { queue = queue, gap_sec = 0.05 }
+		local double = { queue = queue, gap_sec = 0.05, acquisitions = 0, refuse_from = nil }
 		double.after = function(_, fn)
+			double.acquisitions = double.acquisitions + 1
 			local handle = { fn = fn }
+			if double.refuse_from and double.acquisitions >= double.refuse_from then
+				-- An inert handle the scheduler keeps only as cleanup debt
+				return handle, false
+			end
 			queue[#queue + 1] = handle
-			return handle
+			return handle, true
 		end
 		double.cancel = function(handle)
 			handle.dead = true
@@ -156,6 +163,37 @@ function M.register(helpers)
 			helpers.assert_eq(store.cursor, "encrypt:" .. Plan.DEFAULT_BATCH_SIZE)
 			helpers.assert_true(TextCrypto.is_encrypted(store.rows[1].values.text), "converted rows stay converted")
 			helpers.assert_eq(TextCrypto.is_encrypted(store.rows[450].values.text), false)
+		end)
+
+		helpers.it("(text-migration-driver-contract) (migration-refused-slice-timer) a refused first slice is not a running pass", function()
+			local store = backend(450)
+			local clock = scheduler()
+			clock.refuse_from = 1
+			local module = build(store, { scheduler = clock, device_id = function() return DEVICE end })
+			helpers.assert_eq(module.start(Plan.MODE_ENCRYPT), false, "start reports the refused slice")
+			helpers.assert_eq(module.is_running(), false, "no pass without an armed slice")
+			helpers.assert_eq(module.get_progress().running, false)
+			helpers.assert_eq(clock.cancelled(), 1, "the refused handle is handed back for cleanup")
+			clock.refuse_from = nil
+			helpers.assert_true(module.start(Plan.MODE_ENCRYPT), "a later start can still run the pass")
+			clock.run()
+			helpers.assert_true(TextCrypto.is_encrypted(store.rows[450].values.text))
+		end)
+
+		helpers.it("(text-migration-driver-contract) (migration-refused-slice-timer) a refused rearm pauses with the cursor kept", function()
+			local store = backend(450)
+			local clock = scheduler()
+			local module = build(store, { scheduler = clock, device_id = function() return DEVICE end })
+			helpers.assert_true(module.start(Plan.MODE_ENCRYPT))
+			clock.refuse_from = 2
+			helpers.assert_eq(clock.run(), 1, "only the first slice ran")
+			helpers.assert_eq(module.is_running(), false, "the pass is paused, not stranded as running")
+			helpers.assert_eq(store.cursor, "encrypt:" .. Plan.DEFAULT_BATCH_SIZE, "converted progress is kept")
+			clock.refuse_from = nil
+			helpers.assert_true(module.resume(Plan.MODE_ENCRYPT), "the unfinished pass can be resumed")
+			clock.run()
+			helpers.assert_eq(module.is_running(), false)
+			helpers.assert_true(TextCrypto.is_encrypted(store.rows[450].values.text))
 		end)
 
 		helpers.it("(text-migration-driver-contract) sliced: restarting cancels the previous pass first", function()

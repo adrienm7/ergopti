@@ -47,7 +47,7 @@ local M = {}
 ---   log_tag    string    Tag passed as the logger's first argument.
 ---   cipher     table     encrypt/decrypt of the driver's text_cipher.
 ---   backend    table     The driver's real row access (see text_migration_runner).
----   scheduler  table|nil { after(seconds, fn) -> handle, cancel(handle), gap_sec }
+---   scheduler  table|nil { after(seconds, fn) -> handle, committed, cancel(handle), gap_sec }
 ---                        When present, the module slices its own passes.
 ---   device_id  function|nil Returns the LOCAL device id used when a caller gives none.
 --- }
@@ -84,9 +84,24 @@ function M.new(ports)
 		return ports.device_id()
 	end
 
-	--- Arms the next slice; a no-op without a scheduler.
+	--- Arms the next slice; always committed without a scheduler.
+	--- A refused timer pauses the pass: the scheduler only returns a handle that
+	--- will never fire, so reporting the pass as running would strand it.
+	--- @return boolean True when the next slice is armed.
 	local function arm()
-		if scheduler then _slice = scheduler.after(scheduler.gap_sec, run_slice) end
+		if not scheduler then return true end
+		local handle, committed = scheduler.after(scheduler.gap_sec, run_slice)
+		if committed == true then
+			_slice = handle
+			return true
+		end
+		-- The scheduler owns the exact cleanup of a refused native timer
+		if handle ~= nil then scheduler.cancel(handle) end
+		_slice = nil
+		_runner.cancel()
+		ports.logger.error(ports.log_tag,
+			"At-rest migration paused: the next slice could not be scheduled; the stored cursor keeps its progress.")
+		return false
 	end
 
 	-- Declared as a local BEFORE the closure that reschedules it: a forward
@@ -111,8 +126,7 @@ function M.new(ports)
 	function module.start(mode, device_id)
 		if scheduler then module.cancel() end
 		if not _runner.start(mode, resolve_device(device_id)) then return false end
-		arm()
-		return true
+		return arm()
 	end
 
 	--- Resumes only a pass a previous run left unfinished.
@@ -122,8 +136,7 @@ function M.new(ports)
 	function module.resume(mode, device_id)
 		if scheduler then module.cancel() end
 		if not _runner.resume(mode, resolve_device(device_id)) then return false end
-		arm()
-		return true
+		return arm()
 	end
 
 	--- Converts one bounded batch. Safe to call at any cadence; a no-op when idle.
