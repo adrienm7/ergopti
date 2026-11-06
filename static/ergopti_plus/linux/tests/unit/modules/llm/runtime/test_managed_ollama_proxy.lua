@@ -644,7 +644,7 @@ it("retains one settlement observer while a cancelled lookup is still owned (pac
 	eq(w.operation:is_settled(), false)
 	w.child.settled = true
 	assert(pcall(observers[1]), "one failing listener cannot abort native settlement")
-	eq(delivered, 1)
+	helpers.assert_eq(delivered, 1)
 	eq(w.operation:is_settled(), true)
 end)
 
@@ -677,7 +677,7 @@ it("retires a PAC result even when its result observer throws (pac-observer-boun
 	op:on_settled(function() settled = settled + 1 end)
 	w.child.settled = true
 	assert(pcall(w.callback, { ok = true, proxies = { "direct://" } }), "result observer cannot escape")
-	eq(op:is_settled(), true)
+	helpers.assert_eq(op:is_settled(), true)
 	eq(settled, 1)
 end)
 
@@ -744,7 +744,7 @@ it("retires real native handles when both observers and diagnostics throw (pac-o
 		assert(pcall(finished.callback, { ok = true, proxies = { "direct://" } }))
 		close()
 		pump(function() return op:is_settled() end)
-		eq(retired, 1, "failed result diagnostics must not skip physical retirement")
+		helpers.assert_eq(retired, 1, "failed result diagnostics must not skip physical retirement")
 	end)
 	logger.error = old_error
 	assert(tested, reason)
