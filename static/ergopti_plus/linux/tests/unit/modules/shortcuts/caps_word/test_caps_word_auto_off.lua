@@ -584,6 +584,28 @@ helpers.describe("caps word auto-off: the manager session", function()
 		end)
 	end)
 
+	-- The editing and navigation keys end CapsWord whatever the delimiters, as
+	-- macOS's fixed Karabiner exits do (decision of 2026-11-06).
+	helpers.it("(capsword-fixed-exits) Escape, the arrows, Page Up and F5 end CapsWord with no delimiter checked", function()
+		for _, key_name in ipairs({ "escape", "left", "up", "delete", "home", "end", "pageup", "pagedown", "f5", "f12" }) do
+			with_caps_word('[shortcuts.caps_word]\nterminators = []\nidle_timeout_seconds = 0\n', function(c)
+				helpers.assert_true(c.manager.toggle_caps_word())
+				helpers.assert_eq(c.manager.caps_word_observe_control(key_name), true, key_name .. " ends CapsWord")
+				helpers.assert_eq(c.manager.is_caps_word_active(), false, key_name)
+				helpers.assert_eq(c.hook.releases, 1, key_name .. " unlocks CapsLock")
+			end)
+		end
+	end)
+
+	helpers.it("(capsword-fixed-exits) Backspace and Insert keep CapsWord on", function()
+		with_caps_word('[shortcuts.caps_word]\nterminators = []\nidle_timeout_seconds = 0\n', function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_eq(c.manager.caps_word_observe_control("backspace"), false)
+			helpers.assert_eq(c.manager.caps_word_observe_control("insert"), false)
+			helpers.assert_true(c.manager.is_caps_word_active())
+		end)
+	end)
+
 	helpers.it("(cwl-002) a hand edit still waits for the next activation", function()
 		with_caps_word(nil, function(c)
 			helpers.assert_true(c.manager.toggle_caps_word())

@@ -569,3 +569,12 @@ edit of `config.toml` still waits for the next activation. Linux owner:
 Aligned on the policy every OS already applies (Windows documents it): the
 CapsWord ★ delimiter is the built-in literal ★, not the renamed magic key, and
 its menu caption says ★ on Windows, macOS and Linux.
+
+## CapsWord variants follow one contract (6 November 2026)
+
+The catalogue action toggles on every OS (macOS used to re-request ACTIVE).
+Escape, Delete, the arrows, Home/End, Page Up/Down and F1-F12 always end
+CapsWord, as macOS's fixed Karabiner exits do: one list,
+`FIXED_EXIT_KEYS` in `_shared/lua/caps_word/auto_off.lua`, pinned by
+`test-capsword-fixed-exits-single-source.cjs`. A modifier pressed alone is no
+keystroke for the idle delay (macOS and Linux; Windows follows).

@@ -31,6 +31,11 @@
 ; 4. Defaults: Space, Tab, Enter and every pointer kind, no delay — Space,
 ;    Enter and the left and right clicks ended CapsWord before; Tab, the middle
 ;    and X buttons and the pointer motion join them for parity with macOS.
+; 5. Fixed Exits and Activity: Escape, Delete, the arrows, Home/End, Page
+;    Up/Down and F1-F12 always end CapsWord, and a modifier pressed alone is no
+;    keystroke for the delay, as on macOS (decision of 2026-11-06). The names
+;    are the shared policy's FIXED_EXIT_KEYS (_shared/lua/caps_word/auto_off.lua),
+;    pinned by tools/test/test-capsword-fixed-exits-single-source.cjs.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -71,6 +76,18 @@ class CapsWordAutoOff {
 ; ======= 1/ Settings =======
 ; ===========================
 ; ===========================
+
+; Virtual-key code -> shared fixed-exit name (FIXED_EXIT_KEYS).
+global CAPSWORD_FIXED_EXIT_VKS := Map(
+	0x1B, "escape", 0x2E, "delete", 0x26, "up", 0x28, "down", 0x25, "left", 0x27, "right",
+	0x24, "home", 0x23, "end", 0x21, "page_up", 0x22, "page_down",
+	0x70, "f1", 0x71, "f2", 0x72, "f3", 0x73, "f4", 0x74, "f5", 0x75, "f6",
+	0x76, "f7", 0x77, "f8", 0x78, "f9", 0x79, "f10", 0x7A, "f11", 0x7B, "f12")
+
+; Modifier virtual-key codes: pressed alone they are no keystroke for the delay.
+global CAPSWORD_MODIFIER_VKS := Map(
+	0x10, true, 0x11, true, 0x12, true, 0xA0, true, 0xA1, true, 0xA2, true,
+	0xA3, true, 0xA4, true, 0xA5, true, 0x5B, true, 0x5C, true)
 
 ; The pointer kinds the manifest declares for this platform, in order.
 ; @returns {Array}
@@ -379,9 +396,9 @@ CapsWordAutoOffArm(EndFn) {
 	Generation := CapsWordAutoOffDisarm()
 	Policy := CapsWordAutoOffCurrentPolicy()
 	Callbacks := _CapsWordAutoOffBindCallbacks(Generation)
-	Subscriptions := [[HookDispatcherConst.EVT_KB_CHAR, Callbacks["char"]]]
-	if Policy["idle_ms"] > 0
-		Subscriptions.Push([HookDispatcherConst.EVT_KB_DOWN, Callbacks["key_down"]])
+	; Key-downs always: the fixed exits end CapsWord even without a delay.
+	Subscriptions := [[HookDispatcherConst.EVT_KB_CHAR, Callbacks["char"]],
+		[HookDispatcherConst.EVT_KB_DOWN, Callbacks["key_down"]]]
 	for Event, Kind in CapsWordAutoOffPointerEvents() {
 		if CapsWordAutoOffEndsOnPointer(Policy, Kind)
 			Subscriptions.Push([Event, Callbacks[Event]])
@@ -549,7 +566,14 @@ _CapsWordAutoOff_OnChar(Generation, Hook, Char) {
 }
 
 _CapsWordAutoOff_OnKeyDown(Generation, Hook, Vk, Sc) {
-	if !_CapsWordAutoOffActive(Generation) || !CapsWordAutoOff.IdleRunning
+	global CAPSWORD_FIXED_EXIT_VKS, CAPSWORD_MODIFIER_VKS
+	if !_CapsWordAutoOffActive(Generation)
+		return
+	if CAPSWORD_FIXED_EXIT_VKS.Has(Vk) {
+		_CapsWordAutoOffEnd(Generation, "editing key " . CAPSWORD_FIXED_EXIT_VKS[Vk])
+		return
+	}
+	if CAPSWORD_MODIFIER_VKS.Has(Vk) || !CapsWordAutoOff.IdleRunning
 		return
 	; A keystroke restarts the delay; the timer adapter replaces its pending period.
 	PreviousCritical := Critical("On")
