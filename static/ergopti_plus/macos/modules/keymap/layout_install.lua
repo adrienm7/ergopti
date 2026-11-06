@@ -295,11 +295,11 @@ local function keylayout_index(dir)
 			-- find does not follow directory symlinks: retain that boundary.
 			if not physical_directory(bundle_path) or not physical_directory(contents)
 				or not physical_directory(resources) then return end
-			local read_ok = entries(resources, function(filename)
+			local resources_listed = entries(resources, function(filename)
 				local layout = filename:match("^(.*)%.keylayout$")
 				if layout and index[layout] == nil then index[layout] = bundle end
 			end)
-			if not read_ok then error("resource enumeration refused") end
+			if not resources_listed then error("resource enumeration refused") end
 		end)
 		if read_ok and ok then return index end
 		index = {}
