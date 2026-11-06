@@ -612,6 +612,7 @@
 		"test:encryptor-launch": "node ./tools/test/test-encryptor-launch.cjs",
 		"test:encryptor-convert": "node ./tools/test/test-encryptor-convert.cjs",
 		"test:encryptor-shared-vectors": "node ./tools/test/test-encryptor-shared-vectors.cjs",
+		"test:app-cloner-families": "node ./tools/test/test-app-cloner-families.cjs",
 		"test:app-cloner-generated-literals": "node ./tools/test/test-app-cloner-generated-literals.cjs",
 		"test:app-cloner-dock-url": "node ./tools/test/test-app-cloner-dock-url.cjs",
 		"test:ollama-stock-installer-retired": "node ./tools/test/test-ollama-stock-installer-retired.cjs",

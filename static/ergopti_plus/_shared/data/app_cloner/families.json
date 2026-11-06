@@ -1,0 +1,53 @@
+{
+	"$description": "How App Cloner isolates a copy of an application, read by the Windows and Linux App Cloners; the macOS clone_app.sh keeps its own detection, held to the same executable names by tools/test/test-app-cloner-families.cjs. A source program is matched by its executable's base name, lower-cased and without `.exe`, in `detection_order`; an Electron program is also recognised by a `markers` path next to its real executable. Each family's `arguments` are passed before the user's own item to open; `{profile}` is the clone's private profile folder, `{window_class}` its own window class (so the dock or taskbar groups the clone apart) and `{home}` the user's home folder. An argument with `platforms` is passed only there. `web_app` is the argument that opens a URL as a separate application window. A program of no family (native) gets no argument: on Linux its XDG base directories point into the profile instead; Windows has no per-process equivalent, so its native clone is a separate shortcut only.",
+	"detection_order": ["vscode", "chromium", "firefox", "electron"],
+	"families": {
+		"vscode": {
+			"executables": ["code", "code - insiders", "code-insiders", "codium", "vscodium"],
+			"arguments": [
+				{ "value": "--user-data-dir={profile}" },
+				{ "value": "--extensions-dir={home}/.vscode/extensions" }
+			],
+			"share_user_settings": true
+		},
+		"chromium": {
+			"executables": [
+				"chrome",
+				"google-chrome",
+				"google-chrome-stable",
+				"chromium",
+				"chromium-browser",
+				"msedge",
+				"microsoft-edge",
+				"microsoft-edge-stable",
+				"brave",
+				"brave-browser",
+				"vivaldi",
+				"vivaldi-stable",
+				"opera"
+			],
+			"arguments": [
+				{ "value": "--user-data-dir={profile}" },
+				{ "value": "--class={window_class}", "platforms": ["linux"] }
+			],
+			"web_app": "--app={url}"
+		},
+		"firefox": {
+			"executables": ["firefox", "firefox-esr", "librewolf", "waterfox", "thunderbird"],
+			"arguments": [
+				{ "value": "--no-remote" },
+				{ "value": "--profile" },
+				{ "value": "{profile}" },
+				{ "value": "--class={window_class}", "platforms": ["linux"] },
+				{ "value": "--name={window_class}", "platforms": ["linux"] }
+			]
+		},
+		"electron": {
+			"executables": ["slack", "discord", "notion", "spotify", "figma", "postman"],
+			"markers": ["resources/app.asar", "resources/app"],
+			"arguments": [{ "value": "--user-data-dir={profile}" }]
+		}
+	},
+	"profile_folder": "app_cloner",
+	"window_class_prefix": "ergopti-clone-"
+}

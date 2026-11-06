@@ -317,6 +317,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-encryptor-shared-vectors.cjs"],
 			"repro": "npm run test:encryptor-shared-vectors"
+		},
+		{
+			"id": "app-cloner-shared-families",
+			"ordinal": 596,
+			"name": "App Cloner families are one catalogue the macOS detection agrees with",
+			"cmd": "node",
+			"args": ["tools/test/test-app-cloner-families.cjs"],
+			"repro": "npm run test:app-cloner-families"
 		}
 	]
 }
