@@ -80,7 +80,7 @@ _WTRW_MenuRowsAndManifest() {
 		AssertEqual(0, InStr(Row[0], "reason_key"), Path . " carries no platform-absence reason any more")
 	}
 	Save := _WTRW_Body("_ConfigCollectFullSaveUpdates")
-	AssertContains(Save, "ConfigLeaf.WPM_MENUBAR_VISIBLE, Value: WPMTrayReadout.running", "a full save keeps the choice")
-	AssertContains(Save, "ConfigLeaf.WPM_MENUBAR_COLORS, Value: WPMTrayReadout.use_colors", "and its colour")
+	AssertContains(Save, _DriverResolveConstants("ConfigLeaf.WPM_MENUBAR_VISIBLE") . ", Value: WPMTrayReadout.running", "a full save keeps the choice")
+	AssertContains(Save, _DriverResolveConstants("ConfigLeaf.WPM_MENUBAR_COLORS") . ", Value: WPMTrayReadout.use_colors", "and its colour")
 }
 Test("wpm tray readout: menu rows, manifest and full save on Windows (wpm-tray-readout)", _WTRW_MenuRowsAndManifest)
