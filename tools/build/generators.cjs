@@ -256,6 +256,15 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/modules/layouts/composer_check/composed.keylayout']
 	},
 	{
+		script: 'codegen/codegen-windows-keyboard-layout.cjs',
+		outputs: [
+			'static/ergopti_plus/windows/native/keyboard_layout/_generated/kbdergop.c',
+			'static/ergopti_plus/windows/native/keyboard_layout/_generated/kbdergop.h',
+			'static/ergopti_plus/windows/native/keyboard_layout/_generated/kbdergop.rc',
+			'static/ergopti_plus/windows/native/keyboard_layout/_generated/kbdergop.def'
+		]
+	},
+	{
 		script: 'codegen/codegen-onboarding-catalogue.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/ui/_generated/onboarding_catalogue.js',

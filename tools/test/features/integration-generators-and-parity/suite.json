@@ -81,6 +81,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-config-template-shared.cjs"],
 			"repro": "npm run test:config-template-shared"
+		},
+		{
+			"id": "windows-keyboard-layout-codegen",
+			"ordinal": 595,
+			"name": "Windows keyboard layout: the tracked keyboard DLL sources are what the generator writes from the registry .keylayout, one virtual key per key, nothing dropped silently",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-keyboard-layout-codegen.cjs"],
+			"repro": "npm run test:windows-keyboard-layout-codegen"
 		}
 	]
 }
