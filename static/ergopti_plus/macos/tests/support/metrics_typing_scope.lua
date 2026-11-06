@@ -20,6 +20,8 @@ local OWNERS = {
 	"infra.i18n", "infra.fs_dir", "infra.text_utils", "text_utils",
 	"hs.fs", "hs.json", "json", "ui.ui_builder", "ui.metrics_typing",
 	"modules.keystats.log_manager", "modules.keystats.sqlite_reader",
+	-- The dashboard and the reader name the shared metric keys through this table.
+	"keystats.manifest_keys",
 	"infra.paced_job", "infra.paced_json", "ui.metrics_typing.projection", "ui.metrics_typing.snapshot",
 }
 
