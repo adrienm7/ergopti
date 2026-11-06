@@ -1037,9 +1037,11 @@ end
 
 local DATA_SQL_OUTBOX_KEY = "local_data_sql_outbox"
 local REPLAY_FLUSH_EVENT_COUNT = 500
--- Revision 4 rebuilds typing contexts and settles them at durable rollover
--- boundaries. Revision 3 introduced n-gram token encoding 2.
-local AGGREGATE_CACHE_REVISION = "4"
+-- Revision 5 rebuilds the measured sleep, lock and keep-awake durations the
+-- system walker used to drop. Revision 4 rebuilds typing contexts and settles
+-- them at durable rollover boundaries. Revision 3 introduced n-gram token
+-- encoding 2.
+local AGGREGATE_CACHE_REVISION = "5"
 local PRE_ENCODING_REVISION = "2"
 local PRE_ENCODING_BACKUP_SUFFIX = ".pre-ngram-encoding-2.bak"
 -- Every table written by aggregator/sql.lua.  Replaying a device's canonical

@@ -74,7 +74,7 @@ local function start(root, prepare, revision)
 			local rows = {}
 			if sql:find("key='today_log_offset'", 1, true) then rows = { { value = tostring(SAVED_OFFSET) } }
 			elseif sql:find("key='today_log_date'", 1, true) then rows = { { value = "2026-10-28" } }
-			elseif sql:find("key='aggregate_cache_revision'", 1, true) then rows = { { value = revision or "4" } }
+			elseif sql:find("key='aggregate_cache_revision'", 1, true) then rows = { { value = revision or "5" } }
 			elseif sql:find("key='ngram_ctx_json'", 1, true) then rows = { { value = "{}" } }
 			elseif sql:find("key='local_data_sql_outbox'", 1, true) then rows = { { value = "" } } end
 			local index = 0
@@ -205,7 +205,7 @@ helpers.describe("keystats cache location: a reboot keeps the cache (L64)", func
 		for index, sql in ipairs(seen.exec) do
 			if sql:find("VACUUM INTO", 1, true) and sql:find(".pre-ngram-encoding-2.bak", 1, true) then copied = index end
 			if sql:find("PUBLISH ", 1, true) then published = index end
-			if sql:find("aggregate_cache_revision", 1, true) and sql:find("value='4'", 1, true) then rebuilt = index end
+			if sql:find("aggregate_cache_revision", 1, true) and sql:find("value='5'", 1, true) then rebuilt = index end
 		end
 		helpers.assert_true(copied ~= nil, "the old cache must be copied aside")
 		helpers.assert_true(published ~= nil and copied < published, "snapshot publication must follow the copy")

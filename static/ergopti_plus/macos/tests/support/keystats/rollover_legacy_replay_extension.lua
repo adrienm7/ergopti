@@ -33,7 +33,7 @@ return {
  end,
  after_init = function(_, db, timers, errors)
   for _ = 1, 1000 do
-   if meta(db, "aggregate_cache_revision") == "4" and meta(db, "local_ledger_replay") == nil then return end
+   if meta(db, "aggregate_cache_revision") == "5" and meta(db, "local_ledger_replay") == nil then return end
    local count = #timers
    for index = 1, count do
     local timer = timers[index]
@@ -43,7 +43,7 @@ return {
   error("durable ledger replay did not certify recovery: " .. table.concat(errors, " | "))
  end,
  after_recovery = function(db)
-  assert(meta(db, "aggregate_cache_revision") == "4")
+  assert(meta(db, "aggregate_cache_revision") == "5")
   assert(meta(db, "local_ledger_replay") == nil)
   local total = 0
   for row in db:nrows("SELECT c FROM ngram_words WHERE date='2026-10-20' AND app='Editor' AND token='hi'") do total = total + row.c end
