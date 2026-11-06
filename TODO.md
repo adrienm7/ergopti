@@ -33,6 +33,11 @@ into an exported `.keylayout`, since macOS may refuse to load it.
       `_shared/lua/layouts/composer.lua` and `composer_check` (whose `composition.json` beside `composed.keylayout`
       already shows the superset idea), `_shared/ui/layout_composer/`, the composer corpus vectors, and the Windows
       installer from `layout/windows-klc-installer`. Each target gets a golden-vector test against the same corpus.
+- [ ] **Two products from one source.** (1) A standalone installable layout per OS that never assumes
+      ErgoptiPlus is installed: it carries as many features as that OS can express natively (macOS bundle, Linux
+      XKB with its extra levels and dead keys, Windows DLL and installer), and the export says what was left out
+      and why. (2) The same layout inside ErgoptiPlus, where the driver emulates what the OS cannot express. A
+      user without ErgoptiPlus still gets the richest native layout their OS allows.
 - [ ] **macOS export: bundle by default, ISO and ANSI.** A macOS layout can be one `.keylayout` file, but the
       default export is a `.bundle` holding both physical variants, ISO and ANSI (as `Ergopti_v2.2.0.bundle` does
       today). The export dialog has a drop-down: « Bundle ISO + ANSI » (default), « ISO only » or « ANSI only », the
