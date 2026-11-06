@@ -727,6 +727,15 @@ function M.note_capsword_activated()
 	return true
 end
 
+--- Ends the running CapsWord when its catalogue action is invoked again, the
+--- action toggling as on Windows and Linux. A no-op without a running watcher.
+--- @return boolean accepted True when a running watcher took the clear.
+function M.deactivate_capsword_by_action()
+	if not _capsword_listener_owned then return false end
+	deactivate_capsword(_capsword_watcher_gen, "switched off by its action", true)
+	return true
+end
+
 --- Stops every CapsWord pointer resource owned by this remap generation.
 --- @param watcher table|nil Eventtap returned by start_gesture_watcher().
 function M.stop_gesture_watcher(watcher)
