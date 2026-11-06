@@ -20,11 +20,11 @@ case "$suite" in
 	*) echo 'Unsupported distribution suite.' >&2; exit 1 ;;
 esac
 case "$distro" in
-	debian) apt-get install -y --no-install-recommends luajit python3 ca-certificates git gcc libc6-dev make cmake pkg-config libluajit-5.1-dev libuv1-dev libglib2.0-0t64 sqlite3 openssl tzdata tar libxkbcommon0 xkb-data libx11-data iproute2 curl ;;
-	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel glib2 sqlite openssl tzdata tar libxkbcommon xkeyboard-config libX11-common iproute curl ;;
-	arch) pacman -Sy --noconfirm luajit python ca-certificates git gcc make cmake pkgconf libuv glib2 sqlite openssl tzdata tar libxkbcommon xkeyboard-config libx11 iproute2 curl ;;
-	alpine) apk add --no-cache luajit python3 ca-certificates git build-base cmake pkgconf luajit-dev libuv-dev glib sqlite openssl tzdata tar libxkbcommon xkeyboard-config libx11 iproute2-ss curl ;;
-	opensuse) zypper --non-interactive install luajit python3 ca-certificates git gcc make cmake pkg-config luajit-devel libuv-devel libglib-2_0-0 sqlite3 openssl timezone tar libxkbcommon0 xkeyboard-config libX11-data iproute2 curl ;;
+	debian) apt-get install -y --no-install-recommends luajit python3 ca-certificates git gcc libc6-dev make cmake pkg-config libluajit-5.1-dev libuv1-dev libglib2.0-0t64 sqlite3 openssl tzdata tar libxkbcommon0 xkb-data libx11-data iproute2 nodejs curl ;;
+	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel glib2 sqlite openssl tzdata tar libxkbcommon xkeyboard-config libX11-common iproute nodejs curl ;;
+	arch) pacman -Sy --noconfirm luajit python ca-certificates git gcc make cmake pkgconf libuv glib2 sqlite openssl tzdata tar libxkbcommon xkeyboard-config libx11 iproute2 nodejs curl ;;
+	alpine) apk add --no-cache luajit python3 ca-certificates git build-base cmake pkgconf luajit-dev libuv-dev glib sqlite openssl tzdata tar libxkbcommon xkeyboard-config libx11 iproute2-ss nodejs curl ;;
+	opensuse) zypper --non-interactive install luajit python3 ca-certificates git gcc make cmake pkg-config luajit-devel libuv-devel libglib-2_0-0 sqlite3 openssl timezone tar libxkbcommon0 xkeyboard-config libX11-data iproute2 nodejs-default curl ;;
 	*) echo 'Unsupported mandatory unit distribution.' >&2; exit 1 ;;
 esac
 
@@ -37,6 +37,9 @@ test -x "$sqlite"
 "$sqlite" --version
 # The GNOME proxy check decodes gsettings output with the native GLib.
 "$interpreter" -e 'require("ffi").load("libglib-2.0.so.0")'
+# The literal AppDir fixture renders the AppImage C library preflight with the
+# build's own Node renderer, as the packager does.
+node --version
 # Every installed system has a machine id (systemd or D-Bus writes it); the
 # metrics ledger names the host by it. Container images ship none, so give this
 # one its own, as first boot would, instead of testing a host that cannot exist.
