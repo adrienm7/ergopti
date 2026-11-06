@@ -350,6 +350,16 @@ function M.send(text, opts, callback)
 	if mode == "auto" then
 		mode = #text > CLIPBOARD_THRESHOLD and "clipboard" or "direct"
 	end
+	-- Another family's temporary payload is not the user's clipboard: snapshotting
+	-- it would lose the original. Type the text instead, as Windows' SendInstant
+	-- does when the shared clipboard owner is busy (MCP-002).
+	if mode == "clipboard" and not _paste_owns_clipboard then
+		local holder = ClipboardBorrowers.foreign_holder("text_sender")
+		if holder then
+			Logger.debug(LOG, "send(): %s borrows the clipboard — typing the text instead.", holder)
+			mode = "direct"
+		end
+	end
 
 	local ok, err
 	local producer

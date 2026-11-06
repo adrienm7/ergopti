@@ -539,3 +539,11 @@ while typing (`ui/wpm/wpm_tray_readout.ahk`, `adapters/notify_icon.ahk`). The
 `metrics.wpm_menubar_*` keys are declared on `ahk`;
 `platform_reason.wpm_readout_needs_a_menubar` is retired. Windows alone decides
 whether a new icon starts in the overflow; the user pins it.
+
+## Output types instead of pasting over a borrowed clipboard (6 November 2026)
+
+When another family borrows the clipboard (a selection read, a plain paste, an
+Apps or Search capture), macOS TextSender and keymap output do not snapshot it:
+they type the text as keystrokes, as Windows' `SendInstant` does when the
+shared clipboard owner is busy. Output is neither dropped nor delayed
+(`infra/clipboard_borrowers.lua`, MCP-002).
