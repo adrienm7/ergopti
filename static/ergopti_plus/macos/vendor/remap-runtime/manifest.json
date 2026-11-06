@@ -11,6 +11,7 @@
   },
   "virtual_hid_device": {
     "version": "8.5.0",
+    "extension_version": "1.8.0",
     "team_identifier": "G43BCU2T37",
     "file_name": "Karabiner-DriverKit-VirtualHIDDevice-8.5.0.pkg",
     "source_url": "https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases/download/v8.5.0/Karabiner-DriverKit-VirtualHIDDevice-8.5.0.pkg",
