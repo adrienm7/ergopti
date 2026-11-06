@@ -411,6 +411,40 @@ LayoutManager_Select(Id, Options := unset) {
 }
 
 /**
+ * Selects a layout and reports its terminal outcome. Launch acceptance only
+ * means the successor started: the configuration is rolled back if it later
+ * refuses the handoff, so success is reported when the reload commits.
+ * @param {String} Id Registry layout identifier.
+ * @param {Func} OnDone Called once with (Ok, Detail) at the terminal outcome.
+ * @param {Map} Options Configuration lifecycle ports for owner tests.
+ * @returns {Boolean} Whether the successor launch was accepted.
+ */
+LayoutManager_SelectSettled(Id, OnDone, Options := unset) {
+	Settled := false
+	Settle(Ok, Detail := "") {
+		if Settled
+			return
+		Settled := true
+		OnDone.Call(Ok, Detail)
+	}
+	Lifecycle := IsSet(Options) ? Options.Clone() : Map()
+	ReloadFn := Lifecycle.Get("reload", ReloadPreservingSuspend)
+	Lifecycle["reload"] := (OnCommitted, Bundle, Refused) => ReloadFn.Call(
+		(*) => (OnCommitted.Call(), Settle(true)),
+		Bundle,
+		(Reason := "") => (Refused.Call(Reason), Settle(false, "the driver refused the layout handoff")))
+	Receipt := LayoutManager_SelectTransition(Id, Lifecycle)
+	if Receipt["status"] == "committed" {
+		Settle(true)
+		return true
+	}
+	if Receipt["status"] == "pending"
+		return true
+	Settle(false, "the layout could not be selected")
+	return false
+}
+
+/**
  * Retains the selected configuration until successor completion or rollback.
  * The resident input owner keeps its admitted layout while the reload is pending.
  * @param {String} Id Registry layout identifier.
