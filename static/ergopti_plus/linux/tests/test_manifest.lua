@@ -33,6 +33,7 @@ return {
 	"tests.unit.ui.editors.prompt_editor.test_profile_roundtrip",
 	"tests.unit.modules.hotstrings.injector.test_hotstring_undo_owner",
 	"tests.unit.modules.hotstrings.injector.test_repeat_main_commit",
+	"tests.unit.modules.hotstrings.engine.test_action_arrow_effects",
 	"tests.unit.adapters.processes.test_desktop_opener",
 	"tests.unit.ui.healthcheck.test_desktop_report_shutdown",
 	"tests.unit.ui.menu.structure.test_menu_rebuild_owner",
