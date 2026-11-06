@@ -1514,6 +1514,15 @@ if _LLM_Menu_RuntimeActivated
 	_MenuStartupCommands.NotifyReady()
 _MenuPopulationPublished.Start()
 _DriverBootPhase := "ready"
+; The layout of the live pause state, as macOS applies once its boot settles. A
+; quarantined smoke never touches the user's keyboard layout.
+if !_DriverSmokeInputQuarantined {
+	try {
+		if !PauseLayoutSwitch_ApplyStartup(A_IsSuspended ? 1 : 0)
+			LoggerError("ErgoptiPlus", "The startup keyboard layout switch was refused.")
+	} catch as _StartupLayoutErr
+		LoggerError("ErgoptiPlus", "The startup keyboard layout switch failed: {1}.", _StartupLayoutErr.Message)
+}
 SetTimer(ShellRunner_CheckWinPsAtStart, -1)
 ProxyOverride_ScheduleSealAtStart()
 HTTP_ScheduleCurlCheck(_LLM_Menu.Get("enabled", false))

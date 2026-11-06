@@ -3,7 +3,8 @@
 ; ==============================================================================
 ; MODULE: Pause Layout Switch (Windows)
 ; DESCRIPTION:
-; Switches the keyboard layout when the driver pauses, resumes or quits, to
+; Switches the keyboard layout when the driver starts, pauses, resumes or
+; quits, to
 ; the layouts chosen in Layout > « Layout on pause / resume », and builds those
 ; rows from the shared manifest frames macOS and Linux draw too.
 ;
@@ -15,6 +16,9 @@
 ;    terminal quit run PauseLayoutSwitch_Apply through _LifecycleRunRequiredStep
 ;    as owner "keyboard-layout": 1 is a switch made or nothing to switch, false
 ;    a refused switch, which the transition reports as its debt.
+; 4. The boot tail applies the layout of the live pause state once, as macOS
+;    does after its boot settles (PauseSwitchPolicyStartupEvent); a restored
+;    pause whose transition already switched keeps its choice.
 ; 3. The picker lists the layouts installed for the user (KLS_Choices) after
 ;    « No change »; a choice is written through WriteFeatureV2.
 ; ==============================================================================
@@ -27,6 +31,9 @@
 
 
 
+
+; Whether an event already chose the layout this session: the start then defers to it.
+global _PauseLayoutSwitchEventApplied := false
 
 /**
  * The three settings as the policy reads them.
@@ -57,7 +64,9 @@ PauseLayoutSwitch_Apply(Event, SelectFn := 0) {
 	global Features
 	if !IsSet(Features)
 		throw Error("the layout settings are not loaded")
+	global _PauseLayoutSwitchEventApplied
 	Target := PauseSwitchPolicyTarget(PauseLayoutSwitch_Settings(Features), Event)
+	_PauseLayoutSwitchEventApplied := true
 	if (Target == "")
 		return 1
 	if !HasMethod(SelectFn, "Call")
@@ -69,6 +78,23 @@ PauseLayoutSwitch_Apply(Event, SelectFn := 0) {
 		return false
 	}
 	return 1
+}
+
+/**
+ * Applies the layout of the live pause state once the boot is ready.
+ * @param {Integer} Paused 1 when the driver starts paused, else 0.
+ * @param {Func} SelectFn Optional switch port with KLS_Select's contract.
+ * @returns {Integer|Boolean} 1 when the layout was requested, nothing switches
+ *   or a pause transition already chose it; false when the switch was refused.
+ */
+PauseLayoutSwitch_ApplyStartup(Paused, SelectFn := 0) {
+	global _PauseLayoutSwitchEventApplied
+	Event := PauseSwitchPolicyStartupEvent(Paused)
+	if _PauseLayoutSwitchEventApplied {
+		try LoggerDebug("PauseLayoutSwitch", "Startup layout switch skipped: a pause transition already chose the layout.")
+		return 1
+	}
+	return PauseLayoutSwitch_Apply(Event, SelectFn)
 }
 
 /**
