@@ -4099,7 +4099,7 @@
 	"inventory.behavior.dead_linux_composition": "Natives XKB/Compose mit unabhängiger Texterfassung; abgefangene Folgezeichen können abweichen.",
 	"inventory.behavior.dead_windows_fallback": "Eine nicht zugeordnete Folge gibt das Abschlusszeichen des Akzents und danach das aktuelle Zeichen aus.",
 	"inventory.behavior.dead_macos_fallback": "Der Rückfall liegt beim nativen Layout; physische Ereignisse und Anwendungsausgabe wurden nicht geprüft.",
-	"inventory.behavior.dead_linux_fallback": "Ein Erfassungsabbruch behält das aktuelle Zeichen und verwirft den vorherigen Akzent; die native Ausgabe kann abweichen.",
-	"inventory.behavior.dead_windows_lifetime": "Integrierte Tabellen warten bis zu 2 Sekunden; der Register-Tottastenzustand hat kein Zeitlimit.",
+	"inventory.behavior.dead_linux_fallback": "Die konvertierten Compose-Tabellen tippen den Akzent und danach das aktuelle Zeichen, wie macOS.",
+	"inventory.behavior.dead_windows_lifetime": "Die integrierten Tabellen warten höchstens 2 Sekunden; der Totzustand des Registers hat kein Zeitlimit. Ablauf und Pause verwerfen eine wartende Tottaste.",
 	"inventory.behavior.dead_native_lifetime": "Das native System verwaltet ausstehende Komposition; Erfassungs- und Rücksetzregeln sind von einem gemeinsamen Treiberzeitlimit getrennt."
 }

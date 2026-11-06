@@ -172,7 +172,7 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "7855749443818d57f4676484a41d8ea9cbabcb5d952ba1682ded0fdabba3c43c"
+					"sha256": "a17138aaf6f33716723ac32d702e099db9c70aa6f07f4166aa837a75473e13af"
 				},
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
@@ -218,8 +218,8 @@
 				"en": "Fallback belongs to the native layout; its physical payload and application output are unverified."
 			},
 			"linux": {
-				"fr": "Une capture annulée conserve le caractère courant et abandonne l’accent précédent ; la sortie native peut différer.",
-				"en": "Cancelled capture keeps the current character and discards the previous accent; native output can differ."
+				"fr": "Les tables Compose converties tapent l’accent, puis le caractère courant, comme macOS.",
+				"en": "Converted Compose tables type the accent, then the current character, as macOS does."
 			}
 		},
 		"evidence": {
@@ -227,7 +227,7 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "7855749443818d57f4676484a41d8ea9cbabcb5d952ba1682ded0fdabba3c43c"
+					"sha256": "a17138aaf6f33716723ac32d702e099db9c70aa6f07f4166aa837a75473e13af"
 				},
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
@@ -257,8 +257,8 @@
 		"platforms": { "windows": true, "macos": true, "linux": true },
 		"notes": {
 			"windows": {
-				"fr": "Les tables intégrées attendent au plus 2 secondes ; l’état mort du registre n’a pas de délai maximal.",
-				"en": "Builtin maps wait up to 2 seconds; registry dead-key state has no timeout."
+				"fr": "Les tables intégrées attendent au plus 2 secondes ; l’état mort du registre n’a pas de délai maximal. L’expiration et la pause annulent une touche morte en attente.",
+				"en": "Builtin maps wait up to 2 seconds; registry dead-key state has no timeout. Expiry and pause cancel a pending dead key."
 			},
 			"macos": {
 				"fr": "Le système natif gère la composition en attente ; les règles de capture et de réinitialisation sont distinctes d’un délai commun au pilote.",
@@ -274,7 +274,7 @@
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 					"symbol": "DeadKey(Mapping)",
-					"sha256": "7855749443818d57f4676484a41d8ea9cbabcb5d952ba1682ded0fdabba3c43c"
+					"sha256": "a17138aaf6f33716723ac32d702e099db9c70aa6f07f4166aa837a75473e13af"
 				},
 				{
 					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",

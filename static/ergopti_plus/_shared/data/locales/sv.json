@@ -4099,7 +4099,7 @@
 	"inventory.behavior.dead_linux_composition": "Inbyggd XKB/Compose med separat textregistrering; uppfångade fortsättningar kan avvika.",
 	"inventory.behavior.dead_windows_fallback": "En omappad fortsättning skriver accentens avslutningstecken följt av det aktuella tecknet.",
 	"inventory.behavior.dead_macos_fallback": "Reservalternativet styrs av den inbyggda layouten; fysiska händelser och programmets utdata har inte verifierats.",
-	"inventory.behavior.dead_linux_fallback": "Avbruten registrering behåller det aktuella tecknet och släpper föregående accent; inbyggda utdata kan avvika.",
-	"inventory.behavior.dead_windows_lifetime": "Inbyggda tabeller väntar högst 2 sekunder; registrets dödtangentstillstånd saknar tidsgräns.",
+	"inventory.behavior.dead_linux_fallback": "De konverterade Compose-tabellerna skriver accenten och sedan det aktuella tecknet, som macOS.",
+	"inventory.behavior.dead_windows_lifetime": "De inbyggda tabellerna väntar högst 2 sekunder; registrets dödtangentläge har ingen tidsgräns. Utgång och paus avbryter en väntande dödtangent.",
 	"inventory.behavior.dead_native_lifetime": "Det inbyggda systemet styr väntande komposition; registrering och återställning är skilda från en gemensam tidsgräns i drivrutinen."
 }

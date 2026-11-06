@@ -4099,7 +4099,7 @@
 	"inventory.behavior.dead_linux_composition": "Natywne XKB/Compose z niezależnym przechwytywaniem tekstu; przechwycone kontynuacje mogą się różnić.",
 	"inventory.behavior.dead_windows_fallback": "Nieprzypisana kontynuacja emituje znak kończący akcent, a następnie bieżący znak.",
 	"inventory.behavior.dead_macos_fallback": "Zachowanie zastępcze zależy od natywnego układu; zdarzenia fizyczne i tekst w aplikacji nie zostały zweryfikowane.",
-	"inventory.behavior.dead_linux_fallback": "Anulowane przechwytywanie zachowuje bieżący znak i odrzuca poprzedni akcent; wynik natywny może się różnić.",
-	"inventory.behavior.dead_windows_lifetime": "Wbudowane mapy czekają do 2 sekund; stan martwego klawisza z rejestru nie ma limitu czasu.",
+	"inventory.behavior.dead_linux_fallback": "Przekonwertowane tabele Compose wpisują akcent, a potem bieżący znak, jak macOS.",
+	"inventory.behavior.dead_windows_lifetime": "Wbudowane tabele czekają najwyżej 2 sekundy; stan klawisza martwego z rejestru nie ma limitu czasu. Wygaśnięcie i pauza anulują oczekujący klawisz martwy.",
 	"inventory.behavior.dead_native_lifetime": "Natywny system zarządza oczekującym składaniem; przechwytywanie i resetowanie są niezależne od wspólnego limitu czasu sterownika."
 }

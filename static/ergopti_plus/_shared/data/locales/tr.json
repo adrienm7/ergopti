@@ -4099,7 +4099,7 @@
 	"inventory.behavior.dead_linux_composition": "Bağımsız metin yakalamayla yerel XKB/Compose; yakalanan devam girişleri farklı sonuç verebilir.",
 	"inventory.behavior.dead_windows_fallback": "Eşlenmemiş devam, aksanın bitiş karakterini ve ardından geçerli karakteri üretir.",
 	"inventory.behavior.dead_macos_fallback": "Yedek davranışı yerel düzen yönetir; fiziksel olaylar ve uygulama çıktısı doğrulanmamıştır.",
-	"inventory.behavior.dead_linux_fallback": "İptal edilen yakalama geçerli karakteri korur ve önceki aksanı atar; yerel çıktı farklı olabilir.",
-	"inventory.behavior.dead_windows_lifetime": "Yerleşik tablolar en fazla 2 saniye bekler; kayıt defteri ölü tuş durumunda zaman aşımı yoktur.",
+	"inventory.behavior.dead_linux_fallback": "Dönüştürülmüş Compose tabloları, macOS gibi önce aksanı, ardından geçerli karakteri yazar.",
+	"inventory.behavior.dead_windows_lifetime": "Yerleşik tablolar en fazla 2 saniye bekler; kayıt defterinin ölü tuş durumunun zaman aşımı yoktur. Süre dolması ve duraklatma bekleyen ölü tuşu iptal eder.",
 	"inventory.behavior.dead_native_lifetime": "Bekleyen birleştirmeyi yerel işletim sistemi yönetir; yakalama ve sıfırlama kuralları ortak sürücü zaman aşımından ayrıdır."
 }
