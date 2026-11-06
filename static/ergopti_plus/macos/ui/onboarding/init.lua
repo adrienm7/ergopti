@@ -62,6 +62,8 @@ local RELOAD_DELAY_SEC = 1.5
 -- the wizard reloads without its answer: its deployment waits on the remap
 -- guardian (20 s at most to register) and the lease, never on the user.
 local TAP_HOLD_IMPORT_TIMEOUT_SEC = 30
+-- How long the reload waits for the live number-row rebuild of a stored order.
+local NUMBER_ROW_APPLY_TIMEOUT_SEC = 20
 
 -- Path to config.toml — set by M.run() before the wizard opens
 local _config_path  = nil
@@ -348,6 +350,79 @@ end
 
 --- Sends the initData payload (locale, strings, folders and the values in
 --- force) so the first step renders correctly on open.
+--- The number-row order capability the page asks, as the Linux bridge answers
+--- it: true when a layout of ours types now (the menu's own availability,
+--- modules/keymap/number_row_live.lua), else the locale key of why not.
+--- @return boolean|string
+function M._number_row_capability()
+	local called, available, why = pcall(function() return M._number_row_live().available() end)
+	if called and available == true then return true end
+	if not called then
+		Logger.error(LOG, "The number-row capability could not be read: %s.", tostring(available))
+	end
+	if called then Logger.debug(LOG, "The wizard greys the number-row order: %s.", tostring(why)) end
+	return "platform_reason.number_row_live_no_layout"
+end
+
+--- The live number-row owner; a test seam.
+function M._number_row_live() return require("modules.keymap.number_row_live") end
+
+--- The number-row order a batch writes, or nil when it writes none.
+--- @param rows table The batch's `{ section, key, value | delete }` rows.
+--- @return string|nil order
+function M._number_row_order_written(rows)
+	for _, row in ipairs(rows or {}) do
+		if row.section == "layout" and row.key == "direct_access_digits" and type(row.value) == "string" then
+			return row.value
+		end
+	end
+	return nil
+end
+
+--- Applies a number-row order the wizard stored to the typing layout, as the
+--- menu row does, then runs `done`: a reload started earlier would cut the
+--- rebuild short. A refused application keeps the stored choice and still
+--- runs `done`, so the rest of the answers apply.
+--- @param order string The stored order ("native", "digits", "symbols").
+--- @param config_path string The config.toml the answers were written to.
+--- @param done function Called once the application has settled.
+function M._apply_number_row_then(order, config_path, done)
+	-- The edges option is the menu's, kept as config.toml holds it.
+	local edges = false
+	local content, status = FileSystem.read_with_status(config_path)
+	local decoded_ok, decoded = false, nil
+	if status == "ok" and type(content) == "string" then decoded_ok, decoded = pcall(toml_codec.decode, content) end
+	if decoded_ok and type(decoded) == "table" and type(decoded.layout) == "table" then
+		edges = decoded.layout.number_row_reorder_edges == true
+	end
+	local settled = false
+	local function settle()
+		if settled then return end
+		settled = true
+		done()
+	end
+	if DeferredWork.after(NUMBER_ROW_APPLY_TIMEOUT_SEC, function()
+		if not settled then Logger.warn(LOG, "The onboarding number-row rebuild did not answer; the reload goes on.") end
+		settle()
+	end, "onboarding.number_row") ~= true then
+		Logger.error(LOG, "The onboarding number-row rebuild could not be bounded; the reload goes on now.")
+		return settle()
+	end
+	local dispatched, dispatch_err = pcall(M._number_row_live().apply, { order = order, edges = edges },
+		function(applied, code)
+			if applied then
+				Logger.success(LOG, "The onboarding number-row order %s is applied to the typing layout.", order)
+			else
+				Logger.warn(LOG, "The onboarding number-row order %s is stored, not applied: %s.", order, tostring(code))
+			end
+			settle()
+		end)
+	if not dispatched then
+		Logger.error(LOG, "The onboarding number-row order could not be applied: %s.", tostring(dispatch_err))
+		settle()
+	end
+end
+
 local function inject_init_data(owner, view, config_path)
 	if not publication_is_current(owner, view) then return end
 
@@ -395,8 +470,9 @@ local function inject_init_data(owner, view, config_path)
 	Logger.debug(LOG, "Injecting initData into onboarding webview…")
 	local _, admitted = submit_data(owner, view, "initData", {
 		platform           = CATALOGUE_DRIVER,
-		-- Gesture registration with the system is a Windows host action only.
-		capabilities       = { gesture_registration = false },
+		-- Gesture registration with the system is a Windows host action only. The
+		-- number-row order is rebuilt live into the layout of ours typing now.
+		capabilities       = { gesture_registration = false, number_row_live = M._number_row_capability() },
 		locale             = current_locale,
 		strings            = strings,
 		-- One locale order for the wizard and every tray language menu.
@@ -825,12 +901,19 @@ local function commit_owned(answers, publication)
 	Logger.success(LOG, "Onboarding answers committed (%d configuration row(s)).", #rows)
 	close_webview()
 
-	local function announce_and_reload()
+	local function schedule_reload()
 		notifications.notify(i18n.get("onboarding.done.title"), i18n.get("onboarding.done.body"))
 		if DeferredWork.after(RELOAD_DELAY_SEC, reload_applying_answers, "onboarding.reload") ~= true then
 			Logger.error(LOG, "The reload that applies the onboarding answers could not be scheduled.")
 			deferred_notice("onboarding.error.reload_pending")
 		end
+	end
+	-- A number-row order the batch wrote is stored; a reload does not rebuild
+	-- the typing layout, so it is applied live first and the reload waits.
+	local order = M._number_row_order_written(rows)
+	local function announce_and_reload()
+		if order == nil then return schedule_reload() end
+		M._apply_number_row_then(order, _config_path, schedule_reload)
 	end
 	if #tap_hold_keys == 0 then
 		announce_and_reload()

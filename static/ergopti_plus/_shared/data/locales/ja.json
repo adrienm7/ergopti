@@ -2536,6 +2536,7 @@
 	"onboarding.layout.emulated_ergopti_plus": "Ergopti➕",
 	"onboarding.layout.number_row_emulation": "数字の段をエミュレートする（通常と Shift）",
 	"onboarding.page.keyboard_layout.system_note": "このシステムでは Ergopti はシステムのキーボード配列としてインストールされるため、ここで有効にするものはありません。後でキーボードレイアウトメニューからインストールまたは選択してください。",
+	"onboarding.page.tap_holds.rollover_note": "macOS では、Space、Enter、Tab、Escape、Backspace、Delete は入力を優先します。ホールドの遅延より前に押されたキーはそのキー自体を入力し、より長く押したときだけホールドが働きます。Windows と Linux はキーを離した順序で判断するため、これらのキーでのごく速い同時押しは、あちらではホールドになる場面でもこちらでは入力になることがあります。",
 	"onboarding.page.llm.description": "AI 予測は入力中に文の続きを提案します。モデルは後で人工知能メニューからダウンロードします。今は何もダウンロードされません。",
 	"onboarding.page.shortcuts.description": "Ergopti の操作を実行するキーボードショートカット：選択範囲の大文字・小文字の変換、囲み、スクリーンショット、ウィンドウの切り替えなど。以下のリストは Ergopti が推奨するショートカットです。",
 	"onboarding.page.tap_holds.description": "タップホールドはキーに 2 つの役割を与えます。タップすると 1 つの入力を行い、長押しすると別のキーとして働きます。たとえば Caps Lock はタップで Enter を入力し、長押しで修飾キーとして使えます。以下のリストは Ergopti が推奨するキーです。チェックした各キーには推奨のタップと長押しが設定され、後からタップホールドメニューで変更できます。",

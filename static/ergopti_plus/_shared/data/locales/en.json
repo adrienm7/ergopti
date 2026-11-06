@@ -2536,6 +2536,7 @@
 	"onboarding.layout.emulated_ergopti_plus": "Ergopti➕",
 	"onboarding.layout.number_row_emulation": "Emulate the number row (base and Shift levels)",
 	"onboarding.page.keyboard_layout.system_note": "On this system, Ergopti is installed as a system keyboard layout, so there is nothing to enable here. Install or select it later from the Keyboard layout menu.",
+	"onboarding.page.tap_holds.rollover_note": "On macOS, Space, Enter, Tab, Escape, Backspace and Delete favour typing: a key struck before the hold delay types the key itself, and only a longer press takes its hold. Windows and Linux decide from the order of the releases, so a very fast chord on these keys can type here where it would hold there.",
 	"onboarding.page.llm.description": "AI prediction suggests the end of your sentence as you type. Models are downloaded later from the Artificial Intelligence menu; nothing is downloaded now.",
 	"onboarding.page.shortcuts.description": "Keyboard shortcuts that run Ergopti actions: changing the case of the selection, wrapping it, screenshots, switching windows and more. The list below holds the shortcuts Ergopti recommends.",
 	"onboarding.page.tap_holds.description": "A tap-hold gives a key two roles: tapped, it types one thing; held, it acts as another key. For example, Caps Lock can type Enter when tapped and act as a modifier when held. The list below holds the keys Ergopti recommends: each checked key gets its recommended tap and hold, which you can change later in the Tap-Holds menu.",
