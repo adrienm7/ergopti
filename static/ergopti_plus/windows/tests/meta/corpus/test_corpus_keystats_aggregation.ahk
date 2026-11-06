@@ -380,6 +380,12 @@ _KlgAggCorpus_RunVector(Vec) {
 		AssertTrue(Sday != "", "system_day row exists")
 		AssertEqual(2, Sday["wifi_changes"], "wifi_changes = 2")
 	}
+	else if (Id = "system_event_night_wake") {
+		Sday := _KlgAggCorpus_ReadSystemDay("2024-06-01")
+		AssertTrue(Sday != "", "system_day row exists")
+		AssertEqual(Vec["expected"]["system_day_night_wake_count"], Sday["night_wake_count"],
+			"only the wakes before NIGHT_WAKE_END_MS are night wakes")
+	}
 	else if (Id = "system_event_modifier_hold") {
 		R := _KlgAggCorpus_ReadKcHold("2024-06-01", "TestApp", 56)
 		AssertTrue(R != "", "kc_hold row exists")

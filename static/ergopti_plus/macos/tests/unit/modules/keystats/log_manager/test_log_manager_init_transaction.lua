@@ -74,7 +74,7 @@ helpers.describe("log_manager — initialization transaction", function()
 					if not yielded and query:find("aggregate_cache_revision", 1, true) then
 						yielded = true
 						-- A current cache: an older revision starts the aggregate recovery.
-						return { value = "5" }
+						return { value = "6" }
 					end
 					return nil
 				end

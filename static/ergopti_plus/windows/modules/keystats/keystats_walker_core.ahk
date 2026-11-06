@@ -64,6 +64,10 @@ class KLWConst {
 		static CASCADE_MIN_BS            := 3
 		static HOLD_THRESHOLD_MS         := 0   ; <- keystats.hold_threshold_ms
 		static TITLE_CAP_PER_APP_DAY     := 100
+		; A wake earlier than this after local midnight is a night wake. A pinned
+		; copy of keystats.night_wake_end_ms rather than a boot-loaded one: the
+		; dashboard worker receives only the six walk thresholds.
+		static NIGHT_WAKE_END_MS         := 21600000
 }
 
 ; Reassign the KLWConst timing thresholds from the shared registry. Called once

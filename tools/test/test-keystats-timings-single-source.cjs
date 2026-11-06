@@ -64,6 +64,7 @@ function pin(section, key, file, name, unit = 'ms') {
 const PINS = [
 	pin('keystats', 'ingest_tick_ms', KEYSTATS + 'keystats_constants.ahk', 'INGEST_TICK_MS'),
 	pin('keystats', 'think_pause_ms', KEYSTATS + 'keystats_constants.ahk', 'THINK_PAUSE_MS'),
+	pin('keystats', 'night_wake_end_ms', KEYSTATS + 'keystats_walker_core.ahk', 'NIGHT_WAKE_END_MS'),
 	pin(
 		'keystats',
 		'max_keystroke_delay_ms',

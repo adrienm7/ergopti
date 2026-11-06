@@ -45,7 +45,7 @@ local function child()
 	local reset = upvalue(upvalue(manager.init, "_init"), "_reset_rollover_cache")
 	assert(db:exec([[INSERT OR REPLACE INTO meta(key,value) VALUES
 		('today_log_offset','0'),('today_log_date','2026-10-17'),('ngram_ctx_json','{}'),
-		('local_data_sql_outbox',''),('aggregate_cache_revision','5'),('rev','0');]]) == sqlite.OK)
+		('local_data_sql_outbox',''),('aggregate_cache_revision','6'),('rev','0');]]) == sqlite.OK)
 	local function snapshot(word)
 		aggregator.reset_ngram_ctx()
 		aggregator.reset_batch()

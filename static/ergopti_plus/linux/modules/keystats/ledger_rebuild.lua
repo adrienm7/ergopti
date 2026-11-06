@@ -33,7 +33,12 @@ local SharedWalker = require("keystats.walker")
 local AggregateWalker = require("modules.keystats.aggregate_walker")
 local SqliteCommand = require("modules.keystats.sqlite_command")
 
+local Helpers = require("keystats.aggregator_helpers")
+
 local SEPARATOR = "\1"
+
+-- A wake earlier than this after local midnight is a night wake.
+local NIGHT_WAKE_END_MS = require("infra.timings").ms("keystats", "night_wake_end_ms")
 
 --- System-day stat names a manifest_increment row may bump (macOS events.lua).
 local MANIFEST_STAT_FIELDS = { hs_suggested = true, llm_suggested = true }
@@ -122,7 +127,8 @@ end
 --- @param date string Row date.
 --- @param action string Row action.
 --- @param meta table Decoded metadata.
-local function walk_system(batch, date, action, meta)
+--- @param timestamp string Row timestamp, local on the drivers that wake-count from it.
+local function walk_system(batch, date, action, meta, timestamp)
 	if action == "manifest_increment" and MANIFEST_STAT_FIELDS[meta.stat] then
 		local app = type(meta.app) == "string" and meta.app or "Unknown"
 		local key = date .. SEPARATOR .. app
@@ -145,7 +151,9 @@ local function walk_system(batch, date, action, meta)
 		elseif meta.kind == "lock" then day.locked_ms = day.locked_ms + duration
 		elseif meta.kind == "awake" then day.awake_ms = day.awake_ms + duration end
 	elseif action == "unlock" then day.locked_ms = day.locked_ms + duration
-	elseif action == "wake" then day.sleep_ms = day.sleep_ms + duration
+	elseif action == "wake" then
+		day.sleep_ms = day.sleep_ms + duration
+		if Helpers.is_night_wake(timestamp, NIGHT_WAKE_END_MS) then day.night_wake_count = day.night_wake_count + 1 end
 	end
 end
 
@@ -190,7 +198,7 @@ function M.walk_device(opts)
 	for _, row in ipairs(read_rows(store, "events_system", { "ts", "date", "action", "metadata_json" }, device_id)) do
 		local ok, meta = pcall(Json.decode, row.metadata_json ~= "" and row.metadata_json or "{}")
 		if not ok or type(meta) ~= "table" then meta = {} end
-		walk_system(batch, row.ts:sub(1, 10), row.action, meta)
+		walk_system(batch, row.ts:sub(1, 10), row.action, meta, row.ts)
 	end
 	return batch
 end
