@@ -160,6 +160,64 @@ try {
 		assert.notEqual(refused.status, 0, 'OpenSSL reports the bad decrypt');
 	});
 
+	scenario(
+		'(encryptor-failed-conversion-keeps-destination) a refused decrypt leaves the approved overwrite target intact',
+		() => {
+			const folder = fs.mkdtempSync(path.join(work, 'keep-'));
+			const clear = path.join(folder, 'notes.txt');
+			const sealed = `${clear}.enc`;
+			fs.writeFileSync(clear, 'what was sealed\n');
+			assert.equal(convert('encrypt', clear, sealed, passwordFile('keep.pw', SENTINEL)).status, 0);
+			// The user edited the clear file since: overwriting it was approved
+			const valuable = Buffer.from('newer valuable edits\n\u0000\u00ff', 'latin1');
+			fs.writeFileSync(clear, valuable);
+			const refused = convert('decrypt', sealed, clear, passwordFile('typo.pw', 'typo'));
+			assert.notEqual(refused.status, 0, 'the wrong password is reported');
+			assert.deepEqual(fs.readFileSync(clear), valuable, 'the destination is kept byte for byte');
+			assert.deepEqual(
+				fs.readdirSync(folder).sort(),
+				['notes.txt', 'notes.txt.enc'],
+				'the failed stage is removed and nothing else'
+			);
+			const corrupt = path.join(folder, 'corrupt.txt.enc');
+			fs.writeFileSync(corrupt, 'Salted__ not a ciphertext');
+			const target = path.join(folder, 'corrupt.txt');
+			fs.writeFileSync(target, valuable);
+			assert.notEqual(
+				convert('decrypt', corrupt, target, passwordFile('c.pw', SENTINEL)).status,
+				0
+			);
+			assert.deepEqual(
+				fs.readFileSync(target),
+				valuable,
+				'a corrupted input keeps the destination too'
+			);
+		}
+	);
+
+	scenario(
+		'(encryptor-failed-conversion-keeps-destination) a successful conversion replaces the target with a new-file mode',
+		() => {
+			const folder = fs.mkdtempSync(path.join(work, 'replace-'));
+			const clear = path.join(folder, 'plan.txt');
+			const sealed = `${clear}.enc`;
+			fs.writeFileSync(clear, 'the plan\n');
+			const secret = passwordFile('replace.pw', SENTINEL);
+			assert.equal(convert('encrypt', clear, sealed, secret).status, 0);
+			fs.writeFileSync(clear, 'older copy\n');
+			const decrypted = convert('decrypt', sealed, clear, secret);
+			assert.equal(decrypted.status, 0, decrypted.stderr);
+			assert.equal(fs.readFileSync(clear, 'utf8'), 'the plan\n');
+			assert.deepEqual(
+				fs.readdirSync(folder).sort(),
+				['plan.txt', 'plan.txt.enc'],
+				'no stage is left'
+			);
+			const umask = process.umask();
+			assert.equal(fs.statSync(clear).mode & 0o777, 0o666 & ~umask, 'the output is not left 0600');
+		}
+	);
+
 	scenario('an unknown mode or a missing password file is refused before OpenSSL runs', () => {
 		fs.rmSync(argvLog, { force: true });
 		const clear = path.join(work, 'mode.txt');
