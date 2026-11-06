@@ -1323,6 +1323,22 @@ _PrefixShortcutModifierHeld() {
 	return IsDown.Call("LWin") or IsDown.Call("RWin")
 }
 
+; Takes the expansion undo record on the key after an expansion. A modifier
+; pressed alone keeps it, so Shift+Backspace still restores; Ctrl, Alt or Win
+; with Backspace stay the application's, as on macOS and Linux.
+; @param VK {Integer} The key going down.
+; @returns {Boolean} True when HSE_UndoExpansion owns this Backspace.
+_PrefixTakeUndoOnKeyDown(VK) {
+	global HSE_Undoable
+	if !IsObject(HSE_Undoable) || _PrefixIsModifierVK(VK)
+		return false
+	Undo := HSE_Undoable
+	HSE_Undoable := ""
+	if (VK != 0x08 || _PrefixShortcutModifierHeld())
+		return false
+	return HSE_UndoExpansion(Undo)
+}
+
 ; Handle the two genuine Ctrl chords proven to relocate focus without OnChar.
 ; AltGr synthesizes Ctrl on a standard layout, so RAlt/SC138 ownership is
 ; resolved by the caller (_PrefixAltGrMasksCtrl) and excludes that path.
@@ -1792,6 +1808,11 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	; Same try guard as _OnPrefixChar — an unhandled error here permanently
 	; silences the OnKeyDown callback for all subsequent keystrokes.
 	try {
+		; The very next key after an expansion decides its undo: a plain or Shift
+		; Backspace restores the trigger and owns its buffer effect; any other key
+		; voids it (HSE_UndoExpansion).
+		if _PrefixTakeUndoOnKeyDown(VK)
+			return
 		; A long enough pause before this key starts a new word, whatever the
 		; key does next (a Backspace or a navigation key then applies on top).
 		_PrefixApplyIdleReset(A_TickCount)

@@ -55,11 +55,11 @@
 			"fr": "Restaurer une expansion avec Retour arrière",
 			"en": "Restore an expansion with Backspace"
 		},
-		"platforms": { "windows": false, "macos": false, "linux": true },
+		"platforms": { "windows": true, "macos": false, "linux": true },
 		"notes": {
 			"windows": {
-				"fr": "Pas de restauration automatique du déclencheur avec Retour arrière ; l’annulation de l’application est distincte.",
-				"en": "No automatic trigger restoration with Backspace; the application’s Undo is separate."
+				"fr": "Un Retour arrière immédiat sans modificateur peut restaurer une expansion en texte simple éligible ; le comportement des champs natifs reste à vérifier.",
+				"en": "An immediate unmodified Backspace can restore an eligible plain-text expansion; native text-field behavior remains unqualified."
 			},
 			"macos": {
 				"fr": "Pas de restauration automatique du déclencheur avec Retour arrière ; l’annulation de l’application est distincte.",
@@ -75,7 +75,12 @@
 				{
 					"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
 					"symbol": "_OnPrefixKeyDown",
-					"sha256": "efd2e20c6ede64d5c9a16320f660799629680d1718d00541b6a2d09fc04a633b"
+					"sha256": "1b8b1ecd86352debd1fdd6c92636bafaead2324ff3ea8d6ba390254b08582780"
+				},
+				{
+					"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
+					"symbol": "HSE_UndoExpansion(Undo",
+					"sha256": "c2a09369b02df0382c2adda33397ab92cbcfa763339ad84160ec344d22729f57"
 				}
 			],
 			"macos": [
