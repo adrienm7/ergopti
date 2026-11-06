@@ -1,0 +1,18 @@
+Selecting exact test module: "tests.unit.modules.keymap.terminators.test_nav_invalidates_hotstring_buffer"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.terminators.test_nav_invalidates_hotstring_buffer
+
+=== navigation invalidates hotstring buffer ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_nav_invalidates_hotstring_buffer","name":"navigation invalidates hotstring buffer while retaining optional LLM context","status":"pass","elapsed_ms":75.644065,"timing_error":""}
+  ok   navigation invalidates hotstring buffer while retaining optional LLM context
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.terminators.test_nav_invalidates_hotstring_buffer","name":"tests.unit.modules.keymap.terminators.test_nav_invalidates_hotstring_buffer","status":"pass","elapsed_ms":75.926679,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  1
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

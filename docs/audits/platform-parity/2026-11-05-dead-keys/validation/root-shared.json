@@ -1,0 +1,44 @@
+{
+	"head": "c3f261cdaa8fbc3f3c880f87e335aa5db5aed62d",
+	"layouts": 6,
+	"states": 140,
+	"wire_expectations": 4391,
+	"known_magic_deviations": 8,
+	"new_bepo_deviations": 1,
+	"prefix_controls": 5,
+	"classification_negative_controls": [
+		"missing layout",
+		"missing expectations",
+		"concealed new deviation",
+		"changed known deviation"
+	],
+	"runs": [
+		{
+			"name": "enumeration",
+			"exit": 0,
+			"program_sha256": "572c55aa79aa57541a5e3988cc116f4d2308dbc7edf11212abf38ddd06c6698d",
+			"stdout_sha256": "5edf686338ce783a3845cb8d97591643861ea2a7073cd54465c0d1efa68af60e",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "prefix",
+			"exit": 0,
+			"program_sha256": "6d5d44466c1110973fc0f75a0d4cad7474ed6d3162138a750da80a87934e47e4",
+			"stdout_sha256": "37ca83ac90151f4fb4a8c9dca3cafe316c3e26f00d50b9d70039f5e4b3d2210e",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		}
+	],
+	"native_dependency": {
+		"path": "/usr/lib/x86_64-linux-gnu/libxkbcommon.so.0.0.0",
+		"sha256": "9f26c41577e0e036cbf42352e85b13db6bce953fb730555b4fc7de5362dc93bb"
+	},
+	"locale": {
+		"path": "/usr/share/X11/locale/en_US.UTF-8/Compose",
+		"sha256": "a3077ce7fdae43776b9a485d8a9689c0bfeb0cd17348a87b7a06818e59554ea1",
+		"matching_lines": [
+			"<dead_currency> <dead_cedilla> <C>\t: \"₵\"\tU20B5 # CEDI SIGN",
+			"<dead_currency> <dead_cedilla> <c>\t: \"₵\"\tU20B5 # CEDI SIGN"
+		]
+	},
+	"qualification": "Original Python/Lua parsers and converters; all six registry layouts and seven converter levels. Genuine libxkbcommon Compose table/keysym/state calls in a private process. No keyboard, native Mac input source, AHK, compositor or receiving application. Missing-state pairs are source relations, not measured Mac event payloads."
+}

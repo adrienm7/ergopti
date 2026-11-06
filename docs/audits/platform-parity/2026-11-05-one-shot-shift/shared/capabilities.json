@@ -1,0 +1,257 @@
+{
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"rows": [
+		{
+			"id": "one-shot-specials",
+			"contract": "Shared result table",
+			"windows": "Source loader selects all7 mappings",
+			"macos": "Actual resolver selects all7 mappings",
+			"linux": "Actual shared resolver and source loader select all7 mappings",
+			"classification": "raw_parity",
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified.",
+			"finding_ids": [],
+			"evidence": ["report.md", "policy-probe.lua", "declaration-probe.cjs", "source-contract.txt"]
+		},
+		{
+			"id": "magic-result",
+			"contract": "Magic has priority and yields J",
+			"windows": "Snapshot before InputHook waiting",
+			"macos": "Live magic reader on event",
+			"linux": "Live magic reader on event",
+			"classification": "unknown_intent",
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Shared J result explicit; setting lifetime differs. Current allowed magic symbols do not collide with ASCII table keys. Actual config changes during a pending capture are not certified.",
+			"finding_ids": [],
+			"evidence": ["report.md", "policy-probe.lua", "declaration-probe.cjs", "source-contract.txt"]
+		},
+		{
+			"id": "generic-versus-tap",
+			"contract": "An action origin is not a whole capability",
+			"windows": "Generic catalogue and tap action available",
+			"macos": "sticky_shift explicit generic equivalent and native tap source",
+			"linux": "Reserved tap one_shot_shift exists; generic catalogue names absent",
+			"classification": "observed_limit",
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Exact catalogue/platform projection and separate reserved tap namespace; OS accessibility Sticky Keys is not assumed to reproduce Ergopti special punctuation mappings.",
+			"finding_ids": [],
+			"evidence": ["report.md", "policy-probe.lua", "declaration-probe.cjs", "source-contract.txt"]
+		},
+		{
+			"id": "default-carrier",
+			"contract": "Recommended physical trigger",
+			"windows": "right_ctrl",
+			"macos": "right_option",
+			"linux": "right_ctrl",
+			"classification": "explicit_intent",
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Shared defaults and explicit namespace reconciliation table document these differences; physical admission remains per-driver.",
+			"finding_ids": [],
+			"evidence": ["report.md", "policy-probe.lua", "declaration-probe.cjs", "source-contract.txt"]
+		},
+		{
+			"id": "timeout",
+			"contract": "Default and editable deadline",
+			"windows": "Shared2000ms; nonpositive constant falls back2s",
+			"macos": "Same default; positive sticky_timeout_ms user override through hs-only menu",
+			"linux": "Shared2000ms registry value",
+			"classification": "explicit_intent",
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Shared timing registry and explicit per-driver menu construction. No common permanent exclusion policy is inferred from missing controls.",
+			"finding_ids": [],
+			"evidence": ["report.md", "policy-probe.lua", "declaration-probe.cjs", "source-contract.txt"]
+		},
+		{
+			"id": "zero-timeout",
+			"contract": "Zero/infinite timeout is not a current shared setting",
+			"windows": "Nonpositive constant fallback2s",
+			"macos": "Current setter/arm rejects nonpositive; historical TODO wording is not current evidence",
+			"linux": "No same user setting; registry default positive",
+			"classification": "observed_limit",
+			"availability": {
+				"windows": "absent",
+				"macos": "absent",
+				"linux": "absent"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "No zero/infinite user setting established; native or malformed-data behavior is not inferred from old prose.",
+			"finding_ids": [],
+			"evidence": ["report.md", "policy-probe.lua", "declaration-probe.cjs", "source-contract.txt"]
+		},
+		{
+			"id": "control-spend",
+			"contract": "Editing controls spend unchanged",
+			"windows": "Named controls3; Tab/Escape scalar handling needs actual native EndKey representation",
+			"macos": "Actual shared/state controls cover5 names",
+			"linux": "Shared policy covers5; native producer classification driver-owned",
+			"classification": "unknown_intent",
+			"availability": {
+				"windows": "unverified",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified.",
+			"finding_ids": [],
+			"evidence": ["report.md", "policy-probe.lua", "declaration-probe.cjs", "source-contract.txt"]
+		},
+		{
+			"id": "unicode-title",
+			"contract": "Unicode title fallback",
+			"windows": "AHK Format title; non-ASCII exact native results unexecuted",
+			"macos": "Actual shared Unicode title includes expansions",
+			"linux": "Actual shared Unicode title includes expansions",
+			"classification": "observed_limit",
+			"availability": {
+				"windows": "unverified",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "No inference that Windows Format exactly equals shared generated Unicode tables. Scalar output may expand, e.gß→Ss andİ→I+combiningdot on actual Lua.",
+			"finding_ids": [],
+			"evidence": ["report.md", "policy-probe.lua", "declaration-probe.cjs", "source-contract.txt"]
+		},
+		{
+			"id": "retrigger",
+			"contract": "A second activation has precise ownership",
+			"windows": "Second exclusive SIHO capture refused while incumbent owns capture",
+			"macos": "Internal owner refreshes deadline and preserves old key release debt",
+			"linux": "Native input-arm lease can refuse rearm while consumed",
+			"classification": "unknown_intent",
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "State/source mechanisms only; reaching them through a held trigger or another consumer may change admission.",
+			"finding_ids": [],
+			"evidence": ["report.md", "policy-probe.lua", "declaration-probe.cjs", "source-contract.txt"]
+		},
+		{
+			"id": "native-plan",
+			"contract": "Shift choice must match actual output",
+			"windows": "Literal captured scalar/result path",
+			"macos": "Resolver predicate and adapter native flags are different layers",
+			"linux": "Resolver predicate and Hook/uinput lease are different layers",
+			"classification": "observed_limit",
+			"availability": {
+				"windows": "unverified",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Actual shared resolver contracts tested, not all public native modifiers/CapsWord combinations; peers own concrete driver findings.",
+			"finding_ids": [],
+			"evidence": ["report.md", "policy-probe.lua", "declaration-probe.cjs", "source-contract.txt"]
+		},
+		{
+			"id": "carrier-shape",
+			"contract": "One scalar is not an arbitrary event payload",
+			"windows": "Complete scalar capture; multi-scalar native receiving unexecuted",
+			"macos": "Actual state can title whole text; NNBSP% not scalar% special",
+			"linux": "Shared resolve takes text produced by key layout",
+			"classification": "unknown_intent",
+			"availability": {
+				"windows": "unverified",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified.",
+			"finding_ids": [],
+			"evidence": ["report.md", "policy-probe.lua", "declaration-probe.cjs", "source-contract.txt"]
+		},
+		{
+			"id": "read-failure",
+			"contract": "Catalogue failures are explicit",
+			"windows": "Loud one-time empty-map degradation until restart",
+			"macos": "Construction refuses unreadable/malformed input",
+			"linux": "Read/parse refuses manager candidate",
+			"classification": "observed_limit",
+			"availability": {
+				"windows": "partial",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Source fault contracts only, no full startup/device receiving claim. Shipped valid data and baseline guard pass.",
+			"finding_ids": [],
+			"evidence": ["report.md", "policy-probe.lua", "declaration-probe.cjs", "source-contract.txt"]
+		}
+	]
+}

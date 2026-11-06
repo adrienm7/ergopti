@@ -1,0 +1,383 @@
+{
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"role": "windows",
+	"qualification": "40 source contracts plus7 explicit gaps, not47 native cases.",
+	"rows": [
+		{
+			"id": "OSW-C001",
+			"aspect": "entry refuses native suspended state before arming",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C002",
+			"aspect": "capture is exclusive and current scalar decoder based",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C003",
+			"aspect": "positive timeout uses shared constant, otherwise finite2s",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C004",
+			"aspect": "shared timeout source is2000ms",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C005",
+			"aspect": "magic key and table prepared before native capture",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C006",
+			"aspect": "complete scalar capture, named controls exactly Backspace Enter Delete",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C007",
+			"aspect": "refused rearm cannot change incumbent logical state",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C008",
+			"aspect": "exact-token publication and suspend guard share Critical",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C009",
+			"aspect": "Wait always settles exact token before dispatch",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C010",
+			"aspect": "timeout and invalid capture do not emit",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C011",
+			"aspect": "invalid scalar produces warning",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C012",
+			"aspect": "named control branch replays key before text transform",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C013",
+			"aspect": "OSW001 control replay lacks modifier attribution",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C014",
+			"aspect": "non-atomic nonliteral replay uses ordinary SendEvent",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C015",
+			"aspect": "runtime primitive send hook defaults disabled",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C016",
+			"aspect": "other native tap owner explicitly preserves held modifiers with Blind",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C017",
+			"aspect": "control completion is not an inferred Tab or Escape result",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C018",
+			"aspect": "ordinary scalar path titlecases through native AHK Format",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C019",
+			"aspect": "shared table contains seven explicit punctuation/space replacements",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C020",
+			"aspect": "chosen magic key result precedes fixed punctuation lookup",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C021",
+			"aspect": "fixed chord cancellation changes only enable bit",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C022",
+			"aspect": "one-shot owner does not itself cancel CapsWord",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C023",
+			"aspect": "gesture catalogue directly exposes character one-shot action",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C024",
+			"aspect": "Windows/Linux action aliases macOS sticky Shift",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C025",
+			"aspect": "suspended start and competing exclusivity checked inside Critical",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C026",
+			"aspect": "start rollback retains failed native cleanup owner",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C027",
+			"aspect": "only actual current terminal retirement permits producer output",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C028",
+			"aspect": "decoder distinguishes timeout controls complete BMP and surrogate pair",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C029",
+			"aspect": "named controls require exact explicit token list",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C030",
+			"aspect": "shared EndChars excludes high halves but admits remaining BMP units",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C031",
+			"aspect": "lifecycle stop and logical latch cleanup coexist",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C032",
+			"aspect": "key-combination non-one-shot action cancels pending shift",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C033",
+			"aspect": "native scalar fixture refuses held modifiers",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C034",
+			"aspect": "named end-key regression is a source check, not modified receiving",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C035",
+			"aspect": "existing rearm fixture distinguishes disabled incumbent",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C036",
+			"aspect": "existing settlement fixture covers successor inserted during Stop",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C037",
+			"aspect": "OSW001 sibling dead-key capture replays named key without modifier attribution",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C038",
+			"aspect": "LAlt dedicated producer captures immediately then enters a bounded Shift hold",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C039",
+			"aspect": "RCtrl dedicated producer distinguishes tap from long Shift hold",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C040",
+			"aspect": "control decoder returns named identity without captured modifier fields",
+			"outcome": "Authenticated source relationship; no Windows runtime result",
+			"basis": "source",
+			"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+			"evidence": ["source-contract.json", "report.md"]
+		},
+		{
+			"id": "OSW-C041",
+			"aspect": "native-modified-control-receiving",
+			"outcome": "unverified",
+			"basis": "source",
+			"qualification": "OSW-001 requested chord is source-derived; actual named-end admission, suppression and receiver counts unexecuted.",
+			"evidence": ["report.md"]
+		},
+		{
+			"id": "OSW-C042",
+			"aspect": "tab-escape-endkey-representation",
+			"outcome": "unverified",
+			"basis": "source",
+			"qualification": "BMP control membership does not establish native EndKey E/C representation or pass-through.",
+			"evidence": ["report.md"]
+		},
+		{
+			"id": "OSW-C043",
+			"aspect": "native-physical-producer-priority",
+			"outcome": "unverified",
+			"basis": "source",
+			"qualification": "HotIf admission and competing remapped keys remain source-qualified, not native keyboard traces.",
+			"evidence": ["report.md"]
+		},
+		{
+			"id": "OSW-C044",
+			"aspect": "post-retirement-reentry",
+			"outcome": "unverified",
+			"basis": "source",
+			"qualification": "Possible successful retirement-to-replay generation window is a hypothesis, not a confirmed root.",
+			"evidence": ["report.md"]
+		},
+		{
+			"id": "OSW-C045",
+			"aspect": "rapid-editor-abc-order",
+			"outcome": "unverified",
+			"basis": "source",
+			"qualification": "No real editor or delayed-thread rapid typing receipt; do not equate emitter order with receiving order.",
+			"evidence": ["report.md"]
+		},
+		{
+			"id": "OSW-C046",
+			"aspect": "native-latency-memory",
+			"outcome": "unverified",
+			"basis": "source",
+			"qualification": "No G4 constructor cost or long-duration RSS measurement; existing prototype code only inspected.",
+			"evidence": ["report.md"]
+		},
+		{
+			"id": "OSW-C047",
+			"aspect": "arbitrary-control-shortcut-spending",
+			"outcome": "unverified",
+			"basis": "source",
+			"qualification": "Explicit cancellation paths are traced; general Ctrl-letter/AltGr/native transcription needs actual hook observation.",
+			"evidence": ["report.md"]
+		}
+	]
+}

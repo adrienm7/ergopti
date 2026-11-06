@@ -148,5 +148,159 @@
 				}
 			]
 		}
+	},
+	{
+		"path": "deadkeys.composition",
+		"labels": { "fr": "Composition par touche morte", "en": "Dead-key composition" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"notes": {
+			"windows": {
+				"fr": "Tables de touches mortes intégrées et émulation des dispositions du registre.",
+				"en": "Builtin dead-key maps and registry layout emulation."
+			},
+			"macos": {
+				"fr": "La disposition native gère la composition ; le regroupement des caractères physiques n’est pas vérifié.",
+				"en": "The native keyboard layout owns composition; physical payload grouping is unverified."
+			},
+			"linux": {
+				"fr": "XKB/Compose natif avec capture de texte indépendante ; une suite interceptée peut diverger.",
+				"en": "Native XKB/Compose with independent text capture; consumed continuations can diverge."
+			}
+		},
+		"evidence": {
+			"windows": [
+				{
+					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
+					"symbol": "DeadKey(Mapping)",
+					"sha256": "edfbf6d0f4633915217cf03bd0490092613d3c9cf474914ee423f535ca0e0661"
+				},
+				{
+					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
+					"symbol": "KeylayoutEmulation_PressNative",
+					"sha256": "64741afe52a81b9086e246487dbd347fca485c2730b79913e5830ca1f17a74df"
+				}
+			],
+			"macos": [
+				{
+					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
+					"symbol": "local chars = e:getCharacters(false)",
+					"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56"
+				}
+			],
+			"linux": [
+				{
+					"file": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
+					"symbol": "local function resolve_press(keycode)",
+					"sha256": "cb6b98f7a76e7b47d8ddfacc546a058c3c83961050ff4d8716d04aaa2b028de6"
+				},
+				{
+					"file": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+					"symbol": "local function _dispatch_post_remap(ev, source)",
+					"sha256": "fe64d1d6985da694281e21d3b09614fc7f346947dbfb24a2a136a05e98c455b7"
+				}
+			]
+		}
+	},
+	{
+		"path": "deadkeys.unmapped_continuation",
+		"labels": {
+			"fr": "Suite non associée après une touche morte",
+			"en": "Unmapped dead-key continuation"
+		},
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"notes": {
+			"windows": {
+				"fr": "Une suite non associée émet le caractère de terminaison de l’accent, puis le caractère courant.",
+				"en": "An unmapped continuation emits the accent terminator followed by the current character."
+			},
+			"macos": {
+				"fr": "Le repli dépend de la disposition native ; ses événements physiques et le texte reçu par l’application ne sont pas vérifiés.",
+				"en": "Fallback belongs to the native layout; its physical payload and application output are unverified."
+			},
+			"linux": {
+				"fr": "Une capture annulée conserve le caractère courant et abandonne l’accent précédent ; la sortie native peut différer.",
+				"en": "Cancelled capture keeps the current character and discards the previous accent; native output can differ."
+			}
+		},
+		"evidence": {
+			"windows": [
+				{
+					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
+					"symbol": "DeadKey(Mapping)",
+					"sha256": "edfbf6d0f4633915217cf03bd0490092613d3c9cf474914ee423f535ca0e0661"
+				},
+				{
+					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
+					"symbol": "KeylayoutEmulation_PressNative",
+					"sha256": "64741afe52a81b9086e246487dbd347fca485c2730b79913e5830ca1f17a74df"
+				}
+			],
+			"macos": [
+				{
+					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
+					"symbol": "local chars = e:getCharacters(false)",
+					"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56"
+				}
+			],
+			"linux": [
+				{
+					"file": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
+					"symbol": "local function resolve_press(keycode)",
+					"sha256": "cb6b98f7a76e7b47d8ddfacc546a058c3c83961050ff4d8716d04aaa2b028de6"
+				}
+			]
+		}
+	},
+	{
+		"path": "deadkeys.pending_lifetime",
+		"labels": { "fr": "Durée d’attente d’une touche morte", "en": "Pending dead-key lifetime" },
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"notes": {
+			"windows": {
+				"fr": "Les tables intégrées attendent au plus 2 secondes ; l’état mort du registre n’a pas de délai maximal.",
+				"en": "Builtin maps wait up to 2 seconds; registry dead-key state has no timeout."
+			},
+			"macos": {
+				"fr": "Le système natif gère la composition en attente ; les règles de capture et de réinitialisation sont distinctes d’un délai commun au pilote.",
+				"en": "The native OS owns pending composition; capture and reset rules are separate from a shared driver timeout."
+			},
+			"linux": {
+				"fr": "Le système natif gère la composition en attente ; les règles de capture et de réinitialisation sont distinctes d’un délai commun au pilote.",
+				"en": "The native OS owns pending composition; capture and reset rules are separate from a shared driver timeout."
+			}
+		},
+		"evidence": {
+			"windows": [
+				{
+					"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
+					"symbol": "DeadKey(Mapping)",
+					"sha256": "edfbf6d0f4633915217cf03bd0490092613d3c9cf474914ee423f535ca0e0661"
+				},
+				{
+					"file": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
+					"symbol": "KeylayoutEmulation_PressNative",
+					"sha256": "64741afe52a81b9086e246487dbd347fca485c2730b79913e5830ca1f17a74df"
+				}
+			],
+			"macos": [
+				{
+					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
+					"symbol": "local chars = e:getCharacters(false)",
+					"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56"
+				}
+			],
+			"linux": [
+				{
+					"file": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
+					"symbol": "local function resolve_press(keycode)",
+					"sha256": "cb6b98f7a76e7b47d8ddfacc546a058c3c83961050ff4d8716d04aaa2b028de6"
+				},
+				{
+					"file": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+					"symbol": "local function _dispatch_post_remap(ev, source)",
+					"sha256": "fe64d1d6985da694281e21d3b09614fc7f346947dbfb24a2a136a05e98c455b7"
+				}
+			]
+		}
 	}
 ]

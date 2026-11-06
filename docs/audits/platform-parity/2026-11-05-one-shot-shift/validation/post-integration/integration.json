@@ -1,0 +1,366 @@
+{
+	"tested_head": "db557521f33d31e8c183b0cd7537a39898b1bb0e",
+	"integrated_base": "19587d92dcafb63c0b20d74531c0656f9ac54652",
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"qualification": "Post-integration37-owner replay and all three supplemental validators pass. These do not assert native receiving. Eight upstream checks initially had one fixture failure; adding the actual Accessibility budget source to its fixture makes all17 field checks pass. The other seven upstream checks passed. The complete572 gate is being repeated on the integrated source after this fixture correction.",
+	"archives": [
+		{
+			"path": "owner-replay/aggregate-source.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/aggregate-source.stdout.txt.txt",
+			"sha256": "f161db4d09303b736e278af9f6a7029175795d9a71c25aef08bfa32cd5847fe6"
+		},
+		{
+			"path": "owner-replay/infinity-qualification.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/infinity-qualification.stdout.txt.txt",
+			"sha256": "dd64dee8a99131745d49eac632168b84c44bf3b50a02c2d048b2445e2ee0597d"
+		},
+		{
+			"path": "owner-replay/linux-lua-channel-probe.lua.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-lua-channel-probe.lua.stdout.txt.txt",
+			"sha256": "7517aedefdb39ba315d749137fa984090d5dff932d06d40f633205003c4c1498"
+		},
+		{
+			"path": "owner-replay/linux-lua-public-probe.lua.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-lua-public-probe.lua.stdout.txt.txt",
+			"sha256": "4dd4ab1ca71bcb32f536102dd4076bc5043cf61930cd727541af2afd04aa55f9"
+		},
+		{
+			"path": "owner-replay/linux-lua-tests.meta.corpus.test_corpus_tap_hold_decisions.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-lua-tests.meta.corpus.test_corpus_tap_hold_decisions.stdout.txt.txt",
+			"sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385"
+		},
+		{
+			"path": "owner-replay/linux-lua-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-lua-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.stdout.txt.txt",
+			"sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93"
+		},
+		{
+			"path": "owner-replay/linux-lua-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-lua-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.stdout.txt.txt",
+			"sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8"
+		},
+		{
+			"path": "owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.stdout.txt.txt",
+			"sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8"
+		},
+		{
+			"path": "owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.stdout.txt.txt",
+			"sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe"
+		},
+		{
+			"path": "owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.stdout.txt.txt",
+			"sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199"
+		},
+		{
+			"path": "owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.stdout.txt.txt",
+			"sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a"
+		},
+		{
+			"path": "owner-replay/linux-luajit-channel-probe.lua.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-luajit-channel-probe.lua.stdout.txt.txt",
+			"sha256": "58da403d3057a37bb59710dcfe25366d02a8b39dbf0d6d1794a1c6e900ae45c0"
+		},
+		{
+			"path": "owner-replay/linux-luajit-public-probe.lua.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-luajit-public-probe.lua.stdout.txt.txt",
+			"sha256": "1a97471ad1afb61ef87e4ce5a1866762c0f76fafe85414e3b2eafd0da4b3e81d"
+		},
+		{
+			"path": "owner-replay/linux-luajit-tests.meta.corpus.test_corpus_tap_hold_decisions.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-luajit-tests.meta.corpus.test_corpus_tap_hold_decisions.stdout.txt.txt",
+			"sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385"
+		},
+		{
+			"path": "owner-replay/linux-luajit-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-luajit-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.stdout.txt.txt",
+			"sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93"
+		},
+		{
+			"path": "owner-replay/linux-luajit-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-luajit-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.stdout.txt.txt",
+			"sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8"
+		},
+		{
+			"path": "owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.stdout.txt.txt",
+			"sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8"
+		},
+		{
+			"path": "owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.stdout.txt.txt",
+			"sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe"
+		},
+		{
+			"path": "owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.stdout.txt.txt",
+			"sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199"
+		},
+		{
+			"path": "owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.stdout.txt.txt",
+			"sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a"
+		},
+		{
+			"path": "owner-replay/macos-config.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/macos-config.stdout.txt.txt",
+			"sha256": "0b578100534d1efc0f49659d27d56d28400e871ab0aa1650278ae3eb84af1392"
+		},
+		{
+			"path": "owner-replay/macos-public.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/macos-public.stdout.txt.txt",
+			"sha256": "72f72dba8944056642d57717ecf115158858f2e6d36e3a3828fd0cd637157617"
+		},
+		{
+			"path": "owner-replay/macos-registered-1.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/macos-registered-1.stdout.txt.txt",
+			"sha256": "1f1d07b81ee8c3049631a56caae1050a9434e82783e38818175f8c26ee48d07b"
+		},
+		{
+			"path": "owner-replay/macos-registered-2.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/macos-registered-2.stdout.txt.txt",
+			"sha256": "d1d2cbd94810ba73d5394af5af20c954afd5f2608904c776b1a368090e01997c"
+		},
+		{
+			"path": "owner-replay/macos-registered-3.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/macos-registered-3.stdout.txt.txt",
+			"sha256": "45d5fb9ea1d598de0c50e65705411133e4c598b8668a8f525bce8df61924b2e1"
+		},
+		{
+			"path": "owner-replay/macos-registered-4.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/macos-registered-4.stdout.txt.txt",
+			"sha256": "3c7a5432b14a9bcb7a8f5027454951ea1b0b3b8bc4b0eabcec793aa029129e08"
+		},
+		{
+			"path": "owner-replay/macos-registered-5.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/macos-registered-5.stdout.txt.txt",
+			"sha256": "2a3777e34c4d3a79951a18c4bb3bb9b0533268487e9f5a835d4d0aef4a8e517e"
+		},
+		{
+			"path": "owner-replay/macos-registered-6.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/macos-registered-6.stdout.txt.txt",
+			"sha256": "089bafe61477e9e3d6fd261eb34cecbee89eefabd3365435a97ec7bcb5ac6cb4"
+		},
+		{
+			"path": "owner-replay/metadata-controls.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/metadata-controls.stdout.txt.txt",
+			"sha256": "b4adb90622bb6ef54a0b44c51b25e7354d30d4f1b85d5314fa1a9ba1aa17619b"
+		},
+		{
+			"path": "owner-replay/native-inverse.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/native-inverse.stdout.txt.txt",
+			"sha256": "9c5dc4fe13ba97277dbcb99af25bb30ded429649deedfeb5800695a41736b2a4"
+		},
+		{
+			"path": "owner-replay/receipts.json.txt",
+			"sha256": "2a18a697ec7db23a565f0665fb86456359e8aaa1dff2a1e0ce2493aac170ea96"
+		},
+		{
+			"path": "owner-replay/shared-catalogue-guard.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/shared-catalogue-guard.stdout.txt.txt",
+			"sha256": "edcebe120e38daba02e054914afb4a45c81231e1a32fe5a1592b83899ba9813e"
+		},
+		{
+			"path": "owner-replay/shared-declarations.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/shared-declarations.stdout.txt.txt",
+			"sha256": "b62e6f9308e539e3d5f3e69100fdb501b2f833138a0ce54fe39c78f26be3f486"
+		},
+		{
+			"path": "owner-replay/shared-pinned-source.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/shared-pinned-source.stdout.txt.txt",
+			"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+		},
+		{
+			"path": "owner-replay/shared-policy-lua54.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/shared-policy-lua54.stdout.txt.txt",
+			"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+		},
+		{
+			"path": "owner-replay/shared-policy-luajit.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/shared-policy-luajit.stdout.txt.txt",
+			"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+		},
+		{
+			"path": "owner-replay/shared-single-source.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/shared-single-source.stdout.txt.txt",
+			"sha256": "04a3fef985b6d5644eacb5883107af58b25c12d8a6172e9c8c1fff69babe6a8a"
+		},
+		{
+			"path": "owner-replay/source-check.json.txt",
+			"sha256": "6907c8fc30cf8425017c02e53ce685aadb05264dc20be734ecf2694a615e9f7b"
+		},
+		{
+			"path": "owner-replay/windows-source.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "owner-replay/windows-source.stdout.txt.txt",
+			"sha256": "0b12e2fccb13014a8c953569b3d012b22fea7a6fc509db8c726d8503fcbd92f5"
+		},
+		{
+			"path": "source-guards/source-guards.json.txt",
+			"sha256": "504202fae7c664472a9b8da90d80fd5f202b0d413fbe2ef5be228f11436c0218"
+		},
+		{
+			"path": "public-channel/public-channel-admission-lua.txt.txt",
+			"sha256": "eedb49a26d91792b2c1c8b5734c8b43c444664ec9fc6e3502412c1d5ff0bb2ae"
+		},
+		{
+			"path": "public-channel/public-channel-admission-luajit.txt.txt",
+			"sha256": "7883cce62b43ecae020f13235c4099817b3d8cef64e34d49f87b7c31122c80f7"
+		},
+		{
+			"path": "public-channel/public-channel-admission-receipt.json.txt",
+			"sha256": "2c96460ad69827c8cff5de3e5c08525230e61c87b81b452791c42f69be648e80"
+		},
+		{
+			"path": "config-domain/config-domain-boundaries-current.log.txt",
+			"sha256": "04861fd7e0866d529c251523458e48a2ccfd7d110ed49b756282d5885c3aabfc"
+		},
+		{
+			"path": "config-domain/config-domain-receipt.json.txt",
+			"sha256": "8085d12d2b448b9099f25eb65b9f03de7c0c2da0ea52501da65229ecdd09aa59"
+		},
+		{
+			"path": "config-domain/logger-domain-boundaries-current.log.txt",
+			"sha256": "576b7afd9c314ff3ef03ff5c5ad07d3ecddec88d90434813fe7c1791c0ec442c"
+		},
+		{
+			"path": "config-domain/public-arm-domain-boundaries-current.log.txt",
+			"sha256": "3a2b2faf28152bf76f40c55a4ddf78e7882fb80170188a534f82b2771ad1239e"
+		}
+	],
+	"owner_replay": {
+		"processes": 37,
+		"failed": 0,
+		"receipt": "owner-replay/receipts.json.txt"
+	},
+	"field_fixture_correction": {
+		"file": "tools/test/test-macos-field-run-contract.cjs",
+		"before_sha256": "bbfbcad1581ebe09eed2b85d382d7527d5e2e2e06288f76853dd2eaa9a962665",
+		"after_sha256": "4152662be2615fcfb6dff3cf6a8f6ed1c56dd1ccdf0262f88ab3da1cc7e31a6f",
+		"exit_code": 0,
+		"checks_passed": 17,
+		"stdout": "field-fixture-rerun.stdout.txt",
+		"stdout_sha256": "d1ad093e2b7371029780d31674a53fb9ad814c4fb9015aefd4a2f8bbb6d32b8b",
+		"stderr": "field-fixture-rerun.stderr.txt",
+		"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+		"qualification": "Copies the real source read by the changed collector. No assertion removed, no fake budget and no production behavior changed.",
+		"exact_tested_source": "field-fixture-tested-source.cjs.txt"
+	},
+	"subsequent_upstream_fix": {
+		"commit": "ef7e58366e78b3a59e7d5a52b79174eda191f087",
+		"qualification": "Upstream independently supplied the same missing fixture source through a named constant. The local redundant one-line fixture commit is dropped during rebase; the exact earlier tested source is archived. Original test observations remain historical, and integrated source will receive the complete gate."
+	}
+}

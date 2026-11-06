@@ -1,0 +1,34 @@
+
+=== tap-hold decision corpus (linux) ===
+  ok   holds the pinned number of vectors
+  ok   (tap-hold-decision) hold_key_lone_quick_release_taps
+  ok   (tap-hold-decision) hold_key_lone_release_past_threshold_types_nothing
+  ok   (tap-hold-decision) hold_key_bounce_below_tap_minimum_types_nothing
+  ok   (tap-hold-decision) hold_key_letter_struck_under_it_is_a_chord
+  ok   (tap-hold-decision) hold_key_hold_is_down_before_its_threshold
+  ok   (tap-hold-decision) hold_key_letter_struck_past_threshold_is_a_chord
+  ok   (tap-hold-decision) hold_key_release_of_an_earlier_key_cancels_the_tap
+  ok   (tap-hold-decision) hold_key_tap_keeps_a_modifier_held_before_it
+  ok   (tap-hold-decision) hold_key_nested_tap_under_another_hold
+  ok   (tap-hold-decision) hold_key_two_holds_combine
+  ok   (tap-hold-decision) own_side_right_shift_holds_right_shift
+  ok   (tap-hold-decision) own_side_left_shift_holds_left_shift
+  ok   (tap-hold-decision) roll_key_lone_tap_types_itself
+  ok   (tap-hold-decision) roll_key_short_tap_has_no_minimum
+  ok   (tap-hold-decision) roll_key_rolled_over_a_letter_is_a_tap
+  ok   (tap-hold-decision) roll_key_letter_released_first_is_a_hold
+  ok   (tap-hold-decision) roll_key_two_letters_struck_is_typing
+  ok   (tap-hold-decision) roll_key_letter_past_threshold_is_a_chord
+  ok   (tap-hold-decision) roll_key_long_lone_press_types_nothing
+  ok   (tap-hold-decision) one_shot_tap_shifts_the_next_letter
+  ok   (tap-hold-decision) one_shot_is_spent_by_one_letter
+  ok   (tap-hold-decision) one_shot_is_spent_by_one_letter_typed_in_a_roll
+  ok   (tap-hold-decision) one_shot_hold_is_shift_and_arms_nothing
+  ok   (tap-hold-decision) one_shot_expires_after_its_timeout
+  ok   (tap-hold-decision) lone_modifier_tap_up_to_its_window
+  ok   (tap-hold-decision) lone_modifier_tap_on_left_shift
+  ok   (tap-hold-decision) lone_modifier_past_its_window_types_nothing
+  ok   (tap-hold-decision) lone_modifier_window_keeps_chords
+  ok   (tap-hold-decision) lone_modifier_window_off_is_strict
+  ok   (tap-hold-decision) lone_modifier_window_keeps_the_tap_minimum
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":31}

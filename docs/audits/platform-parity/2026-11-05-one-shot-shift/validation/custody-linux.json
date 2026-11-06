@@ -1,0 +1,528 @@
+{
+	"role": "linux",
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"handoff_path": "handoff-sha256.txt",
+	"handoff_sha256": "91924569588579c92be5f7beb47c6dcd7c10aac3d3744516f9f9c77f6145ccf3",
+	"artifact_claims": [
+		{
+			"path": "report.md",
+			"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c",
+			"archived_matches": true,
+			"archived_sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c",
+			"resolution": "current archive"
+		},
+		{
+			"path": "findings.json",
+			"sha256": "6c11b10108876031ec6be1cc711182f5fa1b653ab42a84f8c596181222cc6a6a",
+			"archived_matches": true,
+			"archived_sha256": "6c11b10108876031ec6be1cc711182f5fa1b653ab42a84f8c596181222cc6a6a",
+			"resolution": "current archive"
+		},
+		{
+			"path": "coverage.json",
+			"sha256": "f390d16394a2db85037a45273af8edb0512c7a77ab924de420d6cb4358932d71",
+			"archived_matches": true,
+			"archived_sha256": "f390d16394a2db85037a45273af8edb0512c7a77ab924de420d6cb4358932d71",
+			"resolution": "current archive"
+		},
+		{
+			"path": "source-receipts.json",
+			"sha256": "eda0905c715e72929b4c668bb09bb9afee43ce40ad981a0a5939a7e5a84faa63",
+			"archived_matches": true,
+			"archived_sha256": "eda0905c715e72929b4c668bb09bb9afee43ce40ad981a0a5939a7e5a84faa63",
+			"resolution": "current archive"
+		},
+		{
+			"path": "source-contract.py",
+			"sha256": "01024b2ef4db1e8539cb10c52877913d382b8b8db16fe582850bcf482c66d3ab",
+			"archived_matches": false,
+			"archived_sha256": "535761074a0f06f99ccb961ba4e11b01a05a08a8a28aa6c8b10f880bcee6c003",
+			"resolution": "exact original bytes",
+			"original_bytes": "validation/original-submissions/linux/source-contract.py.txt"
+		},
+		{
+			"path": "sweep.py",
+			"sha256": "1526691bc50298ee028ccbacd9a7f04d9579ca8097e782c861407896483000a9",
+			"archived_matches": true,
+			"archived_sha256": "1526691bc50298ee028ccbacd9a7f04d9579ca8097e782c861407896483000a9",
+			"resolution": "current archive"
+		},
+		{
+			"path": "run-registered.lua",
+			"sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"archived_matches": true,
+			"archived_sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"resolution": "current archive"
+		},
+		{
+			"path": "public-probe.lua",
+			"sha256": "dac95c96dcde57e91a21a67c9810808036822f3ba3437d08ec2d6574e9689d57",
+			"archived_matches": true,
+			"archived_sha256": "dac95c96dcde57e91a21a67c9810808036822f3ba3437d08ec2d6574e9689d57",
+			"resolution": "current archive"
+		},
+		{
+			"path": "channel-probe.lua",
+			"sha256": "fcc5756f4f6faf60e8dc355fa82740b7591859d450ceb3171fbcd0acdddece77",
+			"archived_matches": true,
+			"archived_sha256": "fcc5756f4f6faf60e8dc355fa82740b7591859d450ceb3171fbcd0acdddece77",
+			"resolution": "current archive"
+		},
+		{
+			"path": "false-green-baseline.txt",
+			"sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"archived_matches": true,
+			"archived_sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"resolution": "current archive"
+		},
+		{
+			"path": "dedup-exact-roots.txt",
+			"sha256": "4dcbdbbdab7d2e568c7964b4d59364dc2ab95795a8e3a1dd4ff8d7911d9b53e7",
+			"archived_matches": true,
+			"archived_sha256": "4dcbdbbdab7d2e568c7964b4d59364dc2ab95795a8e3a1dd4ff8d7911d9b53e7",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/lua-channel-probe.lua.txt",
+			"sha256": "5fcac2dab572d3c0019760c7c330e5dc1a68ced9e349443288171756f06406ad",
+			"archived_matches": true,
+			"archived_sha256": "5fcac2dab572d3c0019760c7c330e5dc1a68ced9e349443288171756f06406ad",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/lua-public-probe.lua.txt",
+			"sha256": "69822e6fd795299446d12aaecfd6ae39bae5868cb11152991620c13edc038a5e",
+			"archived_matches": true,
+			"archived_sha256": "69822e6fd795299446d12aaecfd6ae39bae5868cb11152991620c13edc038a5e",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/lua-tests.meta.corpus.test_corpus_tap_hold_decisions.txt",
+			"sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385",
+			"archived_matches": true,
+			"archived_sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/lua-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.txt",
+			"sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93",
+			"archived_matches": true,
+			"archived_sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/lua-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.txt",
+			"sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8",
+			"archived_matches": true,
+			"archived_sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.txt",
+			"sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8",
+			"archived_matches": true,
+			"archived_sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.txt",
+			"sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe",
+			"archived_matches": true,
+			"archived_sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.txt",
+			"sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199",
+			"archived_matches": true,
+			"archived_sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.txt",
+			"sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a",
+			"archived_matches": true,
+			"archived_sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/luajit-channel-probe.lua.txt",
+			"sha256": "5fc45e5c4cdcdad3527769a41ff1edefbf353b9a788f4ceabd55510563729943",
+			"archived_matches": true,
+			"archived_sha256": "5fc45e5c4cdcdad3527769a41ff1edefbf353b9a788f4ceabd55510563729943",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/luajit-public-probe.lua.txt",
+			"sha256": "592ddba3e8454c762f39bd524a607a4085b42fed6123db5f9435ea4dee7a51a6",
+			"archived_matches": true,
+			"archived_sha256": "592ddba3e8454c762f39bd524a607a4085b42fed6123db5f9435ea4dee7a51a6",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/luajit-tests.meta.corpus.test_corpus_tap_hold_decisions.txt",
+			"sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385",
+			"archived_matches": true,
+			"archived_sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/luajit-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.txt",
+			"sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93",
+			"archived_matches": true,
+			"archived_sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/luajit-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.txt",
+			"sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8",
+			"archived_matches": true,
+			"archived_sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.txt",
+			"sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8",
+			"archived_matches": true,
+			"archived_sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.txt",
+			"sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe",
+			"archived_matches": true,
+			"archived_sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.txt",
+			"sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199",
+			"archived_matches": true,
+			"archived_sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.txt",
+			"sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a",
+			"archived_matches": true,
+			"archived_sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/source-contract.txt",
+			"sha256": "632df408e8e8eeeb000c9f7ba640b581fa57a29e0d8713025b375213ed27d912",
+			"archived_matches": true,
+			"archived_sha256": "632df408e8e8eeeb000c9f7ba640b581fa57a29e0d8713025b375213ed27d912",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-1/results.json",
+			"sha256": "8714fda9012b8848fa677379f04b5f667fc7b069e1030f29768f22c447b9191f",
+			"archived_matches": true,
+			"archived_sha256": "8714fda9012b8848fa677379f04b5f667fc7b069e1030f29768f22c447b9191f",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/lua-channel-probe.lua.txt",
+			"sha256": "b56d81b7acda6bdff5f8e72e0ad3e36717fed31fc1ea33bb9dbd1f47b4a3e771",
+			"archived_matches": true,
+			"archived_sha256": "b56d81b7acda6bdff5f8e72e0ad3e36717fed31fc1ea33bb9dbd1f47b4a3e771",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/lua-public-probe.lua.txt",
+			"sha256": "68f881bf103e951d3ddac4329471ba6db43be3d358d081bdff3260524dcedca3",
+			"archived_matches": true,
+			"archived_sha256": "68f881bf103e951d3ddac4329471ba6db43be3d358d081bdff3260524dcedca3",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/lua-tests.meta.corpus.test_corpus_tap_hold_decisions.txt",
+			"sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385",
+			"archived_matches": true,
+			"archived_sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/lua-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.txt",
+			"sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93",
+			"archived_matches": true,
+			"archived_sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/lua-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.txt",
+			"sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8",
+			"archived_matches": true,
+			"archived_sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.txt",
+			"sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8",
+			"archived_matches": true,
+			"archived_sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.txt",
+			"sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe",
+			"archived_matches": true,
+			"archived_sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.txt",
+			"sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199",
+			"archived_matches": true,
+			"archived_sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.txt",
+			"sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a",
+			"archived_matches": true,
+			"archived_sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/luajit-channel-probe.lua.txt",
+			"sha256": "b0e547861851f068dbbdf04b3c080dd2a693e501770fd03617650de7bd5c4593",
+			"archived_matches": true,
+			"archived_sha256": "b0e547861851f068dbbdf04b3c080dd2a693e501770fd03617650de7bd5c4593",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/luajit-public-probe.lua.txt",
+			"sha256": "ae6bc66658c1ca777ec375c39e625e6c724b93a302db1d9bfab2c9b7b3560275",
+			"archived_matches": true,
+			"archived_sha256": "ae6bc66658c1ca777ec375c39e625e6c724b93a302db1d9bfab2c9b7b3560275",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/luajit-tests.meta.corpus.test_corpus_tap_hold_decisions.txt",
+			"sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385",
+			"archived_matches": true,
+			"archived_sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/luajit-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.txt",
+			"sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93",
+			"archived_matches": true,
+			"archived_sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/luajit-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.txt",
+			"sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8",
+			"archived_matches": true,
+			"archived_sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.txt",
+			"sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8",
+			"archived_matches": true,
+			"archived_sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.txt",
+			"sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe",
+			"archived_matches": true,
+			"archived_sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.txt",
+			"sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199",
+			"archived_matches": true,
+			"archived_sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.txt",
+			"sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a",
+			"archived_matches": true,
+			"archived_sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/source-contract.txt",
+			"sha256": "632df408e8e8eeeb000c9f7ba640b581fa57a29e0d8713025b375213ed27d912",
+			"archived_matches": true,
+			"archived_sha256": "632df408e8e8eeeb000c9f7ba640b581fa57a29e0d8713025b375213ed27d912",
+			"resolution": "current archive"
+		},
+		{
+			"path": "final-dry-2/results.json",
+			"sha256": "08f13517ed5f6b77cfacb20013eea820647302e4c33f995b28ce205c663cf9cb",
+			"archived_matches": true,
+			"archived_sha256": "08f13517ed5f6b77cfacb20013eea820647302e4c33f995b28ce205c663cf9cb",
+			"resolution": "current archive"
+		}
+	],
+	"source_claims": [
+		{
+			"path": "static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua",
+			"sha256": "b856fe543eece29449c3c736af6fed9f524e70466d812d5d5567c8ab52be97e7",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
+			"sha256": "e3d8970dd41e7e1239b370ecbc9e0d04edf2f8a1f2c4a4fbfb5a0ed6d3b1522b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+			"sha256": "fe64d1d6985da694281e21d3b09614fc7f346947dbfb24a2a136a05e98c455b7",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/keyboard_layout.lua",
+			"sha256": "a1114103fbfc238572c562e5b9842fc51207b866997774e630c63979d8fbb15b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
+			"sha256": "cb6b98f7a76e7b47d8ddfacc546a058c3c83961050ff4d8716d04aaa2b028de6",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/evdev_reader.lua",
+			"sha256": "114af1d0ff1daa21df141a8e006f10e19cdc3e30a1de32a5f18f718f06b891bb",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/uinput_writer.lua",
+			"sha256": "d5cd2ebaba30e1f27bffbf3c215ffeea8173c3d31e824c923a2c86c3c4532ba4",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/modifier_broker.lua",
+			"sha256": "71d6384cf91985d7c404022f053017db0fb85a04ca9775848a5d7209a86bf736",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/shortcuts/key_combinations.lua",
+			"sha256": "e7ae043263815685a369c38c7efac8666a48b26cec68f771bb5f3a4c79e0eedf",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/support/input_owner_fixture.lua",
+			"sha256": "b4fd01d091c450a8473bd16475b93d23e1976265b8d58ef69605b1505c835cd8",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/support/tap_hold_fixture.lua",
+			"sha256": "13f9c1a0b759f18c9045dfc65579dbc33190f80f2d1f99fcf72363dd1d384b93",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/support/key_combination_declaration_fixture.lua",
+			"sha256": "55f3528d1eab688a8d8ffb7ef595a4ca5f0dcf14dacf47736926075b1579f84c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_integration.lua",
+			"sha256": "539d60387b46e9d9fc7146e73e6d540a97d29a023624680d331f0359d5eecd37",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_engine_modifier_key.lua",
+			"sha256": "41a4c4dee64c526a4c6650d95f697b48cce06792c57e9fcd84a8f5e6a4c992a8",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_engine_under_modifier_layer.lua",
+			"sha256": "5a746267a95ed721f45fbb659d5e194e5f610c4862f0ccfe74ad245c07a081e3",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_roll.lua",
+			"sha256": "3a4f0ab297e8f41383d1a9243efb8a13640c018d4ff6978affe05f94fcd1b9d0",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/adapters/keyboard_hook/test_keyboard_hook_tap_hold.lua",
+			"sha256": "fe6aac73330538f726d09e6557691ebb63d949c8eaef958c0cc4c3e2103ba985",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua",
+			"sha256": "6dee75000babb19ad6e3f5aa48428a94f0787c2cff5ba4e59e1705f5c3154424",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/meta/corpus/test_corpus_tap_hold_decisions.lua",
+			"sha256": "70eb3a13b2a14a6cbbe15d62bada1c5d5d588611fe24c8f41720715e4f45b99b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/tap_hold/one_shot_shift.lua",
+			"sha256": "9ff4f097e014ada2c6755d774c5570b91239f611b4699bdbb317c5af84071b13",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tap_hold/one_shot_shift.json",
+			"sha256": "6c605b612374f4e21a3ad5edfea6c0c676c37c23cff32db78d867aef4e28d182",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tap_hold/defaults.toml",
+			"sha256": "c4f4a6678703dada0e58179124c0c956770ca35c6129d18d62179730d9952799",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+			"sha256": "0d28466a2306acc79dec7c8bcc39b49c07ba742f488aaea1bfc00727b498cf91",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"pinned_matches": true,
+			"current_matches": true
+		}
+	],
+	"counts": {
+		"source_claims": 24,
+		"subject_summaries": 8,
+		"public_streams": 20,
+		"channel_cases": 5,
+		"registered_modules": 7,
+		"registered_cases_per_runtime": 405,
+		"findings": 2,
+		"final_processes": 38,
+		"artifact_hashes": 51
+	},
+	"qualification": "Frozen initial role claims; Windows source-only, Linux actual original owners over recorded native ports. No native keyboard/application receiving inferred; channel retirement is observed only at the recorded ports.",
+	"independent_replay": {
+		"receipt": "independent/receipts.json",
+		"qualification": "Rerun after archive source program formatting; original Lua bodies unchanged."
+	}
+}

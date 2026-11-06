@@ -1,0 +1,5 @@
+/workspace/scratch/parity-toolchain/lua-5.4.8-dlopen/src/lua: ...cratch/parity-dead-keys-2026-11-05/shared/rows_probe.lua:14: assertion failed!
+stack traceback:
+	[C]: in function 'assert'
+	...cratch/parity-dead-keys-2026-11-05/shared/rows_probe.lua:14: in main chunk
+	[C]: in ?

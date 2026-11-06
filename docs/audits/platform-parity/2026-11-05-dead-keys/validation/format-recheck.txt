@@ -1,0 +1,5 @@
+
+> svelte-static@3.0.0 format:check
+> node ./tools/lint/format.cjs --check
+
+657 files already formatted

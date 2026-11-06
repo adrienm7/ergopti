@@ -1,0 +1,74 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"files": [
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/registry.lua",
+			"sha256": "1fdc94fb8b7001627ae314b42a6c04eefdab98d1a38b51c3c88cac5a138f6eb1"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+			"sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/state.lua",
+			"sha256": "e565599088ffc788cdd93b8133b013c931183dde93690d0d8d551d29beb9897e"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/synthetic_input.lua",
+			"sha256": "3a72301204dd545ca4773ad114f719e0d6b171799874dbe96b047899d102259e"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/text_sender.lua",
+			"sha256": "b8b8a4f5c2b672874feab51192185f1100b67495f1a3071470c06ffd83caef9f"
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/text_utils.lua",
+			"sha256": "5fae92ac44b056a320998c9ff7f6079a3294522f9c1524e67e70f73051e84197"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/helpers/init.lua",
+			"sha256": "03e75d07bb6759fbdf665652fdeb805ef39253b5ed60df4286adbcdd2b7048ce"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/stubs/hs.lua",
+			"sha256": "c1702704058115f7573ef4da2dc2924a72c45b0229c00e5ea932c89f27f3b8f6"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/run.lua",
+			"sha256": "a2767ffc7e86d1a722e0422d0952bd198dbcc26c06c123ab6d50cd8be6d5e23e"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/keymap/terminators/test_nav_invalidates_hotstring_buffer.lua",
+			"sha256": "5bb615922f08b13a09f38844ee9d8ed9ad2a202225b847a5473b080a119c4511"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/keymap/registry/test_registry.lua",
+			"sha256": "b51eac4839666434a30bce8e755c7b361ffb362c7099b0bbccd0b06a1e03859a"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/keymap/expansion/test_expander.lua",
+			"sha256": "8905643592de6473d35f94a30e9c815e9246ea2e4a12b153d3819697cc7533c2"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/keymap/expansion/test_expander_delete_count_sanity.lua",
+			"sha256": "c99cbada86241d0f5c40fdc1fd15e936b94c2eb59a59cb31bc500b861355f9a5"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/hotstring_engine/injection_plan.lua",
+			"sha256": "9fe473ec606cc57acbed69d527bf402cd0eb119d3aa25c915d2ace2467238b5c"
+		}
+	],
+	"external_sources": [
+		{
+			"artifact": "hammerspoon-eventtap_event.m.txt",
+			"sha256": "33105ade3a156f4786dd5591de4db17e52738651ff1b500b7f9de43b11c15243",
+			"git_blob_sha1": "309784cd87b9e1ab4b6317a0c75f62456f3f7e43",
+			"metadata": "hammerspoon-source-api.json",
+			"qualification": "Retained upstream Hammerspoon 1.1.1 source, not a native execution receipt."
+		}
+	]
+}

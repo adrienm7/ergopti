@@ -4078,5 +4078,16 @@
 	"inventory.behavior.backspace_other": "Ingen automatisk gendannelse af udløseren med Backspace; programmets Fortryd er separat.",
 	"inventory.behavior.repeat_activation_window": "Aktiveringsvindue for gentagelse med den magiske tast",
 	"inventory.behavior.repeat_window_untimed": "Intet særskilt aktiveringsvindue for reservegentagelsen; en ny ordstart efter inaktivitet er uafhængig.",
-	"inventory.behavior.repeat_window_macos": "Bruger den magiske tasts gældende aktiveringsvindue med tidsregler for modifikatortaster; nul deaktiverer dette vindue. En ny ordstart efter inaktivitet er uafhængig."
+	"inventory.behavior.repeat_window_macos": "Bruger den magiske tasts gældende aktiveringsvindue med tidsregler for modifikatortaster; nul deaktiverer dette vindue. En ny ordstart efter inaktivitet er uafhængig.",
+	"inventory.behavior.dead_composition": "Komposition med døde taster",
+	"inventory.behavior.dead_fallback": "Ikke tilknyttet fortsættelse efter en død tast",
+	"inventory.behavior.dead_lifetime": "Ventetid for en død tast",
+	"inventory.behavior.dead_windows_composition": "Indbyggede tabeller for døde taster og emulering af registerlayouts.",
+	"inventory.behavior.dead_macos_composition": "Det native tastaturlayout styrer kompositionen; gruppering af fysiske tegn er ikke verificeret.",
+	"inventory.behavior.dead_linux_composition": "Native XKB/Compose med uafhængig tekstregistrering; opsnappede fortsættelser kan afvige.",
+	"inventory.behavior.dead_windows_fallback": "En ikke tilknyttet fortsættelse skriver accentens afslutningstegn efterfulgt af det aktuelle tegn.",
+	"inventory.behavior.dead_macos_fallback": "Reserveløsningen styres af det native layout; fysiske hændelser og programmets output er ikke verificeret.",
+	"inventory.behavior.dead_linux_fallback": "Annulleret registrering bevarer det aktuelle tegn og kasserer den forrige accent; native output kan afvige.",
+	"inventory.behavior.dead_windows_lifetime": "Indbyggede tabeller venter højst 2 sekunder; registerets dødtasttilstand har ingen tidsgrænse.",
+	"inventory.behavior.dead_native_lifetime": "Det native system styrer afventende komposition; registrering og nulstilling er adskilt fra en fælles tidsgrænse i driveren."
 }

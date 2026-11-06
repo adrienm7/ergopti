@@ -1,0 +1,137 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"files": [
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
+			"sha256": "64741afe52a81b9086e246487dbd347fca485c2730b79913e5830ca1f17a74df"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_parser.ahk",
+			"sha256": "efaddef49340d04e59b84754148964e9f78616fc104cba2955a2284adfaf811b"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_tables.ahk",
+			"sha256": "038805b28fe5eaccc752e869bdb492917974f0c4e195dd94f9cbd3493b2413c8"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/keylayout/layout_registry.ahk",
+			"sha256": "08177c030862e3a74faecbd1f1d00e73a54e48664bc02ecf166bf30473d688db"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
+			"sha256": "edfbf6d0f4633915217cf03bd0490092613d3c9cf474914ee423f535ca0e0661"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/layout/layout_ergopti.ahk",
+			"sha256": "1bd24324386564c89a2656cfc7e7a4a06f09eae8722e49c673aadcf5948dccf0"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/layout/layout_shift_caps.ahk",
+			"sha256": "2d4d444d5e51f2f192a6a0839ccec3e875566e1816a994de81ac9c098129d399"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/layout/layout_altgr.ahk",
+			"sha256": "d72fc151beec91a8058929465bc89dc0ea5e7966e7297a6456ca79af8673bb1e"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/master_gates.ahk",
+			"sha256": "3c07d385bcf1e1fcb712de0ed1887134aa7ab76756c83a7ddc2c965a934d9bc1"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+			"sha256": "82f831243cc220a81da56ad61fe5ee97d2eb84d1790ce2d9f35bd30c44bf1b8f"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/suppressive_inputhook_ownership.ahk",
+			"sha256": "9b580bc5420ee7e64af922d8124452199d8a1c941b7a680bb5eaeed18c28f711"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_send.ahk",
+			"sha256": "dcc3b043ac6fdd16099edda1d3f225335daf2b4f797e1feb568cbeead047915e"
+		},
+		{
+			"path": "static/ergopti_plus/windows/adapters/key_state.ahk",
+			"sha256": "5f9426ebd47a57fd3c66066e77bed1399fa5c47021d94a031c819ee2c8291050"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ErgoptiPlus.ahk",
+			"sha256": "520ed68623d143edd1ea55c5f3727cf636a8162287cdf65d517671bece545161"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/hotstrings/hotstrings_helpers.ahk",
+			"sha256": "47ad93892036dd22fe719cd0022c6f46429d5bca6ee90b58f498c908e1d90e1c"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/hotstrings/hotstrings_distances.ahk",
+			"sha256": "afd6a0c5622126d2ac94c89eaed726ec2d0cc4fe746a9d451c426f81ef29ea00"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/hotstrings.ahk",
+			"sha256": "7472dad3a3b160cc59536e5b48da146d7bca458b95e2175950aaff2678c36c0d"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/modules/keymap/test_keylayout_emulation.ahk",
+			"sha256": "49edd58f5dee47e2a2ddeab517792c1f2b73f5d16ba81250a0b2504aa4a3a13e"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/modules/keymap/test_layout_rows_policy.ahk",
+			"sha256": "035c312428bb8011ab1c9b6bac50c0c3f6ec7185ca50a3611c6912154d3f7e2d"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/modules/keymap/test_ergopti_keylayout_tables.ahk",
+			"sha256": "75f128ba286577a674726d3d66aa8f201b80606cea81cff548530c53be3d365d"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/meta/platform/remap/layers/test_deadkey_suspend_guard.ahk",
+			"sha256": "4d6a87d8cc2a62784b81c79eaef791e576117c60f02c709cfedf275efe087875"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/meta/platform/remap/layers/test_layout_deadkey_endkey.ahk",
+			"sha256": "beb1321961b6fa5c6c1199f1c6ad8b8c3306e156dc4914407773ca600beb1a3d"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/meta/platform/remap/layers/test_deadkey_unmapped_base_char.ahk",
+			"sha256": "0eb611a0e9405e93191e931a287bf35e83c1fa194a3795b363a9cba4f44fbc42"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/meta/platform/remap/layers/test_deadkey_timeout.ahk",
+			"sha256": "d51f3979eae38ef8c97985f1dc73b2b95e78ee342aca00235dd141905631365d"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/meta/platform/remap/layers/test_keymap_deadkey_emit_serialized.ahk",
+			"sha256": "8ab45888efde565120b75310280f75ef59a13ff34a78dbc83537f536a9000c35"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/meta/platform/remap/layers/test_deadkey_ring_push.ahk",
+			"sha256": "8253d20440ae6950a1e09b16327725cfdf3889af9264404c17328a9ecdb8c19f"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/layout_rows_policy.ahk",
+			"sha256": "18b257f934c04137f8d65b2776c69601e253d63d6ece01bcdc04076ec552d89d"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/layout/layout_rows_policy.lua",
+			"sha256": "3cbee55657e7b81448ab387555abdc59dd026282ad128c4dd825e114a17f1714"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/layouts/keylayout.lua",
+			"sha256": "095fc49ce776a89aa395ebf3d1c7dc9fa34d542fc166fd83ac6b0263e119fc13"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/json.lua",
+			"sha256": "439d729b3e8f61234e726bafb34fea6f4e4235ba07edf0583fcf8518d2e32d6e"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/keycodes/physical_keys.json",
+			"sha256": "8dbb2201375e641dfee074555697e9fb02a858a9b7f65a62d9bf9337fb9195b9"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/layouts/mac_keycodes.json",
+			"sha256": "67a78500bec7c10b825f734e40d69819d1e2dcb0c16f954b50a5d95cbd21d11d"
+		},
+		{
+			"path": "static/layouts/registry/ergopti_plus/ergopti_plus.keylayout",
+			"sha256": "23dac99d4bc366e3baaab1ce2895d087868ccd01330c188aa32df3e28f92a059"
+		}
+	]
+}

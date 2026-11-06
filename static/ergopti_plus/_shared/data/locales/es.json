@@ -4078,5 +4078,16 @@
 	"inventory.behavior.backspace_other": "Retroceso no restaura automáticamente el activador; Deshacer en la aplicación es una función distinta.",
 	"inventory.behavior.repeat_activation_window": "Ventana de activación de la repetición con la tecla mágica",
 	"inventory.behavior.repeat_window_untimed": "La repetición de respaldo no tiene una ventana de activación propia; el reinicio de palabra por inactividad es independiente.",
-	"inventory.behavior.repeat_window_macos": "Usa la ventana efectiva de la tecla mágica, incluidas las reglas de tiempo de los modificadores; cero desactiva esta ventana. El reinicio de palabra por inactividad es independiente."
+	"inventory.behavior.repeat_window_macos": "Usa la ventana efectiva de la tecla mágica, incluidas las reglas de tiempo de los modificadores; cero desactiva esta ventana. El reinicio de palabra por inactividad es independiente.",
+	"inventory.behavior.dead_composition": "Composición con tecla muerta",
+	"inventory.behavior.dead_fallback": "Continuación no asignada de una tecla muerta",
+	"inventory.behavior.dead_lifetime": "Duración de espera de una tecla muerta",
+	"inventory.behavior.dead_windows_composition": "Tablas integradas de teclas muertas y emulación de distribuciones del registro.",
+	"inventory.behavior.dead_macos_composition": "La distribución nativa controla la composición; no se ha verificado la agrupación de caracteres físicos.",
+	"inventory.behavior.dead_linux_composition": "XKB/Compose nativo con captura de texto independiente; las continuaciones interceptadas pueden diferir.",
+	"inventory.behavior.dead_windows_fallback": "Una continuación no asignada emite el terminador del acento y después el carácter actual.",
+	"inventory.behavior.dead_macos_fallback": "La alternativa depende de la distribución nativa; no se han verificado sus eventos físicos ni la salida de la aplicación.",
+	"inventory.behavior.dead_linux_fallback": "La captura cancelada conserva el carácter actual y descarta el acento anterior; la salida nativa puede diferir.",
+	"inventory.behavior.dead_windows_lifetime": "Las tablas integradas esperan hasta 2 segundos; el estado de tecla muerta del registro no caduca.",
+	"inventory.behavior.dead_native_lifetime": "El sistema nativo gestiona la composición pendiente; las reglas de captura y reinicio son independientes de un plazo común del controlador."
 }

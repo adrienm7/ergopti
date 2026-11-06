@@ -1,0 +1,184 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"cwd": "/workspace/worktrees/parity-dead-keys-2026-11-05/linux/static/ergopti_plus/linux",
+	"environment": {
+		"PATH": "/workspace/scratch/parity-toolchain/ci-bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+		"LOGNAME": "agent",
+		"XCOMPOSEFILE": "/workspace/scratch/parity-dead-keys-2026-11-05/linux/generated/ergopti_plus.XCompose",
+		"PYTHONDONTWRITEBYTECODE": "1"
+	},
+	"sweeps": [
+		{
+			"sweep": 1,
+			"scope": "same four bounded fresh-process commands; 7 public/10 native/122 registered cases per runtime",
+			"runs": [
+				{
+					"name": "public",
+					"argv": [
+						"luajit",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/linux/public-compose.lua",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/linux"
+					],
+					"exit": 0,
+					"outputs": {
+						"stdout": {
+							"path": "sweep-1-public.stdout",
+							"sha256": "c5d8b2eff492af0697251ef37ed9479d4f234761b269f4c74863ce4aacd47b8e"
+						},
+						"stderr": {
+							"path": "sweep-1-public.stderr",
+							"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+						}
+					},
+					"program_sha256": "6d9c8ff9901bb6942f6370a910596ad9b9de8f9cb3832c162c167e2bae8a5f5f"
+				},
+				{
+					"name": "native",
+					"argv": [
+						"luajit",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/linux/native-controls.lua",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/linux"
+					],
+					"exit": 0,
+					"outputs": {
+						"stdout": {
+							"path": "sweep-1-native.stdout",
+							"sha256": "66aeeae2ae30453fb1cccd0bef8a4a4189dd25395149048f35536517c7c76fa6"
+						},
+						"stderr": {
+							"path": "sweep-1-native.stderr",
+							"sha256": "1971c4938c770ad6ac213d3d5fe774869cc1851a000ebfd413b5ccf09eaa4006"
+						}
+					},
+					"program_sha256": "9048216a5e095e474f69b139312470d6412c7d9df569468c4453c56621ee43c4"
+				},
+				{
+					"name": "lua",
+					"argv": [
+						"lua",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/linux/selected-tests.lua",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/linux"
+					],
+					"exit": 0,
+					"outputs": {
+						"stdout": {
+							"path": "sweep-1-lua.stdout",
+							"sha256": "69058726b11f9fc4da9b04254f72d6a12f5a53c589ddba892fab6f0ae858cbf6"
+						},
+						"stderr": {
+							"path": "sweep-1-public.stderr",
+							"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+						}
+					},
+					"program_sha256": "83c4e76747da660ef867704737732b5b87a264917d4dc0d77fc4d9da94655d10"
+				},
+				{
+					"name": "luajit",
+					"argv": [
+						"luajit",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/linux/selected-tests.lua",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/linux"
+					],
+					"exit": 0,
+					"outputs": {
+						"stdout": {
+							"path": "sweep-1-luajit.stdout",
+							"sha256": "a3955f5841d22c316df6c9c81b88f06efa4ec8753982f0dc6798d8d23fe54fbc"
+						},
+						"stderr": {
+							"path": "sweep-1-public.stderr",
+							"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+						}
+					},
+					"program_sha256": "83c4e76747da660ef867704737732b5b87a264917d4dc0d77fc4d9da94655d10"
+				}
+			]
+		},
+		{
+			"sweep": 2,
+			"scope": "same four bounded fresh-process commands; 7 public/10 native/122 registered cases per runtime",
+			"runs": [
+				{
+					"name": "public",
+					"argv": [
+						"luajit",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/linux/public-compose.lua",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/linux"
+					],
+					"exit": 0,
+					"outputs": {
+						"stdout": {
+							"path": "sweep-1-public.stdout",
+							"sha256": "c5d8b2eff492af0697251ef37ed9479d4f234761b269f4c74863ce4aacd47b8e"
+						},
+						"stderr": {
+							"path": "sweep-1-public.stderr",
+							"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+						}
+					},
+					"program_sha256": "6d9c8ff9901bb6942f6370a910596ad9b9de8f9cb3832c162c167e2bae8a5f5f"
+				},
+				{
+					"name": "native",
+					"argv": [
+						"luajit",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/linux/native-controls.lua",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/linux"
+					],
+					"exit": 0,
+					"outputs": {
+						"stdout": {
+							"path": "sweep-1-native.stdout",
+							"sha256": "66aeeae2ae30453fb1cccd0bef8a4a4189dd25395149048f35536517c7c76fa6"
+						},
+						"stderr": {
+							"path": "sweep-1-native.stderr",
+							"sha256": "1971c4938c770ad6ac213d3d5fe774869cc1851a000ebfd413b5ccf09eaa4006"
+						}
+					},
+					"program_sha256": "9048216a5e095e474f69b139312470d6412c7d9df569468c4453c56621ee43c4"
+				},
+				{
+					"name": "lua",
+					"argv": [
+						"lua",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/linux/selected-tests.lua",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/linux"
+					],
+					"exit": 0,
+					"outputs": {
+						"stdout": {
+							"path": "sweep-2-lua.stdout",
+							"sha256": "d1f397324e06d25a8a58e88081ef7f665d3643d181a6807b561a17baee47e97b"
+						},
+						"stderr": {
+							"path": "sweep-1-public.stderr",
+							"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+						}
+					},
+					"program_sha256": "83c4e76747da660ef867704737732b5b87a264917d4dc0d77fc4d9da94655d10"
+				},
+				{
+					"name": "luajit",
+					"argv": [
+						"luajit",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/linux/selected-tests.lua",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/linux"
+					],
+					"exit": 0,
+					"outputs": {
+						"stdout": {
+							"path": "sweep-2-luajit.stdout",
+							"sha256": "6254dc23f6b80f1711c5d58ca614b0223850b3004021159f73926a4062eb09da"
+						},
+						"stderr": {
+							"path": "sweep-1-public.stderr",
+							"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+						}
+					},
+					"program_sha256": "83c4e76747da660ef867704737732b5b87a264917d4dc0d77fc4d9da94655d10"
+				}
+			]
+		}
+	]
+}

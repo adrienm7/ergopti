@@ -1,0 +1,8 @@
+{
+	"external_path": "extensions/eventtap/libeventtap_event.m",
+	"reference": "Hammerspoon 1.1.1",
+	"api_git_blob_sha1": "309784cd87b9e1ab4b6317a0c75f62456f3f7e43",
+	"independently_computed_git_blob_sha1": "309784cd87b9e1ab4b6317a0c75f62456f3f7e43",
+	"matches": true,
+	"qualification": "Dependency source identity only; no upstream native execution."
+}

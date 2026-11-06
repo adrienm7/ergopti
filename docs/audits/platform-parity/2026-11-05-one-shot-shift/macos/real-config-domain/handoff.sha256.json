@@ -1,0 +1,51 @@
+{
+	"formatter": "Prettier --config /workspace/ergopti/.prettierrc (cwd /workspace/ergopti), Ruff format/check Python",
+	"prior_supplements_unchanged": true,
+	"files": [
+		{
+			"file": "check_real_config.py",
+			"sha256": "fe960c53b738100d3d40a02b48ba3971aba14c3141f591044be0448110762b28",
+			"bytes": 9283
+		},
+		{
+			"file": "real-config-domain.lua",
+			"sha256": "e6335f4cac6ed417a8178e09387b1d9fde669f4550fce11d5a64caf6f1665c4b",
+			"bytes": 3034
+		},
+		{
+			"file": "real-menu-persistence.lua",
+			"sha256": "fdcc5410e56bc7a1c9f8da2d8d4acf2889bca308baed64bc3ef857e25d9adfee",
+			"bytes": 2864
+		},
+		{
+			"file": "report.md",
+			"sha256": "28217f3b440af17e1649db174ec861f2cb27ebe765ef85da572732d884eeb17e",
+			"bytes": 4965
+		},
+		{
+			"file": "source-and-replay-receipt.json",
+			"sha256": "b329d140eaeea4b04c07aafc5ae39d9cb12a799c32b473781a20083fce5d7105",
+			"bytes": 6407
+		},
+		{
+			"file": "sweep-1-real-config-domain.log",
+			"sha256": "845737096d41dd14dc2cf81f320ff01914d254ed6e52b6c2986d5eb6b00c6b50",
+			"bytes": 8910
+		},
+		{
+			"file": "sweep-1-real-menu-persistence.log",
+			"sha256": "a146bd057a18500b61c50572a0330c06ea2e944b0459a4054a7f31874683fdf3",
+			"bytes": 16731
+		},
+		{
+			"file": "sweep-2-real-config-domain.log",
+			"sha256": "845737096d41dd14dc2cf81f320ff01914d254ed6e52b6c2986d5eb6b00c6b50",
+			"bytes": 8910
+		},
+		{
+			"file": "sweep-2-real-menu-persistence.log",
+			"sha256": "a146bd057a18500b61c50572a0330c06ea2e944b0459a4054a7f31874683fdf3",
+			"bytes": 16731
+		}
+	]
+}

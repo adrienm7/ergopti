@@ -1,0 +1,223 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"new_roots": 1,
+	"known_magic_contexts": 8,
+	"candidates": [
+		{
+			"layout": "bepo",
+			"classification": "new DKS001 inherited prefix collision",
+			"observation": {
+				"sequence": ["dead_currency", "dead_cedilla"],
+				"expected": "₢",
+				"action": "cedille",
+				"state": "monnaie",
+				"key": "AC06",
+				"level": 6,
+				"trail": [
+					{
+						"keysym": "dead_currency",
+						"accepted": 1,
+						"status": 1
+					},
+					{
+						"keysym": "dead_cedilla",
+						"accepted": 1,
+						"status": 1
+					}
+				]
+			}
+		},
+		{
+			"layout": "ergopti_plus",
+			"classification": "known base_level_only magic limitation",
+			"observation": {
+				"sequence": ["dead_circumflex", "U2605"],
+				"expected": "j",
+				"action": "j",
+				"state": "s1_circumflex",
+				"key": "AB03",
+				"level": 1,
+				"trail": [
+					{
+						"keysym": "dead_circumflex",
+						"accepted": 1,
+						"status": 1
+					},
+					{
+						"keysym": "U2605",
+						"accepted": 1,
+						"status": 3
+					}
+				]
+			}
+		},
+		{
+			"layout": "ergopti_plus",
+			"classification": "known base_level_only magic limitation",
+			"observation": {
+				"sequence": ["mu", "U2605"],
+				"expected": "ξ",
+				"action": "j",
+				"state": "s4_greek",
+				"key": "AB03",
+				"level": 1,
+				"trail": [
+					{
+						"keysym": "mu",
+						"accepted": 1,
+						"status": 1
+					},
+					{
+						"keysym": "U2605",
+						"accepted": 1,
+						"status": 3
+					}
+				]
+			}
+		},
+		{
+			"layout": "ergopti_plus",
+			"classification": "known base_level_only magic limitation",
+			"observation": {
+				"sequence": ["uparrow", "U2605"],
+				"expected": "ʲ",
+				"action": "j",
+				"state": "s5_superscript",
+				"key": "AB03",
+				"level": 1,
+				"trail": [
+					{
+						"keysym": "uparrow",
+						"accepted": 1,
+						"status": 1
+					},
+					{
+						"keysym": "U2605",
+						"accepted": 1,
+						"status": 3
+					}
+				]
+			}
+		},
+		{
+			"layout": "ergopti_plus",
+			"classification": "known base_level_only magic limitation",
+			"observation": {
+				"sequence": ["downarrow", "U2605"],
+				"expected": "ⱼ",
+				"action": "j",
+				"state": "s6_subscript",
+				"key": "AB03",
+				"level": 1,
+				"trail": [
+					{
+						"keysym": "downarrow",
+						"accepted": 1,
+						"status": 1
+					},
+					{
+						"keysym": "U2605",
+						"accepted": 1,
+						"status": 3
+					}
+				]
+			}
+		},
+		{
+			"layout": "ergopti_plus_ansi",
+			"classification": "known base_level_only magic limitation",
+			"observation": {
+				"sequence": ["dead_circumflex", "U2605"],
+				"expected": "j",
+				"action": "j",
+				"state": "s1_circumflex",
+				"key": "AB03",
+				"level": 1,
+				"trail": [
+					{
+						"keysym": "dead_circumflex",
+						"accepted": 1,
+						"status": 1
+					},
+					{
+						"keysym": "U2605",
+						"accepted": 1,
+						"status": 3
+					}
+				]
+			}
+		},
+		{
+			"layout": "ergopti_plus_ansi",
+			"classification": "known base_level_only magic limitation",
+			"observation": {
+				"sequence": ["mu", "U2605"],
+				"expected": "ξ",
+				"action": "j",
+				"state": "s4_greek",
+				"key": "AB03",
+				"level": 1,
+				"trail": [
+					{
+						"keysym": "mu",
+						"accepted": 1,
+						"status": 1
+					},
+					{
+						"keysym": "U2605",
+						"accepted": 1,
+						"status": 3
+					}
+				]
+			}
+		},
+		{
+			"layout": "ergopti_plus_ansi",
+			"classification": "known base_level_only magic limitation",
+			"observation": {
+				"sequence": ["uparrow", "U2605"],
+				"expected": "ʲ",
+				"action": "j",
+				"state": "s5_superscript",
+				"key": "AB03",
+				"level": 1,
+				"trail": [
+					{
+						"keysym": "uparrow",
+						"accepted": 1,
+						"status": 1
+					},
+					{
+						"keysym": "U2605",
+						"accepted": 1,
+						"status": 3
+					}
+				]
+			}
+		},
+		{
+			"layout": "ergopti_plus_ansi",
+			"classification": "known base_level_only magic limitation",
+			"observation": {
+				"sequence": ["downarrow", "U2605"],
+				"expected": "ⱼ",
+				"action": "j",
+				"state": "s6_subscript",
+				"key": "AB03",
+				"level": 1,
+				"trail": [
+					{
+						"keysym": "downarrow",
+						"accepted": 1,
+						"status": 1
+					},
+					{
+						"keysym": "U2605",
+						"accepted": 1,
+						"status": 3
+					}
+				]
+			}
+		}
+	]
+}

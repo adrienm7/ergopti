@@ -1,0 +1,85 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"findings": [
+		{
+			"severity": "medium",
+			"confidence": "high for actual original Lua owner behavior over registered fixture; conditional native reachability",
+			"native_limitations": [
+				"No macOS native dead-state payload grouping measured.",
+				"No receiving application measured.",
+				"Returned event objects are registered unit-fixture objects."
+			],
+			"evidence": [
+				"public-probe.lua",
+				"root-observed.json",
+				"ordinary-baseline-control.lua",
+				"ordinary-baseline-observed.json",
+				"no-marker-control.lua",
+				"no-marker-observed.json",
+				"check-record.py"
+			],
+			"id": "DKM-001",
+			"title": "Two-ASCII-codepoint event uses whole payload as automatic tail bucket",
+			"root_cause": "Byte length <=2 fast path forces char_len=1; run_trigger_checks uses entire multi-codepoint payload as a single tail key.",
+			"paths": [
+				"static/ergopti_plus/macos/modules/keymap/init.lua:1957",
+				"static/ergopti_plus/macos/modules/keymap/init.lua:1311",
+				"static/ergopti_plus/macos/modules/keymap/registry.lua:412"
+			],
+			"reproduction": {
+				"registration": "strict auto ^0 -> EXPANDED",
+				"baseline": "ordinary x then Backspace returns logical buffer to empty",
+				"event_payload": "^0",
+				"actual": "not consumed; no expansion; buffer ^0",
+				"controls": "split ^ and 0 expands; single €0, éà, ^00 expand with same baseline"
+			},
+			"silence": "Wrong automatic bucket skips the mapping without error; later preview tail lookup does not perform expansion.",
+			"regression_direction": "Compare grouped and split two-ASCII payloads through original registered callback; assert automatic result and consumption, retain Unicode/longer-payload controls."
+		},
+		{
+			"severity": "medium",
+			"confidence": "high for actual original Lua owner behavior over registered fixture; conditional native reachability",
+			"native_limitations": [
+				"No macOS native dead-state payload grouping measured.",
+				"No receiving application measured.",
+				"Returned event objects are registered unit-fixture objects."
+			],
+			"evidence": [
+				"public-probe.lua",
+				"root-observed.json",
+				"ordinary-baseline-control.lua",
+				"ordinary-baseline-observed.json",
+				"no-marker-control.lua",
+				"no-marker-observed.json",
+				"check-record.py"
+			],
+			"id": "DKM-002",
+			"title": "Unmatched prefix omitted from constructed output when a shorter suffix expands",
+			"root_cause": "Whole event is consumed, replacement-only injection plan clamps erasures at zero while logical buffer splice retains unmatched event prefix.",
+			"paths": [
+				"static/ergopti_plus/macos/modules/keymap/expander.lua:1083",
+				"static/ergopti_plus/macos/modules/keymap/expander.lua:1094",
+				"static/ergopti_plus/macos/adapters/synthetic_input.lua:4185",
+				"static/ergopti_plus/_shared/lua/hotstring_engine/injection_plan.lua:130"
+			],
+			"reproduction": {
+				"registration": "strict automatic 0 -> EXPANDED with final_result=false",
+				"baseline": "ordinary x then Backspace returns logical buffer to empty",
+				"event_payload": "´0",
+				"actual": "consumed=true; 16 returned fixture events construct EXPANDED; buffer ´EXPANDED",
+				"parallel_control": "single NNBSP+? with suffix ? produces same prefix omission",
+				"split_control": "´ event passes through; subsequent 0 is consumed, constructs EXPANDED and retains buffer ´EXPANDED appropriately"
+			},
+			"silence": "Constructed output and successful logical buffer commit differ with no refusal; native receiving effect is unknown.",
+			"regression_direction": "Preserve held-back unmatched event prefix exactly once; compare constructed event Unicode and buffer through original callback, retain split/full-trigger/Unicode controls."
+		}
+	],
+	"not_confirmed": [
+		{
+			"candidate": "Backspace after empty pending-accent-shaped fixture event",
+			"reason": "Buffer becomes empty but native pending-state cancellation and receiving application behavior are unmeasured; cannot infer a native desynchronization defect."
+		}
+	],
+	"timing_control": "Unseeded first events may fail the default delay from initial last_key_time=0; ordinary x+Backspace baseline demonstrates both defects without a modeled dead marker.",
+	"intentional_difference": "macOS consumes completing events before output; other driver compensation paths generally operate after native text delivery."
+}

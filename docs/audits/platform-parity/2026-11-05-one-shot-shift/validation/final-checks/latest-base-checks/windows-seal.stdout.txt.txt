@@ -1,0 +1,25 @@
+PASS imports collect no Source receipt and start neither main nor native children
+PASS clean actual Git and immutable twenty-one inputs receive local Source
+PASS local explicit context uses real HEAD and absolute arguments
+PASS hosted run metadata refuses local even when value is empty
+PASS credential binding grants no local or official authority
+PASS unknown mixed relative and wrong-arity modes refuse
+PASS official original manual grammar stays separate from API authentication
+PASS official malformed SHA IDs event and release refuse
+PASS Source context rejects forged labels extra fields and incoherent primitives
+PASS inert descriptor snapshot denies Proxy label injection during spread
+PASS whole tracked cleanliness covers outside selected roots
+PASS foreign candidate refuses identical working bytes
+PASS two PAC replacements without authenticated publication still refuse
+PASS original independent oracle cannot be changed by a clean successor
+PASS original cohort names order and filters cannot be changed by input data
+PASS untracked repository AHK shadow refuses
+PASS tracked case-ambiguous Source names refuse
+PASS a Windows path stat without a device still names the acquired file
+SOURCE_SEAL_CLI controls=12 elapsed_ms=2516.924 native=false official=false
+PASS strong acquired bytes identity and maximum are actual filesystem facts
+PASS real hardlink and symlink reader aliases refuse
+PASS same-byte final pathname replacement cannot pay acquired FD identity
+PASS actual local main reaches modeled acquisition with real Source and honest metadata
+PASS original child commands clocks and independent oracle remain frozen
+WINDOWS_UPDATER_SOURCE controls=23 native=false official=false

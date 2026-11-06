@@ -1,0 +1,1 @@
+NATIVE_INVERSE={"inverse_plan":{"keycode":30,"level":2,"mods":["shift"]},"live_caps_shift_text":"a","qualification":"Actual libxkbcommon through original Capture adapter with explicit standard US keymap; no desktop authority, physical device, whole engine or receiving application.","requested_title":"A"}

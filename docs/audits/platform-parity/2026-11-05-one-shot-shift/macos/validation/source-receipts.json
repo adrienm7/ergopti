@@ -1,0 +1,38 @@
+{
+	"commit": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"files": [
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/init.lua",
+			"sha256": "18082e82568983bbd93847843a0f309719d51da7909f4145541275edd197923b"
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/config.lua",
+			"sha256": "05f383dff5598cb296bbdb3fdfc89594bb4731845a4350b5d1131c19c175bbc8"
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/logger.lua",
+			"sha256": "d6af6e7bfab9e4f97c67f5bf60a93415e4e79811ede656dfbfcb7e6403470e53"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/logger/init.lua",
+			"sha256": "aa1d13396cbcc84ee9e1bebcab7d7b1ca6f364e23167c447d92205c8728493e0"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/one_shot_shift.lua",
+			"sha256": "645f3a237074fc49e3294579e09cd65aa45e4840664f59ffdc0b72152c992213"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/one_shot_shift.lua",
+			"sha256": "1b772c8608804b5962bcd038fcd621fdd095bb4803f930383b1660ffc3339aa0"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/support/remap_transaction_fixture.lua",
+			"sha256": "388f8976e15d9a4d2a0ccb09d143b93311b5a91d2788d5eb99414d5e4e41be91"
+		}
+	],
+	"frozen_public_fixture_sha256": "15f04c498881b7b5a5e33322a273f51fffd2fc83f570cc2577710376406493e1"
+}

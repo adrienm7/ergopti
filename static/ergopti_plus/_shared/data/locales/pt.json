@@ -4078,5 +4078,16 @@
 	"inventory.behavior.backspace_other": "Sem restauração automática do acionador com Backspace; a função Desfazer da aplicação é independente.",
 	"inventory.behavior.repeat_activation_window": "Janela de ativação da repetição pela tecla mágica",
 	"inventory.behavior.repeat_window_untimed": "A repetição de recurso não tem uma janela de ativação própria; o reinício de palavra por inatividade é independente.",
-	"inventory.behavior.repeat_window_macos": "Usa a janela efetiva da tecla mágica, incluindo as regras de tempo dos modificadores; zero desativa esta janela. O reinício de palavra por inatividade é independente."
+	"inventory.behavior.repeat_window_macos": "Usa a janela efetiva da tecla mágica, incluindo as regras de tempo dos modificadores; zero desativa esta janela. O reinício de palavra por inatividade é independente.",
+	"inventory.behavior.dead_composition": "Composição com tecla morta",
+	"inventory.behavior.dead_fallback": "Continuação não associada de uma tecla morta",
+	"inventory.behavior.dead_lifetime": "Tempo de espera de uma tecla morta",
+	"inventory.behavior.dead_windows_composition": "Tabelas integradas de teclas mortas e emulação de disposições do registo.",
+	"inventory.behavior.dead_macos_composition": "A disposição nativa gere a composição; o agrupamento dos caracteres físicos não foi verificado.",
+	"inventory.behavior.dead_linux_composition": "XKB/Compose nativo com captura de texto independente; as continuações intercetadas podem divergir.",
+	"inventory.behavior.dead_windows_fallback": "Uma continuação não associada emite o terminador do acento seguido do caráter atual.",
+	"inventory.behavior.dead_macos_fallback": "A alternativa depende da disposição nativa; os eventos físicos e a saída da aplicação não foram verificados.",
+	"inventory.behavior.dead_linux_fallback": "A captura cancelada mantém o caráter atual e descarta o acento anterior; a saída nativa pode diferir.",
+	"inventory.behavior.dead_windows_lifetime": "As tabelas integradas esperam até 2 segundos; o estado de tecla morta do registo não tem prazo.",
+	"inventory.behavior.dead_native_lifetime": "O sistema nativo gere a composição pendente; captura e reposição são independentes de um prazo comum do controlador."
 }

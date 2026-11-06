@@ -1,0 +1,2 @@
+[OK] Independent SDK enrollment, fixed metadata grammar, native-retirement source inverses and clean source receipts; no native API execution in portable controls.
+[OK] macOS CI requires a completed XCTest summary before the app build, and every OS lane gates the release success-only.

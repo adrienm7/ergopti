@@ -610,6 +610,15 @@ const STEP_CONDITIONS = [
 		'Save the Ubuntu archive cache',
 		"${{ !cancelled() && steps.ubuntu-apt-used.outputs.count != '0' && steps.ubuntu-apt-used.outputs.key != steps.ubuntu-apt-cache.outputs.cache-matched-key }}"
 	],
+	// The shared UI job keeps its browsers' Ubuntu archives the same way, also
+	// after a stopped install, so a slow mirror's next run resumes (2026-11-05).
+	[COMMON_BOX, 'common-e2e', 'Name the used Ubuntu archive set', '${{ !cancelled() }}'],
+	[
+		COMMON_BOX,
+		'common-e2e',
+		'Save the Ubuntu archive cache',
+		"${{ !cancelled() && steps.ubuntu-apt-used.outputs.count != '0' && steps.ubuntu-apt-used.outputs.key != steps.ubuntu-apt-cache.outputs.cache-matched-key }}"
+	],
 	[
 		LINUX_BOX,
 		'test-linux',

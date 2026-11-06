@@ -1,0 +1,20 @@
+{
+	"source_head_during_run": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"invocation": ["node", "tools/test/verify-change.cjs", "--help"],
+	"invocation_qualification": "This launcher does not implement --help: it executed normal working-tree validation, including format and all572 JS checks. The observed tool session exit was0; the exact machine timing journal is retained. No HEAD or production source mutation occurred during the run. Final audit documents and new Python helpers also passed focused Prettier/Ruff checks after their last edits.",
+	"effective_gates": ["npm run format:check", "npm run test:js"],
+	"exit_code": 0,
+	"js_checks_passed": 572,
+	"js_checks_failed": 0,
+	"journal": "general-js-timings.ndjson.txt",
+	"journal_sha256": "6492abb10bf62f55abc7304d56e3b21665d0877c4eff2e66eb2beb474527c83c",
+	"completion": {
+		"type": "complete",
+		"executed_count": 572,
+		"passed": 572,
+		"failed": 0,
+		"child_duration_ms": 1834191.582,
+		"duration_ms": 1834513.32
+	},
+	"not_executed": "The JS suite explicitly reported one host-unexecutable AHK case; it was not counted as native execution. Properties/mutations were not selected for this documentation change. Native receiving remains unqualified."
+}

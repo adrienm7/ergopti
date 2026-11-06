@@ -1,0 +1,60 @@
+{
+	"qualification": "Actual final portable-validator tool outcomes on the latest integrated source; raw child receipts are archived beside this file. Source-guard negative subprocess exits are expected refusals.",
+	"processes": [
+		{
+			"name": "check_source_guards",
+			"command": [
+				"python3",
+				"docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/check_source_guards.py",
+				"/workspace/ergopti",
+				"/workspace/scratch/parity-one-shot-2026-11-05/root/final-check_source_guards"
+			],
+			"exit_code": 0,
+			"stdout": "Source authentication guards: 2 positive controls; 5 negative controls rejected.\n"
+		},
+		{
+			"name": "check_public_channel_admission",
+			"command": [
+				"python3",
+				"docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/check_public_channel_admission.py",
+				"/workspace/ergopti",
+				"/workspace/scratch/parity-one-shot-2026-11-05/root/final-check_public_channel_admission"
+			],
+			"exit_code": 0,
+			"stdout": "{\"sources\": 28, \"fresh_processes\": 2, \"parsed_assertions_passed\": true, \"receipt\": \"/workspace/scratch/parity-one-shot-2026-11-05/root/final-check_public_channel_admission/public-channel-admission-receipt.json\"}\n"
+		},
+		{
+			"name": "check_config_domain",
+			"command": [
+				"python3",
+				"docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/check_config_domain.py",
+				"/workspace/ergopti",
+				"/workspace/scratch/parity-one-shot-2026-11-05/root/final-check_config_domain"
+			],
+			"exit_code": 0,
+			"stdout": "CONFIG_DOMAIN_ASSERTIONS=14 setter / 5 public arm / 2 shared formatter; all passed\n"
+		},
+		{
+			"name": "check_menu_domain",
+			"command": [
+				"python3",
+				"docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/check_menu_domain.py",
+				"/workspace/ergopti",
+				"/workspace/scratch/parity-one-shot-2026-11-05/root/final-check_menu_domain"
+			],
+			"exit_code": 0,
+			"stdout": "MENU_DOMAIN_ASSERTIONS=10 rows per sweep; two sweeps passed\n"
+		},
+		{
+			"name": "check_real_config",
+			"command": [
+				"python3",
+				"docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/check_real_config.py",
+				"/workspace/ergopti",
+				"/workspace/scratch/parity-one-shot-2026-11-05/root/final-check_real_config"
+			],
+			"exit_code": 0,
+			"stdout": "REAL_CONFIG_ASSERTIONS=10 direct rows +10 linked UI rows per sweep; two sweeps passed\n"
+		}
+	]
+}

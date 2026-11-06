@@ -1,0 +1,4 @@
+
+=== remap defaults: the one-shot timeout is the shared registry's (one-shot-timeout-shared) ===
+  ok   takes the cross-driver registry value, not a macOS-only one (one-shot-timeout-shared)
+AUDIT_RESULT	1	0

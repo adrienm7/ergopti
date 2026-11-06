@@ -1,0 +1,113 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"files": [
+		{
+			"path": "check-record.py",
+			"sha256": "062ec9c1e95ef7a085f43ca901e42ec7be8e5cf33142312254c01246182da8d2"
+		},
+		{
+			"path": "coverage.json",
+			"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+		},
+		{
+			"path": "findings.json",
+			"sha256": "6b01739d39dbcb036f04844e5524d65b6d51c548d831d95348c44c11d1a91f01"
+		},
+		{
+			"path": "hammerspoon-eventtap_event.m.txt",
+			"sha256": "33105ade3a156f4786dd5591de4db17e52738651ff1b500b7f9de43b11c15243"
+		},
+		{
+			"path": "hammerspoon-source-api.json",
+			"sha256": "4122efd3d5e9d8a841653a89316c8d8cb142a7a5c3e61f7bbf8760b7c7c1a57f"
+		},
+		{
+			"path": "no-marker-control.lua",
+			"sha256": "34432450858b940c9e112f27a8164dde74a4e9799f941da8358855be91226c4d"
+		},
+		{
+			"path": "no-marker-observed.json",
+			"sha256": "04f8a5e48c1b51a876ae90dc625f9007aaccbce8425d5b5bd60f5fe0a83e621c"
+		},
+		{
+			"path": "ordinary-baseline-control.lua",
+			"sha256": "8cf91407217c0ca58948e78a74cee0280289b46c9b5982570a6d4abddfdff91d"
+		},
+		{
+			"path": "ordinary-baseline-observed.json",
+			"sha256": "bdd295c5b655f3f376e1e1f3a888fcc9f3ab632db552f410ffeec78e223daddb"
+		},
+		{
+			"path": "pass1-delete-count.txt",
+			"sha256": "6eb86ff506a7022e4426e296659f2ea3e00c32f055a29ce65b649b9e4828137d"
+		},
+		{
+			"path": "pass1-expander.txt",
+			"sha256": "432b22d980ec138bd43a8e7017ff2c2a6c53ff403b18f956b2fe454902e33b08"
+		},
+		{
+			"path": "pass1-nav.txt",
+			"sha256": "724dea2769f858238114115a92a351d6808df21c7eb0dfe4643ab6992e260f2f"
+		},
+		{
+			"path": "pass1-registry.txt",
+			"sha256": "7d7d484a8d678a9c5c4467dbff146ca1e53cc163de0c458c987dd3edc764fd37"
+		},
+		{
+			"path": "pass2-delete-count.txt",
+			"sha256": "f2bf7bf26ba75e60b3b83b03b754f81c8307e54e0f1b84865489b0019a5b20b8"
+		},
+		{
+			"path": "pass2-expander.txt",
+			"sha256": "a6ecdf6253853f63f59d35fb9a8b99232232c51e926126c7140854004f81d3e4"
+		},
+		{
+			"path": "pass2-nav.txt",
+			"sha256": "742755c1d77cafb4187161c848b1ba04f89514e924ffb6ff32312edf92a37ab9"
+		},
+		{
+			"path": "pass2-registry.txt",
+			"sha256": "9b5e945983d43fc44f52d564bf44dea0a9e035cd406aeb1b2718ae1599dcce97"
+		},
+		{
+			"path": "public-probe.lua",
+			"sha256": "083421e74856cdef69a2ceb5795551313a747bf06ffe5e3b9869617c7de490b8"
+		},
+		{
+			"path": "report.md",
+			"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+		},
+		{
+			"path": "root-observed.json",
+			"sha256": "18e38010dff3e16a3386641180b1101c8706bd4b71ffc5975c041b0ada28fddf"
+		},
+		{
+			"path": "run-sweeps.py",
+			"sha256": "bc49c25e11c1423a5d8df61ee6f26328c82de168099f7db31b8677566c830496"
+		},
+		{
+			"path": "semantic-output.json",
+			"sha256": "106821bf721dedd63dbe0d6e231d20e679926f7dd9d90219804f683388b703db"
+		},
+		{
+			"path": "source-check.py",
+			"sha256": "74ede1cfb45dd6ef343c97f6e60da622043b851acdab5275e0971bc5edbeab1f"
+		},
+		{
+			"path": "source-clean.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "source-output.json",
+			"sha256": "1054513f25e3fcbaa3cfb58bbc44138a97a20759f5e513c16a09a1e9f090309a"
+		},
+		{
+			"path": "source-receipts.json",
+			"sha256": "552bed8db8eccdc8a73766c26d0f0a54448dce65a70d0977ffe03dc3c77223bd"
+		},
+		{
+			"path": "sweeps.json",
+			"sha256": "74f30ea6d4ea00d7c003f558226042d2a199a2fe718cf2a1a0f551d8de363a2d"
+		}
+	]
+}

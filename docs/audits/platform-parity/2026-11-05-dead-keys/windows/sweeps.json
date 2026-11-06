@@ -1,0 +1,136 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"scope": "Two final bounded source/data sweeps after DKW-001; no Windows/native/AHK behavior execution.",
+	"environment": {
+		"PATH_prefix": "/workspace/scratch/parity-toolchain/ci-bin",
+		"LOGNAME": "agent",
+		"PYTHONDONTWRITEBYTECODE": "1",
+		"TMPDIR": "fresh private temporary directory per pass"
+	},
+	"versions": {
+		"lua": "Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio",
+		"luajit": "LuaJIT 2.1.1793383622 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/",
+		"node": "v22.22.2",
+		"python": "Python 3.12.14"
+	},
+	"passes": [
+		{
+			"pass": 1,
+			"finished_utc": "2026-11-05T21:30:10.624678+00:00",
+			"new_root_causes": 0,
+			"runs": [
+				{
+					"command": [
+						"python",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/windows/source-contract.py",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/windows"
+					],
+					"cwd": "/workspace/worktrees/parity-dead-keys-2026-11-05/windows",
+					"exit_code": 0,
+					"stderr": "",
+					"stdout_path": "source-output.json",
+					"stdout_sha256": "8f32ae5e1dc450162bd8bb414ddbf2d3edb603e865e6819535450e1070adc410"
+				},
+				{
+					"command": [
+						"lua",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/windows/data-probe.lua",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/windows"
+					],
+					"cwd": "/workspace/worktrees/parity-dead-keys-2026-11-05/windows",
+					"exit_code": 0,
+					"stderr": "",
+					"stdout_path": "data-output.json",
+					"stdout_sha256": "7d8fe41313acb6109f86f9eb53b05040e972bec245307aaff3c4f62271cb0a5c"
+				},
+				{
+					"command": [
+						"luajit",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/windows/data-probe.lua",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/windows"
+					],
+					"cwd": "/workspace/worktrees/parity-dead-keys-2026-11-05/windows",
+					"exit_code": 0,
+					"stderr": "",
+					"stdout_path": "data-output.json",
+					"stdout_sha256": "7d8fe41313acb6109f86f9eb53b05040e972bec245307aaff3c4f62271cb0a5c"
+				},
+				{
+					"command": ["node", "tools/test/find-false-greens.cjs"],
+					"cwd": "/workspace/worktrees/parity-dead-keys-2026-11-05/windows",
+					"exit_code": 0,
+					"stderr": "",
+					"stdout_path": "false-green.txt",
+					"stdout_sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a"
+				},
+				{
+					"command": ["git", "status", "--porcelain=v1"],
+					"cwd": "/workspace/worktrees/parity-dead-keys-2026-11-05/windows",
+					"exit_code": 0,
+					"stderr": "",
+					"stdout_path": "source-clean.txt",
+					"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			]
+		},
+		{
+			"pass": 2,
+			"finished_utc": "2026-11-05T21:30:15.419090+00:00",
+			"new_root_causes": 0,
+			"runs": [
+				{
+					"command": [
+						"python",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/windows/source-contract.py",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/windows"
+					],
+					"cwd": "/workspace/worktrees/parity-dead-keys-2026-11-05/windows",
+					"exit_code": 0,
+					"stderr": "",
+					"stdout_path": "source-output.json",
+					"stdout_sha256": "8f32ae5e1dc450162bd8bb414ddbf2d3edb603e865e6819535450e1070adc410"
+				},
+				{
+					"command": [
+						"lua",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/windows/data-probe.lua",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/windows"
+					],
+					"cwd": "/workspace/worktrees/parity-dead-keys-2026-11-05/windows",
+					"exit_code": 0,
+					"stderr": "",
+					"stdout_path": "data-output.json",
+					"stdout_sha256": "7d8fe41313acb6109f86f9eb53b05040e972bec245307aaff3c4f62271cb0a5c"
+				},
+				{
+					"command": [
+						"luajit",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/windows/data-probe.lua",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/windows"
+					],
+					"cwd": "/workspace/worktrees/parity-dead-keys-2026-11-05/windows",
+					"exit_code": 0,
+					"stderr": "",
+					"stdout_path": "data-output.json",
+					"stdout_sha256": "7d8fe41313acb6109f86f9eb53b05040e972bec245307aaff3c4f62271cb0a5c"
+				},
+				{
+					"command": ["node", "tools/test/find-false-greens.cjs"],
+					"cwd": "/workspace/worktrees/parity-dead-keys-2026-11-05/windows",
+					"exit_code": 0,
+					"stderr": "",
+					"stdout_path": "false-green.txt",
+					"stdout_sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a"
+				},
+				{
+					"command": ["git", "status", "--porcelain=v1"],
+					"cwd": "/workspace/worktrees/parity-dead-keys-2026-11-05/windows",
+					"exit_code": 0,
+					"stderr": "",
+					"stdout_path": "source-clean.txt",
+					"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,44 @@
+{
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"module": "one-shot-shift",
+	"date": "2026-11-05",
+	"roles": ["windows", "macos", "linux", "shared"],
+	"literal_replacements": {
+		"f2a7dba5fc580aad61e6a0ed16ede84406aed2b0": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+		"caps-word": "one-shot-shift",
+		"CapsWord": "One-shot Shift",
+		"caps_word_metadata": "one_shot_shift_metadata"
+	},
+	"files": [
+		{
+			"path": "project.py",
+			"adapted_from": "docs/audits/platform-parity/2026-11-05-caps-word/project.py",
+			"source_sha256": "71af0c4422830cd68ecbc2fc1562d5c3a8f32ad2231eb590ed1872cf3e7c2260",
+			"sha256": "186d061299b632276423c8cecef1b60b24e4b0b24e41a52ac3697a93e10cb888",
+			"equivalence": "Python AST matches narrow literal replacements",
+			"matches_expected": true
+		},
+		{
+			"path": "check_project.py",
+			"adapted_from": "docs/audits/platform-parity/2026-11-05-caps-word/check_project.py",
+			"source_sha256": "fd33058bb255d06223ae3cc44bce466a864d104c634574224e80c9a69dd03892",
+			"sha256": "a4308fe16ba31dc12a9bb256936c8966912df6598480db49f22bdd2c588e68ac",
+			"equivalence": "Python AST matches narrow literal replacements",
+			"matches_expected": true
+		},
+		{
+			"path": "sample-owner.json",
+			"adapted_from": "docs/audits/platform-parity/2026-11-05-caps-word/sample-owner.json",
+			"source_sha256": "edeba45db2bbecd9270957aa4c56b8ec6331bc0c10d3a44cce0701b12cd3af22",
+			"sha256": "8ae91133d2eb54fb35d5209184257180b5d19a0abb6ffe22f9256e28f90a95d7",
+			"equivalence": "JSON values match narrow literal replacements",
+			"matches_expected": true
+		},
+		{
+			"path": "README.md",
+			"sha256": "051d8bd051b3344c950c8a488a5cbc9ed6af69a15b63b87660d5ef8572b511ce",
+			"qualification": "New scope-specific documentation; no inherited CapsWord counts or findings."
+		}
+	],
+	"qualification": "Strict four-role metadata helper and synthetic controls only; validation algorithm unchanged after literal rebinding, not driver execution or semantic/native parity proof."
+}

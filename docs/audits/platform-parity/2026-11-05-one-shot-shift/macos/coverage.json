@@ -1,0 +1,47 @@
+[
+	{
+		"area": "Catalogue and sentinel routing",
+		"basis": "source + registered actions/lifecycle",
+		"qualification": "No native F20 or Karabiner delivery measurement"
+	},
+	{
+		"area": "CapsLock plus held Shift",
+		"basis": "actual public Keymap callback and actual adapter/state/shared policy, original parser/shipped layout projection",
+		"qualification": "OSM-001; recorded stateless translation port, no native receiving"
+	},
+	{
+		"area": "First fresh key, controls, repeats, release, rearm, expiry, pause and Cmd",
+		"basis": "22 public callback scenarios + original state/adapter suites",
+		"qualification": "Explicit monotonic clock, translation, event and collector ports; no whole-app/native proof"
+	},
+	{
+		"area": "Settings",
+		"basis": "actual Remap transaction setter + actual public arm separately",
+		"qualification": "OSM-002; acknowledged persistence, not real disk; ordinary menu rejects zero"
+	},
+	{
+		"area": "Refusal/rollback/missed releases",
+		"basis": "9 registered original adapter cases",
+		"qualification": "No native serializer receiver proof"
+	},
+	{
+		"area": "Stale callbacks, admission, startup, tap repair, shutdown ownership",
+		"basis": "50 registered original public lifecycle cases + source reset/disarm routes",
+		"qualification": "Existing fixture native lifecycle ports, no actual Hammerspoon taps"
+	},
+	{
+		"area": "Live magic and Unicode fallback",
+		"basis": "7 registered state cases +9 registered adapter cases + action source",
+		"qualification": "Public physical geometry disabled in new probe; no native magic key certification"
+	},
+	{
+		"area": "CapsWord generated delimiter interaction",
+		"basis": "source path reviewed",
+		"qualification": "Unresolved missing-relay candidate; combined actual serializer/watcher and native order not executed"
+	},
+	{
+		"area": "Layout carriers and special punctuation",
+		"basis": "original shared policy plus shipped layout parser projection and five public cases",
+		"qualification": "Exact full-string lookup; raw policy payload differs from native multi-codepoint carrier; unsupported magic carriers not tested"
+	}
+]

@@ -1,0 +1,185 @@
+{
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"sweeps": [
+		{
+			"sweep": "A",
+			"new_independent_roots": 0,
+			"processes": [
+				{
+					"name": "policy-lua54",
+					"command": [
+						"lua",
+						"/workspace/scratch/parity-one-shot-2026-11-05/shared/policy-probe.lua",
+						"/workspace/worktrees/parity-one-shot-2026-11-05/shared"
+					],
+					"program_sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6",
+					"exit_code": 0,
+					"stdout": "dry-A-policy-lua54.stdout.txt",
+					"stdout_sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1",
+					"stderr": "dry-A-policy-lua54.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "policy-luajit",
+					"command": [
+						"luajit",
+						"/workspace/scratch/parity-one-shot-2026-11-05/shared/policy-probe.lua",
+						"/workspace/worktrees/parity-one-shot-2026-11-05/shared"
+					],
+					"program_sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6",
+					"exit_code": 0,
+					"stdout": "dry-A-policy-luajit.stdout.txt",
+					"stdout_sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1",
+					"stderr": "dry-A-policy-luajit.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "catalogue-guard",
+					"command": [
+						"node",
+						"/workspace/scratch/parity-one-shot-2026-11-05/shared/catalogue-guard.cjs",
+						"/workspace/worktrees/parity-one-shot-2026-11-05/shared"
+					],
+					"program_sha256": "f2941261793bc30d3adc76a7afd6d267e59a3387defcf1d68af64d7a22df8a08",
+					"exit_code": 0,
+					"stdout": "dry-A-catalogue-guard.stdout.txt",
+					"stdout_sha256": "edcebe120e38daba02e054914afb4a45c81231e1a32fe5a1592b83899ba9813e",
+					"stderr": "dry-A-catalogue-guard.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "declarations",
+					"command": [
+						"node",
+						"/workspace/scratch/parity-one-shot-2026-11-05/shared/declaration-probe.cjs",
+						"/workspace/worktrees/parity-one-shot-2026-11-05/shared"
+					],
+					"program_sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e",
+					"exit_code": 0,
+					"stdout": "dry-A-declarations.stdout.txt",
+					"stdout_sha256": "b62e6f9308e539e3d5f3e69100fdb501b2f833138a0ce54fe39c78f26be3f486",
+					"stderr": "dry-A-declarations.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "pinned-source",
+					"command": [
+						"python3",
+						"/workspace/scratch/parity-one-shot-2026-11-05/shared/source-contract.py",
+						"/workspace/worktrees/parity-one-shot-2026-11-05/shared"
+					],
+					"program_sha256": "5d20eb4a1d9c67914bf31eaf3e04fd4ef28e2d748e4380997c789f0e9fe9b698",
+					"exit_code": 0,
+					"stdout": "dry-A-pinned-source.stdout.txt",
+					"stdout_sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8",
+					"stderr": "dry-A-pinned-source.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "single-source",
+					"command": [
+						"node",
+						"/workspace/worktrees/parity-one-shot-2026-11-05/shared/tools/test/test-tap-hold-one-shot-results-single-source.cjs"
+					],
+					"program_sha256": "232f91b45edfcfb0e9cae21ed5703076b00111b89c3f8a655483740d11dd7da9",
+					"exit_code": 0,
+					"stdout": "dry-A-single-source.stdout.txt",
+					"stdout_sha256": "04a3fef985b6d5644eacb5883107af58b25c12d8a6172e9c8c1fff69babe6a8a",
+					"stderr": "dry-A-single-source.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			],
+			"qualification": "Actual shared policy and state owner, model/projection and negative metadata controls; source checks are not AHK execution. No native receiving or exhaustive transitive scope."
+		},
+		{
+			"sweep": "B",
+			"new_independent_roots": 0,
+			"processes": [
+				{
+					"name": "policy-lua54",
+					"command": [
+						"lua",
+						"/workspace/scratch/parity-one-shot-2026-11-05/shared/policy-probe.lua",
+						"/workspace/worktrees/parity-one-shot-2026-11-05/shared"
+					],
+					"program_sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6",
+					"exit_code": 0,
+					"stdout": "dry-B-policy-lua54.stdout.txt",
+					"stdout_sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1",
+					"stderr": "dry-B-policy-lua54.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "policy-luajit",
+					"command": [
+						"luajit",
+						"/workspace/scratch/parity-one-shot-2026-11-05/shared/policy-probe.lua",
+						"/workspace/worktrees/parity-one-shot-2026-11-05/shared"
+					],
+					"program_sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6",
+					"exit_code": 0,
+					"stdout": "dry-B-policy-luajit.stdout.txt",
+					"stdout_sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1",
+					"stderr": "dry-B-policy-luajit.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "catalogue-guard",
+					"command": [
+						"node",
+						"/workspace/scratch/parity-one-shot-2026-11-05/shared/catalogue-guard.cjs",
+						"/workspace/worktrees/parity-one-shot-2026-11-05/shared"
+					],
+					"program_sha256": "f2941261793bc30d3adc76a7afd6d267e59a3387defcf1d68af64d7a22df8a08",
+					"exit_code": 0,
+					"stdout": "dry-B-catalogue-guard.stdout.txt",
+					"stdout_sha256": "edcebe120e38daba02e054914afb4a45c81231e1a32fe5a1592b83899ba9813e",
+					"stderr": "dry-B-catalogue-guard.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "declarations",
+					"command": [
+						"node",
+						"/workspace/scratch/parity-one-shot-2026-11-05/shared/declaration-probe.cjs",
+						"/workspace/worktrees/parity-one-shot-2026-11-05/shared"
+					],
+					"program_sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e",
+					"exit_code": 0,
+					"stdout": "dry-B-declarations.stdout.txt",
+					"stdout_sha256": "b62e6f9308e539e3d5f3e69100fdb501b2f833138a0ce54fe39c78f26be3f486",
+					"stderr": "dry-B-declarations.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "pinned-source",
+					"command": [
+						"python3",
+						"/workspace/scratch/parity-one-shot-2026-11-05/shared/source-contract.py",
+						"/workspace/worktrees/parity-one-shot-2026-11-05/shared"
+					],
+					"program_sha256": "5d20eb4a1d9c67914bf31eaf3e04fd4ef28e2d748e4380997c789f0e9fe9b698",
+					"exit_code": 0,
+					"stdout": "dry-B-pinned-source.stdout.txt",
+					"stdout_sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8",
+					"stderr": "dry-B-pinned-source.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "single-source",
+					"command": [
+						"node",
+						"/workspace/worktrees/parity-one-shot-2026-11-05/shared/tools/test/test-tap-hold-one-shot-results-single-source.cjs"
+					],
+					"program_sha256": "232f91b45edfcfb0e9cae21ed5703076b00111b89c3f8a655483740d11dd7da9",
+					"exit_code": 0,
+					"stdout": "dry-B-single-source.stdout.txt",
+					"stdout_sha256": "04a3fef985b6d5644eacb5883107af58b25c12d8a6172e9c8c1fff69babe6a8a",
+					"stderr": "dry-B-single-source.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			],
+			"qualification": "Actual shared policy and state owner, model/projection and negative metadata controls; source checks are not AHK execution. No native receiving or exhaustive transitive scope."
+		}
+	]
+}

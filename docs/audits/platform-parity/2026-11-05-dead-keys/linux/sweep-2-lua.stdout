@@ -1,0 +1,293 @@
+
+=== xkb_capture: exact evdev event semantics ===
+# lua_timing {"schema":1,"driver":"linux","id":1,"kind":"case","module":"","name":"adds the XKB offset and resolves before committing key-down","status":"pass","elapsed_ms":7.245751,"timing_error":""}
+  ok   adds the XKB offset and resolves before committing key-down
+# lua_timing {"schema":1,"driver":"linux","id":2,"kind":"case","module":"","name":"updates releases but does not resolve or reapply repeats","status":"pass","elapsed_ms":1.135181,"timing_error":""}
+  ok   updates releases but does not resolve or reapply repeats
+
+=== xkb_capture: locks, levels and groups ===
+# lua_timing {"schema":1,"driver":"linux","id":3,"kind":"case","module":"","name":"keeps Shift active until both physical Shift keys are released","status":"pass","elapsed_ms":1.057816,"timing_error":""}
+  ok   keeps Shift active until both physical Shift keys are released
+# lua_timing {"schema":1,"driver":"linux","id":4,"kind":"case","module":"","name":"applies CapsLock and AltGr through XKB state","status":"pass","elapsed_ms":1.339070,"timing_error":""}
+  ok   applies CapsLock and AltGr through XKB state
+# lua_timing {"schema":1,"driver":"linux","id":5,"kind":"case","module":"","name":"tells what a key would type without pressing it (one-shot-types-nothing)","status":"pass","elapsed_ms":1.052078,"timing_error":""}
+  ok   tells what a key would type without pressing it (one-shot-types-nothing)
+# lua_timing {"schema":1,"driver":"linux","id":6,"kind":"case","module":"","name":"switches groups from the keymap action without reloading a table","status":"pass","elapsed_ms":1.008865,"timing_error":""}
+  ok   switches groups from the keymap action without reloading a table
+
+=== xkb_capture: Compose and atomic keymap reload ===
+# lua_timing {"schema":1,"driver":"linux","id":7,"kind":"case","module":"","name":"suppresses a dead key and emits the completed composed string","status":"pass","elapsed_ms":0.985740,"timing_error":""}
+  ok   suppresses a dead key and emits the completed composed string
+# lua_timing {"schema":1,"driver":"linux","id":8,"kind":"case","module":"","name":"keeps the previous session when a replacement keymap is invalid","status":"pass","elapsed_ms":1.267705,"timing_error":""}
+  ok   keeps the previous session when a replacement keymap is invalid
+# lua_timing {"schema":1,"driver":"linux","id":9,"kind":"case","module":"","name":"recreates a clean state while retaining the validated keymap","status":"pass","elapsed_ms":1.223430,"timing_error":""}
+  ok   recreates a clean state while retaining the validated keymap
+
+=== xkb_capture: a modifier key's role comes from the live keymap ===
+# lua_timing {"schema":1,"driver":"linux","id":10,"kind":"case","module":"","name":"names the role of the keysym the key carries, and refuses before a keymap","status":"pass","elapsed_ms":1.338770,"timing_error":""}
+  ok   names the role of the keysym the key carries, and refuses before a keymap
+
+=== xkb_capture: the injection table comes from the loaded keymap ===
+# lua_timing {"schema":1,"driver":"linux","id":11,"kind":"case","module":"","name":"refuses before a keymap is loaded","status":"pass","elapsed_ms":1.031478,"timing_error":""}
+  ok   refuses before a keymap is loaded
+# lua_timing {"schema":1,"driver":"linux","id":12,"kind":"case","module":"","name":"asks the backend that holds the loaded keymap","status":"pass","elapsed_ms":1.059108,"timing_error":""}
+  ok   asks the backend that holds the loaded keymap
+# lua_timing {"schema":1,"driver":"linux","id":13,"kind":"case","module":"","name":"reports a backend that cannot enumerate instead of guessing","status":"pass","elapsed_ms":0.984960,"timing_error":""}
+  ok   reports a backend that cannot enumerate instead of guessing
+
+=== xkb_capture: physical magic editor source receipts ===
+# lua_timing {"schema":1,"driver":"linux","id":14,"kind":"case","module":"","name":"(magic-editor-native) preserves duplicate physical sources and owns the active group epoch","status":"pass","elapsed_ms":1.069053,"timing_error":""}
+  ok   (magic-editor-native) preserves duplicate physical sources and owns the active group epoch
+# lua_timing {"schema":1,"driver":"linux","id":15,"kind":"case","module":"","name":"(magic-editor-native) refuses unproved groups, invalid registries and backend failures","status":"pass","elapsed_ms":1.033381,"timing_error":""}
+  ok   (magic-editor-native) refuses unproved groups, invalid registries and backend failures
+
+=== xkb_capture: direct source callback currency ===
+# lua_timing {"schema":1,"driver":"linux","id":16,"kind":"case","module":"","name":"refuses stale plain rows after a native group transition during enumeration","status":"pass","elapsed_ms":1.068181,"timing_error":""}
+  ok   refuses stale plain rows after a native group transition during enumeration
+# lua_timing {"schema":1,"driver":"linux","id":17,"kind":"case","module":"","name":"refuses a later native source epoch despite the same group","status":"pass","elapsed_ms":1.042805,"timing_error":""}
+  ok   refuses a later native source epoch despite the same group
+# lua_timing {"schema":1,"driver":"linux","id":18,"kind":"case","module":"","name":"refuses retired-session rows after a same-map replacement during enumeration","status":"pass","elapsed_ms":1.061842,"timing_error":""}
+  ok   refuses retired-session rows after a same-map replacement during enumeration
+# lua_timing {"schema":1,"driver":"linux","id":19,"kind":"case","module":"","name":"refuses a session replaced by the initial source observation","status":"pass","elapsed_ms":1.385829,"timing_error":""}
+  ok   refuses a session replaced by the initial source observation
+# lua_timing {"schema":1,"driver":"linux","id":20,"kind":"case","module":"","name":"refuses a session replaced by the final source observation","status":"pass","elapsed_ms":1.186335,"timing_error":""}
+  ok   refuses a session replaced by the final source observation
+# lua_timing {"schema":1,"driver":"linux","id":21,"kind":"case","module":"","name":"detaches requested positions and refuses backend request substitution","status":"pass","elapsed_ms":1.192674,"timing_error":""}
+  ok   detaches requested positions and refuses backend request substitution
+# lua_timing {"schema":1,"driver":"linux","id":22,"kind":"case","module":"","name":"keeps the validated positions when source callbacks mutate the caller","status":"pass","elapsed_ms":1.050576,"timing_error":""}
+  ok   keeps the validated positions when source callbacks mutate the caller
+# lua_timing {"schema":1,"driver":"linux","id":23,"kind":"case","module":"","name":"keeps direct-source proof across ordinary reconstructed key events","status":"pass","elapsed_ms":1.013211,"timing_error":""}
+  ok   keeps direct-source proof across ordinary reconstructed key events
+
+=== xkb_capture: selected-group inverse source currency ===
+# lua_timing {"schema":1,"driver":"linux","id":24,"kind":"case","module":"","name":"passes the actual selected group to inverse enumeration","status":"pass","elapsed_ms":1.043515,"timing_error":""}
+  ok   passes the actual selected group to inverse enumeration
+# lua_timing {"schema":1,"driver":"linux","id":25,"kind":"case","module":"","name":"refuses inverse rows after native group reentry","status":"pass","elapsed_ms":1.005900,"timing_error":""}
+  ok   refuses inverse rows after native group reentry
+# lua_timing {"schema":1,"driver":"linux","id":26,"kind":"case","module":"","name":"refuses inverse rows after an observed group away-and-back","status":"pass","elapsed_ms":1.024888,"timing_error":""}
+  ok   refuses inverse rows after an observed group away-and-back
+# lua_timing {"schema":1,"driver":"linux","id":27,"kind":"case","module":"","name":"refuses inverse rows from a retired same-map session","status":"pass","elapsed_ms":1.005890,"timing_error":""}
+  ok   refuses inverse rows from a retired same-map session
+# lua_timing {"schema":1,"driver":"linux","id":28,"kind":"case","module":"","name":"refuses session replacement by initial group observation","status":"pass","elapsed_ms":0.965771,"timing_error":""}
+  ok   refuses session replacement by initial group observation
+# lua_timing {"schema":1,"driver":"linux","id":29,"kind":"case","module":"","name":"refuses session replacement by final group observation","status":"pass","elapsed_ms":1.026229,"timing_error":""}
+  ok   refuses session replacement by final group observation
+# lua_timing {"schema":1,"driver":"linux","id":30,"kind":"case","module":"","name":"refuses invalid native groups before enumeration","status":"pass","elapsed_ms":5.133763,"timing_error":""}
+  ok   refuses invalid native groups before enumeration
+# lua_timing {"schema":1,"driver":"linux","id":31,"kind":"case","module":"","name":"preserves native inverse rows across ordinary key transitions","status":"pass","elapsed_ms":1.006584,"timing_error":""}
+  ok   preserves native inverse rows across ordinary key transitions
+
+=== xkb_capture: inverse receipt ownership ===
+# lua_timing {"schema":1,"driver":"linux","id":32,"kind":"case","module":"","name":"retains original source currency without granting caller capabilities","status":"pass","elapsed_ms":4.086412,"timing_error":""}
+  ok   retains original source currency without granting caller capabilities
+# lua_timing {"schema":1,"driver":"linux","id":33,"kind":"case","module":"","name":"retires receipt after actual group change and observed ABA","status":"pass","elapsed_ms":1.905854,"timing_error":""}
+  ok   retires receipt after actual group change and observed ABA
+# lua_timing {"schema":1,"driver":"linux","id":34,"kind":"case","module":"","name":"retires receipt when the same native map gets a new session","status":"pass","elapsed_ms":2.724709,"timing_error":""}
+  ok   retires receipt when the same native map gets a new session
+# lua_timing {"schema":1,"driver":"linux","id":35,"kind":"case","module":"","name":"refuses getter reentry replacing the original session","status":"pass","elapsed_ms":1.873315,"timing_error":""}
+  ok   refuses getter reentry replacing the original session
+# lua_timing {"schema":1,"driver":"linux","id":36,"kind":"case","module":"","name":"refuses replacement of captured enumeration and observation exports","status":"pass","elapsed_ms":3.620219,"timing_error":""}
+  ok   refuses replacement of captured enumeration and observation exports
+# lua_timing {"schema":1,"driver":"linux","id":37,"kind":"case","module":"","name":"detaches native rows and modifier arrays for every enumeration","status":"pass","elapsed_ms":1.925023,"timing_error":""}
+  ok   detaches native rows and modifier arrays for every enumeration
+# lua_timing {"schema":1,"driver":"linux","id":38,"kind":"case","module":"","name":"refuses enumerator replacement within its native callback","status":"pass","elapsed_ms":1.724801,"timing_error":""}
+  ok   refuses enumerator replacement within its native callback
+# lua_timing {"schema":1,"driver":"linux","id":39,"kind":"case","module":"","name":"refuses malformed native inverse modifier data","status":"pass","elapsed_ms":1.877171,"timing_error":""}
+  ok   refuses malformed native inverse modifier data
+
+=== xkb_capture: terminal inverse observation seal ===
+# lua_timing {"schema":1,"driver":"linux","id":40,"kind":"case","module":"","name":"seals observations in RAM and never revives a refused full receipt","status":"pass","elapsed_ms":1.952995,"timing_error":""}
+  ok   seals observations in RAM and never revives a refused full receipt
+
+=== xkb_capture: startup-capture-publication ===
+# lua_timing {"schema":1,"driver":"linux","id":41,"kind":"case","module":"","name":"startup-capture-publication retains map provenance after reset without reviving old receipts","status":"pass","elapsed_ms":1.942249,"timing_error":""}
+  ok   startup-capture-publication retains map provenance after reset without reviving old receipts
+# lua_timing {"schema":1,"driver":"linux","id":42,"kind":"case","module":"","name":"startup-capture-publication refuses changed load provenance","status":"pass","elapsed_ms":1.881808,"timing_error":""}
+  ok   startup-capture-publication refuses changed load provenance
+# lua_timing {"schema":1,"driver":"linux","id":43,"kind":"case","module":"","name":"startup-capture-publication refuses changed backend provenance","status":"pass","elapsed_ms":1.868788,"timing_error":""}
+  ok   startup-capture-publication refuses changed backend provenance
+# lua_timing {"schema":1,"driver":"linux","id":44,"kind":"case","module":"","name":"startup-capture-publication refuses changed create provenance","status":"pass","elapsed_ms":1.856089,"timing_error":""}
+  ok   startup-capture-publication refuses changed create provenance
+# lua_timing {"schema":1,"driver":"linux","id":45,"kind":"case","module":"","name":"startup-capture-publication refuses changed inverse provenance","status":"pass","elapsed_ms":1.791592,"timing_error":""}
+  ok   startup-capture-publication refuses changed inverse provenance
+# lua_timing {"schema":1,"driver":"linux","id":46,"kind":"case","module":"","name":"startup-capture-publication refuses changed getter provenance","status":"pass","elapsed_ms":1.979485,"timing_error":""}
+  ok   startup-capture-publication refuses changed getter provenance
+# lua_timing {"schema":1,"driver":"linux","id":47,"kind":"case","module":"","name":"startup-capture-publication refuses source reentry during enumeration","status":"pass","elapsed_ms":1.815227,"timing_error":""}
+  ok   startup-capture-publication refuses source reentry during enumeration
+
+=== xkb_capture: selected semantic control return ===
+# lua_timing {"schema":1,"driver":"linux","id":48,"kind":"case","module":"","name":"publishes KP_Home after the unchanged text identity and error slots","status":"pass","elapsed_ms":1.039197,"timing_error":""}
+  ok   publishes KP_Home after the unchanged text identity and error slots
+# lua_timing {"schema":1,"driver":"linux","id":49,"kind":"case","module":"","name":"resolves repeats without committing another transition and filters release","status":"pass","elapsed_ms":1.014590,"timing_error":""}
+  ok   resolves repeats without committing another transition and filters release
+# lua_timing {"schema":1,"driver":"linux","id":50,"kind":"case","module":"","name":"uses the selected keysym even at another physical position","status":"pass","elapsed_ms":1.122393,"timing_error":""}
+  ok   uses the selected keysym even at another physical position
+# lua_timing {"schema":1,"driver":"linux","id":51,"kind":"case","module":"","name":"does not infer Home from the physical keypad code or nil text: keypad digit","status":"pass","elapsed_ms":1.003874,"timing_error":""}
+  ok   does not infer Home from the physical keypad code or nil text: keypad digit
+# lua_timing {"schema":1,"driver":"linux","id":52,"kind":"case","module":"","name":"does not infer Home from the physical keypad code or nil text: ordinary letter","status":"pass","elapsed_ms":1.351118,"timing_error":""}
+  ok   does not infer Home from the physical keypad code or nil text: ordinary letter
+# lua_timing {"schema":1,"driver":"linux","id":53,"kind":"case","module":"","name":"does not infer Home from the physical keypad code or nil text: unclassified keypad Begin","status":"pass","elapsed_ms":1.343146,"timing_error":""}
+  ok   does not infer Home from the physical keypad code or nil text: unclassified keypad Begin
+# lua_timing {"schema":1,"driver":"linux","id":54,"kind":"case","module":"","name":"does not infer Home from the physical keypad code or nil text: function","status":"pass","elapsed_ms":1.170946,"timing_error":""}
+  ok   does not infer Home from the physical keypad code or nil text: function
+# lua_timing {"schema":1,"driver":"linux","id":55,"kind":"case","module":"","name":"does not infer Home from the physical keypad code or nil text: unknown symbol","status":"pass","elapsed_ms":2.084403,"timing_error":""}
+  ok   does not infer Home from the physical keypad code or nil text: unknown symbol
+# lua_timing {"schema":1,"driver":"linux","id":56,"kind":"case","module":"","name":"leaves KP_Delete DEL bytes on their original text and identity routes","status":"pass","elapsed_ms":1.252068,"timing_error":""}
+  ok   leaves KP_Delete DEL bytes on their original text and identity routes
+# lua_timing {"schema":1,"driver":"linux","id":57,"kind":"case","module":"","name":"keeps pending Compose intact while reporting the selected known control","status":"pass","elapsed_ms":1.080880,"timing_error":""}
+  ok   keeps pending Compose intact while reporting the selected known control
+# lua_timing {"schema":1,"driver":"linux","id":58,"kind":"case","module":"","name":"preserves composed text and suppresses semantic projection: UTF8","status":"pass","elapsed_ms":1.080850,"timing_error":""}
+  ok   preserves composed text and suppresses semantic projection: UTF8
+# lua_timing {"schema":1,"driver":"linux","id":59,"kind":"case","module":"","name":"preserves composed text and suppresses semantic projection: empty","status":"pass","elapsed_ms":1.023514,"timing_error":""}
+  ok   preserves composed text and suppresses semantic projection: empty
+# lua_timing {"schema":1,"driver":"linux","id":60,"kind":"case","module":"","name":"preserves cancelled Compose's current key and its existing reset","status":"pass","elapsed_ms":1.119618,"timing_error":""}
+  ok   preserves cancelled Compose's current key and its existing reset
+# lua_timing {"schema":1,"driver":"linux","id":61,"kind":"case","module":"","name":"keeps genuine text even if a controlled backend associates it with KP_Home","status":"pass","elapsed_ms":1.075893,"timing_error":""}
+  ok   keeps genuine text even if a controlled backend associates it with KP_Home
+# lua_timing {"schema":1,"driver":"linux","id":62,"kind":"case","module":"","name":"retains error in slot three with no semantic control after resolver failure","status":"pass","elapsed_ms":1.407001,"timing_error":""}
+  ok   retains error in slot three with no semantic control after resolver failure
+# lua_timing {"schema":1,"driver":"linux","id":63,"kind":"case","module":"","name":"retains error in slot three with no semantic control after down update failure","status":"pass","elapsed_ms":1.215072,"timing_error":""}
+  ok   retains error in slot three with no semantic control after down update failure
+# lua_timing {"schema":1,"driver":"linux","id":64,"kind":"case","module":"","name":"retains error in slot three with no semantic control after up update failure","status":"pass","elapsed_ms":1.048751,"timing_error":""}
+  ok   retains error in slot three with no semantic control after up update failure
+# lua_timing {"schema":1,"driver":"linux","id":65,"kind":"case","module":"","name":"retains error in slot three with no semantic control after Compose status failure","status":"pass","elapsed_ms":1.056793,"timing_error":""}
+  ok   retains error in slot three with no semantic control after Compose status failure
+# lua_timing {"schema":1,"driver":"linux","id":66,"kind":"case","module":"","name":"keeps validation and unavailable-session errors in their original slot","status":"pass","elapsed_ms":1.073680,"timing_error":""}
+  ok   keeps validation and unavailable-session errors in their original slot
+
+=== xkb_capture: direct sources retain original native callback owners ===
+# lua_timing {"schema":1,"driver":"linux","id":67,"kind":"case","module":"","name":"retains duplicate readonly facts and detaches the original validated request","status":"pass","elapsed_ms":1.045407,"timing_error":""}
+  ok   retains duplicate readonly facts and detaches the original validated request
+# lua_timing {"schema":1,"driver":"linux","id":68,"kind":"case","module":"","name":"preserves validated intent when a source callback changes the caller array","status":"pass","elapsed_ms":1.122944,"timing_error":""}
+  ok   preserves validated intent when a source callback changes the caller array
+# lua_timing {"schema":1,"driver":"linux","id":69,"kind":"case","module":"","name":"refuses a foreign enumerator installed by the first native observation","status":"pass","elapsed_ms":1.074270,"timing_error":""}
+  ok   refuses a foreign enumerator installed by the first native observation
+# lua_timing {"schema":1,"driver":"linux","id":70,"kind":"case","module":"","name":"refuses a foreign fact issuer even while original source currency remains current","status":"pass","elapsed_ms":1.060189,"timing_error":""}
+  ok   refuses a foreign fact issuer even while original source currency remains current
+# lua_timing {"schema":1,"driver":"linux","id":71,"kind":"case","module":"","name":"refuses original enumerator loss within its own callback","status":"pass","elapsed_ms":1.049703,"timing_error":""}
+  ok   refuses original enumerator loss within its own callback
+# lua_timing {"schema":1,"driver":"linux","id":72,"kind":"case","module":"","name":"refuses original enumerator loss during the final native observation","status":"pass","elapsed_ms":1.158477,"timing_error":""}
+  ok   refuses original enumerator loss during the final native observation
+# lua_timing {"schema":1,"driver":"linux","id":73,"kind":"case","module":"","name":"refuses a replaced native getter before invoking it after enumeration","status":"pass","elapsed_ms":0.986959,"timing_error":""}
+  ok   refuses a replaced native getter before invoking it after enumeration
+# lua_timing {"schema":1,"driver":"linux","id":74,"kind":"case","module":"","name":"refuses getter replacement within the initial native observation","status":"pass","elapsed_ms":1.061821,"timing_error":""}
+  ok   refuses getter replacement within the initial native observation
+# lua_timing {"schema":1,"driver":"linux","id":75,"kind":"case","module":"","name":"refuses source identity changed by the initial native observation","status":"pass","elapsed_ms":1.036173,"timing_error":""}
+  ok   refuses source identity changed by the initial native observation
+# lua_timing {"schema":1,"driver":"linux","id":76,"kind":"case","module":"","name":"refuses native group-count changes even when the observed group stays equal","status":"pass","elapsed_ms":1.362425,"timing_error":""}
+  ok   refuses native group-count changes even when the observed group stays equal
+# lua_timing {"schema":1,"driver":"linux","id":77,"kind":"case","module":"","name":"refuses metatable requests before position or native callbacks","status":"pass","elapsed_ms":1.154961,"timing_error":""}
+  ok   refuses metatable requests before position or native callbacks
+# lua_timing {"schema":1,"driver":"linux","id":78,"kind":"case","module":"","name":"refuses backend-installed request metatables without calling foreign readers","status":"pass","elapsed_ms":1.193931,"timing_error":""}
+  ok   refuses backend-installed request metatables without calling foreign readers
+# lua_timing {"schema":1,"driver":"linux","id":79,"kind":"case","module":"","name":"refuses request mutation during the final native observation","status":"pass","elapsed_ms":1.395414,"timing_error":""}
+  ok   refuses request mutation during the final native observation
+# lua_timing {"schema":1,"driver":"linux","id":80,"kind":"case","module":"","name":"retains native exceptions and refused rows as existing closed failures","status":"pass","elapsed_ms":1.051766,"timing_error":""}
+  ok   retains native exceptions and refused rows as existing closed failures
+# lua_timing {"schema":1,"driver":"linux","id":81,"kind":"case","module":"","name":"restores the prior module identity after a raised controlled scenario","status":"pass","elapsed_ms":1.259829,"timing_error":""}
+  ok   restores the prior module identity after a raised controlled scenario
+
+=== keyboard_hook: live XKB capture stream ===
+# lua_timing {"schema":1,"driver":"linux","id":82,"kind":"case","module":"","name":"refuses to open a keyboard before live XKB state is ready","status":"pass","elapsed_ms":15.075254,"timing_error":""}
+  ok   refuses to open a keyboard before live XKB state is ready
+# lua_timing {"schema":1,"driver":"linux","id":83,"kind":"case","module":"","name":"forwards every key transition to live XKB before routing","status":"pass","elapsed_ms":3.821082,"timing_error":""}
+  ok   forwards every key transition to live XKB before routing
+# lua_timing {"schema":1,"driver":"linux","id":84,"kind":"case","module":"","name":"keeps the second Shift held after the first Shift is released","status":"pass","elapsed_ms":4.639637,"timing_error":""}
+  ok   keeps the second Shift held after the first Shift is released
+
+=== keyboard_hook: Right Alt follows the live layout ===
+# lua_timing {"schema":1,"driver":"linux","id":85,"kind":"case","module":"","name":"is Alt on a layout where it is Alt_R: Alt+Q is a shortcut, not text","status":"pass","elapsed_ms":4.477242,"timing_error":""}
+  ok   is Alt on a layout where it is Alt_R: Alt+Q is a shortcut, not text
+# lua_timing {"schema":1,"driver":"linux","id":86,"kind":"case","module":"","name":"is AltGr on a layout where it is ISO_Level3_Shift: AltGr+Q is text","status":"pass","elapsed_ms":5.030476,"timing_error":""}
+  ok   is AltGr on a layout where it is ISO_Level3_Shift: AltGr+Q is text
+# lua_timing {"schema":1,"driver":"linux","id":87,"kind":"case","module":"","name":"releases a Right Alt under the role it was pressed with","status":"pass","elapsed_ms":4.735040,"timing_error":""}
+  ok   releases a Right Alt under the role it was pressed with
+
+=== keyboard_hook: XKB shortcut identity ===
+# lua_timing {"schema":1,"driver":"linux","id":88,"kind":"case","module":"","name":"uses the keysym identity instead of Ctrl-transformed UTF-8","status":"pass","elapsed_ms":3.104351,"timing_error":""}
+  ok   uses the keysym identity instead of Ctrl-transformed UTF-8
+
+=== keyboard_hook: a modifier the XKB options put on another key ===
+# lua_timing {"schema":1,"driver":"linux","id":89,"kind":"case","module":"","name":"reads CapsLock as Ctrl under ctrl:nocaps, and Super under caps:super","status":"pass","elapsed_ms":11.230696,"timing_error":""}
+  ok   reads CapsLock as Ctrl under ctrl:nocaps, and Super under caps:super
+# lua_timing {"schema":1,"driver":"linux","id":90,"kind":"case","module":"","name":"types the level-3 character with CapsLock or Menu as AltGr (lv3:caps_switch, lv3:menu_switch)","status":"pass","elapsed_ms":9.364201,"timing_error":""}
+  ok   types the level-3 character with CapsLock or Menu as AltGr (lv3:caps_switch, lv3:menu_switch)
+# lua_timing {"schema":1,"driver":"linux","id":91,"kind":"case","module":"","name":"trades Ctrl and CapsLock under ctrl:swapcaps","status":"pass","elapsed_ms":10.054833,"timing_error":""}
+  ok   trades Ctrl and CapsLock under ctrl:swapcaps
+# lua_timing {"schema":1,"driver":"linux","id":92,"kind":"case","module":"","name":"says once, not at every key, that XKB cannot tell a role or capture a key (xkb-options-modifier-role)","status":"pass","elapsed_ms":4.671074,"timing_error":""}
+  ok   says once, not at every key, that XKB cannot tell a role or capture a key (xkb-options-modifier-role)
+
+=== keyboard_hook: a consumed dead key leaves no Compose pending ===
+# lua_timing {"schema":1,"driver":"linux","id":93,"kind":"case","module":"","name":"(magic-key-source) reads the next key plain after a consumed dead key","status":"pass","elapsed_ms":9.824856,"timing_error":""}
+  ok   (magic-key-source) reads the next key plain after a consumed dead key
+# lua_timing {"schema":1,"driver":"linux","id":94,"kind":"case","module":"","name":"(magic-key-source) reads the next key plain after a consumed dead key was held","status":"pass","elapsed_ms":4.592836,"timing_error":""}
+  ok   (magic-key-source) reads the next key plain after a consumed dead key was held
+
+=== Original Hook physical editor position observation ===
+# lua_timing {"schema":1,"driver":"linux","id":95,"kind":"case","module":"","name":"captures detached original positions/modifiers without changing key forwarding","status":"pass","elapsed_ms":11.890080,"timing_error":""}
+  ok   captures detached original positions/modifiers without changing key forwarding
+# lua_timing {"schema":1,"driver":"linux","id":96,"kind":"case","module":"","name":"cannot authenticate fabricated positive predicates and caller-created event rows","status":"pass","elapsed_ms":9.196658,"timing_error":""}
+  ok   cannot authenticate fabricated positive predicates and caller-created event rows
+# lua_timing {"schema":1,"driver":"linux","id":97,"kind":"case","module":"","name":"refuses virtual sources and custom Reader providers before enrollment","status":"pass","elapsed_ms":68.546299,"timing_error":""}
+  ok   refuses virtual sources and custom Reader providers before enrollment
+# lua_timing {"schema":1,"driver":"linux","id":98,"kind":"case","module":"","name":"refuses ambiguous physical RightAlt instead of inventing AltGr or Alt","status":"pass","elapsed_ms":11.376947,"timing_error":""}
+  ok   refuses ambiguous physical RightAlt instead of inventing AltGr or Alt
+# lua_timing {"schema":1,"driver":"linux","id":99,"kind":"case","module":"","name":"rechecks page/source currency after native key queries and the final callback","status":"pass","elapsed_ms":13.574360,"timing_error":""}
+  ok   rechecks page/source currency after native key queries and the final callback
+# lua_timing {"schema":1,"driver":"linux","id":100,"kind":"case","module":"","name":"refuses replacement Reader/source/page guards without invoking foreign callbacks","status":"pass","elapsed_ms":13.500560,"timing_error":""}
+  ok   refuses replacement Reader/source/page guards without invoking foreign callbacks
+# lua_timing {"schema":1,"driver":"linux","id":101,"kind":"case","module":"","name":"requires complete held-byte acknowledgements and the actual primary held key","status":"pass","elapsed_ms":27.961296,"timing_error":""}
+  ok   requires complete held-byte acknowledgements and the actual primary held key
+# lua_timing {"schema":1,"driver":"linux","id":102,"kind":"case","module":"","name":"withdraws observation when the final page callback changes the native source","status":"pass","elapsed_ms":11.046548,"timing_error":""}
+  ok   withdraws observation when the final page callback changes the native source
+# lua_timing {"schema":1,"driver":"linux","id":103,"kind":"case","module":"","name":"withdraws when original source classification is republished during observation","status":"pass","elapsed_ms":9.932718,"timing_error":""}
+  ok   withdraws when original source classification is republished during observation
+# lua_timing {"schema":1,"driver":"linux","id":104,"kind":"case","module":"","name":"rejects replaced observation exports and exact cancellation during a native query","status":"pass","elapsed_ms":19.442590,"timing_error":""}
+  ok   rejects replaced observation exports and exact cancellation during a native query
+# lua_timing {"schema":1,"driver":"linux","id":105,"kind":"case","module":"","name":"retains idempotent cancellation without retaining completed page callbacks","status":"pass","elapsed_ms":16.273902,"timing_error":""}
+  ok   retains idempotent cancellation without retaining completed page callbacks
+# lua_timing {"schema":1,"driver":"linux","id":106,"kind":"case","module":"","name":"joins the original Reader occurrence to the actual host and shared editor without writes","status":"pass","elapsed_ms":23.239666,"timing_error":""}
+  ok   joins the original Reader occurrence to the actual host and shared editor without writes
+
+=== Position capture native effect ownership ===
+INDEPENDENT_FOREIGN_EFFECT_CALLS	0	WRITES	0
+# lua_timing {"schema":1,"driver":"linux","id":107,"kind":"case","module":"","name":"refuses a replaced native effect port and permits a fresh original request after restoration","status":"pass","elapsed_ms":20.412622,"timing_error":""}
+  ok   refuses a replaced native effect port and permits a fresh original request after restoration
+INDEPENDENT_FOREIGN_EFFECT_CALLS	0	WRITES	0
+# lua_timing {"schema":1,"driver":"linux","id":108,"kind":"case","module":"","name":"refuses effect replacement inside an original canonical getter before delivery","status":"pass","elapsed_ms":32.903114,"timing_error":""}
+  ok   refuses effect replacement inside an original canonical getter before delivery
+
+=== Linux number-row tap keys (tap-keys) ===
+# lua_timing {"schema":1,"driver":"linux","id":109,"kind":"case","module":"","name":"tap-config-owner: absent overrides stay native despite legacy storage","status":"pass","elapsed_ms":3.606018,"timing_error":""}
+  ok   tap-config-owner: absent overrides stay native despite legacy storage
+# lua_timing {"schema":1,"driver":"linux","id":110,"kind":"case","module":"","name":"tap-config-owner: refuses malformed input and preserves live assignments on a failed save","status":"pass","elapsed_ms":2.877529,"timing_error":""}
+  ok   tap-config-owner: refuses malformed input and preserves live assignments on a failed save
+# lua_timing {"schema":1,"driver":"linux","id":111,"kind":"case","module":"","name":"tap-config-owner: cleanup retains consumed keys and writes preserve unknown neighbors","status":"pass","elapsed_ms":72.172212,"timing_error":""}
+  ok   tap-config-owner: cleanup retains consumed keys and writes preserve unknown neighbors
+# lua_timing {"schema":1,"driver":"linux","id":112,"kind":"case","module":"","name":"a plain tap on an assigned key is consumed and runs its action on the next tick","status":"pass","elapsed_ms":1.343506,"timing_error":""}
+  ok   a plain tap on an assigned key is consumed and runs its action on the next tick
+# lua_timing {"schema":1,"driver":"linux","id":113,"kind":"case","module":"","name":"a modifier, AltGr, an unassigned key or shortcuts off let the key through","status":"pass","elapsed_ms":3.339531,"timing_error":""}
+  ok   a modifier, AltGr, an unassigned key or shortcuts off let the key through
+# lua_timing {"schema":1,"driver":"linux","id":114,"kind":"case","module":"","name":"an assignment is stored, and an unknown stored action leaves the key alone","status":"pass","elapsed_ms":41.277772,"timing_error":""}
+  ok   an assignment is stored, and an unknown stored action leaves the key alone
+# lua_timing {"schema":1,"driver":"linux","id":115,"kind":"case","module":"","name":"the labels follow the loaded keymap, a dead key hinted","status":"pass","elapsed_ms":38.401105,"timing_error":""}
+  ok   the labels follow the loaded keymap, a dead key hinted
+
+=== Tap-key configuration admission ===
+# lua_timing {"schema":1,"driver":"linux","id":116,"kind":"case","module":"","name":"keeps ordinary rebind bounded by the actual tap dispatcher","status":"pass","elapsed_ms":50.610632,"timing_error":""}
+  ok   keeps ordinary rebind bounded by the actual tap dispatcher
+# lua_timing {"schema":1,"driver":"linux","id":117,"kind":"case","module":"","name":"keeps owned dispatch bounded by the actual tap dispatcher","status":"pass","elapsed_ms":1.466732,"timing_error":""}
+  ok   keeps owned dispatch bounded by the actual tap dispatcher
+# lua_timing {"schema":1,"driver":"linux","id":118,"kind":"case","module":"","name":"keeps released generation bounded by the actual tap dispatcher","status":"pass","elapsed_ms":1.182573,"timing_error":""}
+  ok   keeps released generation bounded by the actual tap dispatcher
+# lua_timing {"schema":1,"driver":"linux","id":119,"kind":"case","module":"","name":"keeps new generation bounded by the actual tap dispatcher","status":"pass","elapsed_ms":1.483668,"timing_error":""}
+  ok   keeps new generation bounded by the actual tap dispatcher
+# lua_timing {"schema":1,"driver":"linux","id":120,"kind":"case","module":"","name":"keeps paused drain bounded by the actual tap dispatcher","status":"pass","elapsed_ms":1.278178,"timing_error":""}
+  ok   keeps paused drain bounded by the actual tap dispatcher
+
+=== tap-key collision claim source ===
+# lua_timing {"schema":1,"driver":"linux","id":121,"kind":"case","module":"","name":"captures only assigned plain taps and revokes after real publication","status":"pass","elapsed_ms":2.024022,"timing_error":""}
+  ok   captures only assigned plain taps and revokes after real publication
+# lua_timing {"schema":1,"driver":"linux","id":122,"kind":"case","module":"","name":"refuses a held configuration owner and observes disable after capture","status":"pass","elapsed_ms":1.098266,"timing_error":""}
+  ok   refuses a held configuration owner and observes disable after capture
+RESULT {"failed":0,"failures":{},"modules":["tests.unit.adapters.layout.test_xkb_capture_exact_evdev_event","tests.unit.adapters.layout.test_xkb_capture_semantic_controls","tests.unit.adapters.layout.test_xkb_capture_direct_sources_retain","tests.unit.adapters.keyboard_hook.test_keyboard_hook_xkb_capture_live_stream","tests.unit.adapters.keyboard_hook.test_keyboard_hook_xkb_capture_position_native_effect","tests.unit.modules.shortcuts.text_actions.test_tap_keys"],"passed":122}

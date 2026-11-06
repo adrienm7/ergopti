@@ -1,0 +1,32 @@
+[
+	{
+		"module": "tests.unit.modules.keymap.synthetic.test_one_shot_shift",
+		"exit": 0,
+		"result": ["AUDIT_RESULT\t7\t0"]
+	},
+	{
+		"module": "tests.unit.adapters.synthetic_input.test_one_shot_shift",
+		"exit": 0,
+		"result": ["AUDIT_RESULT\t9\t0"]
+	},
+	{
+		"module": "tests.unit.modules.keymap.lifecycle.test_start_commit_transaction",
+		"exit": 0,
+		"result": ["AUDIT_RESULT\t50\t0"]
+	},
+	{
+		"module": "tests.unit.platform.remap.config.test_one_shot_timeout_is_shared",
+		"exit": 0,
+		"result": ["AUDIT_RESULT\t1\t0"]
+	},
+	{
+		"module": "tests.unit.modules.gestures.actions.test_sticky_modifiers",
+		"exit": 0,
+		"result": ["AUDIT_RESULT\t33\t0"]
+	},
+	{
+		"module": "tests.unit.modules.shortcuts.pause_owners.test_sticky_modifiers",
+		"exit": 0,
+		"result": ["AUDIT_RESULT\t6\t0"]
+	}
+]

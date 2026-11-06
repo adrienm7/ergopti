@@ -4078,5 +4078,16 @@
 	"inventory.behavior.backspace_other": "Backspace से ट्रिगर अपने आप बहाल नहीं होता; अनुप्रयोग का पूर्ववत करना अलग सुविधा है।",
 	"inventory.behavior.repeat_activation_window": "मैजिक कुंजी दोहराव की सक्रियण समय-सीमा",
 	"inventory.behavior.repeat_window_untimed": "वैकल्पिक दोहराव की अलग सक्रियण समय-सीमा नहीं है; निष्क्रियता के बाद नया शब्द शुरू करने का नियम स्वतंत्र है।",
-	"inventory.behavior.repeat_window_macos": "संशोधक कुंजियों के समय नियमों सहित मैजिक कुंजी की प्रभावी सक्रियण समय-सीमा का उपयोग करता है; शून्य इस सीमा को बंद करता है। निष्क्रियता के बाद नया शब्द शुरू करने का नियम स्वतंत्र है।"
+	"inventory.behavior.repeat_window_macos": "संशोधक कुंजियों के समय नियमों सहित मैजिक कुंजी की प्रभावी सक्रियण समय-सीमा का उपयोग करता है; शून्य इस सीमा को बंद करता है। निष्क्रियता के बाद नया शब्द शुरू करने का नियम स्वतंत्र है।",
+	"inventory.behavior.dead_composition": "डेड की से वर्ण संयोजन",
+	"inventory.behavior.dead_fallback": "डेड की के बाद अमैप किया गया इनपुट",
+	"inventory.behavior.dead_lifetime": "डेड की की प्रतीक्षा अवधि",
+	"inventory.behavior.dead_windows_composition": "अंतर्निहित डेड की तालिकाएँ और रजिस्ट्री लेआउट का अनुकरण।",
+	"inventory.behavior.dead_macos_composition": "संयोजन का नियंत्रण मूल कीबोर्ड लेआउट के पास है; भौतिक इनपुट के वर्ण समूहों की पुष्टि नहीं हुई है।",
+	"inventory.behavior.dead_linux_composition": "स्वतंत्र टेक्स्ट कैप्चर के साथ मूल XKB/Compose; रोके गए अगले इनपुट का परिणाम अलग हो सकता है।",
+	"inventory.behavior.dead_windows_fallback": "अमैप किया गया अगला इनपुट पहले उच्चारण का समाप्ति वर्ण और फिर वर्तमान वर्ण भेजता है।",
+	"inventory.behavior.dead_macos_fallback": "वैकल्पिक व्यवहार मूल लेआउट का है; भौतिक घटनाओं और ऐप के आउटपुट की पुष्टि नहीं हुई है।",
+	"inventory.behavior.dead_linux_fallback": "रद्द किया गया कैप्चर वर्तमान वर्ण रखता है और पिछला उच्चारण छोड़ता है; मूल आउटपुट अलग हो सकता है।",
+	"inventory.behavior.dead_windows_lifetime": "अंतर्निहित तालिकाएँ अधिकतम 2 सेकंड प्रतीक्षा करती हैं; रजिस्ट्री डेड की स्थिति की कोई समय सीमा नहीं है।",
+	"inventory.behavior.dead_native_lifetime": "मूल ऑपरेटिंग सिस्टम लंबित संयोजन संभालता है; कैप्चर और रीसेट के नियम साझा ड्राइवर समय सीमा से अलग हैं।"
 }

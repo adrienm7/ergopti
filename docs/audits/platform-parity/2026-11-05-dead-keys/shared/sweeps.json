@@ -1,0 +1,161 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"cwd": "/workspace/worktrees/parity-dead-keys-2026-11-05/shared",
+	"environment": {
+		"PATH": "/workspace/scratch/parity-toolchain/ci-bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+		"LOGNAME": "agent",
+		"PYTHONDONTWRITEBYTECODE": "1"
+	},
+	"sweeps": [
+		{
+			"sweep": 1,
+			"runs": [
+				{
+					"name": "enumeration",
+					"argv": [
+						"python",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/shared/shared_probe.py",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/shared",
+						"--output",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/shared/enumeration-1.json"
+					],
+					"exit": 0,
+					"program_sha256": "572c55aa79aa57541a5e3988cc116f4d2308dbc7edf11212abf38ddd06c6698d",
+					"outputs": {
+						"stdout": {
+							"path": "sweep-1-enumeration.stdout",
+							"sha256": "5edf686338ce783a3845cb8d97591643861ea2a7073cd54465c0d1efa68af60e"
+						},
+						"stderr": {
+							"path": "sweep-1-enumeration.stderr",
+							"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+						}
+					},
+					"result": {
+						"path": "enumeration.json",
+						"sha256": "6a7c2691fb2ddd42bd11e014017ed4f23977c1382ca1793eb090c1c344496e75"
+					}
+				},
+				{
+					"name": "prefix",
+					"argv": [
+						"python",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/shared/prefix_probe.py",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/shared",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/shared/prefix-1.json"
+					],
+					"exit": 0,
+					"program_sha256": "6d5d44466c1110973fc0f75a0d4cad7474ed6d3162138a750da80a87934e47e4",
+					"outputs": {
+						"stdout": {
+							"path": "sweep-1-prefix.stdout",
+							"sha256": "37ca83ac90151f4fb4a8c9dca3cafe316c3e26f00d50b9d70039f5e4b3d2210e"
+						},
+						"stderr": {
+							"path": "sweep-1-enumeration.stderr",
+							"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+						}
+					},
+					"result": {
+						"path": "prefix.json",
+						"sha256": "7638c91a74828d038e49b6c475b62df3a5040e5f1e77f830665dbea3cab18d03"
+					}
+				},
+				{
+					"name": "python-tests",
+					"argv": [
+						"python",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/shared/static/ergopti/linux/xkb_generation/tests/run_all_tests.py"
+					],
+					"exit": 0,
+					"program_sha256": "d815acbd1bafae31d025ade0aa97b5f8f734cc0c625b5eded38ce893ce3bfd60",
+					"outputs": {
+						"stdout": {
+							"path": "sweep-1-enumeration.stderr",
+							"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+						},
+						"stderr": {
+							"path": "sweep-1-python-tests.stderr",
+							"sha256": "dc8c4e7e23660ed4029c1125529811218ac011f9136fcf3ab060f1cbec619f5b"
+						}
+					}
+				}
+			]
+		},
+		{
+			"sweep": 2,
+			"runs": [
+				{
+					"name": "enumeration",
+					"argv": [
+						"python",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/shared/shared_probe.py",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/shared",
+						"--output",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/shared/enumeration-2.json"
+					],
+					"exit": 0,
+					"program_sha256": "572c55aa79aa57541a5e3988cc116f4d2308dbc7edf11212abf38ddd06c6698d",
+					"outputs": {
+						"stdout": {
+							"path": "sweep-1-enumeration.stdout",
+							"sha256": "5edf686338ce783a3845cb8d97591643861ea2a7073cd54465c0d1efa68af60e"
+						},
+						"stderr": {
+							"path": "sweep-1-enumeration.stderr",
+							"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+						}
+					},
+					"result": {
+						"path": "enumeration.json",
+						"sha256": "6a7c2691fb2ddd42bd11e014017ed4f23977c1382ca1793eb090c1c344496e75"
+					}
+				},
+				{
+					"name": "prefix",
+					"argv": [
+						"python",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/shared/prefix_probe.py",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/shared",
+						"/workspace/scratch/parity-dead-keys-2026-11-05/shared/prefix-2.json"
+					],
+					"exit": 0,
+					"program_sha256": "6d5d44466c1110973fc0f75a0d4cad7474ed6d3162138a750da80a87934e47e4",
+					"outputs": {
+						"stdout": {
+							"path": "sweep-1-prefix.stdout",
+							"sha256": "37ca83ac90151f4fb4a8c9dca3cafe316c3e26f00d50b9d70039f5e4b3d2210e"
+						},
+						"stderr": {
+							"path": "sweep-1-enumeration.stderr",
+							"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+						}
+					},
+					"result": {
+						"path": "prefix.json",
+						"sha256": "7638c91a74828d038e49b6c475b62df3a5040e5f1e77f830665dbea3cab18d03"
+					}
+				},
+				{
+					"name": "python-tests",
+					"argv": [
+						"python",
+						"/workspace/worktrees/parity-dead-keys-2026-11-05/shared/static/ergopti/linux/xkb_generation/tests/run_all_tests.py"
+					],
+					"exit": 0,
+					"program_sha256": "d815acbd1bafae31d025ade0aa97b5f8f734cc0c625b5eded38ce893ce3bfd60",
+					"outputs": {
+						"stdout": {
+							"path": "sweep-1-enumeration.stderr",
+							"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+						},
+						"stderr": {
+							"path": "sweep-2-python-tests.stderr",
+							"sha256": "63ca093d398682ed7ce3a0b77d7d47615ff9e0395f821b0ac8d0c32ba06b9684"
+						}
+					}
+				}
+			]
+		}
+	]
+}

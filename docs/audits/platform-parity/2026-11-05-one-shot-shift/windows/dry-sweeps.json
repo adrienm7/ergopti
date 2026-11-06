@@ -1,0 +1,46 @@
+{
+	"program_sha256": "4957e2156c46df9538a73fa809c9d59868fe3ca043348ca910bda0ced3ee3709",
+	"qualification": "Two final bounded source-only rereads after OSW-001; no AHK runtime evidence and no additional unique native coverage.",
+	"sweeps": [
+		{
+			"label": "A",
+			"command": [
+				"python3",
+				"/workspace/scratch/parity-one-shot-2026-11-05/windows/source-contract.py",
+				"/workspace/worktrees/parity-one-shot-2026-11-05/windows",
+				"--sweep",
+				"A"
+			],
+			"environment": {
+				"PYTHONDONTWRITEBYTECODE": "1"
+			},
+			"exit_code": 0,
+			"checks": 40,
+			"source_files": 31,
+			"new_root_findings": 0,
+			"runtime_cases": 0,
+			"stdout_sha256": "8ca369700a8e445a460dcef4d8ca48b423e4225ccf31addf387348e681225344",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"label": "B",
+			"command": [
+				"python3",
+				"/workspace/scratch/parity-one-shot-2026-11-05/windows/source-contract.py",
+				"/workspace/worktrees/parity-one-shot-2026-11-05/windows",
+				"--sweep",
+				"B"
+			],
+			"environment": {
+				"PYTHONDONTWRITEBYTECODE": "1"
+			},
+			"exit_code": 0,
+			"checks": 40,
+			"source_files": 31,
+			"new_root_findings": 0,
+			"runtime_cases": 0,
+			"stdout_sha256": "c1125aa930cd159ce54d8fa06850aadcfd7e1ba8d07d84d0685ee78edc49f2e6",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		}
+	]
+}

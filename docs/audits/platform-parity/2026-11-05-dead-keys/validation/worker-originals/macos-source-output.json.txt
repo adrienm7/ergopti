@@ -1,0 +1,7 @@
+{
+  "audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+  "pinned_disk_files": 15,
+  "external_git_blob_matches_retained_api": true,
+  "original_probe_sha256": "083421e74856cdef69a2ceb5795551313a747bf06ffe5e3b9869617c7de490b8",
+  "qualification": "Source identity only; no native behavior measured."
+}

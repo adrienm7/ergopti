@@ -1,0 +1,9509 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"native_library": "libxkbcommon.so.0",
+	"native_locale": "C.UTF-8",
+	"qualification": "Original Python/Lua parsers and converters; all six registry layouts and seven converter levels. Genuine libxkbcommon Compose table/keysym/state calls in a private process. No keyboard, native Mac input source, AHK, compositor or receiving application. Missing-state pairs are source relations, not measured Mac event payloads.",
+	"layouts": [
+		{
+			"id": "bepo",
+			"platforms": ["linux", "macos"],
+			"source": "static/layouts/registry/bepo/bepo.keylayout",
+			"source_sha256": "1ae285b4d523e3969474eab01084fdf09145f00cdb4daae1245ac2d52e30b6ba",
+			"action_count": 192,
+			"states": 94,
+			"state_entry_sequences": [
+				{
+					"state": "aigu",
+					"sequence": ["dead_acute"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "grave",
+					"sequence": ["dead_grave"],
+					"trail": [
+						{
+							"keysym": "dead_grave",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "circonflexe",
+					"sequence": ["dead_circumflex"],
+					"trail": [
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "caron",
+					"sequence": ["dead_caron"],
+					"trail": [
+						{
+							"keysym": "dead_caron",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "scientifique",
+					"sequence": ["infinity"],
+					"trail": [
+						{
+							"keysym": "infinity",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "barre",
+					"sequence": ["fiveeighths"],
+					"trail": [
+						{
+							"keysym": "fiveeighths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "raye",
+					"sequence": ["onesixth"],
+					"trail": [
+						{
+							"keysym": "onesixth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "trema",
+					"sequence": ["dead_diaeresis"],
+					"trail": [
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "pointsuscrit",
+					"sequence": ["dead_abovedot"],
+					"trail": [
+						{
+							"keysym": "dead_abovedot",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "monnaie",
+					"sequence": ["dead_currency"],
+					"trail": [
+						{
+							"keysym": "dead_currency",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "virgule",
+					"sequence": ["seveneighths"],
+					"trail": [
+						{
+							"keysym": "seveneighths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "cedille",
+					"sequence": ["dead_cedilla"],
+					"trail": [
+						{
+							"keysym": "dead_cedilla",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "exposant",
+					"sequence": ["oneeighth"],
+					"trail": [
+						{
+							"keysym": "oneeighth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "latin",
+					"sequence": ["ssharp"],
+					"trail": [
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "breve",
+					"sequence": ["dead_breve"],
+					"trail": [
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "tilde",
+					"sequence": ["dead_tilde"],
+					"trail": [
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "macron",
+					"sequence": ["dead_macron"],
+					"trail": [
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "crochet",
+					"sequence": ["fourfifths"],
+					"trail": [
+						{
+							"keysym": "fourfifths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "rond",
+					"sequence": ["onethird"],
+					"trail": [
+						{
+							"keysym": "onethird",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "corne",
+					"sequence": ["fivesixths"],
+					"trail": [
+						{
+							"keysym": "fivesixths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "grec",
+					"sequence": ["dead_greek"],
+					"trail": [
+						{
+							"keysym": "dead_greek",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "pointsouscrit",
+					"sequence": ["onefifth"],
+					"trail": [
+						{
+							"keysym": "onefifth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "ogonek",
+					"sequence": ["dead_ogonek"],
+					"trail": [
+						{
+							"keysym": "dead_ogonek",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "gotiquesgras",
+					"sequence": ["infinity", "F"],
+					"trail": [
+						{
+							"keysym": "infinity",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "F",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "grasitalique",
+					"sequence": ["infinity", "I"],
+					"trail": [
+						{
+							"keysym": "infinity",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "I",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "doubleaigu",
+					"sequence": ["dead_acute", "dead_acute"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigubarre",
+					"sequence": ["fiveeighths", "dead_acute"],
+					"trail": [
+						{
+							"keysym": "fiveeighths",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigubarre",
+					"sequence": ["dead_acute", "fiveeighths"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "fiveeighths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigubreve",
+					"sequence": ["dead_breve", "dead_acute"],
+					"trail": [
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigubreve",
+					"sequence": ["dead_acute", "dead_breve"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigucedille",
+					"sequence": ["dead_cedilla", "dead_acute"],
+					"trail": [
+						{
+							"keysym": "dead_cedilla",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigucedille",
+					"sequence": ["dead_acute", "dead_cedilla"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_cedilla",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "circonflexeaigu",
+					"sequence": ["dead_circumflex", "dead_acute"],
+					"trail": [
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "circonflexeaigu",
+					"sequence": ["dead_acute", "dead_circumflex"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigucorne",
+					"sequence": ["fivesixths", "dead_acute"],
+					"trail": [
+						{
+							"keysym": "fivesixths",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigucorne",
+					"sequence": ["dead_acute", "fivesixths"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "fivesixths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "grecaigu",
+					"sequence": ["dead_greek", "dead_acute"],
+					"trail": [
+						{
+							"keysym": "dead_greek",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "grecaigu",
+					"sequence": ["dead_acute", "dead_greek"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_greek",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigumacron",
+					"sequence": ["dead_macron", "dead_acute"],
+					"trail": [
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigumacron",
+					"sequence": ["dead_acute", "dead_macron"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigupoint",
+					"sequence": ["dead_abovedot", "dead_acute"],
+					"trail": [
+						{
+							"keysym": "dead_abovedot",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigupoint",
+					"sequence": ["dead_acute", "dead_abovedot"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_abovedot",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigurond",
+					"sequence": ["onethird", "dead_acute"],
+					"trail": [
+						{
+							"keysym": "onethird",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigurond",
+					"sequence": ["dead_acute", "onethird"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "onethird",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigutilde",
+					"sequence": ["dead_tilde", "dead_acute"],
+					"trail": [
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigutilde",
+					"sequence": ["dead_acute", "dead_tilde"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigutrema",
+					"sequence": ["dead_diaeresis", "dead_acute"],
+					"trail": [
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "aigutrema",
+					"sequence": ["dead_acute", "dead_diaeresis"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "doubletrait",
+					"sequence": ["infinity", "b"],
+					"trail": [
+						{
+							"keysym": "infinity",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "b",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "doublebarre",
+					"sequence": ["fiveeighths", "fiveeighths"],
+					"trail": [
+						{
+							"keysym": "fiveeighths",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "fiveeighths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "barrelatin",
+					"sequence": ["ssharp", "fiveeighths"],
+					"trail": [
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "fiveeighths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "barrelatin",
+					"sequence": ["fiveeighths", "ssharp"],
+					"trail": [
+						{
+							"keysym": "fiveeighths",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "barreraye",
+					"sequence": ["onesixth", "fiveeighths"],
+					"trail": [
+						{
+							"keysym": "onesixth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "fiveeighths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "barreraye",
+					"sequence": ["fiveeighths", "onesixth"],
+					"trail": [
+						{
+							"keysym": "fiveeighths",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "onesixth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "scientifiquebarre",
+					"sequence": ["infinity", "fiveeighths"],
+					"trail": [
+						{
+							"keysym": "infinity",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "fiveeighths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "scientifiquebarre",
+					"sequence": ["fiveeighths", "infinity"],
+					"trail": [
+						{
+							"keysym": "fiveeighths",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "infinity",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "tildebarre",
+					"sequence": ["dead_tilde", "fiveeighths"],
+					"trail": [
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "fiveeighths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "breveinverse",
+					"sequence": ["dead_breve", "dead_breve"],
+					"trail": [
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "brevecedille",
+					"sequence": ["dead_cedilla", "dead_breve"],
+					"trail": [
+						{
+							"keysym": "dead_cedilla",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "brevecedille",
+					"sequence": ["dead_breve", "dead_cedilla"],
+					"trail": [
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_cedilla",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "brevecrochet",
+					"sequence": ["fourfifths", "dead_breve"],
+					"trail": [
+						{
+							"keysym": "fourfifths",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "brevecrochet",
+					"sequence": ["dead_breve", "fourfifths"],
+					"trail": [
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "fourfifths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "gravebreve",
+					"sequence": ["dead_grave", "dead_breve"],
+					"trail": [
+						{
+							"keysym": "dead_grave",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "gravebreve",
+					"sequence": ["dead_breve", "dead_grave"],
+					"trail": [
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_grave",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "brevepoint",
+					"sequence": ["onefifth", "dead_breve"],
+					"trail": [
+						{
+							"keysym": "onefifth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "brevepoint",
+					"sequence": ["dead_breve", "onefifth"],
+					"trail": [
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "onefifth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "brevetilde",
+					"sequence": ["dead_tilde", "dead_breve"],
+					"trail": [
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "brevetilde",
+					"sequence": ["dead_breve", "dead_tilde"],
+					"trail": [
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "calligraphique",
+					"sequence": ["infinity", "c"],
+					"trail": [
+						{
+							"keysym": "infinity",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "c",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "caronlatin",
+					"sequence": ["ssharp", "dead_caron"],
+					"trail": [
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_caron",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "caronlatin",
+					"sequence": ["dead_caron", "ssharp"],
+					"trail": [
+						{
+							"keysym": "dead_caron",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "caronpoint",
+					"sequence": ["dead_abovedot", "dead_caron"],
+					"trail": [
+						{
+							"keysym": "dead_abovedot",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_caron",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "caronpoint",
+					"sequence": ["dead_caron", "dead_abovedot"],
+					"trail": [
+						{
+							"keysym": "dead_caron",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_abovedot",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "carontrema",
+					"sequence": ["dead_diaeresis", "dead_caron"],
+					"trail": [
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_caron",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "carontrema",
+					"sequence": ["dead_caron", "dead_diaeresis"],
+					"trail": [
+						{
+							"keysym": "dead_caron",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "circonflexesouscrit",
+					"sequence": ["dead_circumflex", "dead_circumflex"],
+					"trail": [
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "circonflexecrochet",
+					"sequence": ["fourfifths", "dead_circumflex"],
+					"trail": [
+						{
+							"keysym": "fourfifths",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "circonflexecrochet",
+					"sequence": ["dead_circumflex", "fourfifths"],
+					"trail": [
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "fourfifths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "circonflexegrave",
+					"sequence": ["dead_grave", "dead_circumflex"],
+					"trail": [
+						{
+							"keysym": "dead_grave",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "circonflexegrave",
+					"sequence": ["dead_circumflex", "dead_grave"],
+					"trail": [
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_grave",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "circonflexepoint",
+					"sequence": ["onefifth", "dead_circumflex"],
+					"trail": [
+						{
+							"keysym": "onefifth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "circonflexepoint",
+					"sequence": ["dead_circumflex", "onefifth"],
+					"trail": [
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "onefifth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "circonflexetilde",
+					"sequence": ["dead_tilde", "dead_circumflex"],
+					"trail": [
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "circonflexetilde",
+					"sequence": ["dead_circumflex", "dead_tilde"],
+					"trail": [
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "cornecrochet",
+					"sequence": ["fourfifths", "fivesixths"],
+					"trail": [
+						{
+							"keysym": "fourfifths",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "fivesixths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "cornecrochet",
+					"sequence": ["fivesixths", "fourfifths"],
+					"trail": [
+						{
+							"keysym": "fivesixths",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "fourfifths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "gravecorne",
+					"sequence": ["dead_grave", "fivesixths"],
+					"trail": [
+						{
+							"keysym": "dead_grave",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "fivesixths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "gravecorne",
+					"sequence": ["fivesixths", "dead_grave"],
+					"trail": [
+						{
+							"keysym": "fivesixths",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_grave",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "pointsouscritcorne",
+					"sequence": ["onefifth", "fivesixths"],
+					"trail": [
+						{
+							"keysym": "onefifth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "fivesixths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "pointsouscritcorne",
+					"sequence": ["fivesixths", "onefifth"],
+					"trail": [
+						{
+							"keysym": "fivesixths",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "onefifth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "tildecorne",
+					"sequence": ["dead_tilde", "fivesixths"],
+					"trail": [
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "fivesixths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "tildecorne",
+					"sequence": ["fivesixths", "dead_tilde"],
+					"trail": [
+						{
+							"keysym": "fivesixths",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "crosse",
+					"sequence": ["fourfifths", "fourfifths"],
+					"trail": [
+						{
+							"keysym": "fourfifths",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "fourfifths",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "indices",
+					"sequence": ["oneeighth", "oneeighth"],
+					"trail": [
+						{
+							"keysym": "oneeighth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "oneeighth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "latinexposant",
+					"sequence": ["ssharp", "oneeighth"],
+					"trail": [
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "oneeighth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "latinexposant",
+					"sequence": ["oneeighth", "ssharp"],
+					"trail": [
+						{
+							"keysym": "oneeighth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "gotiques",
+					"sequence": ["infinity", "f"],
+					"trail": [
+						{
+							"keysym": "infinity",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "f",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "gras",
+					"sequence": ["infinity", "g"],
+					"trail": [
+						{
+							"keysym": "infinity",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "g",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "doublegrave",
+					"sequence": ["dead_grave", "dead_grave"],
+					"trail": [
+						{
+							"keysym": "dead_grave",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_grave",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "gravemacron",
+					"sequence": ["dead_macron", "dead_grave"],
+					"trail": [
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_grave",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "gravemacron",
+					"sequence": ["dead_grave", "dead_macron"],
+					"trail": [
+						{
+							"keysym": "dead_grave",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "gravetrema",
+					"sequence": ["dead_diaeresis", "dead_grave"],
+					"trail": [
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_grave",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "gravetrema",
+					"sequence": ["dead_grave", "dead_diaeresis"],
+					"trail": [
+						{
+							"keysym": "dead_grave",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "grectremaaigu",
+					"sequence": ["dead_diaeresis", "dead_acute", "dead_greek"],
+					"trail": [
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_greek",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "grectremaaigu",
+					"sequence": ["dead_greek", "dead_acute", "dead_diaeresis"],
+					"trail": [
+						{
+							"keysym": "dead_greek",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "grectremaaigu",
+					"sequence": ["dead_acute", "dead_greek", "dead_diaeresis"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_greek",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "grectremaaigu",
+					"sequence": ["dead_diaeresis", "dead_greek", "dead_acute"],
+					"trail": [
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_greek",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "grectremaaigu",
+					"sequence": ["dead_greek", "dead_diaeresis", "dead_acute"],
+					"trail": [
+						{
+							"keysym": "dead_greek",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "grectremaaigu",
+					"sequence": ["dead_acute", "dead_diaeresis", "dead_greek"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_greek",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "grectrema",
+					"sequence": ["dead_diaeresis", "dead_greek"],
+					"trail": [
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_greek",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "grectrema",
+					"sequence": ["dead_greek", "dead_diaeresis"],
+					"trail": [
+						{
+							"keysym": "dead_greek",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "italique",
+					"sequence": ["infinity", "i"],
+					"trail": [
+						{
+							"keysym": "infinity",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "i",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "crochetlatin",
+					"sequence": ["fourfifths", "ssharp"],
+					"trail": [
+						{
+							"keysym": "fourfifths",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "latinpoint",
+					"sequence": ["onefifth", "ssharp"],
+					"trail": [
+						{
+							"keysym": "onefifth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "latinpoint",
+					"sequence": ["dead_abovedot", "ssharp"],
+					"trail": [
+						{
+							"keysym": "dead_abovedot",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "latinpoint",
+					"sequence": ["ssharp", "dead_abovedot"],
+					"trail": [
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_abovedot",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "rayelatin",
+					"sequence": ["onesixth", "ssharp"],
+					"trail": [
+						{
+							"keysym": "onesixth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "rayelatin",
+					"sequence": ["ssharp", "onesixth"],
+					"trail": [
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "onesixth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "macronsouscrit",
+					"sequence": ["dead_macron", "dead_macron"],
+					"trail": [
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "macronogonek",
+					"sequence": ["dead_ogonek", "dead_macron"],
+					"trail": [
+						{
+							"keysym": "dead_ogonek",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "macronogonek",
+					"sequence": ["dead_macron", "dead_ogonek"],
+					"trail": [
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_ogonek",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "macronpointsouscrit",
+					"sequence": ["onefifth", "dead_macron"],
+					"trail": [
+						{
+							"keysym": "onefifth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "macronpointsouscrit",
+					"sequence": ["dead_macron", "onefifth"],
+					"trail": [
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "onefifth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "macronpointsuscrit",
+					"sequence": ["dead_abovedot", "dead_macron"],
+					"trail": [
+						{
+							"keysym": "dead_abovedot",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "macronpointsuscrit",
+					"sequence": ["dead_macron", "dead_abovedot"],
+					"trail": [
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_abovedot",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "tildemacron",
+					"sequence": ["dead_tilde", "dead_macron"],
+					"trail": [
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "tildemacron",
+					"sequence": ["dead_macron", "dead_tilde"],
+					"trail": [
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "tremamacron",
+					"sequence": ["dead_diaeresis", "dead_macron"],
+					"trail": [
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "tremamacron",
+					"sequence": ["dead_macron", "dead_diaeresis"],
+					"trail": [
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "points",
+					"sequence": ["dead_abovedot", "onefifth"],
+					"trail": [
+						{
+							"keysym": "dead_abovedot",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "onefifth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "points",
+					"sequence": ["onefifth", "dead_abovedot"],
+					"trail": [
+						{
+							"keysym": "onefifth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_abovedot",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "rayepoint",
+					"sequence": ["onesixth", "dead_abovedot"],
+					"trail": [
+						{
+							"keysym": "onesixth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_abovedot",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "rayepoint",
+					"sequence": ["dead_abovedot", "onesixth"],
+					"trail": [
+						{
+							"keysym": "dead_abovedot",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "onesixth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "scriptes",
+					"sequence": ["infinity", "r"],
+					"trail": [
+						{
+							"keysym": "infinity",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "r",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "doubleraye",
+					"sequence": ["onesixth", "onesixth"],
+					"trail": [
+						{
+							"keysym": "onesixth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "onesixth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "doublerayelatin",
+					"sequence": ["onesixth", "ssharp", "onesixth"],
+					"trail": [
+						{
+							"keysym": "onesixth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "onesixth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "doublerayelatin",
+					"sequence": ["ssharp", "onesixth", "onesixth"],
+					"trail": [
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "onesixth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "onesixth",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "doublerayelatin",
+					"sequence": ["onesixth", "onesixth", "ssharp"],
+					"trail": [
+						{
+							"keysym": "onesixth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "onesixth",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "ssharp",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "rondsouscrit",
+					"sequence": ["onethird", "onethird"],
+					"trail": [
+						{
+							"keysym": "onethird",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "onethird",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "tildeinscrit",
+					"sequence": ["dead_tilde", "dead_tilde"],
+					"trail": [
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "trematilde",
+					"sequence": ["dead_diaeresis", "dead_tilde"],
+					"trail": [
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "tremasouscrit",
+					"sequence": ["dead_diaeresis", "dead_diaeresis"],
+					"trail": [
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				}
+			],
+			"explicit_output_key_level_contexts": 5242,
+			"unique_wire_expectations": 2273,
+			"native_mismatches": [
+				{
+					"sequence": ["dead_currency", "dead_cedilla"],
+					"expected": "₢",
+					"action": "cedille",
+					"state": "monnaie",
+					"key": "AC06",
+					"level": 6,
+					"trail": [
+						{
+							"keysym": "dead_currency",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "dead_cedilla",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				}
+			],
+			"ambiguous_neutral_text_compositions": [],
+			"two_ascii_explicit_outputs": [],
+			"two_ascii_missing_state_pairs": [
+				{
+					"state": "barre",
+					"action": "!",
+					"terminator": "/",
+					"neutral": "!",
+					"source_fallback_pair": "/!"
+				},
+				{
+					"state": "circonflexe",
+					"action": "!",
+					"terminator": "^",
+					"neutral": "!",
+					"source_fallback_pair": "^!"
+				},
+				{
+					"state": "doubleraye",
+					"action": "!",
+					"terminator": "=",
+					"neutral": "!",
+					"source_fallback_pair": "=!"
+				},
+				{
+					"state": "grave",
+					"action": "!",
+					"terminator": "`",
+					"neutral": "!",
+					"source_fallback_pair": "`!"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "!",
+					"terminator": "_",
+					"neutral": "!",
+					"source_fallback_pair": "_!"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "!",
+					"terminator": ".",
+					"neutral": "!",
+					"source_fallback_pair": ".!"
+				},
+				{
+					"state": "tilde",
+					"action": "!",
+					"terminator": "~",
+					"neutral": "!",
+					"source_fallback_pair": "~!"
+				},
+				{
+					"state": "virgule",
+					"action": "!",
+					"terminator": ",",
+					"neutral": "!",
+					"source_fallback_pair": ",!"
+				},
+				{
+					"state": "barre",
+					"action": "#",
+					"terminator": "/",
+					"neutral": "#",
+					"source_fallback_pair": "/#"
+				},
+				{
+					"state": "circonflexe",
+					"action": "#",
+					"terminator": "^",
+					"neutral": "#",
+					"source_fallback_pair": "^#"
+				},
+				{
+					"state": "doubleraye",
+					"action": "#",
+					"terminator": "=",
+					"neutral": "#",
+					"source_fallback_pair": "=#"
+				},
+				{
+					"state": "grave",
+					"action": "#",
+					"terminator": "`",
+					"neutral": "#",
+					"source_fallback_pair": "`#"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "#",
+					"terminator": "_",
+					"neutral": "#",
+					"source_fallback_pair": "_#"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "#",
+					"terminator": ".",
+					"neutral": "#",
+					"source_fallback_pair": ".#"
+				},
+				{
+					"state": "tilde",
+					"action": "#",
+					"terminator": "~",
+					"neutral": "#",
+					"source_fallback_pair": "~#"
+				},
+				{
+					"state": "virgule",
+					"action": "#",
+					"terminator": ",",
+					"neutral": "#",
+					"source_fallback_pair": ",#"
+				},
+				{
+					"state": "barre",
+					"action": "$",
+					"terminator": "/",
+					"neutral": "$",
+					"source_fallback_pair": "/$"
+				},
+				{
+					"state": "circonflexe",
+					"action": "$",
+					"terminator": "^",
+					"neutral": "$",
+					"source_fallback_pair": "^$"
+				},
+				{
+					"state": "doubleraye",
+					"action": "$",
+					"terminator": "=",
+					"neutral": "$",
+					"source_fallback_pair": "=$"
+				},
+				{
+					"state": "grave",
+					"action": "$",
+					"terminator": "`",
+					"neutral": "$",
+					"source_fallback_pair": "`$"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "$",
+					"terminator": "_",
+					"neutral": "$",
+					"source_fallback_pair": "_$"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "$",
+					"terminator": ".",
+					"neutral": "$",
+					"source_fallback_pair": ".$"
+				},
+				{
+					"state": "tilde",
+					"action": "$",
+					"terminator": "~",
+					"neutral": "$",
+					"source_fallback_pair": "~$"
+				},
+				{
+					"state": "virgule",
+					"action": "$",
+					"terminator": ",",
+					"neutral": "$",
+					"source_fallback_pair": ",$"
+				},
+				{
+					"state": "barre",
+					"action": "%",
+					"terminator": "/",
+					"neutral": "%",
+					"source_fallback_pair": "/%"
+				},
+				{
+					"state": "circonflexe",
+					"action": "%",
+					"terminator": "^",
+					"neutral": "%",
+					"source_fallback_pair": "^%"
+				},
+				{
+					"state": "doubleraye",
+					"action": "%",
+					"terminator": "=",
+					"neutral": "%",
+					"source_fallback_pair": "=%"
+				},
+				{
+					"state": "grave",
+					"action": "%",
+					"terminator": "`",
+					"neutral": "%",
+					"source_fallback_pair": "`%"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "%",
+					"terminator": "_",
+					"neutral": "%",
+					"source_fallback_pair": "_%"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "%",
+					"terminator": ".",
+					"neutral": "%",
+					"source_fallback_pair": ".%"
+				},
+				{
+					"state": "tilde",
+					"action": "%",
+					"terminator": "~",
+					"neutral": "%",
+					"source_fallback_pair": "~%"
+				},
+				{
+					"state": "virgule",
+					"action": "%",
+					"terminator": ",",
+					"neutral": "%",
+					"source_fallback_pair": ",%"
+				},
+				{
+					"state": "barre",
+					"action": "'",
+					"terminator": "/",
+					"neutral": "'",
+					"source_fallback_pair": "/'"
+				},
+				{
+					"state": "circonflexe",
+					"action": "'",
+					"terminator": "^",
+					"neutral": "'",
+					"source_fallback_pair": "^'"
+				},
+				{
+					"state": "doubleraye",
+					"action": "'",
+					"terminator": "=",
+					"neutral": "'",
+					"source_fallback_pair": "='"
+				},
+				{
+					"state": "grave",
+					"action": "'",
+					"terminator": "`",
+					"neutral": "'",
+					"source_fallback_pair": "`'"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "'",
+					"terminator": "_",
+					"neutral": "'",
+					"source_fallback_pair": "_'"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "'",
+					"terminator": ".",
+					"neutral": "'",
+					"source_fallback_pair": ".'"
+				},
+				{
+					"state": "tilde",
+					"action": "'",
+					"terminator": "~",
+					"neutral": "'",
+					"source_fallback_pair": "~'"
+				},
+				{
+					"state": "virgule",
+					"action": "'",
+					"terminator": ",",
+					"neutral": "'",
+					"source_fallback_pair": ",'"
+				},
+				{
+					"state": "barre",
+					"action": "(",
+					"terminator": "/",
+					"neutral": "(",
+					"source_fallback_pair": "/("
+				},
+				{
+					"state": "doubleraye",
+					"action": "(",
+					"terminator": "=",
+					"neutral": "(",
+					"source_fallback_pair": "=("
+				},
+				{
+					"state": "grave",
+					"action": "(",
+					"terminator": "`",
+					"neutral": "(",
+					"source_fallback_pair": "`("
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "(",
+					"terminator": "_",
+					"neutral": "(",
+					"source_fallback_pair": "_("
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "(",
+					"terminator": ".",
+					"neutral": "(",
+					"source_fallback_pair": ".("
+				},
+				{
+					"state": "tilde",
+					"action": "(",
+					"terminator": "~",
+					"neutral": "(",
+					"source_fallback_pair": "~("
+				},
+				{
+					"state": "virgule",
+					"action": "(",
+					"terminator": ",",
+					"neutral": "(",
+					"source_fallback_pair": ",("
+				},
+				{
+					"state": "barre",
+					"action": ")",
+					"terminator": "/",
+					"neutral": ")",
+					"source_fallback_pair": "/)"
+				},
+				{
+					"state": "doubleraye",
+					"action": ")",
+					"terminator": "=",
+					"neutral": ")",
+					"source_fallback_pair": "=)"
+				},
+				{
+					"state": "grave",
+					"action": ")",
+					"terminator": "`",
+					"neutral": ")",
+					"source_fallback_pair": "`)"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": ")",
+					"terminator": "_",
+					"neutral": ")",
+					"source_fallback_pair": "_)"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": ")",
+					"terminator": ".",
+					"neutral": ")",
+					"source_fallback_pair": ".)"
+				},
+				{
+					"state": "tilde",
+					"action": ")",
+					"terminator": "~",
+					"neutral": ")",
+					"source_fallback_pair": "~)"
+				},
+				{
+					"state": "virgule",
+					"action": ")",
+					"terminator": ",",
+					"neutral": ")",
+					"source_fallback_pair": ",)"
+				},
+				{
+					"state": "barre",
+					"action": "*",
+					"terminator": "/",
+					"neutral": "*",
+					"source_fallback_pair": "/*"
+				},
+				{
+					"state": "circonflexe",
+					"action": "*",
+					"terminator": "^",
+					"neutral": "*",
+					"source_fallback_pair": "^*"
+				},
+				{
+					"state": "doubleraye",
+					"action": "*",
+					"terminator": "=",
+					"neutral": "*",
+					"source_fallback_pair": "=*"
+				},
+				{
+					"state": "grave",
+					"action": "*",
+					"terminator": "`",
+					"neutral": "*",
+					"source_fallback_pair": "`*"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "*",
+					"terminator": "_",
+					"neutral": "*",
+					"source_fallback_pair": "_*"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "*",
+					"terminator": ".",
+					"neutral": "*",
+					"source_fallback_pair": ".*"
+				},
+				{
+					"state": "tilde",
+					"action": "*",
+					"terminator": "~",
+					"neutral": "*",
+					"source_fallback_pair": "~*"
+				},
+				{
+					"state": "virgule",
+					"action": "*",
+					"terminator": ",",
+					"neutral": "*",
+					"source_fallback_pair": ",*"
+				},
+				{
+					"state": "barre",
+					"action": "+",
+					"terminator": "/",
+					"neutral": "+",
+					"source_fallback_pair": "/+"
+				},
+				{
+					"state": "doubleraye",
+					"action": "+",
+					"terminator": "=",
+					"neutral": "+",
+					"source_fallback_pair": "=+"
+				},
+				{
+					"state": "grave",
+					"action": "+",
+					"terminator": "`",
+					"neutral": "+",
+					"source_fallback_pair": "`+"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "+",
+					"terminator": "_",
+					"neutral": "+",
+					"source_fallback_pair": "_+"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "+",
+					"terminator": ".",
+					"neutral": "+",
+					"source_fallback_pair": ".+"
+				},
+				{
+					"state": "tilde",
+					"action": "+",
+					"terminator": "~",
+					"neutral": "+",
+					"source_fallback_pair": "~+"
+				},
+				{
+					"state": "virgule",
+					"action": "+",
+					"terminator": ",",
+					"neutral": "+",
+					"source_fallback_pair": ",+"
+				},
+				{
+					"state": "barre",
+					"action": ",",
+					"terminator": "/",
+					"neutral": ",",
+					"source_fallback_pair": "/,"
+				},
+				{
+					"state": "circonflexe",
+					"action": ",",
+					"terminator": "^",
+					"neutral": ",",
+					"source_fallback_pair": "^,"
+				},
+				{
+					"state": "doubleraye",
+					"action": ",",
+					"terminator": "=",
+					"neutral": ",",
+					"source_fallback_pair": "=,"
+				},
+				{
+					"state": "grave",
+					"action": ",",
+					"terminator": "`",
+					"neutral": ",",
+					"source_fallback_pair": "`,"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": ",",
+					"terminator": "_",
+					"neutral": ",",
+					"source_fallback_pair": "_,"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": ",",
+					"terminator": ".",
+					"neutral": ",",
+					"source_fallback_pair": ".,"
+				},
+				{
+					"state": "tilde",
+					"action": ",",
+					"terminator": "~",
+					"neutral": ",",
+					"source_fallback_pair": "~,"
+				},
+				{
+					"state": "barre",
+					"action": "-",
+					"terminator": "/",
+					"neutral": "-",
+					"source_fallback_pair": "/-"
+				},
+				{
+					"state": "doubleraye",
+					"action": "-",
+					"terminator": "=",
+					"neutral": "-",
+					"source_fallback_pair": "=-"
+				},
+				{
+					"state": "grave",
+					"action": "-",
+					"terminator": "`",
+					"neutral": "-",
+					"source_fallback_pair": "`-"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "-",
+					"terminator": "_",
+					"neutral": "-",
+					"source_fallback_pair": "_-"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "-",
+					"terminator": ".",
+					"neutral": "-",
+					"source_fallback_pair": ".-"
+				},
+				{
+					"state": "virgule",
+					"action": "-",
+					"terminator": ",",
+					"neutral": "-",
+					"source_fallback_pair": ",-"
+				},
+				{
+					"state": "doubleraye",
+					"action": ".",
+					"terminator": "=",
+					"neutral": ".",
+					"source_fallback_pair": "=."
+				},
+				{
+					"state": "barre",
+					"action": "/",
+					"terminator": "/",
+					"neutral": "/",
+					"source_fallback_pair": "//"
+				},
+				{
+					"state": "circonflexe",
+					"action": "/",
+					"terminator": "^",
+					"neutral": "/",
+					"source_fallback_pair": "^/"
+				},
+				{
+					"state": "doubleraye",
+					"action": "/",
+					"terminator": "=",
+					"neutral": "/",
+					"source_fallback_pair": "=/"
+				},
+				{
+					"state": "grave",
+					"action": "/",
+					"terminator": "`",
+					"neutral": "/",
+					"source_fallback_pair": "`/"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "/",
+					"terminator": "_",
+					"neutral": "/",
+					"source_fallback_pair": "_/"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "/",
+					"terminator": ".",
+					"neutral": "/",
+					"source_fallback_pair": "./"
+				},
+				{
+					"state": "tilde",
+					"action": "/",
+					"terminator": "~",
+					"neutral": "/",
+					"source_fallback_pair": "~/"
+				},
+				{
+					"state": "virgule",
+					"action": "/",
+					"terminator": ",",
+					"neutral": "/",
+					"source_fallback_pair": ",/"
+				},
+				{
+					"state": "barre",
+					"action": "0",
+					"terminator": "/",
+					"neutral": "0",
+					"source_fallback_pair": "/0"
+				},
+				{
+					"state": "doubleraye",
+					"action": "0",
+					"terminator": "=",
+					"neutral": "0",
+					"source_fallback_pair": "=0"
+				},
+				{
+					"state": "grave",
+					"action": "0",
+					"terminator": "`",
+					"neutral": "0",
+					"source_fallback_pair": "`0"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "0",
+					"terminator": "_",
+					"neutral": "0",
+					"source_fallback_pair": "_0"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "0",
+					"terminator": ".",
+					"neutral": "0",
+					"source_fallback_pair": ".0"
+				},
+				{
+					"state": "tilde",
+					"action": "0",
+					"terminator": "~",
+					"neutral": "0",
+					"source_fallback_pair": "~0"
+				},
+				{
+					"state": "virgule",
+					"action": "0",
+					"terminator": ",",
+					"neutral": "0",
+					"source_fallback_pair": ",0"
+				},
+				{
+					"state": "barre",
+					"action": "1",
+					"terminator": "/",
+					"neutral": "1",
+					"source_fallback_pair": "/1"
+				},
+				{
+					"state": "doubleraye",
+					"action": "1",
+					"terminator": "=",
+					"neutral": "1",
+					"source_fallback_pair": "=1"
+				},
+				{
+					"state": "grave",
+					"action": "1",
+					"terminator": "`",
+					"neutral": "1",
+					"source_fallback_pair": "`1"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "1",
+					"terminator": "_",
+					"neutral": "1",
+					"source_fallback_pair": "_1"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "1",
+					"terminator": ".",
+					"neutral": "1",
+					"source_fallback_pair": ".1"
+				},
+				{
+					"state": "tilde",
+					"action": "1",
+					"terminator": "~",
+					"neutral": "1",
+					"source_fallback_pair": "~1"
+				},
+				{
+					"state": "virgule",
+					"action": "1",
+					"terminator": ",",
+					"neutral": "1",
+					"source_fallback_pair": ",1"
+				},
+				{
+					"state": "barre",
+					"action": "2",
+					"terminator": "/",
+					"neutral": "2",
+					"source_fallback_pair": "/2"
+				},
+				{
+					"state": "doubleraye",
+					"action": "2",
+					"terminator": "=",
+					"neutral": "2",
+					"source_fallback_pair": "=2"
+				},
+				{
+					"state": "grave",
+					"action": "2",
+					"terminator": "`",
+					"neutral": "2",
+					"source_fallback_pair": "`2"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "2",
+					"terminator": "_",
+					"neutral": "2",
+					"source_fallback_pair": "_2"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "2",
+					"terminator": ".",
+					"neutral": "2",
+					"source_fallback_pair": ".2"
+				},
+				{
+					"state": "tilde",
+					"action": "2",
+					"terminator": "~",
+					"neutral": "2",
+					"source_fallback_pair": "~2"
+				},
+				{
+					"state": "virgule",
+					"action": "2",
+					"terminator": ",",
+					"neutral": "2",
+					"source_fallback_pair": ",2"
+				},
+				{
+					"state": "barre",
+					"action": "3",
+					"terminator": "/",
+					"neutral": "3",
+					"source_fallback_pair": "/3"
+				},
+				{
+					"state": "doubleraye",
+					"action": "3",
+					"terminator": "=",
+					"neutral": "3",
+					"source_fallback_pair": "=3"
+				},
+				{
+					"state": "grave",
+					"action": "3",
+					"terminator": "`",
+					"neutral": "3",
+					"source_fallback_pair": "`3"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "3",
+					"terminator": "_",
+					"neutral": "3",
+					"source_fallback_pair": "_3"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "3",
+					"terminator": ".",
+					"neutral": "3",
+					"source_fallback_pair": ".3"
+				},
+				{
+					"state": "tilde",
+					"action": "3",
+					"terminator": "~",
+					"neutral": "3",
+					"source_fallback_pair": "~3"
+				},
+				{
+					"state": "virgule",
+					"action": "3",
+					"terminator": ",",
+					"neutral": "3",
+					"source_fallback_pair": ",3"
+				},
+				{
+					"state": "barre",
+					"action": "4",
+					"terminator": "/",
+					"neutral": "4",
+					"source_fallback_pair": "/4"
+				},
+				{
+					"state": "doubleraye",
+					"action": "4",
+					"terminator": "=",
+					"neutral": "4",
+					"source_fallback_pair": "=4"
+				},
+				{
+					"state": "grave",
+					"action": "4",
+					"terminator": "`",
+					"neutral": "4",
+					"source_fallback_pair": "`4"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "4",
+					"terminator": "_",
+					"neutral": "4",
+					"source_fallback_pair": "_4"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "4",
+					"terminator": ".",
+					"neutral": "4",
+					"source_fallback_pair": ".4"
+				},
+				{
+					"state": "tilde",
+					"action": "4",
+					"terminator": "~",
+					"neutral": "4",
+					"source_fallback_pair": "~4"
+				},
+				{
+					"state": "virgule",
+					"action": "4",
+					"terminator": ",",
+					"neutral": "4",
+					"source_fallback_pair": ",4"
+				},
+				{
+					"state": "barre",
+					"action": "5",
+					"terminator": "/",
+					"neutral": "5",
+					"source_fallback_pair": "/5"
+				},
+				{
+					"state": "doubleraye",
+					"action": "5",
+					"terminator": "=",
+					"neutral": "5",
+					"source_fallback_pair": "=5"
+				},
+				{
+					"state": "grave",
+					"action": "5",
+					"terminator": "`",
+					"neutral": "5",
+					"source_fallback_pair": "`5"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "5",
+					"terminator": "_",
+					"neutral": "5",
+					"source_fallback_pair": "_5"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "5",
+					"terminator": ".",
+					"neutral": "5",
+					"source_fallback_pair": ".5"
+				},
+				{
+					"state": "tilde",
+					"action": "5",
+					"terminator": "~",
+					"neutral": "5",
+					"source_fallback_pair": "~5"
+				},
+				{
+					"state": "virgule",
+					"action": "5",
+					"terminator": ",",
+					"neutral": "5",
+					"source_fallback_pair": ",5"
+				},
+				{
+					"state": "barre",
+					"action": "6",
+					"terminator": "/",
+					"neutral": "6",
+					"source_fallback_pair": "/6"
+				},
+				{
+					"state": "doubleraye",
+					"action": "6",
+					"terminator": "=",
+					"neutral": "6",
+					"source_fallback_pair": "=6"
+				},
+				{
+					"state": "grave",
+					"action": "6",
+					"terminator": "`",
+					"neutral": "6",
+					"source_fallback_pair": "`6"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "6",
+					"terminator": "_",
+					"neutral": "6",
+					"source_fallback_pair": "_6"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "6",
+					"terminator": ".",
+					"neutral": "6",
+					"source_fallback_pair": ".6"
+				},
+				{
+					"state": "tilde",
+					"action": "6",
+					"terminator": "~",
+					"neutral": "6",
+					"source_fallback_pair": "~6"
+				},
+				{
+					"state": "virgule",
+					"action": "6",
+					"terminator": ",",
+					"neutral": "6",
+					"source_fallback_pair": ",6"
+				},
+				{
+					"state": "barre",
+					"action": "7",
+					"terminator": "/",
+					"neutral": "7",
+					"source_fallback_pair": "/7"
+				},
+				{
+					"state": "doubleraye",
+					"action": "7",
+					"terminator": "=",
+					"neutral": "7",
+					"source_fallback_pair": "=7"
+				},
+				{
+					"state": "grave",
+					"action": "7",
+					"terminator": "`",
+					"neutral": "7",
+					"source_fallback_pair": "`7"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "7",
+					"terminator": "_",
+					"neutral": "7",
+					"source_fallback_pair": "_7"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "7",
+					"terminator": ".",
+					"neutral": "7",
+					"source_fallback_pair": ".7"
+				},
+				{
+					"state": "tilde",
+					"action": "7",
+					"terminator": "~",
+					"neutral": "7",
+					"source_fallback_pair": "~7"
+				},
+				{
+					"state": "virgule",
+					"action": "7",
+					"terminator": ",",
+					"neutral": "7",
+					"source_fallback_pair": ",7"
+				},
+				{
+					"state": "barre",
+					"action": "8",
+					"terminator": "/",
+					"neutral": "8",
+					"source_fallback_pair": "/8"
+				},
+				{
+					"state": "doubleraye",
+					"action": "8",
+					"terminator": "=",
+					"neutral": "8",
+					"source_fallback_pair": "=8"
+				},
+				{
+					"state": "grave",
+					"action": "8",
+					"terminator": "`",
+					"neutral": "8",
+					"source_fallback_pair": "`8"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "8",
+					"terminator": "_",
+					"neutral": "8",
+					"source_fallback_pair": "_8"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "8",
+					"terminator": ".",
+					"neutral": "8",
+					"source_fallback_pair": ".8"
+				},
+				{
+					"state": "tilde",
+					"action": "8",
+					"terminator": "~",
+					"neutral": "8",
+					"source_fallback_pair": "~8"
+				},
+				{
+					"state": "virgule",
+					"action": "8",
+					"terminator": ",",
+					"neutral": "8",
+					"source_fallback_pair": ",8"
+				},
+				{
+					"state": "barre",
+					"action": "9",
+					"terminator": "/",
+					"neutral": "9",
+					"source_fallback_pair": "/9"
+				},
+				{
+					"state": "doubleraye",
+					"action": "9",
+					"terminator": "=",
+					"neutral": "9",
+					"source_fallback_pair": "=9"
+				},
+				{
+					"state": "grave",
+					"action": "9",
+					"terminator": "`",
+					"neutral": "9",
+					"source_fallback_pair": "`9"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "9",
+					"terminator": "_",
+					"neutral": "9",
+					"source_fallback_pair": "_9"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "9",
+					"terminator": ".",
+					"neutral": "9",
+					"source_fallback_pair": ".9"
+				},
+				{
+					"state": "tilde",
+					"action": "9",
+					"terminator": "~",
+					"neutral": "9",
+					"source_fallback_pair": "~9"
+				},
+				{
+					"state": "virgule",
+					"action": "9",
+					"terminator": ",",
+					"neutral": "9",
+					"source_fallback_pair": ",9"
+				},
+				{
+					"state": "doubleraye",
+					"action": ":",
+					"terminator": "=",
+					"neutral": ":",
+					"source_fallback_pair": "=:"
+				},
+				{
+					"state": "barre",
+					"action": ";",
+					"terminator": "/",
+					"neutral": ";",
+					"source_fallback_pair": "/;"
+				},
+				{
+					"state": "circonflexe",
+					"action": ";",
+					"terminator": "^",
+					"neutral": ";",
+					"source_fallback_pair": "^;"
+				},
+				{
+					"state": "doubleraye",
+					"action": ";",
+					"terminator": "=",
+					"neutral": ";",
+					"source_fallback_pair": "=;"
+				},
+				{
+					"state": "grave",
+					"action": ";",
+					"terminator": "`",
+					"neutral": ";",
+					"source_fallback_pair": "`;"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": ";",
+					"terminator": "_",
+					"neutral": ";",
+					"source_fallback_pair": "_;"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": ";",
+					"terminator": ".",
+					"neutral": ";",
+					"source_fallback_pair": ".;"
+				},
+				{
+					"state": "tilde",
+					"action": ";",
+					"terminator": "~",
+					"neutral": ";",
+					"source_fallback_pair": "~;"
+				},
+				{
+					"state": "virgule",
+					"action": ";",
+					"terminator": ",",
+					"neutral": ";",
+					"source_fallback_pair": ",;"
+				},
+				{
+					"state": "doubleraye",
+					"action": "=",
+					"terminator": "=",
+					"neutral": "=",
+					"source_fallback_pair": "=="
+				},
+				{
+					"state": "grave",
+					"action": "=",
+					"terminator": "`",
+					"neutral": "=",
+					"source_fallback_pair": "`="
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "=",
+					"terminator": "_",
+					"neutral": "=",
+					"source_fallback_pair": "_="
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "=",
+					"terminator": ".",
+					"neutral": "=",
+					"source_fallback_pair": ".="
+				},
+				{
+					"state": "virgule",
+					"action": "=",
+					"terminator": ",",
+					"neutral": "=",
+					"source_fallback_pair": ",="
+				},
+				{
+					"state": "circonflexe",
+					"action": ">",
+					"terminator": "^",
+					"neutral": ">",
+					"source_fallback_pair": "^>"
+				},
+				{
+					"state": "doubleraye",
+					"action": ">",
+					"terminator": "=",
+					"neutral": ">",
+					"source_fallback_pair": "=>"
+				},
+				{
+					"state": "grave",
+					"action": ">",
+					"terminator": "`",
+					"neutral": ">",
+					"source_fallback_pair": "`>"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": ">",
+					"terminator": "_",
+					"neutral": ">",
+					"source_fallback_pair": "_>"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": ">",
+					"terminator": ".",
+					"neutral": ">",
+					"source_fallback_pair": ".>"
+				},
+				{
+					"state": "virgule",
+					"action": ">",
+					"terminator": ",",
+					"neutral": ">",
+					"source_fallback_pair": ",>"
+				},
+				{
+					"state": "doubleraye",
+					"action": "?",
+					"terminator": "=",
+					"neutral": "?",
+					"source_fallback_pair": "=?"
+				},
+				{
+					"state": "barre",
+					"action": "@",
+					"terminator": "/",
+					"neutral": "@",
+					"source_fallback_pair": "/@"
+				},
+				{
+					"state": "circonflexe",
+					"action": "@",
+					"terminator": "^",
+					"neutral": "@",
+					"source_fallback_pair": "^@"
+				},
+				{
+					"state": "doubleraye",
+					"action": "@",
+					"terminator": "=",
+					"neutral": "@",
+					"source_fallback_pair": "=@"
+				},
+				{
+					"state": "grave",
+					"action": "@",
+					"terminator": "`",
+					"neutral": "@",
+					"source_fallback_pair": "`@"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "@",
+					"terminator": "_",
+					"neutral": "@",
+					"source_fallback_pair": "_@"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "@",
+					"terminator": ".",
+					"neutral": "@",
+					"source_fallback_pair": ".@"
+				},
+				{
+					"state": "tilde",
+					"action": "@",
+					"terminator": "~",
+					"neutral": "@",
+					"source_fallback_pair": "~@"
+				},
+				{
+					"state": "virgule",
+					"action": "@",
+					"terminator": ",",
+					"neutral": "@",
+					"source_fallback_pair": ",@"
+				},
+				{
+					"state": "doubleraye",
+					"action": "A",
+					"terminator": "=",
+					"neutral": "A",
+					"source_fallback_pair": "=A"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "A",
+					"terminator": "_",
+					"neutral": "A",
+					"source_fallback_pair": "_A"
+				},
+				{
+					"state": "virgule",
+					"action": "A",
+					"terminator": ",",
+					"neutral": "A",
+					"source_fallback_pair": ",A"
+				},
+				{
+					"state": "barre",
+					"action": "B",
+					"terminator": "/",
+					"neutral": "B",
+					"source_fallback_pair": "/B"
+				},
+				{
+					"state": "circonflexe",
+					"action": "B",
+					"terminator": "^",
+					"neutral": "B",
+					"source_fallback_pair": "^B"
+				},
+				{
+					"state": "doubleraye",
+					"action": "B",
+					"terminator": "=",
+					"neutral": "B",
+					"source_fallback_pair": "=B"
+				},
+				{
+					"state": "grave",
+					"action": "B",
+					"terminator": "`",
+					"neutral": "B",
+					"source_fallback_pair": "`B"
+				},
+				{
+					"state": "tilde",
+					"action": "B",
+					"terminator": "~",
+					"neutral": "B",
+					"source_fallback_pair": "~B"
+				},
+				{
+					"state": "virgule",
+					"action": "B",
+					"terminator": ",",
+					"neutral": "B",
+					"source_fallback_pair": ",B"
+				},
+				{
+					"state": "doubleraye",
+					"action": "C",
+					"terminator": "=",
+					"neutral": "C",
+					"source_fallback_pair": "=C"
+				},
+				{
+					"state": "grave",
+					"action": "C",
+					"terminator": "`",
+					"neutral": "C",
+					"source_fallback_pair": "`C"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "C",
+					"terminator": "_",
+					"neutral": "C",
+					"source_fallback_pair": "_C"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "C",
+					"terminator": ".",
+					"neutral": "C",
+					"source_fallback_pair": ".C"
+				},
+				{
+					"state": "tilde",
+					"action": "C",
+					"terminator": "~",
+					"neutral": "C",
+					"source_fallback_pair": "~C"
+				},
+				{
+					"state": "virgule",
+					"action": "C",
+					"terminator": ",",
+					"neutral": "C",
+					"source_fallback_pair": ",C"
+				},
+				{
+					"state": "barre",
+					"action": "D",
+					"terminator": "/",
+					"neutral": "D",
+					"source_fallback_pair": "/D"
+				},
+				{
+					"state": "circonflexe",
+					"action": "D",
+					"terminator": "^",
+					"neutral": "D",
+					"source_fallback_pair": "^D"
+				},
+				{
+					"state": "doubleraye",
+					"action": "D",
+					"terminator": "=",
+					"neutral": "D",
+					"source_fallback_pair": "=D"
+				},
+				{
+					"state": "grave",
+					"action": "D",
+					"terminator": "`",
+					"neutral": "D",
+					"source_fallback_pair": "`D"
+				},
+				{
+					"state": "tilde",
+					"action": "D",
+					"terminator": "~",
+					"neutral": "D",
+					"source_fallback_pair": "~D"
+				},
+				{
+					"state": "virgule",
+					"action": "D",
+					"terminator": ",",
+					"neutral": "D",
+					"source_fallback_pair": ",D"
+				},
+				{
+					"state": "doubleraye",
+					"action": "E",
+					"terminator": "=",
+					"neutral": "E",
+					"source_fallback_pair": "=E"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "E",
+					"terminator": "_",
+					"neutral": "E",
+					"source_fallback_pair": "_E"
+				},
+				{
+					"state": "virgule",
+					"action": "E",
+					"terminator": ",",
+					"neutral": "E",
+					"source_fallback_pair": ",E"
+				},
+				{
+					"state": "barre",
+					"action": "F",
+					"terminator": "/",
+					"neutral": "F",
+					"source_fallback_pair": "/F"
+				},
+				{
+					"state": "circonflexe",
+					"action": "F",
+					"terminator": "^",
+					"neutral": "F",
+					"source_fallback_pair": "^F"
+				},
+				{
+					"state": "doubleraye",
+					"action": "F",
+					"terminator": "=",
+					"neutral": "F",
+					"source_fallback_pair": "=F"
+				},
+				{
+					"state": "grave",
+					"action": "F",
+					"terminator": "`",
+					"neutral": "F",
+					"source_fallback_pair": "`F"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "F",
+					"terminator": "_",
+					"neutral": "F",
+					"source_fallback_pair": "_F"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "F",
+					"terminator": ".",
+					"neutral": "F",
+					"source_fallback_pair": ".F"
+				},
+				{
+					"state": "tilde",
+					"action": "F",
+					"terminator": "~",
+					"neutral": "F",
+					"source_fallback_pair": "~F"
+				},
+				{
+					"state": "virgule",
+					"action": "F",
+					"terminator": ",",
+					"neutral": "F",
+					"source_fallback_pair": ",F"
+				},
+				{
+					"state": "doubleraye",
+					"action": "G",
+					"terminator": "=",
+					"neutral": "G",
+					"source_fallback_pair": "=G"
+				},
+				{
+					"state": "grave",
+					"action": "G",
+					"terminator": "`",
+					"neutral": "G",
+					"source_fallback_pair": "`G"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "G",
+					"terminator": "_",
+					"neutral": "G",
+					"source_fallback_pair": "_G"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "G",
+					"terminator": ".",
+					"neutral": "G",
+					"source_fallback_pair": ".G"
+				},
+				{
+					"state": "tilde",
+					"action": "G",
+					"terminator": "~",
+					"neutral": "G",
+					"source_fallback_pair": "~G"
+				},
+				{
+					"state": "virgule",
+					"action": "G",
+					"terminator": ",",
+					"neutral": "G",
+					"source_fallback_pair": ",G"
+				},
+				{
+					"state": "barre",
+					"action": "H",
+					"terminator": "/",
+					"neutral": "H",
+					"source_fallback_pair": "/H"
+				},
+				{
+					"state": "doubleraye",
+					"action": "H",
+					"terminator": "=",
+					"neutral": "H",
+					"source_fallback_pair": "=H"
+				},
+				{
+					"state": "grave",
+					"action": "H",
+					"terminator": "`",
+					"neutral": "H",
+					"source_fallback_pair": "`H"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "H",
+					"terminator": "_",
+					"neutral": "H",
+					"source_fallback_pair": "_H"
+				},
+				{
+					"state": "tilde",
+					"action": "H",
+					"terminator": "~",
+					"neutral": "H",
+					"source_fallback_pair": "~H"
+				},
+				{
+					"state": "virgule",
+					"action": "H",
+					"terminator": ",",
+					"neutral": "H",
+					"source_fallback_pair": ",H"
+				},
+				{
+					"state": "barre",
+					"action": "I",
+					"terminator": "/",
+					"neutral": "I",
+					"source_fallback_pair": "/I"
+				},
+				{
+					"state": "doubleraye",
+					"action": "I",
+					"terminator": "=",
+					"neutral": "I",
+					"source_fallback_pair": "=I"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "I",
+					"terminator": "_",
+					"neutral": "I",
+					"source_fallback_pair": "_I"
+				},
+				{
+					"state": "virgule",
+					"action": "I",
+					"terminator": ",",
+					"neutral": "I",
+					"source_fallback_pair": ",I"
+				},
+				{
+					"state": "barre",
+					"action": "J",
+					"terminator": "/",
+					"neutral": "J",
+					"source_fallback_pair": "/J"
+				},
+				{
+					"state": "doubleraye",
+					"action": "J",
+					"terminator": "=",
+					"neutral": "J",
+					"source_fallback_pair": "=J"
+				},
+				{
+					"state": "grave",
+					"action": "J",
+					"terminator": "`",
+					"neutral": "J",
+					"source_fallback_pair": "`J"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "J",
+					"terminator": "_",
+					"neutral": "J",
+					"source_fallback_pair": "_J"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "J",
+					"terminator": ".",
+					"neutral": "J",
+					"source_fallback_pair": ".J"
+				},
+				{
+					"state": "tilde",
+					"action": "J",
+					"terminator": "~",
+					"neutral": "J",
+					"source_fallback_pair": "~J"
+				},
+				{
+					"state": "virgule",
+					"action": "J",
+					"terminator": ",",
+					"neutral": "J",
+					"source_fallback_pair": ",J"
+				},
+				{
+					"state": "circonflexe",
+					"action": "K",
+					"terminator": "^",
+					"neutral": "K",
+					"source_fallback_pair": "^K"
+				},
+				{
+					"state": "doubleraye",
+					"action": "K",
+					"terminator": "=",
+					"neutral": "K",
+					"source_fallback_pair": "=K"
+				},
+				{
+					"state": "grave",
+					"action": "K",
+					"terminator": "`",
+					"neutral": "K",
+					"source_fallback_pair": "`K"
+				},
+				{
+					"state": "tilde",
+					"action": "K",
+					"terminator": "~",
+					"neutral": "K",
+					"source_fallback_pair": "~K"
+				},
+				{
+					"state": "virgule",
+					"action": "K",
+					"terminator": ",",
+					"neutral": "K",
+					"source_fallback_pair": ",K"
+				},
+				{
+					"state": "circonflexe",
+					"action": "L",
+					"terminator": "^",
+					"neutral": "L",
+					"source_fallback_pair": "^L"
+				},
+				{
+					"state": "grave",
+					"action": "L",
+					"terminator": "`",
+					"neutral": "L",
+					"source_fallback_pair": "`L"
+				},
+				{
+					"state": "tilde",
+					"action": "L",
+					"terminator": "~",
+					"neutral": "L",
+					"source_fallback_pair": "~L"
+				},
+				{
+					"state": "virgule",
+					"action": "L",
+					"terminator": ",",
+					"neutral": "L",
+					"source_fallback_pair": ",L"
+				},
+				{
+					"state": "barre",
+					"action": "M",
+					"terminator": "/",
+					"neutral": "M",
+					"source_fallback_pair": "/M"
+				},
+				{
+					"state": "circonflexe",
+					"action": "M",
+					"terminator": "^",
+					"neutral": "M",
+					"source_fallback_pair": "^M"
+				},
+				{
+					"state": "doubleraye",
+					"action": "M",
+					"terminator": "=",
+					"neutral": "M",
+					"source_fallback_pair": "=M"
+				},
+				{
+					"state": "grave",
+					"action": "M",
+					"terminator": "`",
+					"neutral": "M",
+					"source_fallback_pair": "`M"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "M",
+					"terminator": "_",
+					"neutral": "M",
+					"source_fallback_pair": "_M"
+				},
+				{
+					"state": "tilde",
+					"action": "M",
+					"terminator": "~",
+					"neutral": "M",
+					"source_fallback_pair": "~M"
+				},
+				{
+					"state": "virgule",
+					"action": "M",
+					"terminator": ",",
+					"neutral": "M",
+					"source_fallback_pair": ",M"
+				},
+				{
+					"state": "doubleraye",
+					"action": "N",
+					"terminator": "=",
+					"neutral": "N",
+					"source_fallback_pair": "=N"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "N",
+					"terminator": "_",
+					"neutral": "N",
+					"source_fallback_pair": "_N"
+				},
+				{
+					"state": "virgule",
+					"action": "N",
+					"terminator": ",",
+					"neutral": "N",
+					"source_fallback_pair": ",N"
+				},
+				{
+					"state": "doubleraye",
+					"action": "O",
+					"terminator": "=",
+					"neutral": "O",
+					"source_fallback_pair": "=O"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "O",
+					"terminator": "_",
+					"neutral": "O",
+					"source_fallback_pair": "_O"
+				},
+				{
+					"state": "virgule",
+					"action": "O",
+					"terminator": ",",
+					"neutral": "O",
+					"source_fallback_pair": ",O"
+				},
+				{
+					"state": "barre",
+					"action": "P",
+					"terminator": "/",
+					"neutral": "P",
+					"source_fallback_pair": "/P"
+				},
+				{
+					"state": "circonflexe",
+					"action": "P",
+					"terminator": "^",
+					"neutral": "P",
+					"source_fallback_pair": "^P"
+				},
+				{
+					"state": "grave",
+					"action": "P",
+					"terminator": "`",
+					"neutral": "P",
+					"source_fallback_pair": "`P"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "P",
+					"terminator": "_",
+					"neutral": "P",
+					"source_fallback_pair": "_P"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "P",
+					"terminator": ".",
+					"neutral": "P",
+					"source_fallback_pair": ".P"
+				},
+				{
+					"state": "tilde",
+					"action": "P",
+					"terminator": "~",
+					"neutral": "P",
+					"source_fallback_pair": "~P"
+				},
+				{
+					"state": "virgule",
+					"action": "P",
+					"terminator": ",",
+					"neutral": "P",
+					"source_fallback_pair": ",P"
+				},
+				{
+					"state": "circonflexe",
+					"action": "Q",
+					"terminator": "^",
+					"neutral": "Q",
+					"source_fallback_pair": "^Q"
+				},
+				{
+					"state": "doubleraye",
+					"action": "Q",
+					"terminator": "=",
+					"neutral": "Q",
+					"source_fallback_pair": "=Q"
+				},
+				{
+					"state": "grave",
+					"action": "Q",
+					"terminator": "`",
+					"neutral": "Q",
+					"source_fallback_pair": "`Q"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "Q",
+					"terminator": "_",
+					"neutral": "Q",
+					"source_fallback_pair": "_Q"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "Q",
+					"terminator": ".",
+					"neutral": "Q",
+					"source_fallback_pair": ".Q"
+				},
+				{
+					"state": "tilde",
+					"action": "Q",
+					"terminator": "~",
+					"neutral": "Q",
+					"source_fallback_pair": "~Q"
+				},
+				{
+					"state": "virgule",
+					"action": "Q",
+					"terminator": ",",
+					"neutral": "Q",
+					"source_fallback_pair": ",Q"
+				},
+				{
+					"state": "circonflexe",
+					"action": "R",
+					"terminator": "^",
+					"neutral": "R",
+					"source_fallback_pair": "^R"
+				},
+				{
+					"state": "doubleraye",
+					"action": "R",
+					"terminator": "=",
+					"neutral": "R",
+					"source_fallback_pair": "=R"
+				},
+				{
+					"state": "grave",
+					"action": "R",
+					"terminator": "`",
+					"neutral": "R",
+					"source_fallback_pair": "`R"
+				},
+				{
+					"state": "tilde",
+					"action": "R",
+					"terminator": "~",
+					"neutral": "R",
+					"source_fallback_pair": "~R"
+				},
+				{
+					"state": "virgule",
+					"action": "R",
+					"terminator": ",",
+					"neutral": "R",
+					"source_fallback_pair": ",R"
+				},
+				{
+					"state": "doubleraye",
+					"action": "S",
+					"terminator": "=",
+					"neutral": "S",
+					"source_fallback_pair": "=S"
+				},
+				{
+					"state": "grave",
+					"action": "S",
+					"terminator": "`",
+					"neutral": "S",
+					"source_fallback_pair": "`S"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "S",
+					"terminator": "_",
+					"neutral": "S",
+					"source_fallback_pair": "_S"
+				},
+				{
+					"state": "tilde",
+					"action": "S",
+					"terminator": "~",
+					"neutral": "S",
+					"source_fallback_pair": "~S"
+				},
+				{
+					"state": "circonflexe",
+					"action": "T",
+					"terminator": "^",
+					"neutral": "T",
+					"source_fallback_pair": "^T"
+				},
+				{
+					"state": "doubleraye",
+					"action": "T",
+					"terminator": "=",
+					"neutral": "T",
+					"source_fallback_pair": "=T"
+				},
+				{
+					"state": "grave",
+					"action": "T",
+					"terminator": "`",
+					"neutral": "T",
+					"source_fallback_pair": "`T"
+				},
+				{
+					"state": "tilde",
+					"action": "T",
+					"terminator": "~",
+					"neutral": "T",
+					"source_fallback_pair": "~T"
+				},
+				{
+					"state": "doubleraye",
+					"action": "U",
+					"terminator": "=",
+					"neutral": "U",
+					"source_fallback_pair": "=U"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "U",
+					"terminator": "_",
+					"neutral": "U",
+					"source_fallback_pair": "_U"
+				},
+				{
+					"state": "virgule",
+					"action": "U",
+					"terminator": ",",
+					"neutral": "U",
+					"source_fallback_pair": ",U"
+				},
+				{
+					"state": "circonflexe",
+					"action": "V",
+					"terminator": "^",
+					"neutral": "V",
+					"source_fallback_pair": "^V"
+				},
+				{
+					"state": "doubleraye",
+					"action": "V",
+					"terminator": "=",
+					"neutral": "V",
+					"source_fallback_pair": "=V"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "V",
+					"terminator": "_",
+					"neutral": "V",
+					"source_fallback_pair": "_V"
+				},
+				{
+					"state": "virgule",
+					"action": "V",
+					"terminator": ",",
+					"neutral": "V",
+					"source_fallback_pair": ",V"
+				},
+				{
+					"state": "barre",
+					"action": "W",
+					"terminator": "/",
+					"neutral": "W",
+					"source_fallback_pair": "/W"
+				},
+				{
+					"state": "doubleraye",
+					"action": "W",
+					"terminator": "=",
+					"neutral": "W",
+					"source_fallback_pair": "=W"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "W",
+					"terminator": "_",
+					"neutral": "W",
+					"source_fallback_pair": "_W"
+				},
+				{
+					"state": "tilde",
+					"action": "W",
+					"terminator": "~",
+					"neutral": "W",
+					"source_fallback_pair": "~W"
+				},
+				{
+					"state": "virgule",
+					"action": "W",
+					"terminator": ",",
+					"neutral": "W",
+					"source_fallback_pair": ",W"
+				},
+				{
+					"state": "barre",
+					"action": "X",
+					"terminator": "/",
+					"neutral": "X",
+					"source_fallback_pair": "/X"
+				},
+				{
+					"state": "circonflexe",
+					"action": "X",
+					"terminator": "^",
+					"neutral": "X",
+					"source_fallback_pair": "^X"
+				},
+				{
+					"state": "doubleraye",
+					"action": "X",
+					"terminator": "=",
+					"neutral": "X",
+					"source_fallback_pair": "=X"
+				},
+				{
+					"state": "grave",
+					"action": "X",
+					"terminator": "`",
+					"neutral": "X",
+					"source_fallback_pair": "`X"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "X",
+					"terminator": "_",
+					"neutral": "X",
+					"source_fallback_pair": "_X"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "X",
+					"terminator": ".",
+					"neutral": "X",
+					"source_fallback_pair": ".X"
+				},
+				{
+					"state": "tilde",
+					"action": "X",
+					"terminator": "~",
+					"neutral": "X",
+					"source_fallback_pair": "~X"
+				},
+				{
+					"state": "virgule",
+					"action": "X",
+					"terminator": ",",
+					"neutral": "X",
+					"source_fallback_pair": ",X"
+				},
+				{
+					"state": "barre",
+					"action": "Y",
+					"terminator": "/",
+					"neutral": "Y",
+					"source_fallback_pair": "/Y"
+				},
+				{
+					"state": "doubleraye",
+					"action": "Y",
+					"terminator": "=",
+					"neutral": "Y",
+					"source_fallback_pair": "=Y"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "Y",
+					"terminator": "_",
+					"neutral": "Y",
+					"source_fallback_pair": "_Y"
+				},
+				{
+					"state": "virgule",
+					"action": "Y",
+					"terminator": ",",
+					"neutral": "Y",
+					"source_fallback_pair": ",Y"
+				},
+				{
+					"state": "barre",
+					"action": "Z",
+					"terminator": "/",
+					"neutral": "Z",
+					"source_fallback_pair": "/Z"
+				},
+				{
+					"state": "doubleraye",
+					"action": "Z",
+					"terminator": "=",
+					"neutral": "Z",
+					"source_fallback_pair": "=Z"
+				},
+				{
+					"state": "grave",
+					"action": "Z",
+					"terminator": "`",
+					"neutral": "Z",
+					"source_fallback_pair": "`Z"
+				},
+				{
+					"state": "tilde",
+					"action": "Z",
+					"terminator": "~",
+					"neutral": "Z",
+					"source_fallback_pair": "~Z"
+				},
+				{
+					"state": "virgule",
+					"action": "Z",
+					"terminator": ",",
+					"neutral": "Z",
+					"source_fallback_pair": ",Z"
+				},
+				{
+					"state": "barre",
+					"action": "[",
+					"terminator": "/",
+					"neutral": "[",
+					"source_fallback_pair": "/["
+				},
+				{
+					"state": "circonflexe",
+					"action": "[",
+					"terminator": "^",
+					"neutral": "[",
+					"source_fallback_pair": "^["
+				},
+				{
+					"state": "doubleraye",
+					"action": "[",
+					"terminator": "=",
+					"neutral": "[",
+					"source_fallback_pair": "=["
+				},
+				{
+					"state": "grave",
+					"action": "[",
+					"terminator": "`",
+					"neutral": "[",
+					"source_fallback_pair": "`["
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "[",
+					"terminator": "_",
+					"neutral": "[",
+					"source_fallback_pair": "_["
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "[",
+					"terminator": ".",
+					"neutral": "[",
+					"source_fallback_pair": ".["
+				},
+				{
+					"state": "tilde",
+					"action": "[",
+					"terminator": "~",
+					"neutral": "[",
+					"source_fallback_pair": "~["
+				},
+				{
+					"state": "virgule",
+					"action": "[",
+					"terminator": ",",
+					"neutral": "[",
+					"source_fallback_pair": ",["
+				},
+				{
+					"state": "barre",
+					"action": "\\",
+					"terminator": "/",
+					"neutral": "\\",
+					"source_fallback_pair": "/\\"
+				},
+				{
+					"state": "circonflexe",
+					"action": "\\",
+					"terminator": "^",
+					"neutral": "\\",
+					"source_fallback_pair": "^\\"
+				},
+				{
+					"state": "doubleraye",
+					"action": "\\",
+					"terminator": "=",
+					"neutral": "\\",
+					"source_fallback_pair": "=\\"
+				},
+				{
+					"state": "grave",
+					"action": "\\",
+					"terminator": "`",
+					"neutral": "\\",
+					"source_fallback_pair": "`\\"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "\\",
+					"terminator": "_",
+					"neutral": "\\",
+					"source_fallback_pair": "_\\"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "\\",
+					"terminator": ".",
+					"neutral": "\\",
+					"source_fallback_pair": ".\\"
+				},
+				{
+					"state": "tilde",
+					"action": "\\",
+					"terminator": "~",
+					"neutral": "\\",
+					"source_fallback_pair": "~\\"
+				},
+				{
+					"state": "virgule",
+					"action": "\\",
+					"terminator": ",",
+					"neutral": "\\",
+					"source_fallback_pair": ",\\"
+				},
+				{
+					"state": "barre",
+					"action": "]",
+					"terminator": "/",
+					"neutral": "]",
+					"source_fallback_pair": "/]"
+				},
+				{
+					"state": "circonflexe",
+					"action": "]",
+					"terminator": "^",
+					"neutral": "]",
+					"source_fallback_pair": "^]"
+				},
+				{
+					"state": "doubleraye",
+					"action": "]",
+					"terminator": "=",
+					"neutral": "]",
+					"source_fallback_pair": "=]"
+				},
+				{
+					"state": "grave",
+					"action": "]",
+					"terminator": "`",
+					"neutral": "]",
+					"source_fallback_pair": "`]"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "]",
+					"terminator": "_",
+					"neutral": "]",
+					"source_fallback_pair": "_]"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "]",
+					"terminator": ".",
+					"neutral": "]",
+					"source_fallback_pair": ".]"
+				},
+				{
+					"state": "tilde",
+					"action": "]",
+					"terminator": "~",
+					"neutral": "]",
+					"source_fallback_pair": "~]"
+				},
+				{
+					"state": "virgule",
+					"action": "]",
+					"terminator": ",",
+					"neutral": "]",
+					"source_fallback_pair": ",]"
+				},
+				{
+					"state": "barre",
+					"action": "^",
+					"terminator": "/",
+					"neutral": "^",
+					"source_fallback_pair": "/^"
+				},
+				{
+					"state": "circonflexe",
+					"action": "^",
+					"terminator": "^",
+					"neutral": "^",
+					"source_fallback_pair": "^^"
+				},
+				{
+					"state": "doubleraye",
+					"action": "^",
+					"terminator": "=",
+					"neutral": "^",
+					"source_fallback_pair": "=^"
+				},
+				{
+					"state": "grave",
+					"action": "^",
+					"terminator": "`",
+					"neutral": "^",
+					"source_fallback_pair": "`^"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "^",
+					"terminator": "_",
+					"neutral": "^",
+					"source_fallback_pair": "_^"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "^",
+					"terminator": ".",
+					"neutral": "^",
+					"source_fallback_pair": ".^"
+				},
+				{
+					"state": "tilde",
+					"action": "^",
+					"terminator": "~",
+					"neutral": "^",
+					"source_fallback_pair": "~^"
+				},
+				{
+					"state": "virgule",
+					"action": "^",
+					"terminator": ",",
+					"neutral": "^",
+					"source_fallback_pair": ",^"
+				},
+				{
+					"state": "doubleraye",
+					"action": "_",
+					"terminator": "=",
+					"neutral": "_",
+					"source_fallback_pair": "=_"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "_",
+					"terminator": "_",
+					"neutral": "_",
+					"source_fallback_pair": "__"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "_",
+					"terminator": ".",
+					"neutral": "_",
+					"source_fallback_pair": "._"
+				},
+				{
+					"state": "barre",
+					"action": "`",
+					"terminator": "/",
+					"neutral": "`",
+					"source_fallback_pair": "/`"
+				},
+				{
+					"state": "circonflexe",
+					"action": "`",
+					"terminator": "^",
+					"neutral": "`",
+					"source_fallback_pair": "^`"
+				},
+				{
+					"state": "doubleraye",
+					"action": "`",
+					"terminator": "=",
+					"neutral": "`",
+					"source_fallback_pair": "=`"
+				},
+				{
+					"state": "grave",
+					"action": "`",
+					"terminator": "`",
+					"neutral": "`",
+					"source_fallback_pair": "``"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "`",
+					"terminator": "_",
+					"neutral": "`",
+					"source_fallback_pair": "_`"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "`",
+					"terminator": ".",
+					"neutral": "`",
+					"source_fallback_pair": ".`"
+				},
+				{
+					"state": "tilde",
+					"action": "`",
+					"terminator": "~",
+					"neutral": "`",
+					"source_fallback_pair": "~`"
+				},
+				{
+					"state": "virgule",
+					"action": "`",
+					"terminator": ",",
+					"neutral": "`",
+					"source_fallback_pair": ",`"
+				},
+				{
+					"state": "doubleraye",
+					"action": "a",
+					"terminator": "=",
+					"neutral": "a",
+					"source_fallback_pair": "=a"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "a",
+					"terminator": "_",
+					"neutral": "a",
+					"source_fallback_pair": "_a"
+				},
+				{
+					"state": "virgule",
+					"action": "a",
+					"terminator": ",",
+					"neutral": "a",
+					"source_fallback_pair": ",a"
+				},
+				{
+					"state": "circonflexe",
+					"action": "b",
+					"terminator": "^",
+					"neutral": "b",
+					"source_fallback_pair": "^b"
+				},
+				{
+					"state": "doubleraye",
+					"action": "b",
+					"terminator": "=",
+					"neutral": "b",
+					"source_fallback_pair": "=b"
+				},
+				{
+					"state": "grave",
+					"action": "b",
+					"terminator": "`",
+					"neutral": "b",
+					"source_fallback_pair": "`b"
+				},
+				{
+					"state": "tilde",
+					"action": "b",
+					"terminator": "~",
+					"neutral": "b",
+					"source_fallback_pair": "~b"
+				},
+				{
+					"state": "virgule",
+					"action": "b",
+					"terminator": ",",
+					"neutral": "b",
+					"source_fallback_pair": ",b"
+				},
+				{
+					"state": "doubleraye",
+					"action": "c",
+					"terminator": "=",
+					"neutral": "c",
+					"source_fallback_pair": "=c"
+				},
+				{
+					"state": "grave",
+					"action": "c",
+					"terminator": "`",
+					"neutral": "c",
+					"source_fallback_pair": "`c"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "c",
+					"terminator": "_",
+					"neutral": "c",
+					"source_fallback_pair": "_c"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "c",
+					"terminator": ".",
+					"neutral": "c",
+					"source_fallback_pair": ".c"
+				},
+				{
+					"state": "tilde",
+					"action": "c",
+					"terminator": "~",
+					"neutral": "c",
+					"source_fallback_pair": "~c"
+				},
+				{
+					"state": "virgule",
+					"action": "c",
+					"terminator": ",",
+					"neutral": "c",
+					"source_fallback_pair": ",c"
+				},
+				{
+					"state": "barre",
+					"action": "d",
+					"terminator": "/",
+					"neutral": "d",
+					"source_fallback_pair": "/d"
+				},
+				{
+					"state": "circonflexe",
+					"action": "d",
+					"terminator": "^",
+					"neutral": "d",
+					"source_fallback_pair": "^d"
+				},
+				{
+					"state": "doubleraye",
+					"action": "d",
+					"terminator": "=",
+					"neutral": "d",
+					"source_fallback_pair": "=d"
+				},
+				{
+					"state": "grave",
+					"action": "d",
+					"terminator": "`",
+					"neutral": "d",
+					"source_fallback_pair": "`d"
+				},
+				{
+					"state": "tilde",
+					"action": "d",
+					"terminator": "~",
+					"neutral": "d",
+					"source_fallback_pair": "~d"
+				},
+				{
+					"state": "virgule",
+					"action": "d",
+					"terminator": ",",
+					"neutral": "d",
+					"source_fallback_pair": ",d"
+				},
+				{
+					"state": "doubleraye",
+					"action": "e",
+					"terminator": "=",
+					"neutral": "e",
+					"source_fallback_pair": "=e"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "e",
+					"terminator": "_",
+					"neutral": "e",
+					"source_fallback_pair": "_e"
+				},
+				{
+					"state": "virgule",
+					"action": "e",
+					"terminator": ",",
+					"neutral": "e",
+					"source_fallback_pair": ",e"
+				},
+				{
+					"state": "doubleraye",
+					"action": "espace",
+					"terminator": "=",
+					"neutral": " ",
+					"source_fallback_pair": "= "
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "espace",
+					"terminator": "_",
+					"neutral": " ",
+					"source_fallback_pair": "_ "
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "espace",
+					"terminator": ".",
+					"neutral": " ",
+					"source_fallback_pair": ". "
+				},
+				{
+					"state": "barre",
+					"action": "esperluette",
+					"terminator": "/",
+					"neutral": "&",
+					"source_fallback_pair": "/&"
+				},
+				{
+					"state": "circonflexe",
+					"action": "esperluette",
+					"terminator": "^",
+					"neutral": "&",
+					"source_fallback_pair": "^&"
+				},
+				{
+					"state": "doubleraye",
+					"action": "esperluette",
+					"terminator": "=",
+					"neutral": "&",
+					"source_fallback_pair": "=&"
+				},
+				{
+					"state": "grave",
+					"action": "esperluette",
+					"terminator": "`",
+					"neutral": "&",
+					"source_fallback_pair": "`&"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "esperluette",
+					"terminator": "_",
+					"neutral": "&",
+					"source_fallback_pair": "_&"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "esperluette",
+					"terminator": ".",
+					"neutral": "&",
+					"source_fallback_pair": ".&"
+				},
+				{
+					"state": "tilde",
+					"action": "esperluette",
+					"terminator": "~",
+					"neutral": "&",
+					"source_fallback_pair": "~&"
+				},
+				{
+					"state": "virgule",
+					"action": "esperluette",
+					"terminator": ",",
+					"neutral": "&",
+					"source_fallback_pair": ",&"
+				},
+				{
+					"state": "barre",
+					"action": "f",
+					"terminator": "/",
+					"neutral": "f",
+					"source_fallback_pair": "/f"
+				},
+				{
+					"state": "circonflexe",
+					"action": "f",
+					"terminator": "^",
+					"neutral": "f",
+					"source_fallback_pair": "^f"
+				},
+				{
+					"state": "doubleraye",
+					"action": "f",
+					"terminator": "=",
+					"neutral": "f",
+					"source_fallback_pair": "=f"
+				},
+				{
+					"state": "grave",
+					"action": "f",
+					"terminator": "`",
+					"neutral": "f",
+					"source_fallback_pair": "`f"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "f",
+					"terminator": "_",
+					"neutral": "f",
+					"source_fallback_pair": "_f"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "f",
+					"terminator": ".",
+					"neutral": "f",
+					"source_fallback_pair": ".f"
+				},
+				{
+					"state": "tilde",
+					"action": "f",
+					"terminator": "~",
+					"neutral": "f",
+					"source_fallback_pair": "~f"
+				},
+				{
+					"state": "virgule",
+					"action": "f",
+					"terminator": ",",
+					"neutral": "f",
+					"source_fallback_pair": ",f"
+				},
+				{
+					"state": "doubleraye",
+					"action": "g",
+					"terminator": "=",
+					"neutral": "g",
+					"source_fallback_pair": "=g"
+				},
+				{
+					"state": "grave",
+					"action": "g",
+					"terminator": "`",
+					"neutral": "g",
+					"source_fallback_pair": "`g"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "g",
+					"terminator": "_",
+					"neutral": "g",
+					"source_fallback_pair": "_g"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "g",
+					"terminator": ".",
+					"neutral": "g",
+					"source_fallback_pair": ".g"
+				},
+				{
+					"state": "tilde",
+					"action": "g",
+					"terminator": "~",
+					"neutral": "g",
+					"source_fallback_pair": "~g"
+				},
+				{
+					"state": "virgule",
+					"action": "g",
+					"terminator": ",",
+					"neutral": "g",
+					"source_fallback_pair": ",g"
+				},
+				{
+					"state": "barre",
+					"action": "guillemet",
+					"terminator": "/",
+					"neutral": "\"",
+					"source_fallback_pair": "/\""
+				},
+				{
+					"state": "circonflexe",
+					"action": "guillemet",
+					"terminator": "^",
+					"neutral": "\"",
+					"source_fallback_pair": "^\""
+				},
+				{
+					"state": "doubleraye",
+					"action": "guillemet",
+					"terminator": "=",
+					"neutral": "\"",
+					"source_fallback_pair": "=\""
+				},
+				{
+					"state": "grave",
+					"action": "guillemet",
+					"terminator": "`",
+					"neutral": "\"",
+					"source_fallback_pair": "`\""
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "guillemet",
+					"terminator": "_",
+					"neutral": "\"",
+					"source_fallback_pair": "_\""
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "guillemet",
+					"terminator": ".",
+					"neutral": "\"",
+					"source_fallback_pair": ".\""
+				},
+				{
+					"state": "tilde",
+					"action": "guillemet",
+					"terminator": "~",
+					"neutral": "\"",
+					"source_fallback_pair": "~\""
+				},
+				{
+					"state": "virgule",
+					"action": "guillemet",
+					"terminator": ",",
+					"neutral": "\"",
+					"source_fallback_pair": ",\""
+				},
+				{
+					"state": "barre",
+					"action": "h",
+					"terminator": "/",
+					"neutral": "h",
+					"source_fallback_pair": "/h"
+				},
+				{
+					"state": "doubleraye",
+					"action": "h",
+					"terminator": "=",
+					"neutral": "h",
+					"source_fallback_pair": "=h"
+				},
+				{
+					"state": "grave",
+					"action": "h",
+					"terminator": "`",
+					"neutral": "h",
+					"source_fallback_pair": "`h"
+				},
+				{
+					"state": "tilde",
+					"action": "h",
+					"terminator": "~",
+					"neutral": "h",
+					"source_fallback_pair": "~h"
+				},
+				{
+					"state": "virgule",
+					"action": "h",
+					"terminator": ",",
+					"neutral": "h",
+					"source_fallback_pair": ",h"
+				},
+				{
+					"state": "barre",
+					"action": "i",
+					"terminator": "/",
+					"neutral": "i",
+					"source_fallback_pair": "/i"
+				},
+				{
+					"state": "doubleraye",
+					"action": "i",
+					"terminator": "=",
+					"neutral": "i",
+					"source_fallback_pair": "=i"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "i",
+					"terminator": "_",
+					"neutral": "i",
+					"source_fallback_pair": "_i"
+				},
+				{
+					"state": "virgule",
+					"action": "i",
+					"terminator": ",",
+					"neutral": "i",
+					"source_fallback_pair": ",i"
+				},
+				{
+					"state": "circonflexe",
+					"action": "inferieur",
+					"terminator": "^",
+					"neutral": "<",
+					"source_fallback_pair": "^<"
+				},
+				{
+					"state": "doubleraye",
+					"action": "inferieur",
+					"terminator": "=",
+					"neutral": "<",
+					"source_fallback_pair": "=<"
+				},
+				{
+					"state": "grave",
+					"action": "inferieur",
+					"terminator": "`",
+					"neutral": "<",
+					"source_fallback_pair": "`<"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "inferieur",
+					"terminator": "_",
+					"neutral": "<",
+					"source_fallback_pair": "_<"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "inferieur",
+					"terminator": ".",
+					"neutral": "<",
+					"source_fallback_pair": ".<"
+				},
+				{
+					"state": "virgule",
+					"action": "inferieur",
+					"terminator": ",",
+					"neutral": "<",
+					"source_fallback_pair": ",<"
+				},
+				{
+					"state": "barre",
+					"action": "j",
+					"terminator": "/",
+					"neutral": "j",
+					"source_fallback_pair": "/j"
+				},
+				{
+					"state": "doubleraye",
+					"action": "j",
+					"terminator": "=",
+					"neutral": "j",
+					"source_fallback_pair": "=j"
+				},
+				{
+					"state": "grave",
+					"action": "j",
+					"terminator": "`",
+					"neutral": "j",
+					"source_fallback_pair": "`j"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "j",
+					"terminator": "_",
+					"neutral": "j",
+					"source_fallback_pair": "_j"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "j",
+					"terminator": ".",
+					"neutral": "j",
+					"source_fallback_pair": ".j"
+				},
+				{
+					"state": "tilde",
+					"action": "j",
+					"terminator": "~",
+					"neutral": "j",
+					"source_fallback_pair": "~j"
+				},
+				{
+					"state": "virgule",
+					"action": "j",
+					"terminator": ",",
+					"neutral": "j",
+					"source_fallback_pair": ",j"
+				},
+				{
+					"state": "circonflexe",
+					"action": "k",
+					"terminator": "^",
+					"neutral": "k",
+					"source_fallback_pair": "^k"
+				},
+				{
+					"state": "doubleraye",
+					"action": "k",
+					"terminator": "=",
+					"neutral": "k",
+					"source_fallback_pair": "=k"
+				},
+				{
+					"state": "grave",
+					"action": "k",
+					"terminator": "`",
+					"neutral": "k",
+					"source_fallback_pair": "`k"
+				},
+				{
+					"state": "tilde",
+					"action": "k",
+					"terminator": "~",
+					"neutral": "k",
+					"source_fallback_pair": "~k"
+				},
+				{
+					"state": "virgule",
+					"action": "k",
+					"terminator": ",",
+					"neutral": "k",
+					"source_fallback_pair": ",k"
+				},
+				{
+					"state": "circonflexe",
+					"action": "l",
+					"terminator": "^",
+					"neutral": "l",
+					"source_fallback_pair": "^l"
+				},
+				{
+					"state": "grave",
+					"action": "l",
+					"terminator": "`",
+					"neutral": "l",
+					"source_fallback_pair": "`l"
+				},
+				{
+					"state": "tilde",
+					"action": "l",
+					"terminator": "~",
+					"neutral": "l",
+					"source_fallback_pair": "~l"
+				},
+				{
+					"state": "virgule",
+					"action": "l",
+					"terminator": ",",
+					"neutral": "l",
+					"source_fallback_pair": ",l"
+				},
+				{
+					"state": "barre",
+					"action": "m",
+					"terminator": "/",
+					"neutral": "m",
+					"source_fallback_pair": "/m"
+				},
+				{
+					"state": "circonflexe",
+					"action": "m",
+					"terminator": "^",
+					"neutral": "m",
+					"source_fallback_pair": "^m"
+				},
+				{
+					"state": "doubleraye",
+					"action": "m",
+					"terminator": "=",
+					"neutral": "m",
+					"source_fallback_pair": "=m"
+				},
+				{
+					"state": "grave",
+					"action": "m",
+					"terminator": "`",
+					"neutral": "m",
+					"source_fallback_pair": "`m"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "m",
+					"terminator": "_",
+					"neutral": "m",
+					"source_fallback_pair": "_m"
+				},
+				{
+					"state": "tilde",
+					"action": "m",
+					"terminator": "~",
+					"neutral": "m",
+					"source_fallback_pair": "~m"
+				},
+				{
+					"state": "virgule",
+					"action": "m",
+					"terminator": ",",
+					"neutral": "m",
+					"source_fallback_pair": ",m"
+				},
+				{
+					"state": "doubleraye",
+					"action": "n",
+					"terminator": "=",
+					"neutral": "n",
+					"source_fallback_pair": "=n"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "n",
+					"terminator": "_",
+					"neutral": "n",
+					"source_fallback_pair": "_n"
+				},
+				{
+					"state": "virgule",
+					"action": "n",
+					"terminator": ",",
+					"neutral": "n",
+					"source_fallback_pair": ",n"
+				},
+				{
+					"state": "doubleraye",
+					"action": "o",
+					"terminator": "=",
+					"neutral": "o",
+					"source_fallback_pair": "=o"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "o",
+					"terminator": "_",
+					"neutral": "o",
+					"source_fallback_pair": "_o"
+				},
+				{
+					"state": "virgule",
+					"action": "o",
+					"terminator": ",",
+					"neutral": "o",
+					"source_fallback_pair": ",o"
+				},
+				{
+					"state": "barre",
+					"action": "p",
+					"terminator": "/",
+					"neutral": "p",
+					"source_fallback_pair": "/p"
+				},
+				{
+					"state": "circonflexe",
+					"action": "p",
+					"terminator": "^",
+					"neutral": "p",
+					"source_fallback_pair": "^p"
+				},
+				{
+					"state": "grave",
+					"action": "p",
+					"terminator": "`",
+					"neutral": "p",
+					"source_fallback_pair": "`p"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "p",
+					"terminator": "_",
+					"neutral": "p",
+					"source_fallback_pair": "_p"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "p",
+					"terminator": ".",
+					"neutral": "p",
+					"source_fallback_pair": ".p"
+				},
+				{
+					"state": "tilde",
+					"action": "p",
+					"terminator": "~",
+					"neutral": "p",
+					"source_fallback_pair": "~p"
+				},
+				{
+					"state": "virgule",
+					"action": "p",
+					"terminator": ",",
+					"neutral": "p",
+					"source_fallback_pair": ",p"
+				},
+				{
+					"state": "circonflexe",
+					"action": "q",
+					"terminator": "^",
+					"neutral": "q",
+					"source_fallback_pair": "^q"
+				},
+				{
+					"state": "doubleraye",
+					"action": "q",
+					"terminator": "=",
+					"neutral": "q",
+					"source_fallback_pair": "=q"
+				},
+				{
+					"state": "grave",
+					"action": "q",
+					"terminator": "`",
+					"neutral": "q",
+					"source_fallback_pair": "`q"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "q",
+					"terminator": "_",
+					"neutral": "q",
+					"source_fallback_pair": "_q"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "q",
+					"terminator": ".",
+					"neutral": "q",
+					"source_fallback_pair": ".q"
+				},
+				{
+					"state": "tilde",
+					"action": "q",
+					"terminator": "~",
+					"neutral": "q",
+					"source_fallback_pair": "~q"
+				},
+				{
+					"state": "virgule",
+					"action": "q",
+					"terminator": ",",
+					"neutral": "q",
+					"source_fallback_pair": ",q"
+				},
+				{
+					"state": "circonflexe",
+					"action": "r",
+					"terminator": "^",
+					"neutral": "r",
+					"source_fallback_pair": "^r"
+				},
+				{
+					"state": "doubleraye",
+					"action": "r",
+					"terminator": "=",
+					"neutral": "r",
+					"source_fallback_pair": "=r"
+				},
+				{
+					"state": "grave",
+					"action": "r",
+					"terminator": "`",
+					"neutral": "r",
+					"source_fallback_pair": "`r"
+				},
+				{
+					"state": "tilde",
+					"action": "r",
+					"terminator": "~",
+					"neutral": "r",
+					"source_fallback_pair": "~r"
+				},
+				{
+					"state": "virgule",
+					"action": "r",
+					"terminator": ",",
+					"neutral": "r",
+					"source_fallback_pair": ",r"
+				},
+				{
+					"state": "doubleraye",
+					"action": "s",
+					"terminator": "=",
+					"neutral": "s",
+					"source_fallback_pair": "=s"
+				},
+				{
+					"state": "grave",
+					"action": "s",
+					"terminator": "`",
+					"neutral": "s",
+					"source_fallback_pair": "`s"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "s",
+					"terminator": "_",
+					"neutral": "s",
+					"source_fallback_pair": "_s"
+				},
+				{
+					"state": "tilde",
+					"action": "s",
+					"terminator": "~",
+					"neutral": "s",
+					"source_fallback_pair": "~s"
+				},
+				{
+					"state": "circonflexe",
+					"action": "t",
+					"terminator": "^",
+					"neutral": "t",
+					"source_fallback_pair": "^t"
+				},
+				{
+					"state": "doubleraye",
+					"action": "t",
+					"terminator": "=",
+					"neutral": "t",
+					"source_fallback_pair": "=t"
+				},
+				{
+					"state": "grave",
+					"action": "t",
+					"terminator": "`",
+					"neutral": "t",
+					"source_fallback_pair": "`t"
+				},
+				{
+					"state": "tilde",
+					"action": "t",
+					"terminator": "~",
+					"neutral": "t",
+					"source_fallback_pair": "~t"
+				},
+				{
+					"state": "doubleraye",
+					"action": "u",
+					"terminator": "=",
+					"neutral": "u",
+					"source_fallback_pair": "=u"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "u",
+					"terminator": "_",
+					"neutral": "u",
+					"source_fallback_pair": "_u"
+				},
+				{
+					"state": "virgule",
+					"action": "u",
+					"terminator": ",",
+					"neutral": "u",
+					"source_fallback_pair": ",u"
+				},
+				{
+					"state": "circonflexe",
+					"action": "v",
+					"terminator": "^",
+					"neutral": "v",
+					"source_fallback_pair": "^v"
+				},
+				{
+					"state": "doubleraye",
+					"action": "v",
+					"terminator": "=",
+					"neutral": "v",
+					"source_fallback_pair": "=v"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "v",
+					"terminator": "_",
+					"neutral": "v",
+					"source_fallback_pair": "_v"
+				},
+				{
+					"state": "virgule",
+					"action": "v",
+					"terminator": ",",
+					"neutral": "v",
+					"source_fallback_pair": ",v"
+				},
+				{
+					"state": "barre",
+					"action": "w",
+					"terminator": "/",
+					"neutral": "w",
+					"source_fallback_pair": "/w"
+				},
+				{
+					"state": "doubleraye",
+					"action": "w",
+					"terminator": "=",
+					"neutral": "w",
+					"source_fallback_pair": "=w"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "w",
+					"terminator": "_",
+					"neutral": "w",
+					"source_fallback_pair": "_w"
+				},
+				{
+					"state": "tilde",
+					"action": "w",
+					"terminator": "~",
+					"neutral": "w",
+					"source_fallback_pair": "~w"
+				},
+				{
+					"state": "virgule",
+					"action": "w",
+					"terminator": ",",
+					"neutral": "w",
+					"source_fallback_pair": ",w"
+				},
+				{
+					"state": "barre",
+					"action": "x",
+					"terminator": "/",
+					"neutral": "x",
+					"source_fallback_pair": "/x"
+				},
+				{
+					"state": "circonflexe",
+					"action": "x",
+					"terminator": "^",
+					"neutral": "x",
+					"source_fallback_pair": "^x"
+				},
+				{
+					"state": "doubleraye",
+					"action": "x",
+					"terminator": "=",
+					"neutral": "x",
+					"source_fallback_pair": "=x"
+				},
+				{
+					"state": "grave",
+					"action": "x",
+					"terminator": "`",
+					"neutral": "x",
+					"source_fallback_pair": "`x"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "x",
+					"terminator": "_",
+					"neutral": "x",
+					"source_fallback_pair": "_x"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "x",
+					"terminator": ".",
+					"neutral": "x",
+					"source_fallback_pair": ".x"
+				},
+				{
+					"state": "tilde",
+					"action": "x",
+					"terminator": "~",
+					"neutral": "x",
+					"source_fallback_pair": "~x"
+				},
+				{
+					"state": "virgule",
+					"action": "x",
+					"terminator": ",",
+					"neutral": "x",
+					"source_fallback_pair": ",x"
+				},
+				{
+					"state": "barre",
+					"action": "y",
+					"terminator": "/",
+					"neutral": "y",
+					"source_fallback_pair": "/y"
+				},
+				{
+					"state": "doubleraye",
+					"action": "y",
+					"terminator": "=",
+					"neutral": "y",
+					"source_fallback_pair": "=y"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "y",
+					"terminator": "_",
+					"neutral": "y",
+					"source_fallback_pair": "_y"
+				},
+				{
+					"state": "virgule",
+					"action": "y",
+					"terminator": ",",
+					"neutral": "y",
+					"source_fallback_pair": ",y"
+				},
+				{
+					"state": "barre",
+					"action": "z",
+					"terminator": "/",
+					"neutral": "z",
+					"source_fallback_pair": "/z"
+				},
+				{
+					"state": "doubleraye",
+					"action": "z",
+					"terminator": "=",
+					"neutral": "z",
+					"source_fallback_pair": "=z"
+				},
+				{
+					"state": "grave",
+					"action": "z",
+					"terminator": "`",
+					"neutral": "z",
+					"source_fallback_pair": "`z"
+				},
+				{
+					"state": "tilde",
+					"action": "z",
+					"terminator": "~",
+					"neutral": "z",
+					"source_fallback_pair": "~z"
+				},
+				{
+					"state": "virgule",
+					"action": "z",
+					"terminator": ",",
+					"neutral": "z",
+					"source_fallback_pair": ",z"
+				},
+				{
+					"state": "barre",
+					"action": "{",
+					"terminator": "/",
+					"neutral": "{",
+					"source_fallback_pair": "/{"
+				},
+				{
+					"state": "circonflexe",
+					"action": "{",
+					"terminator": "^",
+					"neutral": "{",
+					"source_fallback_pair": "^{"
+				},
+				{
+					"state": "doubleraye",
+					"action": "{",
+					"terminator": "=",
+					"neutral": "{",
+					"source_fallback_pair": "={"
+				},
+				{
+					"state": "grave",
+					"action": "{",
+					"terminator": "`",
+					"neutral": "{",
+					"source_fallback_pair": "`{"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "{",
+					"terminator": "_",
+					"neutral": "{",
+					"source_fallback_pair": "_{"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "{",
+					"terminator": ".",
+					"neutral": "{",
+					"source_fallback_pair": ".{"
+				},
+				{
+					"state": "tilde",
+					"action": "{",
+					"terminator": "~",
+					"neutral": "{",
+					"source_fallback_pair": "~{"
+				},
+				{
+					"state": "virgule",
+					"action": "{",
+					"terminator": ",",
+					"neutral": "{",
+					"source_fallback_pair": ",{"
+				},
+				{
+					"state": "barre",
+					"action": "|",
+					"terminator": "/",
+					"neutral": "|",
+					"source_fallback_pair": "/|"
+				},
+				{
+					"state": "circonflexe",
+					"action": "|",
+					"terminator": "^",
+					"neutral": "|",
+					"source_fallback_pair": "^|"
+				},
+				{
+					"state": "doubleraye",
+					"action": "|",
+					"terminator": "=",
+					"neutral": "|",
+					"source_fallback_pair": "=|"
+				},
+				{
+					"state": "grave",
+					"action": "|",
+					"terminator": "`",
+					"neutral": "|",
+					"source_fallback_pair": "`|"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "|",
+					"terminator": "_",
+					"neutral": "|",
+					"source_fallback_pair": "_|"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "|",
+					"terminator": ".",
+					"neutral": "|",
+					"source_fallback_pair": ".|"
+				},
+				{
+					"state": "tilde",
+					"action": "|",
+					"terminator": "~",
+					"neutral": "|",
+					"source_fallback_pair": "~|"
+				},
+				{
+					"state": "virgule",
+					"action": "|",
+					"terminator": ",",
+					"neutral": "|",
+					"source_fallback_pair": ",|"
+				},
+				{
+					"state": "barre",
+					"action": "}",
+					"terminator": "/",
+					"neutral": "}",
+					"source_fallback_pair": "/}"
+				},
+				{
+					"state": "circonflexe",
+					"action": "}",
+					"terminator": "^",
+					"neutral": "}",
+					"source_fallback_pair": "^}"
+				},
+				{
+					"state": "doubleraye",
+					"action": "}",
+					"terminator": "=",
+					"neutral": "}",
+					"source_fallback_pair": "=}"
+				},
+				{
+					"state": "grave",
+					"action": "}",
+					"terminator": "`",
+					"neutral": "}",
+					"source_fallback_pair": "`}"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "}",
+					"terminator": "_",
+					"neutral": "}",
+					"source_fallback_pair": "_}"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "}",
+					"terminator": ".",
+					"neutral": "}",
+					"source_fallback_pair": ".}"
+				},
+				{
+					"state": "tilde",
+					"action": "}",
+					"terminator": "~",
+					"neutral": "}",
+					"source_fallback_pair": "~}"
+				},
+				{
+					"state": "virgule",
+					"action": "}",
+					"terminator": ",",
+					"neutral": "}",
+					"source_fallback_pair": ",}"
+				},
+				{
+					"state": "circonflexe",
+					"action": "~",
+					"terminator": "^",
+					"neutral": "~",
+					"source_fallback_pair": "^~"
+				},
+				{
+					"state": "doubleraye",
+					"action": "~",
+					"terminator": "=",
+					"neutral": "~",
+					"source_fallback_pair": "=~"
+				},
+				{
+					"state": "grave",
+					"action": "~",
+					"terminator": "`",
+					"neutral": "~",
+					"source_fallback_pair": "`~"
+				},
+				{
+					"state": "macronsouscrit",
+					"action": "~",
+					"terminator": "_",
+					"neutral": "~",
+					"source_fallback_pair": "_~"
+				},
+				{
+					"state": "pointsouscrit",
+					"action": "~",
+					"terminator": ".",
+					"neutral": "~",
+					"source_fallback_pair": ".~"
+				},
+				{
+					"state": "tilde",
+					"action": "~",
+					"terminator": "~",
+					"neutral": "~",
+					"source_fallback_pair": "~~"
+				},
+				{
+					"state": "virgule",
+					"action": "~",
+					"terminator": ",",
+					"neutral": "~",
+					"source_fallback_pair": ",~"
+				}
+			],
+			"parser_converter_results": [
+				{
+					"runtime": "lua",
+					"canonical_equal": true,
+					"symbols_sha256": "e030f21c5804bc5a669499da84e9d1787af6d93daf006a237f741e045d9097da",
+					"compose_sha256": "cea9881dfe51f0d7664e46454687da1a556e758f3c2da2ea4951a51dc4137ee7"
+				},
+				{
+					"runtime": "luajit",
+					"canonical_equal": true,
+					"symbols_sha256": "e030f21c5804bc5a669499da84e9d1787af6d93daf006a237f741e045d9097da",
+					"compose_sha256": "cea9881dfe51f0d7664e46454687da1a556e758f3c2da2ea4951a51dc4137ee7"
+				}
+			],
+			"windows_disabled_row_source_seed": null
+		},
+		{
+			"id": "ergol",
+			"platforms": ["linux", "macos", "windows"],
+			"source": "static/layouts/registry/ergol/ergol.keylayout",
+			"source_sha256": "b19d38f7e11ef58983cf2185d8b2097dffeda387d1c4ed8ed0e45ab022e4c189",
+			"action_count": 112,
+			"states": 18,
+			"state_entry_sequences": [
+				{
+					"state": "circumflex",
+					"sequence": ["dead_circumflex"],
+					"trail": [
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "currency",
+					"sequence": ["dead_currency"],
+					"trail": [
+						{
+							"keysym": "dead_currency",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "abovering",
+					"sequence": ["dead_abovering"],
+					"trail": [
+						{
+							"keysym": "dead_abovering",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "1dk",
+					"sequence": ["rightsinglequotemark"],
+					"trail": [
+						{
+							"keysym": "rightsinglequotemark",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "acute",
+					"sequence": ["dead_acute"],
+					"trail": [
+						{
+							"keysym": "dead_acute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "grave",
+					"sequence": ["dead_grave"],
+					"trail": [
+						{
+							"keysym": "dead_grave",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "caron",
+					"sequence": ["dead_caron"],
+					"trail": [
+						{
+							"keysym": "dead_caron",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "abovedot",
+					"sequence": ["dead_abovedot"],
+					"trail": [
+						{
+							"keysym": "dead_abovedot",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "stroke",
+					"sequence": ["dead_stroke"],
+					"trail": [
+						{
+							"keysym": "dead_stroke",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "macron",
+					"sequence": ["dead_macron"],
+					"trail": [
+						{
+							"keysym": "dead_macron",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "doubleacute",
+					"sequence": ["dead_doubleacute"],
+					"trail": [
+						{
+							"keysym": "dead_doubleacute",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "tilde",
+					"sequence": ["dead_tilde"],
+					"trail": [
+						{
+							"keysym": "dead_tilde",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "belowcomma",
+					"sequence": ["dead_belowcomma"],
+					"trail": [
+						{
+							"keysym": "dead_belowcomma",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "ogonek",
+					"sequence": ["dead_ogonek"],
+					"trail": [
+						{
+							"keysym": "dead_ogonek",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "cedilla",
+					"sequence": ["dead_cedilla"],
+					"trail": [
+						{
+							"keysym": "dead_cedilla",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "breve",
+					"sequence": ["dead_breve"],
+					"trail": [
+						{
+							"keysym": "dead_breve",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "greek",
+					"sequence": ["rightsinglequotemark", "g"],
+					"trail": [
+						{
+							"keysym": "rightsinglequotemark",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "g",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "diaeresis",
+					"sequence": ["rightsinglequotemark", "rightsinglequotemark"],
+					"trail": [
+						{
+							"keysym": "rightsinglequotemark",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "rightsinglequotemark",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				}
+			],
+			"explicit_output_key_level_contexts": 1342,
+			"unique_wire_expectations": 532,
+			"native_mismatches": [],
+			"ambiguous_neutral_text_compositions": [],
+			"two_ascii_explicit_outputs": [],
+			"two_ascii_missing_state_pairs": [
+				{
+					"state": "grave",
+					"action": "ae01_1",
+					"terminator": "`",
+					"neutral": "1",
+					"source_fallback_pair": "`1"
+				},
+				{
+					"state": "tilde",
+					"action": "ae01_1",
+					"terminator": "~",
+					"neutral": "1",
+					"source_fallback_pair": "~1"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ae01_1",
+					"terminator": ",",
+					"neutral": "1",
+					"source_fallback_pair": ",1"
+				},
+				{
+					"state": "stroke",
+					"action": "ae01_1",
+					"terminator": "/",
+					"neutral": "1",
+					"source_fallback_pair": "/1"
+				},
+				{
+					"state": "grave",
+					"action": "ae02_2",
+					"terminator": "`",
+					"neutral": "2",
+					"source_fallback_pair": "`2"
+				},
+				{
+					"state": "tilde",
+					"action": "ae02_2",
+					"terminator": "~",
+					"neutral": "2",
+					"source_fallback_pair": "~2"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ae02_2",
+					"terminator": ",",
+					"neutral": "2",
+					"source_fallback_pair": ",2"
+				},
+				{
+					"state": "stroke",
+					"action": "ae02_2",
+					"terminator": "/",
+					"neutral": "2",
+					"source_fallback_pair": "/2"
+				},
+				{
+					"state": "grave",
+					"action": "ae03_3",
+					"terminator": "`",
+					"neutral": "3",
+					"source_fallback_pair": "`3"
+				},
+				{
+					"state": "tilde",
+					"action": "ae03_3",
+					"terminator": "~",
+					"neutral": "3",
+					"source_fallback_pair": "~3"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ae03_3",
+					"terminator": ",",
+					"neutral": "3",
+					"source_fallback_pair": ",3"
+				},
+				{
+					"state": "stroke",
+					"action": "ae03_3",
+					"terminator": "/",
+					"neutral": "3",
+					"source_fallback_pair": "/3"
+				},
+				{
+					"state": "grave",
+					"action": "ae04_4",
+					"terminator": "`",
+					"neutral": "4",
+					"source_fallback_pair": "`4"
+				},
+				{
+					"state": "tilde",
+					"action": "ae04_4",
+					"terminator": "~",
+					"neutral": "4",
+					"source_fallback_pair": "~4"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ae04_4",
+					"terminator": ",",
+					"neutral": "4",
+					"source_fallback_pair": ",4"
+				},
+				{
+					"state": "stroke",
+					"action": "ae04_4",
+					"terminator": "/",
+					"neutral": "4",
+					"source_fallback_pair": "/4"
+				},
+				{
+					"state": "grave",
+					"action": "ae05_5",
+					"terminator": "`",
+					"neutral": "5",
+					"source_fallback_pair": "`5"
+				},
+				{
+					"state": "tilde",
+					"action": "ae05_5",
+					"terminator": "~",
+					"neutral": "5",
+					"source_fallback_pair": "~5"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ae05_5",
+					"terminator": ",",
+					"neutral": "5",
+					"source_fallback_pair": ",5"
+				},
+				{
+					"state": "stroke",
+					"action": "ae05_5",
+					"terminator": "/",
+					"neutral": "5",
+					"source_fallback_pair": "/5"
+				},
+				{
+					"state": "grave",
+					"action": "ae06_6",
+					"terminator": "`",
+					"neutral": "6",
+					"source_fallback_pair": "`6"
+				},
+				{
+					"state": "tilde",
+					"action": "ae06_6",
+					"terminator": "~",
+					"neutral": "6",
+					"source_fallback_pair": "~6"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ae06_6",
+					"terminator": ",",
+					"neutral": "6",
+					"source_fallback_pair": ",6"
+				},
+				{
+					"state": "stroke",
+					"action": "ae06_6",
+					"terminator": "/",
+					"neutral": "6",
+					"source_fallback_pair": "/6"
+				},
+				{
+					"state": "grave",
+					"action": "ae07_7",
+					"terminator": "`",
+					"neutral": "7",
+					"source_fallback_pair": "`7"
+				},
+				{
+					"state": "tilde",
+					"action": "ae07_7",
+					"terminator": "~",
+					"neutral": "7",
+					"source_fallback_pair": "~7"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ae07_7",
+					"terminator": ",",
+					"neutral": "7",
+					"source_fallback_pair": ",7"
+				},
+				{
+					"state": "stroke",
+					"action": "ae07_7",
+					"terminator": "/",
+					"neutral": "7",
+					"source_fallback_pair": "/7"
+				},
+				{
+					"state": "grave",
+					"action": "ae08_8",
+					"terminator": "`",
+					"neutral": "8",
+					"source_fallback_pair": "`8"
+				},
+				{
+					"state": "tilde",
+					"action": "ae08_8",
+					"terminator": "~",
+					"neutral": "8",
+					"source_fallback_pair": "~8"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ae08_8",
+					"terminator": ",",
+					"neutral": "8",
+					"source_fallback_pair": ",8"
+				},
+				{
+					"state": "stroke",
+					"action": "ae08_8",
+					"terminator": "/",
+					"neutral": "8",
+					"source_fallback_pair": "/8"
+				},
+				{
+					"state": "grave",
+					"action": "ae09_9",
+					"terminator": "`",
+					"neutral": "9",
+					"source_fallback_pair": "`9"
+				},
+				{
+					"state": "tilde",
+					"action": "ae09_9",
+					"terminator": "~",
+					"neutral": "9",
+					"source_fallback_pair": "~9"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ae09_9",
+					"terminator": ",",
+					"neutral": "9",
+					"source_fallback_pair": ",9"
+				},
+				{
+					"state": "stroke",
+					"action": "ae09_9",
+					"terminator": "/",
+					"neutral": "9",
+					"source_fallback_pair": "/9"
+				},
+				{
+					"state": "grave",
+					"action": "ae10_0",
+					"terminator": "`",
+					"neutral": "0",
+					"source_fallback_pair": "`0"
+				},
+				{
+					"state": "tilde",
+					"action": "ae10_0",
+					"terminator": "~",
+					"neutral": "0",
+					"source_fallback_pair": "~0"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ae10_0",
+					"terminator": ",",
+					"neutral": "0",
+					"source_fallback_pair": ",0"
+				},
+				{
+					"state": "stroke",
+					"action": "ae10_0",
+					"terminator": "/",
+					"neutral": "0",
+					"source_fallback_pair": "/0"
+				},
+				{
+					"state": "grave",
+					"action": "ad01_q",
+					"terminator": "`",
+					"neutral": "q",
+					"source_fallback_pair": "`q"
+				},
+				{
+					"state": "circumflex",
+					"action": "ad01_q",
+					"terminator": "^",
+					"neutral": "q",
+					"source_fallback_pair": "^q"
+				},
+				{
+					"state": "tilde",
+					"action": "ad01_q",
+					"terminator": "~",
+					"neutral": "q",
+					"source_fallback_pair": "~q"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad01_q",
+					"terminator": ",",
+					"neutral": "q",
+					"source_fallback_pair": ",q"
+				},
+				{
+					"state": "stroke",
+					"action": "ad01_q",
+					"terminator": "/",
+					"neutral": "q",
+					"source_fallback_pair": "/q"
+				},
+				{
+					"state": "grave",
+					"action": "ad01_Q",
+					"terminator": "`",
+					"neutral": "Q",
+					"source_fallback_pair": "`Q"
+				},
+				{
+					"state": "circumflex",
+					"action": "ad01_Q",
+					"terminator": "^",
+					"neutral": "Q",
+					"source_fallback_pair": "^Q"
+				},
+				{
+					"state": "tilde",
+					"action": "ad01_Q",
+					"terminator": "~",
+					"neutral": "Q",
+					"source_fallback_pair": "~Q"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad01_Q",
+					"terminator": ",",
+					"neutral": "Q",
+					"source_fallback_pair": ",Q"
+				},
+				{
+					"state": "stroke",
+					"action": "ad01_Q",
+					"terminator": "/",
+					"neutral": "Q",
+					"source_fallback_pair": "/Q"
+				},
+				{
+					"state": "grave",
+					"action": "ad02_c",
+					"terminator": "`",
+					"neutral": "c",
+					"source_fallback_pair": "`c"
+				},
+				{
+					"state": "tilde",
+					"action": "ad02_c",
+					"terminator": "~",
+					"neutral": "c",
+					"source_fallback_pair": "~c"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad02_c",
+					"terminator": ",",
+					"neutral": "c",
+					"source_fallback_pair": ",c"
+				},
+				{
+					"state": "grave",
+					"action": "ad02_C",
+					"terminator": "`",
+					"neutral": "C",
+					"source_fallback_pair": "`C"
+				},
+				{
+					"state": "tilde",
+					"action": "ad02_C",
+					"terminator": "~",
+					"neutral": "C",
+					"source_fallback_pair": "~C"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad02_C",
+					"terminator": ",",
+					"neutral": "C",
+					"source_fallback_pair": ",C"
+				},
+				{
+					"state": "grave",
+					"action": "ad02_x003c",
+					"terminator": "`",
+					"neutral": "<",
+					"source_fallback_pair": "`<"
+				},
+				{
+					"state": "circumflex",
+					"action": "ad02_x003c",
+					"terminator": "^",
+					"neutral": "<",
+					"source_fallback_pair": "^<"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad02_x003c",
+					"terminator": ",",
+					"neutral": "<",
+					"source_fallback_pair": ",<"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad03_o",
+					"terminator": ",",
+					"neutral": "o",
+					"source_fallback_pair": ",o"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad03_O",
+					"terminator": ",",
+					"neutral": "O",
+					"source_fallback_pair": ",O"
+				},
+				{
+					"state": "grave",
+					"action": "ad03_x003e",
+					"terminator": "`",
+					"neutral": ">",
+					"source_fallback_pair": "`>"
+				},
+				{
+					"state": "circumflex",
+					"action": "ad03_x003e",
+					"terminator": "^",
+					"neutral": ">",
+					"source_fallback_pair": "^>"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad03_x003e",
+					"terminator": ",",
+					"neutral": ">",
+					"source_fallback_pair": ",>"
+				},
+				{
+					"state": "grave",
+					"action": "ad04_p",
+					"terminator": "`",
+					"neutral": "p",
+					"source_fallback_pair": "`p"
+				},
+				{
+					"state": "circumflex",
+					"action": "ad04_p",
+					"terminator": "^",
+					"neutral": "p",
+					"source_fallback_pair": "^p"
+				},
+				{
+					"state": "tilde",
+					"action": "ad04_p",
+					"terminator": "~",
+					"neutral": "p",
+					"source_fallback_pair": "~p"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad04_p",
+					"terminator": ",",
+					"neutral": "p",
+					"source_fallback_pair": ",p"
+				},
+				{
+					"state": "grave",
+					"action": "ad04_P",
+					"terminator": "`",
+					"neutral": "P",
+					"source_fallback_pair": "`P"
+				},
+				{
+					"state": "circumflex",
+					"action": "ad04_P",
+					"terminator": "^",
+					"neutral": "P",
+					"source_fallback_pair": "^P"
+				},
+				{
+					"state": "tilde",
+					"action": "ad04_P",
+					"terminator": "~",
+					"neutral": "P",
+					"source_fallback_pair": "~P"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad04_P",
+					"terminator": ",",
+					"neutral": "P",
+					"source_fallback_pair": ",P"
+				},
+				{
+					"state": "tilde",
+					"action": "ad05_w",
+					"terminator": "~",
+					"neutral": "w",
+					"source_fallback_pair": "~w"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad05_w",
+					"terminator": ",",
+					"neutral": "w",
+					"source_fallback_pair": ",w"
+				},
+				{
+					"state": "stroke",
+					"action": "ad05_w",
+					"terminator": "/",
+					"neutral": "w",
+					"source_fallback_pair": "/w"
+				},
+				{
+					"state": "tilde",
+					"action": "ad05_W",
+					"terminator": "~",
+					"neutral": "W",
+					"source_fallback_pair": "~W"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad05_W",
+					"terminator": ",",
+					"neutral": "W",
+					"source_fallback_pair": ",W"
+				},
+				{
+					"state": "stroke",
+					"action": "ad05_W",
+					"terminator": "/",
+					"neutral": "W",
+					"source_fallback_pair": "/W"
+				},
+				{
+					"state": "grave",
+					"action": "ad06_j",
+					"terminator": "`",
+					"neutral": "j",
+					"source_fallback_pair": "`j"
+				},
+				{
+					"state": "tilde",
+					"action": "ad06_j",
+					"terminator": "~",
+					"neutral": "j",
+					"source_fallback_pair": "~j"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad06_j",
+					"terminator": ",",
+					"neutral": "j",
+					"source_fallback_pair": ",j"
+				},
+				{
+					"state": "grave",
+					"action": "ad06_J",
+					"terminator": "`",
+					"neutral": "J",
+					"source_fallback_pair": "`J"
+				},
+				{
+					"state": "tilde",
+					"action": "ad06_J",
+					"terminator": "~",
+					"neutral": "J",
+					"source_fallback_pair": "~J"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad06_J",
+					"terminator": ",",
+					"neutral": "J",
+					"source_fallback_pair": ",J"
+				},
+				{
+					"state": "grave",
+					"action": "ad07_m",
+					"terminator": "`",
+					"neutral": "m",
+					"source_fallback_pair": "`m"
+				},
+				{
+					"state": "circumflex",
+					"action": "ad07_m",
+					"terminator": "^",
+					"neutral": "m",
+					"source_fallback_pair": "^m"
+				},
+				{
+					"state": "tilde",
+					"action": "ad07_m",
+					"terminator": "~",
+					"neutral": "m",
+					"source_fallback_pair": "~m"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad07_m",
+					"terminator": ",",
+					"neutral": "m",
+					"source_fallback_pair": ",m"
+				},
+				{
+					"state": "stroke",
+					"action": "ad07_m",
+					"terminator": "/",
+					"neutral": "m",
+					"source_fallback_pair": "/m"
+				},
+				{
+					"state": "grave",
+					"action": "ad07_M",
+					"terminator": "`",
+					"neutral": "M",
+					"source_fallback_pair": "`M"
+				},
+				{
+					"state": "circumflex",
+					"action": "ad07_M",
+					"terminator": "^",
+					"neutral": "M",
+					"source_fallback_pair": "^M"
+				},
+				{
+					"state": "tilde",
+					"action": "ad07_M",
+					"terminator": "~",
+					"neutral": "M",
+					"source_fallback_pair": "~M"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad07_M",
+					"terminator": ",",
+					"neutral": "M",
+					"source_fallback_pair": ",M"
+				},
+				{
+					"state": "stroke",
+					"action": "ad07_M",
+					"terminator": "/",
+					"neutral": "M",
+					"source_fallback_pair": "/M"
+				},
+				{
+					"state": "grave",
+					"action": "ad08_d",
+					"terminator": "`",
+					"neutral": "d",
+					"source_fallback_pair": "`d"
+				},
+				{
+					"state": "circumflex",
+					"action": "ad08_d",
+					"terminator": "^",
+					"neutral": "d",
+					"source_fallback_pair": "^d"
+				},
+				{
+					"state": "tilde",
+					"action": "ad08_d",
+					"terminator": "~",
+					"neutral": "d",
+					"source_fallback_pair": "~d"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad08_d",
+					"terminator": ",",
+					"neutral": "d",
+					"source_fallback_pair": ",d"
+				},
+				{
+					"state": "grave",
+					"action": "ad08_D",
+					"terminator": "`",
+					"neutral": "D",
+					"source_fallback_pair": "`D"
+				},
+				{
+					"state": "circumflex",
+					"action": "ad08_D",
+					"terminator": "^",
+					"neutral": "D",
+					"source_fallback_pair": "^D"
+				},
+				{
+					"state": "tilde",
+					"action": "ad08_D",
+					"terminator": "~",
+					"neutral": "D",
+					"source_fallback_pair": "~D"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad08_D",
+					"terminator": ",",
+					"neutral": "D",
+					"source_fallback_pair": ",D"
+				},
+				{
+					"state": "grave",
+					"action": "ad09_!",
+					"terminator": "`",
+					"neutral": "!",
+					"source_fallback_pair": "`!"
+				},
+				{
+					"state": "circumflex",
+					"action": "ad09_!",
+					"terminator": "^",
+					"neutral": "!",
+					"source_fallback_pair": "^!"
+				},
+				{
+					"state": "tilde",
+					"action": "ad09_!",
+					"terminator": "~",
+					"neutral": "!",
+					"source_fallback_pair": "~!"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad09_!",
+					"terminator": ",",
+					"neutral": "!",
+					"source_fallback_pair": ",!"
+				},
+				{
+					"state": "stroke",
+					"action": "ad09_!",
+					"terminator": "/",
+					"neutral": "!",
+					"source_fallback_pair": "/!"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad10_y",
+					"terminator": ",",
+					"neutral": "y",
+					"source_fallback_pair": ",y"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ad10_Y",
+					"terminator": ",",
+					"neutral": "Y",
+					"source_fallback_pair": ",Y"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac01_a",
+					"terminator": ",",
+					"neutral": "a",
+					"source_fallback_pair": ",a"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac01_A",
+					"terminator": ",",
+					"neutral": "A",
+					"source_fallback_pair": ",A"
+				},
+				{
+					"state": "grave",
+					"action": "ac02_s",
+					"terminator": "`",
+					"neutral": "s",
+					"source_fallback_pair": "`s"
+				},
+				{
+					"state": "tilde",
+					"action": "ac02_s",
+					"terminator": "~",
+					"neutral": "s",
+					"source_fallback_pair": "~s"
+				},
+				{
+					"state": "stroke",
+					"action": "ac02_s",
+					"terminator": "/",
+					"neutral": "s",
+					"source_fallback_pair": "/s"
+				},
+				{
+					"state": "grave",
+					"action": "ac02_S",
+					"terminator": "`",
+					"neutral": "S",
+					"source_fallback_pair": "`S"
+				},
+				{
+					"state": "tilde",
+					"action": "ac02_S",
+					"terminator": "~",
+					"neutral": "S",
+					"source_fallback_pair": "~S"
+				},
+				{
+					"state": "stroke",
+					"action": "ac02_S",
+					"terminator": "/",
+					"neutral": "S",
+					"source_fallback_pair": "/S"
+				},
+				{
+					"state": "grave",
+					"action": "ac02_(",
+					"terminator": "`",
+					"neutral": "(",
+					"source_fallback_pair": "`("
+				},
+				{
+					"state": "tilde",
+					"action": "ac02_(",
+					"terminator": "~",
+					"neutral": "(",
+					"source_fallback_pair": "~("
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac02_(",
+					"terminator": ",",
+					"neutral": "(",
+					"source_fallback_pair": ",("
+				},
+				{
+					"state": "stroke",
+					"action": "ac02_(",
+					"terminator": "/",
+					"neutral": "(",
+					"source_fallback_pair": "/("
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac03_e",
+					"terminator": ",",
+					"neutral": "e",
+					"source_fallback_pair": ",e"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac03_E",
+					"terminator": ",",
+					"neutral": "E",
+					"source_fallback_pair": ",E"
+				},
+				{
+					"state": "grave",
+					"action": "ac03_)",
+					"terminator": "`",
+					"neutral": ")",
+					"source_fallback_pair": "`)"
+				},
+				{
+					"state": "tilde",
+					"action": "ac03_)",
+					"terminator": "~",
+					"neutral": ")",
+					"source_fallback_pair": "~)"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac03_)",
+					"terminator": ",",
+					"neutral": ")",
+					"source_fallback_pair": ",)"
+				},
+				{
+					"state": "stroke",
+					"action": "ac03_)",
+					"terminator": "/",
+					"neutral": ")",
+					"source_fallback_pair": "/)"
+				},
+				{
+					"state": "circumflex",
+					"action": "ac04_n",
+					"terminator": "^",
+					"neutral": "n",
+					"source_fallback_pair": "^n"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac04_n",
+					"terminator": ",",
+					"neutral": "n",
+					"source_fallback_pair": ",n"
+				},
+				{
+					"state": "stroke",
+					"action": "ac04_n",
+					"terminator": "/",
+					"neutral": "n",
+					"source_fallback_pair": "/n"
+				},
+				{
+					"state": "circumflex",
+					"action": "ac04_N",
+					"terminator": "^",
+					"neutral": "N",
+					"source_fallback_pair": "^N"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac04_N",
+					"terminator": ",",
+					"neutral": "N",
+					"source_fallback_pair": ",N"
+				},
+				{
+					"state": "stroke",
+					"action": "ac04_N",
+					"terminator": "/",
+					"neutral": "N",
+					"source_fallback_pair": "/N"
+				},
+				{
+					"state": "grave",
+					"action": "ac05_f",
+					"terminator": "`",
+					"neutral": "f",
+					"source_fallback_pair": "`f"
+				},
+				{
+					"state": "circumflex",
+					"action": "ac05_f",
+					"terminator": "^",
+					"neutral": "f",
+					"source_fallback_pair": "^f"
+				},
+				{
+					"state": "tilde",
+					"action": "ac05_f",
+					"terminator": "~",
+					"neutral": "f",
+					"source_fallback_pair": "~f"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac05_f",
+					"terminator": ",",
+					"neutral": "f",
+					"source_fallback_pair": ",f"
+				},
+				{
+					"state": "stroke",
+					"action": "ac05_f",
+					"terminator": "/",
+					"neutral": "f",
+					"source_fallback_pair": "/f"
+				},
+				{
+					"state": "grave",
+					"action": "ac05_F",
+					"terminator": "`",
+					"neutral": "F",
+					"source_fallback_pair": "`F"
+				},
+				{
+					"state": "circumflex",
+					"action": "ac05_F",
+					"terminator": "^",
+					"neutral": "F",
+					"source_fallback_pair": "^F"
+				},
+				{
+					"state": "tilde",
+					"action": "ac05_F",
+					"terminator": "~",
+					"neutral": "F",
+					"source_fallback_pair": "~F"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac05_F",
+					"terminator": ",",
+					"neutral": "F",
+					"source_fallback_pair": ",F"
+				},
+				{
+					"state": "stroke",
+					"action": "ac05_F",
+					"terminator": "/",
+					"neutral": "F",
+					"source_fallback_pair": "/F"
+				},
+				{
+					"state": "grave",
+					"action": "ac05_=",
+					"terminator": "`",
+					"neutral": "=",
+					"source_fallback_pair": "`="
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac05_=",
+					"terminator": ",",
+					"neutral": "=",
+					"source_fallback_pair": ",="
+				},
+				{
+					"state": "grave",
+					"action": "ac06_l",
+					"terminator": "`",
+					"neutral": "l",
+					"source_fallback_pair": "`l"
+				},
+				{
+					"state": "circumflex",
+					"action": "ac06_l",
+					"terminator": "^",
+					"neutral": "l",
+					"source_fallback_pair": "^l"
+				},
+				{
+					"state": "tilde",
+					"action": "ac06_l",
+					"terminator": "~",
+					"neutral": "l",
+					"source_fallback_pair": "~l"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac06_l",
+					"terminator": ",",
+					"neutral": "l",
+					"source_fallback_pair": ",l"
+				},
+				{
+					"state": "grave",
+					"action": "ac06_L",
+					"terminator": "`",
+					"neutral": "L",
+					"source_fallback_pair": "`L"
+				},
+				{
+					"state": "circumflex",
+					"action": "ac06_L",
+					"terminator": "^",
+					"neutral": "L",
+					"source_fallback_pair": "^L"
+				},
+				{
+					"state": "tilde",
+					"action": "ac06_L",
+					"terminator": "~",
+					"neutral": "L",
+					"source_fallback_pair": "~L"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac06_L",
+					"terminator": ",",
+					"neutral": "L",
+					"source_fallback_pair": ",L"
+				},
+				{
+					"state": "grave",
+					"action": "ac07_r",
+					"terminator": "`",
+					"neutral": "r",
+					"source_fallback_pair": "`r"
+				},
+				{
+					"state": "circumflex",
+					"action": "ac07_r",
+					"terminator": "^",
+					"neutral": "r",
+					"source_fallback_pair": "^r"
+				},
+				{
+					"state": "tilde",
+					"action": "ac07_r",
+					"terminator": "~",
+					"neutral": "r",
+					"source_fallback_pair": "~r"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac07_r",
+					"terminator": ",",
+					"neutral": "r",
+					"source_fallback_pair": ",r"
+				},
+				{
+					"state": "grave",
+					"action": "ac07_R",
+					"terminator": "`",
+					"neutral": "R",
+					"source_fallback_pair": "`R"
+				},
+				{
+					"state": "circumflex",
+					"action": "ac07_R",
+					"terminator": "^",
+					"neutral": "R",
+					"source_fallback_pair": "^R"
+				},
+				{
+					"state": "tilde",
+					"action": "ac07_R",
+					"terminator": "~",
+					"neutral": "R",
+					"source_fallback_pair": "~R"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac07_R",
+					"terminator": ",",
+					"neutral": "R",
+					"source_fallback_pair": ",R"
+				},
+				{
+					"state": "grave",
+					"action": "ac07_+",
+					"terminator": "`",
+					"neutral": "+",
+					"source_fallback_pair": "`+"
+				},
+				{
+					"state": "tilde",
+					"action": "ac07_+",
+					"terminator": "~",
+					"neutral": "+",
+					"source_fallback_pair": "~+"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac07_+",
+					"terminator": ",",
+					"neutral": "+",
+					"source_fallback_pair": ",+"
+				},
+				{
+					"state": "stroke",
+					"action": "ac07_+",
+					"terminator": "/",
+					"neutral": "+",
+					"source_fallback_pair": "/+"
+				},
+				{
+					"state": "grave",
+					"action": "ac08_t",
+					"terminator": "`",
+					"neutral": "t",
+					"source_fallback_pair": "`t"
+				},
+				{
+					"state": "circumflex",
+					"action": "ac08_t",
+					"terminator": "^",
+					"neutral": "t",
+					"source_fallback_pair": "^t"
+				},
+				{
+					"state": "tilde",
+					"action": "ac08_t",
+					"terminator": "~",
+					"neutral": "t",
+					"source_fallback_pair": "~t"
+				},
+				{
+					"state": "grave",
+					"action": "ac08_T",
+					"terminator": "`",
+					"neutral": "T",
+					"source_fallback_pair": "`T"
+				},
+				{
+					"state": "circumflex",
+					"action": "ac08_T",
+					"terminator": "^",
+					"neutral": "T",
+					"source_fallback_pair": "^T"
+				},
+				{
+					"state": "tilde",
+					"action": "ac08_T",
+					"terminator": "~",
+					"neutral": "T",
+					"source_fallback_pair": "~T"
+				},
+				{
+					"state": "grave",
+					"action": "ac08_-",
+					"terminator": "`",
+					"neutral": "-",
+					"source_fallback_pair": "`-"
+				},
+				{
+					"state": "tilde",
+					"action": "ac08_-",
+					"terminator": "~",
+					"neutral": "-",
+					"source_fallback_pair": "~-"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac08_-",
+					"terminator": ",",
+					"neutral": "-",
+					"source_fallback_pair": ",-"
+				},
+				{
+					"state": "stroke",
+					"action": "ac08_-",
+					"terminator": "/",
+					"neutral": "-",
+					"source_fallback_pair": "/-"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac09_i",
+					"terminator": ",",
+					"neutral": "i",
+					"source_fallback_pair": ",i"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac09_I",
+					"terminator": ",",
+					"neutral": "I",
+					"source_fallback_pair": ",I"
+				},
+				{
+					"state": "grave",
+					"action": "ac09_/",
+					"terminator": "`",
+					"neutral": "/",
+					"source_fallback_pair": "`/"
+				},
+				{
+					"state": "circumflex",
+					"action": "ac09_/",
+					"terminator": "^",
+					"neutral": "/",
+					"source_fallback_pair": "^/"
+				},
+				{
+					"state": "tilde",
+					"action": "ac09_/",
+					"terminator": "~",
+					"neutral": "/",
+					"source_fallback_pair": "~/"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac09_/",
+					"terminator": ",",
+					"neutral": "/",
+					"source_fallback_pair": ",/"
+				},
+				{
+					"state": "stroke",
+					"action": "ac09_/",
+					"terminator": "/",
+					"neutral": "/",
+					"source_fallback_pair": "//"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac10_u",
+					"terminator": ",",
+					"neutral": "u",
+					"source_fallback_pair": ",u"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ac10_U",
+					"terminator": ",",
+					"neutral": "U",
+					"source_fallback_pair": ",U"
+				},
+				{
+					"state": "grave",
+					"action": "ab01_z",
+					"terminator": "`",
+					"neutral": "z",
+					"source_fallback_pair": "`z"
+				},
+				{
+					"state": "tilde",
+					"action": "ab01_z",
+					"terminator": "~",
+					"neutral": "z",
+					"source_fallback_pair": "~z"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab01_z",
+					"terminator": ",",
+					"neutral": "z",
+					"source_fallback_pair": ",z"
+				},
+				{
+					"state": "grave",
+					"action": "ab01_Z",
+					"terminator": "`",
+					"neutral": "Z",
+					"source_fallback_pair": "`Z"
+				},
+				{
+					"state": "tilde",
+					"action": "ab01_Z",
+					"terminator": "~",
+					"neutral": "Z",
+					"source_fallback_pair": "~Z"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab01_Z",
+					"terminator": ",",
+					"neutral": "Z",
+					"source_fallback_pair": ",Z"
+				},
+				{
+					"state": "grave",
+					"action": "ab02_x",
+					"terminator": "`",
+					"neutral": "x",
+					"source_fallback_pair": "`x"
+				},
+				{
+					"state": "circumflex",
+					"action": "ab02_x",
+					"terminator": "^",
+					"neutral": "x",
+					"source_fallback_pair": "^x"
+				},
+				{
+					"state": "tilde",
+					"action": "ab02_x",
+					"terminator": "~",
+					"neutral": "x",
+					"source_fallback_pair": "~x"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab02_x",
+					"terminator": ",",
+					"neutral": "x",
+					"source_fallback_pair": ",x"
+				},
+				{
+					"state": "stroke",
+					"action": "ab02_x",
+					"terminator": "/",
+					"neutral": "x",
+					"source_fallback_pair": "/x"
+				},
+				{
+					"state": "grave",
+					"action": "ab02_X",
+					"terminator": "`",
+					"neutral": "X",
+					"source_fallback_pair": "`X"
+				},
+				{
+					"state": "circumflex",
+					"action": "ab02_X",
+					"terminator": "^",
+					"neutral": "X",
+					"source_fallback_pair": "^X"
+				},
+				{
+					"state": "tilde",
+					"action": "ab02_X",
+					"terminator": "~",
+					"neutral": "X",
+					"source_fallback_pair": "~X"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab02_X",
+					"terminator": ",",
+					"neutral": "X",
+					"source_fallback_pair": ",X"
+				},
+				{
+					"state": "stroke",
+					"action": "ab02_X",
+					"terminator": "/",
+					"neutral": "X",
+					"source_fallback_pair": "/X"
+				},
+				{
+					"state": "grave",
+					"action": "ab03_-",
+					"terminator": "`",
+					"neutral": "-",
+					"source_fallback_pair": "`-"
+				},
+				{
+					"state": "tilde",
+					"action": "ab03_-",
+					"terminator": "~",
+					"neutral": "-",
+					"source_fallback_pair": "~-"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab03_-",
+					"terminator": ",",
+					"neutral": "-",
+					"source_fallback_pair": ",-"
+				},
+				{
+					"state": "stroke",
+					"action": "ab03_-",
+					"terminator": "/",
+					"neutral": "-",
+					"source_fallback_pair": "/-"
+				},
+				{
+					"state": "grave",
+					"action": "ab03_?",
+					"terminator": "`",
+					"neutral": "?",
+					"source_fallback_pair": "`?"
+				},
+				{
+					"state": "circumflex",
+					"action": "ab03_?",
+					"terminator": "^",
+					"neutral": "?",
+					"source_fallback_pair": "^?"
+				},
+				{
+					"state": "tilde",
+					"action": "ab03_?",
+					"terminator": "~",
+					"neutral": "?",
+					"source_fallback_pair": "~?"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab03_?",
+					"terminator": ",",
+					"neutral": "?",
+					"source_fallback_pair": ",?"
+				},
+				{
+					"state": "stroke",
+					"action": "ab03_?",
+					"terminator": "/",
+					"neutral": "?",
+					"source_fallback_pair": "/?"
+				},
+				{
+					"state": "grave",
+					"action": "ab04_v",
+					"terminator": "`",
+					"neutral": "v",
+					"source_fallback_pair": "`v"
+				},
+				{
+					"state": "circumflex",
+					"action": "ab04_v",
+					"terminator": "^",
+					"neutral": "v",
+					"source_fallback_pair": "^v"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab04_v",
+					"terminator": ",",
+					"neutral": "v",
+					"source_fallback_pair": ",v"
+				},
+				{
+					"state": "stroke",
+					"action": "ab04_v",
+					"terminator": "/",
+					"neutral": "v",
+					"source_fallback_pair": "/v"
+				},
+				{
+					"state": "grave",
+					"action": "ab04_V",
+					"terminator": "`",
+					"neutral": "V",
+					"source_fallback_pair": "`V"
+				},
+				{
+					"state": "circumflex",
+					"action": "ab04_V",
+					"terminator": "^",
+					"neutral": "V",
+					"source_fallback_pair": "^V"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab04_V",
+					"terminator": ",",
+					"neutral": "V",
+					"source_fallback_pair": ",V"
+				},
+				{
+					"state": "stroke",
+					"action": "ab04_V",
+					"terminator": "/",
+					"neutral": "V",
+					"source_fallback_pair": "/V"
+				},
+				{
+					"state": "grave",
+					"action": "ab04__",
+					"terminator": "`",
+					"neutral": "_",
+					"source_fallback_pair": "`_"
+				},
+				{
+					"state": "circumflex",
+					"action": "ab04__",
+					"terminator": "^",
+					"neutral": "_",
+					"source_fallback_pair": "^_"
+				},
+				{
+					"state": "tilde",
+					"action": "ab04__",
+					"terminator": "~",
+					"neutral": "_",
+					"source_fallback_pair": "~_"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab04__",
+					"terminator": ",",
+					"neutral": "_",
+					"source_fallback_pair": ",_"
+				},
+				{
+					"state": "stroke",
+					"action": "ab04__",
+					"terminator": "/",
+					"neutral": "_",
+					"source_fallback_pair": "/_"
+				},
+				{
+					"state": "grave",
+					"action": "ab05_b",
+					"terminator": "`",
+					"neutral": "b",
+					"source_fallback_pair": "`b"
+				},
+				{
+					"state": "circumflex",
+					"action": "ab05_b",
+					"terminator": "^",
+					"neutral": "b",
+					"source_fallback_pair": "^b"
+				},
+				{
+					"state": "tilde",
+					"action": "ab05_b",
+					"terminator": "~",
+					"neutral": "b",
+					"source_fallback_pair": "~b"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab05_b",
+					"terminator": ",",
+					"neutral": "b",
+					"source_fallback_pair": ",b"
+				},
+				{
+					"state": "grave",
+					"action": "ab05_B",
+					"terminator": "`",
+					"neutral": "B",
+					"source_fallback_pair": "`B"
+				},
+				{
+					"state": "circumflex",
+					"action": "ab05_B",
+					"terminator": "^",
+					"neutral": "B",
+					"source_fallback_pair": "^B"
+				},
+				{
+					"state": "tilde",
+					"action": "ab05_B",
+					"terminator": "~",
+					"neutral": "B",
+					"source_fallback_pair": "~B"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab05_B",
+					"terminator": ",",
+					"neutral": "B",
+					"source_fallback_pair": ",B"
+				},
+				{
+					"state": "grave",
+					"action": "ab06_.",
+					"terminator": "`",
+					"neutral": ".",
+					"source_fallback_pair": "`."
+				},
+				{
+					"state": "circumflex",
+					"action": "ab06_.",
+					"terminator": "^",
+					"neutral": ".",
+					"source_fallback_pair": "^."
+				},
+				{
+					"state": "tilde",
+					"action": "ab06_.",
+					"terminator": "~",
+					"neutral": ".",
+					"source_fallback_pair": "~."
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab06_.",
+					"terminator": ",",
+					"neutral": ".",
+					"source_fallback_pair": ",."
+				},
+				{
+					"state": "stroke",
+					"action": "ab06_.",
+					"terminator": "/",
+					"neutral": ".",
+					"source_fallback_pair": "/."
+				},
+				{
+					"state": "grave",
+					"action": "ab07_h",
+					"terminator": "`",
+					"neutral": "h",
+					"source_fallback_pair": "`h"
+				},
+				{
+					"state": "tilde",
+					"action": "ab07_h",
+					"terminator": "~",
+					"neutral": "h",
+					"source_fallback_pair": "~h"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab07_h",
+					"terminator": ",",
+					"neutral": "h",
+					"source_fallback_pair": ",h"
+				},
+				{
+					"state": "grave",
+					"action": "ab07_H",
+					"terminator": "`",
+					"neutral": "H",
+					"source_fallback_pair": "`H"
+				},
+				{
+					"state": "tilde",
+					"action": "ab07_H",
+					"terminator": "~",
+					"neutral": "H",
+					"source_fallback_pair": "~H"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab07_H",
+					"terminator": ",",
+					"neutral": "H",
+					"source_fallback_pair": ",H"
+				},
+				{
+					"state": "grave",
+					"action": "ab07_!",
+					"terminator": "`",
+					"neutral": "!",
+					"source_fallback_pair": "`!"
+				},
+				{
+					"state": "circumflex",
+					"action": "ab07_!",
+					"terminator": "^",
+					"neutral": "!",
+					"source_fallback_pair": "^!"
+				},
+				{
+					"state": "tilde",
+					"action": "ab07_!",
+					"terminator": "~",
+					"neutral": "!",
+					"source_fallback_pair": "~!"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab07_!",
+					"terminator": ",",
+					"neutral": "!",
+					"source_fallback_pair": ",!"
+				},
+				{
+					"state": "stroke",
+					"action": "ab07_!",
+					"terminator": "/",
+					"neutral": "!",
+					"source_fallback_pair": "/!"
+				},
+				{
+					"state": "grave",
+					"action": "ab08_g",
+					"terminator": "`",
+					"neutral": "g",
+					"source_fallback_pair": "`g"
+				},
+				{
+					"state": "tilde",
+					"action": "ab08_g",
+					"terminator": "~",
+					"neutral": "g",
+					"source_fallback_pair": "~g"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab08_g",
+					"terminator": ",",
+					"neutral": "g",
+					"source_fallback_pair": ",g"
+				},
+				{
+					"state": "grave",
+					"action": "ab08_G",
+					"terminator": "`",
+					"neutral": "G",
+					"source_fallback_pair": "`G"
+				},
+				{
+					"state": "tilde",
+					"action": "ab08_G",
+					"terminator": "~",
+					"neutral": "G",
+					"source_fallback_pair": "~G"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab08_G",
+					"terminator": ",",
+					"neutral": "G",
+					"source_fallback_pair": ",G"
+				},
+				{
+					"state": "grave",
+					"action": "ab08_;",
+					"terminator": "`",
+					"neutral": ";",
+					"source_fallback_pair": "`;"
+				},
+				{
+					"state": "circumflex",
+					"action": "ab08_;",
+					"terminator": "^",
+					"neutral": ";",
+					"source_fallback_pair": "^;"
+				},
+				{
+					"state": "tilde",
+					"action": "ab08_;",
+					"terminator": "~",
+					"neutral": ";",
+					"source_fallback_pair": "~;"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab08_;",
+					"terminator": ",",
+					"neutral": ";",
+					"source_fallback_pair": ",;"
+				},
+				{
+					"state": "stroke",
+					"action": "ab08_;",
+					"terminator": "/",
+					"neutral": ";",
+					"source_fallback_pair": "/;"
+				},
+				{
+					"state": "grave",
+					"action": "ab09_,",
+					"terminator": "`",
+					"neutral": ",",
+					"source_fallback_pair": "`,"
+				},
+				{
+					"state": "circumflex",
+					"action": "ab09_,",
+					"terminator": "^",
+					"neutral": ",",
+					"source_fallback_pair": "^,"
+				},
+				{
+					"state": "tilde",
+					"action": "ab09_,",
+					"terminator": "~",
+					"neutral": ",",
+					"source_fallback_pair": "~,"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab09_,",
+					"terminator": ",",
+					"neutral": ",",
+					"source_fallback_pair": ",,"
+				},
+				{
+					"state": "stroke",
+					"action": "ab09_,",
+					"terminator": "/",
+					"neutral": ",",
+					"source_fallback_pair": "/,"
+				},
+				{
+					"state": "grave",
+					"action": "ab09_;",
+					"terminator": "`",
+					"neutral": ";",
+					"source_fallback_pair": "`;"
+				},
+				{
+					"state": "circumflex",
+					"action": "ab09_;",
+					"terminator": "^",
+					"neutral": ";",
+					"source_fallback_pair": "^;"
+				},
+				{
+					"state": "tilde",
+					"action": "ab09_;",
+					"terminator": "~",
+					"neutral": ";",
+					"source_fallback_pair": "~;"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab09_;",
+					"terminator": ",",
+					"neutral": ";",
+					"source_fallback_pair": ",;"
+				},
+				{
+					"state": "stroke",
+					"action": "ab09_;",
+					"terminator": "/",
+					"neutral": ";",
+					"source_fallback_pair": "/;"
+				},
+				{
+					"state": "grave",
+					"action": "ab10_k",
+					"terminator": "`",
+					"neutral": "k",
+					"source_fallback_pair": "`k"
+				},
+				{
+					"state": "circumflex",
+					"action": "ab10_k",
+					"terminator": "^",
+					"neutral": "k",
+					"source_fallback_pair": "^k"
+				},
+				{
+					"state": "tilde",
+					"action": "ab10_k",
+					"terminator": "~",
+					"neutral": "k",
+					"source_fallback_pair": "~k"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab10_k",
+					"terminator": ",",
+					"neutral": "k",
+					"source_fallback_pair": ",k"
+				},
+				{
+					"state": "stroke",
+					"action": "ab10_k",
+					"terminator": "/",
+					"neutral": "k",
+					"source_fallback_pair": "/k"
+				},
+				{
+					"state": "grave",
+					"action": "ab10_K",
+					"terminator": "`",
+					"neutral": "K",
+					"source_fallback_pair": "`K"
+				},
+				{
+					"state": "circumflex",
+					"action": "ab10_K",
+					"terminator": "^",
+					"neutral": "K",
+					"source_fallback_pair": "^K"
+				},
+				{
+					"state": "tilde",
+					"action": "ab10_K",
+					"terminator": "~",
+					"neutral": "K",
+					"source_fallback_pair": "~K"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab10_K",
+					"terminator": ",",
+					"neutral": "K",
+					"source_fallback_pair": ",K"
+				},
+				{
+					"state": "stroke",
+					"action": "ab10_K",
+					"terminator": "/",
+					"neutral": "K",
+					"source_fallback_pair": "/K"
+				},
+				{
+					"state": "grave",
+					"action": "ab10_?",
+					"terminator": "`",
+					"neutral": "?",
+					"source_fallback_pair": "`?"
+				},
+				{
+					"state": "circumflex",
+					"action": "ab10_?",
+					"terminator": "^",
+					"neutral": "?",
+					"source_fallback_pair": "^?"
+				},
+				{
+					"state": "tilde",
+					"action": "ab10_?",
+					"terminator": "~",
+					"neutral": "?",
+					"source_fallback_pair": "~?"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ab10_?",
+					"terminator": ",",
+					"neutral": "?",
+					"source_fallback_pair": ",?"
+				},
+				{
+					"state": "stroke",
+					"action": "ab10_?",
+					"terminator": "/",
+					"neutral": "?",
+					"source_fallback_pair": "/?"
+				},
+				{
+					"state": "grave",
+					"action": "ae11_/",
+					"terminator": "`",
+					"neutral": "/",
+					"source_fallback_pair": "`/"
+				},
+				{
+					"state": "circumflex",
+					"action": "ae11_/",
+					"terminator": "^",
+					"neutral": "/",
+					"source_fallback_pair": "^/"
+				},
+				{
+					"state": "tilde",
+					"action": "ae11_/",
+					"terminator": "~",
+					"neutral": "/",
+					"source_fallback_pair": "~/"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ae11_/",
+					"terminator": ",",
+					"neutral": "/",
+					"source_fallback_pair": ",/"
+				},
+				{
+					"state": "stroke",
+					"action": "ae11_/",
+					"terminator": "/",
+					"neutral": "/",
+					"source_fallback_pair": "//"
+				},
+				{
+					"state": "grave",
+					"action": "ae11__",
+					"terminator": "`",
+					"neutral": "_",
+					"source_fallback_pair": "`_"
+				},
+				{
+					"state": "circumflex",
+					"action": "ae11__",
+					"terminator": "^",
+					"neutral": "_",
+					"source_fallback_pair": "^_"
+				},
+				{
+					"state": "tilde",
+					"action": "ae11__",
+					"terminator": "~",
+					"neutral": "_",
+					"source_fallback_pair": "~_"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ae11__",
+					"terminator": ",",
+					"neutral": "_",
+					"source_fallback_pair": ",_"
+				},
+				{
+					"state": "stroke",
+					"action": "ae11__",
+					"terminator": "/",
+					"neutral": "_",
+					"source_fallback_pair": "/_"
+				},
+				{
+					"state": "grave",
+					"action": "ae12_=",
+					"terminator": "`",
+					"neutral": "=",
+					"source_fallback_pair": "`="
+				},
+				{
+					"state": "belowcomma",
+					"action": "ae12_=",
+					"terminator": ",",
+					"neutral": "=",
+					"source_fallback_pair": ",="
+				},
+				{
+					"state": "grave",
+					"action": "ae12_+",
+					"terminator": "`",
+					"neutral": "+",
+					"source_fallback_pair": "`+"
+				},
+				{
+					"state": "tilde",
+					"action": "ae12_+",
+					"terminator": "~",
+					"neutral": "+",
+					"source_fallback_pair": "~+"
+				},
+				{
+					"state": "belowcomma",
+					"action": "ae12_+",
+					"terminator": ",",
+					"neutral": "+",
+					"source_fallback_pair": ",+"
+				},
+				{
+					"state": "stroke",
+					"action": "ae12_+",
+					"terminator": "/",
+					"neutral": "+",
+					"source_fallback_pair": "/+"
+				},
+				{
+					"state": "grave",
+					"action": "lsgt_x003c",
+					"terminator": "`",
+					"neutral": "<",
+					"source_fallback_pair": "`<"
+				},
+				{
+					"state": "circumflex",
+					"action": "lsgt_x003c",
+					"terminator": "^",
+					"neutral": "<",
+					"source_fallback_pair": "^<"
+				},
+				{
+					"state": "belowcomma",
+					"action": "lsgt_x003c",
+					"terminator": ",",
+					"neutral": "<",
+					"source_fallback_pair": ",<"
+				},
+				{
+					"state": "grave",
+					"action": "lsgt_x003e",
+					"terminator": "`",
+					"neutral": ">",
+					"source_fallback_pair": "`>"
+				},
+				{
+					"state": "circumflex",
+					"action": "lsgt_x003e",
+					"terminator": "^",
+					"neutral": ">",
+					"source_fallback_pair": "^>"
+				},
+				{
+					"state": "belowcomma",
+					"action": "lsgt_x003e",
+					"terminator": ",",
+					"neutral": ">",
+					"source_fallback_pair": ",>"
+				}
+			],
+			"parser_converter_results": [
+				{
+					"runtime": "lua",
+					"canonical_equal": true,
+					"symbols_sha256": "b4b4937fa72665c0a27c40cc466ed2da1054e0bf546dd5c5086c3f34ec901615",
+					"compose_sha256": "653afb6a684f9f5bcffe98a4fbb962c0a1a38eae88211a73fa8f299c0797b7c8"
+				},
+				{
+					"runtime": "luajit",
+					"canonical_equal": true,
+					"symbols_sha256": "b4b4937fa72665c0a27c40cc466ed2da1054e0bf546dd5c5086c3f34ec901615",
+					"compose_sha256": "653afb6a684f9f5bcffe98a4fbb962c0a1a38eae88211a73fa8f299c0797b7c8"
+				}
+			],
+			"windows_disabled_row_source_seed": null
+		},
+		{
+			"id": "ergopti",
+			"platforms": ["linux", "macos", "windows"],
+			"source": "static/layouts/registry/ergopti/ergopti.keylayout",
+			"source_sha256": "91764c4f3879f8046a3198354259cb4ed324b28973d47b6e2cd0eb1c576a0e83",
+			"action_count": 99,
+			"states": 7,
+			"state_entry_sequences": [
+				{
+					"state": "s2_currency",
+					"sequence": ["dead_currency"],
+					"trail": [
+						{
+							"keysym": "dead_currency",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s3_diaeresis",
+					"sequence": ["dead_diaeresis"],
+					"trail": [
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s5_superscript",
+					"sequence": ["uparrow"],
+					"trail": [
+						{
+							"keysym": "uparrow",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s4_greek",
+					"sequence": ["mu"],
+					"trail": [
+						{
+							"keysym": "mu",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s7_RR",
+					"sequence": ["infinity"],
+					"trail": [
+						{
+							"keysym": "infinity",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s1_circumflex",
+					"sequence": ["dead_circumflex"],
+					"trail": [
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s6_subscript",
+					"sequence": ["downarrow"],
+					"trail": [
+						{
+							"keysym": "downarrow",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				}
+			],
+			"explicit_output_key_level_contexts": 851,
+			"unique_wire_expectations": 396,
+			"native_mismatches": [],
+			"ambiguous_neutral_text_compositions": [],
+			"two_ascii_explicit_outputs": [],
+			"two_ascii_missing_state_pairs": [
+				{
+					"state": "s1_circumflex",
+					"action": "$",
+					"terminator": "^",
+					"neutral": "$",
+					"source_fallback_pair": "^$"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "&",
+					"terminator": "^",
+					"neutral": "&",
+					"source_fallback_pair": "^&"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "<",
+					"terminator": "^",
+					"neutral": "<",
+					"source_fallback_pair": "^<"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": ">",
+					"terminator": "^",
+					"neutral": ">",
+					"source_fallback_pair": "^>"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "(",
+					"terminator": "^",
+					"neutral": "(",
+					"source_fallback_pair": "^("
+				},
+				{
+					"state": "s1_circumflex",
+					"action": ")",
+					"terminator": "^",
+					"neutral": ")",
+					"source_fallback_pair": "^)"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "+",
+					"terminator": "^",
+					"neutral": "+",
+					"source_fallback_pair": "^+"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "-",
+					"terminator": "^",
+					"neutral": "-",
+					"source_fallback_pair": "^-"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "0",
+					"terminator": "^",
+					"neutral": "0",
+					"source_fallback_pair": "^0"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "=",
+					"terminator": "^",
+					"neutral": "=",
+					"source_fallback_pair": "^="
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "[",
+					"terminator": "^",
+					"neutral": "[",
+					"source_fallback_pair": "^["
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "]",
+					"terminator": "^",
+					"neutral": "]",
+					"source_fallback_pair": "^]"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "`",
+					"terminator": "^",
+					"neutral": "`",
+					"source_fallback_pair": "^`"
+				}
+			],
+			"parser_converter_results": [
+				{
+					"runtime": "lua",
+					"canonical_equal": true,
+					"symbols_sha256": "3cf8d5964d1296cfb802323e8418f86169bcd9ef12be890c2b94bbdaa0102d0f",
+					"compose_sha256": "4c0297ffa29514774f1d03e11bd9ea1dd1b550d2420d3f41d870acade4d37acd"
+				},
+				{
+					"runtime": "luajit",
+					"canonical_equal": true,
+					"symbols_sha256": "3cf8d5964d1296cfb802323e8418f86169bcd9ef12be890c2b94bbdaa0102d0f",
+					"compose_sha256": "4c0297ffa29514774f1d03e11bd9ea1dd1b550d2420d3f41d870acade4d37acd"
+				}
+			],
+			"windows_disabled_row_source_seed": null
+		},
+		{
+			"id": "ergopti_ansi",
+			"platforms": ["linux", "macos", "windows"],
+			"source": "static/layouts/registry/ergopti_ansi/ergopti_ansi.keylayout",
+			"source_sha256": "c8b3c7a7e51e1622b305d35628bbc4f2766b3be0b9288ce24b06812541e4d87c",
+			"action_count": 99,
+			"states": 7,
+			"state_entry_sequences": [
+				{
+					"state": "s1_circumflex",
+					"sequence": ["dead_circumflex"],
+					"trail": [
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s5_superscript",
+					"sequence": ["uparrow"],
+					"trail": [
+						{
+							"keysym": "uparrow",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s4_greek",
+					"sequence": ["mu"],
+					"trail": [
+						{
+							"keysym": "mu",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s3_diaeresis",
+					"sequence": ["dead_diaeresis"],
+					"trail": [
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s7_RR",
+					"sequence": ["infinity"],
+					"trail": [
+						{
+							"keysym": "infinity",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s2_currency",
+					"sequence": ["dead_currency"],
+					"trail": [
+						{
+							"keysym": "dead_currency",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s6_subscript",
+					"sequence": ["downarrow"],
+					"trail": [
+						{
+							"keysym": "downarrow",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				}
+			],
+			"explicit_output_key_level_contexts": 851,
+			"unique_wire_expectations": 396,
+			"native_mismatches": [],
+			"ambiguous_neutral_text_compositions": [],
+			"two_ascii_explicit_outputs": [],
+			"two_ascii_missing_state_pairs": [
+				{
+					"state": "s1_circumflex",
+					"action": "$",
+					"terminator": "^",
+					"neutral": "$",
+					"source_fallback_pair": "^$"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "&",
+					"terminator": "^",
+					"neutral": "&",
+					"source_fallback_pair": "^&"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "<",
+					"terminator": "^",
+					"neutral": "<",
+					"source_fallback_pair": "^<"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": ">",
+					"terminator": "^",
+					"neutral": ">",
+					"source_fallback_pair": "^>"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "(",
+					"terminator": "^",
+					"neutral": "(",
+					"source_fallback_pair": "^("
+				},
+				{
+					"state": "s1_circumflex",
+					"action": ")",
+					"terminator": "^",
+					"neutral": ")",
+					"source_fallback_pair": "^)"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "+",
+					"terminator": "^",
+					"neutral": "+",
+					"source_fallback_pair": "^+"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "-",
+					"terminator": "^",
+					"neutral": "-",
+					"source_fallback_pair": "^-"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "0",
+					"terminator": "^",
+					"neutral": "0",
+					"source_fallback_pair": "^0"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "=",
+					"terminator": "^",
+					"neutral": "=",
+					"source_fallback_pair": "^="
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "[",
+					"terminator": "^",
+					"neutral": "[",
+					"source_fallback_pair": "^["
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "]",
+					"terminator": "^",
+					"neutral": "]",
+					"source_fallback_pair": "^]"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "`",
+					"terminator": "^",
+					"neutral": "`",
+					"source_fallback_pair": "^`"
+				}
+			],
+			"parser_converter_results": [
+				{
+					"runtime": "lua",
+					"canonical_equal": true,
+					"symbols_sha256": "6aa3b29df4c34db24f2af1d50f7580ab954cfbfd11f627129081d7b9177f9626",
+					"compose_sha256": "5000f53e726925948e17c326acb6f8baf33e061fb691953b07fee4a492cc6aad"
+				},
+				{
+					"runtime": "luajit",
+					"canonical_equal": true,
+					"symbols_sha256": "6aa3b29df4c34db24f2af1d50f7580ab954cfbfd11f627129081d7b9177f9626",
+					"compose_sha256": "5000f53e726925948e17c326acb6f8baf33e061fb691953b07fee4a492cc6aad"
+				}
+			],
+			"windows_disabled_row_source_seed": null
+		},
+		{
+			"id": "ergopti_plus",
+			"platforms": ["linux", "macos", "windows"],
+			"source": "static/layouts/registry/ergopti_plus/ergopti_plus.keylayout",
+			"source_sha256": "23dac99d4bc366e3baaab1ce2895d087868ccd01330c188aa32df3e28f92a059",
+			"action_count": 101,
+			"states": 7,
+			"state_entry_sequences": [
+				{
+					"state": "s2_currency",
+					"sequence": ["dead_currency"],
+					"trail": [
+						{
+							"keysym": "dead_currency",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s3_diaeresis",
+					"sequence": ["dead_diaeresis"],
+					"trail": [
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s5_superscript",
+					"sequence": ["uparrow"],
+					"trail": [
+						{
+							"keysym": "uparrow",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s4_greek",
+					"sequence": ["mu"],
+					"trail": [
+						{
+							"keysym": "mu",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s7_RR",
+					"sequence": ["infinity"],
+					"trail": [
+						{
+							"keysym": "infinity",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s1_circumflex",
+					"sequence": ["dead_circumflex"],
+					"trail": [
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s6_subscript",
+					"sequence": ["downarrow"],
+					"trail": [
+						{
+							"keysym": "downarrow",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				}
+			],
+			"explicit_output_key_level_contexts": 848,
+			"unique_wire_expectations": 397,
+			"native_mismatches": [
+				{
+					"sequence": ["dead_circumflex", "U2605"],
+					"expected": "j",
+					"action": "j",
+					"state": "s1_circumflex",
+					"key": "AB03",
+					"level": 1,
+					"trail": [
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "U2605",
+							"accepted": 1,
+							"status": 3
+						}
+					]
+				},
+				{
+					"sequence": ["mu", "U2605"],
+					"expected": "ξ",
+					"action": "j",
+					"state": "s4_greek",
+					"key": "AB03",
+					"level": 1,
+					"trail": [
+						{
+							"keysym": "mu",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "U2605",
+							"accepted": 1,
+							"status": 3
+						}
+					]
+				},
+				{
+					"sequence": ["uparrow", "U2605"],
+					"expected": "ʲ",
+					"action": "j",
+					"state": "s5_superscript",
+					"key": "AB03",
+					"level": 1,
+					"trail": [
+						{
+							"keysym": "uparrow",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "U2605",
+							"accepted": 1,
+							"status": 3
+						}
+					]
+				},
+				{
+					"sequence": ["downarrow", "U2605"],
+					"expected": "ⱼ",
+					"action": "j",
+					"state": "s6_subscript",
+					"key": "AB03",
+					"level": 1,
+					"trail": [
+						{
+							"keysym": "downarrow",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "U2605",
+							"accepted": 1,
+							"status": 3
+						}
+					]
+				}
+			],
+			"ambiguous_neutral_text_compositions": [],
+			"two_ascii_explicit_outputs": [],
+			"two_ascii_missing_state_pairs": [
+				{
+					"state": "s1_circumflex",
+					"action": "!",
+					"terminator": "^",
+					"neutral": "!",
+					"source_fallback_pair": "^!"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "$",
+					"terminator": "^",
+					"neutral": "$",
+					"source_fallback_pair": "^$"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "%",
+					"terminator": "^",
+					"neutral": "%",
+					"source_fallback_pair": "^%"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "&",
+					"terminator": "^",
+					"neutral": "&",
+					"source_fallback_pair": "^&"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "<",
+					"terminator": "^",
+					"neutral": "<",
+					"source_fallback_pair": "^<"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": ">",
+					"terminator": "^",
+					"neutral": ">",
+					"source_fallback_pair": "^>"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "(",
+					"terminator": "^",
+					"neutral": "(",
+					"source_fallback_pair": "^("
+				},
+				{
+					"state": "s1_circumflex",
+					"action": ")",
+					"terminator": "^",
+					"neutral": ")",
+					"source_fallback_pair": "^)"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "+",
+					"terminator": "^",
+					"neutral": "+",
+					"source_fallback_pair": "^+"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "-",
+					"terminator": "^",
+					"neutral": "-",
+					"source_fallback_pair": "^-"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "0",
+					"terminator": "^",
+					"neutral": "0",
+					"source_fallback_pair": "^0"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "=",
+					"terminator": "^",
+					"neutral": "=",
+					"source_fallback_pair": "^="
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "[",
+					"terminator": "^",
+					"neutral": "[",
+					"source_fallback_pair": "^["
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "]",
+					"terminator": "^",
+					"neutral": "]",
+					"source_fallback_pair": "^]"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "`",
+					"terminator": "^",
+					"neutral": "`",
+					"source_fallback_pair": "^`"
+				}
+			],
+			"parser_converter_results": [
+				{
+					"runtime": "lua",
+					"canonical_equal": true,
+					"symbols_sha256": "95903b79dcf36d855099d8f3265b166b2d72e47db040902c667162113d5d807a",
+					"compose_sha256": "a3dc8d99daf1405bea4fa56466cf1df9e7593266cf35284c5aeae3342496c6a2"
+				},
+				{
+					"runtime": "luajit",
+					"canonical_equal": true,
+					"symbols_sha256": "95903b79dcf36d855099d8f3265b166b2d72e47db040902c667162113d5d807a",
+					"compose_sha256": "a3dc8d99daf1405bea4fa56466cf1df9e7593266cf35284c5aeae3342496c6a2"
+				}
+			],
+			"windows_disabled_row_source_seed": {
+				"trigger": {
+					"code": "Backslash",
+					"ahk": "SC02B",
+					"mac": 42,
+					"resolved": "s1_circumflex"
+				},
+				"follow": {
+					"code": "KeyE",
+					"ahk": "SC012",
+					"mac": 14,
+					"selected_neutral": "o",
+					"selected_pending": "ô",
+					"native_us_text": "e",
+					"native_text_pending": "ê"
+				},
+				"qualification": "Original parsed layout and physical registry relation; native US character is an explicit external control, not AHK execution. Row IDs come from original Lua rows policy separately."
+			}
+		},
+		{
+			"id": "ergopti_plus_ansi",
+			"platforms": ["linux", "macos", "windows"],
+			"source": "static/layouts/registry/ergopti_plus_ansi/ergopti_plus_ansi.keylayout",
+			"source_sha256": "955898fa3afde201ca7d6f68b9ee22675723e6ce68f773e162d9d43336be5757",
+			"action_count": 101,
+			"states": 7,
+			"state_entry_sequences": [
+				{
+					"state": "s1_circumflex",
+					"sequence": ["dead_circumflex"],
+					"trail": [
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s5_superscript",
+					"sequence": ["uparrow"],
+					"trail": [
+						{
+							"keysym": "uparrow",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s4_greek",
+					"sequence": ["mu"],
+					"trail": [
+						{
+							"keysym": "mu",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s3_diaeresis",
+					"sequence": ["dead_diaeresis"],
+					"trail": [
+						{
+							"keysym": "dead_diaeresis",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s7_RR",
+					"sequence": ["infinity"],
+					"trail": [
+						{
+							"keysym": "infinity",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s2_currency",
+					"sequence": ["dead_currency"],
+					"trail": [
+						{
+							"keysym": "dead_currency",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				},
+				{
+					"state": "s6_subscript",
+					"sequence": ["downarrow"],
+					"trail": [
+						{
+							"keysym": "downarrow",
+							"accepted": 1,
+							"status": 1
+						}
+					]
+				}
+			],
+			"explicit_output_key_level_contexts": 848,
+			"unique_wire_expectations": 397,
+			"native_mismatches": [
+				{
+					"sequence": ["dead_circumflex", "U2605"],
+					"expected": "j",
+					"action": "j",
+					"state": "s1_circumflex",
+					"key": "AB03",
+					"level": 1,
+					"trail": [
+						{
+							"keysym": "dead_circumflex",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "U2605",
+							"accepted": 1,
+							"status": 3
+						}
+					]
+				},
+				{
+					"sequence": ["mu", "U2605"],
+					"expected": "ξ",
+					"action": "j",
+					"state": "s4_greek",
+					"key": "AB03",
+					"level": 1,
+					"trail": [
+						{
+							"keysym": "mu",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "U2605",
+							"accepted": 1,
+							"status": 3
+						}
+					]
+				},
+				{
+					"sequence": ["uparrow", "U2605"],
+					"expected": "ʲ",
+					"action": "j",
+					"state": "s5_superscript",
+					"key": "AB03",
+					"level": 1,
+					"trail": [
+						{
+							"keysym": "uparrow",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "U2605",
+							"accepted": 1,
+							"status": 3
+						}
+					]
+				},
+				{
+					"sequence": ["downarrow", "U2605"],
+					"expected": "ⱼ",
+					"action": "j",
+					"state": "s6_subscript",
+					"key": "AB03",
+					"level": 1,
+					"trail": [
+						{
+							"keysym": "downarrow",
+							"accepted": 1,
+							"status": 1
+						},
+						{
+							"keysym": "U2605",
+							"accepted": 1,
+							"status": 3
+						}
+					]
+				}
+			],
+			"ambiguous_neutral_text_compositions": [],
+			"two_ascii_explicit_outputs": [],
+			"two_ascii_missing_state_pairs": [
+				{
+					"state": "s1_circumflex",
+					"action": "!",
+					"terminator": "^",
+					"neutral": "!",
+					"source_fallback_pair": "^!"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "$",
+					"terminator": "^",
+					"neutral": "$",
+					"source_fallback_pair": "^$"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "%",
+					"terminator": "^",
+					"neutral": "%",
+					"source_fallback_pair": "^%"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "&",
+					"terminator": "^",
+					"neutral": "&",
+					"source_fallback_pair": "^&"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "<",
+					"terminator": "^",
+					"neutral": "<",
+					"source_fallback_pair": "^<"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": ">",
+					"terminator": "^",
+					"neutral": ">",
+					"source_fallback_pair": "^>"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "(",
+					"terminator": "^",
+					"neutral": "(",
+					"source_fallback_pair": "^("
+				},
+				{
+					"state": "s1_circumflex",
+					"action": ")",
+					"terminator": "^",
+					"neutral": ")",
+					"source_fallback_pair": "^)"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "+",
+					"terminator": "^",
+					"neutral": "+",
+					"source_fallback_pair": "^+"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "-",
+					"terminator": "^",
+					"neutral": "-",
+					"source_fallback_pair": "^-"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "0",
+					"terminator": "^",
+					"neutral": "0",
+					"source_fallback_pair": "^0"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "=",
+					"terminator": "^",
+					"neutral": "=",
+					"source_fallback_pair": "^="
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "[",
+					"terminator": "^",
+					"neutral": "[",
+					"source_fallback_pair": "^["
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "]",
+					"terminator": "^",
+					"neutral": "]",
+					"source_fallback_pair": "^]"
+				},
+				{
+					"state": "s1_circumflex",
+					"action": "`",
+					"terminator": "^",
+					"neutral": "`",
+					"source_fallback_pair": "^`"
+				}
+			],
+			"parser_converter_results": [
+				{
+					"runtime": "lua",
+					"canonical_equal": true,
+					"symbols_sha256": "4fdd3fce7c9e14a4e5e81dfb200c8a42aa860f6f1841620393d77860e1153181",
+					"compose_sha256": "008d823e22bc729d8b8bba30cf608151c1eddc4710e96f65ea5fbcce2a542912"
+				},
+				{
+					"runtime": "luajit",
+					"canonical_equal": true,
+					"symbols_sha256": "4fdd3fce7c9e14a4e5e81dfb200c8a42aa860f6f1841620393d77860e1153181",
+					"compose_sha256": "008d823e22bc729d8b8bba30cf608151c1eddc4710e96f65ea5fbcce2a542912"
+				}
+			],
+			"windows_disabled_row_source_seed": null
+		}
+	]
+}

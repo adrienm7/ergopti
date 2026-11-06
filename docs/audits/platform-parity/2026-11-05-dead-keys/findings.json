@@ -1,0 +1,163 @@
+{
+	"schema_version": 1,
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"created_at": "2026-11-05",
+	"module": "dead-keys",
+	"findings": [
+		{
+			"id": "DKW-001",
+			"worker_id": "DKW-001",
+			"title": "Pending registry dead key composes a disabled row using selected-layout text",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["Continuation/output consistency within declared owner boundary"],
+			"reproduction": "{\"layout\": \"ergopti_plus\", \"native_layout_assumption\": \"US SC012 resolves e; no DLL/native execution\", \"base\": true, \"emulate_home_row\": true, \"emulate_top_row\": false, \"trigger\": \"SC02B no modifiers -> s1_circumflex\", \"continuation\": \"SC012 no modifiers\", \"source_requested\": \"ô\", \"row_policy_composition\": \"ê\"}",
+			"root_cause": "Pending criterion bypasses row switch; callback checks global base only before selected-layout emit.",
+			"silent_failure": "Supported row setting is accepted; incorrect text is emitted through the ordinary success path without a diagnostic.",
+			"regression_test": "Exercise original registered callback with pending state, global base on, top row off and actual installed US HKL; retain neutral/enabled/Shift controls.",
+			"basis": "source",
+			"qualification": "AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+			"evidence": [
+				{
+					"path": "windows/findings.json",
+					"sha256": "f04efa03a23db4b0c26d364a49c88316f468e323554f147df8b33ae8149eae5b"
+				},
+				{
+					"path": "windows/report.md",
+					"sha256": "7b4fb26bcd4c6d595d095557652ac828b9d8df0a397568130010909e286a3185"
+				},
+				{
+					"path": "windows/sweeps.json",
+					"sha256": "32f79a8bd0f6a173c1cef3f46e135c4f046bf406beacd55dec31e8ac36fa111c"
+				}
+			],
+			"role": "windows",
+			"source_report": "windows/report.md"
+		},
+		{
+			"id": "DKM-001",
+			"worker_id": "DKM-001",
+			"title": "Two-ASCII-codepoint event uses whole payload as automatic tail bucket",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["Continuation/output consistency within declared owner boundary"],
+			"reproduction": "{\"registration\": \"strict auto ^0 -> EXPANDED\", \"baseline\": \"ordinary x then Backspace returns logical buffer to empty\", \"event_payload\": \"^0\", \"actual\": \"not consumed; no expansion; buffer ^0\", \"controls\": \"split ^ and 0 expands; single €0, éà, ^00 expand with same baseline\"}",
+			"root_cause": "Byte length <=2 fast path forces char_len=1; run_trigger_checks uses entire multi-codepoint payload as a single tail key.",
+			"silent_failure": "Wrong automatic bucket skips the mapping without error; later preview tail lookup does not perform expansion.",
+			"regression_test": "Compare grouped and split two-ASCII payloads through original registered callback; assert automatic result and consumption, retain Unicode/longer-payload controls.",
+			"basis": "actual-owner",
+			"qualification": "Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+			"evidence": [
+				{
+					"path": "macos/findings.json",
+					"sha256": "6b01739d39dbcb036f04844e5524d65b6d51c548d831d95348c44c11d1a91f01"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+				},
+				{
+					"path": "macos/sweeps.json",
+					"sha256": "74f30ea6d4ea00d7c003f558226042d2a199a2fe718cf2a1a0f551d8de363a2d"
+				}
+			],
+			"role": "macos",
+			"source_report": "macos/report.md"
+		},
+		{
+			"id": "DKM-002",
+			"worker_id": "DKM-002",
+			"title": "Unmatched prefix omitted from constructed output when a shorter suffix expands",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["Continuation/output consistency within declared owner boundary"],
+			"reproduction": "{\"registration\": \"strict automatic 0 -> EXPANDED with final_result=false\", \"baseline\": \"ordinary x then Backspace returns logical buffer to empty\", \"event_payload\": \"´0\", \"actual\": \"consumed=true; 16 returned fixture events construct EXPANDED; buffer ´EXPANDED\", \"parallel_control\": \"single NNBSP+? with suffix ? produces same prefix omission\", \"split_control\": \"´ event passes through; subsequent 0 is consumed, constructs EXPANDED and retains buffer ´EXPANDED appropriately\"}",
+			"root_cause": "Whole event is consumed, replacement-only injection plan clamps erasures at zero while logical buffer splice retains unmatched event prefix.",
+			"silent_failure": "Constructed output and successful logical buffer commit differ with no refusal; native receiving effect is unknown.",
+			"regression_test": "Preserve held-back unmatched event prefix exactly once; compare constructed event Unicode and buffer through original callback, retain split/full-trigger/Unicode controls.",
+			"basis": "actual-owner",
+			"qualification": "Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+			"evidence": [
+				{
+					"path": "macos/findings.json",
+					"sha256": "6b01739d39dbcb036f04844e5524d65b6d51c548d831d95348c44c11d1a91f01"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+				},
+				{
+					"path": "macos/sweeps.json",
+					"sha256": "74f30ea6d4ea00d7c003f558226042d2a199a2fe718cf2a1a0f551d8de363a2d"
+				}
+			],
+			"role": "macos",
+			"source_report": "macos/report.md"
+		},
+		{
+			"id": "DKL-001",
+			"worker_id": "DKL001",
+			"title": "Consumed continuation erases previously forwarded Compose prefix from semantic capture",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["Continuation/output consistency within declared owner boundary"],
+			"reproduction": "public-compose.lua assigned-second; sweeps.json",
+			"root_cause": "Capture.resolve_press advances and may reset Compose before Hook onConsume decision; unconditional consumed reset cannot preserve acknowledged prefix",
+			"silent_failure": "Semantic callbacks receive plausible plain e with no capture error although native ACK stream composes ê.",
+			"regression_test": "Compare original semantic owner against native acknowledged-raw+emitted-output history; second consumed preserves prefix, first consumed clears; refusal, repeat, ignored modifier, source currency and stale-generation controls.",
+			"basis": "actual-owner",
+			"qualification": "Original owner and genuine libxkbcommon over controlled Reader/ACK/broker/output ports; no real device, desktop or receiving application.",
+			"evidence": [
+				{
+					"path": "linux/findings.json",
+					"sha256": "4e2c732cbc4c27c9abd952a5f23c1f5a4bdbaafda77397fd8ceb4b4e7143e6fb"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "30bc641fb0aa7e04017609f274a44c128a2a392eafd707011320aea80d3394ee"
+				},
+				{
+					"path": "linux/sweeps.json",
+					"sha256": "ad3abba4efe8283f77accc2e751341d7b53f1380ceefe8d6d09137a9c9f636ea"
+				}
+			],
+			"role": "linux",
+			"source_report": "linux/report.md"
+		},
+		{
+			"id": "DKS-001",
+			"worker_id": "DKS001",
+			"title": "Inherited Compose descendants prevent explicit Bépo terminal from completing",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["Continuation/output consistency within declared owner boundary"],
+			"reproduction": "Bépo cedille in monnaie state completes ₢ after dead_currency/dead_cedilla",
+			"root_cause": "Standard trigger reuse plus unconditional locale include imports longer descendants that shadow explicit shorter terminal; both converter implementations share construction.",
+			"silent_failure": "Both converters report zero conflicts and generated text includes expected rule; native parser accepts table, but expected output never completes at pair.",
+			"regression_test": "Actual native Compose with inherited locale descendants: assert COMPOSED and ₢ after pair; preserve ordinary locale and no-include/private-trigger positive controls.",
+			"basis": "native",
+			"qualification": "Original Python/Lua converters and genuine fingerprinted libxkbcommon Compose table; pinned locale, no desktop, native macOS or AHK execution.",
+			"evidence": [
+				{
+					"path": "shared/findings.json",
+					"sha256": "e909a25b6394f4c364592b6e83937959320f18a06979f20717f13f493d5bda19"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "f2d19d70d2347431d8037b2d4b790fed9b3f3d0d866b32c111c67fad2aee6db0"
+				},
+				{
+					"path": "shared/sweeps.json",
+					"sha256": "c5084f8c1dcce6701cc2af16d4e8f8d2b55b81081905b86fdf6ac8bf0454ee86"
+				}
+			],
+			"role": "shared",
+			"source_report": "shared/report.md"
+		}
+	]
+}

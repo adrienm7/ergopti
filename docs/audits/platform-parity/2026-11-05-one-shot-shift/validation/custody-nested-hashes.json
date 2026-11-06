@@ -1,0 +1,335 @@
+{
+	"qualification": "Raw worker stdout/stderr hashes are re-derived; formatting preserves separate exact program originals where required.",
+	"claims": [
+		{
+			"path": "shared/dry-A-policy-lua54.stdout.txt",
+			"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-A-policy-lua54.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-A-policy-luajit.stdout.txt",
+			"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-A-policy-luajit.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-A-catalogue-guard.stdout.txt",
+			"sha256": "edcebe120e38daba02e054914afb4a45c81231e1a32fe5a1592b83899ba9813e",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-A-catalogue-guard.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-A-declarations.stdout.txt",
+			"sha256": "b62e6f9308e539e3d5f3e69100fdb501b2f833138a0ce54fe39c78f26be3f486",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-A-declarations.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-A-pinned-source.stdout.txt",
+			"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-A-pinned-source.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-A-single-source.stdout.txt",
+			"sha256": "04a3fef985b6d5644eacb5883107af58b25c12d8a6172e9c8c1fff69babe6a8a",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-A-single-source.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-B-policy-lua54.stdout.txt",
+			"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-B-policy-lua54.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-B-policy-luajit.stdout.txt",
+			"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-B-policy-luajit.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-B-catalogue-guard.stdout.txt",
+			"sha256": "edcebe120e38daba02e054914afb4a45c81231e1a32fe5a1592b83899ba9813e",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-B-catalogue-guard.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-B-declarations.stdout.txt",
+			"sha256": "b62e6f9308e539e3d5f3e69100fdb501b2f833138a0ce54fe39c78f26be3f486",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-B-declarations.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-B-pinned-source.stdout.txt",
+			"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-B-pinned-source.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-B-single-source.stdout.txt",
+			"sha256": "04a3fef985b6d5644eacb5883107af58b25c12d8a6172e9c8c1fff69babe6a8a",
+			"matched": true
+		},
+		{
+			"path": "shared/dry-B-single-source.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"matched": true
+		},
+		{
+			"path": "windows/dry-A.json",
+			"sha256": "8ca369700a8e445a460dcef4d8ca48b423e4225ccf31addf387348e681225344",
+			"matched": true
+		},
+		{
+			"path": "windows/dry-A.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"matched": true
+		},
+		{
+			"path": "windows/dry-B.json",
+			"sha256": "c1125aa930cd159ce54d8fa06850aadcfd7e1ba8d07d84d0685ee78edc49f2e6",
+			"matched": true
+		},
+		{
+			"path": "windows/dry-B.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/source-contract.txt",
+			"sha256": "632df408e8e8eeeb000c9f7ba640b581fa57a29e0d8713025b375213ed27d912",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/lua-public-probe.lua.txt",
+			"sha256": "69822e6fd795299446d12aaecfd6ae39bae5868cb11152991620c13edc038a5e",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/lua-channel-probe.lua.txt",
+			"sha256": "5fcac2dab572d3c0019760c7c330e5dc1a68ced9e349443288171756f06406ad",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.txt",
+			"sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.txt",
+			"sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.txt",
+			"sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/lua-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.txt",
+			"sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/lua-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.txt",
+			"sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.txt",
+			"sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/lua-tests.meta.corpus.test_corpus_tap_hold_decisions.txt",
+			"sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/luajit-public-probe.lua.txt",
+			"sha256": "592ddba3e8454c762f39bd524a607a4085b42fed6123db5f9435ea4dee7a51a6",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/luajit-channel-probe.lua.txt",
+			"sha256": "5fc45e5c4cdcdad3527769a41ff1edefbf353b9a788f4ceabd55510563729943",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.txt",
+			"sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.txt",
+			"sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.txt",
+			"sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/luajit-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.txt",
+			"sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/luajit-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.txt",
+			"sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.txt",
+			"sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-1/luajit-tests.meta.corpus.test_corpus_tap_hold_decisions.txt",
+			"sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/source-contract.txt",
+			"sha256": "632df408e8e8eeeb000c9f7ba640b581fa57a29e0d8713025b375213ed27d912",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/lua-public-probe.lua.txt",
+			"sha256": "68f881bf103e951d3ddac4329471ba6db43be3d358d081bdff3260524dcedca3",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/lua-channel-probe.lua.txt",
+			"sha256": "b56d81b7acda6bdff5f8e72e0ad3e36717fed31fc1ea33bb9dbd1f47b4a3e771",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.txt",
+			"sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.txt",
+			"sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.txt",
+			"sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/lua-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.txt",
+			"sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/lua-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.txt",
+			"sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.txt",
+			"sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/lua-tests.meta.corpus.test_corpus_tap_hold_decisions.txt",
+			"sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/luajit-public-probe.lua.txt",
+			"sha256": "ae6bc66658c1ca777ec375c39e625e6c724b93a302db1d9bfab2c9b7b3560275",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/luajit-channel-probe.lua.txt",
+			"sha256": "b0e547861851f068dbbdf04b3c080dd2a693e501770fd03617650de7bd5c4593",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.txt",
+			"sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.txt",
+			"sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.txt",
+			"sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/luajit-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.txt",
+			"sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/luajit-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.txt",
+			"sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.txt",
+			"sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a",
+			"matched": true
+		},
+		{
+			"path": "linux/final-dry-2/luajit-tests.meta.corpus.test_corpus_tap_hold_decisions.txt",
+			"sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385",
+			"matched": true
+		}
+	]
+}

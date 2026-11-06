@@ -1,0 +1,47 @@
+
+=== tap-hold engine: under a modifier and on the layer ===
+  ok   types Shift+Tab, not Alt+Tab, when Shift is held
+  ok   types Ctrl+Tab under a held CapsLock and under a physical Ctrl
+  ok   keeps CapsLock a tap-hold under Shift, for Ctrl+Shift
+  ok   makes CapsLock the layer's Backspace while the layer is held
+  ok   is the layer's key or itself when its own hold is the layer another key holds (layer-under-layer)
+  ok   swallows LAlt tapping Backspace on another key's layer, as Windows does (layer-under-layer)
+  ok   makes a key with a modifier hold itself on the layer (layer-tap-holds-off)
+
+=== tap-hold engine: tap sentinels and the one-shot Shift ===
+  ok   types the key itself for an empty tap, and nothing for none
+  ok   shifts the next key, once, and lets a modifier through while armed
+  ok   expires the one-shot Shift
+  ok   ignores a disabled key and a key it does not know
+
+=== tap-hold engine: what the one-shot Shift does with the next key ===
+  ok   treats a key tapped by a tap-hold as the same key pressed by hand (one-shot-next-key)
+  ok   types the native key of a tap-hold as that key (one-shot-next-key)
+  ok   ends on Enter, Backspace, Delete, Tab and Escape, typed unshifted (one-shot-next-key)
+  ok   lets a key that types nothing through and stays armed (one-shot-next-key)
+  ok   lets Print, the volume keys, NumLock and F13 through, and stays armed (one-shot-types-nothing)
+  ok   keeps the one-shot for a keypad key with NumLock off (one-shot-types-nothing)
+  ok   passes a shortcut unshifted and stays armed (one-shot-types-nothing)
+  ok   types a digit as it is and spends the one-shot (one-shot-types-nothing)
+  ok   needs the layout's text when a key taps the one-shot Shift (one-shot-types-nothing)
+  ok   types the shared result for Space, a period, a comma and the magic key (one-shot-results-shared)
+  ok   hands the injector a result the layout cannot type (one-shot-results-shared)
+  ok   types a capital the layout puts on another key or level (one-shot-results-shared)
+  ok   lifts the Shift or AltGr the hand holds around a result (one-shot-lifts-levels)
+
+=== tap-hold engine: nothing stays pressed ===
+  ok   releases every held modifier, layer chord and one-shot key
+  ok   sends one Ctrl for two keys holding it, and lifts it with the last
+  ok   shares Ctrl with a physical Ctrl nobody configured
+  ok   types a tapped Enter again while Enter is held
+  ok   keeps a held Backspace down through the layer's Backspace
+  ok   sends one Left for two layer keys that are both Left
+  ok   releases a shared modifier once
+  ok   pairs every down it emits with an up over a random session
+
+=== tap-hold engine: a lone Alt, AltGr or Super hold ===
+  ok   masks the lone Alt of a tap before releasing it and typing the tap
+  ok   masks a lone long hold too, where no tap follows
+  ok   does not mask a chord, which opens no menu
+  ok   masks Super and AltGr, never Ctrl or Shift
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":36}

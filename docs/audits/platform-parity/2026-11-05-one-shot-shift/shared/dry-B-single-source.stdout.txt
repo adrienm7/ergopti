@@ -1,0 +1,1 @@
+[32m[OK] one-shot Shift: 7 result(s) and the magic key's, read by all three drivers from one shared table.[0m

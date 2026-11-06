@@ -1,0 +1,146 @@
+Selecting exact test module: "tests.unit.modules.keymap.expansion.test_expander"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.expansion.test_expander
+2026-11-05 21:38:19:000 [WARNING] [keystats.kc_bridge] KC log EOF is untrusted at cold start — persistence stays denied until retry: open failed: /tmp/lua_3ZZYa1_ergopti_home/Library/Application Support/Ergopti/config/metrics/karabiner_kc.log: No such file or directory.
+[logger] unified log write refused: /tmp/lua_3ZZYa1_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_3ZZYa1_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_keystats.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_3ZZYa1_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+2026-11-05 21:38:19:000 [WARNING] [keystats.kc_bridge] Cannot create '/tmp/lua_3ZZYa1_ergopti_home/Library/Application Support/Ergopti/config/metrics/karabiner_kc.log' — bridge may not receive KE events.
+
+=== keymap.expander: public surface ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"exposes the documented entry points","status":"pass","elapsed_ms":0.004837,"timing_error":""}
+  ok   exposes the documented entry points
+
+=== keymap.expander: require_state guard ===
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"HS-L-01 every state-dependent public entry fails closed before init","status":"pass","elapsed_ms":5.406758,"timing_error":""}
+  ok   HS-L-01 every state-dependent public entry fails closed before init
+2026-11-05 21:38:19:000 [ERROR] [keymap.expander] 'try_auto_expand' called before M.init() — dependencies not initialized.
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"try_auto_expand returns false when init() not called","status":"pass","elapsed_ms":5.328079,"timing_error":""}
+  ok   try_auto_expand returns false when init() not called
+2026-11-05 21:38:19:000 [ERROR] [keymap.expander] 'try_terminator_expand' called before M.init() — dependencies not initialized.
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"try_terminator_expand returns false when init() not called","status":"pass","elapsed_ms":4.964292,"timing_error":""}
+  ok   try_terminator_expand returns false when init() not called
+2026-11-05 21:38:19:000 [ERROR] [keymap.expander] 'try_repeat_feature' called before M.init() — dependencies not initialized.
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"try_repeat_feature returns false when init() not called","status":"pass","elapsed_ms":10.345632,"timing_error":""}
+  ok   try_repeat_feature returns false when init() not called
+
+=== keymap.expander: init argument validation ===
+2026-11-05 21:38:19:000 [ERROR] [keymap.expander] M.init(): core_state must be a table.
+2026-11-05 21:38:19:000 [ERROR] [keymap.expander] 'try_repeat_feature' called before M.init() — dependencies not initialized.
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"init() is a no-op when core_state is not a table","status":"pass","elapsed_ms":5.228850,"timing_error":""}
+  ok   init() is a no-op when core_state is not a table
+2026-11-05 21:38:19:000 [ERROR] [keymap.expander] M.init(): registry_mod must be a table.
+2026-11-05 21:38:19:000 [ERROR] [keymap.expander] 'try_repeat_feature' called before M.init() — dependencies not initialized.
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"init() is a no-op when registry_mod is not a table","status":"pass","elapsed_ms":4.638412,"timing_error":""}
+  ok   init() is a no-op when registry_mod is not a table
+2026-11-05 21:38:19:000 [ERROR] [keymap.expander] M.init(): llm_mod must be a table.
+2026-11-05 21:38:19:000 [ERROR] [keymap.expander] 'try_repeat_feature' called before M.init() — dependencies not initialized.
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"init() is a no-op when llm_mod is not a table","status":"pass","elapsed_ms":4.645052,"timing_error":""}
+  ok   init() is a no-op when llm_mod is not a table
+
+=== keymap.expander: try_repeat_feature early-returns ===
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"returns false when the repeat feature is disabled","status":"pass","elapsed_ms":4.479322,"timing_error":""}
+  ok   returns false when the repeat feature is disabled
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"returns false when chars is not the magic key","status":"pass","elapsed_ms":4.889138,"timing_error":""}
+  ok   returns false when chars is not the magic key
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"returns false when buffer is shorter than the magic key","status":"pass","elapsed_ms":4.935058,"timing_error":""}
+  ok   returns false when buffer is shorter than the magic key
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"returns false when the previous char is whitespace","status":"pass","elapsed_ms":4.692713,"timing_error":""}
+  ok   returns false when the previous char is whitespace
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"fires for a normal letter before the magic key","status":"pass","elapsed_ms":27.218488,"timing_error":""}
+  ok   fires for a normal letter before the magic key
+
+=== keymap.expander: perform_text_replacement ===
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"calls the tooltip renderer with forced hiding on expansion","status":"pass","elapsed_ms":5.899039,"timing_error":""}
+  ok   calls the tooltip renderer with forced hiding on expansion
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"issues the requested deletes and runs the buffer_action","status":"pass","elapsed_ms":10.797452,"timing_error":""}
+  ok   issues the requested deletes and runs the buffer_action
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"paces the collected delete prefix for terminal TUI inputs (terminal-stale-render)","status":"pass","elapsed_ms":10.416619,"timing_error":""}
+  ok   paces the collected delete prefix for terminal TUI inputs (terminal-stale-render)
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"refreshes chained preview only from committed replacement completion","status":"pass","elapsed_ms":10.686344,"timing_error":""}
+  ok   refreshes chained preview only from committed replacement completion
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"does not re-arm preview when stop invalidates a mid-batch transaction","status":"pass","elapsed_ms":10.202256,"timing_error":""}
+  ok   does not re-arm preview when stop invalidates a mid-batch transaction
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"does not arm the LLM timer when LLM is disabled","status":"pass","elapsed_ms":5.924577,"timing_error":""}
+  ok   does not arm the LLM timer when LLM is disabled
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"arms the LLM timer when LLM is enabled and not ignored","status":"pass","elapsed_ms":5.097291,"timing_error":""}
+  ok   arms the LLM timer when LLM is enabled and not ignored
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"skips LLM side-effects when is_ignored=true","status":"pass","elapsed_ms":4.931693,"timing_error":""}
+  ok   skips LLM side-effects when is_ignored=true
+2026-11-05 21:38:20:000 [ERROR] [keymap.expander] emit_action failed: ...os/tests/unit/modules/keymap/expansion/test_expander.lua:550: producer failed after a partial prefix
+stack traceback:
+	[C]: in function 'error'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:550: in function <...os/tests/unit/modules/keymap/expansion/test_expander.lua:548>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:2618: in function 'adapters.synthetic_input.with_transaction'
+	(...tail calls...)
+	[C]: in function 'pcall'
+	...os/static/ergopti_plus/macos/modules/keymap/expander.lua:187: in function 'modules.keymap.expander.perform_text_replacement'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:546: in upvalue 'callback'
+	...s/static/ergopti_plus/_shared/lua/test/runner_timing.lua:110: in function <...s/static/ergopti_plus/_shared/lua/test/runner_timing.lua:108>
+	[C]: in function 'pcall'
+	...s/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in function <...s/static/ergopti_plus/_shared/lua/test/runner_timing.lua:74>
+	(...tail calls...)
+	...5/macos/static/ergopti_plus/macos/tests/helpers/init.lua:841: in function 'tests.helpers.it'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:539: in function <...os/tests/unit/modules/keymap/expansion/test_expander.lua:298>
+	[C]: in function 'pcall'
+	...5/macos/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:298: in main chunk
+	[C]: in function 'require'
+	tests/run.lua:181: in function <tests/run.lua:181>
+	[C]: in function 'pcall'
+	...s/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in field 'measure'
+	...5/macos/static/ergopti_plus/macos/tests/helpers/init.lua:965: in function 'tests.helpers.measure_module'
+	tests/run.lua:181: in main chunk
+	[C]: in ?.
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"cancels an emitted prefix when the producer raises before commit","status":"pass","elapsed_ms":11.071884,"timing_error":""}
+  ok   cancels an emitted prefix when the producer raises before commit
+2026-11-05 21:38:20:000 [ERROR] [keymap.expander] Replacement rescan deadline preparation failed: ...os/tests/unit/modules/keymap/expansion/test_expander.lua:577: second clock read refused.
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"prepares the final-result clock before mutating the engine buffer","status":"pass","elapsed_ms":10.703510,"timing_error":""}
+  ok   prepares the final-result clock before mutating the engine buffer
+2026-11-05 21:38:20:000 [ERROR] [keymap.expander] emit_action failed: ...os/tests/unit/modules/keymap/expansion/test_expander.lua:616: boom
+stack traceback:
+	[C]: in function 'error'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:616: in function <...os/tests/unit/modules/keymap/expansion/test_expander.lua:616>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:2618: in function 'adapters.synthetic_input.with_transaction'
+	(...tail calls...)
+	[C]: in function 'pcall'
+	...os/static/ergopti_plus/macos/modules/keymap/expander.lua:187: in function 'modules.keymap.expander.perform_text_replacement'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:614: in function <...os/tests/unit/modules/keymap/expansion/test_expander.lua:613>
+	[C]: in function 'xpcall'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:80: in upvalue 'capture_replacement_logs'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:613: in upvalue 'callback'
+	...	(skipping 3 levels)
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:607: in function <...os/tests/unit/modules/keymap/expansion/test_expander.lua:298>
+	[C]: in function 'pcall'
+	...5/macos/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...os/tests/unit/modules/keymap/expansion/test_expander.lua:298: in main chunk
+	[C]: in function 'require'
+	tests/run.lua:181: in function <tests/run.lua:181>
+	[C]: in function 'pcall'
+	...s/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in field 'measure'
+	...5/macos/static/ergopti_plus/macos/tests/helpers/init.lua:965: in function 'tests.helpers.measure_module'
+	tests/run.lua:181: in main chunk
+	[C]: in ?.
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"cancels the transaction when emit_action throws before output","status":"pass","elapsed_ms":11.835033,"timing_error":""}
+  ok   cancels the transaction when emit_action throws before output
+
+=== keymap.expander: the pause gate is not here ===
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"the module names no pause or suspend state","status":"pass","elapsed_ms":300.582076,"timing_error":""}
+  ok   the module names no pause or suspend state
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander","name":"150 non-matching calls leave the buffer exactly where they found it","status":"pass","elapsed_ms":9.863045,"timing_error":""}
+  ok   150 non-matching calls leave the buffer exactly where they found it
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.expansion.test_expander","name":"tests.unit.modules.keymap.expansion.test_expander","status":"pass","elapsed_ms":566.530952,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  26
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

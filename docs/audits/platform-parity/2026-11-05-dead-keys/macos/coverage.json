@@ -1,0 +1,155 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"scope": "macOS native composition boundary and grouped character event integration with hotstring callback",
+	"items": [
+		{
+			"aspect": "public.registration",
+			"basis": "dynamic original owner",
+			"assessment": "Keymap.add strict automatic registrations through unchanged driver function"
+		},
+		{
+			"aspect": "public.callback",
+			"basis": "dynamic original owner",
+			"assessment": "Registered keyDown tap callback, not direct expander substitute"
+		},
+		{
+			"aspect": "owner.provenance",
+			"basis": "dynamic identity and source receipt",
+			"assessment": "Exact init.lua, registry.lua, expander.lua, adapters/synthetic_input.lua for all 13 cases"
+		},
+		{
+			"aspect": "native.fixture-boundary",
+			"basis": "explicit limitation",
+			"assessment": "Event payloads constructed in memory; native NSEvent/dead state not represented"
+		},
+		{
+			"aspect": "empty-event",
+			"basis": "dynamic original owner",
+			"assessment": "a then empty payload preserves a"
+		},
+		{
+			"aspect": "composed-single",
+			"basis": "dynamic original owner",
+			"assessment": "a, empty marker, é ends aé with no expansion"
+		},
+		{
+			"aspect": "spacing-accent",
+			"basis": "dynamic original owner",
+			"assessment": "a then ´ then Backspace leaves a"
+		},
+		{
+			"aspect": "empty-backspace",
+			"basis": "dynamic original owner; native unknown",
+			"assessment": "a, empty marker, Backspace empties logical buffer; no native defect inferred"
+		},
+		{
+			"aspect": "escape",
+			"basis": "dynamic original owner",
+			"assessment": "Empty marker then Escape preserves a under fixture policy"
+		},
+		{
+			"aspect": "navigation",
+			"basis": "dynamic original owner plus canonical suite",
+			"assessment": "Default arrow clears logical hotstring buffer; native pending state unknown"
+		},
+		{
+			"aspect": "shortcut-option",
+			"basis": "source only",
+			"assessment": "Cmd/Ctrl reset policy differs from character-producing Option and Option+Backspace"
+		},
+		{
+			"aspect": "two-ascii-tail",
+			"basis": "dynamic original owner",
+			"assessment": "DKM-001: ^0 misses, whole-string bucket then preview final-codepoint lookup"
+		},
+		{
+			"aspect": "two-ascii-split",
+			"basis": "dynamic original owner",
+			"assessment": "Split ^,0 expands and consumes completing event"
+		},
+		{
+			"aspect": "unicode-controls",
+			"basis": "dynamic original owner",
+			"assessment": "€0 and éà grouped events expand under established timing baseline"
+		},
+		{
+			"aspect": "longer-ascii-control",
+			"basis": "dynamic original owner",
+			"assessment": "^00 grouped event expands under established timing baseline"
+		},
+		{
+			"aspect": "suffix-accent-prefix",
+			"basis": "dynamic original owner",
+			"assessment": "DKM-002: ´0 consumed, returned EXPANDED only, buffer ´EXPANDED"
+		},
+		{
+			"aspect": "suffix-nnbsp-prefix",
+			"basis": "dynamic original owner plus source contract",
+			"assessment": "NNBSP+? consumed, returned EXPANDED only; init.lua explicitly supports this multi-codepoint shape"
+		},
+		{
+			"aspect": "suffix-split-control",
+			"basis": "dynamic original owner",
+			"assessment": "Earlier ´ passes through; subsequent 0 returns EXPANDED appropriately"
+		},
+		{
+			"aspect": "serializer",
+			"basis": "dynamic original owner",
+			"assessment": "leave_callback returns replacement event table with consume=true; not native application receipt"
+		},
+		{
+			"aspect": "negative-delete",
+			"basis": "source plus canonical suite",
+			"assessment": "Shared plan clamps negative erase counts; previous fix not recounted; prefix reconstruction is distinct"
+		},
+		{
+			"aspect": "unseeded-control",
+			"basis": "dynamic original owner",
+			"assessment": "Exact one seed line removed from test scaffold; five first-event timing declines retained"
+		},
+		{
+			"aspect": "ordinary-baseline",
+			"basis": "dynamic original owner",
+			"assessment": "Only scaffold seed replaced with x+Backspace; pre-carrier empty buffer; eight carrier outcomes match seeded record"
+		},
+		{
+			"aspect": "timing-gate",
+			"basis": "source and contrastive fixtures",
+			"assessment": "last_key_time initial zero; dt from epoch; mapping_delay_remaining conditional default threshold"
+		},
+		{
+			"aspect": "semantic-checker",
+			"basis": "actual Python checker",
+			"assessment": "13 exact cases, four exact owners, outputs/counters/tail calls; five adversarial negative controls"
+		},
+		{
+			"aspect": "canonical.registry",
+			"basis": "canonical unit runner",
+			"assessment": "Exact selected registry suite executed; success does not cover grouped public callback input"
+		},
+		{
+			"aspect": "canonical.expander",
+			"basis": "canonical unit runner",
+			"assessment": "Exact expander suite and delete-count sanity suite executed; no real receiver"
+		},
+		{
+			"aspect": "native.api",
+			"basis": "external source evidence",
+			"assessment": "Hammerspoon 1.1.1 getCharacters(false) uses NSEvent.characters; documented empty Opt-E example"
+		},
+		{
+			"aspect": "native.grouping-receiver",
+			"basis": "unmeasured",
+			"assessment": "Physical composition/fallback grouping and application outcome remain unknown"
+		},
+		{
+			"aspect": "native.lifecycle",
+			"basis": "unmeasured",
+			"assessment": "No real pause/reload/focus/IME-state teardown measured; do not infer Windows-like expiry contract"
+		}
+	],
+	"scenarios_per_record": 13,
+	"records": 3,
+	"new_findings": 2,
+	"claim": "Bounded source/model audit; neither native composition parity nor exhaustive physical behavior is certified."
+}

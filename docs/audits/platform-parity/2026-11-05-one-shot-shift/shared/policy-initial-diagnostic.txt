@@ -1,0 +1,6 @@
+/workspace/scratch/parity-toolchain/lua-5.4.8-dlopen/src/lua: ...ratch/parity-one-shot-2026-11-05/shared/policy-probe.lua:18: actual Unicode title İ
+stack traceback:
+	[C]: in function 'assert'
+	...ratch/parity-one-shot-2026-11-05/shared/policy-probe.lua:18: in local 'check'
+	...ratch/parity-one-shot-2026-11-05/shared/policy-probe.lua:46: in main chunk
+	[C]: in ?

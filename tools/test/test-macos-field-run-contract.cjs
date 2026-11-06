@@ -58,6 +58,8 @@ const BUNDLED_SAMPLE = 'static/ergopti_plus/_shared/modules/hotstrings/french/au
 const FIELD_PATHS = 'tools/dev/field-report-paths.py';
 const APP_DIRS = 'static/ergopti_plus/_shared/modules/paths/app_dirs.toml';
 const SUB_FILES = 'static/ergopti_plus/_shared/modules/logger/sub_files.toml';
+// The readiness budget covers the boot's Accessibility wait, read from its owner.
+const ACCESSIBILITY_WAIT = 'static/ergopti_plus/macos/infra/accessibility_wait.lua';
 
 if (process.platform === 'win32') {
 	console.log('[SKIP] The macOS field report collector is a macOS shell tool; not run on Windows.');
@@ -129,6 +131,7 @@ function fixture(name, { onDev = false } = {}) {
 		FIELD_PATHS,
 		APP_DIRS,
 		SUB_FILES,
+		ACCESSIBILITY_WAIT,
 		ANALYSER,
 		...ANALYSER_SOURCES
 	]) {
@@ -468,8 +471,16 @@ function reportFolder(paths) {
 				);
 				// The fixture shortens these through overrides; a real run keeps the
 				// budgets the field runs of 2026-10-28 settled on.
+				// A new install waits for Accessibility before it is ready: the
+				// readiness budget is that wait plus two minutes of boot, read from
+				// infra/accessibility_wait.lua (field report 2026-11-05).
+				assert.match(
+					collector,
+					/^FIELD_RUN_READY_SECONDS="\$\{FIELD_RUN_READY_SECONDS_OVERRIDE:-\$\(\(FIELD_RUN_ACCESSIBILITY_WAIT_SECONDS \+ 120\)\)\}"$/m,
+					'FIELD_RUN_READY_SECONDS covers the Accessibility wait and the boot'
+				);
+				assert.match(collector, /s\/\^M\\\.DEADLINE_SECONDS = /);
 				for (const [name, value] of [
-					['FIELD_RUN_READY_SECONDS', 240],
 					['FIELD_RUN_ACCEPT_SECONDS', 300],
 					['FIELD_RUN_POLL_SECONDS', 5]
 				])

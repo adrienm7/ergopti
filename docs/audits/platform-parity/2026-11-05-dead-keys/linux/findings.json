@@ -1,0 +1,27 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"findings": [
+		{
+			"id": "DKL001",
+			"title": "Consumed continuation erases previously forwarded Compose prefix from semantic capture",
+			"os": "linux",
+			"module": "dead-key runtime capture / public tap shortcut",
+			"priority": "medium",
+			"confidence": "high for original-owner/native-component divergence; receiving desktop app unmeasured",
+			"expected": "ACK-only native history dead-circumflex then e yields \u00ea; consuming intervening assigned tap must preserve earlier forwarded prefix",
+			"observed": "Hook semantic e; independent native reference \u00ea; raw ACK43down/up,32down/up; actual public TapKeys queued1/executed0",
+			"root": "Capture.resolve_press advances and may reset Compose before Hook onConsume decision; unconditional consumed reset cannot preserve acknowledged prefix",
+			"reproduction": "public-compose.lua assigned-second; sweeps.json",
+			"source_refs": [
+				"static/ergopti_plus/linux/adapters/xkb_capture.lua:1306",
+				"static/ergopti_plus/linux/adapters/keyboard_hook.lua:1640",
+				"static/ergopti_plus/linux/adapters/keyboard_hook.lua:1799",
+				"static/ergopti_plus/linux/modules/shortcuts/tap_keys.lua:277"
+			],
+			"silent_failure": "Semantic callbacks receive plausible plain e with no capture error although native ACK stream composes \u00ea.",
+			"regression": "Compare original semantic owner against native acknowledged-raw+emitted-output history; second consumed preserves prefix, first consumed clears; refusal, repeat, ignored modifier, source currency and stale-generation controls.",
+			"deduplication": "Distinct from existing OSL001/OSL002 and Shared DKS001; single consumed-history root.",
+			"qualification": "Controlled original Reader/broker/ACK ports, actual consumer and genuine native adapter; no device/desktop/receiving-app certification."
+		}
+	]
+}

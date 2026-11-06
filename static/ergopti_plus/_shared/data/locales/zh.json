@@ -4078,5 +4078,16 @@
 	"inventory.behavior.backspace_other": "退格键不会自动恢复触发文本；应用的撤销功能与此不同。",
 	"inventory.behavior.repeat_activation_window": "魔法键重复的激活时间窗口",
 	"inventory.behavior.repeat_window_untimed": "后备重复功能没有独立的激活时间窗口；空闲后重新开始词语的规则独立生效。",
-	"inventory.behavior.repeat_window_macos": "使用魔法键当前生效的激活时间窗口，包括修饰键的计时规则；设为零可禁用此窗口。空闲后重新开始词语的规则独立生效。"
+	"inventory.behavior.repeat_window_macos": "使用魔法键当前生效的激活时间窗口，包括修饰键的计时规则；设为零可禁用此窗口。空闲后重新开始词语的规则独立生效。",
+	"inventory.behavior.dead_composition": "死键字符组合",
+	"inventory.behavior.dead_fallback": "死键未映射的后续输入",
+	"inventory.behavior.dead_lifetime": "死键等待时间",
+	"inventory.behavior.dead_windows_composition": "内置死键映射表和注册表布局模拟。",
+	"inventory.behavior.dead_macos_composition": "组合由原生键盘布局管理；尚未验证物理输入的字符分组。",
+	"inventory.behavior.dead_linux_composition": "使用原生 XKB/Compose 和独立文本捕获；被拦截的后续输入可能产生不同结果。",
+	"inventory.behavior.dead_windows_fallback": "未映射的后续输入会先输出重音终止字符，再输出当前字符。",
+	"inventory.behavior.dead_macos_fallback": "回退行为由原生布局管理；尚未验证物理事件及应用程序收到的输出。",
+	"inventory.behavior.dead_linux_fallback": "取消捕获时保留当前字符并丢弃之前的重音；原生输出可能不同。",
+	"inventory.behavior.dead_windows_lifetime": "内置映射表最多等待 2 秒；注册表死键状态没有超时。",
+	"inventory.behavior.dead_native_lifetime": "原生操作系统管理待定组合；捕获和重置规则与驱动程序共用超时不同。"
 }

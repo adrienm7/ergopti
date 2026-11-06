@@ -1,0 +1,27 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"registry_layouts": 6,
+	"states": 140,
+	"converter_levels": 7,
+	"unique_wire_expectations": 4391,
+	"native_deviations": 9,
+	"new_roots": 1,
+	"known_magic_contexts": 8,
+	"original_python_tests_per_sweep": 51,
+	"final_sweeps": 2,
+	"runtime_parity": [
+		"Python canonical vs Lua5.4/LuaJIT canonical",
+		"Python symbols/Compose vs Lua5.4/LuaJIT bytes for each registry layout"
+	],
+	"native_controls": 5,
+	"qualification": "Reachable explicit converter output expectations over original parsed XML relations; not an independent native macOS oracle, not every unspecified fallback or physical desktop sequence.",
+	"excluded_harness": "rows_probe.lua failure due lossy JSON null decoding; not product defect or passing coverage",
+	"unmeasured": [
+		"active compositor/desktop input layout",
+		"receiving app",
+		"real keyboard",
+		"native macOS action execution",
+		"AHK runtime",
+		"OS-specific lifecycle races"
+	]
+}

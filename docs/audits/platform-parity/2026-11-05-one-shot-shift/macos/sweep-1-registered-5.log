@@ -1,0 +1,36 @@
+
+=== gestures.sticky_modifiers ===
+  ok   arms the requested modifier and schedules the auto-cancel
+  ok   toggles each modifier independently, as Karabiner does
+  ok   toggling the last armed modifier off disarms everything
+  ok   releases the arm when the keystroke consumes it
+  ok   releases the arm when the auto-cancel fires
+  ok   refuses a delay it was not given rather than inventing one
+  ok   refuses a modifier no key event carries
+  ok   refuses an empty modifier list
+  ok   keeps no armed state when the injector refuses
+  ok   clear() releases an armed set
+  ok   armed() hands back a copy, not the live set
+  ok   rejects an uncommitted auto-cancel timer and disarms immediately
+  ok   contains a throwing timer acquisition without leaving the injector armed
+  ok   fences a stale auto-cancel callback after a newer arm commits
+  ok   retains refused timer cleanup and settles it before a later retry
+  ok   isolates sticky admission and cleanup between gesture and shortcut parents
+  ok   retains the gesture parent until disarm false debt settles
+  ok   retains the gesture parent until disarm nil debt settles
+  ok   retains the gesture parent until disarm throw debt settles
+  ok   rolls back gestures when arm acquisition reenters same-parent clear
+  ok   does not let sibling clear cancel gestures arm acquisition
+  ok   rolls back shortcut_bindings when arm acquisition reenters same-parent clear
+  ok   does not let sibling clear cancel shortcut_bindings arm acquisition
+  ok   rolls back gestures when timer acquisition reenters same-parent clear
+  ok   does not let sibling clear cancel gestures timer acquisition
+  ok   rolls back shortcut_bindings when timer acquisition reenters same-parent clear
+  ok   does not let sibling clear cancel shortcut_bindings timer acquisition
+  ok   retains matching arm rollback debt after disarm false
+  ok   retains matching arm rollback debt after disarm nil
+  ok   retains matching arm rollback debt after disarm throw
+  ok   retains matching timer rollback debt after disarm false
+  ok   retains matching timer rollback debt after disarm nil
+  ok   retains matching timer rollback debt after disarm throw
+AUDIT_RESULT	33	0

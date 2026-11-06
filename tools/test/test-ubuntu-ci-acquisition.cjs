@@ -298,5 +298,5 @@ const result = spawnSync(
 assert.ifError(result.error);
 assert.equal(result.signal, null);
 assert.equal(result.status, 0, result.stdout + result.stderr);
-assert.match(result.stderr, /Ran 34 tests in /);
+assert.match(result.stderr, /Ran 35 tests in /);
 console.log('PASS: signed Ubuntu host acquisition, failure controls and workflow mutations');

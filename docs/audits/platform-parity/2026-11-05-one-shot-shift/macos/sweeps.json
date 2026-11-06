@@ -1,0 +1,98 @@
+[
+	{
+		"sweep": 1,
+		"name": "public",
+		"exit": 0,
+		"log": "sweep-1-public.log"
+	},
+	{
+		"sweep": 1,
+		"name": "config",
+		"exit": 0,
+		"log": "sweep-1-config.log"
+	},
+	{
+		"sweep": 1,
+		"name": "registered-1",
+		"exit": 0,
+		"log": "sweep-1-registered-1.log"
+	},
+	{
+		"sweep": 1,
+		"name": "registered-2",
+		"exit": 0,
+		"log": "sweep-1-registered-2.log"
+	},
+	{
+		"sweep": 1,
+		"name": "registered-3",
+		"exit": 0,
+		"log": "sweep-1-registered-3.log"
+	},
+	{
+		"sweep": 1,
+		"name": "registered-4",
+		"exit": 0,
+		"log": "sweep-1-registered-4.log"
+	},
+	{
+		"sweep": 1,
+		"name": "registered-5",
+		"exit": 0,
+		"log": "sweep-1-registered-5.log"
+	},
+	{
+		"sweep": 1,
+		"name": "registered-6",
+		"exit": 0,
+		"log": "sweep-1-registered-6.log"
+	},
+	{
+		"sweep": 2,
+		"name": "public",
+		"exit": 0,
+		"log": "sweep-2-public.log"
+	},
+	{
+		"sweep": 2,
+		"name": "config",
+		"exit": 0,
+		"log": "sweep-2-config.log"
+	},
+	{
+		"sweep": 2,
+		"name": "registered-1",
+		"exit": 0,
+		"log": "sweep-2-registered-1.log"
+	},
+	{
+		"sweep": 2,
+		"name": "registered-2",
+		"exit": 0,
+		"log": "sweep-2-registered-2.log"
+	},
+	{
+		"sweep": 2,
+		"name": "registered-3",
+		"exit": 0,
+		"log": "sweep-2-registered-3.log"
+	},
+	{
+		"sweep": 2,
+		"name": "registered-4",
+		"exit": 0,
+		"log": "sweep-2-registered-4.log"
+	},
+	{
+		"sweep": 2,
+		"name": "registered-5",
+		"exit": 0,
+		"log": "sweep-2-registered-5.log"
+	},
+	{
+		"sweep": 2,
+		"name": "registered-6",
+		"exit": 0,
+		"log": "sweep-2-registered-6.log"
+	}
+]

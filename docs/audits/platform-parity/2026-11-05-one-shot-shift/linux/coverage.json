@@ -1,0 +1,43 @@
+{
+	"pin": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"os": "linux",
+	"module": "single-use Shift",
+	"findings": ["OSL-001", "OSL-002"],
+	"public_asserted_streams": 20,
+	"channel_asserted_streams": 5,
+	"registered_modules": 7,
+	"registered_passed_per_runtime": 405,
+	"runtimes": ["Lua 5.4", "LuaJIT"],
+	"final_sweeps": ["final-dry-1/results.json", "final-dry-2/results.json"],
+	"source_receipts": "source-receipts.json",
+	"qualification": {
+		"executed": [
+			"original public standalone tap producer through actual Manager/Hook/Engine/shared policy",
+			"actual XKB adapter with valid keysym modifier metadata",
+			"original Reader/broker/Writer issuance and retirement over recorded FFI ports"
+		],
+		"controlled": [
+			"native XKB backend with Latin CapsLock XOR Shift semantics",
+			"inverse output table",
+			"FFI/syscalls/physical classification/time/device transport"
+		],
+		"unexecuted": [
+			"real evdev grabs",
+			"real uinput native delivery",
+			"libxkbcommon native inverse generation",
+			"receiving application",
+			"normal admission of excluded generic/legacy logical one-shot actions",
+			"combined actual CapsWord activation and one-shot end-to-end receiving-app route"
+		]
+	},
+	"subjects": {
+		"next_key_controls_modifiers": "20-stream public probe and registered owner cases",
+		"physical_vs_synthetic": "actual physical recorded trigger and real wrapped output owner; registered logical guarded producer only invariant qualification",
+		"punctuation_magic": "shared source/registered original Engine and integration tests, no bespoke native receipt",
+		"capslock_held_shift": "OSL-001 left/right matched controls; CapsWord downstream CapsLock ownership is source-derived, combined actual producer not executed",
+		"retrigger_timeout": "asserted native capture public producer streams, inclusive2000ms and expired2001ms",
+		"pause_stop_stale_partial_ack_refusal": "asserted original-channel ordinary tap pause/resume, reload and stop clear arm; registered guarded-owner stale/ACK/refusal tests; OSL-002 unexpected channel retirement",
+		"settings": "real private tap_hold TOML loader and defaults; timing from shipped shared constant; no user file edited",
+		"intentional_difference": "generic gesture catalogue Linux exclusion vs implemented tap-hold route"
+	}
+}

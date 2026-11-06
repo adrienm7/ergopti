@@ -1,0 +1,48 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"finding_count": 1,
+	"executed": {
+		"public_original_owner_native_cases": 7,
+		"capture_native_cases": 10,
+		"registered_original_files": 6,
+		"registered_cases_per_interpreter": 122,
+		"interpreters": ["Lua5.4", "LuaJIT"],
+		"final_sweeps": 2,
+		"false_green_scan": {
+			"observed": 0,
+			"baseline": 0
+		}
+	},
+	"source_traced": [
+		"capture process/peek/cancel/reset/load publication",
+		"Hook capture-before-consume and repeat/release ownership",
+		"actual public TapKeys admission/refusal and config reading",
+		"deferred same-drain scheduling",
+		"daemon consumer priority and active gating",
+		"restart/source reacquisition reset/refusal",
+		"separate native row commit path"
+	],
+	"delegated_to_shared": [
+		"registry chains and converter mappings",
+		"native Compose inherited prefix conflicts",
+		"magic-key base-level-only limits"
+	],
+	"policy_differences": [
+		"CANCELLED keeps current ordinary text without dead-key terminator; intentional local source policy, not claimed native platform impossibility."
+	],
+	"unmeasured": [
+		"receiving desktop application",
+		"real evdev/uinput/device hotplug",
+		"Wayland/X11 layout authority",
+		"full pause/reload/source race execution",
+		"native modifier sequences in generated component (modifier definitions absent)"
+	],
+	"evidence": [
+		"report.md",
+		"sweeps.json",
+		"public-compose.lua",
+		"native-controls.lua",
+		"selected-tests.lua",
+		"source-receipts.json"
+	]
+}

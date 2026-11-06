@@ -1,0 +1,413 @@
+{
+  "audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+  "finding": "OSL-002",
+  "conclusion": "Confirmed reachable with valid empty config.toml and explicitly enabled shipped tap-hold preset, using unchanged production chord declarations. Repeat still retires original keyboard channel; matched no-repeat remains healthy.",
+  "qualification": "Enabled shipped preset is a valid user configuration, not the neutral installation default. Existing original test fixture initially constructs an unused legacy owner and controlled base Engine; actual Manager then replaces them before all physical events. No unavailable declaration fixture, legacy action trigger or generic action dispatch occurs. Native ports are recording controls; no native input descriptor, libxkb inverse or receiving application is measured.",
+  "production_or_registered_test_changes": false,
+  "program": "public-channel-admission.lua",
+  "program_sha256": "a9ef06f29e25d75160af380ee5f6a63ca80cf2770164614b7f864addb1b0c36e",
+  "source_contracts": {
+    "public_option_bypasses_unavailable_declaration_fixture": true,
+    "before_manager_runs_before_actual_manager_init": true,
+    "real_source_reader_serves_s_bytes": true,
+    "actual_tap_document_explicitly_selects_shipped_preset": true
+  },
+  "source_receipts": [
+    {
+      "path": "static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua",
+      "sha256": "b856fe543eece29449c3c736af6fed9f524e70466d812d5d5567c8ab52be97e7",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
+      "sha256": "e3d8970dd41e7e1239b370ecbc9e0d04edf2f8a1f2c4a4fbfb5a0ed6d3b1522b",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+      "sha256": "fe64d1d6985da694281e21d3b09614fc7f346947dbfb24a2a136a05e98c455b7",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/adapters/keyboard_layout.lua",
+      "sha256": "a1114103fbfc238572c562e5b9842fc51207b866997774e630c63979d8fbb15b",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
+      "sha256": "cb6b98f7a76e7b47d8ddfacc546a058c3c83961050ff4d8716d04aaa2b028de6",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "114af1d0ff1daa21df141a8e006f10e19cdc3e30a1de32a5f18f718f06b891bb",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "sha256": "d5cd2ebaba30e1f27bffbf3c215ffeea8173c3d31e824c923a2c86c3c4532ba4",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/adapters/modifier_broker.lua",
+      "sha256": "71d6384cf91985d7c404022f053017db0fb85a04ca9775848a5d7209a86bf736",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/modules/shortcuts/key_combinations.lua",
+      "sha256": "e7ae043263815685a369c38c7efac8666a48b26cec68f771bb5f3a4c79e0eedf",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/support/input_owner_fixture.lua",
+      "sha256": "b4fd01d091c450a8473bd16475b93d23e1976265b8d58ef69605b1505c835cd8",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/support/tap_hold_fixture.lua",
+      "sha256": "13f9c1a0b759f18c9045dfc65579dbc33190f80f2d1f99fcf72363dd1d384b93",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/support/key_combination_declaration_fixture.lua",
+      "sha256": "55f3528d1eab688a8d8ffb7ef595a4ca5f0dcf14dacf47736926075b1579f84c",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_integration.lua",
+      "sha256": "539d60387b46e9d9fc7146e73e6d540a97d29a023624680d331f0359d5eecd37",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_engine_modifier_key.lua",
+      "sha256": "41a4c4dee64c526a4c6650d95f697b48cce06792c57e9fcd84a8f5e6a4c992a8",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_engine_under_modifier_layer.lua",
+      "sha256": "5a746267a95ed721f45fbb659d5e194e5f610c4862f0ccfe74ad245c07a081e3",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_roll.lua",
+      "sha256": "3a4f0ab297e8f41383d1a9243efb8a13640c018d4ff6978affe05f94fcd1b9d0",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/adapters/keyboard_hook/test_keyboard_hook_tap_hold.lua",
+      "sha256": "fe6aac73330538f726d09e6557691ebb63d949c8eaef958c0cc4c3e2103ba985",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua",
+      "sha256": "6dee75000babb19ad6e3f5aa48428a94f0787c2cff5ba4e59e1705f5c3154424",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/tests/meta/corpus/test_corpus_tap_hold_decisions.lua",
+      "sha256": "70eb3a13b2a14a6cbbe15d62bada1c5d5d588611fe24c8f41720715e4f45b99b",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/lua/tap_hold/one_shot_shift.lua",
+      "sha256": "9ff4f097e014ada2c6755d774c5570b91239f611b4699bdbb317c5af84071b13",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/tap_hold/one_shot_shift.json",
+      "sha256": "6c605b612374f4e21a3ad5edfea6c0c676c37c23cff32db78d867aef4e28d182",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/tap_hold/defaults.toml",
+      "sha256": "c4f4a6678703dada0e58179124c0c956770ca35c6129d18d62179730d9952799",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+      "sha256": "0d28466a2306acc79dec7c8bcc39b49c07ba742f488aaea1bfc00727b498cf91",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+      "sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/infra/manifest_reader.lua",
+      "sha256": "90a161f14bf6056bf8255a85338f6310864fd3d25801c496384586d18adfc85e",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/lua/manifest_reader.lua",
+      "sha256": "cb68bda75949cc6a023db14dfa7d72fd0e625e82324c1b1bea034ac30bfb2e40",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/lua/features/manifest.lua",
+      "sha256": "9c7b12b0756a91fc00a265baaea71d218554f568fe5528d262f59c0ec0936b9a",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/lua/features/manifest_data.lua",
+      "sha256": "b505d479ba84f7f72f355ca7475c305ad03eb4dcad2bb57210c9d71be844d9c3",
+      "pinned_matches": true,
+      "current_matches": true
+    }
+  ],
+  "runs": [
+    {
+      "runtime": "lua",
+      "version": "Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio",
+      "command": [
+        "lua",
+        "/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/public-channel-admission.lua",
+        "/workspace/ergopti"
+      ],
+      "exit": 0,
+      "log": "public-channel-admission-lua.txt",
+      "sha256": "5a2d9f2bf4ba7984d3759b29d3c773cf09f338202f8147fd8c2336824901d68b",
+      "parsed_assertions_passed": true,
+      "observations": [
+        {
+          "broker_debt": false,
+          "chars": [
+            "A",
+            "a"
+          ],
+          "config_toml": "",
+          "errors": {},
+          "generic_action_calls": 0,
+          "hook_running": true,
+          "original_production_declarations": true,
+          "output_closes": 0,
+          "output_current": true,
+          "output_destroys": 0,
+          "preset": {
+            "right_ctrl_hold": "shift",
+            "right_ctrl_tap": "one_shot_shift"
+          },
+          "reader_closes": 0,
+          "repeated": false,
+          "unavailable_declaration_fixture_loaded": false,
+          "wire": [
+            [
+              42,
+              1
+            ],
+            [
+              42,
+              0
+            ],
+            [
+              42,
+              1
+            ],
+            [
+              30,
+              1
+            ],
+            [
+              30,
+              0
+            ],
+            [
+              42,
+              0
+            ],
+            [
+              30,
+              1
+            ],
+            [
+              30,
+              0
+            ]
+          ]
+        },
+        {
+          "broker_debt": true,
+          "chars": [
+            "A"
+          ],
+          "config_toml": "",
+          "errors": [
+            "2026-11-05 19:34:41:000 [ERROR] [adapters.keyboard_hook] Emergency keyboard stop \u2014 raw ownership settlement failed (code=30 value=2): refused."
+          ],
+          "generic_action_calls": 0,
+          "hook_running": false,
+          "original_production_declarations": true,
+          "output_closes": 1,
+          "output_current": false,
+          "output_destroys": 1,
+          "preset": {
+            "right_ctrl_hold": "shift",
+            "right_ctrl_tap": "one_shot_shift"
+          },
+          "reader_closes": 2,
+          "repeated": true,
+          "unavailable_declaration_fixture_loaded": false,
+          "wire": [
+            [
+              42,
+              1
+            ],
+            [
+              42,
+              0
+            ],
+            [
+              42,
+              1
+            ],
+            [
+              30,
+              1
+            ]
+          ]
+        }
+      ],
+      "qualification": "Original production declarations and original Manager with empty valid config.toml, explicitly enabled shipped tap-hold preset and ordinary physical RCtrl tap; no unsupported declaration fixture or generic action. Existing test transport initially creates an unused legacy owner before Manager replacement. Native ports remain recording FFI/syscall/XKB; no real device, libxkb inverse or receiving-app proof. This establishes reachable enabled-preset configuration, not enabled-by-default neutral installation."
+    },
+    {
+      "runtime": "luajit",
+      "version": "LuaJIT 2.1.1793383622 -- Copyright (C) 2005-2026 Mike Pall. https://luajit.org/",
+      "command": [
+        "luajit",
+        "/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/public-channel-admission.lua",
+        "/workspace/ergopti"
+      ],
+      "exit": 0,
+      "log": "public-channel-admission-luajit.txt",
+      "sha256": "83a2ae981905b62c142996bdb7525a08425e498b41b9aa16b88da0916ae8d345",
+      "parsed_assertions_passed": true,
+      "observations": [
+        {
+          "broker_debt": false,
+          "chars": [
+            "A",
+            "a"
+          ],
+          "config_toml": "",
+          "errors": {},
+          "generic_action_calls": 0,
+          "hook_running": true,
+          "original_production_declarations": true,
+          "output_closes": 0,
+          "output_current": true,
+          "output_destroys": 0,
+          "preset": {
+            "right_ctrl_hold": "shift",
+            "right_ctrl_tap": "one_shot_shift"
+          },
+          "reader_closes": 0,
+          "repeated": false,
+          "unavailable_declaration_fixture_loaded": false,
+          "wire": [
+            [
+              42,
+              1
+            ],
+            [
+              42,
+              0
+            ],
+            [
+              42,
+              1
+            ],
+            [
+              30,
+              1
+            ],
+            [
+              30,
+              0
+            ],
+            [
+              42,
+              0
+            ],
+            [
+              30,
+              1
+            ],
+            [
+              30,
+              0
+            ]
+          ]
+        },
+        {
+          "broker_debt": true,
+          "chars": [
+            "A"
+          ],
+          "config_toml": "",
+          "errors": [
+            "2026-11-05 19:34:42:000 [ERROR] [adapters.keyboard_hook] Emergency keyboard stop \u2014 raw ownership settlement failed (code=30 value=2): refused."
+          ],
+          "generic_action_calls": 0,
+          "hook_running": false,
+          "original_production_declarations": true,
+          "output_closes": 1,
+          "output_current": false,
+          "output_destroys": 1,
+          "preset": {
+            "right_ctrl_hold": "shift",
+            "right_ctrl_tap": "one_shot_shift"
+          },
+          "reader_closes": 2,
+          "repeated": true,
+          "unavailable_declaration_fixture_loaded": false,
+          "wire": [
+            [
+              42,
+              1
+            ],
+            [
+              42,
+              0
+            ],
+            [
+              42,
+              1
+            ],
+            [
+              30,
+              1
+            ]
+          ]
+        }
+      ],
+      "qualification": "Original production declarations and original Manager with empty valid config.toml, explicitly enabled shipped tap-hold preset and ordinary physical RCtrl tap; no unsupported declaration fixture or generic action. Existing test transport initially creates an unused legacy owner before Manager replacement. Native ports remain recording FFI/syscall/XKB; no real device, libxkb inverse or receiving-app proof. This establishes reachable enabled-preset configuration, not enabled-by-default neutral installation."
+    }
+  ]
+}

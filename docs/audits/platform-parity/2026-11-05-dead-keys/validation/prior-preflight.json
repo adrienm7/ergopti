@@ -1,0 +1,584 @@
+{
+	"run_id": 42108198520,
+	"url": "https://github.com/adrienm7/ergopti/actions/runs/42108198520",
+	"head_sha": "4ca161c3e512eecc4c78499db0465139c9a71861",
+	"conclusion": "success",
+	"jobs": [
+		{
+			"conclusion": "success",
+			"name": "Check formatting and plan shared tests",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Release plan",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / Unit tests (menu_input)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / Unit tests (meta)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / Unit tests (modules)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / Unit tests (other)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Unit tests (core)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Unit tests (infra)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / Unit tests (ui)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Unit tests (modules)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Unit tests (ui)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / Unit tests (core)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / Unit tests (menu_llm)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Unit tests (arch)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Unit tests (Input and actions)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Unit tests (fedora)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Unit tests (Diagnostics and metrics)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Unit tests (Menus)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Unit tests (Data and source contracts)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Unit tests (input)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Unit tests (debian)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Unit tests (Ai and network)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Unit tests (Hotstring TOML formatting)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Unit tests (meta)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Unit tests (Shared ui)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Unit tests (config-scope-features)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Unit tests (opensuse)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Unit tests (Distribution and updates)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Unit tests (llm-servers)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Unit tests (Release ci)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Unit tests (alpine)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Unit tests (Test infrastructure)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Unit tests (meta)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Unit tests (llm)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Unit tests (Property tests)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Unit tests (config-transition)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Unit tests (config-updater)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Unit tests (hotstrings-shortcuts)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Unit tests (llm-terminal)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Unit tests (keystats)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Unit tests (llm-server-panel)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Unit tests (keymap-gestures)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Unit tests (config-scope-global)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Unit tests (core)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Unit tests (ui)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / Integration tests (Lua module wiring, stubbed hs)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / E2E tests (Archive update controls (macOS 26))",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / E2E tests (Virtual-keyboard replay (stubbed))",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / E2E tests (Managed Ollama build (macOS 15, Intel))",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / E2E tests (Launcher XCTest and native probes (macOS 26))",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / E2E tests (Lease silence (macOS 15, Intel))",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / E2E tests (Tooltip canvas (macOS 15, Apple silicon))",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / E2E tests (Managed Ollama (macOS 15, Intel))",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / E2E tests (Native XCTest (macOS 15, Intel))",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / E2E tests (Lease silence (macOS 15, Apple silicon))",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / E2E tests (Managed Ollama (macOS 15, Apple silicon))",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / E2E tests (Managed Ollama build (macOS 15, Apple silicon))",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Integration tests (driver)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Integration tests (opensuse)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Integration tests (arch)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Integration tests (native)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Integration tests (alpine)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Integration tests (debian)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Integration tests (fedora)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Integration tests (Packaging and boot)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Integration tests (Generators and parity)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / E2E tests (network-ai)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / E2E tests (desktop-webview)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / E2E tests (input-display)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / E2E tests (updater)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / E2E tests (platform-metrics)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Integration tests (Fresh clone bootstrap)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Integration tests (Driver startup)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Integration tests (Native cohorts and contracts)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / E2E tests (Shared UI rendering)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / E2E tests (Engine E2E corpus)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Build (Development site)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Build (Stable site)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Build (ErgoptiPlus.exe and layout installer)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Build (.deb, .rpm, AppImage and archive)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Install and launch (Compiled ErgoptiPlus.exe)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Install and launch (Development site)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Install and launch (Stable site)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Windows / Verdict (All mandatory results)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / Build (ErgoptiPlus.app, macOS 26)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Common / Verdict (All mandatory results)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / Install and launch (Installed app: clean, karabiner config, upgraded (macOS 15, Apple silicon))",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / Install and launch (Installed app: symlink config, symlink hammerspoon, symlink logs (macOS 15, A...",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / Install and launch (Installed app: dangling logs, configured symlink, plain open, cold MLX bootst...",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / Install and launch (Installed app: symlink logs dir, tilde paths (macOS 15, Apple silicon))",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / Install and launch (Cold native bootstrap (macOS 15, Apple silicon))",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (Fedora: installed archive)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (Arch Linux: installed archive)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (.rpm package)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (Arch Linux: first installation)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (Archive tarball)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (Debian 12: first installation)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (openSUSE Tumbleweed: first installation)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (Alpine: installed archive)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (Ubuntu 24.04: first installation)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (Debian: installed archive)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (openSUSE: installed archive)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (Arch package)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (Fedora latest: first installation)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (Flatpak package)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (AppImage package)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (Fedora 41: first installation)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (.deb package)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (Ubuntu 22.04: first installation)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (Debian 13: first installation)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Install and launch (Alpine: first installation)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Linux / Verdict (All mandatory results)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "macOS / Verdict (All mandatory results)",
+			"status": "completed"
+		},
+		{
+			"conclusion": "success",
+			"name": "Release / Verify all lanes and original plan",
+			"status": "completed"
+		},
+		{
+			"conclusion": "skipped",
+			"name": "Release / Publish",
+			"status": "completed"
+		}
+	],
+	"qualification": "Earlier one-shot audit follow-up; not dead-key receiving evidence or qualification of this new campaign commit."
+}

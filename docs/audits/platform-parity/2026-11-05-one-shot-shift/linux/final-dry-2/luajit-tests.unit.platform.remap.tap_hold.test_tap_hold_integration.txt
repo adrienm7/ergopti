@@ -1,0 +1,38 @@
+
+=== tap-holds end to end: the shipped defaults ===
+  ok   copies on a Shift tap and pastes on a left Ctrl tap
+  ok   ignores a bounce below the minimum and a hold past the threshold
+  ok   types Shift+A, not a copy, for a Shift chord
+  ok   makes CapsLock Ctrl when held and a hotstring-ending Enter when tapped
+  ok   never lets CapsLock toggle the lock, however long it is held
+  ok   runs the navigation layer on left Alt, with repeats and no Alt
+  ok   types Backspace for a lone left Alt tap
+  ok   shifts the next letter after a right Ctrl tap, once
+  ok   lets a shortcut and Print through the one-shot, and types a digit as it is
+  ok   types the shared one-shot results, and hands the injector what the layout lacks
+  ok   sends Alt+Tab for a Tab tap and Shift+Tab under Shift
+  ok   holds AltGr as AltGr and taps it as Tab
+  ok   keeps Ctrl down while CapsLock or left Ctrl still holds it
+  ok   gives Ctrl+Shift for CapsLock and left Shift held together
+
+=== tap-holds end to end: a tray change is live ===
+  ok   runs a new tap action on the next keystroke
+  ok   moves the navigation layer to CapsLock
+  ok   gives a key back to the keyboard when made native
+  ok   swallows a key whose tap is none and which has no hold
+  ok   holds a modifier combination
+  ok   uses a key's own delay
+  ok   clears everything, then restores the recommended preset
+  ok   switches the feature off and on from the file
+  ok   starts off when the user's file says so
+  ok   keeps the native key when the user's file is broken
+
+=== tap-holds end to end: nothing stays pressed ===
+  ok   releases a held CapsLock's Ctrl when the script pauses
+  ok   releases the layer's chord when the tray reloads mid-hold
+  ok   releases everything the engine holds when the hook stops
+  ok   leaves nothing down over a long random session on the defaults
+
+=== tap-holds end to end: every option of the hold picker ===
+  ok   (hold-picker-every-option-2026-10-01) the hold a key gets is the option picked, after Shift
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":29}

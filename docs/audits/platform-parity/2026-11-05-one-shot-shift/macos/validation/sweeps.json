@@ -1,0 +1,32 @@
+[
+	{
+		"sweep": 1,
+		"name": "config-domain-boundaries",
+		"exit": 0
+	},
+	{
+		"sweep": 1,
+		"name": "public-arm-domain-boundaries",
+		"exit": 0
+	},
+	{
+		"sweep": 1,
+		"name": "logger-domain-boundaries",
+		"exit": 0
+	},
+	{
+		"sweep": 2,
+		"name": "config-domain-boundaries",
+		"exit": 0
+	},
+	{
+		"sweep": 2,
+		"name": "public-arm-domain-boundaries",
+		"exit": 0
+	},
+	{
+		"sweep": 2,
+		"name": "logger-domain-boundaries",
+		"exit": 0
+	}
+]

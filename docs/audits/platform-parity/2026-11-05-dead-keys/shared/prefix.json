@@ -1,0 +1,240 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"source_output": "₢",
+	"written_rule_present": true,
+	"reported_conflicts": 0,
+	"observations": [
+		{
+			"name": "generated_with_locale",
+			"table_sha256": "cea9881dfe51f0d7664e46454687da1a556e758f3c2da2ea4951a51dc4137ee7",
+			"sequence": ["dead_currency", "dead_cedilla"],
+			"pair": [
+				{
+					"keysym": "dead_currency",
+					"accepted": 1,
+					"status": 1
+				},
+				{
+					"keysym": "dead_cedilla",
+					"accepted": 1,
+					"status": 1
+				}
+			],
+			"with_following_c": [
+				{
+					"keysym": "dead_currency",
+					"accepted": 1,
+					"status": 1
+				},
+				{
+					"keysym": "dead_cedilla",
+					"accepted": 1,
+					"status": 1
+				},
+				{
+					"keysym": "c",
+					"accepted": 1,
+					"status": 2,
+					"output": "₵"
+				}
+			],
+			"ordinary_currency_c": [
+				{
+					"keysym": "dead_currency",
+					"accepted": 1,
+					"status": 1
+				},
+				{
+					"keysym": "c",
+					"accepted": 1,
+					"status": 2,
+					"output": "¢"
+				}
+			]
+		},
+		{
+			"name": "generated_without_locale_include",
+			"table_sha256": "f02214f60d92767e82c44ac0ffe3be8d1449e4f069d0444b24f7469226ad3eae",
+			"sequence": ["dead_currency", "dead_cedilla"],
+			"pair": [
+				{
+					"keysym": "dead_currency",
+					"accepted": 1,
+					"status": 1
+				},
+				{
+					"keysym": "dead_cedilla",
+					"accepted": 1,
+					"status": 2,
+					"output": "₢"
+				}
+			],
+			"with_following_c": [
+				{
+					"keysym": "dead_currency",
+					"accepted": 1,
+					"status": 1
+				},
+				{
+					"keysym": "dead_cedilla",
+					"accepted": 1,
+					"status": 2,
+					"output": "₢"
+				},
+				{
+					"keysym": "c",
+					"accepted": 1,
+					"status": 0
+				}
+			],
+			"ordinary_currency_c": [
+				{
+					"keysym": "dead_currency",
+					"accepted": 1,
+					"status": 1
+				},
+				{
+					"keysym": "c",
+					"accepted": 1,
+					"status": 2,
+					"output": "¢"
+				}
+			]
+		},
+		{
+			"name": "minimal_explicit_rule",
+			"table_sha256": "ffdc7ecb7bc65c07e43827350a7c96b916634cd016feddc39e4ae2bede4f39d4",
+			"sequence": ["dead_currency", "dead_cedilla"],
+			"pair": [
+				{
+					"keysym": "dead_currency",
+					"accepted": 1,
+					"status": 1
+				},
+				{
+					"keysym": "dead_cedilla",
+					"accepted": 1,
+					"status": 2,
+					"output": "₢"
+				}
+			],
+			"with_following_c": [
+				{
+					"keysym": "dead_currency",
+					"accepted": 1,
+					"status": 1
+				},
+				{
+					"keysym": "dead_cedilla",
+					"accepted": 1,
+					"status": 2,
+					"output": "₢"
+				},
+				{
+					"keysym": "c",
+					"accepted": 1,
+					"status": 0
+				}
+			],
+			"ordinary_currency_c": null
+		},
+		{
+			"name": "locale_plus_explicit_rule",
+			"table_sha256": "ee6827a56e0c0d60112f2573161b93202b658644e2c2bbc049116a05cd00ea3a",
+			"sequence": ["dead_currency", "dead_cedilla"],
+			"pair": [
+				{
+					"keysym": "dead_currency",
+					"accepted": 1,
+					"status": 1
+				},
+				{
+					"keysym": "dead_cedilla",
+					"accepted": 1,
+					"status": 1
+				}
+			],
+			"with_following_c": [
+				{
+					"keysym": "dead_currency",
+					"accepted": 1,
+					"status": 1
+				},
+				{
+					"keysym": "dead_cedilla",
+					"accepted": 1,
+					"status": 1
+				},
+				{
+					"keysym": "c",
+					"accepted": 1,
+					"status": 2,
+					"output": "₵"
+				}
+			],
+			"ordinary_currency_c": null
+		},
+		{
+			"name": "generated_private_trigger_control",
+			"table_sha256": "bcfd94564d23fac353d0615664f19b8f73e0191ab0fa11b0058a15a8276e9e4f",
+			"sequence": ["U100100", "dead_cedilla"],
+			"pair": [
+				{
+					"keysym": "U100100",
+					"accepted": 1,
+					"status": 1
+				},
+				{
+					"keysym": "dead_cedilla",
+					"accepted": 1,
+					"status": 2,
+					"output": "₢"
+				}
+			],
+			"with_following_c": [
+				{
+					"keysym": "U100100",
+					"accepted": 1,
+					"status": 1
+				},
+				{
+					"keysym": "dead_cedilla",
+					"accepted": 1,
+					"status": 2,
+					"output": "₢"
+				},
+				{
+					"keysym": "c",
+					"accepted": 1,
+					"status": 0
+				}
+			],
+			"ordinary_currency_c": [
+				{
+					"keysym": "U100100",
+					"accepted": 1,
+					"status": 1
+				},
+				{
+					"keysym": "c",
+					"accepted": 1,
+					"status": 2,
+					"output": "¢"
+				}
+			]
+		}
+	],
+	"native_dependency": {
+		"path": "/usr/lib/x86_64-linux-gnu/libxkbcommon.so.0.0.0",
+		"sha256": "9f26c41577e0e036cbf42352e85b13db6bce953fb730555b4fc7de5362dc93bb"
+	},
+	"system_locale_reference": {
+		"path": "/usr/share/X11/locale/en_US.UTF-8/Compose",
+		"sha256": "a3077ce7fdae43776b9a485d8a9689c0bfeb0cd17348a87b7a06818e59554ea1",
+		"matching_lines": [
+			"<dead_currency> <dead_cedilla> <C>\t: \"₵\"\tU20B5 # CEDI SIGN",
+			"<dead_currency> <dead_cedilla> <c>\t: \"₵\"\tU20B5 # CEDI SIGN"
+		]
+	},
+	"qualification": "Genuine libxkbcommon Compose protocol over original Python-converted shipped Bépo input and explicitly labelled generated-data controls. Actual shared Lua converters produce byte-identical files. No hardware, application, native macOS or AHK execution; the locale include is not a fake parser. The private-trigger control is not a production fix."
+}

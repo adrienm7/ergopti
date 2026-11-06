@@ -1,0 +1,93 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"encodings": [
+		{
+			"role": "macos",
+			"path": "hammerspoon-eventtap_event.m.txt",
+			"codec": "gzip",
+			"storage": "validation/worker-originals/macos-hammerspoon-eventtap_event.m.txt.gz",
+			"storage_sha256": "b41689b97b5af515ce128fcd3018a5c21166c41a5de6409123fc1716524c3ea5",
+			"decoded_sha256": "33105ade3a156f4786dd5591de4db17e52738651ff1b500b7f9de43b11c15243"
+		},
+		{
+			"role": "linux",
+			"path": "generated/xkb_types.txt",
+			"codec": "gzip",
+			"storage": "validation/worker-originals/linux-generated-xkb_types.txt.gz",
+			"storage_sha256": "6f8c7206cfd076bec04e5088d4119473f30eeb01e896ac543e14db18fb594385",
+			"decoded_sha256": "29cbb5abfb43ce134a1fc452df8ee3e6ff0c6645d15a6d678d9f3a5f1083e037"
+		},
+		{
+			"role": "shared",
+			"path": "generated/xkb_types.txt",
+			"codec": "gzip",
+			"storage": "validation/worker-originals/shared-generated-xkb_types.txt.gz",
+			"storage_sha256": "6f8c7206cfd076bec04e5088d4119473f30eeb01e896ac543e14db18fb594385",
+			"decoded_sha256": "29cbb5abfb43ce134a1fc452df8ee3e6ff0c6645d15a6d678d9f3a5f1083e037"
+		},
+		{
+			"role": "shared",
+			"path": "generated-bepo/xkb_types.txt",
+			"codec": "gzip",
+			"storage": "validation/worker-originals/shared-generated-bepo-xkb_types.txt.gz",
+			"storage_sha256": "6f8c7206cfd076bec04e5088d4119473f30eeb01e896ac543e14db18fb594385",
+			"decoded_sha256": "29cbb5abfb43ce134a1fc452df8ee3e6ff0c6645d15a6d678d9f3a5f1083e037"
+		},
+		{
+			"role": "macos",
+			"path": "check-record.py",
+			"codec": "gzip",
+			"storage": "validation/worker-originals/macos-check-record.py.gz",
+			"storage_sha256": "7cfbf726e760b2778601d8c3032a66d9bda086281081a87275fdf011e366e44b",
+			"decoded_sha256": "062ec9c1e95ef7a085f43ca901e42ec7be8e5cf33142312254c01246182da8d2"
+		},
+		{
+			"role": "macos",
+			"path": "source-check.py",
+			"codec": "gzip",
+			"storage": "validation/worker-originals/macos-source-check.py.gz",
+			"storage_sha256": "985d7d3cb15a292f8aaffcd07c6992bb4dc655f83b3816c435e84a44da561e2e",
+			"decoded_sha256": "74ede1cfb45dd6ef343c97f6e60da622043b851acdab5275e0971bc5edbeab1f"
+		},
+		{
+			"role": "shared",
+			"path": "consolidate.py",
+			"codec": "gzip",
+			"storage": "validation/worker-originals/shared-consolidate.py.gz",
+			"storage_sha256": "8c1a7779f4677de07b4cfe05d5c716a54f7fc65e1e2567c4b171f6b5364fe7e0",
+			"decoded_sha256": "ff6a63d043b9cb4b00c539f56be266e2c6cf70ae89ddbbf0f6d2b7f54b4264c3"
+		},
+		{
+			"role": "shared",
+			"path": "prefix_probe.py",
+			"codec": "gzip",
+			"storage": "validation/worker-originals/shared-prefix_probe.py.gz",
+			"storage_sha256": "e00227551aca6172d2e0971ef6c71c0cddaeacdfe94d157d4b1c37db5de57a22",
+			"decoded_sha256": "6d5d44466c1110973fc0f75a0d4cad7474ed6d3162138a750da80a87934e47e4"
+		},
+		{
+			"role": "shared",
+			"path": "shared_probe.py",
+			"codec": "gzip",
+			"storage": "validation/worker-originals/shared-shared_probe.py.gz",
+			"storage_sha256": "27bdb0daed7ab915b58b9be2f69b17521e42d56d196366c2322f8186ba1830cf",
+			"decoded_sha256": "572c55aa79aa57541a5e3988cc116f4d2308dbc7edf11212abf38ddd06c6698d"
+		},
+		{
+			"role": "shared",
+			"path": "sweep.py",
+			"codec": "gzip",
+			"storage": "validation/worker-originals/shared-sweep.py.gz",
+			"storage_sha256": "5e157865de712c3bc8ff24c6d5109e9de7bbe5db48659071e170a5d476926101",
+			"decoded_sha256": "2204dc983bbfd03ba1ad372aa085ac7ae65fc3195b5173a06c13e402bc253942"
+		},
+		{
+			"role": "windows",
+			"path": "source-contract.py",
+			"codec": "gzip",
+			"storage": "validation/worker-originals/windows-source-contract.py.gz",
+			"storage_sha256": "db10b908b740d3e4173df5514f4f6c9a17867515c3207c0725bf27e97f94a285",
+			"decoded_sha256": "061b749a29dfe144a8696089be6e4adbdfa022be66cf374123c3e7c9b397f625"
+		}
+	]
+}

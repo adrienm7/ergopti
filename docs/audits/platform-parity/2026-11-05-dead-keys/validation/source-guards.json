@@ -1,0 +1,118 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"program": {
+		"path": "validation/check_source_guards.py",
+		"sha256": "5f5ee9b446888bf1ee65d9b107c7b8de6fe7e80eac2416dc520d395d65e2dd99"
+	},
+	"checker": {
+		"path": "check_sources.py",
+		"sha256": "7ce7d689bcdca22090936b68b7b64629d856b3e37454087eb47976117b917997"
+	},
+	"source_receipts": [
+		{
+			"path": "windows/source-receipts.json",
+			"sha256": "1c2a758d2329ce389c73c58920e41f227ddf39c905eae044b33cc8f30a4ecde7"
+		},
+		{
+			"path": "macos/source-receipts.json",
+			"sha256": "552bed8db8eccdc8a73766c26d0f0a54448dce65a70d0977ffe03dc3c77223bd"
+		},
+		{
+			"path": "linux/source-receipts.json",
+			"sha256": "bc0be9741f2c23994f7b54a533b43280e7a73f8d8fd7e0dcb1e5aefb779c6601"
+		},
+		{
+			"path": "shared/source-receipts.json",
+			"sha256": "3f9bc3d68a33867754599f5a736314c74778cf69b491bb7e12aebda48ae76dc9"
+		}
+	],
+	"positive_controls": 2,
+	"negative_controls": 5,
+	"rationale": "A private 97-source/4-receipt skeleton uses real Git init and an object alternate pointing to the repository object database, with a real audited HEAD ref. No full checkout, fake Git executable, production mutation or frozen receipt mutation. Each negative must fail with its specific guard marker and produce no acceptance receipt. These controls test authentication refusal, not semantic parity or native delivery.",
+	"current_drift": {
+		"path": "static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk",
+		"current_before_sha256": "64741afe52a81b9086e246487dbd347fca485c2730b79913e5830ca1f17a74df",
+		"current_drifted_sha256": "c6be9962a2170970932b0d8b2c209b2c6ce3d9fe5e234d6a56d939ee4297680a",
+		"pinned_before_sha256": "64741afe52a81b9086e246487dbd347fca485c2730b79913e5830ca1f17a74df",
+		"pinned_after_sha256": "64741afe52a81b9086e246487dbd347fca485c2730b79913e5830ca1f17a74df",
+		"qualification": "Hashes use complete original Git blob bytes before and after the private current-file mutation; the pinned blob remains unchanged."
+	},
+	"results": [
+		{
+			"case": "original-main",
+			"expected": "accept",
+			"expected_marker": "Authenticated 101 role claims over 97 distinct source paths.",
+			"exit_code": 0,
+			"stdout": "Authenticated 101 role claims over 97 distinct source paths.\n",
+			"stderr": "",
+			"stdout_sha256": "b4f71a33ed5b00935ab2083bbb6cfca220e9640b8cfb051563e948b860579a5f",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"result_sha256": "949715eff8d8d1a0d174e48ff7666655273c9cd4a4770f872330d914f32102ab",
+			"claims": 101,
+			"distinct_paths": 97
+		},
+		{
+			"case": "private-mirror-baseline",
+			"expected": "accept",
+			"expected_marker": "Authenticated 101 role claims over 97 distinct source paths.",
+			"exit_code": 0,
+			"stdout": "Authenticated 101 role claims over 97 distinct source paths.\n",
+			"stderr": "",
+			"stdout_sha256": "b4f71a33ed5b00935ab2083bbb6cfca220e9640b8cfb051563e948b860579a5f",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"result_sha256": "2fcae731804c27bd80b7063c056384fa05c3b984d0996593b056e16114a176eb",
+			"claims": 101,
+			"distinct_paths": 97
+		},
+		{
+			"case": "wrong-receipt-pin",
+			"expected": "reject",
+			"expected_marker": "wrong source pin:",
+			"exit_code": 1,
+			"stdout": "",
+			"stderr": "Traceback (most recent call last):\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 126, in <module>\n    main()\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 84, in main\n    entries = claims(directory)\n              ^^^^^^^^^^^^^^^^^\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 54, in claims\n    require(document.get(pin_field) == AUDITED_SHA, f\"wrong source pin: {receipt}\")\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 20, in require\n    raise ValueError(message)\nValueError: wrong source pin: windows/source-receipts.json\n",
+			"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stderr_sha256": "d72c464e96fb27ef9bfa46136b056a6dbbb5d2e22d98c715d452dcc236139b16"
+		},
+		{
+			"case": "wrong-receipt-digest",
+			"expected": "reject",
+			"expected_marker": "pinned claim mismatch:",
+			"exit_code": 1,
+			"stdout": "",
+			"stderr": "Traceback (most recent call last):\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 126, in <module>\n    main()\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 103, in main\n    require(pinned_digest == expected, f\"pinned claim mismatch: {relative}\")\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 20, in require\n    raise ValueError(message)\nValueError: pinned claim mismatch: static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk\n",
+			"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stderr_sha256": "c4e9483fb26d57e1fd10e0a28f326c10bfc9739c02f8044c99a803a2b6692928"
+		},
+		{
+			"case": "unsafe-parent-path",
+			"expected": "reject",
+			"expected_marker": "noncanonical source path:",
+			"exit_code": 1,
+			"stdout": "",
+			"stderr": "Traceback (most recent call last):\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 126, in <module>\n    main()\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 84, in main\n    entries = claims(directory)\n              ^^^^^^^^^^^^^^^^^\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 63, in claims\n    relative_path(relative)\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 29, in relative_path\n    require(\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 20, in require\n    raise ValueError(message)\nValueError: noncanonical source path: ../outside-source\n",
+			"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stderr_sha256": "f3e916ab0cebbf1eda14d1d7e658f03e4dbd705721923adfcf1a17ecf360799f"
+		},
+		{
+			"case": "symlink-receipt",
+			"expected": "reject",
+			"expected_marker": "symlink source or receipt:",
+			"exit_code": 1,
+			"stdout": "",
+			"stderr": "Traceback (most recent call last):\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 126, in <module>\n    main()\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 84, in main\n    entries = claims(directory)\n              ^^^^^^^^^^^^^^^^^\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 53, in claims\n    document = json.loads(regular_file(directory, receipt).read_text(encoding=\"utf-8\"))\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 44, in regular_file\n    require(not path.is_symlink(), f\"symlink source or receipt: {relative}\")\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 20, in require\n    raise ValueError(message)\nValueError: symlink source or receipt: windows/source-receipts.json\n",
+			"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stderr_sha256": "7821aad1fe35fedef16fd12192c03d411764db2e5b22fe24199f6c49e8a0bbb4"
+		},
+		{
+			"case": "real-current-byte-drift",
+			"expected": "reject",
+			"expected_marker": "current claimed source drift:",
+			"exit_code": 1,
+			"stdout": "",
+			"stderr": "Traceback (most recent call last):\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 126, in <module>\n    main()\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 104, in main\n    require(current_digest == expected, f\"current claimed source drift: {relative}\")\n  File \"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-dead-keys/check_sources.py\", line 20, in require\n    raise ValueError(message)\nValueError: current claimed source drift: static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk\n",
+			"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"stderr_sha256": "61b01944202519f66a969872214e5255b9bf99ce0ab74ae6ebf3947309074616"
+		}
+	]
+}

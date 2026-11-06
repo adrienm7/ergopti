@@ -1043,6 +1043,55 @@ class ArchiveCacheControls(unittest.TestCase):
             seen["used"] = {p.name: p.read_bytes() for p in (cache / "used").glob("*.deb")}
             return seen
 
+    def test_a_stopped_install_keeps_the_archives_it_completed(self):
+        # 2026-11-05: a slow mirror stopped the same install three runs in a row,
+        # each from zero; the completed archives now seed the next run.
+        import tempfile
+
+        listing = "\n".join(
+            [
+                self.plan_line("xdotool_1%3a3.2_amd64.deb", self.GOOD),
+                self.plan_line("libxdo3_1%3a3.2_amd64.deb", self.GOOD),
+            ]
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            cache = Path(folder)
+            for half in ("restored", "used"):
+                (cache / half).mkdir()
+
+            def execute(argv, *, check, timeout):
+                if "install" in argv:
+                    archives = (
+                        Path(next(v.split("=", 1)[1] for v in argv if v.startswith("Dir::Cache=")))
+                        / "archives"
+                    )
+                    (archives / "xdotool_1%3a3.2_amd64.deb").write_bytes(self.GOOD)
+                    (archives / "partial" / "libxdo3_1%3a3.2_amd64.deb").write_bytes(b"half")
+                    raise subprocess.TimeoutExpired(argv, timeout)
+
+            def capture(argv, **kwargs):
+                if argv[0] == "/usr/bin/apt-cache":
+                    return SimpleNamespace(
+                        stdout=self.index(
+                            ["xdotool_1%3a3.2_amd64.deb", "libxdo3_1%3a3.2_amd64.deb"]
+                        )
+                    )
+                return SimpleNamespace(stdout=listing)
+
+            with self.assertRaises(subprocess.TimeoutExpired):
+                acquire_as_root(
+                    VALID,
+                    ["-y", "xdotool"],
+                    execute,
+                    keyring=CANONICAL,
+                    deb_cache=str(cache),
+                    capture=capture,
+                )
+            self.assertEqual(
+                sorted(p.name for p in (cache / "used").glob("*.deb")),
+                ["xdotool_1%3a3.2_amd64.deb"],
+            )
+
     def test_hash_matching_archives_are_reused_and_every_used_one_is_kept(self):
         listing = "\n".join(
             [

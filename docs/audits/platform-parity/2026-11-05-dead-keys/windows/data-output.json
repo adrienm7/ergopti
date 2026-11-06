@@ -1,0 +1,18 @@
+{
+	"basis": "original Lua parser and row-policy execution; Windows dispatch source-only",
+	"follow": {
+		"emulated": false,
+		"mac_code": 14,
+		"row": "top_row",
+		"scan": "SC012",
+		"selected_neutral": "o",
+		"selected_pending": "ô"
+	},
+	"native_scenario": {
+		"assumption": "native US layout SC012 resolves e; no native reader executed",
+		"composition": "ê",
+		"text": "e"
+	},
+	"result": "distinct selected and native composition outputs confirmed in shipped data",
+	"trigger": { "mac_code": 42, "row": "home_row", "scan": "SC02B", "state": "s1_circumflex" }
+}

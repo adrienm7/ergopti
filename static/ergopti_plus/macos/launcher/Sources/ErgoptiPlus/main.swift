@@ -122,6 +122,11 @@ func launcherChildEnvironment(
 	// Only the original Fresh issuer may add its private route after this ordinary
 	// inheritance boundary; inherited text cannot select the first native loader.
 	environment.removeValue(forKey: "ERGOPTI_INSTALLED_CAPTURE_CONTROL")
+	// The bundled Python helpers run from the app's Resources: a __pycache__
+	// written there breaks the bundle's sealed signature, which the managed
+	// Ollama guardian then refuses (three folders in the field report of
+	// 2026-11-05). Every child inherits this, so no helper writes bytecode.
+	environment["PYTHONDONTWRITEBYTECODE"] = "1"
 	environment["ERGOPTI_LAUNCHER_PID"] = String(launcherPid)
 	environment.removeValue(forKey: "ERGOPTI_LAUNCHER_BUNDLE_ID")
 	environment.removeValue(forKey: kLoggerDatagramPortEnvironment)

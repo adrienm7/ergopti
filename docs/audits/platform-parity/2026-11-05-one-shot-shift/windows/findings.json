@@ -1,0 +1,23 @@
+{
+	"schema_version": 1,
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"created_at": "2026-11-05",
+	"scope": "windows-one-shot-shift",
+	"findings": [
+		{
+			"id": "OSW-001",
+			"title": "Named-control capture replay does not retain the original modifier chord",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["modified_control_identity"],
+			"basis": "source",
+			"qualification": "Authenticated executable Windows source only; no AHK or native input/editor ran. The conditional reproduction requires a genuine configured named-control completion. Native suppression/pass-through and final receiving are explicitly unmeasured; no duplicate delivery is claimed.",
+			"reproduction": "Use a blank scratch editor, CapsWord/hotstrings/Enter remaps off, and arm one_shot_shift via an independent configured action. After arming hold LCtrl (independently Shift) and press Enter within the2s timeout, retaining the modifier during replay. Conditional on the explicit native named-control completion, the producer requests SendNewResult(\"{Enter}\",False,False) with no original modifier attribution. Its default non-atomic nonliteral path uses ordinary SendEvent, which the existing tap sender contract documents as lifting external modifiers. The request is bare Enter rather than the captured Ctrl/Shift+Enter. Test Ctrl+Backspace/Delete similarly. This is source-derived, not a native event trace.",
+			"root_cause": "_SIHO_ReadScalar publishes a named control without its completing modifier chord. OneShotShift replays only Capture.Name via normal SendNewResult/SendEvent, unlike the guarded tap-key producer which explicitly retains modifiers. DeadKey uses the same decoder and ordinary Send for its sibling control branch.",
+			"silent_failure": "The control name and plain-key send are individually accepted; no diagnostic detects lost chord identity. Existing end-key meta checks pin the named list/order, while native scalar fixtures require physical modifiers released and settlement/rearm probes assert unmodified controls or emitter calls.",
+			"regression_test": "Execute actual capture and public replay for unmodified and Ctrl/Shift/Alt/Win-modified Backspace/Enter/Delete; retain the completing modifier identity and final destination/admission through Wait and output. Include modifier release between capture and replay, pause/rearm and native refusal, exactly-once receiving and sibling DeadKey controls. Adding Blind alone preserves current modifiers, which may differ from the original capture. Genuine AHK/native application execution is still needed.",
+			"evidence": ["report.md", "source-contract.py", "source-contract.json"]
+		}
+	]
+}

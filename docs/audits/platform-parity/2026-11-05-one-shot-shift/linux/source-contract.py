@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""Source reachability/receipt checks only; never counted as runtime output proof."""
+
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+root = Path(sys.argv[1]).resolve()
+here = Path(__file__).resolve().parent
+pin = "9c565c88c9a1366a2e9b18c1b9d2868509510975"
+assert subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip() == pin
+linux = "static/ergopti_plus/linux/"
+shared = "static/ergopti_plus/_shared/"
+paths = [
+    linux + item
+    for item in [
+        "platform/remap/tap_hold_engine.lua",
+        "platform/remap/tap_hold_manager.lua",
+        "adapters/keyboard_hook.lua",
+        "adapters/keyboard_layout.lua",
+        "adapters/xkb_capture.lua",
+        "adapters/evdev_reader.lua",
+        "adapters/uinput_writer.lua",
+        "adapters/modifier_broker.lua",
+        "modules/shortcuts/key_combinations.lua",
+        "tests/support/input_owner_fixture.lua",
+        "tests/support/tap_hold_fixture.lua",
+        "tests/support/key_combination_declaration_fixture.lua",
+        "tests/unit/platform/remap/tap_hold/test_tap_hold_integration.lua",
+        "tests/unit/platform/remap/tap_hold/test_tap_hold_engine_modifier_key.lua",
+        "tests/unit/platform/remap/tap_hold/test_tap_hold_engine_under_modifier_layer.lua",
+        "tests/unit/platform/remap/tap_hold/test_tap_hold_roll.lua",
+        "tests/unit/adapters/keyboard_hook/test_keyboard_hook_tap_hold.lua",
+        "tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua",
+        "tests/meta/corpus/test_corpus_tap_hold_decisions.lua",
+    ]
+] + [
+    shared + item
+    for item in [
+        "lua/tap_hold/one_shot_shift.lua",
+        "tap_hold/one_shot_shift.json",
+        "tap_hold/defaults.toml",
+        "modules/timings/constants.toml",
+        "modules/features/manifest.toml",
+    ]
+]
+receipts = []
+for path in paths:
+    raw = (root / path).read_bytes()
+    baseline = subprocess.check_output(["git", "show", pin + ":" + path], cwd=root)
+    assert raw == baseline, path
+    receipts.append({"path": path, "sha256": hashlib.sha256(raw).hexdigest()})
+engine = (root / paths[0]).read_text()
+xkb = (root / (linux + "adapters/xkb_capture.lua")).read_text()
+checks = {
+    "same_key_shift_optimization_does_not_test_caps_lock": 'step.keycode == code and #step.mods == 1 and step.mods[1] == "shift"'
+    in engine,
+    "inverse_discards_locked_modifiers": "lib.xkb_state_update_mask(state, 0, 0, 0, 0, 0, group)"
+    in xkb,
+    "wrapped_repeat_requires_guarded_input_arm": "if wrapped and value == REPEAT and input_arms[self] then"
+    in engine,
+    "ordinary_release_arms_without_guard": 'if tap == "one_shot_shift" then\n\t\t\tarm_one_shot(self, now_ms)'
+    in engine,
+}
+assert all(checks.values()), checks
+print(
+    json.dumps(
+        {
+            "pin": pin,
+            "qualification": "Source receipts and exact root assertions only.",
+            "checks": checks,
+            "sources": receipts,
+        },
+        indent=2,
+    )
+)

@@ -1,0 +1,57 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"findings": [
+		{
+			"id": "DKW-001",
+			"title": "Pending registry dead key composes a disabled row using selected-layout text",
+			"severity": "medium",
+			"confidence": "high source routing; native delivery unexecuted",
+			"status": "new source-level defect",
+			"paths": [
+				"static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk:279",
+				"static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk:748",
+				"static/ergopti_plus/_shared/modules/features/layout_rows_policy.ahk:9"
+			],
+			"root_cause": "Pending criterion bypasses row switch; callback checks global base only before selected-layout emit.",
+			"reproduction": {
+				"layout": "ergopti_plus",
+				"native_layout_assumption": "US SC012 resolves e; no DLL/native execution",
+				"base": true,
+				"emulate_home_row": true,
+				"emulate_top_row": false,
+				"trigger": "SC02B no modifiers -> s1_circumflex",
+				"continuation": "SC012 no modifiers",
+				"source_requested": "\u00f4",
+				"row_policy_composition": "\u00ea"
+			},
+			"evidence": [
+				"data-probe.lua",
+				"data-output.json",
+				"source-contract.py",
+				"source-output.json"
+			],
+			"silence": "Supported row setting is accepted; incorrect text is emitted through the ordinary success path without a diagnostic.",
+			"test_gap": "Existing tests call PressNative with global base off or check neutral row criteria, not the registered pending callback with one row off.",
+			"regression_direction": "Exercise original registered callback with pending state, global base on, top row off and actual installed US HKL; retain neutral/enabled/Shift controls.",
+			"limitations": [
+				"Source/data proof, not AutoHotkey runtime or Windows delivery.",
+				"No native host available."
+			]
+		}
+	],
+	"deduplicated": [
+		{
+			"id": "OSW-001",
+			"reason": "Legacy DeadKey named-control modifier loss already included."
+		},
+		{
+			"id": "OI-001",
+			"reason": "Registry pause persistence already reported as policy hypothesis."
+		}
+	],
+	"native_gaps": [
+		"Modified reset control matching and focus behavior",
+		"Native HKL fallback, modifier combinations, SendEvent output and foreground delivery",
+		"Retry policy after output failure and uniform expiry/pause policy"
+	]
+}

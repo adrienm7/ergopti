@@ -1,0 +1,18 @@
+PASS declares a step for every Debug field check and the person verdicts
+PASS the request deadline covers every step and ends before the collector stops waiting
+PASS the collector reads every name it uses from the declaration
+PASS a managed Mac installs the dev prerelease with one administrator password
+PASS a reload during the run requests it again instead of ending the report
+PASS the collector runs the shell checklist steps from their own file
+PASS the collector summarizes the run's own crash reports without paths
+PASS the collector recompiles a stale compiled AppleScript and only a stale one
+PASS the input-source probe answers every question it declares, without the v4 defects
+PASS a ready app built from the current launcher is reused, a newer launcher rebuilds it
+PASS the collector requests every step, waits for done and copies the results
+PASS the probe runs after-logout first when an earlier run left its marker, and says why it skipped otherwise
+PASS a request the app never takes is withdrawn when the collector gives up
+PASS acceptance waits across a developer app that restarts after its readiness
+PASS started on dev, the collector reports on a field branch derived from dev and names its base
+PASS a refusal is reported and the other steps still run and commit
+PASS Ctrl-C during the field run still commits its results and logs
+[OK] macOS field run contract (17 checks).

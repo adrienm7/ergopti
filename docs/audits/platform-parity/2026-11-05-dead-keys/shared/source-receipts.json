@@ -1,0 +1,142 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"verification": "Each listed file matches pinned git object and current checkout byte-for-byte.",
+	"files": [
+		{
+			"path": "AGENTS.md",
+			"sha256": "f31390b134692f273ab7256b2aece7743428996731b597a0a2cd147c163bcf64"
+		},
+		{
+			"path": "static/ergopti/linux/xkb_generation/data/key_sym.json",
+			"sha256": "d62a07690179e2b9aed77a0df5d9dc9ccd7086ee8cada432424f1aad7266a68f"
+		},
+		{
+			"path": "static/ergopti/linux/xkb_generation/data/xkb_symbols.txt",
+			"sha256": "97b84bffda1fef26d6fb26690f2f81c65839b3e68c847064b1aef5a08d061b90"
+		},
+		{
+			"path": "static/ergopti/linux/xkb_generation/data/xkb_types.txt",
+			"sha256": "29cbb5abfb43ce134a1fc452df8ee3e6ff0c6645d15a6d678d9f3a5f1083e037"
+		},
+		{
+			"path": "static/ergopti/linux/xkb_generation/keylayout_to_xkb.py",
+			"sha256": "1bc1e99ddbf6c4342d1a7bb3c0083a781186e87dad2c0c709e49bf3ace25501c"
+		},
+		{
+			"path": "static/ergopti/linux/xkb_generation/tests/__init__.py",
+			"sha256": "fee898a1ed77853ac18d238b059977a5ad8163ba4a2a150ca5c99cfc0bf99fd3"
+		},
+		{
+			"path": "static/ergopti/linux/xkb_generation/tests/run_all_tests.py",
+			"sha256": "d815acbd1bafae31d025ade0aa97b5f8f734cc0c625b5eded38ce893ce3bfd60"
+		},
+		{
+			"path": "static/ergopti/linux/xkb_generation/tests/support.py",
+			"sha256": "047b3d651370ecff94767a94a87d0e3d511552d8912c93b77cb2e15482f8aca9"
+		},
+		{
+			"path": "static/ergopti/linux/xkb_generation/tests/test_canonical_form.py",
+			"sha256": "b85c311c2396899701917e31e649a0c98e88778f256ae9304702057ecbdc954e"
+		},
+		{
+			"path": "static/ergopti/linux/xkb_generation/tests/test_chained_dead_keys.py",
+			"sha256": "c5b51ff25836c30067c5f709a60b5506c3fb3d8abfad75ecaa2ba73c05a8175b"
+		},
+		{
+			"path": "static/ergopti/linux/xkb_generation/tests/test_composer_corpus.py",
+			"sha256": "79fdf74582e42ef1014128c1c836284c90d4e074d19d4d6a4bae4fb1295a26e4"
+		},
+		{
+			"path": "static/ergopti/linux/xkb_generation/tests/test_ergopti_golden.py",
+			"sha256": "95552726fac572f896e6bbbb9a9c3cc134645ba5c3380e3cb7739bdf6dd6025f"
+		},
+		{
+			"path": "static/ergopti/linux/xkb_generation/tests/test_keylayout_correction_boundaries.py",
+			"sha256": "4105910b928ea68afb04a32a72ecdc54ba71a9e17d131447dd6238be61a7e0bf"
+		},
+		{
+			"path": "static/ergopti/linux/xkb_generation/tests/test_keylayout_parsing.py",
+			"sha256": "b80d43e9e7b8ffb14ba2d483090899cfbd55b5cb985334f757ac7a2fc6acf48c"
+		},
+		{
+			"path": "static/ergopti/linux/xkb_generation/tests/test_keystroke_vectors.py",
+			"sha256": "8192fb00cee75bc82823e02637ed0ee8d5db828691a968b54368c36808bbc667"
+		},
+		{
+			"path": "static/ergopti/linux/xkb_generation/tests/test_registry_conversion.py",
+			"sha256": "1d8487cd6225073f39d7c54f274938e8092b78b027092fc969b515869f945e84"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/layouts/keylayout.lua",
+			"sha256": "095fc49ce776a89aa395ebf3d1c7dc9fa34d542fc166fd83ac6b0263e119fc13"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/layouts/xkb_converter.lua",
+			"sha256": "28afe1c55e0cdf968026a90d0e26ab007c3e59000c25097093faad2d6ba2bfce"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/layouts/mac_keycodes.json",
+			"sha256": "67a78500bec7c10b825f734e40d69819d1e2dcb0c16f954b50a5d95cbd21d11d"
+		},
+		{
+			"path": "static/layouts/registry/bepo/bepo.keylayout",
+			"sha256": "1ae285b4d523e3969474eab01084fdf09145f00cdb4daae1245ac2d52e30b6ba"
+		},
+		{
+			"path": "static/layouts/registry/bepo/meta.toml",
+			"sha256": "bc293bfc535aab2d5061426d4188014b11d28b4406744e823a200f431a375c44"
+		},
+		{
+			"path": "static/layouts/registry/ergol/ergol.keylayout",
+			"sha256": "b19d38f7e11ef58983cf2185d8b2097dffeda387d1c4ed8ed0e45ab022e4c189"
+		},
+		{
+			"path": "static/layouts/registry/ergol/meta.toml",
+			"sha256": "158984f8533e9c7e26b3b02f6d57f6f6c6e8734aaf1891993c7dd0870bd42ce2"
+		},
+		{
+			"path": "static/layouts/registry/ergopti/ergopti.keylayout",
+			"sha256": "91764c4f3879f8046a3198354259cb4ed324b28973d47b6e2cd0eb1c576a0e83"
+		},
+		{
+			"path": "static/layouts/registry/ergopti/meta.toml",
+			"sha256": "270df7f04a65483ce63dd1e3558c687263b31368972fd9dd9d941e6893ff62c1"
+		},
+		{
+			"path": "static/layouts/registry/ergopti_ansi/ergopti_ansi.keylayout",
+			"sha256": "c8b3c7a7e51e1622b305d35628bbc4f2766b3be0b9288ce24b06812541e4d87c"
+		},
+		{
+			"path": "static/layouts/registry/ergopti_ansi/meta.toml",
+			"sha256": "247aed77d7c8384c3e74ce4f1022d6b5cdfd3876f1ff04a6c42a8eb3c133c69a"
+		},
+		{
+			"path": "static/layouts/registry/ergopti_plus/ergopti_plus.keylayout",
+			"sha256": "23dac99d4bc366e3baaab1ce2895d087868ccd01330c188aa32df3e28f92a059"
+		},
+		{
+			"path": "static/layouts/registry/ergopti_plus/meta.toml",
+			"sha256": "f330349b196a915819cf7b8d0b0b1b1fcbfccfcce82b8789380d245bba912d70"
+		},
+		{
+			"path": "static/layouts/registry/ergopti_plus_ansi/ergopti_plus_ansi.keylayout",
+			"sha256": "955898fa3afde201ca7d6f68b9ee22675723e6ce68f773e162d9d43336be5757"
+		},
+		{
+			"path": "static/layouts/registry/ergopti_plus_ansi/meta.toml",
+			"sha256": "9c73968bc01b14b89fd1552c722b11c3974f6360f2be7b05ff8a47f9e77be652"
+		},
+		{
+			"path": "static/layouts/registry/index.json",
+			"sha256": "930ac08df8116eb10d190ef73bb1f7b736730554aad6f135ae829000d5719380"
+		},
+		{
+			"path": "tools/test/fixtures/keylayout-canonical-dump.lua",
+			"sha256": "fedd2b200d4ef3bb7076628509a8e0ec0b5a3c720f60fd2a5e1f0ac3f6ab07a1"
+		},
+		{
+			"path": "tools/test/fixtures/keylayout-xkb-convert.lua",
+			"sha256": "8255272a13e0c554c8a403b6cae828f3c18eec0ea207188d1542a986bdc2a709"
+		}
+	]
+}

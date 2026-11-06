@@ -1,0 +1,316 @@
+{
+	"role": "windows",
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"handoff_path": "handoff.json",
+	"handoff_sha256": "cdbeb52bed298a456e0565f34d4749deb4b2f2513343f4c0118ab464d90e50dd",
+	"artifact_claims": [
+		{
+			"path": "report.md",
+			"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3",
+			"archived_matches": true,
+			"archived_sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3",
+			"resolution": "current archive"
+		},
+		{
+			"path": "findings.json",
+			"sha256": "946e23677465d8d773119f7d40879bc0244fe9f5565de9777af38aece2ade3a1",
+			"archived_matches": true,
+			"archived_sha256": "946e23677465d8d773119f7d40879bc0244fe9f5565de9777af38aece2ade3a1",
+			"resolution": "current archive"
+		},
+		{
+			"path": "coverage.json",
+			"sha256": "8c7c094ea13ea16dd5bb69927f51955aa336e2dca59e1eed26f48965eb072f66",
+			"archived_matches": true,
+			"archived_sha256": "8c7c094ea13ea16dd5bb69927f51955aa336e2dca59e1eed26f48965eb072f66",
+			"resolution": "current archive"
+		},
+		{
+			"path": "source-contract.py",
+			"sha256": "4957e2156c46df9538a73fa809c9d59868fe3ca043348ca910bda0ced3ee3709",
+			"archived_matches": false,
+			"archived_sha256": "ef7ddc0dae3a3e1b58f2fa0c88a736c95bab4c49520449efad5bd9b0f52ea1e1",
+			"resolution": "exact original bytes",
+			"original_bytes": "validation/original-submissions/windows/source-contract.py.txt"
+		},
+		{
+			"path": "source-contract.json",
+			"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9",
+			"archived_matches": true,
+			"archived_sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9",
+			"resolution": "current archive"
+		},
+		{
+			"path": "reader-controls.json",
+			"sha256": "6df109997f257b9597376d2ea31f730c8cfeff84f98bb04b1d8fbe163a6a701e",
+			"archived_matches": true,
+			"archived_sha256": "6df109997f257b9597376d2ea31f730c8cfeff84f98bb04b1d8fbe163a6a701e",
+			"resolution": "current archive"
+		},
+		{
+			"path": "prior-search.json",
+			"sha256": "e26cbe94bb19e8495794b1511c4415cbab69b3238f9037377d22ca0b2be15eef",
+			"archived_matches": true,
+			"archived_sha256": "e26cbe94bb19e8495794b1511c4415cbab69b3238f9037377d22ca0b2be15eef",
+			"resolution": "current archive"
+		},
+		{
+			"path": "false-greens.txt",
+			"sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"archived_matches": true,
+			"archived_sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"resolution": "current archive"
+		},
+		{
+			"path": "dry-A.json",
+			"sha256": "8ca369700a8e445a460dcef4d8ca48b423e4225ccf31addf387348e681225344",
+			"archived_matches": true,
+			"archived_sha256": "8ca369700a8e445a460dcef4d8ca48b423e4225ccf31addf387348e681225344",
+			"resolution": "current archive"
+		},
+		{
+			"path": "dry-B.json",
+			"sha256": "c1125aa930cd159ce54d8fa06850aadcfd7e1ba8d07d84d0685ee78edc49f2e6",
+			"archived_matches": true,
+			"archived_sha256": "c1125aa930cd159ce54d8fa06850aadcfd7e1ba8d07d84d0685ee78edc49f2e6",
+			"resolution": "current archive"
+		},
+		{
+			"path": "dry-A.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"archived_matches": true,
+			"archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current archive"
+		},
+		{
+			"path": "dry-B.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"archived_matches": true,
+			"archived_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current archive"
+		},
+		{
+			"path": "dry-sweeps.json",
+			"sha256": "e92ee83e1e2278010465996331fe82f8b54d24f0a5d82323fd60800d0691d634",
+			"archived_matches": true,
+			"archived_sha256": "e92ee83e1e2278010465996331fe82f8b54d24f0a5d82323fd60800d0691d634",
+			"resolution": "current archive"
+		},
+		{
+			"path": "format.txt",
+			"sha256": "90f21bd525c16614ee252a17fc5827b5e5042915a5b5d415b9ac6a85cb63814b",
+			"archived_matches": true,
+			"archived_sha256": "90f21bd525c16614ee252a17fc5827b5e5042915a5b5d415b9ac6a85cb63814b",
+			"resolution": "current archive"
+		},
+		{
+			"path": "ruff.txt",
+			"sha256": "ce04ce92b16073000b77c97a42c00b98b96305692d9d5ed4dcfa5a9ca9ea62d6",
+			"archived_matches": true,
+			"archived_sha256": "ce04ce92b16073000b77c97a42c00b98b96305692d9d5ed4dcfa5a9ca9ea62d6",
+			"resolution": "current archive"
+		}
+	],
+	"source_claims": [
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/one_shot_shift.ahk",
+			"sha256": "458c21c994de1d2794b62d1f70dabd6f8b26305c174c6641429cb8c07a994b5b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/suppressive_inputhook_ownership.ahk",
+			"sha256": "9b580bc5420ee7e64af922d8124452199d8a1c941b7a680bb5eaeed18c28f711",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/tap_hold_loader.ahk",
+			"sha256": "76d475638cc48a101e8d18cff17cf02ee7ebb87536fde78e47abc9dd23bf285c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/constants.ahk",
+			"sha256": "3c094b62641fa76bbdd53782e0d243a6697492c025a99476b036d6622b52835c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/lalt.ahk",
+			"sha256": "5481190fe880db41019ceef6f70eac69d6f88e7073997a81c3e0767379b6c6c1",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/rctrl.ahk",
+			"sha256": "fd82fb933c9d258294fc39aff9e169eeac01057ef9d2ee106a7f580d48fd98f7",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/enter.ahk",
+			"sha256": "64e9df8db5d05d0b4285b2d325f94611ca913f2d107db08b33fe6594648ee076",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/gestures/actions.ahk",
+			"sha256": "38ac49e062182b7e57a4b50642f2fc817fa933a7c04d12c8ccbf744f10070224",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/key_combinations.ahk",
+			"sha256": "cf33d2209d4fc15014a20eec6fd326718b3b11b76e0d47d9687910932f3e8e71",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/sticky_modifiers.ahk",
+			"sha256": "604ca225a666a52fcfd6d0ea80c6b9515a46a5202e7149e4a2210cfcf5948cd9",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_send.ahk",
+			"sha256": "dcc3b043ac6fdd16099edda1d3f225335daf2b4f797e1feb568cbeead047915e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine.ahk",
+			"sha256": "9da05a6e39e03c5208cb93fac59e4bf9e00c41f9fce620a9a1b962e69c578704",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/adapters/text_sender.ahk",
+			"sha256": "0721bdeb5445797f3ca698428278dfd598964bd2ba5cea63d34e6bc7b93132ad",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/adapters/key_state.ahk",
+			"sha256": "5f9426ebd47a57fd3c66066e77bed1399fa5c47021d94a031c819ee2c8291050",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
+			"sha256": "edfbf6d0f4633915217cf03bd0490092613d3c9cf474914ee423f535ca0e0661",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/boot.ahk",
+			"sha256": "0c61b257229c7d29ebfab82e43eb5c17eebdcbad9a4b16cb5c36b24db4a7a85c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+			"sha256": "82f831243cc220a81da56ad61fe5ee97d2eb84d1790ce2d9f35bd30c44bf1b8f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/ErgoptiPlus.ahk",
+			"sha256": "520ed68623d143edd1ea55c5f3727cf636a8162287cdf65d517671bece545161",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/meta/platform/remap/keys/test_oneshotshift_endkeys.ahk",
+			"sha256": "5f265868700519522d4d2c5d271a0f332316605e0eee1f07f4f2fbba66b46355",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/meta/platform/remap/keys/test_oneshotshift_lalt_lshift_stuck.ahk",
+			"sha256": "22be4766c767ab1880e358ed26ea505c6a9e22b9398560b469176931f225e8df",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/meta/platform/remap/keys/test_oneshotshift_suspend_guard.ahk",
+			"sha256": "e702600c003eab76849846b84a6936ebe425df4720a1fffecef097984b658a6f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/meta/platform/remap/keys/test_rctrl_lalt_hotif_gated.ahk",
+			"sha256": "d7d5ee65f2fe7a0627222f50f55b6a8b5f0fca8703f64d0cdc0f9372c34f74f4",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/platform/remap/keys/test_timings_config.ahk",
+			"sha256": "5c5c30103a14647d8e7577cbf8522f73c5ca2931bf5814f15837b45f53799c6b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/adapters/input/test_one_shot_rearm_admission.ahk",
+			"sha256": "90fa38dfe5a202255974229419a68b60e7158e245c9301a623fbdf16e52f2cb9",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/fixtures/one_shot_rearm_admission_body.ahk",
+			"sha256": "3758a840b16286dc6b2f4699093bf8df749203e296e1bbe1b997a3f0a2133ad7",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/fixtures/suppressive_capture_settlement_body.ahk",
+			"sha256": "dd9a66983df86f81f422d2c195f206203fcacf758646ed31fece760f1a00ec55",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/fixtures/suppressive_capture_unicode_body.ahk",
+			"sha256": "3f16329105e294185b9118f978382416290825900c36f48cfe855f15012d9644",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tap_hold/one_shot_shift.json",
+			"sha256": "6c605b612374f4e21a3ad5edfea6c0c676c37c23cff32db78d867aef4e28d182",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/tap_hold/one_shot_shift.lua",
+			"sha256": "9ff4f097e014ada2c6755d774c5570b91239f611b4699bdbb317c5af84071b13",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+			"sha256": "0d28466a2306acc79dec7c8bcc39b49c07ba742f488aaea1bfc00727b498cf91",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+			"sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0",
+			"pinned_matches": true,
+			"current_matches": true
+		}
+	],
+	"counts": {
+		"source_claims": 31,
+		"coverage_rows": 47,
+		"findings": 1,
+		"lexical_checks": 40,
+		"runtime_cases": 0,
+		"final_processes": 2,
+		"artifact_hashes": 15
+	},
+	"qualification": "Frozen initial role claims; Windows source-only, Linux actual original owners over recorded native ports. No native keyboard/application receiving inferred; channel retirement is observed only at the recorded ports.",
+	"independent_replay": {
+		"receipt": "independent/receipts.json",
+		"qualification": "Rerun after archive source program formatting; original Lua bodies unchanged."
+	}
+}

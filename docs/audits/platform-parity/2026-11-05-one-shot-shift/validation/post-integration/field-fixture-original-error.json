@@ -1,0 +1,4 @@
+{
+	"qualification": "Exact stderr represented as a JSON string to preserve its trailing whitespace without whitespace errors in the audit diff. Decode stderr as UTF-8 and hash the resulting bytes.",
+	"stderr": "AssertionError [ERR_ASSERTION]: \nsed: can't read /tmp/one-shot-integrated-o7wc1yyf/ergopti-field-run-h9EPiq/current/clone/static/ergopti_plus/macos/infra/accessibility_wait.lua: No such file or directory\n[field-report] ERROR: infra/accessibility_wait.lua declares no DEADLINE_SECONDS.\n\n\n1 !== 0\n\n    at /workspace/ergopti/tools/test/test-macos-field-run-contract.cjs:826:13\n    at async check (/workspace/ergopti/tools/test/test-macos-field-run-contract.cjs:73:2)\n    at async /workspace/ergopti/tools/test/test-macos-field-run-contract.cjs:818:3 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: 1,\n  expected: 0,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n"
+}

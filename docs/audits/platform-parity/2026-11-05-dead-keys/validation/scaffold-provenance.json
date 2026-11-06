@@ -1,0 +1,196 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"qualification": "Scaffold-only controls use four synthetic role receipts naming four actual pinned repository metadata files. They establish authentication behavior, not the pending workers' dead-key coverage. Run the same guards again on actual role receipts after custody.",
+	"helper_adaptations": [
+		{
+			"source_path": "docs/audits/platform-parity/2026-11-05-one-shot-shift/project.py",
+			"original_copy": "validation/scaffold-originals/project.py.txt",
+			"original_sha256": "186d061299b632276423c8cecef1b60b24e4b0b24e41a52ac3697a93e10cb888",
+			"current_path": "project.py",
+			"current_sha256": "21a27064dbfb157d6fdbb748dfbc929080ee88f6f48159edfb796bf558dd5f54",
+			"qualification": "Exact original bytes retained. Changes are declared module/title/pin substitution; source receipt uniformization and dynamic control scope are additionally declared for source helpers.",
+			"ast_equal_after_declared_metadata_substitutions": true
+		},
+		{
+			"source_path": "docs/audits/platform-parity/2026-11-05-one-shot-shift/check_project.py",
+			"original_copy": "validation/scaffold-originals/check_project.py.txt",
+			"original_sha256": "a4308fe16ba31dc12a9bb256936c8966912df6598480db49f22bdd2c588e68ac",
+			"current_path": "check_project.py",
+			"current_sha256": "d07ce66fe9e8d0691a5c8c31561463c0a5fe99fba2f150c2060353852a11125c",
+			"qualification": "Exact original bytes retained. Changes are declared module/title/pin substitution; source receipt uniformization and dynamic control scope are additionally declared for source helpers.",
+			"ast_equal_after_declared_metadata_substitutions": true
+		},
+		{
+			"source_path": "docs/audits/platform-parity/2026-11-05-one-shot-shift/sample-owner.json",
+			"original_copy": "validation/scaffold-originals/sample-owner.json.txt",
+			"original_sha256": "8ae91133d2eb54fb35d5209184257180b5d19a0abb6ffe22f9256e28f90a95d7",
+			"current_path": "sample-owner.json",
+			"current_sha256": "9bf618f3af9d58c3da335fed77005c828c27822f5e9d7887dc2417836adbc203",
+			"qualification": "Exact original bytes retained. Changes are declared module/title/pin substitution; source receipt uniformization and dynamic control scope are additionally declared for source helpers.",
+			"json_equal_after_declared_metadata_substitutions": true
+		},
+		{
+			"source_path": "docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py",
+			"original_copy": "validation/scaffold-originals/check_sources.py.txt",
+			"original_sha256": "3f6d132409869225c62775cfa47febd89eac76e2fd6a6d8defd65e91684261c3",
+			"current_path": "check_sources.py",
+			"current_sha256": "7ce7d689bcdca22090936b68b7b64629d856b3e37454087eb47976117b917997",
+			"qualification": "Exact original bytes retained. Changes are declared module/title/pin substitution; source receipt uniformization and dynamic control scope are additionally declared for source helpers.",
+			"declared_additional_changes": "Uniform four role receipt paths and pin/list field names; negative guard scopes/counts derived from actual claims rather than previous campaign constants."
+		},
+		{
+			"source_path": "docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/check_source_guards.py",
+			"original_copy": "validation/scaffold-originals/validation__check_source_guards.py.txt",
+			"original_sha256": "685d6adb87ae034f6b0d95af09e263882d65c753d9e3d8ae851920b3b9c4e46e",
+			"current_path": "validation/check_source_guards.py",
+			"current_sha256": "5f5ee9b446888bf1ee65d9b107c7b8de6fe7e80eac2416dc520d395d65e2dd99",
+			"qualification": "Exact original bytes retained. Changes are declared module/title/pin substitution; source receipt uniformization and dynamic control scope are additionally declared for source helpers.",
+			"declared_additional_changes": "Uniform four role receipt paths and pin/list field names; negative guard scopes/counts derived from actual claims rather than previous campaign constants."
+		}
+	],
+	"metadata_controls": {
+		"positive_owners": 2,
+		"negative_controls_rejected": 22,
+		"command": ["python3", "check_project.py", "/workspace/ergopti"]
+	},
+	"synthetic_source_guard_controls": {
+		"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+		"program": {
+			"path": "validation/check_source_guards.py",
+			"sha256": "5f5ee9b446888bf1ee65d9b107c7b8de6fe7e80eac2416dc520d395d65e2dd99"
+		},
+		"checker": {
+			"path": "check_sources.py",
+			"sha256": "7ce7d689bcdca22090936b68b7b64629d856b3e37454087eb47976117b917997"
+		},
+		"source_receipts": [
+			{
+				"path": "windows/source-receipts.json",
+				"sha256": "256890b7d273db56079ca1fc91e06d69122846afbefed2c3bae7d1cb38b32a3b"
+			},
+			{
+				"path": "macos/source-receipts.json",
+				"sha256": "cc164bc39bb5a59a2c3c08fc70398a64f770f259f2aeafd3dd155c16819a00a4"
+			},
+			{
+				"path": "linux/source-receipts.json",
+				"sha256": "6adb5606f7b79961dc7b3a2cf44c7b40f58aa609d29840a78e34211f3cd46a85"
+			},
+			{
+				"path": "shared/source-receipts.json",
+				"sha256": "0ae27db55667ea4d1d766cd47da2c513abff9432b9c253cfdff788ad234ee202"
+			}
+		],
+		"positive_controls": 2,
+		"negative_controls": 5,
+		"rationale": "A private 4-source/4-receipt skeleton uses real Git init and an object alternate pointing to the repository object database, with a real audited HEAD ref. No full checkout, fake Git executable, production mutation or frozen receipt mutation. Each negative must fail with its specific guard marker and produce no acceptance receipt. These controls test authentication refusal, not semantic parity or native delivery.",
+		"current_drift": {
+			"path": "AGENTS.md",
+			"current_before_sha256": "f31390b134692f273ab7256b2aece7743428996731b597a0a2cd147c163bcf64",
+			"current_drifted_sha256": "862a5b2af255594233668776b78dc5feba5d9565dd025e4dfc251f43ab89f78a",
+			"pinned_before_sha256": "f31390b134692f273ab7256b2aece7743428996731b597a0a2cd147c163bcf64",
+			"pinned_after_sha256": "f31390b134692f273ab7256b2aece7743428996731b597a0a2cd147c163bcf64",
+			"qualification": "Hashes use complete original Git blob bytes before and after the private current-file mutation; the pinned blob remains unchanged."
+		},
+		"results": [
+			{
+				"case": "original-main",
+				"expected": "accept",
+				"expected_marker": "Authenticated 4 role claims over 4 distinct source paths.",
+				"exit_code": 0,
+				"stdout": "Authenticated 4 role claims over 4 distinct source paths.\n",
+				"stderr": "",
+				"stdout_sha256": "b7dc447ffaa447bebf8df99772e01d703e10f3ebb214556eed534d475d61225f",
+				"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+				"result_sha256": "9fbad4feae1b9f545005d5b54afb96238cb8355e6f9ae616d9ff9ec0e7c50c12",
+				"claims": 4,
+				"distinct_paths": 4
+			},
+			{
+				"case": "private-mirror-baseline",
+				"expected": "accept",
+				"expected_marker": "Authenticated 4 role claims over 4 distinct source paths.",
+				"exit_code": 0,
+				"stdout": "Authenticated 4 role claims over 4 distinct source paths.\n",
+				"stderr": "",
+				"stdout_sha256": "b7dc447ffaa447bebf8df99772e01d703e10f3ebb214556eed534d475d61225f",
+				"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+				"result_sha256": "9fbad4feae1b9f545005d5b54afb96238cb8355e6f9ae616d9ff9ec0e7c50c12",
+				"claims": 4,
+				"distinct_paths": 4
+			},
+			{
+				"case": "wrong-receipt-pin",
+				"expected": "reject",
+				"expected_marker": "wrong source pin:",
+				"exit_code": 1,
+				"stdout": "",
+				"stderr": "Traceback (most recent call last):\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 126, in <module>\n    main()\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 84, in main\n    entries = claims(directory)\n              ^^^^^^^^^^^^^^^^^\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 54, in claims\n    require(document.get(pin_field) == AUDITED_SHA, f\"wrong source pin: {receipt}\")\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 20, in require\n    raise ValueError(message)\nValueError: wrong source pin: windows/source-receipts.json\n",
+				"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+				"stderr_sha256": "d3047e45ec6b041e54a4e8bf22874c0e2f7765f477d0201533e482f8a1f59d82"
+			},
+			{
+				"case": "wrong-receipt-digest",
+				"expected": "reject",
+				"expected_marker": "pinned claim mismatch:",
+				"exit_code": 1,
+				"stdout": "",
+				"stderr": "Traceback (most recent call last):\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 126, in <module>\n    main()\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 103, in main\n    require(pinned_digest == expected, f\"pinned claim mismatch: {relative}\")\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 20, in require\n    raise ValueError(message)\nValueError: pinned claim mismatch: AGENTS.md\n",
+				"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+				"stderr_sha256": "f6d609d0543aa49e4d3c88e586708a35be1236e703436ff0c60a2e1e413e9afd"
+			},
+			{
+				"case": "unsafe-parent-path",
+				"expected": "reject",
+				"expected_marker": "noncanonical source path:",
+				"exit_code": 1,
+				"stdout": "",
+				"stderr": "Traceback (most recent call last):\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 126, in <module>\n    main()\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 84, in main\n    entries = claims(directory)\n              ^^^^^^^^^^^^^^^^^\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 63, in claims\n    relative_path(relative)\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 29, in relative_path\n    require(\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 20, in require\n    raise ValueError(message)\nValueError: noncanonical source path: ../outside-source\n",
+				"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+				"stderr_sha256": "8a857e9fb0cbaa21ae5128c85da904743d109909e73995b747563147cf3011fc"
+			},
+			{
+				"case": "symlink-receipt",
+				"expected": "reject",
+				"expected_marker": "symlink source or receipt:",
+				"exit_code": 1,
+				"stdout": "",
+				"stderr": "Traceback (most recent call last):\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 126, in <module>\n    main()\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 84, in main\n    entries = claims(directory)\n              ^^^^^^^^^^^^^^^^^\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 53, in claims\n    document = json.loads(regular_file(directory, receipt).read_text(encoding=\"utf-8\"))\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 44, in regular_file\n    require(not path.is_symlink(), f\"symlink source or receipt: {relative}\")\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 20, in require\n    raise ValueError(message)\nValueError: symlink source or receipt: windows/source-receipts.json\n",
+				"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+				"stderr_sha256": "7f3bfcd2dd48cdb8ef3e044bf15b89c13c88399603122c45c9b6f9e83d17f030"
+			},
+			{
+				"case": "real-current-byte-drift",
+				"expected": "reject",
+				"expected_marker": "current claimed source drift:",
+				"exit_code": 1,
+				"stdout": "",
+				"stderr": "Traceback (most recent call last):\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 126, in <module>\n    main()\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 104, in main\n    require(current_digest == expected, f\"current claimed source drift: {relative}\")\n  File \"/tmp/dead-keys-scaffold-controls-n4gw2ttj/check_sources.py\", line 20, in require\n    raise ValueError(message)\nValueError: current claimed source drift: AGENTS.md\n",
+				"stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+				"stderr_sha256": "6be8836b64d94714f54332f699e279c1568d1e3db1b07503dca766a7c6b163e9"
+			}
+		]
+	},
+	"synthetic_source_receipt_inputs": [
+		{
+			"path": "windows/source-receipts.json",
+			"raw_utf8": "{\"audited_sha\": \"f2c3ea43542c985fb20e5f0887976f1c02525341\", \"files\": [{\"path\": \"AGENTS.md\", \"sha256\": \"f31390b134692f273ab7256b2aece7743428996731b597a0a2cd147c163bcf64\"}]}",
+			"sha256": "256890b7d273db56079ca1fc91e06d69122846afbefed2c3bae7d1cb38b32a3b"
+		},
+		{
+			"path": "macos/source-receipts.json",
+			"raw_utf8": "{\"audited_sha\": \"f2c3ea43542c985fb20e5f0887976f1c02525341\", \"files\": [{\"path\": \".node-version\", \"sha256\": \"4c42fb8d6334c5cdcac68b93f96c581fb83b1f58cda898cff115e5e941ef717d\"}]}",
+			"sha256": "cc164bc39bb5a59a2c3c08fc70398a64f770f259f2aeafd3dd155c16819a00a4"
+		},
+		{
+			"path": "linux/source-receipts.json",
+			"raw_utf8": "{\"audited_sha\": \"f2c3ea43542c985fb20e5f0887976f1c02525341\", \"files\": [{\"path\": \"package.json\", \"sha256\": \"0300f27e5a196dbb5ba48322939a0f5269d566ee094c40df253568391796e046\"}]}",
+			"sha256": "6adb5606f7b79961dc7b3a2cf44c7b40f58aa609d29840a78e34211f3cd46a85"
+		},
+		{
+			"path": "shared/source-receipts.json",
+			"raw_utf8": "{\"audited_sha\": \"f2c3ea43542c985fb20e5f0887976f1c02525341\", \"files\": [{\"path\": \".gitattributes\", \"sha256\": \"468c2ac4748e197d53a431e3fabc8581008e7b659cafe2e389420cd52c260f4f\"}]}",
+			"sha256": "0ae27db55667ea4d1d766cd47da2c513abff9432b9c253cfdff788ad234ee202"
+		}
+	]
+}

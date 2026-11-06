@@ -1,0 +1,15 @@
+{
+  "cases_per_record": 13,
+  "records": 3,
+  "unseeded_first_event_timing_declines": 5,
+  "unchanged_original_owner_functions_per_case": 4,
+  "ordinary_baseline_matching_cases": 8,
+  "negative_controls_rejected": [
+    "missing case",
+    "wrong original owner",
+    "miss falsely expanded",
+    "prefix unexpectedly constructed",
+    "split control missing"
+  ],
+  "qualification": "Original production Lua functions over registered in-memory fixture; native dead state and receiver unmeasured."
+}

@@ -1,0 +1,254 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"scope": "Windows dead-key module only",
+	"runtime_qualification": "All AHK paths source-only; original shared Lua parser and row policy actually executed under Lua 5.4 and LuaJIT.",
+	"items": [
+		{
+			"aspect": "legacy.public-producers",
+			"owners": "layout.ahk dispatch and layout_ergopti helper",
+			"assessment": "Reviewed real producers; chain literal used during active capture",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "legacy.activation",
+			"owners": "DeadKey",
+			"assessment": "Suspension and reentrancy guards",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "legacy.capture",
+			"owners": "DeadKey + SIHO",
+			"assessment": "Two UTF-16 units, scalar decoder, named end keys, ownership token",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "legacy.wait",
+			"owners": "DeadKey",
+			"assessment": "Critical released around Wait and restored; two-second deadline",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "legacy.mapped",
+			"owners": "DeadKey",
+			"assessment": "Original mapping success branch",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "legacy.unmapped",
+			"owners": "DeadKey",
+			"assessment": "Base/terminator plus scalar continuation",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "legacy.timeout",
+			"owners": "DeadKey",
+			"assessment": "Base emitted if mapping supplies space entry",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "legacy.invalid",
+			"owners": "DeadKey + SIHO",
+			"assessment": "Invalid scalar discarded with warning",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "legacy.named-controls",
+			"owners": "DeadKey",
+			"assessment": "Bare control re-send; modifier loss deduplicated OSW-001",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "legacy.pause-stale",
+			"owners": "DeadKey + lifecycle + SIHO",
+			"assessment": "Before/after suspension guards; settled token prevents old capture output",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "legacy.chain",
+			"owners": "_DeadKeyDispatch + _ErgoptiDeadKeyOrChain",
+			"assessment": "Nested producer emits literal rather than starting capture",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "legacy.generated-chain-refusal",
+			"owners": "ErgoptiLayout_BuildSpec",
+			"assessment": "Next transitions explicitly unsupported by builtin map builder",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "legacy.deviations",
+			"owners": "layout_ergopti",
+			"assessment": "Documented golden compatibility overrides retained intentionally",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "legacy.output-ring",
+			"owners": "layout.ahk + hotstring_send",
+			"assessment": "SIHO reached-screen ownership gate prevents capture-consumed output recording",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.activation",
+			"owners": "IsActive + LayerIsActive + master_gates",
+			"assessment": "Canonical model/category/navigation plus desired independent layer gates",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.neutral-row",
+			"owners": "_KLE_BaseCriterion",
+			"assessment": "Row switch respected while neutral",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.pending-row",
+			"owners": "_KLE_BaseCriterion + _KLE_OnKey",
+			"assessment": "DKW-001: missing callback row policy; shipped parser data witness",
+			"basis": "source body review plus actual original Lua data/policy execution"
+		},
+		{
+			"aspect": "registry.selected-step",
+			"owners": "Press + StepReplayRoute + parser Step",
+			"assessment": "Original action machine supports output and chained Next",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.unmapped",
+			"owners": "Keylayout_Step",
+			"assessment": "Printable terminator prefix then neutral resolve",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.native-compose",
+			"owners": "PressNative + _KLE_BuildCompositions",
+			"assessment": "Native text lookup into pending composition; source reviewed, no native DLL run",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.native-dead",
+			"owners": "PressNative",
+			"assessment": "Native dead/empty reader result terminates registry state and forwards physical key",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.ambiguous-neutral",
+			"owners": "_KLE_BuildCompositions",
+			"assessment": "Conditional custom-layout rejection; shared agent all-six inventory found none shipped",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.digits",
+			"owners": "_KLE_OnKey + PressNative",
+			"assessment": "Independent symbol/digit overrides have dedicated paths; ordinary KeyE witness avoids these branches",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.modifiers",
+			"owners": "level selection + registration",
+			"assessment": "Shift/Caps/AltGr levels and shortcut prefixes reviewed; native combinations unexecuted",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.magic",
+			"owners": "_KLE_MagicKeyOwnsKey",
+			"assessment": "Neutral unshifted magic ownership exclusion; pending state routes continuation",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.shortcuts",
+			"owners": "_KLE_OnShortcut",
+			"assessment": "Reset before command text/physical fallback; native Win-L behavior unexecuted",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.reset-controls",
+			"owners": "KLE_DEAD_RESET_KEYS + registrar",
+			"assessment": "Thirteen physical scan identities; fixed computed-name shadow is not a finding",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.modified-controls",
+			"owners": "plain reset hotkey registrations",
+			"assessment": "Native matching/policy gap; no confirmed second root",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.deadline",
+			"owners": "state transitions",
+			"assessment": "No timer expiry; intentional construction difference from legacy timeout",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.source-replacement",
+			"owners": "Load/Unload",
+			"assessment": "Candidate before publication; successful replacement neutralizes, failed load preserves old cell",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.retained-replay",
+			"owners": "CaptureReplayRoute + owner cell",
+			"assessment": "Old admitted model retained intentionally, no new native authority",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.reset-metadata",
+			"owners": "_KLE_AltGrBindingOwner",
+			"assessment": "Function/source/cohort checks; explicit metadata-only and no native admission",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "registry.pause-gates",
+			"owners": "emulation + lifecycle + navigation/category criteria",
+			"assessment": "Persistent state source path; existing OI-001 policy hypothesis deduplicated",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "both.output-refusal",
+			"owners": "hotstring_send + caller sites",
+			"assessment": "Logged production exceptions and no ring advancement; retry policy unestablished",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "synthetic.producer",
+			"owners": "_HS_RegisterCircumflexDeadkeys",
+			"assessment": "Case variants plus contextual non-vowels; explicit e/t exceptions for rolls/words",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "synthetic.magic-context",
+			"owners": "ShouldActivateDeadkey",
+			"assessment": "Configured magic exclusion, non-regex membership, time/context gates",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "synthetic.transaction",
+			"owners": "ShouldActivateDeadkey",
+			"assessment": "Prepare-only no send; actual buffer transaction succeeds only after send success",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "tests.legacy",
+			"owners": "Six remap meta bodies",
+			"assessment": "Reviewed timeout/endkey/unmapped/pause/ring/serialized tests; not executed on Linux",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "tests.registry",
+			"owners": "test_keylayout_emulation + test_layout_rows_policy",
+			"assessment": "Native helper test global-base-off gap vs real pending per-row callback",
+			"basis": "source body review"
+		},
+		{
+			"aspect": "tests.tables",
+			"owners": "test_ergopti_keylayout_tables",
+			"assessment": "Golden deviations/chain builder intent checked, no native run",
+			"basis": "source body review"
+		}
+	],
+	"not_executed": [
+		"AutoHotkey tests",
+		"Windows native hook admission",
+		"native HKL ToUnicodeEx",
+		"foreground application delivery"
+	],
+	"claim": "Bounded audit inventory, not proof of exhaustive native behavior."
+}

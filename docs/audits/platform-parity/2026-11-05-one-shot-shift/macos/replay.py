@@ -1,0 +1,41 @@
+"""Replay actual Lua owners over recorded native ports; takes repository root."""
+
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(sys.argv[1]).resolve()
+HERE = Path(__file__).resolve().parent
+MODS = [
+    "tests.unit.modules.keymap.synthetic.test_one_shot_shift",
+    "tests.unit.adapters.synthetic_input.test_one_shot_shift",
+    "tests.unit.modules.keymap.lifecycle.test_start_commit_transaction",
+    "tests.unit.platform.remap.config.test_one_shot_timeout_is_shared",
+    "tests.unit.modules.gestures.actions.test_sticky_modifiers",
+    "tests.unit.modules.shortcuts.pause_owners.test_sticky_modifiers",
+]
+rows = []
+for sweep in (1, 2):
+    jobs = [("public", "public-probe.lua", []), ("config", "config-probe.lua", [])]
+    jobs += [(f"registered-{i}", "run-module.lua", [mod]) for i, mod in enumerate(MODS, 1)]
+    for name, program, args in jobs:
+        with tempfile.TemporaryDirectory(prefix="oneshot-mac-replay-") as temporary:
+            env = dict(os.environ, LOGNAME="agent", TMPDIR=temporary)
+            result = subprocess.run(
+                ["lua", str(HERE / program), str(ROOT), *args],
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+        log = f"sweep-{sweep}-{name}.log"
+        (HERE / log).write_text(result.stdout, encoding="utf-8")
+        rows.append({"sweep": sweep, "name": name, "exit": result.returncode, "log": log})
+        if result.returncode:
+            raise SystemExit(result.stdout)
+(HERE / "sweeps.json").write_text(json.dumps(rows, indent=2) + "\n", encoding="utf-8")
+print(json.dumps(rows))

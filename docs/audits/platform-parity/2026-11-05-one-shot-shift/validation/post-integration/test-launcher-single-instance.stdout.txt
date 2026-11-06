@@ -1,0 +1,1 @@
+[32m[OK] launcher Info.plist declares LSMultipleInstancesProhibited (F-MED-29).[0m

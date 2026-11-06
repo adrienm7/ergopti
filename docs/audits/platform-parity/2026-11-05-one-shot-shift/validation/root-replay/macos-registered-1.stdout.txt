@@ -1,0 +1,10 @@
+
+=== one-shot Shift state ===
+  ok   spends a fresh arm while a previous shifted key remains held
+  ok   shifts only the first of three letters rolled inside the timeout (one-shot-roll)
+  ok   uses every shared special and gives the magic key priority (one-shot-policy)
+  ok   keeps modifiers, navigation and dead keys but spends editing controls (one-shot-policy)
+  ok   uses Unicode title casing and the live same-key Shift verdict (one-shot-policy)
+  ok   expires on the next text key and refreshes on another tap (one-shot-policy)
+  ok   owns repeats only after output commits and settles every release (one-shot-policy)
+AUDIT_RESULT	7	0

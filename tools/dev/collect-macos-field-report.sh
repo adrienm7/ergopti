@@ -87,8 +87,15 @@ FIELD_RUN_RELOAD_RETRIES=2
 # 2026-10-28 saw the ready app hold its main thread 138 s (keystats ledger
 # replay) before it took the request, past the former 60 s. The field run
 # contract test shortens the budgets and the poll through the *_OVERRIDE
-# variables, so a case that waits on purpose does not wait minutes.
-FIELD_RUN_READY_SECONDS="${FIELD_RUN_READY_SECONDS_OVERRIDE:-240}"
+# variables, so a case that waits on purpose does not wait minutes. A new
+# install asks for Accessibility first and the app's boot waits for it up to
+# M.DEADLINE_SECONDS of infra/accessibility_wait.lua (600 s): the readiness
+# budget covers that wait and two minutes of boot.
+FIELD_RUN_ACCESSIBILITY_WAIT_SECONDS="$(sed -n 's/^M\.DEADLINE_SECONDS = \([0-9][0-9]*\)$/\1/p' \
+	"${REPO_ROOT}/static/ergopti_plus/macos/infra/accessibility_wait.lua")"
+[ -n "${FIELD_RUN_ACCESSIBILITY_WAIT_SECONDS}" ] \
+	|| { printf '[field-report] ERROR: infra/accessibility_wait.lua declares no DEADLINE_SECONDS.\n' >&2; exit 1; }
+FIELD_RUN_READY_SECONDS="${FIELD_RUN_READY_SECONDS_OVERRIDE:-$((FIELD_RUN_ACCESSIBILITY_WAIT_SECONDS + 120))}"
 FIELD_RUN_ACCEPT_SECONDS="${FIELD_RUN_ACCEPT_SECONDS_OVERRIDE:-300}"
 FIELD_RUN_POLL_SECONDS="${FIELD_RUN_POLL_SECONDS_OVERRIDE:-5}"
 
@@ -279,9 +286,6 @@ step karabiner sh -c '"/Library/Application Support/org.pqrs/Karabiner-Elements/
 # The app's field check only sees codesign's exit code; keep both tools' own
 # reasons so a failed signature check names its cause.
 step karabiner_signature sh -c 'codesign --verify --deep --strict --verbose=4 /Applications/Karabiner-Elements.app; echo "codesign exit=$?"; spctl -a -vv /Applications/Karabiner-Elements.app; echo "spctl exit=$?"'
-# The managed Ollama guardian refuses a launcher whose strict signature fails
-# (OwnedSuspendedImageGuardian); a file written into the bundle breaks it.
-step app_signature sh -c 'app="/Applications/$1"; verdict=$(codesign --verify --deep --strict "$app" 2>&1); status=$?; printf "%s\n" "$verdict" | sed "s#$HOME#~#g"; echo "codesign exit=$status"; n=$(find "$app/Contents" -name __pycache__ 2>/dev/null | wc -l | tr -d " "); echo "pycache_folders=$n"' sh "${ERGOPTI_APP_BUNDLE}"
 step memory sh -c 'memory_pressure | tail -1; vm_stat | head -5'
 # Only a Mac compiles AppleScript, so a .applescript edited elsewhere leaves
 # its .scpt stale (the Encryptor comment of the keystats rename). The rebuilt
@@ -495,6 +499,10 @@ run_field_run() {
 			|| log "WARNING: the managed Ollama was not built from this clone's pinned sources (reason above); the ollama_runtime step will fail."
 	fi
 
+	# The readiness budget counts from the app's opening, not from before the
+	# install: the download and the administrator password once used all 240 s
+	# while the new app became ready 2 s after it opened (field report 2026-11-05).
+	started_at="$(date +%s)"
 	# A reload (from the menu, or one the run triggers) closes the run as
 	# interrupted before any step result; the run is requested again, up to
 	# FIELD_RUN_RELOAD_RETRIES times, so one reload does not cost the report.
@@ -596,6 +604,10 @@ run_field_attempt() {
 
 run_field_run 2>&1 | tee "${out}/field_run.txt"
 field_run_status=${PIPESTATUS[0]}
+# After the run, on the app it installed: the managed Ollama guardian refuses a
+# launcher whose strict signature fails
+# (OwnedSuspendedImageGuardian); a file written into the bundle breaks it.
+step app_signature sh -c 'app="/Applications/$1"; verdict=$(codesign --verify --deep --strict "$app" 2>&1); status=$?; printf "%s\n" "$verdict" | sed "s#$HOME#~#g"; echo "codesign exit=$status"; n=$(find "$app/Contents" -name __pycache__ 2>/dev/null | wc -l | tr -d " "); echo "pycache_folders=$n"' sh "${ERGOPTI_APP_BUNDLE}"
 # What no command can do on its own, said once instead of faked.
 cat > "${out}/not_automated.txt" <<'NOTE'
 typing through the owned runtime: refused. Karabiner captures the keyboards at the HID level, below the event system;

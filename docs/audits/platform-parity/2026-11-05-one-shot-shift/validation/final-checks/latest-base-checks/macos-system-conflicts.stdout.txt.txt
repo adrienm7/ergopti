@@ -1,0 +1,38 @@
+Selecting exact test module: "tests/unit/modules/gestures/config/test_system_gesture_conflicts.lua"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.gestures.config.test_system_gesture_conflicts
+
+=== system gesture snapshots (gesture-conflicts) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.gestures.config.test_system_gesture_conflicts","name":"cancels owned tasks and refuses late completion after shutdown","status":"pass","elapsed_ms":8.046314,"timing_error":""}
+  ok   cancels owned tasks and refuses late completion after shutdown
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.gestures.config.test_system_gesture_conflicts","name":"checks the live enabled posture at boot completion and warns once per group","status":"pass","elapsed_ms":1.382306,"timing_error":""}
+  ok   checks the live enabled posture at boot completion and warns once per group
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.gestures.config.test_system_gesture_conflicts","name":"shows no boot dialog when the settings read returned nothing","status":"pass","elapsed_ms":0.706511,"timing_error":""}
+  ok   shows no boot dialog when the settings read returned nothing
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.gestures.config.test_system_gesture_conflicts","name":"does not warn when gesture startup was refused","status":"pass","elapsed_ms":0.654703,"timing_error":""}
+  ok   does not warn when gesture startup was refused
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.gestures.config.test_system_gesture_conflicts","name":"never probes while evaluating an assignment","status":"pass","elapsed_ms":0.372980,"timing_error":""}
+  ok   never probes while evaluating an assignment
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.gestures.config.test_system_gesture_conflicts","name":"publishes only after every asynchronous defaults probe settles","status":"pass","elapsed_ms":0.631558,"timing_error":""}
+  ok   publishes only after every asynchronous defaults probe settles
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.gestures.config.test_system_gesture_conflicts","name":"detects secondary click and three-finger dragging","status":"pass","elapsed_ms":2.253665,"timing_error":""}
+  ok   detects secondary click and three-finger dragging
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.gestures.config.test_system_gesture_conflicts","name":"requires both swipe and drag policies before calling three-finger motion conflict-free","status":"pass","elapsed_ms":2.481356,"timing_error":""}
+  ok   requires both swipe and drag policies before calling three-finger motion conflict-free
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.gestures.config.test_system_gesture_conflicts","name":"keeps failed probes unknown rather than calling them disabled","status":"pass","elapsed_ms":0.398068,"timing_error":""}
+  ok   keeps failed probes unknown rather than calling them disabled
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.gestures.config.test_system_gesture_conflicts","name":"reports native pinch without manufacturing an assigned pinch conflict","status":"pass","elapsed_ms":0.547873,"timing_error":""}
+  ok   reports native pinch without manufacturing an assigned pinch conflict
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.gestures.config.test_system_gesture_conflicts","name":"coalesces concurrent refreshes and ignores duplicate completions","status":"pass","elapsed_ms":0.821193,"timing_error":""}
+  ok   coalesces concurrent refreshes and ignores duplicate completions
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.gestures.config.test_system_gesture_conflicts","name":"tests.unit.modules.gestures.config.test_system_gesture_conflicts","status":"pass","elapsed_ms":18.888618,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  11
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

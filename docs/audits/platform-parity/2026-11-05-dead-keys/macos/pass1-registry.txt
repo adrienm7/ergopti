@@ -1,0 +1,134 @@
+Selecting exact test module: "tests.unit.modules.keymap.registry.test_registry"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.registry.test_registry
+
+=== Registry.init / guard ===
+2026-11-05 21:38:19:000 [ERROR] [keymap.registry] M.init(): core_state must be a table (got string).
+[logger] unified log write refused: /tmp/lua_LtkdkI_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_LtkdkI_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_hotstrings.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_LtkdkI_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+2026-11-05 21:38:19:000 [ERROR] [keymap.registry] 'add' called before M.init() — shared state not initialized.
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"init silently rejects non-table arg","status":"pass","elapsed_ms":13.130643,"timing_error":""}
+  ok   init silently rejects non-table arg
+2026-11-05 21:38:19:000 [WARNING] [keymap.registry] M.init() called more than once with the active state — ignoring duplicate call.
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"warns on duplicate init","status":"pass","elapsed_ms":2.667766,"timing_error":""}
+  ok   warns on duplicate init
+
+=== Registry.add ===
+2026-11-05 21:38:19:000 [ERROR] [keymap.registry] add: trigger must be a non-empty string (got '').
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"rejects empty trigger","status":"pass","elapsed_ms":4.197397,"timing_error":""}
+  ok   rejects empty trigger
+2026-11-05 21:38:19:000 [ERROR] [keymap.registry] add: replacement must be a string (got 'nil').
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"rejects non-string replacement","status":"pass","elapsed_ms":1.790996,"timing_error":""}
+  ok   rejects non-string replacement
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"inserts the lowercase trigger plus case variants","status":"pass","elapsed_ms":1.735813,"timing_error":""}
+  ok   inserts the lowercase trigger plus case variants
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"respects is_case_sensitive (no case-variant generation)","status":"pass","elapsed_ms":1.734090,"timing_error":""}
+  ok   respects is_case_sensitive (no case-variant generation)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"auto-detects final_result when replacement contains tokens","status":"pass","elapsed_ms":5.209471,"timing_error":""}
+  ok   auto-detects final_result when replacement contains tokens
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"refreshes every mutable option on same-group re-registration","status":"pass","elapsed_ms":2.323958,"timing_error":""}
+  ok   refreshes every mutable option on same-group re-registration
+
+=== Registry.sort_mappings ===
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"orders longest trigger first","status":"pass","elapsed_ms":1.914812,"timing_error":""}
+  ok   orders longest trigger first
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"rebuilds tail-char buckets in sorted order","status":"pass","elapsed_ms":1.966530,"timing_error":""}
+  ok   rebuilds tail-char buckets in sorted order
+
+=== Registry.defer_sort / flush_sort ===
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"flush_sort applies pending sort","status":"pass","elapsed_ms":1.937396,"timing_error":""}
+  ok   flush_sort applies pending sort
+
+=== Registry group lifecycle ===
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"register_lua_group creates an enabled group","status":"pass","elapsed_ms":1.979820,"timing_error":""}
+  ok   register_lua_group creates an enabled group
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"list_groups returns name → enabled map","status":"pass","elapsed_ms":2.005268,"timing_error":""}
+  ok   list_groups returns name → enabled map
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"is_group_enabled returns false for unknown group","status":"pass","elapsed_ms":1.777686,"timing_error":""}
+  ok   is_group_enabled returns false for unknown group
+
+=== Registry section enable/disable ===
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"a section the manifest does not declare stays enabled (settings entry absent)","status":"pass","elapsed_ms":7.579748,"timing_error":""}
+  ok   a section the manifest does not declare stays enabled (settings entry absent)
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"(hs-opt-in-default) an untouched bundled section takes the manifest's disabled default","status":"pass","elapsed_ms":4.334745,"timing_error":""}
+  ok   (hs-opt-in-default) an untouched bundled section takes the manifest's disabled default
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"(hs-opt-in-default) an explicit true survives the disabled default","status":"pass","elapsed_ms":8.952694,"timing_error":""}
+  ok   (hs-opt-in-default) an explicit true survives the disabled default
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"returns false when settings store has explicit false","status":"pass","elapsed_ms":4.873946,"timing_error":""}
+  ok   returns false when settings store has explicit false
+
+=== Registry terminator re-exports ===
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"exposes the terminators API surface","status":"pass","elapsed_ms":0.002013,"timing_error":""}
+  ok   exposes the terminators API surface
+
+=== Registry.update_trigger_char ===
+2026-11-05 21:38:19:000 [ERROR] [keymap.registry] update_trigger_char: candidate refused (invalid_character).
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"rejects non-string char","status":"pass","elapsed_ms":1.966590,"timing_error":""}
+  ok   rejects non-string char
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"is a no-op when char is unchanged","status":"pass","elapsed_ms":2.388315,"timing_error":""}
+  ok   is a no-op when char is unchanged
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"renames magic-key triggers when the char changes","status":"pass","elapsed_ms":2.035584,"timing_error":""}
+  ok   renames magic-key triggers when the char changes
+
+=== Registry group enable/disable ===
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"disable_group removes mappings from the live list","status":"pass","elapsed_ms":1.835062,"timing_error":""}
+  ok   disable_group removes mappings from the live list
+2026-11-05 21:38:19:000 [WARNING] [keymap.registry] disable_group: unknown group 'nonexistent'.
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"disable_group is a no-op when group is unknown","status":"pass","elapsed_ms":2.270528,"timing_error":""}
+  ok   disable_group is a no-op when group is unknown
+2026-11-05 21:38:19:000 [WARNING] [keymap.registry] enable_group: unknown group 'nonexistent'.
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"enable_group warns on unknown group","status":"pass","elapsed_ms":4.674025,"timing_error":""}
+  ok   enable_group warns on unknown group
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"set_post_load_hook accepts a function","status":"pass","elapsed_ms":4.170909,"timing_error":""}
+  ok   set_post_load_hook accepts a function
+2026-11-05 21:38:19:000 [ERROR] [keymap.registry] set_post_load_hook: f must be a function.
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"set_post_load_hook rejects non-function value","status":"pass","elapsed_ms":11.871087,"timing_error":""}
+  ok   set_post_load_hook rejects non-function value
+
+=== Registry.get_meta_description ===
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"returns nil for unknown group","status":"pass","elapsed_ms":26.900429,"timing_error":""}
+  ok   returns nil for unknown group
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"returns the recorded description after register_lua_group","status":"pass","elapsed_ms":2.078589,"timing_error":""}
+  ok   returns the recorded description after register_lua_group
+
+=== Registry collision priority ===
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"source_priority ranks personal > package > common","status":"pass","elapsed_ms":2.003766,"timing_error":""}
+  ok   source_priority ranks personal > package > common
+# lua_timing {"schema":1,"driver":"macos","id":32,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"source_priority scores personal_ext_* as the package tier (parity with Windows ext.*)","status":"pass","elapsed_ms":2.562877,"timing_error":""}
+  ok   source_priority scores personal_ext_* as the package tier (parity with Windows ext.*)
+# lua_timing {"schema":1,"driver":"macos","id":33,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"source_priority scores the editor's custom group at the personal tier","status":"pass","elapsed_ms":2.073040,"timing_error":""}
+  ok   source_priority scores the editor's custom group at the personal tier
+# lua_timing {"schema":1,"driver":"macos","id":34,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"add stores an explicit opts.priority on the mapping","status":"pass","elapsed_ms":2.025980,"timing_error":""}
+  ok   add stores an explicit opts.priority on the mapping
+# lua_timing {"schema":1,"driver":"macos","id":35,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"defaults a missing priority to the common source value","status":"pass","elapsed_ms":2.778222,"timing_error":""}
+  ok   defaults a missing priority to the common source value
+# lua_timing {"schema":1,"driver":"macos","id":36,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"higher priority wins an equal-length collision","status":"pass","elapsed_ms":2.546192,"timing_error":""}
+  ok   higher priority wins an equal-length collision
+# lua_timing {"schema":1,"driver":"macos","id":37,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"priority order is independent of insertion order","status":"pass","elapsed_ms":2.093561,"timing_error":""}
+  ok   priority order is independent of insertion order
+# lua_timing {"schema":1,"driver":"macos","id":38,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"longest trigger still wins over a shorter higher-priority one","status":"pass","elapsed_ms":2.304879,"timing_error":""}
+  ok   longest trigger still wins over a shorter higher-priority one
+# lua_timing {"schema":1,"driver":"macos","id":39,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"a higher-priority source wins a same-trigger collision instead of being overwritten","status":"pass","elapsed_ms":7.689964,"timing_error":""}
+  ok   a higher-priority source wins a same-trigger collision instead of being overwritten
+# lua_timing {"schema":1,"driver":"macos","id":40,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"resolve_priority follows individual > section > file > source","status":"pass","elapsed_ms":2.554565,"timing_error":""}
+  ok   resolve_priority follows individual > section > file > source
+
+=== personal-file descriptor transport through the real registry ===
+2026-11-05 21:38:19:000 [ERROR] [hotstrings_config] 'get_user_override' called before M.init() — shared state not initialized.
+2026-11-05 21:38:19:000 [ERROR] [logger] ↑ 5 identical lines suppressed
+2026-11-05 21:38:19:000 [ERROR] [keymap.registry] load_toml: personal source descriptor is invalid.
+2026-11-05 21:38:19:000 [ERROR] [hotstrings_config] 'get_user_override' called before M.init() — shared state not initialized.
+# lua_timing {"schema":1,"driver":"macos","id":41,"kind":"case","module":"tests.unit.modules.keymap.registry.test_registry","name":"owns snapshots across load, disable, enable and same-path reload without changing output","status":"pass","elapsed_ms":26.993899,"timing_error":""}
+  ok   owns snapshots across load, disable, enable and same-path reload without changing output
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.registry.test_registry","name":"tests.unit.modules.keymap.registry.test_registry","status":"pass","elapsed_ms":238.202905,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  40
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

@@ -4078,5 +4078,16 @@
 	"inventory.behavior.backspace_other": "Keine automatische Wiederherstellung des Auslösers mit der Rücktaste; die Rückgängig-Funktion der Anwendung ist davon unabhängig.",
 	"inventory.behavior.repeat_activation_window": "Aktivierungszeitfenster für die Wiederholung per magischer Taste",
 	"inventory.behavior.repeat_window_untimed": "Kein eigenes Aktivierungszeitfenster für die Ersatzwiederholung; der Wortneustart nach einer Pause ist unabhängig.",
-	"inventory.behavior.repeat_window_macos": "Verwendet das wirksame Aktivierungszeitfenster der magischen Taste einschließlich der Zeitregeln für Zusatztasten; null deaktiviert dieses Fenster. Der Wortneustart nach einer Pause ist unabhängig."
+	"inventory.behavior.repeat_window_macos": "Verwendet das wirksame Aktivierungszeitfenster der magischen Taste einschließlich der Zeitregeln für Zusatztasten; null deaktiviert dieses Fenster. Der Wortneustart nach einer Pause ist unabhängig.",
+	"inventory.behavior.dead_composition": "Komposition mit Tottasten",
+	"inventory.behavior.dead_fallback": "Nicht zugeordnete Folge nach einer Tottaste",
+	"inventory.behavior.dead_lifetime": "Wartezeit einer Tottaste",
+	"inventory.behavior.dead_windows_composition": "Integrierte Tottastentabellen und Emulation der Layouts aus dem Register.",
+	"inventory.behavior.dead_macos_composition": "Das native Tastaturlayout übernimmt die Komposition; die Gruppierung physischer Zeichen wurde nicht geprüft.",
+	"inventory.behavior.dead_linux_composition": "Natives XKB/Compose mit unabhängiger Texterfassung; abgefangene Folgezeichen können abweichen.",
+	"inventory.behavior.dead_windows_fallback": "Eine nicht zugeordnete Folge gibt das Abschlusszeichen des Akzents und danach das aktuelle Zeichen aus.",
+	"inventory.behavior.dead_macos_fallback": "Der Rückfall liegt beim nativen Layout; physische Ereignisse und Anwendungsausgabe wurden nicht geprüft.",
+	"inventory.behavior.dead_linux_fallback": "Ein Erfassungsabbruch behält das aktuelle Zeichen und verwirft den vorherigen Akzent; die native Ausgabe kann abweichen.",
+	"inventory.behavior.dead_windows_lifetime": "Integrierte Tabellen warten bis zu 2 Sekunden; der Register-Tottastenzustand hat kein Zeitlimit.",
+	"inventory.behavior.dead_native_lifetime": "Das native System verwaltet ausstehende Komposition; Erfassungs- und Rücksetzregeln sind von einem gemeinsamen Treiberzeitlimit getrennt."
 }

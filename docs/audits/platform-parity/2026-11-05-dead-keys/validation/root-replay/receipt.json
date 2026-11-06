@@ -1,0 +1,233 @@
+{
+	"head": "c3f261cdaa8fbc3f3c880f87e335aa5db5aed62d",
+	"qualification": "Windows source/data only; macOS original Lua in-memory fixture; Linux original owners and native XKB component over controlled transport. No device or application receiving.",
+	"runs": [
+		{
+			"name": "windows-source",
+			"argv": [
+				"python3",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/workers/windows/source-contract.py",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"outputs": {
+				"stdout": {
+					"path": "windows-source.stdout.txt",
+					"sha256": "8f32ae5e1dc450162bd8bb414ddbf2d3edb603e865e6819535450e1070adc410"
+				},
+				"stderr": {
+					"path": "windows-source.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		},
+		{
+			"name": "windows-data-lua",
+			"argv": [
+				"lua",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/workers/windows/data-probe.lua",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"outputs": {
+				"stdout": {
+					"path": "windows-data-lua.stdout.txt",
+					"sha256": "7d8fe41313acb6109f86f9eb53b05040e972bec245307aaff3c4f62271cb0a5c"
+				},
+				"stderr": {
+					"path": "windows-data-lua.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		},
+		{
+			"name": "windows-data-luajit",
+			"argv": [
+				"luajit",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/workers/windows/data-probe.lua",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"outputs": {
+				"stdout": {
+					"path": "windows-data-luajit.stdout.txt",
+					"sha256": "7d8fe41313acb6109f86f9eb53b05040e972bec245307aaff3c4f62271cb0a5c"
+				},
+				"stderr": {
+					"path": "windows-data-luajit.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		},
+		{
+			"name": "macos-seeded",
+			"argv": [
+				"lua",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/workers/macos/public-probe.lua",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"outputs": {
+				"stdout": {
+					"path": "macos-seeded.stdout.txt",
+					"sha256": "bb1ac410783b3b3b0f84f60a4970e281496098c0d9e50c153cd02060e1e4e70f"
+				},
+				"stderr": {
+					"path": "macos-seeded.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		},
+		{
+			"name": "macos-unseeded",
+			"argv": [
+				"lua",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/workers/macos/no-marker-control.lua",
+				"/workspace/ergopti",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/workers/macos/public-probe.lua"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"outputs": {
+				"stdout": {
+					"path": "macos-unseeded.stdout.txt",
+					"sha256": "1dc547728b5ddd0bad493383f03a6fd78ae0568d211f240a59be9c4857a544e3"
+				},
+				"stderr": {
+					"path": "macos-unseeded.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		},
+		{
+			"name": "macos-ordinary",
+			"argv": [
+				"lua",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/workers/macos/ordinary-baseline-control.lua",
+				"/workspace/ergopti",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/workers/macos/public-probe.lua"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"outputs": {
+				"stdout": {
+					"path": "macos-ordinary.stdout.txt",
+					"sha256": "a5d1ee59a3c3f375d7f45463f19fa1f4c045254804e88c5e2bb3ab28355df685"
+				},
+				"stderr": {
+					"path": "macos-ordinary.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		},
+		{
+			"name": "macos-check",
+			"argv": [
+				"python3",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/workers/macos/check-record.py",
+				"/workspace/ergopti",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/macos-seeded.stdout.txt",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/macos-unseeded.stdout.txt",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/macos-ordinary.stdout.txt"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"outputs": {
+				"stdout": {
+					"path": "macos-check.stdout.txt",
+					"sha256": "106821bf721dedd63dbe0d6e231d20e679926f7dd9d90219804f683388b703db"
+				},
+				"stderr": {
+					"path": "macos-check.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		},
+		{
+			"name": "linux-public",
+			"argv": [
+				"luajit",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/workers/linux/public-compose.lua",
+				"/workspace/ergopti",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/workers/linux/generated"
+			],
+			"cwd": "/workspace/ergopti/static/ergopti_plus/linux",
+			"exit": 0,
+			"outputs": {
+				"stdout": {
+					"path": "linux-public.stdout.txt",
+					"sha256": "c5d8b2eff492af0697251ef37ed9479d4f234761b269f4c74863ce4aacd47b8e"
+				},
+				"stderr": {
+					"path": "linux-public.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		},
+		{
+			"name": "linux-native",
+			"argv": [
+				"luajit",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/workers/linux/native-controls.lua",
+				"/workspace/ergopti",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/workers/linux/generated"
+			],
+			"cwd": "/workspace/ergopti/static/ergopti_plus/linux",
+			"exit": 0,
+			"outputs": {
+				"stdout": {
+					"path": "linux-native.stdout.txt",
+					"sha256": "66aeeae2ae30453fb1cccd0bef8a4a4189dd25395149048f35536517c7c76fa6"
+				},
+				"stderr": {
+					"path": "linux-native.stderr.txt",
+					"sha256": "1971c4938c770ad6ac213d3d5fe774869cc1851a000ebfd413b5ccf09eaa4006"
+				}
+			}
+		},
+		{
+			"name": "linux-tests-lua",
+			"argv": [
+				"lua",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/workers/linux/selected-tests.lua",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti/static/ergopti_plus/linux",
+			"exit": 0,
+			"outputs": {
+				"stdout": {
+					"path": "linux-tests-lua.stdout.txt",
+					"sha256": "95d95dbc5c58f2537044258e58192a925ca3d56b73ee07df433135fbd3cc023d"
+				},
+				"stderr": {
+					"path": "linux-tests-lua.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		},
+		{
+			"name": "linux-tests-luajit",
+			"argv": [
+				"luajit",
+				"/workspace/scratch/parity-dead-keys-2026-11-05/final-replays/workers/linux/selected-tests.lua",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti/static/ergopti_plus/linux",
+			"exit": 0,
+			"outputs": {
+				"stdout": {
+					"path": "linux-tests-luajit.stdout.txt",
+					"sha256": "08daf8f0e81a62f4edd92e0eb0d511640474a80a411428ce5695268de104377f"
+				},
+				"stderr": {
+					"path": "linux-tests-luajit.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		}
+	]
+}

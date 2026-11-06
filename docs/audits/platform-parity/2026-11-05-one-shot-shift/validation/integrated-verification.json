@@ -1,0 +1,28 @@
+{
+	"tested_commit": "acb52cfb2b433eb47972b6967c8adbb029a675fa",
+	"integrated_base": "087d3c7134c54e29c0d4a0d42f638b1418f30d52",
+	"command": ["node", "tools/test/verify-change.cjs", "--range=origin/dev..HEAD"],
+	"exit_code": 0,
+	"gates": ["format", "js"],
+	"js_passed": 572,
+	"js_failed": 0,
+	"completion": {
+		"type": "complete",
+		"executed_count": 572,
+		"passed": 572,
+		"failed": 0,
+		"child_duration_ms": 1617603.355,
+		"duration_ms": 1617882.994
+	},
+	"qualification": "Full selected gate rerun after upstream integration and its corrected field fixture. HEAD and production source remained unchanged throughout. Later changes add audit evidence/documents only; their own source/projection/custody/format checks remain separate. Snapshot replay success reproduces dated counterexamples; it does not mean defects were repaired or native receiving is certified. The suite explicitly reports a host-unexecutable AHK case; properties/mutations were not selected for this documentation range.",
+	"artifacts": [
+		{
+			"path": "integrated-verification.log.txt",
+			"sha256": "8de9ca3d60fc7652ef24b53f86b933cb2252ad3d63d9a47e73f07b27de3c34ee"
+		},
+		{
+			"path": "integrated-js-timings.ndjson.txt",
+			"sha256": "ab55ead67f3241c0ee448bb38415ab91898a102e9dd6624f9aaa62de49249562"
+		}
+	]
+}

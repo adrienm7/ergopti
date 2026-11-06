@@ -1,0 +1,11 @@
+docs/audits/platform-parity/2026-11-05-sequential/wpm/windows/report.md:17:Regression direction: a genuine isolated AHK startup fixture must receive the actual configured tray disable before the armed one-shot fires, then observe native HWND/timer/state and persisted config after the deadline. Include no-action healthy, refused-write, disable-after-show and repeated activation controls. Revoke/fence the boot obligation; do not make ordinary Toggle->Show refuse its own newly committed true.
+docs/audits/windows-2026-10-28/report.json:6311:						"one_shot_shift: ToggleCapsLock delegates LED to UpdateCapsLockLED (capslock-led-multiple-owners)",
+docs/audits/windows-2026-10-28/report.json:6910:						"one_shot_shift: ToggleCapsLock flips the recorded intent, not the live toggle",
+docs/audits/platform-parity/2026-11-05-caps-word/windows/source-contract.py:311:        'TimerArmOneShotMs(_CapsWordAutoOffCallbacks()["idle"], CapsWordAutoOff.Armed["idle_ms"])'
+docs/audits/platform-parity/2026-11-05-caps-word/windows/source-contract.py:353:        in function("platform/remap/one_shot_shift.ahk", "ToggleCapsLock")
+docs/audits/platform-parity/2026-11-05-caps-word/windows/source-contract.py:355:        not in executable(function("platform/remap/one_shot_shift.ahk", "ToggleCapsLock")),
+docs/audits/platform-parity/2026-11-05-caps-word/macos/tests/unit_platform_remap_watchers_test_capsword_control_signal.txt:4:  ok   keeps CapsWord tags separate from navigation, one-shot Shift and unrelated chords
+docs/audits/platform-parity/2026-11-05-caps-word/validation/root-replay/macos-registered-03.stdout.txt:4:  ok   keeps CapsWord tags separate from navigation, one-shot Shift and unrelated chords
+docs/audits/platform-parity/2026-11-05-caps-word/validation/delivery/scoped-replay/macos-registered-03.stdout.txt:4:  ok   keeps CapsWord tags separate from navigation, one-shot Shift and unrelated chords
+docs/audits/platform-parity/2026-11-05-caps-word/validation/root-first-complete-replay/macos-registered-03.stdout.txt:4:  ok   keeps CapsWord tags separate from navigation, one-shot Shift and unrelated chords
+docs/audits/platform-parity/2026-11-05-caps-word/validation/root-initial-replay/macos-registered-03.stdout.txt:4:  ok   keeps CapsWord tags separate from navigation, one-shot Shift and unrelated chords

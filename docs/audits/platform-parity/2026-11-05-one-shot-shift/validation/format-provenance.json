@@ -1,0 +1,37 @@
+{
+	"qualification": "Worker hashes retain their exact original bytes; canonical evidence refers to current formatted archive. No worker hash value was changed.",
+	"rows": [
+		{
+			"formatted_archive": "macos/handoff.sha256.json",
+			"original_bytes": "validation/original-submissions/macos/handoff.sha256.json.txt",
+			"original_sha256": "4622e4d33a842edfbc61de74316605ac19481ee1105b65372159ef2e21b2b95f",
+			"formatted_sha256": "f419218b1e76ddbe4f2e06a80edd0446b6fc46dc939915d576ef74a8fe3fe170",
+			"qualification": "JSON values unchanged",
+			"equivalent": true
+		},
+		{
+			"formatted_archive": "macos/replay.py",
+			"original_bytes": "validation/original-submissions/macos/replay.py.txt",
+			"original_sha256": "61107bdc39de938753cdab7f6f319a0ecbe5c3f017c071118099b21aedd01690",
+			"formatted_sha256": "d968673e5c3d3e37bec61e33dfba16c52e245691434b5861bf5b0f25a4a33640",
+			"qualification": "Python AST unchanged",
+			"equivalent": true
+		},
+		{
+			"formatted_archive": "windows/source-contract.py",
+			"original_bytes": "validation/original-submissions/windows/source-contract.py.txt",
+			"original_sha256": "4957e2156c46df9538a73fa809c9d59868fe3ca043348ca910bda0ced3ee3709",
+			"formatted_sha256": "ef7ddc0dae3a3e1b58f2fa0c88a736c95bab4c49520449efad5bd9b0f52ea1e1",
+			"qualification": "Python AST unchanged",
+			"equivalent": true
+		},
+		{
+			"formatted_archive": "linux/source-contract.py",
+			"original_bytes": "validation/original-submissions/linux/source-contract.py.txt",
+			"original_sha256": "01024b2ef4db1e8539cb10c52877913d382b8b8db16fe582850bcf482c66d3ab",
+			"formatted_sha256": "535761074a0f06f99ccb961ba4e11b01a05a08a8a28aa6c8b10f880bcee6c003",
+			"qualification": "Python AST unchanged",
+			"equivalent": true
+		}
+	]
+}
