@@ -15,6 +15,14 @@
 ---    from the config_backup block of _shared/modules/updater/defaults.json.
 --- 2. A link to a folder is neither followed nor copied (it could loop); a link
 ---    to a file is copied through its target.
+--- 3. The remote API entries are configuration Windows backs up (its
+---    api_entries.json sits in the configuration folder) and Linux too (its
+---    api_keys.json), but this driver keeps them in hs.settings: they are backed
+---    up as api_entries.json through a native port and written back on restore.
+---    Each key is a Keychain reference there, never the key itself. The rest of
+---    hs.settings is runtime state (boot and reload markers, ports, lease tokens,
+---    the WPM pill's position) or a mirror config.toml restores (the LLM
+---    generation values menu_state resyncs), so it is not copied.
 --- ==============================================================================
 
 local M = {}
@@ -26,6 +34,8 @@ local FsDir       = require("infra.fs_dir")
 local FileSystem  = require("adapters.file_system")
 local JsonCodec   = require("adapters.json_codec")
 local Binding     = require("updater.config_backup_binding")
+local Storage     = require("adapters.storage")
+local Json        = require("json")
 
 local LOG = "updater.config_backup"
 
@@ -160,8 +170,37 @@ local function read_defaults()
 	return decoded
 end
 
---- The roots of this driver: the configuration folder only. The settings of
---- this driver live in hs.settings, not in a file a backup could copy.
+-- The hs.settings key of the remote API entries (modules/llm/init.lua
+-- API_STATE_KEY; test_config_backup_api_entries pins the two together).
+M.API_STATE_KEY = "llm_api_state_v1"
+
+-- The name the API entries carry in a backup, Windows' file name.
+local API_ENTRIES_NAME = "api_entries.json"
+
+--- The native port of the remote API entries: their hs.settings value as
+--- canonical JSON (the shared encoder sorts keys, so a read-back compares).
+--- @return table port { read, replace }
+function M._api_entries_port()
+	local port = {}
+	function port.read()
+		local ok, value = Storage.read_exact(M.API_STATE_KEY)
+		if ok ~= true then return nil, "the API entries could not be read from hs.settings" end
+		if value == nil then return nil, "absent" end
+		local encoded = Json.encode(value)
+		if type(encoded) ~= "string" then return nil, "the API entries cannot be written as JSON" end
+		return encoded
+	end
+	function port.replace(content)
+		local decoded_ok, value = pcall(Json.decode, content)
+		if not decoded_ok or type(value) ~= "table" then return nil, "the backed-up API entries are not JSON" end
+		if Storage.set(M.API_STATE_KEY, value) ~= true then return nil, "hs.settings refused the API entries" end
+		return true
+	end
+	return port
+end
+
+--- The roots of this driver: the configuration folder, and the remote API
+--- entries this driver keeps in hs.settings (feature 3).
 --- @return table|nil roots
 --- @return string|nil reason
 --- @return string|nil log_text
@@ -171,7 +210,10 @@ local function default_roots()
 		return nil, "configuration folder unknown",
 			"Configuration backup refused: the configuration folder is unknown."
 	end
-	return { { id = "config", dir = config_dir } }
+	return {
+		{ id = "config", dir = config_dir },
+		{ id = "api_entries", name = API_ENTRIES_NAME, port = M._api_entries_port() },
+	}
 end
 
 local _binding = Binding.new({
@@ -192,5 +234,6 @@ local _binding = Binding.new({
 function M.owner() return _binding.owner() end
 
 M._list = list
+M._default_roots = default_roots
 
 return M

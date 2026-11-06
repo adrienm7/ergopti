@@ -492,6 +492,70 @@ function M.register(helpers, env)
 				"the replaced configuration is kept")
 		end)
 
+		--- A native store holding one value, as the macOS API entries are.
+		local function native_port(value)
+			local port = { value = value, writes = 0 }
+			function port.read()
+				if port.value == nil then return nil, "absent" end
+				return port.value
+			end
+			function port.replace(content)
+				port.writes = port.writes + 1
+				if port.refuse then return nil, "store refused" end
+				port.value = port.drop and "other" or content
+				return true
+			end
+			return port
+		end
+
+		helpers.it("(config-backup-native-port) backs up and restores a value a driver keeps in a native store", function()
+			local port = native_port('{"entries":[1]}')
+			local owner, fs = fixture({ times = { "20260930-101500", "20260930-111500" }, roots = {
+				{ id = "config", dir = "/cfg/" },
+				{ id = "api_entries", name = "api_entries.json", port = port },
+			} })
+			local record = assert(owner.create("pre_install"))
+			helpers.assert_eq(fs.files[record.path .. "/api_entries/api_entries.json"], '{"entries":[1]}')
+			port.value = '{"entries":[]}'
+			local restored, reason, pre = owner.restore(record.id)
+			helpers.assert_eq(restored, true, tostring(reason))
+			helpers.assert_eq(port.value, '{"entries":[1]}', "the native store holds the backed-up value again")
+			helpers.assert_eq(fs.files[pre.path .. "/api_entries/api_entries.json"], '{"entries":[]}',
+				"the replaced value is kept in the pre-restore backup")
+		end)
+
+		helpers.it("(config-backup-native-port) an absent native value is no file, an unreadable one refuses", function()
+			local owner = fixture({ roots = {
+				{ id = "config", dir = "/cfg/" },
+				{ id = "api_entries", name = "api_entries.json", port = native_port(nil) },
+			} })
+			local record = assert(owner.create("pre_install"))
+			helpers.assert_true(not paths_of(record):find("api_entries/", 1, true))
+			local broken = native_port(nil)
+			broken.read = function() return nil, "store unreadable" end
+			local refused = fixture({ roots = {
+				{ id = "config", dir = "/cfg/" },
+				{ id = "api_entries", name = "api_entries.json", port = broken },
+			} })
+			helpers.assert_nil(refused.create("pre_install"), "an unreadable native store refuses the backup")
+		end)
+
+		helpers.it("(config-backup-native-port) a native store that refuses or loses the value fails the restore", function()
+			for _, fault in ipairs({ "refuse", "drop" }) do
+				local port = native_port('{"entries":[1]}')
+				local owner = fixture({ times = { "20260930-101500", "20260930-111500" }, roots = {
+					{ id = "config", dir = "/cfg/" },
+					{ id = "api_entries", name = "api_entries.json", port = port },
+				} })
+				local record = assert(owner.create("pre_install"))
+				port.value = '{"entries":[]}'
+				port[fault] = true
+				local restored, reason = owner.restore(record.id)
+				helpers.assert_eq(restored, false, fault)
+				helpers.assert_eq(reason, "write", fault)
+			end
+		end)
+
 		helpers.it("refuses to report a substituted staging file as restored", function()
 			local owner, fs = fixture({ times = { "20260930-101500", "20260930-111500" } })
 			local record = assert(owner.create("pre_install", {}))
