@@ -452,6 +452,10 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- (field 'ms')" the moment modules.keystats is not already cached.
 	loaded["infra.timings"] = nil
 
+	-- Clipboard borrowing admission is process-global: each test starts with no
+	-- borrower registered by a previous test's module instances.
+	loaded["infra.clipboard_borrowers"] = nil
+
 	-- Drop the keyboard-layout install / input-source modules (split out of
 	-- ui/menu/menu_keyboard_layout.lua in audit F4). They hold session caches and
 	-- capture `local hs` at require-time, so a test that stubs hs.task to drive the

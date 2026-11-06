@@ -26,6 +26,7 @@ local shared_utils = require("keymap.utils")
 local Logger      = require("infra.logger")
 local Timings     = require("infra.timings")
 local Clipboard = require("adapters.clipboard")
+local ClipboardBorrowers = require("infra.clipboard_borrowers")
 local TimerScheduler = require("adapters.timer_scheduler")
 local SyntheticInput = require("adapters.synthetic_input")
 local SecureFieldDetector = require("adapters.secure_field_detector")
@@ -143,6 +144,7 @@ local _paste_saved_original = nil
 local _paste_pending_timer = nil
 local _paste_timer_cleanup = nil
 local _paste_owns_clipboard = false
+ClipboardBorrowers.register("keymap_output", function() return _paste_owns_clipboard == true end)
 local _paste_builtin_count = nil
 local _publication_clipboards = setmetatable({}, { __mode = "k" })
 local _paste_publication_lease = nil
