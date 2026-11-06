@@ -331,7 +331,10 @@ local function _build_layouts(ctx)
 				letters[#letters + 1] = { label = letter:upper(), checked = entry.enabled and entry.letter == letter,
 					action = function() choose(id, letter) end }
 			end
-			items[#items + 1] = { label = i18n_safe("menu.shortcuts." .. id), checked = entry.enabled, items = letters }
+			-- The Windows title: « Tous les raccourcis sur la touche É correspondent
+			-- à ceux de » and the current letter (GetMenuTitleByPath).
+			local title = i18n_safe("shortcuts." .. id:gsub("_", "")) .. entry.letter:upper()
+			items[#items + 1] = { label = title, checked = entry.enabled, items = letters }
 		end
 		return { items = items }
 	end
