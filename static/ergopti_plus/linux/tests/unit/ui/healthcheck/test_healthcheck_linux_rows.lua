@@ -213,3 +213,33 @@ helpers.describe("healthcheck (linux): the features the page lists", function()
 		helpers.assert_nil(features.gestures)
 	end)
 end)
+
+helpers.describe("healthcheck (linux): the features this driver lacks", function()
+	-- macOS alone published the manifest-derived `unavailable` section, so a
+	-- Linux user could not ask the page why a documented feature is missing.
+	helpers.it("lists every Linux absence of the generated manifest with its reason", function()
+		local unavailable = helpers.load_module("ui.healthcheck.bridge").build_snapshot({
+			engine = {}, keystats = {}, config = {}, llm = {},
+		}, false).sections.unavailable
+		local explained, silent = require("infra.manifest_reader").coverage_gaps()
+		helpers.assert_true(type(unavailable) == "table" and type(unavailable.items) == "table",
+			"the snapshot carries the section")
+		helpers.assert_eq(#unavailable.items, #explained + #silent, "every absence, explained or not")
+		helpers.assert_true(#explained > 0, "the Linux manifest explains some absences")
+		local by_feature = {}
+		for _, item in ipairs(unavailable.items) do by_feature[item.feature] = item end
+		for _, gap in ipairs(explained) do
+			local item = by_feature[gap.path]
+			helpers.assert_true(item ~= nil, "listed: " .. tostring(gap.path))
+			helpers.assert_eq(item.reason, gap.reason_key)
+			helpers.assert_true(not item.platforms:find("Linux", 1, true), "Linux never offers what it lacks")
+		end
+		local schema = require("ui.healthcheck.bridge").config().schema
+		for _, section in ipairs(schema.sections) do
+			if section.id == "unavailable" then
+				helpers.assert_true(table.concat(section.platforms, ","):find("linux", 1, true) ~= nil,
+					"the page renders the section on Linux")
+			end
+		end
+	end)
+end)

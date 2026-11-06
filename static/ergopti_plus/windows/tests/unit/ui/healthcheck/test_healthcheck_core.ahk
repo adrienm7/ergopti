@@ -92,6 +92,39 @@ _TestHC_RunIsVersion2() {
 
 Test("HealthCheck: Run returns a version 2 quick snapshot with probes explicitly not run", _TestHC_RunIsVersion2)
 
+; macOS alone published the manifest-derived absences, so a Windows user could
+; not ask the diagnostics page why a documented feature is missing.
+_TestHC_UnavailableListsEveryAbsence() {
+	global FEATURES_MANIFEST
+	Result := HealthCheck_Run()
+	Items := Result["sections"]["unavailable"]["items"]
+	AssertEqual(FEATURES_MANIFEST["unavailable"].Length, Items.Length, "every absence, explained or not")
+	Assert(Items.Length > 0, "the Windows manifest lacks some features")
+	for Index, Item in Items {
+		Assert(!InStr(Item["platforms"], "Windows"), "Windows never offers what it lacks: " . Item["feature"])
+		if (Index > 1)
+			Assert(StrCompare(Items[Index - 1]["feature"], Item["feature"], true) <= 0, "ordered by feature")
+	}
+	Fixture := [
+		Map("path", "z.silent", "section", "z", "platforms", ["hs"]),
+		Map("path", "a.explained", "section", "a", "reason_key", "platform_reason.x", "platforms", ["hs", "linux"])]
+	Built := _HealthCheck_Unavailable(Fixture)["items"]
+	AssertEqual(2, Built.Length)
+	AssertEqual("a.explained", Built[1]["feature"])
+	AssertEqual("macOS, Linux", Built[1]["platforms"])
+	AssertEqual("platform_reason.x", Built[1]["reason"])
+	AssertEqual("z.silent", Built[2]["feature"])
+	AssertFalse(Built[2].Has("reason"), "an unexplained absence is still listed, without a reason")
+	Threw := false
+	try _HealthCheck_Unavailable([Map("path", "q", "platforms", ["amiga"])])
+	catch ValueError
+		Threw := true
+	AssertTrue(Threw, "an unknown platform code is refused")
+}
+
+Test("HealthCheck: the snapshot lists every feature Windows lacks (diagnostics-unavailable)",
+	_TestHC_UnavailableListsEveryAbsence)
+
 /** Proves the actual starter admits only the independent extensive selection. */
 _TestHC_ExtensiveAdmission(Selected, ExpectedStarts) {
 	global _HC_Session, _HC_ProbeRun, _HC_WindowEpoch, _HC_ResetDone

@@ -465,6 +465,7 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 	System      := _HealthCheck_Collect("system", () => _HealthCheck_System(Detailed, UptimeSec), Map(), Timings)
 	Input       := _HealthCheck_Collect("input", _HealthCheck_Input, Map(), Timings)
 	FeatureMap  := _HealthCheck_Collect("features", _HealthCheck_Features, Map("items", []), Timings)
+	Unavailable := _HealthCheck_Collect("platform_coverage", _HealthCheck_Unavailable, Map("items", []), Timings)
 	Ai          := _HealthCheck_Collect("ai", _HealthCheck_Ai, Map(), Timings)
 	Peripherals := _HealthCheck_Collect("peripherals", () => _HealthCheck_Peripherals(Detailed), Map("items", []), Timings)
 	Issues      := _HealthCheck_Collect("issues", _HealthCheck_Issues, Map(), Timings)
@@ -482,6 +483,7 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 		; over the phase A budget
 		"configuration_files", Map("items", []),
 		"configuration", Map("items", []),
+		"unavailable", Unavailable,
 		"ai",          Ai,
 		"network",     Map(),
 		"peripherals", Peripherals,

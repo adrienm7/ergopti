@@ -593,6 +593,9 @@ function M.build_snapshot(state, detailed, extensive, complete_local)
 		-- over the phase A budget
 		configuration_files = { items = {} },
 		configuration = { items = {} },
+		unavailable = collect_timed("platform_coverage", function()
+			return require("healthcheck.unavailable").collect(require("infra.manifest_reader"))
+		end),
 		ai          = collect_timed("ai", function() return collect_ai(state) end),
 		network     = {},
 		permissions = collect_timed("permissions", function() return collect_permissions(permission_ids) end),
