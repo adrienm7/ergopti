@@ -714,14 +714,19 @@ local function scratch_typing(keys, callback, options)
 	-- The scratch window's id, proven through Accessibility at the first key
 	local proven_window_id = nil
 	--- True while the scratch field's window is the focused one of this process.
+	--- The window's own focus report comes first: the Accessibility read is
+	--- asked only once macOS told the window it has the focus, so a main-thread
+	--- hold before that report cannot make the one read miss (field report
+	--- 2026-11-05: a 523 ms hold). Each refusal has its own token.
 	--- @return boolean focused, string|integer reason_or_window_id
 	local function scratch_has_focus()
 		local front = hs.application.frontmostApplication()
 		if not front or front:pid() ~= hs.processInfo.processID then return false, "not_frontmost" end
 		if native_focus == false then return false, "window_unfocused" end
+		if native_focus == nil then return false, "focus_unreported" end
 		if proven_window_id ~= nil then return true, proven_window_id end
 		local focused, own = hs.window.focusedWindow(), OwnWindow.for_webview(view)
-		if not focused or not own or focused:id() ~= own:id() then return false, "window_unfocused" end
+		if not focused or not own or focused:id() ~= own:id() then return false, "ax_window_mismatch" end
 		proven_window_id = own:id()
 		return true, proven_window_id
 	end
