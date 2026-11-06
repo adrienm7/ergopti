@@ -54,7 +54,9 @@ end
 local function load_reader(sqlite)
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["hs.sqlite3"] = nil
-	return helpers.load_with_stubs("modules.keystats.sqlite_reader", { sqlite3 = sqlite })
+	local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", { sqlite3 = sqlite })
+	reader.history_fingerprint_exact = true -- The fixture owns every row and mutation, so its fingerprint is exact.
+	return reader
 end
 
 --- A pacer that yields nothing but counts pause checks.

@@ -132,6 +132,7 @@ function M.with_publication(options, callback)
 				package.loaded["hs.sqlite3"] = state.sqlite
 				package.loaded["modules.keystats.sqlite_reader"] = nil
 				local reader = require("modules.keystats.sqlite_reader")
+				reader.history_fingerprint_exact = true -- The fixture owns every row and mutation, so its fingerprint is exact.
 				observe_manifest(state, reader)
 				package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return "/fixture/db.sqlite" end
 				dashboard._app_icon_cache.Editor = false

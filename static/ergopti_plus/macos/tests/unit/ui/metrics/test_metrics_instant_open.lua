@@ -37,6 +37,7 @@ local function with_store(callback)
 		package.loaded["hs.fs"].attributes = function() return { mode = "file" } end
 		local dashboard_json = package.loaded["hs.json"]
 		local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", { sqlite3 = sqlite })
+		reader.history_fingerprint_exact = true -- The fixture owns every row and mutation, so its fingerprint is exact.
 		package.loaded["modules.keystats.sqlite_reader"] = reader
 		package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return "/fake/db.sqlite" end
 		package.loaded["modules.keystats.log_manager"].get_db_rev = function() return 1 end
