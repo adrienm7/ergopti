@@ -1932,6 +1932,27 @@ LLM_Bridge_OnBackspace() {
 }
 
 /**
+ * Retires every complete AI context after an edit this driver cannot follow: a
+ * word deleted by Ctrl+Backspace, a selection replaced after Select All, an
+ * undo, a paste, a synthetic Enter/Tab. The prediction buffer, the agent-only
+ * buffer and any request or offer built on them go, so the next observer starts
+ * from what the field now holds rather than forwarding obsolete text. Arrow
+ * navigation is NOT this: it keeps following hotstrings/llm reset_on_nav.
+ * Safe when the bridge is inactive (only the agent feed, if any, is cleared).
+ * @param {String} Reason The event, for the debug log.
+ */
+LLM_Bridge_OnUnknownEdit(Reason) {
+	global _LLM_Bridge_Active
+	if (IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active) {
+		_LLM_Bridge_ClearBuffer()
+		LLM_Bridge_ResetPredictions()
+	}
+	LLM_Bridge_MirrorAgentEdit(0, "", true)
+	if LoggerIsDebugEnabled()
+		LoggerDebug("LLM", "{1}: AI typing context dropped (unknown edit).", Reason)
+}
+
+/**
  * Must be called on Enter, Escape, or Tab.
  * Flushes the buffer so the next prediction starts from a fresh context.
  */

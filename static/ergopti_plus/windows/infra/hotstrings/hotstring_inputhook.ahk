@@ -1806,6 +1806,9 @@ _OnPrefixKeyDown(IH, VK, SC) {
 				; char, leaving the buffer ahead of the screen and later firing an
 				; expansion with backspaces into unrelated text.
 				_PrefixInvalidateInputContext(_PrefixFocusedControlToken, _PrefixWordDeleteChordHeld())
+				; The AI context describes text that is no longer there.
+				if IsSet(LLM_Bridge_OnUnknownEdit)
+					LLM_Bridge_OnUnknownEdit("Modified Backspace")
 				return
 			}
 			; Insert and Delete keep their own reset below, modifiers or not.
@@ -1818,7 +1821,9 @@ _OnPrefixKeyDown(IH, VK, SC) {
 				; then empties the field and the next one deletes nothing.
 				SelectsAll := (VK == 0x41 and _PrefixWordDeleteChordHeld()
 					and !_PrefixTerminalHostFocused())
-				HS_ApplyEventWordReset(HS_ShortcutWordResetKey(), "Shortcut", SelectsAll)
+				if HS_ApplyEventWordReset(HS_ShortcutWordResetKey(), "Shortcut", SelectsAll)
+						and IsSet(LLM_Bridge_OnUnknownEdit)
+					LLM_Bridge_OnUnknownEdit("Shortcut")
 				return
 			}
 		}
