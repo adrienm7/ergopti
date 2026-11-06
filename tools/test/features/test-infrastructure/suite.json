@@ -542,7 +542,7 @@
 		},
 		{
 			"id": "js-git-paths",
-			"ordinal": 575,
+			"ordinal": 591,
 			"name": "Git path inventories retain every record beyond the default capture ceiling",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-git-paths.cjs"],

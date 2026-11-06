@@ -535,7 +535,7 @@
 		},
 		{
 			"id": "js-prompt-editor-literal-token",
-			"ordinal": 574,
+			"ordinal": 590,
 			"name": "prompt editor preserves literal brace text through its save bridge",
 			"cmd": "node",
 			"args": ["tools/test/test-prompt-editor-literal-token.cjs"],
