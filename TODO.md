@@ -138,7 +138,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 ### personal-info
 
-- [ ] **[CODE] PIW-001:** Eager registered compounds escape field-navigation separators and admit partial identities. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/personal-info/windows/report.md).
+- [x] **[CODE] PIW-001:** Eager registered compounds escape field-navigation separators and admit partial identities. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/personal-info/windows/report.md). Done: registered @-combos escape each value separately, keep the {Tab} separators live and decline the whole combo for an unknown letter or an empty field, as the fire-time resolver does.
 - [ ] **[CODE] PIW-002:** Valid TOML known personal fields silently load as placeholders. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/personal-info/windows/report.md).
 - [x] **[CODE] PIM-001:** Added valid ASCII aliases are ignored and removed by unrelated personal-info saves. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/personal-info/macos/report.md). Done: [letters] now loads and saves any lowercase ASCII alias to a known field; an alias outside that alphabet is refused at load instead of being dropped and erased on the next save.
 - [x] **[CODE] PIM-002:** Personal prefix expansion interprets accepted field data as key commands. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/personal-info/macos/report.md). Done: personal prefix mappings register with literal_output, so field data such as {Tab} is typed as text and never sent as a key.

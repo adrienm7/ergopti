@@ -30,3 +30,26 @@ _PICG_SeedLoopIteratesMapKeys() {
 		"keys.Push(k) must push the key bound by the first (key) loop variable")
 }
 Test("personal-info combos: alphabet seeded from Map keys, not values", _PICG_SeedLoopIteratesMapKeys)
+
+; PIW-001: the eager generator used to join the raw values with {Tab} and escape
+; the WHOLE string, which neutralised the separators as well (a literal
+; LEFT{Tab}RIGHT in one field), and it registered a combo with a missing field.
+; The fire-time resolver escapes each value and keeps the separator live, and it
+; declines the whole combo when any field is empty.
+_PICG_GeneratorEscapesEachValueAndDeclinesEmpty() {
+	Body := _StripFullLineComments(_DriverFuncBody("Generate"))
+	Assert(Body != "", "Generate() must exist in modules/hotstrings/hotstrings_text_expansion.ahk")
+	Assert(InStr(Body, "EscapeSpecialChars(hotstrings[A_LoopField])") > 0,
+		"Generate() must escape each field value on its own")
+	Assert(InStr(Body, "EscapeSpecialChars(value)") = 0,
+		"Generate() must not escape the joined string: that also escapes the {Tab} separators")
+	TabPos := InStr(Body, "{Tab}")
+	EscapePos := InStr(Body, "EscapeSpecialChars(hotstrings[A_LoopField])")
+	Assert(TabPos > 0 && TabPos < EscapePos,
+		"the separator must be appended unescaped, before the next escaped value")
+	Assert(InStr(Body, "hotstrings[A_LoopField] == " . Chr(34) . Chr(34)) > 0,
+		"an empty field must decline the whole combo, as the fire-time resolver does")
+	Assert(InStr(Body, "Complete := false") > 0 && InStr(Body, "if (Complete and value != " . Chr(34) . Chr(34) . ")") > 0,
+		"an incomplete combo must not be registered")
+}
+Test("personal-info combos: registered compounds escape per value and decline empty fields (PIW-001)", _PICG_GeneratorEscapesEachValueAndDeclinesEmpty)

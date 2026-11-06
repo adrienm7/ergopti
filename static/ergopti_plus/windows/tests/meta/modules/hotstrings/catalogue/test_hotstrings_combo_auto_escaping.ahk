@@ -50,7 +50,7 @@ _HSCAEscapingApplied() {
 	Assert(GenBody != "",
 		"modules/hotstrings/hotstrings_text_expansion.ahk must define Generate() — the registration path for combos up to pattern_max_length")
 	Assert(InStr(GenBody, "EscapeSpecialChars(") > 0,
-		"Generate() must escape the concatenated value before registering it (EscapeSpecialChars delegates to SendEscapeLiteral)")
+		"Generate() must escape each field value before registering it (EscapeSpecialChars delegates to SendEscapeLiteral)")
 }
 Test("hotstrings: every personal-info combo producer escapes its field values (F17 regression)",
 	_HSCAEscapingApplied)
