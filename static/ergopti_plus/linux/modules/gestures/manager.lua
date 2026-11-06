@@ -226,6 +226,19 @@ end
 M.SINGLE_SLOTS = copy_list(Catalogue.slots.single)
 M.AXIS_SLOTS = copy_list(Catalogue.slots.axis)
 
+-- The horizontal axis slot each finger count falls back to. An axis slot is
+-- the binding of BOTH horizontal directions of one count: a straight left or
+-- right swipe whose own direction slot is unbound runs it (decided 2026-11-06,
+-- docs/memory/maintainer-decisions.md). Derived from the shared slot list so a
+-- renamed or added axis slot cannot leave a stale literal here; a name this
+-- rule does not understand is refused at load rather than never firing.
+local AXIS_SLOT_FOR_FINGERS = {}
+for _, slot in ipairs(M.AXIS_SLOTS) do
+	local fingers = slot:match("^swipe_(%d)_horiz$")
+	assert(fingers, "unsupported axis gesture slot in the shared catalogue: " .. tostring(slot))
+	AXIS_SLOT_FOR_FINGERS[tonumber(fingers)] = slot
+end
+
 -- Exclude picker headings and modifier groups from the declared action rows.
 M.LINUX_DECLARED_ACTIONS = {}
 for _, item in ipairs(Catalogue.sg_items) do
@@ -2148,6 +2161,21 @@ function M.dispatch_gesture(gesture)
 	end
 
 	local action = _actions[slot]
+	-- A straight horizontal swipe whose direction slot is unbound runs the axis
+	-- slot of its finger count. The direction slot wins when both are bound, so
+	-- an explicit left/right choice is never overridden. Diagonals and taps have
+	-- no axis slot. The decoder already applied the shared direction thresholds,
+	-- and the Linux recognizer fires once per completed gesture, as for every
+	-- other slot: there is no incremental repeat to apply.
+	if (not action or action == "none") and not gesture.tap
+		and (gesture.direction == "left" or gesture.direction == "right") then
+		local axis_slot = AXIS_SLOT_FOR_FINGERS[math.min(gesture.fingers, 5)]
+		local axis_action = axis_slot and _actions[axis_slot]
+		if axis_action and axis_action ~= "none" then
+			Logger.debug(LOG, "%s is unbound: the horizontal axis slot %s answers.", slot, axis_slot)
+			slot, action = axis_slot, axis_action
+		end
+	end
 	if (_parameter_configuration_owner ~= nil or _gesture_click_fence ~= nil) and (action == "left_click_toggle" or action == "right_click_toggle") then return false end
 	if not action or action == "none" then
 		-- Not a warning. Linux ships no default bindings, so an unbound slot is

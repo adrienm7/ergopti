@@ -213,7 +213,8 @@
 				"static/ergopti_plus/linux/tests/unit/modules/gestures/config/test_gestures_manager_config.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_dispatch.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/gestures/config/test_gesture_enable_transaction.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_pump_chain.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_pump_chain.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_axis_slots.lua"
 			]
 		},
 		"hotstrings": {
