@@ -21,7 +21,7 @@ case "$suite" in
 esac
 case "$distro" in
 	debian) apt-get install -y --no-install-recommends luajit python3 ca-certificates git gcc libc6-dev make cmake pkg-config libluajit-5.1-dev libuv1-dev libglib2.0-0t64 sqlite3 openssl tzdata tar libxkbcommon0 xkb-data libx11-data iproute2 nodejs curl ;;
-	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel glib2 sqlite openssl tzdata tar libxkbcommon xkeyboard-config libX11-common iproute nodejs curl ;;
+	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel glib2 sqlite openssl tzdata tar libxkbcommon xkeyboard-config libX11-common iproute procps-ng nodejs curl ;;
 	arch) pacman -Sy --noconfirm luajit python ca-certificates git gcc make cmake pkgconf libuv glib2 sqlite openssl tzdata tar libxkbcommon xkeyboard-config libx11 iproute2 nodejs curl ;;
 	alpine) apk add --no-cache luajit python3 ca-certificates git build-base cmake pkgconf luajit-dev libuv-dev glib sqlite openssl tzdata tar libxkbcommon xkeyboard-config libx11 iproute2-ss nodejs curl ;;
 	opensuse) zypper --non-interactive install luajit python3 ca-certificates git gcc make cmake pkg-config luajit-devel libuv-devel libglib-2_0-0 sqlite3 openssl timezone tar libxkbcommon0 xkeyboard-config libX11-data iproute2 nodejs-default curl ;;
