@@ -11,15 +11,17 @@
  * compiled from, and as the MSKLC .klc source of the same layout.
  *
  * FEATURES & RATIONALE:
- * 1. Kalamine's approach (https://github.com/OneDeadKey/kalamine, MIT): the C
- *    file follows its full.C template and klc.py rules, so the DLL is built by
- *    a plain MSVC + Windows SDK toolchain (kbd.h is in the SDK) without MSKLC.
+ * 1. The DLL is built by a plain MSVC + Windows SDK toolchain without MSKLC:
+ *    the C tables are written from kbd.h's structures (KBDTABLES and the
+ *    tables it points to) and the .klc from the MSKLC source format. Kalamine
+ *    showed the idea; none of its code or templates is used. The key names
+ *    come from the shared physical key registry.
  * 2. Nothing is specific to one layout: each Windows column is read from the
  *    keyMap the layout's own modifierMap selects (base, Shift, AltGr, Shift +
  *    AltGr), the physical keys come from the shared keycode table through the
  *    layout's keycode convention, and the dead keys from its actions and
  *    terminators.
- * 3. A virtual key follows the character a key types (kalamine's default):
+ * 3. A virtual key follows the character a key types:
  *    Ctrl+C is on the key that types c. Windows keys its character tables by
  *    virtual key, so two keys cannot share one; the macOS Command keyMap's
  *    left-hand shortcuts cannot be expressed and are not read.
@@ -46,7 +48,7 @@ const COLUMNS = [
 ];
 
 // The virtual keys a character key may take when the character it types names
-// none, in allocation order (kalamine's VK_OEM_* pool, plus the ISO key's own).
+// none, in allocation order (the VK_OEM_* keys, the ISO key's own last).
 const OEM_POOL = [
 	'OEM_1',
 	'OEM_2',
@@ -59,7 +61,7 @@ const OEM_POOL = [
 	'OEM_102'
 ];
 
-// Scan code of the ISO key left of Z: it keeps VK_OEM_102 (kalamine).
+// Scan code of the ISO key left of Z: it keeps its own VK_OEM_102.
 const ISO_KEY_SCAN_CODE = 0x56;
 
 // The QWERTY virtual key of every scan code a layout key can sit on (kbd.h,
@@ -116,7 +118,7 @@ const QWERTY_VK = {
 	0x56: 'OEM_102'
 };
 
-// Characters that name a punctuation virtual key (kalamine's klc_virtual_key).
+// Characters that name a punctuation virtual key of their own.
 const PUNCTUATION_VK = { ',': 'OEM_COMMA', '.': 'OEM_PERIOD', '+': 'OEM_PLUS', '-': 'OEM_MINUS' };
 
 // Longest ligature a keyboard DLL can carry (kbd.h defines LIGATURE1..5) and
@@ -300,8 +302,9 @@ function capsAttribute(layout, code, cells, keyName) {
 }
 
 /**
- * Assigns the virtual keys (kalamine's klc_virtual_key rules, then the key's
- * QWERTY punctuation virtual key when free, then the OEM pool).
+ * Assigns the virtual keys: the ISO key's own, a digit or letter the key
+ * types, a punctuation character's own; then the key's QWERTY punctuation
+ * virtual key when free; then the OEM pool.
  * @param {object[]} keys - Model keys with their cells.
  */
 function assignVirtualKeys(keys) {
@@ -538,30 +541,6 @@ function klcCell(cell) {
 }
 
 /**
- * Fills every @NAME@ placeholder of a template, refusing a placeholder left
- * unfilled or a value with no placeholder.
- * @param {string} template - Template text.
- * @param {Record<string, string>} values - Placeholder values.
- * @returns {string}
- */
-function fill(template, values) {
-	let text = template;
-	for (const [name, value] of Object.entries(values)) {
-		const marker = `@${name}@`;
-		if (!text.includes(marker)) throw new Error(`template has no ${marker}`);
-		text = text.split(marker).join(value);
-	}
-	const left = /@[A-Z0-9_]+@/.exec(text);
-	if (left) throw new Error(`template placeholder ${left[0]} is not filled`);
-	return text;
-}
-
-/** One C table row, padded like kalamine's. */
-function cRow(values) {
-	return `  {${values.map((value) => value.padEnd(13)).join(',')}},`;
-}
-
-/**
  * The generated-file banner shared by every C-family source.
  * @param {object} context - { fileName, meta, sourceRel }.
  * @returns {string[]} Comment lines.
@@ -606,56 +585,251 @@ function renderHeader(model, context) {
 	return `${lines.join('\n')}\n`;
 }
 
+// Scan codes whose virtual key Windows needs flagged (kbd.h): the right Shift
+// is extended, Num * and Num Lock have a second virtual key, and the number
+// pad keys that double as navigation are KBDNUMPAD | KBDSPECIAL.
+const SCAN_FLAGS = new Map([
+	[0x36, 'KBDEXT'],
+	[0x37, 'KBDMULTIVK'],
+	[0x45, 'KBDEXT | KBDMULTIVK'],
+	[0x46, 'KBDMULTIVK'],
+	...[0x47, 0x48, 0x49, 0x4b, 0x4c, 0x4d, 0x4f, 0x50, 0x51, 0x52, 0x53].map((sc) => [
+		sc,
+		'KBDNUMPAD | KBDSPECIAL'
+	])
+]);
+
+// Highest plain scan code the table maps (kbd.h's T00..T7E).
+const MAX_PLAIN_SCAN_CODE = 0x7e;
+
+// E0-prefixed scan codes kbd.h names an X macro for: right-hand modifiers,
+// navigation, the number pad's Enter and divide, the Windows keys and media.
+const E0_SCAN_CODES = [
+	0x10, 0x19, 0x1c, 0x1d, 0x20, 0x21, 0x22, 0x24, 0x2e, 0x30, 0x32, 0x35, 0x37, 0x38, 0x46, 0x47,
+	0x48, 0x49, 0x4b, 0x4d, 0x4f, 0x50, 0x51, 0x52, 0x53, 0x5b, 0x5c, 0x5d, 0x5f, 0x65, 0x66, 0x67,
+	0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d
+];
+
+// Keys outside the layout whose characters every Windows layout gives: by
+// table width, each row the virtual key and its characters per column.
+const FIXED_KEYS = [
+	{
+		width: 1,
+		rows: [...'0123456789'].map((digit) => [`VK_NUMPAD${digit}`, `'${digit}'`])
+	},
+	{
+		width: 2,
+		rows: [
+			['VK_TAB', "'\\t'", "'\\t'"],
+			['VK_ADD', "'+'", "'+'"],
+			['VK_SUBTRACT', "'-'", "'-'"],
+			['VK_MULTIPLY', "'*'", "'*'"],
+			['VK_DIVIDE', "'/'", "'/'"],
+			['VK_DECIMAL', "'.'", "'.'"]
+		]
+	},
+	{
+		width: 3,
+		rows: [
+			['VK_BACK', "'\\b'", "'\\b'", '0x007f'],
+			['VK_ESCAPE', '0x001b', '0x001b', '0x001b'],
+			['VK_RETURN', "'\\r'", "'\\r'", "'\\n'"],
+			['VK_CANCEL', '0x0003', '0x0003', '0x0003']
+		]
+	}
+];
+
 /**
- * The layout tables (kalamine's full.C template, with this model).
+ * The names Windows shows for keys that type no character (GetKeyNameText),
+ * from the shared physical key registry: the W3C code with its words split
+ * ("ArrowUp" → "Arrow Up"). Plain and E0-extended keys are separate tables.
+ * @param {object} registry - Decoded _shared/data/keycodes/physical_keys.json.
+ * @returns {{plain: Array<[number, string]>, extended: Array<[number, string]>}}
+ */
+function keyNames(registry) {
+	const entries = Array.isArray(registry.keys) ? registry.keys : Object.entries(registry.keys);
+	const plain = [];
+	const extended = [];
+	for (const [code, key] of entries) {
+		if (key.kind !== 'key' || key.ahk_send === null || key.ahk_send === undefined) continue;
+		const match = /^SC([0-9A-F]{3})$/.exec(key.ahk);
+		if (!match) throw new Error(`physical key ${code} has no scan code (ahk '${key.ahk}')`);
+		const value = parseInt(match[1], 16);
+		const name = code.replace(/([a-z])([A-Z0-9])/g, '$1 $2');
+		if (!/^[A-Za-z0-9 ]+$/.test(name))
+			throw new Error(`physical key ${code} gives a non-ASCII key name`);
+		if (value >= 0x100) extended.push([value & 0xff, name]);
+		else plain.push([value, name]);
+	}
+	const byCode = (a, b) => a[0] - b[0];
+	return { plain: plain.sort(byCode), extended: extended.sort(byCode) };
+}
+
+/** Two upper-case hex digits. */
+function hex2(value) {
+	return value.toString(16).toUpperCase().padStart(2, '0');
+}
+
+/** A C array definition in the DLL's data section. */
+function cArray(type, name, lines) {
+	return [`static KBD_DATA ${type} ${name}[] = {`, ...lines.map((line) => `    ${line}`), '};', ''];
+}
+
+/**
+ * The tables of the keyboard DLL, written from this model and kbd.h's
+ * structures (KBDTABLES, VK_TO_WCHARS<n>, DEADKEY, LIGATURE<n>).
  */
 function renderC(model, context) {
-	const name8 = context.spec.dll_name;
-	const rows = [];
+	const names = keyNames(context.physicalKeys);
+	const out = [
+		...banner(context, '//'),
+		...omittedLines(model, '//'),
+		'',
+		'#include <windows.h>',
+		'#include "kbd.h"',
+		`#include "${context.spec.dll_name}.h"`,
+		'',
+		'// win32k reads the tables from the image: keep them in one writable data section.',
+		'#pragma data_seg(".data")',
+		'#define KBD_DATA',
+		''
+	];
+
+	const scanRows = [];
+	for (let sc = 0; sc <= MAX_PLAIN_SCAN_CODE; sc++) {
+		const flags = SCAN_FLAGS.get(sc);
+		scanRows.push(`T${hex2(sc)}${flags ? ` | ${flags}` : ''},`);
+	}
+	out.push(...cArray('USHORT', 'ScanToVk', scanRows));
+	out.push(
+		...cArray('VSC_VK', 'ScanE0ToVk', [
+			...E0_SCAN_CODES.map((sc) => `{ 0x${hex2(sc)}, X${hex2(sc)} | KBDEXT },`),
+			'{ 0, 0 }'
+		])
+	);
+	out.push(...cArray('VSC_VK', 'ScanE1ToVk', ['{ 0x1D, Y1D },', '{ 0, 0 }']));
+	out.push(
+		...cArray('VK_TO_BIT', 'ModifierKeys', [
+			'{ VK_SHIFT, KBDSHIFT },',
+			'{ VK_CONTROL, KBDCTRL },',
+			'{ VK_MENU, KBDALT },',
+			'{ 0, 0 }'
+		])
+	);
+	// Columns: none, Shift, Ctrl, Shift+Ctrl, then AltGr (Ctrl+Alt) and Shift+AltGr;
+	// Alt alone types nothing.
+	out.push(
+		'static KBD_DATA MODIFIERS Modifiers = {',
+		'    &ModifierKeys[0],',
+		'    7,',
+		'    { 0, 1, 2, 3, SHFT_INVALID, SHFT_INVALID, 4, 5 }',
+		'};',
+		''
+	);
+
+	const layoutRows = [];
 	for (const key of model.keys) {
 		const cells = COLUMNS.map((column) => key.cells[column.name]);
-		rows.push(cRow([cVk(key.vk), key.attribute === 0 ? '0' : key.attribute, ...cells.map(cCell)]));
-		if (cells.some((cell) => cell.kind === 'dead')) {
-			rows.push(
-				cRow([
-					'0xff',
-					'0',
-					...cells.map((cell) => (cell.kind === 'dead' ? `0x${hex4(cell.deadChar)}` : 'WCH_NONE'))
-				])
+		layoutRows.push(
+			`{ ${[cVk(key.vk), key.attribute === 0 ? '0' : key.attribute, ...cells.map(cCell)].join(', ')} },`
+		);
+		// The row after a dead key holds, in its columns, the dead characters.
+		if (cells.some((cell) => cell.kind === 'dead'))
+			layoutRows.push(
+				`{ ${['0xff', '0', ...cells.map((cell) => (cell.kind === 'dead' ? `0x${hex4(cell.deadChar)}` : 'WCH_NONE'))].join(', ')} },`
 			);
-		}
 	}
-	const deadNames = model.deadKeys.map(
-		(dead) => `    L"\\x${hex4(dead.deadChar)}" L"${dead.name}",`
+	layoutRows.push(
+		`{ ${Array(COLUMNS.length + 2)
+			.fill('0')
+			.join(', ')} }`
 	);
+	out.push(...cArray(`VK_TO_WCHARS${COLUMNS.length}`, 'LayoutKeys', layoutRows));
+	for (const group of [...FIXED_KEYS].reverse()) {
+		out.push(
+			...cArray(`VK_TO_WCHARS${group.width}`, `FixedKeys${group.width}`, [
+				...group.rows.map((row) => `{ ${[row[0], '0', ...row.slice(1)].join(', ')} },`),
+				`{ ${Array(group.width + 2)
+					.fill('0')
+					.join(', ')} }`
+			])
+		);
+	}
+	// The layout's keys first: VkKeyScan then finds a digit on the digit row,
+	// not on the number pad.
+	out.push(
+		...cArray('VK_TO_WCHAR_TABLE', 'CharacterTables', [
+			`{ (PVK_TO_WCHARS1)LayoutKeys, ${COLUMNS.length}, sizeof(LayoutKeys[0]) },`,
+			...[...FIXED_KEYS]
+				.reverse()
+				.map(
+					(group) =>
+						`{ (PVK_TO_WCHARS1)FixedKeys${group.width}, ${group.width}, sizeof(FixedKeys${group.width}[0]) },`
+				),
+			'{ NULL, 0, 0 }'
+		])
+	);
+
 	const deadTrans = [];
 	for (const dead of model.deadKeys) {
-		deadTrans.push(`    // ${dead.name}`);
-		for (const entry of dead.entries) {
+		deadTrans.push(`// ${dead.name}`);
+		for (const entry of dead.entries)
 			deadTrans.push(
-				`    DEADTRANS(0x${hex4(entry.base)}, 0x${hex4(dead.deadChar)}, 0x${hex4(entry.result)}, ${entry.chained ? '0x0001' : '0x0000'}),`
+				`DEADTRANS(0x${hex4(entry.base)}, 0x${hex4(dead.deadChar)}, 0x${hex4(entry.result)}, ${entry.chained ? '0x0001' : '0x0000'}),`
 			);
-		}
 	}
-	const ligatureWidth = Math.max(1, ...model.ligatures.map((item) => item.units.length));
-	const ligatureRows = model.ligatures.map(
-		(item) =>
-			`    {${cVk(item.vk)}, ${item.column}, ${[...item.units.map((unit) => `0x${hex4(unit)}`), ...Array(ligatureWidth - item.units.length).fill('WCH_NONE')].join(', ')}},`
+	out.push(...cArray('DEADKEY', 'DeadKeys', [...deadTrans, '{ 0, 0, 0 }']));
+	out.push(
+		...cArray('DEADKEY_LPWSTR', 'DeadKeyNames', [
+			...model.deadKeys.map((dead) => `L"\\x${hex4(dead.deadChar)}" L"${dead.name}",`),
+			'NULL'
+		])
 	);
-	const ligatureEnd = `    {0, 0, ${Array(ligatureWidth).fill('0').join(', ')}}`;
-	return fill(C_TEMPLATE, {
-		BANNER: [...banner(context, '//'), ...omittedLines(model, '//')].join('\n'),
-		NAME8: name8,
-		LAYOUT: rows.join('\n'),
-		DEAD_KEY_NAMES: deadNames.join('\n'),
-		DEAD_KEYS: deadTrans.join('\n'),
-		LIGATURE_TYPE: `LIGATURE${ligatureWidth}`,
-		LIGATURES: [...ligatureRows, ligatureEnd].join('\n'),
-		LIGATURE_TABLE:
-			model.ligatures.length === 0
-				? '0,\n    0,\n    NULL'
-				: `${ligatureWidth},\n    sizeof(aLigature[0]),\n    (PLIGATURE1)aLigature`
-	});
+	const nameRows = (rows) => [
+		...rows.map(([sc, name]) => `{ 0x${hex2(sc)}, L"${name}" },`),
+		'{ 0, NULL }'
+	];
+	out.push(...cArray('VSC_LPWSTR', 'KeyNames', nameRows(names.plain)));
+	out.push(...cArray('VSC_LPWSTR', 'KeyNamesExtended', nameRows(names.extended)));
+
+	const width = Math.max(1, ...model.ligatures.map((item) => item.units.length));
+	out.push(
+		...cArray(`LIGATURE${width}`, 'Ligatures', [
+			...model.ligatures.map(
+				(item) =>
+					`{ ${[cVk(item.vk), String(item.column), ...item.units.map((unit) => `0x${hex4(unit)}`), ...Array(width - item.units.length).fill('WCH_NONE')].join(', ')} },`
+			),
+			`{ ${Array(width + 2)
+				.fill('0')
+				.join(', ')} }`
+		])
+	);
+	out.push(
+		'static KBD_DATA KBDTABLES Tables = {',
+		'    &Modifiers,',
+		'    CharacterTables,',
+		'    DeadKeys,',
+		'    KeyNames,',
+		'    KeyNamesExtended,',
+		'    DeadKeyNames,',
+		'    ScanToVk,',
+		'    sizeof(ScanToVk) / sizeof(ScanToVk[0]),',
+		'    ScanE0ToVk,',
+		'    ScanE1ToVk,',
+		'    MAKELONG(KLLF_ALTGR, KBD_VERSION),',
+		model.ligatures.length === 0
+			? '    0, 0, NULL'
+			: `    ${width}, sizeof(Ligatures[0]), (PLIGATURE1)Ligatures`,
+		'};',
+		'',
+		'// The one export: Windows asks the DLL for its tables.',
+		'PKBDTABLES KbdLayerDescriptor(VOID)',
+		'{',
+		'    return &Tables;',
+		'}',
+		''
+	);
+	return out.join('\n');
 }
 
 /** The comma-separated four-part version of a.b.c[.d]. */
@@ -770,7 +944,19 @@ function renderKlc(model, context) {
 			lines.push(`${hex4(entry.base)}\t${hex4(entry.result)}${entry.chained ? '@' : ''}`);
 		lines.push('');
 	}
-	lines.push(KLC_KEY_NAMES, '', 'KEYNAME_DEAD', '');
+	const names = keyNames(context.physicalKeys);
+	const klcName = ([sc, name]) =>
+		`${hex2(sc).toLowerCase()}\t${name.includes(' ') ? `"${name}"` : name}`;
+	lines.push(
+		'KEYNAME',
+		'',
+		...names.plain.map(klcName),
+		'',
+		'KEYNAME_EXT',
+		'',
+		...names.extended.map(klcName)
+	);
+	lines.push('', 'KEYNAME_DEAD', '');
 	for (const dead of model.deadKeys) lines.push(`${hex4(dead.deadChar)}\t"${dead.name}"`);
 	lines.push(
 		'',
@@ -822,393 +1008,6 @@ function encodeKlc(text) {
 		Buffer.from(text.replace(/\n/g, '\r\n'), 'utf16le')
 	]);
 }
-
-const KLC_KEY_NAMES = `KEYNAME
-
-01\tEsc
-0e\tBackspace
-0f\tTab
-1c\tEnter
-1d\tCtrl
-2a\tShift
-36\t"Right Shift"
-37\t"Num *"
-38\tAlt
-39\tSpace
-3a\t"Caps Lock"
-3b\tF1
-3c\tF2
-3d\tF3
-3e\tF4
-3f\tF5
-40\tF6
-41\tF7
-42\tF8
-43\tF9
-44\tF10
-45\tPause
-46\t"Scroll Lock"
-47\t"Num 7"
-48\t"Num 8"
-49\t"Num 9"
-4a\t"Num -"
-4b\t"Num 4"
-4c\t"Num 5"
-4d\t"Num 6"
-4e\t"Num +"
-4f\t"Num 1"
-50\t"Num 2"
-51\t"Num 3"
-52\t"Num 0"
-53\t"Num Del"
-54\t"Sys Req"
-57\tF11
-58\tF12
-
-KEYNAME_EXT
-
-1c\t"Num Enter"
-1d\t"Right Ctrl"
-35\t"Num /"
-37\t"Prnt Scrn"
-38\t"Right Alt"
-45\t"Num Lock"
-46\tBreak
-47\tHome
-48\tUp
-49\t"Page Up"
-4b\tLeft
-4d\tRight
-4f\tEnd
-50\tDown
-51\t"Page Down"
-52\tInsert
-53\tDelete
-54\t<00>
-56\tHelp
-5b\t"Left Windows"
-5c\t"Right Windows"
-5d\tApplication`;
-
-// Kalamine's full.C template (MIT), with the ligature table this layout needs.
-const C_TEMPLATE = `@BANNER@
-//
-// Tables of a Windows keyboard layout DLL, after kalamine's full.C template
-// (https://github.com/OneDeadKey/kalamine, MIT licence).
-
-#include <windows.h>
-#include "kbd.h"
-#include "@NAME8@.h"
-
-#if defined(_M_IA64)
-#pragma section(".data")
-#define ALLOC_SECTION_LDATA __declspec(allocate(".data"))
-#else
-#pragma data_seg(".data")
-#define ALLOC_SECTION_LDATA
-#endif
-
-/*
- * ausVK[] - Virtual Scan Code to Virtual Key conversion table
- */
-static ALLOC_SECTION_LDATA USHORT ausVK[] = {
-    T00, T01, T02, T03, T04, T05, T06, T07,
-    T08, T09, T0A, T0B, T0C, T0D, T0E, T0F,
-    T10, T11, T12, T13, T14, T15, T16, T17,
-    T18, T19, T1A, T1B, T1C, T1D, T1E, T1F,
-    T20, T21, T22, T23, T24, T25, T26, T27,
-    T28, T29, T2A, T2B, T2C, T2D, T2E, T2F,
-    T30, T31, T32, T33, T34, T35,
-
-    /* Right-hand Shift key must have KBDEXT bit set. */
-    T36 | KBDEXT,
-
-    T37 | KBDMULTIVK,               // numpad_* + Shift/Alt -> SnapShot
-
-    T38, T39, T3A, T3B, T3C, T3D, T3E,
-    T3F, T40, T41, T42, T43, T44,
-
-    /* NumLock: an extended key, VK_NUMLOCK or VK_PAUSE (without or with Ctrl). */
-    T45 | KBDEXT | KBDMULTIVK,
-
-    T46 | KBDMULTIVK,
-
-    /* Number pad keys: digits and decimal point, special processing by Windows. */
-    T47 | KBDNUMPAD | KBDSPECIAL,   // Numpad 7 (Home)
-    T48 | KBDNUMPAD | KBDSPECIAL,   // Numpad 8 (Up)
-    T49 | KBDNUMPAD | KBDSPECIAL,   // Numpad 9 (PgUp)
-    T4A,
-    T4B | KBDNUMPAD | KBDSPECIAL,   // Numpad 4 (Left)
-    T4C | KBDNUMPAD | KBDSPECIAL,   // Numpad 5 (Clear)
-    T4D | KBDNUMPAD | KBDSPECIAL,   // Numpad 6 (Right)
-    T4E,
-    T4F | KBDNUMPAD | KBDSPECIAL,   // Numpad 1 (End)
-    T50 | KBDNUMPAD | KBDSPECIAL,   // Numpad 2 (Down)
-    T51 | KBDNUMPAD | KBDSPECIAL,   // Numpad 3 (PgDn)
-    T52 | KBDNUMPAD | KBDSPECIAL,   // Numpad 0 (Ins)
-    T53 | KBDNUMPAD | KBDSPECIAL,   // Numpad . (Del)
-
-    T54, T55, T56, T57, T58, T59, T5A, T5B,
-    T5C, T5D, T5E, T5F, T60, T61, T62, T63,
-    T64, T65, T66, T67, T68, T69, T6A, T6B,
-    T6C, T6D, T6E, T6F, T70, T71, T72, T73,
-    T74, T75, T76, T77, T78, T79, T7A, T7B,
-    T7C, T7D, T7E
-};
-
-static ALLOC_SECTION_LDATA VSC_VK aE0VscToVk[] = {
-    { 0x10, X10 | KBDEXT },  // Previous Track
-    { 0x19, X19 | KBDEXT },  // Next Track
-    { 0x1D, X1D | KBDEXT },  // RControl
-    { 0x20, X20 | KBDEXT },  // Volume Mute
-    { 0x21, X21 | KBDEXT },  // Launch App 2
-    { 0x22, X22 | KBDEXT },  // Media Play/Pause
-    { 0x24, X24 | KBDEXT },  // Media Stop
-    { 0x2E, X2E | KBDEXT },  // Volume Down
-    { 0x30, X30 | KBDEXT },  // Volume Up
-    { 0x32, X32 | KBDEXT },  // Browser Home
-    { 0x35, X35 | KBDEXT },  // Numpad Divide
-    { 0x37, X37 | KBDEXT },  // Snapshot
-    { 0x38, X38 | KBDEXT },  // RMenu
-    { 0x47, X47 | KBDEXT },  // Home
-    { 0x48, X48 | KBDEXT },  // Up
-    { 0x49, X49 | KBDEXT },  // Prior
-    { 0x4B, X4B | KBDEXT },  // Left
-    { 0x4D, X4D | KBDEXT },  // Right
-    { 0x4F, X4F | KBDEXT },  // End
-    { 0x50, X50 | KBDEXT },  // Down
-    { 0x51, X51 | KBDEXT },  // Next
-    { 0x52, X52 | KBDEXT },  // Insert
-    { 0x53, X53 | KBDEXT },  // Delete
-    { 0x5B, X5B | KBDEXT },  // Left Win
-    { 0x5C, X5C | KBDEXT },  // Right Win
-    { 0x5D, X5D | KBDEXT },  // Application
-    { 0x5F, X5F | KBDEXT },  // Sleep
-    { 0x65, X65 | KBDEXT },  // Browser Search
-    { 0x66, X66 | KBDEXT },  // Browser Favorites
-    { 0x67, X67 | KBDEXT },  // Browser Refresh
-    { 0x68, X68 | KBDEXT },  // Browser Stop
-    { 0x69, X69 | KBDEXT },  // Browser Forward
-    { 0x6A, X6A | KBDEXT },  // Browser Back
-    { 0x6B, X6B | KBDEXT },  // Launch App 1
-    { 0x6C, X6C | KBDEXT },  // Launch Mail
-    { 0x6D, X6D | KBDEXT },  // Launch Media Selector
-    { 0x1C, X1C | KBDEXT },  // Numpad Enter
-    { 0x46, X46 | KBDEXT },  // Break (Ctrl + Pause)
-    { 0,    0            }
-};
-
-static ALLOC_SECTION_LDATA VSC_VK aE1VscToVk[] = {
-    { 0x1D, Y1D },  // Pause
-    { 0,    0   }
-};
-
-/*
- * aVkToBits[] - map Virtual Keys to Modifier Bits
- */
-static ALLOC_SECTION_LDATA VK_TO_BIT aVkToBits[] = {
-    { VK_SHIFT,   KBDSHIFT },
-    { VK_CONTROL, KBDCTRL  },
-    { VK_MENU,    KBDALT   },
-    { 0,          0        }
-};
-
-/*
- * CharModifiers - map character modifier bits to the column of the tables
- */
-static ALLOC_SECTION_LDATA MODIFIERS CharModifiers = {
-    &aVkToBits[0],
-    7,
-    {
-        0,            // (none)
-        1,            // Shift
-        2,            // Control
-        3,            // Shift + Control
-        SHFT_INVALID, // Menu
-        SHFT_INVALID, // Shift + Menu
-        4,            // Control + Menu (AltGr)
-        5             // Shift + Control + Menu (Shift + AltGr)
-    }
-};
-
-static ALLOC_SECTION_LDATA VK_TO_WCHARS2 aVkToWch2[] = {
-  {VK_TAB       ,0      ,'\\t'     ,'\\t'     },
-  {VK_ADD       ,0      ,'+'      ,'+'      },
-  {VK_DECIMAL   ,0      ,'.'      ,'.'      },
-  {VK_DIVIDE    ,0      ,'/'      ,'/'      },
-  {VK_MULTIPLY  ,0      ,'*'      ,'*'      },
-  {VK_SUBTRACT  ,0      ,'-'      ,'-'      },
-  {0            ,0      ,0        ,0        }
-};
-
-static ALLOC_SECTION_LDATA VK_TO_WCHARS3 aVkToWch3[] = {
-  {VK_BACK      ,0      ,'\\b'     ,'\\b'     ,0x007f   },
-  {VK_ESCAPE    ,0      ,0x001b   ,0x001b   ,0x001b   },
-  {VK_RETURN    ,0      ,'\\r'     ,'\\r'     ,'\\n'     },
-  {VK_CANCEL    ,0      ,0x0003   ,0x0003   ,0x0003   },
-  {0            ,0      ,0        ,0        ,0        }
-};
-
-/*
- * aVkToWch6[] - the layout's keys: base, Shift, Ctrl, Shift + Ctrl, AltGr,
- * Shift + AltGr. A 0xff row holds the dead characters of the row above.
- */
-static ALLOC_SECTION_LDATA VK_TO_WCHARS6 aVkToWch6[] = {
-@LAYOUT@
-  {0        ,0        ,0        ,0        ,0        ,0        ,0        ,0        }
-};
-
-// Last, so that VkKeyScan finds digits in the main section before the numpad.
-static ALLOC_SECTION_LDATA VK_TO_WCHARS1 aVkToWch1[] = {
-    { VK_NUMPAD0, 0, '0' },
-    { VK_NUMPAD1, 0, '1' },
-    { VK_NUMPAD2, 0, '2' },
-    { VK_NUMPAD3, 0, '3' },
-    { VK_NUMPAD4, 0, '4' },
-    { VK_NUMPAD5, 0, '5' },
-    { VK_NUMPAD6, 0, '6' },
-    { VK_NUMPAD7, 0, '7' },
-    { VK_NUMPAD8, 0, '8' },
-    { VK_NUMPAD9, 0, '9' },
-    { 0,          0, '\\0' }
-};
-
-static ALLOC_SECTION_LDATA VK_TO_WCHAR_TABLE aVkToWcharTable[] = {
-    { (PVK_TO_WCHARS1)aVkToWch3, 3, sizeof(aVkToWch3[0]) },
-    { (PVK_TO_WCHARS1)aVkToWch6, 6, sizeof(aVkToWch6[0]) },
-    { (PVK_TO_WCHARS1)aVkToWch2, 2, sizeof(aVkToWch2[0]) },
-    { (PVK_TO_WCHARS1)aVkToWch1, 1, sizeof(aVkToWch1[0]) },
-    { NULL,                      0, 0                    }
-};
-
-static ALLOC_SECTION_LDATA VSC_LPWSTR aKeyNames[] = {
-    0x01, L"Esc",
-    0x0e, L"Backspace",
-    0x0f, L"Tab",
-    0x1c, L"Enter",
-    0x1d, L"Ctrl",
-    0x2a, L"Shift",
-    0x36, L"Right Shift",
-    0x37, L"Num *",
-    0x38, L"Alt",
-    0x39, L"Space",
-    0x3a, L"Caps Lock",
-    0x3b, L"F1",
-    0x3c, L"F2",
-    0x3d, L"F3",
-    0x3e, L"F4",
-    0x3f, L"F5",
-    0x40, L"F6",
-    0x41, L"F7",
-    0x42, L"F8",
-    0x43, L"F9",
-    0x44, L"F10",
-    0x45, L"Pause",
-    0x46, L"Scroll Lock",
-    0x47, L"Num 7",
-    0x48, L"Num 8",
-    0x49, L"Num 9",
-    0x4a, L"Num -",
-    0x4b, L"Num 4",
-    0x4c, L"Num 5",
-    0x4d, L"Num 6",
-    0x4e, L"Num +",
-    0x4f, L"Num 1",
-    0x50, L"Num 2",
-    0x51, L"Num 3",
-    0x52, L"Num 0",
-    0x53, L"Num Del",
-    0x54, L"Sys Req",
-    0x57, L"F11",
-    0x58, L"F12",
-    0x7c, L"F13",
-    0x7d, L"F14",
-    0x7e, L"F15",
-    0x7f, L"F16",
-    0x80, L"F17",
-    0x81, L"F18",
-    0x82, L"F19",
-    0x83, L"F20",
-    0x84, L"F21",
-    0x85, L"F22",
-    0x86, L"F23",
-    0x87, L"F24",
-    0,    NULL
-};
-
-static ALLOC_SECTION_LDATA VSC_LPWSTR aKeyNamesExt[] = {
-    0x1c, L"Num Enter",
-    0x1d, L"Right Ctrl",
-    0x35, L"Num /",
-    0x37, L"Prnt Scrn",
-    0x38, L"Right Alt",
-    0x45, L"Num Lock",
-    0x46, L"Break",
-    0x47, L"Home",
-    0x48, L"Up",
-    0x49, L"Page Up",
-    0x4b, L"Left",
-    0x4d, L"Right",
-    0x4f, L"End",
-    0x50, L"Down",
-    0x51, L"Page Down",
-    0x52, L"Insert",
-    0x53, L"Delete",
-    0x54, L"<00>",
-    0x56, L"Help",
-    0x5b, L"Left Windows",
-    0x5c, L"Right Windows",
-    0x5d, L"Application",
-    0,    NULL
-};
-
-static ALLOC_SECTION_LDATA DEADKEY_LPWSTR aKeyNamesDead[] = {
-@DEAD_KEY_NAMES@
-    NULL
-};
-
-static ALLOC_SECTION_LDATA DEADKEY aDeadKey[] = {
-@DEAD_KEYS@
-    0, 0, 0
-};
-
-static ALLOC_SECTION_LDATA @LIGATURE_TYPE@ aLigature[] = {
-@LIGATURES@
-};
-
-static ALLOC_SECTION_LDATA KBDTABLES KbdTables = {
-    /* Modifier keys */
-    &CharModifiers,
-
-    /* Characters tables */
-    aVkToWcharTable,
-
-    /* Diacritics */
-    aDeadKey,
-
-    /* Names of keys */
-    aKeyNames,
-    aKeyNamesExt,
-    aKeyNamesDead,
-
-    /* Scan codes to virtual keys */
-    ausVK,
-    sizeof(ausVK) / sizeof(ausVK[0]),
-    aE0VscToVk,
-    aE1VscToVk,
-
-    /* Locale-specific special processing */
-    MAKELONG(KLLF_ALTGR, KBD_VERSION),
-
-    /* Ligatures */
-    @LIGATURE_TABLE@
-};
-
-PKBDTABLES KbdLayerDescriptor(VOID)
-{
-    return &KbdTables;
-}
-`;
 
 module.exports = {
 	COLUMNS,

@@ -45,6 +45,12 @@ const KEYCODES = JSON.parse(
 	)
 );
 const SPEC = JSON.parse(fs.readFileSync(SPEC_PATH, 'utf8'));
+const PHYSICAL_KEYS = JSON.parse(
+	fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/_shared/data/keycodes/physical_keys.json'),
+		'utf8'
+	)
+);
 
 let failures = 0;
 function check(name, fn) {
@@ -89,6 +95,20 @@ check('the sources are ASCII with LF line ends', () => {
 		assert.ok(!/[^\x09\x0a\x20-\x7e]/.test(text), `${name} holds a non-ASCII or control character`);
 	}
 });
+
+check(
+	'the sources owe nothing to kalamine: written from kbd.h, key names from the shared registry',
+	() => {
+		// Maintainer rule (2026-11-06): kalamine may be read for ideas, never copied.
+		for (const [name, text] of built.files)
+			assert.ok(!/kalamine/i.test(text), `${name} names kalamine`);
+		assert.ok(!/kalamine/i.test(built.klc), 'the .klc names kalamine');
+		const source = built.files.get(`${SPEC.dll_name}.c`);
+		assert.match(source, /\{ 0x01, L"Escape" \},/, 'Escape is named after its W3C code');
+		assert.match(source, /KeyNamesExtended\[\] = \{\n    \{ 0x1C, L"Numpad Enter" \},/);
+		assert.match(built.klc, /\nKEYNAME_EXT\n\n1c\t"Numpad Enter"\n/);
+	}
+);
 
 check('the generated DLL is named by the shared spec and exports KbdLayerDescriptor', () => {
 	assert.ok(built.files.has(`${SPEC.dll_name}.c`));
@@ -135,7 +155,7 @@ check('the base, Shift and AltGr columns come from the layout keyMaps', () => {
 	assert.strictEqual(a.ctrl.kind, 'none');
 	assert.match(
 		built.files.get(`${SPEC.dll_name}.c`),
-		/\{'A' +,CAPLOK +,0x0061 +,0x0041 +,WCH_NONE +,WCH_NONE +,0x003c +,0x2264 +\},/
+		/\{ 'A', CAPLOK, 0x0061, 0x0041, WCH_NONE, WCH_NONE, 0x003c, 0x2264 \},/
 	);
 });
 
@@ -278,6 +298,7 @@ check('a dead-key result beyond one UTF-16 unit is named, never silently dropped
 		},
 		spec: SPEC,
 		keycodes: KEYCODES,
+		physicalKeys: PHYSICAL_KEYS,
 		sourceRel: 'synthetic.keylayout'
 	});
 	assert.deepStrictEqual(result.model.omitted, [
