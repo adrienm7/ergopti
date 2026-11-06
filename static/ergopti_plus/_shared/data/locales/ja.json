@@ -4099,7 +4099,7 @@
 	"inventory.behavior.dead_linux_composition": "ネイティブのXKB/Composeと独立したテキスト取得を使用します。捕捉した後続入力では結果が異なる場合があります。",
 	"inventory.behavior.dead_windows_fallback": "未割り当ての後続入力では、アクセントの終端文字に続いて現在の文字を出力します。",
 	"inventory.behavior.dead_macos_fallback": "代替動作はネイティブ配列に依存します。物理イベントとアプリケーションへの出力は未検証です。",
-	"inventory.behavior.dead_linux_fallback": "取得を取り消すと現在の文字を残し、前のアクセントを破棄します。ネイティブ出力とは異なる場合があります。",
-	"inventory.behavior.dead_windows_lifetime": "組み込み表の待機は最大2秒です。レジストリのデッドキー状態にタイムアウトはありません。",
+	"inventory.behavior.dead_linux_fallback": "変換された Compose テーブルは、macOS と同様にアクセントを入力してから現在の文字を入力します。",
+	"inventory.behavior.dead_windows_lifetime": "組み込みテーブルは最大 2 秒待ちます。レジストリのデッドキー状態にはタイムアウトがありません。期限切れと一時停止で、保留中のデッドキーは取り消されます。",
 	"inventory.behavior.dead_native_lifetime": "待機中の合成はネイティブOSが管理します。取得とリセットの規則はドライバー共通のタイムアウトとは別です。"
 }

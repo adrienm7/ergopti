@@ -4099,7 +4099,7 @@
 	"inventory.behavior.dead_linux_composition": "Oorspronkelijke XKB/Compose met onafhankelijke tekstregistratie; onderschepte vervolgen kunnen afwijken.",
 	"inventory.behavior.dead_windows_fallback": "Een niet toegewezen vervolg geeft het afsluitteken van het accent en daarna het huidige teken weer.",
 	"inventory.behavior.dead_macos_fallback": "Terugval wordt door de oorspronkelijke indeling bepaald; fysieke gebeurtenissen en toepassingsuitvoer zijn niet geverifieerd.",
-	"inventory.behavior.dead_linux_fallback": "Geannuleerde registratie behoudt het huidige teken en verwerpt het vorige accent; oorspronkelijke uitvoer kan afwijken.",
-	"inventory.behavior.dead_windows_lifetime": "Ingebouwde tabellen wachten maximaal 2 seconden; de dode-toetsstatus van het register heeft geen tijdslimiet.",
+	"inventory.behavior.dead_linux_fallback": "De geconverteerde Compose-tabellen typen het accent en daarna het huidige teken, zoals macOS.",
+	"inventory.behavior.dead_windows_lifetime": "De ingebouwde tabellen wachten maximaal 2 seconden; de dode-toetsstatus van het register heeft geen time-out. Verlopen en pauzeren annuleren een wachtende dode toets.",
 	"inventory.behavior.dead_native_lifetime": "Het oorspronkelijke systeem beheert wachtende compositie; registratie en reset staan los van een gedeelde tijdslimiet van het stuurprogramma."
 }

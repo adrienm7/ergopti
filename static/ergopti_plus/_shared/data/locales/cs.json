@@ -4099,7 +4099,7 @@
 	"inventory.behavior.dead_linux_composition": "Nativní XKB/Compose s nezávislým zachytáváním textu; zachycená pokračování se mohou lišit.",
 	"inventory.behavior.dead_windows_fallback": "Nepřiřazené pokračování vypíše ukončovací znak diakritiky a poté aktuální znak.",
 	"inventory.behavior.dead_macos_fallback": "Náhradní chování řídí nativní rozložení; fyzické události a výstup aplikace nebyly ověřeny.",
-	"inventory.behavior.dead_linux_fallback": "Zrušené zachytávání ponechá aktuální znak a zahodí předchozí diakritiku; nativní výstup se může lišit.",
-	"inventory.behavior.dead_windows_lifetime": "Vestavěné mapy čekají nejvýše 2 sekundy; stav mrtvé klávesy z registru nemá časový limit.",
+	"inventory.behavior.dead_linux_fallback": "Převedené tabulky Compose napíšou akcent a poté aktuální znak, stejně jako macOS.",
+	"inventory.behavior.dead_windows_lifetime": "Vestavěné tabulky čekají nejvýše 2 sekundy; stav mrtvé klávesy z registru nemá časový limit. Vypršení a pozastavení zruší čekající mrtvou klávesu.",
 	"inventory.behavior.dead_native_lifetime": "Nativní systém řídí čekající skládání; zachytávání a resetování jsou oddělené od společného časového limitu ovladače."
 }

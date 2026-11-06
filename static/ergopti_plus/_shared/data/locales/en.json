@@ -4099,7 +4099,7 @@
 	"inventory.behavior.dead_linux_composition": "Native XKB/Compose with independent text capture; consumed continuations can diverge.",
 	"inventory.behavior.dead_windows_fallback": "An unmapped continuation emits the accent terminator followed by the current character.",
 	"inventory.behavior.dead_macos_fallback": "Fallback belongs to the native layout; its physical payload and application output are unverified.",
-	"inventory.behavior.dead_linux_fallback": "Cancelled capture keeps the current character and discards the previous accent; native output can differ.",
-	"inventory.behavior.dead_windows_lifetime": "Builtin maps wait up to 2 seconds; registry dead-key state has no timeout.",
+	"inventory.behavior.dead_linux_fallback": "Converted Compose tables type the accent, then the current character, as macOS does.",
+	"inventory.behavior.dead_windows_lifetime": "Builtin maps wait up to 2 seconds; registry dead-key state has no timeout. Expiry and pause cancel a pending dead key.",
 	"inventory.behavior.dead_native_lifetime": "The native OS owns pending composition; capture and reset rules are separate from a shared driver timeout."
 }

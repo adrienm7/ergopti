@@ -4099,7 +4099,7 @@
 	"inventory.behavior.dead_linux_composition": "XKB/Compose מובנה עם לכידת טקסט נפרדת; קלט המשך שנלכד עשוי לתת תוצאה שונה.",
 	"inventory.behavior.dead_windows_fallback": "קלט המשך ללא מיפוי מפיק את תו הסיום של סימן ההטעמה ואחריו את התו הנוכחי.",
 	"inventory.behavior.dead_macos_fallback": "ההתנהגות החלופית מנוהלת בפריסה המובנית; האירועים הפיזיים ופלט היישום לא נבדקו.",
-	"inventory.behavior.dead_linux_fallback": "לכידה שבוטלה שומרת את התו הנוכחי ומשמיטה את סימן ההטעמה הקודם; הפלט המובנה עשוי להיות שונה.",
-	"inventory.behavior.dead_windows_lifetime": "הטבלאות המובנות ממתינות עד 2 שניות; למצב המקש המת מהמאגר אין מגבלת זמן.",
+	"inventory.behavior.dead_linux_fallback": "טבלאות ה-Compose המומרות מקלידות את סימן ההטעמה ואחריו את התו הנוכחי, כמו macOS.",
+	"inventory.behavior.dead_windows_lifetime": "הטבלאות המובנות ממתינות עד 2 שניות; למצב המקש המת של הרישום אין מגבלת זמן. פקיעת הזמן והשהיה מבטלות מקש מת ממתין.",
 	"inventory.behavior.dead_native_lifetime": "מערכת ההפעלה מנהלת הרכבה ממתינה; כללי הלכידה והאיפוס נפרדים ממגבלת זמן משותפת למנהל ההתקן."
 }

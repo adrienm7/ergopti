@@ -4099,7 +4099,7 @@
 	"inventory.behavior.dead_linux_composition": "XKB/Compose أصلي مع التقاط نص مستقل؛ قد تختلف نتيجة الإدخال اللاحق الذي يُعترض.",
 	"inventory.behavior.dead_windows_fallback": "يُخرج الإدخال اللاحق غير المعيّن علامة إنهاء التشكيل ثم الحرف الحالي.",
 	"inventory.behavior.dead_macos_fallback": "يتولى التخطيط الأصلي السلوك البديل؛ لم يُتحقق من الأحداث الفعلية ولا مما يستقبله التطبيق.",
-	"inventory.behavior.dead_linux_fallback": "يحتفظ الالتقاط الملغى بالحرف الحالي ويتجاهل علامة التشكيل السابقة؛ قد يختلف الإخراج الأصلي.",
-	"inventory.behavior.dead_windows_lifetime": "تنتظر الجداول المدمجة ثانيتين كحد أقصى؛ لا مهلة لحالة المفتاح الميت في السجل.",
+	"inventory.behavior.dead_linux_fallback": "تكتب جداول Compose المحوّلة علامة التشكيل ثم الحرف الحالي، كما يفعل macOS.",
+	"inventory.behavior.dead_windows_lifetime": "تنتظر الجداول المدمجة ثانيتين على الأكثر؛ ولا مهلة لحالة المفتاح الميت في السجل. يلغي انتهاء المهلة والإيقاف المؤقت مفتاحًا ميتًا معلّقًا.",
 	"inventory.behavior.dead_native_lifetime": "يدير النظام الأصلي التركيب المعلّق؛ قواعد الالتقاط وإعادة الضبط منفصلة عن مهلة مشتركة لبرنامج التشغيل."
 }

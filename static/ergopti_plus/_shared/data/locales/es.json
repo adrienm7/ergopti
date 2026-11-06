@@ -4099,7 +4099,7 @@
 	"inventory.behavior.dead_linux_composition": "XKB/Compose nativo con captura de texto independiente; las continuaciones interceptadas pueden diferir.",
 	"inventory.behavior.dead_windows_fallback": "Una continuación no asignada emite el terminador del acento y después el carácter actual.",
 	"inventory.behavior.dead_macos_fallback": "La alternativa depende de la distribución nativa; no se han verificado sus eventos físicos ni la salida de la aplicación.",
-	"inventory.behavior.dead_linux_fallback": "La captura cancelada conserva el carácter actual y descarta el acento anterior; la salida nativa puede diferir.",
-	"inventory.behavior.dead_windows_lifetime": "Las tablas integradas esperan hasta 2 segundos; el estado de tecla muerta del registro no caduca.",
+	"inventory.behavior.dead_linux_fallback": "Las tablas Compose convertidas escriben el acento y después el carácter actual, como macOS.",
+	"inventory.behavior.dead_windows_lifetime": "Las tablas integradas esperan hasta 2 segundos; el estado de tecla muerta del registro no tiene límite. La expiración y la pausa cancelan una tecla muerta pendiente.",
 	"inventory.behavior.dead_native_lifetime": "El sistema nativo gestiona la composición pendiente; las reglas de captura y reinicio son independientes de un plazo común del controlador."
 }

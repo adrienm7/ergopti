@@ -4099,7 +4099,7 @@
 	"inventory.behavior.dead_linux_composition": "使用原生 XKB/Compose 和独立文本捕获；被拦截的后续输入可能产生不同结果。",
 	"inventory.behavior.dead_windows_fallback": "未映射的后续输入会先输出重音终止字符，再输出当前字符。",
 	"inventory.behavior.dead_macos_fallback": "回退行为由原生布局管理；尚未验证物理事件及应用程序收到的输出。",
-	"inventory.behavior.dead_linux_fallback": "取消捕获时保留当前字符并丢弃之前的重音；原生输出可能不同。",
-	"inventory.behavior.dead_windows_lifetime": "内置映射表最多等待 2 秒；注册表死键状态没有超时。",
+	"inventory.behavior.dead_linux_fallback": "转换后的 Compose 表会像 macOS 一样先输入重音符号，再输入当前字符。",
+	"inventory.behavior.dead_windows_lifetime": "内置表最多等待 2 秒；注册表的死键状态没有超时。超时和暂停会取消待处理的死键。",
 	"inventory.behavior.dead_native_lifetime": "原生操作系统管理待定组合；捕获和重置规则与驱动程序共用超时不同。"
 }

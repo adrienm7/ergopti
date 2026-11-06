@@ -50,7 +50,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
 			"symbol": "DeadKey(Mapping)",
-			"sha256": "7855749443818d57f4676484a41d8ea9cbabcb5d952ba1682ded0fdabba3c43c"
+			"sha256": "a17138aaf6f33716723ac32d702e099db9c70aa6f07f4166aa837a75473e13af"
 		},
 		{
 			"id": "windows-dead-registry",

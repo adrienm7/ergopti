@@ -4099,7 +4099,7 @@
 	"inventory.behavior.dead_linux_composition": "XKB/Compose natif avec capture de texte indépendante ; une suite interceptée peut diverger.",
 	"inventory.behavior.dead_windows_fallback": "Une suite non associée émet le caractère de terminaison de l’accent, puis le caractère courant.",
 	"inventory.behavior.dead_macos_fallback": "Le repli dépend de la disposition native ; ses événements physiques et le texte reçu par l’application ne sont pas vérifiés.",
-	"inventory.behavior.dead_linux_fallback": "Une capture annulée conserve le caractère courant et abandonne l’accent précédent ; la sortie native peut différer.",
-	"inventory.behavior.dead_windows_lifetime": "Les tables intégrées attendent au plus 2 secondes ; l’état mort du registre n’a pas de délai maximal.",
+	"inventory.behavior.dead_linux_fallback": "Les tables Compose converties tapent l’accent, puis le caractère courant, comme macOS.",
+	"inventory.behavior.dead_windows_lifetime": "Les tables intégrées attendent au plus 2 secondes ; l’état mort du registre n’a pas de délai maximal. L’expiration et la pause annulent une touche morte en attente.",
 	"inventory.behavior.dead_native_lifetime": "Le système natif gère la composition en attente ; les règles de capture et de réinitialisation sont distinctes d’un délai commun au pilote."
 }
