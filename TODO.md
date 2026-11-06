@@ -48,6 +48,12 @@ into an exported `.keylayout`, since macOS may refuse to load it.
       compose, ligatures, numpad and media keys, key remapping, sticker printing, Unicode palette, live preview),
       for free and on all three OS. Inventory and design:
       [layout-generator-kbdedit-parity.md](docs/design/layout-generator-kbdedit-parity.md).
+- [ ] **One layout editor, not three.** Decided 2026-11-06: the generator's editor is built by unifying the editors
+      that already exist, never as a new parallel one: the navigation layer editor (`_shared/ui/layer_editor`, whose
+      model already reads and writes a TOML file with per-OS sections), the per-layer layout composer
+      (`_shared/ui/layout_composer`, which compiles a `.keylayout`) and the layout manager window that hosts it
+      (`_shared/ui/layout_manager`). One shared model and one page edit every layer, the navigation layer included,
+      and save the Ergopti TOML source; improve the navigation layer editor's UI on the way and retire the duplicates.
 - [ ] **Layout editor on the Svelte site.** A new tab where a user configures their own layout, opens or saves the
       Ergopti TOML, imports a `.keylayout`, and downloads every generated target.
 - [ ] **The same UI inside ErgoptiPlus.** The editor page runs locally in the app's webview on Windows, macOS and
