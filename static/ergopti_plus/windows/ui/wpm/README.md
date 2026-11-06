@@ -6,11 +6,11 @@ Always-on-top floating widget showing real-time typing speed (WPM). Supports two
 
 ## Key files
 
-| File              | Description                                                      |
-| ----------------- | ---------------------------------------------------------------- |
-| `init.ahk`        | Module entry: `WPMWidget_Start()` / `WPMWidget_Stop()` lifecycle |
-| `wpm_widget.ahk`  | GDI+ drawing, tick handler, colour logic                         |
-| `wpm_menubar.ahk` | Compact, always-visible WPM label in the tray area (non-GDI+)    |
+| File                   | Description                                                      |
+| ---------------------- | ---------------------------------------------------------------- |
+| `init.ahk`             | Module entry: `WPMWidget_Start()` / `WPMWidget_Stop()` lifecycle |
+| `wpm_widget.ahk`       | GDI+ drawing, tick handler, colour logic                         |
+| `wpm_tray_readout.ahk` | Live WPM number painted into a second notification-area icon     |
 
 ## Shared constants
 

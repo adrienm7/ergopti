@@ -2134,14 +2134,9 @@
 			"checked_when": [
 				"metrics_menubar_wpm"
 			],
-			"platforms": [
-				"hs",
-				"linux"
-			],
 			"disabled_when": [
 				"keystats_enabled"
-			],
-			"reason_key": "platform_reason.wpm_readout_needs_a_menubar"
+			]
 		},
 		{
 			"type": "check",
@@ -2150,15 +2145,10 @@
 			"checked_when": [
 				"metrics_menubar_colors"
 			],
-			"platforms": [
-				"hs",
-				"linux"
-			],
 			"disabled_when": [
 				"keystats_enabled",
 				"wpm_menubar_visible"
-			],
-			"reason_key": "platform_reason.wpm_readout_needs_a_menubar"
+			]
 		},
 		{
 			"type": "check",

@@ -507,6 +507,8 @@ disabled_apps = []
 wpm_widget_visible = false
 wpm_widget_colors = true
 wpm_widget_graph = true
+wpm_menubar_visible = false
+wpm_menubar_colors = true
 
 
 

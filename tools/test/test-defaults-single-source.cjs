@@ -172,8 +172,8 @@ async function main() {
 		// Maintainer decision of 2026-11-03: colours and graph on, the pill itself off.
 		['wpm_widget_colors', ['ahk', 'hs', 'linux'], true],
 		['wpm_widget_graph', ['ahk', 'hs', 'linux'], true],
-		['wpm_menubar_visible', ['hs', 'linux'], false],
-		['wpm_menubar_colors', ['hs', 'linux'], true]
+		['wpm_menubar_visible', ['ahk', 'hs', 'linux'], false],
+		['wpm_menubar_colors', ['ahk', 'hs', 'linux'], true]
 	]) {
 		const entry = metricsEntries.find((candidate) => candidate.id === id);
 		assert(entry, `metrics.${id} must be declared`);

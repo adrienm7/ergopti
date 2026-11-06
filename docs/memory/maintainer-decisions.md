@@ -508,3 +508,13 @@ daemon pumps the widget's own GLib context instead of leaving it to the tray's
 pump. WPM pointer-hide and colour precedence align on Windows (mouse after the
 last keystroke hides unless a preview is up; AI, then hotstring, then
 autocorrection); the Lua trackers still owe that change.
+
+## The WPM readout sits in the Windows notification area too (6 November 2026)
+
+Aligned on macOS and Linux: Windows shows the live typing speed as a second
+notification-area icon with the number painted on the source colour, shown
+while typing (`ui/wpm/wpm_tray_readout.ahk`, `adapters/notify_icon.ahk`). The
+`metrics_menu.wpm_menubar` / `menubar_colors` rows and the two
+`metrics.wpm_menubar_*` keys are declared on `ahk`;
+`platform_reason.wpm_readout_needs_a_menubar` is retired. Windows alone decides
+whether a new icon starts in the overflow; the user pins it.

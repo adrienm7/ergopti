@@ -53,6 +53,7 @@ _WPMZ_ChildSource(Canon, Recovery := false) {
 		Code .= State[0] . "`n"
 	}
 	Symbols := ["TickElapsed64", "_WPMWidget_TickDelta", "_WPMWidget_NeutralCategory", "_WPMWidget_ResetRolling",
+		"_WPMWidget_Collecting",
 		"WPMWidget_Push", "WPMWidget_Calc", "WPMWidget_Tick", "_WPMWidget_TooltipUp",
 		"_WPMWidget_HideSurface", "WPMWidget_ResolveBgColor", "_WPMWidget_DarkenHex"]
 	if Recovery {

@@ -51,7 +51,8 @@ _WPMR_ChildSource() {
 		AssertEqual(0, RegExMatch(Source, Pattern, , State.Pos + State.Len), "A state class may not be ambiguous: " . Name)
 		Code .= State[0] . "`n"
 	}
-	for Symbol in ["TickElapsed64", "_WPMWidget_TickDelta", "_WPMWidget_NeutralCategory", "WPMWidget_Push", "WPMWidget_Calc"] {
+	for Symbol in ["TickElapsed64", "_WPMWidget_TickDelta", "_WPMWidget_NeutralCategory", "_WPMWidget_Collecting",
+		"WPMWidget_Push", "WPMWidget_Calc"] {
 		Body := Symbol == "_WPMWidget_TickDelta" ? _WPMR_DeltaSource(Source) : _DriverFuncBody(Symbol)
 		AssertTrue(Body != "", "Every genuine WPM function must be nonempty: " . Symbol)
 		if Symbol == "WPMWidget_Push" || Symbol == "WPMWidget_Calc"

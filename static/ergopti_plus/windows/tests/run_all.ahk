@@ -376,6 +376,7 @@ InstallHotstringHooks()
 #Include ../adapters/system_control.ahk
 #Include ../adapters/mouse_control.ahk
 #Include ../adapters/graphics_renderer.ahk
+#Include ../adapters/notify_icon.ahk
 #Include ../ui/spotlight/ownership.ahk
 #Include ../adapters/shell_runner.ahk
 #Include ../../_shared/modules/actions/brightness.ahk
@@ -1335,6 +1336,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/test_keystats_password_fail_closed.ahk
 #Include unit/adapters/test_single_instance_gate.ahk
 #Include unit/adapters/test_worker_tray_icon_hidden.ahk
+#Include unit/adapters/test_notify_icon.ahk
 #Include unit/modules/keystats/test_keystats_network_transitions.ahk
 #Include ../infra/menu_command_origin.ahk
 #Include unit/ui/menu/test_menu_command_origin.ahk
@@ -1861,6 +1863,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/gestures/test_winorder_unbounded_and_cross_thread.ahk
 #Include meta/ui/wpm/test_wpm_push_unguarded_debug_arg_build.ahk
 #Include meta/ui/wpm/test_wpm_config_position_pair_validation.ahk
+#Include meta/ui/wpm/test_wpm_tray_readout_wiring.ahk
 #Include meta/ui/wpm/test_wpm_persistence_transaction.ahk
 #Include meta/infra/config/persistence/test_config_full_save_generation_guard.ahk
 #Include meta/ui/wpm/test_wpm_ring_buffer_cross_thread_race.ahk

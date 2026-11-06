@@ -477,10 +477,10 @@ M.features = {
 		path = "metrics.wpm_widget_graph", id = "wpm_widget_graph", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.wpm_widget_graph", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
-		path = "metrics.wpm_menubar_visible", id = "wpm_menubar_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.show_wpm_menubar", platforms = { "hs", "linux" }, recommended = false, family = "setting", reason_key = "platform_reason.wpm_readout_needs_a_menubar",
+		path = "metrics.wpm_menubar_visible", id = "wpm_menubar_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.show_wpm_menubar", platforms = { "ahk", "hs", "linux" }, recommended = false, family = "setting",
 	},
 	{
-		path = "metrics.wpm_menubar_colors", id = "wpm_menubar_colors", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.colors_by_source", platforms = { "hs", "linux" }, recommended = true, family = "setting", reason_key = "platform_reason.wpm_readout_needs_a_menubar",
+		path = "metrics.wpm_menubar_colors", id = "wpm_menubar_colors", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.colors_by_source", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
 		path = "shortcuts.enabled", id = "enabled", section = "shortcuts", default = false, type = "boolean", description_key = "menu.shortcuts.enabled", platforms = { "hs", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.category_master_is_a_gate_on_windows",

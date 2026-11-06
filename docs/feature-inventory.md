@@ -6,14 +6,12 @@ These are complete projections of the shared configuration and action catalogues
 
 Each unchecked row is a triage item, not a confirmed missing feature. To update this queue and the website data, edit the manifest and run `node tools/codegen/codegen-feature-inventory.cjs`; the Linux parity gate checks for stale outputs.
 
-## windows — 132 paths not declared
+## windows — 130 paths not declared
 
 - [ ] `hotstrings.enabled` (feature; declared: macos; reason: `platform_reason.hotstrings_master_is_macos_engine`)
 - [ ] `llm.models.user_models` (setting; declared: macos; reason: `platform_reason.llm_saved_user_models_are_macos`)
 - [ ] `llm.models.mlx` (setting; declared: macos; reason: `platform_reason.llm_mlx_is_apple_silicon`)
 - [ ] `llm.navigation.arrow_nav_enabled` (setting; declared: macos; reason: `platform_reason.arrow_navigation_is_macos`)
-- [ ] `metrics.wpm_menubar_visible` (setting; declared: macos, linux; reason: `platform_reason.wpm_readout_needs_a_menubar`)
-- [ ] `metrics.wpm_menubar_colors` (setting; declared: macos, linux; reason: `platform_reason.wpm_readout_needs_a_menubar`)
 - [ ] `shortcuts.enabled` (feature; declared: macos, linux; reason: `platform_reason.category_master_is_a_gate_on_windows`)
 - [ ] `shortcuts.keyboard.secondary_space` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.secondary_a` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
@@ -552,8 +550,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `tap_hold_close_other_karabiner_rows.tap_hold_close_other_karabiner` (hide): Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.
 - [ ] `tap_hold_vhid_update_rows.tap_hold_vhid_update` (hide): Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.
 - [ ] `tap_hold_owned_install_rows.tap_hold_owned_install` (hide): Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.
-- [ ] `metrics_menu.wpm_menubar` (hide): Not on Windows: these rows govern the words-per-minute readout in the menu bar (macOS) or the notification area (Linux). Windows has no equivalent; its readout is the floating widget.
-- [ ] `metrics_menu.menubar_colors` (hide): Not on Windows: these rows govern the words-per-minute readout in the menu bar (macOS) or the notification area (Linux). Windows has no equivalent; its readout is the floating widget.
 - [ ] `metrics_menu.metrics_availability` (hide): Linux only: under Wayland an application gets neither the cursor position nor the current desktop, so this list names the metrics that session cannot measure, each with its reason. Windows and macOS measure both on every session and have nothing to list.
 - [ ] `metrics_menu.metrics_migration` (hide): Linux only: this driver converts the stored metrics to encrypted form in the background and shows the progress here, with a way to stop. Windows and macOS convert on the next launch, so they have no progress to show.
 - [ ] `layout_menu.layout_bundle` (hide): macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.

@@ -1923,13 +1923,13 @@ family = "setting"
 type = "boolean"
 description_key = "menu.metrics.wpm_widget_graph"
 
-# The typing-speed readout in the Linux tray and the macOS menu bar. Same
-# shipped answers on both: off, coloured by source once on.
+# The typing-speed readout in the macOS menu bar and the Windows and Linux
+# notification areas. Same shipped answers everywhere: off, coloured by source
+# once on.
 [[features.metrics]]
 id = "wpm_menubar_visible"
-platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev"] }
-reason_key = "platform_reason.wpm_readout_needs_a_menubar"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = ["karabiner"], linux = ["evdev"], windows = [] }
 default = false
 recommended = false
 family = "setting"
@@ -1938,9 +1938,8 @@ description_key = "menu.metrics.show_wpm_menubar"
 
 [[features.metrics]]
 id = "wpm_menubar_colors"
-platforms = ["hs", "linux"]
-requires = { macos = ["karabiner"], linux = ["evdev"] }
-reason_key = "platform_reason.wpm_readout_needs_a_menubar"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = ["karabiner"], linux = ["evdev"], windows = [] }
 default = true
 recommended = true
 family = "setting"

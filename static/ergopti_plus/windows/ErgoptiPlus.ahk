@@ -431,6 +431,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/window_manager.ahk
 #Include adapters/system_control.ahk
 #Include adapters/graphics_renderer.ahk
+#Include adapters/notify_icon.ahk
 #Include adapters/tooltip_renderer.ahk
 #Include adapters/shell_runner.ahk
 #Include ../_shared/modules/actions/brightness.ahk
@@ -1241,6 +1242,7 @@ global _ParseExtTomlSectionsCache := Map()
 ; Loaded with Metrics off too: SaveFullConfig writes the widget booleans back, so
 ; they must carry the user's or the manifest's answer, not the class placeholders.
 WPMWidget_LoadConfig(_BootMetricsCache)
+WPMTrayReadout_LoadConfig(_BootMetricsCache)
 
 BootProfile_StageEnd("shortcuts", KeyboardShortcutAssignments.Count . " configured keyboard slot(s) read")
 BootProfile_Mark("Config, features & shortcuts loaded")
@@ -1704,6 +1706,9 @@ if (MetricsShortcuts.enabled and WPMWidget.visible) {
 		SetTimer(WPMWidget_PrewarmGraph, -WPMWidgetConst.PREWARM_DELAY_MS)
 	SetTimer(WPMWidget_BootShow, -WPMWidgetConst.BOOT_SHOW_DELAY_MS)
 }
+; The notification-area readout follows its own choice; it stays hidden until
+; the user types, and hides itself while metrics are off.
+WPMTrayReadout_BootStart()
 ; Publish the metrics dashboards' sidecars in a background worker once boot has
 ; settled, so the first open paints from disk at once instead of waiting for a
 ; cold projection (keystats_webview.ahk, background sidecar warm-up).
