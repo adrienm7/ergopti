@@ -386,6 +386,41 @@ assert(reasons["secret-service:fixture#1"] ~= "absent", "unreadable diagnostics 
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("linux-secret-tool-write-refusal: a refused stdin write cannot publish a reference", function()
+		-- LCR-002: secret-tool exits 0 after reading a short stdin, so its exit
+		-- status alone is not proof that the whole key reached the service.
+		local tool, dir = stand_in("exit 0")
+		local Store = helpers.load_module("modules.llm.api_token_store")
+		Store._set_backend_for_test(nil)
+		Store._set_tool_for_test(tool)
+		local popen = io.popen
+		local ok, err = pcall(function()
+			io.popen = function(command, mode)
+				local pipe = popen(command, mode)
+				if mode ~= "w" or not pipe then return pipe end
+				return setmetatable({}, { __index = function(_, key)
+					if key == "write" then
+						return function(_, input)
+							pipe:write(input:sub(1, 3))
+							return nil, "controlled short write"
+						end
+					end
+					local value = pipe[key]
+					if type(value) ~= "function" then return value end
+					return function(_, ...) return value(pipe, ...) end
+				end })
+			end
+			local reference = Store.store("provider", "SYNTHETIC-KEY-0123456789abcd")
+			io.popen = popen
+			helpers.assert_eq(recorded(dir, "stdin"), "SYN", "the stand-in received only the short write")
+			helpers.assert_nil(reference, "a refused write must not publish a secret-service reference")
+		end)
+		io.popen = popen
+		Store._set_tool_for_test(nil)
+		os.execute("rm -rf '" .. dir .. "'")
+		assert(ok, err)
+	end)
+
 	helpers.it("hands the key on stdin, byte for byte, never in the arguments (linux-api-key-secret-service)", function()
 		local tool, dir = stand_in("exit 0")
 		local Store = helpers.load_module("modules.llm.api_token_store")
