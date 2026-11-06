@@ -152,7 +152,8 @@ const GENERATORS = [
 		script: 'codegen/codegen-key-names.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/lua/keycodes/key_names_data.lua',
-			'static/ergopti_plus/windows/_generated/key_names.ahk'
+			'static/ergopti_plus/windows/_generated/key_names.ahk',
+			'static/ergopti_plus/_shared/ui/_generated/key_names.js'
 		]
 	},
 	{
