@@ -716,7 +716,7 @@ function M.sqlite_writer(opts)
 	local system_day_paths = {}
 	local fake = {
 		typing = {}, hotstrings = {}, shortcuts = {}, llm = {}, app_switches = {}, window_switches = {},
-		session_events = {}, system_events = {},
+		session_events = {}, system_events = {}, network_events = {},
 		app_days = {}, ngrams = {}, scancodes = {},
 		chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {},
 		app_buckets = {}, bursts = {}, sessions = {}, switches_to = {}, ergo = {},
@@ -774,6 +774,7 @@ function M.sqlite_writer(opts)
 	fake.insert_window_switch_events = collect(fake.window_switches)
 	fake.insert_session_events = collect(fake.session_events)
 	fake.insert_system_events = collect(fake.system_events)
+	fake.insert_network_events = collect(fake.network_events)
 	fake.insert_app_switch_events = collect(fake.app_switches)
 
 	function fake.upsert_app_day(device_id, date, app, fields)

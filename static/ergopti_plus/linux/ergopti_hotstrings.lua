@@ -3251,6 +3251,12 @@ local function main()
 				owner.observe_desktop()
 			end, function() system_metrics = nil end)
 		end
+		-- Internet and VPN transitions, the Windows events_network rows. The
+		-- module owns its sampler (this loop is at LuaJIT's upvalue limit) and
+		-- decides which probe is due; reachability answers later through libuv.
+		RuntimeGuard.call("network metrics sampler", function()
+			require("modules.keystats.network_metrics").daemon_tick(keystats.record_network_event)
+		end)
 
 		-- The WPM readouts' clock: the floating widget and the tray readout each
 		-- redraw at their shared rate however often this runs, from the live

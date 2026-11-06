@@ -116,8 +116,6 @@ local TextCipher = require("modules.keystats.text_cipher")
 local TextMigration = require("modules.keystats.text_migration")
 -- The per-device data.sql the macOS and Windows drivers import.
 local MetricsLedger = require("modules.keystats.metrics_ledger")
-local LedgerImport = require("modules.keystats.ledger_import")
-local LedgerRebuild = require("modules.keystats.ledger_rebuild")
 local MigrationPlan = require("keystats.text_migration")
 -- Battery, network, lock and suspend. Optional: a machine with none of the
 -- tools it reads simply reports nothing, and the typing path must not care.
@@ -172,6 +170,8 @@ local _pending_shortcut_events = {}
 -- LLM prediction events (generation, suggested, dismissed, accepted), buffered like their
 -- siblings and written to events_llm so the dashboard's AI tab has rows on this driver too.
 local _pending_llm_events = {}
+-- Connectivity transitions (network_metrics), the Windows events_network rows.
+local _pending_network_events = {}
 local _pending_app_switch_events = {}
 -- Window title changes, written to events_window_switch as Windows and macOS do:
 -- the dashboard's per-application context shifts read them.
@@ -729,6 +729,8 @@ end
 --- @param identity table This device's identity.
 --- @param metrics_dir string|nil Override of <config>/metrics (tests).
 LedgerSetup.start_import = function(identity, metrics_dir)
+	local LedgerImport = require("modules.keystats.ledger_import")
+	local LedgerRebuild = require("modules.keystats.ledger_rebuild")
 	local Paths = require("infra.paths")
 	local schema_path = Paths.shared("data/db/schema.sql")
 	local schema = schema_path and require("adapters.file_system").read(schema_path)
@@ -1429,6 +1431,23 @@ function M.record_llm_event(app_id, kind, fields)
 		row.net_saved_chars = char_count(row.prediction) - math.max(0, tonumber(row.deletes) or 0)
 	end
 	_pending_llm_events[#_pending_llm_events + 1] = row
+end
+
+--- Records one connectivity transition (network_metrics) in events_network.
+--- @param kind string One of network_metrics.KINDS.
+--- @param fields table|nil Metadata; only the kind's own keys are kept.
+function M.record_network_event(kind, fields)
+	if not may_record() then return end
+	local allowed = require("modules.keystats.network_metrics").KINDS[kind]
+	assert(allowed, "not an events_network kind: " .. tostring(kind))
+	fields = type(fields) == "table" and fields or {}
+	local clock = observe_calendar()
+	local meta = {}
+	for _, name in ipairs(allowed) do meta[name] = fields[name] end
+	_pending_network_events[#_pending_network_events + 1] = {
+		ts = clock.ts, date = clock.date, kind = kind,
+		app = dashboard_app_name(M.last_app() or "unknown"), meta = meta,
+	}
 end
 
 --- Records successful automated output that is not a static hotstring (LLM,
@@ -2532,7 +2551,7 @@ local function capture_flush(close_session)
 	local date = clock.date
 	local calendar_snapshot = snapshot_calendar(clock)
 	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {}, windows = {},
-		sessions = {}, system = {}, media = {} }, upserts = {} }
+		sessions = {}, system = {}, media = {}, network = {} }, upserts = {} }
 	local add = setmetatable({}, { __index = function(_, kind)
 		return function(_, ...)
 			payload.upserts[#payload.upserts + 1] = { kind = kind, args = copy_flush_value({ ... }) }
@@ -2542,11 +2561,13 @@ local function capture_flush(close_session)
 		typing = _pending_typing_events, hotstrings = _pending_hotstring_events,
 		shortcuts = _pending_shortcut_events, switches = _pending_app_switch_events,
 		llm = _pending_llm_events, windows = _pending_window_switch_events, sessions = _pending_session_events,
+		network = _pending_network_events,
 		system = _pending_system_events, media = _pending_media_events,
 	}
 	local _pending_typing_events, _pending_hotstring_events = buffers.typing, buffers.hotstrings
 	local _pending_shortcut_events, _pending_app_switch_events = buffers.shortcuts, buffers.switches
 	local _pending_llm_events = buffers.llm
+	local _pending_network_events = buffers.network
 	local _pending_window_switch_events = buffers.windows
 	local _pending_session_events = buffers.sessions
 	local _pending_system_events = buffers.system
@@ -2665,6 +2686,10 @@ local function capture_flush(close_session)
 	if #_pending_shortcut_events > 0 then
 		payload.raw.shortcuts = _pending_shortcut_events
 		_pending_shortcut_events = {}
+	end
+	if #_pending_network_events > 0 then
+		payload.raw.network = _pending_network_events
+		_pending_network_events = {}
 	end
 	if #_pending_llm_events > 0 then
 		payload.raw.llm = _pending_llm_events
@@ -3003,6 +3028,7 @@ local function restore_flush_buffers(buffers)
 	_pending_hotstring_events = prepend(buffers.hotstrings, _pending_hotstring_events)
 	_pending_shortcut_events = prepend(buffers.shortcuts, _pending_shortcut_events)
 	_pending_llm_events = prepend(buffers.llm, _pending_llm_events)
+	_pending_network_events = prepend(buffers.network, _pending_network_events)
 	_pending_window_switch_events = prepend(buffers.windows, _pending_window_switch_events)
 	_pending_session_events = prepend(buffers.sessions, _pending_session_events)
 	_pending_system_events = prepend(buffers.system, _pending_system_events)
@@ -3032,6 +3058,7 @@ local function dispatch_flush(close_session)
 	if #payload.raw.typing == 0 and #payload.raw.hotstrings == 0 and #payload.raw.shortcuts == 0
 		and #payload.raw.llm == 0 and #payload.raw.switches == 0 and #payload.raw.windows == 0
 		and #payload.raw.sessions == 0 and #payload.raw.system == 0 and #payload.raw.media == 0
+		and #payload.raw.network == 0
 		and #payload.upserts == 0 then
 		_last_flush_committed = true
 		prune_calendar(snapshot.calendar)
@@ -3045,6 +3072,7 @@ local function dispatch_flush(close_session)
 	_pending_typing_events, _pending_hotstring_events = {}, {}
 	_pending_shortcut_events, _pending_app_switch_events = {}, {}
 	_pending_llm_events = {}
+	_pending_network_events = {}
 	_pending_window_switch_events = {}
 	_pending_session_events = {}
 	_pending_system_events = {}
@@ -3243,7 +3271,7 @@ end
 --- Whether fresh capture still needs a durable reset boundary.
 has_reset_input = function()
 	return next(_pending_typing_events) ~= nil or #_pending_hotstring_events > 0
-		or #_pending_shortcut_events > 0 or #_pending_llm_events > 0
+		or #_pending_shortcut_events > 0 or #_pending_llm_events > 0 or #_pending_network_events > 0
 		or #_pending_window_switch_events > 0 or #_pending_session_events > 0
 		or #_pending_system_events > 0 or #_pending_app_switch_events > 0
 end
@@ -3415,6 +3443,7 @@ end
 --- @return integer
 function M._pending_buffer_count_for_test()
 	local count = #_pending_hotstring_events + #_pending_shortcut_events + #_pending_llm_events
+		+ #_pending_network_events
 		+ #_pending_app_switch_events + #_pending_window_switch_events
 	for _, stream in pairs(_pending_typing_events) do
 		for _, pending in ipairs(stream.runs) do count = count + #pending.events end
