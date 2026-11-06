@@ -689,7 +689,8 @@ do
 			} })
 			put("infra.llm_preferences", preferences)
 			put("modules.llm.profiles", { init = yes, is_enabled = yes })
-			put("modules.llm.api_entries", { active = function() return { id = "owned", provider = "openai_compat", model = "fixture-model" } end })
+			put("modules.llm.api_entries", { active = function() return { id = "owned", provider = "openai_compat", model = "fixture-model" } end,
+			  migrate_plaintext = yes })
 			put("modules.llm.api_remote", { serves = yes, provider = function() return { default_model = "fixture-model" } end,
 			  chat = function(_, _, messages, _, stream, done) state.requests[#state.requests + 1] = { messages = messages, stream = stream, done = done }; return true end,
 			  cancel = function() state.cancellations = state.cancellations + 1; return true end })
@@ -704,7 +705,9 @@ do
 			watch.barrier = function() local receipt = original_barrier(); receipt.role = role; return receipt end
 			watch.snapshot = function() local receipt = original_snapshot(); receipt.role = role; return receipt end
 			put("adapters.atspi_focus_watch", { new = function() return watch end })
+			-- Main binds the metrics sources at boot; none is granted, as on Wayland.
 			local window = { getFocused = function() return { appId = app, windowTitle = "owned ordinary field" } end,
+			  metrics_sources = function() return {} end,
 			  start_privacy_context = function(field, opts, callback)
 			    assert(field.role == role and opts.authorized())
 			    callback({ app_id = app, title = "owned ordinary field", native_identity = "owned-audit-frame" })
