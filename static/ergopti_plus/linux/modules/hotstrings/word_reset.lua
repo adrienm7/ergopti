@@ -558,6 +558,48 @@ function M.apply_control(engine, key_name, detail, app_id)
 	return at_word_start and "word_start" or "unknown"
 end
 
+-- The final key of a catalogue combination, as the catalogue spells it.
+local function combo_key(combo)
+	if type(combo) ~= "string" then return nil end
+	return combo:match("([^+]+)$")
+end
+
+local ARROW_COMBO_KEYS = { Left = true, Right = true, Up = true, Down = true }
+local DELIMITER_COMBO_KEYS = { Return = "enter", Tab = "tab" }
+
+--- Whether a catalogue combination is an arrow under any modifier (the declared
+--- arrow policy applies to every origin: physical, remap, gesture, tap-hold).
+--- @param combo string|nil X keysym combination such as "Left" or "ctrl+Right".
+--- @return boolean
+function M.is_arrow_combo(combo)
+	return ARROW_COMBO_KEYS[combo_key(combo)] == true
+end
+
+--- The hook's control-key name for a delimiter a catalogue combination presses.
+--- @param combo string|nil
+--- @return string|nil name "enter" or "tab", or nil for any other combination.
+function M.delimiter_key(combo)
+	return DELIMITER_COMBO_KEYS[combo_key(combo)]
+end
+
+--- Applies the arrow policy to an arrow the catalogue emitted and the virtual
+--- keyboard acknowledged. The keys never reach the hook, so this is the only
+--- place the engine hears of them. hotstrings.arrow_resets_word decides the
+--- word, whoever asked for the arrow; the AI context follows its own navigation
+--- preference through the engine.
+--- @param engine table Hotstring engine.
+--- @param combo string|nil The emitted combination.
+--- @return string effect "word_start", "kept", or "not_arrow".
+function M.apply_emitted_combo(engine, combo)
+	if not M.is_arrow_combo(combo) then return "not_arrow" end
+	if not M.arrow_resets_word() then
+		engine:navigated()
+		return "kept"
+	end
+	engine:reset(true, nil, "navigation")
+	return "word_start"
+end
+
 --- Applies a tap-hold key's own command (copy, paste, a window switch: any
 --- catalogue action the engine could not express as a typed key) to the
 --- hotstring engine. Its keys go straight to the virtual keyboard and never

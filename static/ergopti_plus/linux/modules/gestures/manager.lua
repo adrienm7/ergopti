@@ -680,6 +680,13 @@ local BUILTIN_HANDLERS = {
 local _action_handlers = {}
 
 
+-- The observer told about every key combination the catalogue emitted AND the
+-- virtual keyboard acknowledged, whoever asked for it (a gesture, a keyboard
+-- shortcut, a tap-hold). The emitted keys never reach the hook, so this is the
+-- only place their logical effect (an arrow's word and AI-context reset, a
+-- CapsWord delimiter) can be published, once, after the output is certain.
+local _effect_observer = nil
+
 local function _execute_action(action_name, go_next, binding)
 	if not action_name or action_name == "none" then return end
 
@@ -703,20 +710,21 @@ local function _execute_action(action_name, go_next, binding)
 	local function _press_combo(combo)
 		if not emitter_authority_current() then
 			Logger.error(LOG, "The gesture emitter is unavailable; '%s' was refused.", combo)
-			return
+			return false
 		end
 		local press, certify = _emitter_press, _emitter_certify
 		local emitted, result = press(combo)
-		if emitted == true then return end
+		if emitted == true then return true end
 		Logger.debug(LOG, "Checking pre-acquisition fallback admission for '%s' (X11 only).", combo)
 		if emitted ~= false or type(certify) ~= "function"
 			or not emitter_authority_current()
 			or certify(result, combo) ~= true
 			or not emitter_authority_current() then
 			Logger.warn(LOG, "Gesture '%s' refused another output producer after native refusal or unknown custody.", combo)
-			return
+			return false
 		end
 		_run("xdotool key " .. combo)
+		return true
 	end
 
 	--- Raises one of the driver's own windows, or reveals one of its files.
@@ -791,7 +799,12 @@ local function _execute_action(action_name, go_next, binding)
 	-- which did nothing under Wayland; they take the uinput path below as well.
 	local emit_combo = MODIFIER_ACTION_COMMANDS[action_name] or _EMIT_ROWS[action_name]
 	if emit_combo then
-		_press_combo(emit_combo)
+		if _press_combo(emit_combo) == true and _effect_observer then
+			local observed, detail = pcall(_effect_observer, action_name, emit_combo, binding)
+			if not observed then
+				Logger.error(LOG, "The action effect observer raised for '%s': %s.", action_name, tostring(detail))
+			end
+		end
 		return
 	end
 
@@ -2068,6 +2081,23 @@ local function _slot_for_gesture(fingers, direction, tap)
 	if tap then return "tap_" .. math.min(fingers, 5) end
 	if type(direction) ~= "string" or direction == "" then return nil end
 	return string.format("swipe_%d_%s", math.min(fingers, 5), direction)
+end
+
+--- The key combination the catalogue emits for an action, when it is a single one.
+--- @param action_name string An action id.
+--- @return string|nil combo X keysym names joined by "+", or nil.
+function M.emit_combo_for(action_name)
+	return MODIFIER_ACTION_COMMANDS[action_name] or _EMIT_ROWS[action_name]
+end
+
+--- Installs the one observer of acknowledged catalogue key emissions. The
+--- daemon owns it; a restarted session replaces its predecessor's.
+--- @param observer function|nil fn(action_name, combo, binding), or nil to remove.
+function M.set_effect_observer(observer)
+	if observer ~= nil and type(observer) ~= "function" then
+		error("the action effect observer must be a function or nil", 2)
+	end
+	_effect_observer = observer
 end
 
 --- Runs one action by name, whatever asked for it.

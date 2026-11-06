@@ -1149,8 +1149,11 @@ local function main()
 			if accepted == false then return false end
 			-- The command's keys (Ctrl+V for paste) go straight to the virtual
 			-- keyboard and never reach the hook: hotstrings.tap_hold_resets_word
-			-- decides here whether the next key starts a word.
-			local effect = WordReset.apply_tap_action(engine, binding)
+			-- decides here whether the next key starts a word. An arrow is the
+			-- exception: the effect observer below already applied the arrow policy
+			-- to it, whoever asked, and this option must not overrule it.
+			local effect = WordReset.is_arrow_combo(action_catalogue.emit_combo_for(action))
+				and "arrow" or WordReset.apply_tap_action(engine, binding)
 			if effect == "word_start" then _undoable = nil end
 			Logger.debug(LOG, "Tap action '%s' — hotstring word %s.", tostring(action), effect)
 			return accepted
@@ -1180,6 +1183,20 @@ local function main()
 		end
 		if shutdown.is_pending() then error("Tap-hold startup cleanup remains unacknowledged", 0) end
 		error("Tap-hold initialization refused; refusing input capture", 0)
+	end
+	-- The keys the action catalogue emits never reach the hook, so their logical
+	-- effect is published here once the virtual keyboard acknowledged them, for
+	-- every origin (gesture, keyboard shortcut, tap-hold): an arrow follows
+	-- hotstrings.arrow_resets_word and the AI navigation preference, and an
+	-- Enter or Tab ends CapsWord when it is a checked delimiter.
+	if action_catalogue then
+		action_catalogue.set_effect_observer(function(_, combo)
+			if WordReset.apply_emitted_combo(engine, combo) == "word_start" then _undoable = nil end
+			local delimiter = WordReset.delimiter_key(combo)
+			if delimiter and shortcuts and shortcuts.is_enabled() and shortcuts.is_caps_word_active() then
+				shortcuts.caps_word_observe_control(delimiter)
+			end
+		end)
 	end
 	-- The tray's tap-hold rows write the user's file through this and reload
 	-- the engine live. A hold that enters the recommended layer creates the
