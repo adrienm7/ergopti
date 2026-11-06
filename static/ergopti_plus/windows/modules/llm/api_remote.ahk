@@ -1286,8 +1286,10 @@ _LLMRemote_PollRequest(req_id) {
         _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("invalid_encoding", status, "", NetworkReport))
         return
     }
+    ; Status 0 is no HTTP answer at all: that stays a transport failure. Only an
+    ; answered response may hand its provider verdict to the classifier.
     Classified := _LLMRemoteClassifyTerminal(entryFormat,
-        Map("exit", 0, "status", status, "body_read", true, "body", body),
+        Map("exit", 0, "status", status, "body_read", (status is Integer) && status > 0, "body", body),
         entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : "")
     if !_LLMRemote_DeleteOwned(req_id, entry, true) || entry["cancelled"]
         return
