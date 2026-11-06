@@ -256,13 +256,22 @@ WrapSymbols_Reset(WriterFn := 0, ReplaceFn := 0, DeleteFn := 0) {
 		WriterFn, ReplaceFn, DeleteFn)
 }
 
+; Whether a custom wrap symbol is exactly one Unicode scalar. A supplementary
+; scalar is two UTF-16 units, so StrLen would refuse the emoji and math
+; letters macOS and Linux accept; an orphan surrogate is still refused.
+; @param Text any The candidate symbol.
+; @return bool
+WrapSymbols_IsSingleSymbol(Text) {
+	return Text is String && _TextCodepointLength(Text) == 1 && Text == _TextCompleteTailScalar(Text)
+}
+
 ; Add a custom symbol pair, then persist + rebuild.
 ; @param LeftChar  string Opening character.
 ; @param RightChar string Closing character (same as LeftChar when symmetric).
 WrapSymbols_AddCustom(LeftChar, RightChar, WriterFn := 0, ReplaceFn := 0,
 		DeleteFn := 0) {
 	if !(LeftChar is String) || !(RightChar is String)
-			|| StrLen(LeftChar) != 1 || StrLen(RightChar) != 1 {
+			|| !WrapSymbols_IsSingleSymbol(LeftChar) || !WrapSymbols_IsSingleSymbol(RightChar) {
 		try LoggerError("WrapSymbols", "Refusing to add a malformed custom symbol pair.")
 		return false
 	}
@@ -504,7 +513,7 @@ _WS_SerializeCandidate(Disabled, Custom) {
 		LeftChar := Pair["left"]
 		RightChar := Pair["right"]
 		if !(LeftChar is String) || !(RightChar is String)
-				|| StrLen(LeftChar) != 1 || StrLen(RightChar) != 1
+				|| !WrapSymbols_IsSingleSymbol(LeftChar) || !WrapSymbols_IsSingleSymbol(RightChar)
 			return false
 		Lines .= "`n[[custom]]`n"
 		Lines .= "left  = `"" . _WS_EscapeToml(LeftChar) . "`"`n"
@@ -634,7 +643,7 @@ _WS_ProjectCustom(Entry, Custom) {
 		throw ValueError("Custom wrap symbols must be nonempty text.")
 	; The legacy reader treats an absent/empty right side as a symmetric pair.
 	Right := Right == "" ? Left : Right
-	if StrLen(Left) != 1 || StrLen(Right) != 1
+	if !WrapSymbols_IsSingleSymbol(Left) || !WrapSymbols_IsSingleSymbol(Right)
 		throw ValueError("Custom wrap symbols must fit the native single-symbol domain.")
 	Custom.Push(Map("left", Left, "right", Right))
 }
