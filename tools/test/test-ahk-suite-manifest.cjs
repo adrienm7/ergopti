@@ -985,6 +985,10 @@ function assertReplayChildTimeoutWiring() {
 		path.resolve(__dirname, '../../.github/workflows/windows-test-replay.yml'),
 		'utf8'
 	);
+	// Other replay steps read the same selection; the controls must mutate the
+	// one consumer that check() asserts on, or they cannot make it fail.
+	const REPLAY_STEP = 'Replay every case alone and the selection in reverse';
+	const replayStep = (doc) => doc.jobs.replay.steps.find((step) => step.name === REPLAY_STEP);
 	function check(source) {
 		const parsed = yaml.parse(source, { uniqueKeys: true });
 		const choice = parsed.on.workflow_dispatch.inputs.child_timeout_ms;
@@ -994,9 +998,7 @@ function assertReplayChildTimeoutWiring() {
 		assert.equal(choice.default, '120000', 'automatic replay keeps its original child budget');
 		assert.deepEqual(choice.options, ['120000', '300000']);
 		assert.equal(parsed.jobs.replay['timeout-minutes'], 35);
-		const steps = parsed.jobs.replay.steps.filter(
-			(step) => step.name === 'Replay every case alone and the selection in reverse'
-		);
+		const steps = parsed.jobs.replay.steps.filter((step) => step.name === REPLAY_STEP);
 		assert.equal(steps.length, 1, 'one actual native replay consumer');
 		assert.equal(steps[0].shell, 'pwsh');
 		assert.equal(
@@ -1021,15 +1023,15 @@ function assertReplayChildTimeoutWiring() {
 		(doc) => doc.on.workflow_dispatch.inputs.child_timeout_ms.options.push('600000'),
 		(doc) => (doc.jobs.replay['timeout-minutes'] = 40),
 		(doc) => {
-			const step = doc.jobs.replay.steps.find((item) => item.env?.ERGOPTI_REPLAY_SELECTION);
+			const step = replayStep(doc);
 			step.env.ERGOPTI_REPLAY_CHILD_TIMEOUT_MS = '120000';
 		},
 		(doc) => {
-			const step = doc.jobs.replay.steps.find((item) => item.env?.ERGOPTI_REPLAY_SELECTION);
+			const step = replayStep(doc);
 			step.run = step.run.replace(' --timeout-ms "$env:ERGOPTI_REPLAY_CHILD_TIMEOUT_MS"', '');
 		},
 		(doc) => {
-			const step = doc.jobs.replay.steps.find((item) => item.env?.ERGOPTI_REPLAY_SELECTION);
+			const step = replayStep(doc);
 			step.run = step.run.replace(
 				'"$env:ERGOPTI_REPLAY_CHILD_TIMEOUT_MS"',
 				'$env:ERGOPTI_REPLAY_CHILD_TIMEOUT_MS'
