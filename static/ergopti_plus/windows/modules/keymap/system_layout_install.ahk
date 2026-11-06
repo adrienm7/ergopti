@@ -82,8 +82,8 @@ _SystemLayout_RegistryKlid(DllFile) {
 	global SLI_LAYOUTS_KEY
 	Loop Reg, SLI_LAYOUTS_KEY, "K" {
 		; Not every layout key names a file (an IME may not): absence is ordinary.
-		File := RegRead(A_LoopRegKey . "\" . A_LoopRegName, "Layout File", "")
-		if (StrLower(File) == StrLower(DllFile))
+		LayoutFile := RegRead(A_LoopRegKey . "\" . A_LoopRegName, "Layout File", "")
+		if (StrLower(LayoutFile) == StrLower(DllFile))
 			return StrUpper(A_LoopRegName)
 	}
 	return ""
