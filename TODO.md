@@ -123,7 +123,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 - [ ] **[CODE] WPMW-001:** Delayed boot Show overrides a newer widget disable. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wpm/windows/report.md).
 - [ ] **[CODE] WPMW-002:** Graph reports success after native bitmap upload refuses. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wpm/windows/report.md).
 - [x] **[CODE] WPMM-001:** Floating WPM canvas never opts into native mouse event delivery. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wpm/macos/report.md). Done: the floating WPM canvas now opts into mouse down, up and move delivery (canvasMouseEvents), so dragging reaches its callback.
-- [ ] **[CODE] WPMM-002:** WPM default anchor remains outside the desktop after display shrink. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wpm/macos/report.md).
+- [x] **[CODE] WPMM-002:** WPM default anchor remains outside the desktop after display shrink. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wpm/macos/report.md). Done: the default anchor is recomputed from the current display on every draw and no longer cached; only a dragged position persists.
 - [ ] **[CODE] WPML-001:** Refused redraw clears shown while the existing native widget remains visible, skipping later idle hide. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wpm/linux/report.md).
 
 ### wrap-symbols
