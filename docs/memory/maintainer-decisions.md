@@ -465,3 +465,10 @@ the shared word-start rule (`HSE_IsWordChar`, as `word_boundary_allows` in the
 Lua engine) applies: they never fire inside a larger word. The `@td★` / `@dt★` /
 `@date★` spelling is retired; `@` stays the prefix of personal-information
 tags only.
+
+## The +33 phone form drops only a leading 0 (6 November 2026)
+
+The international phone hotstring (`+33` followed by the first digits) types
+`+33` plus the stored number with a leading national `0` removed, on every OS.
+A number that does not start with `0` keeps all its digits; Windows no longer
+cuts whatever digit comes first (`_DynHS_InternationalPhone`).
