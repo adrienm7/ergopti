@@ -29,6 +29,35 @@ helpers.describe("ui.bridge_handlers", function()
   helpers.describe("onboarding_bridge", function()
     local handler = helpers.load_module("ui.onboarding.bridge")
 
+		helpers.it("(onboarding-config-fifo) refuses a chosen FIFO without blocking", function()
+			if package.config:sub(1, 1) == "\\" then return end
+			local quote, root = require("text_utils").shell_quote, helpers.driver_root()
+			local dir = os.tmpname(); os.remove(dir)
+			local made = os.execute("mkdir " .. quote(dir) .. " && mkfifo " .. quote(dir .. "/config.toml"))
+			assert(made == true or made == 0)
+			local source = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/?/init.lua;"
+				.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;")
+				.. "..package.path; local b=require('ui.onboarding.bridge'); local r=b.on_message("
+				.. "{action='loadExistingConfig',request=1,config_dir=" .. string.format("%q", dir) .. "},"
+				.. "{config_paths={default_config_dir=function()return '/' end}}); assert(r.loaded==false)"
+			local status = os.execute("timeout 3 " .. quote(assert(require("luv").exepath())) .. " -e " .. quote(source))
+			assert(os.remove(dir .. "/config.toml")); assert(os.remove(dir))
+			helpers.assert_true(status == true or status == 0, "a FIFO must be refused without waiting for a writer")
+		end)
+
+		helpers.it("(onboarding-config-fifo) refuses an unacknowledged configuration close", function()
+			local reader = require("infra.regular_file_reader")
+			local original = reader.open_source
+			reader.open_source = function() return { read = function() return "" end,
+				close = function() return nil, "close failed" end } end
+			local ok, result = pcall(handler.on_message,
+				{ action = "loadExistingConfig", request = 1, config_dir = "/tmp/fixture" },
+				{ config_paths = { default_config_dir = function() return "/" end } })
+			reader.open_source = original
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(result.loaded, false)
+		end)
+
 		-- A folder name no test creates, so the pages start from neutral values
 		-- unless a case writes a configuration on purpose.
 		local function scratch_dir()
@@ -103,6 +132,46 @@ helpers.describe("ui.bridge_handlers", function()
 		local function finish(state, answers)
 			return handler.on_message({ action = "finish", answers = answers }, state)
 		end
+
+		helpers.it("(onboarding-page-owner) does not send a picker result to a replacement", function()
+			local state, _, captured = onboarding_state()
+			local epoch = 1
+			state.webview_manager.current_epoch = function() return epoch end
+			state.webview_manager.page_current = function(_, value) return value == epoch end
+			state.shell = { quote = function(value) return value end, exec_checked = function() return true, "/tmp/ignored" end }
+			local picker, original = require("ui.config_dir_picker"), require("ui.config_dir_picker").pick
+			picker.pick = function() epoch = 2; return "/tmp/selected" end
+			local ok, result = pcall(handler.on_message, { action = "pickConfigDir" }, state,
+				{ app_name = "onboarding", epoch = 1 })
+			picker.pick = original
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(#captured.pushes, 0)
+		end)
+
+		helpers.it("(onboarding-page-owner) does not send a metrics result to a replacement", function()
+			local state, _, captured = onboarding_state()
+			local epoch = 1
+			state.webview_manager.current_epoch = function() return epoch end
+			state.webview_manager.page_current = function(_, value) return value == epoch end
+			state.config_paths.metrics_path = function() epoch = 2; return "/tmp/metrics.sqlite" end
+			local result = handler.on_message({ action = "resolveMetricsPath", request = 1 }, state,
+				{ app_name = "onboarding", epoch = 1 })
+			helpers.assert_eq(result.pushed, false)
+			helpers.assert_eq(#captured.pushes, 0)
+		end)
+
+		helpers.it("(onboarding-page-owner) refuses stale native pages and accepts a live one", function()
+			local state, _, captured = onboarding_state()
+			local live = false
+			state.webview_manager.current_epoch = function() return 1 end
+			state.webview_manager.page_current = function() return live end
+			local context = { app_name = "onboarding", epoch = 1 }
+			helpers.assert_nil(handler.on_message({ action = "resolveMetricsPath", request = 1 }, state, context))
+			live = true
+			local result = handler.on_message({ action = "resolveMetricsPath", request = 2 }, state, context)
+			helpers.assert_true(result.pushed)
+			helpers.assert_eq(#captured.pushes, 1)
+		end)
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "hsOnboarding")

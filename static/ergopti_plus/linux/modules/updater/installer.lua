@@ -166,7 +166,9 @@ local function archive_listings_canonical(names, verbose)
 	for _, entry in ipairs(split_lines(names)) do
 		if entry:sub(1, 1) == "/"
 			or entry:find("\\", 1, true)
-			or entry:find("..", 1, true)
+			-- Only a complete parent component escapes a root; names such as
+			-- notes..toml are ordinary files produced by tar as well.
+			or ("/" .. entry .. "/"):find("/../", 1, true)
 			or entry:match("^%./") then
 			return false, "archive contains an unsafe path: " .. entry
 		end
@@ -377,7 +379,9 @@ local function install_transaction(options, owned_current)
 
 	local retained_work = false
 	local function fail(detail)
-		if not retained_work then cleanup_work(work_dir, context.parent, ops) end
+		if not retained_work and not cleanup_work(work_dir, context.parent, ops) then
+			detail = detail .. "; staging cleanup failed at " .. work_dir
+		end
 		return false, detail
 	end
 
@@ -437,11 +441,10 @@ local function install_transaction(options, owned_current)
 
 	if not forward_current() or not ops.move(candidate, context.install_root) then
 		local restored = ops.move(backup, context.install_root)
-		cleanup_work(work_dir, context.parent, ops)
 		if not restored then
-			return false, "candidate activation and rollback both failed; backup remains at " .. backup
+			return fail("candidate activation and rollback both failed; backup remains at " .. backup)
 		end
-		return false, "candidate activation failed; previous installation restored"
+		return fail("candidate activation failed; previous installation restored")
 	end
 
 	local smoke_ok = forward_current() and ops.smoke(context.wrapper) and forward_current()
@@ -466,10 +469,10 @@ local function install_transaction(options, owned_current)
 		end
 		local restored = displaced and ops.move(backup, context.install_root)
 		if restored then
-			cleanup_work(work_dir, context.parent, ops)
-			return false, "updated wrapper smoke failed; previous installation restored"
+			return fail("updated wrapper smoke failed; previous installation restored")
 		end
 		return false, "updated wrapper smoke and rollback failed; backup remains at " .. backup
+			.. "; staging retained at " .. work_dir
 	end
 
 	local work_removed = cleanup_work(work_dir, context.parent, ops)

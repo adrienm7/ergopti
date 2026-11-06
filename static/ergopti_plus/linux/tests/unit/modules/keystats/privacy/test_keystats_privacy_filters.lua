@@ -181,6 +181,44 @@ helpers.describe("keystats privacy — private browsing", function()
 		end
 	end)
 
+	it("protects localized Firefox private windows before recording keys", function()
+		local kl = fresh_keystats()
+		for _, title in ipairs({
+			"Exemple — Navigation privée de Mozilla Firefox",
+			"Beispiel — Mozilla Firefox Privater Modus",
+			"Ejemplo — Mozilla Firefox Navegación privada",
+			"Mozilla Firefox — Navigazione anonima", "Mozilla Firefox — navegação privativa",
+			"Mozilla Firefox-privénavigatie", "Mozilla Firefox — tryb prywatny",
+			"Приватный просмотр Mozilla Firefox", "Приватний перегляд Mozilla Firefox",
+			"Mozilla Firefox Gizli Gezinti", "Mozilla Firefox プライベートブラウジング",
+			"Mozilla Firefox 사생활 보호 모드", "Mozilla Firefox 隐私浏览",
+			"Mozilla Firefox التصفح الخاص", "Anonymní prohlížení — Mozilla Firefox",
+			"Mozilla Firefox Privat browsing", "Mozilla Firefox Privat surfning",
+			"Mozilla Firefox Privat nettlesing", "גלישה פרטית של Mozilla Firefox",
+			"Exemple — NAVIGATION PRIVÉE de Mozilla Firefox",
+		}) do
+			kl.set_private_window(kl.is_private_window(title))
+			helpers.assert_true(kl.is_private_window(title), "private window must be detected")
+			helpers.assert_eq(keystrokes_after_typing(kl, "firefox"), 0, "private input must not be recorded")
+		end
+	end)
+
+	it("refreshes changed private markers and honors extra Unicode keywords", function()
+		local matcher = require("keystats.private_window")
+		local original = matcher.KEYWORDS
+		local ok, err = pcall(function()
+			matcher.KEYWORDS = { "Old marker" }
+			helpers.assert_true(matcher.matches("OLD MARKER"))
+			matcher.KEYWORDS[1] = "Nouveau marqueur"
+			helpers.assert_eq(matcher.matches("OLD MARKER"), false)
+			helpers.assert_true(matcher.matches("NOUVEAU MARQUEUR"))
+			helpers.assert_true(matcher.matches("Fenêtre ÉPHÉMÈRE", { "éphémère" }))
+			helpers.assert_eq(matcher.matches("Fenêtre ÉPHÉMÈRE", { "autre" }), false)
+		end)
+		matcher.KEYWORDS = original
+		if not ok then error(err, 0) end
+	end)
+
 	it("does not flag an ordinary window", function()
 		local kl = fresh_keystats()
 		helpers.assert_eq(kl.is_private_window("Inbox — Mozilla Firefox"), false)

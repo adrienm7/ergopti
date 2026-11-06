@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 
 --- Runs real privacy consumers against controlled native observations.
 --- @param body function Fixture assertions.
-local function fixture(body)
+local function fixture(body, asynchronous)
 	local names = { "modules.keystats.keystats", "modules.keystats.focus_guard", "adapters.secure_field_detector" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -24,6 +24,7 @@ local function fixture(body)
 			app = "code", title = "Ordinary editor", reads = 0, publications = 0, depth = 0, max_depth = 0 }
 		local listener, guard
 		local environment = setmetatable({ _cached_app_id = "code", keystats = logger,
+			TapHold = { observe_copy_activity = function() end },
 			-- Bare keys: the shared expansion delay reads the held modifiers per key.
 			keyboard_hook = { held_modifiers = function() return {} end },
 			InputEvent = require("infra.input_event"), Monotonic = { now_ms = function() return state.now end },
@@ -56,9 +57,9 @@ local function fixture(body)
 				return result
 			end,
 		}
-		guard = require("modules.keystats.focus_guard").new({
+		local ports = {
 			watch = watch, detector = require("adapters.secure_field_detector"), keystats = logger,
-			now_ms = function() return state.now end, settle_ms = 250,
+			now_ms = function() return state.now end, settle_ms = 250, retry_ms = 1000,
 			capture_context = function()
 				helpers.assert_eq(state.pumping == true, false, "context must not query from watch callbacks")
 				helpers.assert_eq(state.depth, 0, "context must not query inside native admission")
@@ -75,7 +76,18 @@ local function fixture(body)
 				if logger.is_password_app(context.app_id) then logger.suppress() else logger.unsuppress() end
 				return true, logger.is_context_protected(context.app_id, context.title)
 			end,
-		})
+		}
+		if asynchronous then
+			ports.capture_context = nil
+			ports.capture_context_async = function(_, _, callback)
+				state.complete_context = function()
+					state.settled = true
+					callback({ app_id = state.app, title = state.title, native_identity = "controlled-window" })
+				end
+				return { is_settled = function() return state.settled == true end, cancel = function() return state.settled == true end }
+			end
+		end
+		guard = require("modules.keystats.focus_guard").new(ports)
 		environment.secure_focus_guard = guard
 		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
 		local source = file:read("*a"); file:close()
@@ -104,6 +116,62 @@ local function fixture(body)
 end
 
 helpers.describe("Native field application privacy context", function()
+	helpers.it("starts application metrics only when asynchronous focus is admitted", function()
+		fixture(function(guard, logger, state)
+			local clock = require("infra.monotonic")
+			local previous = clock.now_ms
+			clock.now_ms = function() return state.now end
+			local ok, err = pcall(function()
+				local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+				local source = assert(file:read("*a")); assert(file:close())
+				local first = source:find("\tlocal function publish_admitted_focus()", 1, true)
+				local last = first and assert(source:find("\n\t-- Close the input path", first, true))
+				if not first then assert(source:find("secure_focus_guard.refresh(false)", 1, true), "baseline refresh must exist") end
+				local env = setmetatable({ secure_focus_guard = guard, keystats = logger,
+					Monotonic = { now_ms = function() return state.now end } }, { __index = _G })
+				local chunk
+				local code = first and (source:sub(first, last - 1) .. "\nreturn refresh_admitted_focus")
+					or "return function(immediate) return secure_focus_guard.refresh(immediate) end"
+				if loadstring then chunk = assert(loadstring(code)); setfenv(chunk, env)
+				else chunk = assert(load(code, "daemon metrics admission", "t", env)) end
+				local refresh = chunk()
+				helpers.assert_eq(guard.prime(), false)
+				logger.on_app_focus("code", state.now)
+				helpers.assert_nil(logger.get_app_stats().code, "the pending context cannot start an interval")
+				state.now = 1100; state.complete_context()
+				helpers.assert_true(refresh(true))
+				state.now = 1400
+				helpers.assert_eq(logger.get_app_stats().code.focus_time_ms, 300)
+				state.change("firefox", "Private Browsing")
+				state.settled = false
+				guard.refresh(true)
+				state.complete_context()
+				helpers.assert_true(refresh(true))
+				helpers.assert_nil(logger.get_app_stats().firefox, "a private context cannot start a focus interval")
+				state.press("x", 30)
+				helpers.assert_eq(logger._pending_buffer_count_for_test(), 0, "private input remains excluded")
+			end)
+			clock.now_ms = previous
+			if not ok then error(err, 0) end
+		end, true)
+	end)
+	helpers.it("(localized-private-context) protects metrics and hotstrings only while the filter is enabled", function()
+		fixture(function(guard, logger, state)
+			state.app, state.title = "firefox", "Exemple — NAVIGATION PRIVÉE de Mozilla Firefox"
+			helpers.assert_true(guard.prime())
+			helpers.assert_true(guard.blocks_text())
+			state.press("x", 30)
+			helpers.assert_eq(logger._pending_buffer_count_for_test(), 0, "private input cannot reach metrics")
+			helpers.assert_eq(state.engine_calls or 0, 0, "private input cannot reach the hotstring engine")
+			local configuration = assert(logger.configuration_snapshot())
+			configuration.private_filter_enabled = false
+			helpers.assert_true(logger.apply_configuration(configuration))
+			helpers.assert_eq(guard.blocks_text(), false, "the user-disabled filter is respected")
+			state.press("y", 31)
+			helpers.assert_eq(logger._pending_buffer_count_for_test(), 1)
+			helpers.assert_eq(state.engine_calls, 1)
+		end)
+	end)
 	for _, policy in ipairs({ "password application", "private window" }) do
 		helpers.it("(focus-context-join) " .. policy .. " cannot borrow the previous ordinary context", function()
 			fixture(function(guard, logger, state, environment)

@@ -47,10 +47,10 @@ local function fixture(initial_role)
 	local source = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
 	local body = assert(source:read("*a"):match("local function on_click%(%)(.-)\n\tend"), "native pointer callback missing")
 	source:close()
-	local factory = assert((loadstring or load)("return function(secure_focus_guard,wrap_on_type,prediction_engine,WordReset,engine,Logger,LOG) "
+	local factory = assert((loadstring or load)("return function(secure_focus_guard,wrap_on_type,prediction_engine,WordReset,engine,Logger,LOG,TapHold) "
 		.. "return function() " .. body .. " end end"))()
 	local click = factory(guard, wrap, nil, { click_resets_word = function() return true end }, engine,
-		helpers.make_logger_stub(), "fixture")
+		helpers.make_logger_stub(), "fixture", { observe_copy_activity = function() end })
 	return {
 		click = click, guard = guard, detector = detector, output = output,
 		reads = function() return reads end, secure = function() return secure end,

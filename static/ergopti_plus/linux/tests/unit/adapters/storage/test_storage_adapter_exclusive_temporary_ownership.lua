@@ -121,6 +121,8 @@ helpers.describe("storage concurrent backup ownership", function()
 				local backup = path .. ".corrupt" .. (depth == 0 and "" or ".1")
 				local original, history = "{Malformed original bytes", "Retained concurrent backup bytes"
 				local real_open, real_getenv = io.open, os.getenv
+				local Reader = require("infra.regular_file_reader")
+				local real_source = Reader.open_source
 				local function write(name, bytes)
 					local file = assert(real_open(name, "wb")); assert(file:write(bytes) and file:close())
 				end
@@ -131,17 +133,19 @@ helpers.describe("storage concurrent backup ownership", function()
 				if depth == 1 then write(path .. ".corrupt", history) end
 				os.getenv = function(name) if name == "XDG_CONFIG_HOME" then return root end; return real_getenv(name) end
 				local claimed = false
-				io.open = function(name, mode)
-					if name == backup and mode == "r" and not claimed then
+				Reader.open_source = function(name)
+					local file, detail, code = real_source(name)
+					if name == backup and not claimed then
+						helpers.assert_nil(file)
+						helpers.assert_eq(code, Reader.ENOENT)
 						claimed = true
 						if alias == "regular" then write(backup, history)
 						else
 							local Shell = require("adapters.shell_runner")
 							helpers.assert_true(Shell.run("ln -s -- " .. Shell.quote(root .. "/missing") .. " " .. Shell.quote(backup)))
 						end
-						return nil, "No such file or directory", 2
 					end
-					return real_open(name, mode)
+					return file, detail, code
 				end
 				local next_backup = path .. ".corrupt." .. (depth + 1)
 				local ok, err = xpcall(function()
@@ -161,7 +165,7 @@ helpers.describe("storage concurrent backup ownership", function()
 					if depth == 1 then helpers.assert_eq(read(path .. ".corrupt"), history) end
 					helpers.assert_true(storage.set("value", "replacement"))
 				end, debug.traceback)
-				io.open, os.getenv = real_open, real_getenv
+				Reader.open_source, os.getenv = real_source, real_getenv
 				package.loaded["adapters.storage"] = nil
 				os.remove(backup); os.remove(next_backup); os.remove(path .. ".corrupt"); os.remove(path)
 				os.remove(root .. "/" .. FOLDER); os.remove(root)
@@ -455,17 +459,19 @@ helpers.describe("storage backup open receipts", function()
 				local file = assert(io.open(target, "wb"))
 				assert(file:write(bytes) and file:close())
 			end
-			local real_getenv, real_open = os.getenv, io.open
+			local real_getenv = os.getenv
+			local Reader = require("infra.regular_file_reader")
+			local real_source = Reader.open_source
 			os.getenv = function(name)
 				if name == "XDG_CONFIG_HOME" then return root end
 				return real_getenv(name)
 			end
-			io.open = function(target, mode)
-				if target == backup and mode == "r" then
+			Reader.open_source = function(target)
+				if target == backup then
 					if receipt == "throw" then error("native backup open raised") end
 					return nil, "native backup open refused", type(receipt) == "number" and receipt or nil
 				end
-				return real_open(target, mode)
+				return real_source(target)
 			end
 			local ok, err = xpcall(function()
 				local storage = helpers.load_module("adapters.storage")
@@ -475,7 +481,7 @@ helpers.describe("storage backup open receipts", function()
 				helpers.assert_eq(recovery.path, path)
 				helpers.assert_eq(recovery.preserved, false)
 			end, debug.traceback)
-			os.getenv, io.open = real_getenv, real_open
+			os.getenv, Reader.open_source = real_getenv, real_source
 			package.loaded["adapters.storage"] = nil
 			local preserved = {}
 			for target in pairs(originals) do

@@ -16,6 +16,7 @@ local ConfigDirPicker = require("ui.config_dir_picker")
 local Version = require("infra.version")
 local LOG = "bridge.hsPaths"
 local APP_NAME = "paths_editor"
+local _save_owner = nil
 
 local function dependency(state, field, module_name)
 	if type(state[field]) == "table" then return state[field] end
@@ -93,7 +94,10 @@ local function build_initial_payload(state)
 	}
 end
 
-local function hide(state)
+local function hide(state, context)
+	if type(context) == "table" and type(context.close_owned_window) == "function" then
+		return context.close_owned_window() == true
+	end
 	local manager = dependency(state, "webview_manager", "ui.webview_manager")
 	if not manager or type(manager.hide) ~= "function" then return false end
 	local ok, hidden = pcall(manager.hide, APP_NAME)
@@ -104,13 +108,36 @@ end
 --- @param payload any Action table from host_bridge.js.
 --- @param state table Daemon state and optional test-injected authorities.
 --- @return table|nil Diagnostic response; page data is pushed through eval_js.
-function M.on_message(payload, state)
+function M.on_message(payload, state, context)
 	state = type(state) == "table" and state or {}
 	if type(payload) ~= "table" then return nil end
 	local action = payload.action
+	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local epoch = type(context) == "table" and context.epoch or nil
+	local current_epoch = manager and manager.current_epoch
+	local native_current = manager and manager.page_current
+	local function page_current()
+		if epoch == nil then return true end
+		if context.app_name ~= APP_NAME or type(current_epoch) ~= "function"
+			or dependency(state, "webview_manager", "ui.webview_manager") ~= manager
+			or manager.current_epoch ~= current_epoch then return false end
+		local ok, observed = pcall(current_epoch, APP_NAME)
+		if not ok or observed ~= epoch or manager.current_epoch ~= current_epoch
+			or dependency(state, "webview_manager", "ui.webview_manager") ~= manager then return false end
+		if action == "ready" or action == "cancel" then return true end
+		if type(native_current) ~= "function" or manager.page_current ~= native_current then return false end
+		local checked, live = pcall(native_current, APP_NAME, epoch)
+		if not checked or live ~= true or manager.current_epoch ~= current_epoch
+			or manager.page_current ~= native_current then return false end
+		local reread, final = pcall(current_epoch, APP_NAME)
+		return reread and final == epoch and dependency(state, "webview_manager", "ui.webview_manager") == manager
+			and manager.current_epoch == current_epoch
+			and manager.page_current == native_current
+	end
+	if not page_current() then return nil end
 	if action == "ready" then
 		local data = build_initial_payload(state)
-		if not data then return { pushed = false } end
+		if not data or not page_current() then return { pushed = false } end
 		return { pushed = push(state, "initData", data), data = data }
 	elseif action == "browse" then
 		local config_paths = dependency(state, "config_paths", "infra.config_paths")
@@ -127,6 +154,7 @@ function M.on_message(payload, state)
 			dependency(state, "i18n", "infra.i18n"),
 			current
 		)
+		if not page_current() then return { picked = false } end
 		if not selected then
 			Logger.debug(LOG, "Folder picker returned no directory: %s.", tostring(select_err))
 			return { picked = false }
@@ -137,72 +165,85 @@ function M.on_message(payload, state)
 			pushed = push_browse_result(state, selected, target),
 		}
 	elseif action == "save" then
-		local config_paths = dependency(state, "config_paths", "infra.config_paths")
-		-- A page that sends no logs folder keeps the stored one. A folder it
-		-- does send is validated before anything is stored: refusing it after
-		-- the configuration folder was saved reported a failed save that had
-		-- half happened.
-		local logs_dir = nil
-		if type(payload.logsDir) == "string" then
-			if not config_paths or type(config_paths.normalize_logs_dir) ~= "function"
-				or type(config_paths.set_paths) ~= "function" then
-				Logger.error(LOG, "The logs folder cannot be saved without its writer; editor remains open.")
-				return { saved = false }
-			end
-			local normalized, refusal = config_paths.normalize_logs_dir(payload.logsDir)
-			-- A folder the next start could not use is refused now rather than
-			-- stored: install() would fall back to stdout for it.
-			if normalized ~= nil and normalized ~= "" and normalized ~= config_paths.default_logs_dir() then
-				local sink = dependency(state, "logger_sink", "infra.logger_sink")
-				if not sink or type(sink.prepare_dir) ~= "function" then
-					normalized, refusal = nil, "the logs folder cannot be prepared"
-				else
-					local ready, why = sink.prepare_dir(normalized)
-					if ready ~= true then normalized, refusal = nil, why end
+		if _save_owner then return { saved = false, busy = true } end
+		local owner = { manager = manager, epoch = epoch }
+		_save_owner = owner
+		local function save_paths()
+			local config_paths = dependency(state, "config_paths", "infra.config_paths")
+			-- A page that sends no logs folder keeps the stored one. A folder it
+			-- does send is validated before anything is stored: refusing it after
+			-- the configuration folder was saved reported a failed save that had
+			-- half happened.
+			local logs_dir = nil
+			if type(payload.logsDir) == "string" then
+				if not config_paths or type(config_paths.normalize_logs_dir) ~= "function"
+					or type(config_paths.set_paths) ~= "function" then
+					Logger.error(LOG, "The logs folder cannot be saved without its writer; editor remains open.")
+					return { saved = false }
 				end
+				local normalized, refusal = config_paths.normalize_logs_dir(payload.logsDir)
+				-- A folder the next start could not use is refused now rather than
+				-- stored: install() would fall back to stdout for it.
+				if normalized ~= nil and normalized ~= "" and normalized ~= config_paths.default_logs_dir() then
+					local sink = dependency(state, "logger_sink", "infra.logger_sink")
+					if not sink or type(sink.prepare_dir) ~= "function" then
+						normalized, refusal = nil, "the logs folder cannot be prepared"
+					else
+						local ready, why = sink.prepare_dir(normalized)
+						if ready ~= true then normalized, refusal = nil, why end
+					end
+				end
+				if normalized == nil then
+					Logger.error(LOG, "Logs folder '%s' was refused (%s); nothing was saved and the editor remains open.",
+						payload.logsDir, tostring(refusal))
+					return { saved = false }
+				end
+				logs_dir = payload.logsDir
 			end
-			if normalized == nil then
-				Logger.error(LOG, "Logs folder '%s' was refused (%s); nothing was saved and the editor remains open.",
-					payload.logsDir, tostring(refusal))
+			if not page_current() then return { saved = false } end
+			local saved = config_paths and type(config_paths.set_paths) == "function"
+				and config_paths.set_paths(payload.configDir, logs_dir) == true
+			if not saved then
+	        Logger.error(LOG, "Configuration directory was not persisted; editor remains open.")
 				return { saved = false }
 			end
-			logs_dir = payload.logsDir
-		end
-		local saved = config_paths and type(config_paths.set_paths) == "function"
-			and config_paths.set_paths(payload.configDir, logs_dir) == true
-		if not saved then
-        Logger.error(LOG, "Configuration directory was not persisted; editor remains open.")
-			return { saved = false }
-		end
-		if logs_dir ~= nil then
-			-- The daemon outlives this editor's reload, so the running sink is
-			-- moved now; until it is, every opener names the folder it writes.
-			local sink = dependency(state, "logger_sink", "infra.logger_sink")
-			local moved, move_err = false, "the logger sink cannot be moved"
-			if sink and type(sink.repoint) == "function" then moved, move_err = sink.repoint() end
-			if moved ~= true then
-				Logger.error(LOG, "Logs folder saved, but the logger could not move there (%s); editor remains open.",
-					tostring(move_err))
-				return { saved = false }
+			if logs_dir ~= nil then
+				-- The daemon outlives this editor's reload, so the running sink is
+				-- moved now; until it is, every opener names the folder it writes.
+				local sink = dependency(state, "logger_sink", "infra.logger_sink")
+				local moved, move_err = false, "the logger sink cannot be moved"
+				if sink and type(sink.repoint) == "function" then moved, move_err = sink.repoint() end
+				if moved ~= true then
+					Logger.error(LOG, "Logs folder saved, but the logger could not move there (%s); editor remains open.",
+						tostring(move_err))
+					return { saved = false }
+				end
+				Logger.info(LOG, "Logs now written to %s.", config_paths.get_logs_dir())
 			end
-			Logger.info(LOG, "Logs now written to %s.", config_paths.get_logs_dir())
+			local reloaded = false
+			if type(state.on_reload) == "function" then
+				local ok, accepted = pcall(state.on_reload)
+				reloaded = ok and accepted == true
+				if not reloaded then Logger.error(LOG, "Configuration reload was refused after save.") end
+			else
+				Logger.warn(LOG, "Configuration directory saved; daemon reload is unavailable.")
+			end
+			local hidden = false
+			if reloaded and page_current() then
+				hidden = hide(state, context)
+				Logger.success(LOG, "Configuration directory persisted: %s", config_paths.get_config_dir())
+			end
+			return { saved = true, hidden = hidden, reloaded = reloaded }
 		end
-		local reloaded = false
-		if type(state.on_reload) == "function" then
-			local ok, accepted = pcall(state.on_reload)
-			reloaded = ok and accepted == true
-			if not reloaded then Logger.error(LOG, "Configuration reload was refused after save.") end
-		else
-			Logger.warn(LOG, "Configuration directory saved; daemon reload is unavailable.")
-		end
-		local hidden = false
-		if reloaded then
-			hidden = hide(state)
-			Logger.success(LOG, "Configuration directory persisted: %s", config_paths.get_config_dir())
-		end
-		return { saved = true, hidden = hidden, reloaded = reloaded }
+		local ok, result = pcall(save_paths)
+		if _save_owner == owner then _save_owner = nil end
+		if not ok then error(result, 0) end
+		return result
 	elseif action == "cancel" then
-		return { cancelled = true, hidden = hide(state) }
+		if _save_owner and _save_owner.manager == manager and _save_owner.epoch == epoch then
+			return { cancelled = false, hidden = false, busy = true }
+		end
+		return { cancelled = true, hidden = hide(state, context) }
 	end
 
 	Logger.debug(LOG, "Unknown action: %s", tostring(action))

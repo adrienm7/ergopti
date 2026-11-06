@@ -33,7 +33,7 @@ end
 
 --- Runs one isolated public callback case over explicitly scripted HTTP.
 --- @param test function Receives the provider, queued requests and logger records.
-local function isolated(test)
+local function isolated(test, real_logger)
 	local saved = {}
 	for _, name in ipairs({ "adapters.http_client", "modules.llm.api_remote", "logger.shim" }) do
 		saved[name] = package.loaded[name]
@@ -41,14 +41,19 @@ local function isolated(test)
 	local calls, logs = {}, {}
 	package.loaded["adapters.http_client"] = {
 		post = function(url, headers, body, callback, options)
-			calls[#calls + 1] = { callback = callback, options = options }
+			calls[#calls + 1] = { url = url, callback = callback, options = options }
 			return true
 		end,
 		cancel = function() error("a settled callback must not cancel its successor") end,
 	}
-	local logger = helpers.make_logger_stub()
-	logger.error = function(owner, message, detail)
-		logs[#logs + 1] = { owner = owner, message = message, detail = detail }
+	local logger = real_logger and helpers.fresh_module("logger") or helpers.make_logger_stub()
+	if real_logger then
+		logger.set_level("debug")
+		logger.set_sink(function(line) logs[#logs + 1] = line end)
+	else
+		logger.error = function(owner, message, detail)
+			logs[#logs + 1] = { owner = owner, message = message, detail = detail }
+		end
 	end
 	package.loaded["logger.shim"] = logger
 	local ok, err = pcall(function()
@@ -114,6 +119,36 @@ local function check_delivery(delivered, chunks, text, reason)
 end
 
 helpers.describe("api_remote_callbacks: safe reporting and callback ownership", function()
+	helpers.it("keeps private endpoint path out of real debug logs", function()
+		isolated(function(remote, calls, logs)
+			local secret = "private-path-token-729"
+			local url = "https://example.invalid/" .. secret
+			assert(remote.chat({ provider = "openai_compat", base_url = url, token = "fixture-key", model = "fixture-model" },
+				nil, { { role = "user", content = "hello" } }, { temperature = 0.2, max_tokens = 40 }, nil, function() end))
+			helpers.assert_contains(calls[1].url, secret, "the actual request still uses the configured path")
+			local lines = table.concat(logs, "\n")
+			helpers.assert_contains(lines, "chat()")
+			helpers.assert_nil(lines:find(secret, 1, true))
+		end, true)
+	end)
+	helpers.it("withholds callback text in the real formatted logger", function()
+		isolated(function(remote, calls, logs)
+			assert(start(remote, "openai", nil, function(text) error(text, 0) end))
+			calls[1].callback({ ok = true, status = 200, body = replies.openai })
+			local lines = table.concat(logs, "\n")
+			helpers.assert_contains(lines, "Terminal callback raised")
+			helpers.assert_contains(lines, "details withheld")
+			helpers.assert_nil(lines:find("valid reply", 1, true))
+		end, true)
+	end)
+	helpers.it("withholds private response text raised by a terminal callback", function()
+		isolated(function(remote, calls, logs)
+			assert(start(remote, "openai", nil, function(text) error(text, 0) end))
+			calls[1].callback({ ok = true, status = 200, body = replies.openai })
+			helpers.assert_eq(#logs, 1)
+			check_log(logs[1], "details withheld")
+		end)
+	end)
 	local cases = { "healthy", "chunk-string", "chunk-object", "terminal-string",
 		"terminal-object", "terminal-throwing-object", "reentry-object", "reentry-throwing-object" }
 	for _, format in ipairs({ "openai", "anthropic", "gemini" }) do
@@ -166,7 +201,7 @@ helpers.describe("api_remote_callbacks: safe reporting and callback ownership", 
 						helpers.assert_eq(successors, 1)
 					end
 					helpers.assert_eq(remote.is_active(), false)
-					if case == "terminal-string" then helpers.assert_eq(#logs, 1); check_log(logs[1], "owned terminal failure")
+					if case == "terminal-string" then helpers.assert_eq(#logs, 1); check_log(logs[1], "details withheld")
 					elseif case:find("object", 1, true) and case ~= "chunk-object" then
 						helpers.assert_eq(#logs, 1); check_log(logs[1], "error object (table)")
 					else helpers.assert_eq(#logs, 0) end
@@ -211,8 +246,8 @@ helpers.describe("api_remote_callbacks: safe reporting and callback ownership", 
 			end)
 		end
 	end
-	for _, case in ipairs({ { name = "empty string", value = "", expected = "" },
-		{ name = "number", value = 42, expected = "42" }, { name = "false", value = false, expected = "false" },
+	for _, case in ipairs({ { name = "empty string", value = "", expected = "details withheld" },
+		{ name = "number", value = 42, expected = "details withheld" }, { name = "false", value = false, expected = "false" },
 		{ name = "function", value = function() error("must not be called") end, expected = "error object (function)" },
 		{ name = "thread", value = coroutine.create(function() error("must not resume") end), expected = "error object (thread)" } }) do
 		helpers.it("api_remote_callbacks: safely describes " .. case.name .. " terminal failure", function()

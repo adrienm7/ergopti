@@ -114,6 +114,27 @@ end
 -- =================================================================
 
 helpers.describe("mt decoder: how many fingers", function()
+	helpers.it("refuses a tap whose clock moved backwards during contact", function()
+		local now = 100
+		local decoder = Decoder.new({ now_sec = function() return now end })
+		local events = gesture_events(3, 0, 0)
+		local result
+		for index, event in ipairs(events) do
+			if index > math.floor(#events / 2) then now = 90 end
+			result = decoder:feed({ type = event[1], code = event[2], value = event[3] }) or result
+		end
+		helpers.assert_nil(result, "a negative duration cannot establish a brief tap")
+	end)
+
+	helpers.it("does not let an old scroll guard block gestures after a clock rollback", function()
+		local now = 100
+		local decoder = Decoder.new({ now_sec = function() return now end })
+		feed_all(decoder, gesture_events(2, 0, -400))
+		now = 90
+		local result = feed_all(decoder, gesture_events(3, 0, -400))
+		helpers.assert_true(result ~= nil, "a prior scroll in the future must not suppress a new swipe")
+		helpers.assert_eq(result.fingers, 3)
+	end)
 
 	for fingers = 2, 5 do
 		helpers.it(string.format("reports %d finger(s) despite the count walking up and down", fingers), function()
@@ -333,6 +354,70 @@ end)
 
 helpers.describe("mt decoder: what must not go wrong", function()
 
+	helpers.it("does not classify a long hold as a tap when positions arrive late", function()
+		local now = 10
+		local decoder = Decoder.new({ now_sec = function() return now end, tap_max_sec = 0.3, stable_frames = 1 })
+		feed_all(decoder, {
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, 1 },
+			{ EV_KEY, BTN_TOOL[1], 1 }, { EV_KEY, BTN_TOUCH, 1 }, { EV_SYN, SYN_REPORT, 0 },
+		})
+		now = 11
+		feed_all(decoder, {
+			{ EV_ABS, Decoder.ABS_MT_POSITION_X, 100 }, { EV_ABS, Decoder.ABS_MT_POSITION_Y, 100 },
+			{ EV_SYN, SYN_REPORT, 0 },
+		})
+		now = 11.05
+		local result = feed_all(decoder, {
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1 }, { EV_KEY, BTN_TOOL[1], 0 },
+			{ EV_KEY, BTN_TOUCH, 0 }, { EV_SYN, SYN_REPORT, 0 },
+		})
+		helpers.assert_nil(result, "hold duration begins when touch was observed, not when coordinates arrive")
+	end)
+
+	helpers.it("recognises another tap when a reused slot omits unchanged coordinates", function()
+		local decoder = Decoder.new()
+		local first = feed_all(decoder, gesture_events(1, 0, 0))
+		helpers.assert_true(first and first.tap)
+		local again = feed_all(decoder, {
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, 800 },
+			{ EV_KEY, BTN_TOOL[1], 1 }, { EV_KEY, BTN_TOUCH, 1 },
+			{ EV_SYN, SYN_REPORT, 0 }, { EV_SYN, SYN_REPORT, 0 },
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1 },
+			{ EV_KEY, BTN_TOOL[1], 0 }, { EV_KEY, BTN_TOUCH, 0 },
+			{ EV_SYN, SYN_REPORT, 0 },
+		})
+		helpers.assert_true(again and again.tap, "the kernel need not resend unchanged position values")
+	end)
+
+	helpers.it("retains the current slot across completed gestures", function()
+		local decoder = Decoder.new()
+		feed_all(decoder, {
+			{ EV_ABS, Decoder.ABS_MT_SLOT, 1 }, { EV_ABS, Decoder.ABS_MT_TRACKING_ID, 1 },
+			{ EV_ABS, Decoder.ABS_MT_POSITION_X, 100 }, { EV_ABS, Decoder.ABS_MT_POSITION_Y, 100 },
+			{ EV_KEY, BTN_TOOL[1], 1 }, { EV_KEY, BTN_TOUCH, 1 },
+			{ EV_SYN, SYN_REPORT, 0 }, { EV_SYN, SYN_REPORT, 0 },
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1 },
+			{ EV_KEY, BTN_TOOL[1], 0 }, { EV_KEY, BTN_TOUCH, 0 }, { EV_SYN, SYN_REPORT, 0 },
+		})
+		local result = feed_all(decoder, {
+			-- The selected kernel slot is still 1: there is no redundant slot event.
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, 2 },
+			{ EV_ABS, Decoder.ABS_MT_POSITION_X, 100 }, { EV_ABS, Decoder.ABS_MT_POSITION_Y, 100 },
+			{ EV_KEY, BTN_TOUCH, 1 }, { EV_KEY, BTN_TOOL[1], 1 }, { EV_SYN, SYN_REPORT, 0 },
+			{ EV_ABS, Decoder.ABS_MT_SLOT, 0 }, { EV_ABS, Decoder.ABS_MT_TRACKING_ID, 3 },
+			{ EV_ABS, Decoder.ABS_MT_POSITION_X, 100 }, { EV_ABS, Decoder.ABS_MT_POSITION_Y, 100 },
+			{ EV_KEY, BTN_TOOL[1], 0 }, { EV_KEY, BTN_TOOL[2], 1 },
+			{ EV_SYN, SYN_REPORT, 0 }, { EV_SYN, SYN_REPORT, 0 },
+			{ EV_ABS, Decoder.ABS_MT_SLOT, 1 }, { EV_ABS, Decoder.ABS_MT_POSITION_Y, 500 },
+			{ EV_SYN, SYN_REPORT, 0 },
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1 },
+			{ EV_ABS, Decoder.ABS_MT_SLOT, 0 }, { EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1 },
+			{ EV_KEY, BTN_TOOL[2], 0 }, { EV_KEY, BTN_TOUCH, 0 }, { EV_SYN, SYN_REPORT, 0 },
+		})
+		helpers.assert_true(result and result.direction == "down" and result.fingers == 2,
+			"the two contacts must not collapse into one slot")
+	end)
+
 	helpers.it("throws the gesture away on SYN_DROPPED", function()
 		local decoder = Decoder.new()
 		local events = gesture_events(5, 0, -400)
@@ -397,6 +482,20 @@ helpers.describe("mt decoder: lost queue recovery", function()
 			{ EV_KEY, BTN_TOOL[3], 1 }, { EV_KEY, BTN_TOUCH, 1 },
 		})
 	end
+
+	helpers.it("does not reuse cached slot coordinates after queue loss", function()
+		local decoder = Decoder.new()
+		helpers.assert_true(feed_all(decoder, gesture_events(1, 0, 0)) ~= nil)
+		dropped(decoder); report(decoder)
+		local result = feed_all(decoder, {
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, 800 },
+			{ EV_KEY, BTN_TOOL[1], 1 }, { EV_KEY, BTN_TOUCH, 1 },
+			{ EV_SYN, SYN_REPORT, 0 }, { EV_SYN, SYN_REPORT, 0 },
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1 },
+			{ EV_KEY, BTN_TOOL[1], 0 }, { EV_KEY, BTN_TOUCH, 0 }, { EV_SYN, SYN_REPORT, 0 },
+		})
+		helpers.assert_nil(result, "lost reports invalidate the cached axis values")
+	end)
 
 	helpers.it("mt-drop-recovery: ignores a stale count and lift in the discarded packet", function()
 		local decoder = Decoder.new()

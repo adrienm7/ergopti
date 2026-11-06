@@ -24,7 +24,7 @@ local M = {}
 local NATIVE_READER = "infra.regular_file_reader"
 
 -- Resolved once: package.path is fixed before the codec loads.
-local has_native_reader = package.searchpath(NATIVE_READER, package.path) ~= nil
+local has_native_reader = (package.loaded["infra.literal_module_loader"] or package).searchpath(NATIVE_READER, package.path) ~= nil
 
 --- Opens a TOML source for reading.
 --- @param path string Source path.

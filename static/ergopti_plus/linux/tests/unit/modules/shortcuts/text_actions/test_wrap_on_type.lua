@@ -35,7 +35,7 @@ local function controller_with(state)
 		read_primary = function()
 			log.reads = log.reads + 1
 			if state.on_read then state.on_read(controller, log, state) end
-			return true, state.primary or ""
+			return state.read_ok ~= false, state.primary or ""
 		end,
 		type_text = function(text)
 			if state.type_ok == false then return false end
@@ -56,6 +56,66 @@ local function symbol(char, mods)
 end
 
 helpers.describe("wrap on type (linux): the decision", function()
+	helpers.it("consumes the symbol after a partial replacement attempt", function()
+		local primary, emitted = "old", ""
+		local controller = WrapOnType.new({
+			is_active = function() return true end,
+			get_pair = function(char) return PAIRS[char] end,
+			read_primary = function() return true, primary end,
+			type_text = function(text) emitted = text:sub(1, 1); return false, true end,
+		})
+		controller.on_pointer_down()
+		primary = "selected"
+		local consumed = controller.on_key(symbol("("))
+		helpers.assert_eq(emitted, "(", "the replacement already reached the destination")
+		helpers.assert_true(consumed, "passing the physical symbol would add it after the partial replacement")
+	end)
+
+	helpers.it("consumes the symbol when output raises after its attempt receipt", function()
+		local primary = "old"
+		local controller = WrapOnType.new({
+			is_active = function() return true end,
+			get_pair = function(char) return PAIRS[char] end,
+			read_primary = function() return true, primary end,
+			type_text = function(_, _, mark_attempt) mark_attempt(); error("after attempted output") end,
+		})
+		controller.on_pointer_down()
+		primary = "selected"
+		helpers.assert_true(controller.on_key(symbol("(")))
+	end)
+
+	helpers.it("requires an acknowledged selected PRIMARY read before replacing text (wrap-primary-receipt)", function()
+		local reads, typed = 0, {}
+		local controller = WrapOnType.new({
+			is_active = function() return true end,
+			get_pair = function(char) return PAIRS[char] end,
+			read_primary = function()
+				reads = reads + 1
+				if reads == 1 then return true, "old" end
+				return "unacknowledged", "selected"
+			end,
+			type_text = function(text) typed[#typed + 1] = text; return true end,
+		})
+		controller.on_pointer_down()
+		local consumed = controller.on_key(symbol("("))
+		helpers.assert_eq(consumed, false)
+		helpers.assert_eq(typed, {}, "a non-boolean read result cannot authorize replacement")
+	end)
+	for _, boundary in ipairs({ "baseline", "selected" }) do
+		helpers.it("passes input through when the " .. boundary .. " PRIMARY read raises (wrap-primary-exception)", function()
+			local controller, log, state = controller_with({ primary = "old", on_read = function(_, observed)
+				if observed.reads == (boundary == "baseline" and 1 or 2) then error("controlled PRIMARY failure") end
+			end })
+			local clicked = pcall(controller.on_pointer_down)
+			state.primary = "selected"
+			local called, consumed = pcall(controller.on_key, symbol("("))
+			helpers.assert_true(clicked, "pointer handling must not stop capture")
+			helpers.assert_true(called, "the symbol must remain deliverable")
+			helpers.assert_eq(consumed, false)
+			helpers.assert_eq(log.typed, {})
+			helpers.assert_eq(controller.selection_window_open(), false)
+		end)
+	end
 	helpers.it("wraps a mouse selection and swallows the symbol", function()
 		local controller, log, state = controller_with({ primary = "old" })
 		controller.on_pointer_down()
@@ -84,6 +144,14 @@ helpers.describe("wrap on type (linux): the decision", function()
 		controller.on_pointer_down()
 		helpers.assert_true(not controller.on_key(symbol("(")),
 			"PRIMARY unchanged since the click is an old selection, not a live one")
+		helpers.assert_eq(log.typed, {})
+	end)
+
+	helpers.it("does not wrap stale PRIMARY after its baseline could not be read", function()
+		local controller, log, state = controller_with({ primary = "stale", read_ok = false })
+		controller.on_pointer_down()
+		state.read_ok = true
+		helpers.assert_eq(controller.on_key(symbol("(")), false)
 		helpers.assert_eq(log.typed, {})
 	end)
 
@@ -699,7 +767,8 @@ local function with_daemon_wrap(body, options)
 		assert(shortcuts.set_wrap_on_type_enabled(true))
 		local noop = function() end
 		local env = {
-			type = type, math = math, tostring = tostring, require = require, package = { loaded = {} },
+			type = type, math = math, tostring = tostring, pcall = pcall, error = error,
+			require = require, package = { loaded = {} },
 			LOG = "Main.fixture", Logger = helpers.make_logger_stub(), privacy_owners = {},
 			opts = { dry_run = false }, shortcuts = shortcuts,
 			ScriptActions = require("modules.shortcuts.script_actions"), InputCaptureGate = require("infra.input_capture_gate"),
@@ -711,7 +780,7 @@ local function with_daemon_wrap(body, options)
 			MagicKeySource = { cancel_capture = noop, on_key = function()
 				state.automation = state.automation + 1; return false
 			end },
-			TapHold = { set_paused = noop }, shutdown = { request = noop }, perform_reload = noop,
+			TapHold = { set_paused = noop, observe_copy_activity = noop }, shutdown = { request = noop }, perform_reload = noop,
 			engine = { reset = function() state.resets = state.resets + 1 end },
 			Monotonic = { now_ms = function() return 1000 end },
 			WordReset = { click_resets_word = function() return true end },

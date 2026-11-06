@@ -468,7 +468,15 @@ function M.classify(text, env)
 	local cleaned = strip_trailing(candidate)
 	if cleaned ~= candidate and cleaned ~= "" then
 		local retry = classify_token(cleaned, env)
-		if retry and (found == nil or retry.kind == found.kind) then found = retry end
+		if retry and (found == nil or retry.kind == found.kind) then
+			-- Keep the exact, already decoded and expanded path as an alternative.
+			-- Filesystem owners can prefer it when it exists, while the pure
+			-- classifier retains its documented prose-punctuation result.
+			if found and found.kind == "path" and found.target ~= retry.target then
+				retry.exact_path = found.target
+			end
+			found = retry
+		end
 	end
 	return found or result("search", trimmed)
 end

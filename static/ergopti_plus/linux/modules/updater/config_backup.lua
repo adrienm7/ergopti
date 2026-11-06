@@ -130,7 +130,8 @@ end
 --- Wall-clock time of a backup, in UTC.
 --- @return table { stamp, iso }
 local function clock()
-	return { stamp = os.date("!%Y%m%d-%H%M%S"), iso = os.date("!%Y-%m-%dT%H:%M:%SZ") }
+	local now = os.time()
+	return { stamp = os.date("!%Y%m%d-%H%M%S", now), iso = os.date("!%Y-%m-%dT%H:%M:%SZ", now) }
 end
 
 
@@ -177,8 +178,10 @@ local _binding = Binding.new({
 	log = LOG,
 	defaults = read_defaults,
 	json = { encode = Json.encode, decode = function(text)
-		local ok, value = pcall(Json.decode, text)
+		local ok, value = pcall(Json.decode_lossless, text)
 		if not ok then return nil, tostring(value) end
+		-- Legacy empty manifests can use {}, but an explicit null is no file list.
+		if type(value) == "table" and Json.is_null(value.files) then return nil, "null file list" end
 		return value
 	end },
 	file_ports = file_ports,

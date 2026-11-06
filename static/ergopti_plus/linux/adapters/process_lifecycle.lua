@@ -57,6 +57,8 @@ local _focus_callbacks  = {}
 local _launch_callbacks = {}
 local _quit_callbacks   = {}
 local _running          = false
+local _generation       = 0
+local _polling          = false
 local _last_focus_key   = nil
 local _last_processes   = {}   -- set: process_name -> true
 -- Whether _last_processes came from a real snapshot. Without a baseline the
@@ -77,12 +79,6 @@ local _process_thread = nil
 -- =========================================
 -- =========================================
 
--- Joins the native window, application identity and title into one comparable key.
--- A control character rather than a printable one: a window title may legally
--- contain any punctuation, and a separator that can occur in the data makes two
--- different focus states compare equal.
-local FOCUS_KEY_SEPARATOR = "\1"
-
 --- Returns { appId, windowTitle } for the focused window, both "" when unknown.
 ---
 --- Delegates rather than asking X11 itself. This file used to carry a second,
@@ -95,7 +91,9 @@ local function _focused_identity()
 	local ok, info, native = pcall(WindowInfo.focused_snapshot)
 	if not ok or type(info) ~= "table" then return "", "", "" end
 	if type(native) ~= "string" then native = "" end
-	return info.appId or "", info.windowTitle or "", native
+	local app_id = type(info.appId) == "string" and info.appId or ""
+	local title = type(info.windowTitle) == "string" and info.windowTitle or ""
+	return app_id, title, native
 end
 
 --- A value that changes exactly when the focused window's identity changes.
@@ -107,7 +105,9 @@ end
 --- @param native string
 --- @return string
 local function _focus_key(app_id, title, native)
-	return native .. FOCUS_KEY_SEPARATOR .. app_id .. FOCUS_KEY_SEPARATOR .. title
+	-- Lengths distinguish field boundaries even when metadata contains control
+	-- bytes, so changing focus cannot collide with a previous concatenation.
+	return #native .. ":" .. native .. #app_id .. ":" .. app_id .. title
 end
 
 --- The kernel's process table. Tests point it at a fixture tree.
@@ -129,7 +129,7 @@ local function _parse_stat(line)
 	if open == nil or close == nil or close <= open then return nil end
 	if line:sub(close + 1, close + 1) ~= " " then return nil end
 	local state = line:sub(close + 2, close + 2)
-	if not state:match("^%u$") then return nil end
+	if not state:match("^[%uxt]$") then return nil end
 	return line:sub(open + 1, close - 1), state
 end
 
@@ -151,14 +151,18 @@ local function _snapshot_processes()
 			if file == nil then
 				if open_errno ~= ENOENT and open_errno ~= ESRCH then return nil end
 			else
-				local line, _, read_errno = file:read("*a")
-				file:close()
+				local read_ok, line, _, read_errno = pcall(file.read, file, "*a")
+				local close_ok, closed = pcall(file.close, file)
+				if not read_ok or not close_ok or closed ~= true then return nil end
 				if line == nil then
 					if read_errno ~= ESRCH then return nil end
-				elseif line ~= "" then
+				elseif line == "" then
+					-- An incomplete record is not proof that the process exited.
+					return nil
+				else
 					local name, state = _parse_stat(line)
 					if name == nil then return nil end
-					if name ~= "" and state ~= "Z" and state ~= "X" then snapshot[name] = true end
+					if name ~= "" and state ~= "Z" and state ~= "X" and state ~= "x" then snapshot[name] = true end
 				end
 			end
 		end
@@ -226,11 +230,19 @@ end
 function M.start()
 	if _running then return end
 	_running = true
-	_last_focus_key = _focus_key(_focused_identity())
+	_generation = _generation + 1
+	local generation = _generation
+	local focus_key = _focus_key(_focused_identity())
+	if not _running or generation ~= _generation then return end
+	_last_focus_key = focus_key
 	-- The daemon subscribes only to focus. Enumerating the whole machine has
 	-- no consumer until a launch/quit observer explicitly asks for it.
 	local seed
-	if #_launch_callbacks > 0 or #_quit_callbacks > 0 then seed = _snapshot_processes() end
+	if #_launch_callbacks > 0 or #_quit_callbacks > 0 then
+		local ok, snapshot = pcall(_snapshot_processes)
+		if ok then seed = snapshot else Logger.debug(LOG, "start(): process snapshot failed — retrying on poll.") end
+	end
+	if not _running or generation ~= _generation then return end
 	_last_processes = seed or {}
 	_have_proc_baseline = seed ~= nil
 
@@ -261,6 +273,7 @@ end
 function M.stop()
 	if not _running then return end
 	_running = false
+	_generation = _generation + 1
 	_last_focus_key = nil
 	_last_processes = {}
 	_have_proc_baseline = false
@@ -271,17 +284,21 @@ end
 --- by the host event loop (typically at FOCUS_POLL_S intervals for focus,
 --- and every PROCESS_POLL_S / FOCUS_POLL_S ticks for process detection).
 --- @param tick_count number Monotonically incrementing tick counter (used to throttle process polling).
-function M.tick(tick_count)
+local function tick_once(tick_count)
 	if not _running then return end
+	local generation = _generation
+	local function current() return _running and _generation == generation end
 	tick_count = tonumber(tick_count) or 0
 
 	-- Focus-change check (every tick)
 	local ok_f = pcall(function()
 		local app_name, title, native = _focused_identity()
+		if not current() then return end
 		local key = _focus_key(app_name, title, native)
 		if key ~= _last_focus_key then
 			_last_focus_key = key
 			for _, cb in ipairs(_focus_callbacks) do
+				if not current() then return end
 				pcall(cb, app_name, title)
 			end
 		end
@@ -289,12 +306,14 @@ function M.tick(tick_count)
 	if not ok_f then
 		Logger.debug(LOG, "tick(): focus poll error — suppressed.")
 	end
+	if not current() then return end
 
 	-- Process-list check (every N ticks to stay within PROCESS_POLL_S)
 	local process_every = math.max(1, math.floor(PROCESS_POLL_S / FOCUS_POLL_S))
 	if (#_launch_callbacks > 0 or #_quit_callbacks > 0) and tick_count % process_every == 0 then
 		local ok_p = pcall(function()
 			local current = _snapshot_processes()
+			if not _running or _generation ~= generation then return end
 			-- A failed snapshot keeps the last known set: there is nothing to
 			-- diff it against, and diffing an empty set would report the whole
 			-- desktop as quit.
@@ -310,21 +329,35 @@ function M.tick(tick_count)
 			-- Launched: in current but not in last
 			for name in pairs(current) do
 				if not _last_processes[name] then
-					for _, cb in ipairs(_launch_callbacks) do pcall(cb, name) end
+					for _, cb in ipairs(_launch_callbacks) do
+						if not _running or _generation ~= generation then return end
+						pcall(cb, name)
+					end
 				end
 			end
 			-- Quit: in last but not in current
 			for name in pairs(_last_processes) do
 				if not current[name] then
-					for _, cb in ipairs(_quit_callbacks) do pcall(cb, name) end
+					for _, cb in ipairs(_quit_callbacks) do
+						if not _running or _generation ~= generation then return end
+						pcall(cb, name)
+					end
 				end
 			end
-			_last_processes = current
+			if _running and _generation == generation then _last_processes = current end
 		end)
 		if not ok_p then
 			Logger.debug(LOG, "tick(): process poll error — suppressed.")
 		end
 	end
+end
+
+function M.tick(tick_count)
+	if _polling then return end
+	_polling = true
+	local ok, err = pcall(tick_once, tick_count)
+	_polling = false
+	if not ok then Logger.debug(LOG, "tick(): poll error — %s", tostring(err)) end
 end
 
 return M

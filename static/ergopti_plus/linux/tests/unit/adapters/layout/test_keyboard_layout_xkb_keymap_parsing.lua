@@ -167,6 +167,18 @@ helpers.describe("keysym: name to character", function()
 		helpers.assert_eq(ks.to_char("ISO_Level3_Shift"), nil, "nor is AltGr")
 	end)
 
+	helpers.it("rejects surrogate keysyms and non-scalar values", function()
+		local ks = helpers.load_module("infra.keysym")
+		ks._set_xkb_for_test(false)
+		for _, cp in ipairs({ 0xD800, 0xDBFF, 0xDC00, 0xDFFF, 0 / 0, 0.5 }) do
+			helpers.assert_eq(ks.utf8_encode(cp), nil, "only integer Unicode scalar values are encodable")
+		end
+		helpers.assert_eq(ks.to_char("UD800"), nil)
+		helpers.assert_eq(ks.to_char("0x100DFFF"), nil)
+		helpers.assert_eq(ks.utf8_encode(0xD7FF), "\237\159\191")
+		helpers.assert_eq(ks.utf8_encode(0xE000), "\238\128\128")
+	end)
+
 	helpers.it("encodes above the basic plane", function()
 		local ks = helpers.load_module("infra.keysym")
 		helpers.assert_eq(ks.utf8_encode(0x1F600), "\240\159\152\128",
@@ -822,5 +834,27 @@ xkb_symbols "fr+us" {
 	helpers.it("(xkb-groups) a level of several keysyms is one level no single press types", function()
 		local kb = helpers.load_module("infra.xkb_keymap")
 		helpers.assert_eq(kb.parse_symbols(DUMP).I372, { false, "c" })
+	end)
+end)
+
+helpers.describe("explicit keymap admission", function()
+	helpers.it("an unreadable explicit keymap never falls back to the server", function()
+		local Display = require("infra.display_server")
+		local Shell = require("adapters.shell_runner")
+		local saved_kind, saved_desktop = Display.kind(), Display.desktop()
+		local original_exec, previous_layout = Shell.exec_checked, package.loaded["adapters.keyboard_layout"]
+		local calls = 0
+		Shell.exec_checked = function() calls = calls + 1; return false, "", "controlled refusal" end
+		Display._set_for_test(Display.X11, "")
+		local ok, detail = pcall(function()
+			local layout = helpers.load_module("adapters.keyboard_layout")
+			local path = os.tmpname(); os.remove(path)
+			helpers.assert_eq(layout.refresh(path), false)
+			helpers.assert_eq(calls, 0, "a refused override must not select a different server keymap")
+		end)
+		Shell.exec_checked = original_exec
+		Display._set_for_test(saved_kind, saved_desktop)
+		package.loaded["adapters.keyboard_layout"] = previous_layout
+		if not ok then error(detail, 0) end
 	end)
 end)

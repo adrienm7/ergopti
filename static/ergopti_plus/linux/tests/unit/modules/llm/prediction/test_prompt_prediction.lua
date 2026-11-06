@@ -263,6 +263,13 @@ helpers.describe("prompt prediction: a rewrite from the key press to the injecte
 		end)
 	end)
 
+	helpers.it("preserves explicit manual generation when trigger exclusions are invalid", function()
+		scenario({ buffer = "Bonjour", stored = { ["llm.trigger.disabled_apps"] = { "firefox", "Firefox" } } }, function(world)
+			helpers.assert_true(world.handlers.llm_generate_prediction("keyboard__meta_space", nil))
+			helpers.assert_eq(#world.posts, 1, "an invalid automatic-only list does not change manual policy")
+		end)
+	end)
+
 	helpers.it("a normal prediction is unchanged: the menu's prompt, count, tail and budget", function()
 		scenario({ buffer = "Bonjour Marc, je voulais te dire" }, function(world)
 			helpers.assert_eq(world.handlers.llm_generate_prediction("keyboard__meta_space", nil), true)

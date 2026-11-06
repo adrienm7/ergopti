@@ -30,6 +30,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+-- Tests below load this owner while its dependencies are replaced. Restore the
+-- original cached owner after the module finishes, including an absent entry.
+local previous_magic_key = package.loaded["modules.hotstrings.magic_key"]
 
 
 --- Installs an in-memory canonical preference owner and returns it with a
@@ -176,6 +179,7 @@ end)
 
 
 
+
 -- ==================================================
 -- ==================================================
 -- ======= 2/ Validation ============================
@@ -293,6 +297,22 @@ helpers.describe("magic key: setting and resetting", function()
 		helpers.assert_eq("§", announced,
 			"the dynamic rules bake the character into their triggers, so they must be told")
 
+		restore_manifest(); restore_storage()
+	end)
+
+	helpers.it("reports a transactional publication refusal without writing a preference", function()
+		local storage, restore_storage = stub_storage({})
+		local restore_manifest = stub_manifest("★")
+		local magic = load_magic_key()
+		local attempted
+		magic.init(nil, function(value) attempted = value; return false end)
+		local ok = magic.set("§")
+		helpers.assert_eq(ok, false)
+		helpers.assert_eq(attempted, "§")
+		helpers.assert_eq(storage.writes, 0)
+		helpers.assert_eq(magic.get(), "★")
+		helpers.assert_eq(magic.reset(), false)
+		helpers.assert_eq(storage.deletes, 0)
 		restore_manifest(); restore_storage()
 	end)
 
@@ -492,3 +512,5 @@ helpers.describe("Magic trigger declared native provider", function()
 		end)
 	end
 end)
+
+package.loaded["modules.hotstrings.magic_key"] = previous_magic_key

@@ -38,6 +38,22 @@ local helpers, recorder, le, owned_channel =
 -- ====================================================
 
 helpers.describe("uinput_writer: struct input_event encoding", function()
+	helpers.it("uses the measured 32-bit input_event ABI for output (uinput-32-bit-event)", function()
+		local Input = require("infra.input_event")
+		local native_size, writer_before = Input.native_size, package.loaded["adapters.uinput_writer"]
+		Input.native_size = function() return 16 end
+		local ok, writer = pcall(helpers.load_module, "adapters.uinput_writer")
+		Input.native_size = native_size
+		package.loaded["adapters.uinput_writer"] = writer_before
+		helpers.assert_true(ok)
+		local event = writer.encode_event(1, 30, 1, 2, 3)
+		helpers.assert_eq(#event, 16, "32-bit uinput accepts a 16-byte input_event")
+		helpers.assert_eq(le(event, 1, 4), 2)
+		helpers.assert_eq(le(event, 5, 4), 3)
+		helpers.assert_eq(le(event, 9, 2), 1)
+		helpers.assert_eq(le(event, 11, 2), 30)
+		helpers.assert_eq(le(event, 13, 4), 1)
+	end)
 
 	helpers.it("is exactly 24 bytes with the fields at the 64-bit offsets", function()
 		local U = helpers.load_module("adapters.uinput_writer")
@@ -210,7 +226,7 @@ helpers.describe("uinput_writer: device creation", function()
 		helpers.assert_eq(le(rel, 19, 2), 0x08, "REL_WHEEL")
 		helpers.assert_eq(le(rel, 21, 4), 0xFFFFFFFF, "-1 as two's complement")
 		helpers.assert_eq(le(syn, 17, 2), 0x00, "then EV_SYN")
-		helpers.assert_eq(U.emit_relative(0x09, 1), false, "REL_MISC is not an axis the device has")
+		helpers.assert_eq(U.emit_relative(0x0a, 1), false, "REL_RESERVED is not an axis the device has")
 		helpers.assert_eq(U.emit_relative(0x00, 1.5), false, "a fractional delta is refused")
 		helpers.assert_eq(#rec.writes, before + 2, "a refused report writes nothing")
 		U._reset_backend()
@@ -280,6 +296,52 @@ end)
 -- ====================================================
 
 helpers.describe("uinput_writer: emission", function()
+	for _, mode in ipairs({ "direct", "owned" }) do
+		helpers.it("forwards the signed 32-bit minimum relative delta on " .. mode .. " output (relative-int32-min)", function()
+			local U, rec
+			if mode == "owned" then U, rec = owned_channel()
+			else U = helpers.load_module("adapters.uinput_writer"); rec = recorder(); U._set_backend(rec.backend); assert(U.open()) end
+			local before = #rec.writes
+			local accepted = U.emit_relative(0, -2147483648)
+			local event = rec.writes[before + 1]
+			U._reset_backend()
+			helpers.assert_true(accepted, "the minimum signed 32-bit event is valid")
+			helpers.assert_eq(le(event, U.INPUT_EVENT_SIZE - 3, 4), 0x80000000)
+		end)
+	end
+	helpers.it("forwards relative dial reports from a grabbed composite mouse (uinput-relative-dial)", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		assert(U.open())
+		local before = #rec.writes
+		local accepted = U.emit_relative(0x07, 1) -- REL_DIAL
+		local writes = #rec.writes - before
+		local registered = false
+		for _, call in ipairs(rec.ioctls) do
+			if call.request == 0x40045566 and call.arg == 0x07 then registered = true end
+		end
+		U._reset_backend()
+		helpers.assert_true(registered, "REL_DIAL must be registered before device creation")
+		helpers.assert_true(accepted)
+		helpers.assert_eq(writes, 2, "dial motion and SYN are both forwarded")
+	end)
+
+	helpers.it("refuses out-of-range keycodes before their wire encoding wraps (uinput-keycode-boundary)", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		assert(U.open())
+		local before = #rec.writes
+		local accepted = {}
+		for _, row in ipairs({ { 65566, 1 }, { 0, 1 }, { 30.5, 1 }, { 30, -1 }, { 30, 3 } }) do
+			accepted[#accepted + 1] = U.emit(row[1], row[2])
+		end -- 65566's low 16 bits encode KEY_A (30).
+		local writes = #rec.writes - before
+		U._reset_backend()
+		helpers.assert_eq(accepted, { false, false, false, false, false })
+		helpers.assert_eq(writes, 0, "an invalid key cannot inject another valid key")
+	end)
 
 	helpers.it("writes the key event and then a SYN_REPORT", function()
 		local U = helpers.load_module("adapters.uinput_writer")
@@ -348,6 +410,34 @@ helpers.describe("uinput_writer: emission", function()
 			.. "success there would hide a dead keystroke")
 
 		U._reset_backend()
+	end)
+
+	helpers.it("does not flush an earlier unacknowledged key with a later report (legacy-syn-failure)", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		rec.backend.close = function() return true end
+		U._set_backend(rec.backend)
+		assert(U.open())
+		local calls = 0
+		rec.backend.write = function(_, bytes)
+			calls = calls + 1
+			rec.writes[#rec.writes + 1] = bytes
+			return calls ~= 2 -- first KEY accepted; its SYN unacknowledged
+		end
+		local failed = U.emit(30, 1)
+		local after_failure = #rec.writes
+		local false_reopen = U.open()
+		local successor = U.emit(31, 1)
+		local after_successor = #rec.writes
+		local retired, reopened = U.close(), nil
+		if retired then reopened = U.open() end
+		local after_reopen = reopened and U.emit(31, 1)
+		U._reset_backend()
+		helpers.assert_eq(failed, false)
+		helpers.assert_eq(false_reopen, false, "an existing failed channel is not reopened")
+		helpers.assert_eq(successor, false)
+		helpers.assert_eq(after_successor, after_failure, "later SYN must not publish a possibly buffered key")
+		helpers.assert_true(retired and reopened and after_reopen, "a recreated device can emit normally")
 	end)
 
 	helpers.it("reports failure when the EV_KEY write fails", function()
@@ -636,6 +726,24 @@ helpers.describe("uinput_writer: exact output custody", function()
 			helpers.assert_eq(writer.has_output_debt(), false)
 		end)
 	end
+
+	helpers.it("blocks keys after a relative report loses its SYN", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		local calls = 0
+		recorded.backend.write = function() calls = calls + 1; return calls == 1 end
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		local capability = writer.capture_output()
+		helpers.assert_eq(writer.emit_relative(0, 4), false)
+		helpers.assert_eq(calls, 2, "the relative event was written before the refused SYN")
+		helpers.assert_eq(writer.has_output_debt(), true)
+		helpers.assert_eq(writer.emit_owned(capability, 30, 1), false)
+		helpers.assert_eq(calls, 2, "a later key must not publish the uncertain relative event")
+		helpers.assert_eq(writer.close_owned(capability), true)
+		helpers.assert_eq(writer.has_output_debt(), false)
+	end)
 
 	helpers.it("retains SYN debt and does not pretend that KEY alone reached the application", function()
 		local writer = helpers.load_module("adapters.uinput_writer")

@@ -11,6 +11,7 @@
 return {
 	"tests.unit.modules.llm.prediction.test_parser_comparisons",
 	"tests.unit.modules.llm.prediction.test_parser_unicode_escapes",
+	"tests.unit.ui.test_shared_catalogue_sources",
 	"tests.unit.modules.llm.runtime.test_shared_loader_sources",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_semantic_controls",
 	"tests.unit.adapters.layout.test_xkb_capture_semantic_controls",
@@ -276,6 +277,7 @@ return {
 	"tests.unit.infra.lifecycle.test_gui_stack",
 	"tests.unit.infra.lifecycle.test_input_access",
 	"tests.unit.infra.lifecycle.test_owned_programs",
+	"tests.unit.infra.lifecycle.test_literal_appdir",
 	"tests.unit.infra.lifecycle.test_input_capture_gate",
 	"tests.unit.infra.lifecycle.test_installation",
 	"tests.unit.infra.i18n.test_locale_path_layouts",

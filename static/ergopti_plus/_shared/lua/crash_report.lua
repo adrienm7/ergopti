@@ -150,7 +150,10 @@ function M.parse_name(name)
 	local stem, suffix = name:match("^(%d%d%d%d%-%d%d%-%d%dT%d%d%-%d%d%-%d%dZ)(%-?%d*)%.json$")
 	if not stem then return nil end
 	if suffix == "" then return stem, 1 end
-	local attempt = tonumber(suffix:sub(2))
+	-- A collision number is introduced by a dash. Dropping an arbitrary first
+	-- digit can classify a user's neighbouring JSON file as a report to delete.
+	local digits = suffix:match("^%-(%d+)$")
+	local attempt = digits and tonumber(digits)
 	if not attempt or attempt < 2 then return nil end
 	return stem, attempt
 end

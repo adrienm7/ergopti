@@ -127,3 +127,47 @@ if package.config:sub(1, 1) == "/" then
 		end
 	end)
 end
+
+for _, case in ipairs({
+	{ name = "remote provider catalogue", module = "modules.llm.api_remote", path = "modules/llm/api_providers.json",
+		invoke = function(owner) return owner.provider("openai") ~= nil end, returns_false = true },
+	{ name = "reasoning policy", module = "modules.llm.api_remote", path = "modules/llm/thinking_off.json",
+		invoke = function(owner) return owner.ollama_think("gpt-oss:20b") end, returns_false = true },
+	{ name = "inference", module = "modules.llm.inference", path = "modules/llm/inference.json",
+		invoke = function(owner) return owner.variant_temperature(0.5, 1) end, raises = true },
+	{ name = "backend brands", module = "modules.llm.backend_brands", path = "modules/llm/backends.json",
+		invoke = function(owner) return owner.brand("ollama") end, raises = true },
+	{ name = "translation prompt", module = "modules.llm.translation", path = "modules/llm/translate.json",
+		invoke = function(owner) return owner.data() end },
+	{ name = "translation names", module = "modules.llm.translation", path = "data/locale_names.json",
+		invoke = function(owner) return owner.data() end },
+	{ name = "translation order", module = "modules.llm.translation", path = "data/locale_order.json",
+		invoke = function(owner) return owner.data() end },
+}) do
+	helpers.it("shared config refuses FIFO in " .. case.name, function()
+		local uv, Paths = require("luv"), require("infra.paths")
+		local original_shared, original_module = Paths.shared, package.loaded[case.module]
+		local source = assert(original_shared(case.path))
+		local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-llm-config-XXXXXX"))
+		local path = dir .. "/config"
+		local made = os.execute("mkfifo '" .. path .. "'")
+		assert(made == 0 or made == true)
+		package.loaded[case.module] = nil
+		local owner = require(case.module)
+		Paths.shared = function(relative)
+			if relative == case.path then return path end
+			return original_shared(relative)
+		end
+		local exited, process = false, nil
+		process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$2" > "$1"', "fixture", path, source } }, function()
+			exited = true; process:close()
+		end))
+		local ok, value = pcall(case.invoke, owner)
+		Paths.shared, package.loaded[case.module] = original_shared, original_module
+		os.remove(path); os.remove(dir)
+		while not exited do uv.run("once") end
+		if case.raises then helpers.assert_eq(ok, false, "unreadable source must fail")
+		elseif case.returns_false then helpers.assert_true(ok); helpers.assert_eq(value, false, "unreadable source must refuse")
+		else helpers.assert_true(ok); helpers.assert_nil(value, "unreadable source must refuse") end
+	end)
+end

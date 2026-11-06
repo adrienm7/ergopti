@@ -142,4 +142,12 @@ helpers.describe("token prompt: what the setters accept", function()
 				.. "which looks exactly like a model that cannot be reached")
 	end)
 
+	PreferencesFixture.it("refuses non-finite token budgets without changing the previous value", function()
+		local before = Engine.get_max_tokens()
+		for _, value in ipairs({ math.huge, -math.huge, 0 / 0 }) do
+			helpers.assert_eq(Engine.set_max_tokens(value), false)
+			helpers.assert_eq(Engine.get_max_tokens(), before)
+		end
+	end)
+
 end)

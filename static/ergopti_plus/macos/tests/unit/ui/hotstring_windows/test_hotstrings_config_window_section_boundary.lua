@@ -18,6 +18,35 @@ local FIELDS = {
 }
 
 helpers.describe("Hotstrings configuration section boundary", function()
+	for _, group in ipairs({ "common", "ext:demo", "personal" }) do
+		helpers.it("(mac-config-finite) refuses invalid " .. group .. " settings before writes", function()
+			Fixture.with_window(function(window, state)
+				local category = group == "common" and "magickey" or "ext:demo:sample"
+				local personal
+				if group == "personal" then
+					local root, id, _, binding = Fixture.install_personal_binding("/personal/sample.toml", "[_meta]\n")
+					category, personal = id, binding
+					package.loaded["ui.hotstrings_config_window"] = nil
+					window = require("ui.hotstrings_config_window")
+					Fixture.prepare_personal_window(window, root)
+				end
+				for _, value in ipairs({ 0 / 0, math.huge, -math.huge, -1 }) do
+					for _, action in ipairs({ "set_delay", "set_priority" }) do
+						helpers.assert_eq(window._on_message({ body = { action = action, category = category,
+							group = group, ext_id = "demo", ms = value, priority = value } }), false)
+					end
+				end
+				for _, value in ipairs({ "false", 1, {} }) do
+					helpers.assert_eq(window._on_message({ body = { action = "set_tooltip", category = category,
+						group = group, ext_id = "demo", show_tooltip = value } }), false)
+				end
+				helpers.assert_eq(window._on_message({ body = { action = "set_priority", category = category,
+					group = group, ext_id = "demo", priority = 101 } }), false)
+				helpers.assert_eq(state.writes, 0)
+				if personal then helpers.assert_eq(personal.applications, 0) end
+			end)
+		end)
+	end
 	for _, group in ipairs({ "common", "ext:demo" }) do
 		for _, field in ipairs(FIELDS) do
 			helpers.it("(config-empty-section) commits " .. group .. " category " .. field.action, function()

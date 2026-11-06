@@ -19,29 +19,12 @@ function openAppDrilldown(appName) {
 	const a = agg.apps[appName];
 	if (!a) return;
 
-	// The accepted aggregate owns the period and weekday query. Reuse its
-	// selected dates for both detail families instead of rebuilding a wider scope.
-	const selectedDates = Object.keys(agg.rich.by_date);
-
+	// The accepted aggregate already excludes each app/day rejected by the
+	// current category and date filters.
 	const hourly = {};
 	for (let h = 0; h < 24; h++) hourly[String(h).padStart(2, '0')] = { time_ms: 0, chars: 0 };
-
-	selectedDates.forEach((dateKey) => {
-		const day = manifestData[dateKey];
-		if (!day) return;
-		const app_data = day[metricsManifestKey(appName)];
-		if (!app_data || !app_data.hourly) return;
-		let totalAppChars = 0;
-		Object.values(app_data.hourly).forEach((h) => (totalAppChars += h.c || 0));
-		Object.entries(app_data.hourly).forEach(([hour, hData]) => {
-			const slot = hourly[hour] || (hourly[hour] = { time_ms: 0, chars: 0 });
-			let hMs = hData.time_ms || 0;
-			if (hMs === 0 && totalAppChars > 0 && hData.c > 0) {
-				hMs = (hData.c / totalAppChars) * (Number(app_data.app_time_ms) || 0);
-			}
-			slot.time_ms += hMs;
-			slot.chars += hData.c || 0;
-		});
+	Object.entries(a.modal_hourly || {}).forEach(([hour, data]) => {
+		if (hourly[hour]) hourly[hour] = data;
 	});
 
 	// Title
@@ -83,7 +66,7 @@ function openAppDrilldown(appName) {
 		},
 		{
 			label: _t('ui_apps.tile_focus_lat'),
-			value: focus_lat_mean > 0 ? `${Math.round(focus_lat_mean)} ms` : '—',
+			value: (a.focus_latency_count || 0) > 0 ? `${Math.round(focus_lat_mean)} ms` : '—',
 			detail: a.focus_latency_count > 0 ? `n=${a.focus_latency_count}` : ''
 		},
 		{
@@ -163,18 +146,8 @@ function openAppDrilldown(appName) {
 			: `<div style="color:${ThemeTokens.color('grey-888')};font-size:12px;">${_t('ui_apps.kpi_no_backslash_out')}</div>`;
 	document.getElementById('app_modal_dests').innerHTML = dest_html;
 
-	// Layouts seen — sum from manifest for this app within the period.
-	const layouts = {};
-	selectedDates.forEach((dateKey) => {
-		const ls =
-			manifestData[dateKey] &&
-			manifestData[dateKey][metricsManifestKey(appName)] &&
-			manifestData[dateKey][metricsManifestKey(appName)].layouts_seen;
-		if (!ls) return;
-		Object.entries(ls).forEach(([id, n]) => {
-			layouts[id] = (layouts[id] || 0) + (n || 0);
-		});
-	});
+	// Layouts are projected with the same admitted app/day rows as the tiles.
+	const layouts = a.modal_layouts || {};
 	const layouts_html =
 		Object.keys(layouts).length > 0
 			? Object.entries(layouts)
@@ -193,10 +166,12 @@ function openAppDrilldown(appName) {
 		recs.push(
 			`<div>${_t('ui_apps.modal_record_session')
 				.replace('{dur}', formatDuration(a.session_longest_ms))
-				.replace(
-					'{chars}',
-					a.session_longest_chars > 0 ? ` (${a.session_longest_chars} car.)` : ''
-				)}</div>`
+				.replace('{chars}', '')}</div>`
+		);
+	}
+	if (a.session_longest_chars > 0) {
+		recs.push(
+			`<div>${_t('ui_typing.lbl_longest_chars')}: ${format_int(a.session_longest_chars)}</div>`
 		);
 	}
 	if ((a.burst_max_cpm || 0) > 0) {

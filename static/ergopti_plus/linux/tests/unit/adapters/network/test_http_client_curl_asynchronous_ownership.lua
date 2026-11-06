@@ -103,6 +103,38 @@ end)
 
 
 helpers.describe("http_client: asynchronous curl ownership", function()
+	for _, literal in ipairs({ "nan", "inf", "-1", "1.5", "1e999" }) do
+		helpers.it("linux-http-body-limit-admission: refuses registry value " .. literal, function()
+			local reader, Factory = require("toml_codec.reader"), require("timings")
+			local timing = Factory.new({ logger = { info = function() end }, log = "test", loaded_level = "info",
+				shared_path = function() return "/fixture/constants.toml" end,
+				parse = function() return reader.parse_text("[limits]\nrelease_list_body_bytes = " .. literal .. "\n") end })
+			local parsed, limit = pcall(timing.count, "limits", "release_list_body_bytes")
+			if not parsed then
+				helpers.assert_true(type(limit) == "string" and limit:find("missing or non%-numeric") ~= nil)
+				return -- This host already rejects the literal at the registry boundary.
+			end
+			local client, state = fresh_client()
+			local result, calls = nil, 0
+			local started = client.get("https://example.invalid", {}, { max_body_bytes = limit }, function(value)
+				result, calls = value, calls + 1
+			end)
+			helpers.assert_eq(started, false, "an invalid registry limit cannot admit an unbounded transfer")
+			helpers.assert_true(result and result.ok == false)
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(#state.handles, 0)
+		end)
+	end
+	for _, limit in ipairs({ 0, "4" }) do
+		helpers.it("linux-http-body-limit-admission: retains valid limit " .. tostring(limit), function()
+			local client, state = fresh_client()
+			local result
+			helpers.assert_true(client.get("https://example.invalid", {}, { max_body_bytes = limit },
+				function(value) result = value end))
+			state.complete_request(1, "\nERGOPTI_HTTP_STATUS:200\n")
+			helpers.assert_true(result and result.ok)
+		end)
+	end
 	helpers.it("bounds a buffered response and terminates its process group", function()
 		local client, state = fresh_client()
 		local result = nil

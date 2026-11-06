@@ -58,6 +58,7 @@ local LOG = "modules.hotstrings.loader"
 -- committed=false for that state. Keep serving the last complete source instead
 -- of turning a transient write into a silently deleted hotstring category.
 local _source_snapshots = {}
+local _source_receipts = setmetatable({}, { __mode = "k" })
 
 --- Canonical collision tiers, read once from the shared JSON. Kept as a lazily
 --- resolved local rather than a require-time read so a driver that never loads a
@@ -73,10 +74,8 @@ local function tiers()
 	_tiers = Priority.DEFAULT_TIERS
 	local ok, result = pcall(function()
 		local path = Paths.shared("modules/hotstrings/priority.json")
-		local fh   = io.open(path, "r")
-		if not fh then return nil end
-		local raw = fh:read("*a")
-		fh:close()
+		local raw, status = require("toml_codec.writer").read_classified(path)
+		if status ~= "ok" then return nil end
 		return require("json").decode(raw)
 	end)
 	if not ok or type(result) ~= "table" then
@@ -131,6 +130,27 @@ local function source_identity(path, forced_group)
 	return tostring(path) .. "\0" .. tostring(forced_group or "")
 end
 
+--- Captures fallback sources privately for one explicit transaction inverse.
+--- @return table receipt Opaque immutable source-set receipt.
+function M.capture_source_snapshots()
+	local copy, receipt = {}, {}
+	for identity, data in pairs(_source_snapshots) do copy[identity] = data end
+	_source_receipts[receipt] = copy
+	return receipt
+end
+
+--- Publishes the exact source set prepared by a successful matcher publication.
+--- @param receipt table Opaque source-set receipt.
+--- @return boolean committed
+function M.commit_source_snapshots(receipt)
+	local sources = _source_receipts[receipt]
+	if not sources then return false end
+	local copy = {}
+	for identity, data in pairs(sources) do copy[identity] = data end
+	_source_snapshots = copy
+	return true
+end
+
 --- Replaces the shipped magic-key suffix with the configured one.
 ---
 --- The canonical TOMLs carry the shipped glyph because they are shared source
@@ -183,7 +203,7 @@ end
 --- where a category is
 ---   { id, path, description = {locale → text}, delay, show_tooltip, color,
 ---     sections_order = array, sections = { [name] = { count } }, count }
-function M.load_catalogue(paths, options, prepared_sources)
+function M.load_catalogue(paths, options, prepared_sources, inverse_receipt)
 	Logger.start(LOG, "Loading hotstrings from %d file(s)…", type(paths) == "table" and #paths or 0)
 	if type(paths) ~= "table" then
 		Logger.error(LOG, "load_catalogue(): expected table of paths, got %s.", type(paths))
@@ -194,6 +214,9 @@ function M.load_catalogue(paths, options, prepared_sources)
 	local categories = {}
 	local errors = 0
 	local aggregate_committed = true
+	local deferred = type(options) == "table" and options.defer_source_snapshots == true
+	local inverse = inverse_receipt and _source_receipts[inverse_receipt] or nil
+	local prepared_snapshots = deferred and {} or nil
 
 	for _, source in ipairs(paths) do
 		-- A source is a path, or a table carrying a path and the category key it
@@ -224,7 +247,8 @@ function M.load_catalogue(paths, options, prepared_sources)
 		end
 		if not ok or committed ~= true or type(data) ~= "table" then
 			errors = errors + 1
-			data = _source_snapshots[identity]
+			if inverse_receipt ~= nil then data = inverse and inverse[identity]
+			else data = _source_snapshots[identity] end
 			if data then
 				Logger.warn(LOG, "Source '%s' did not commit — retaining its last healthy snapshot.",
 					tostring(path))
@@ -232,9 +256,10 @@ function M.load_catalogue(paths, options, prepared_sources)
 				aggregate_committed = false
 				Logger.error(LOG, "Source '%s' did not commit and has no healthy snapshot.", tostring(path))
 			end
-		elseif prepared == nil then
+		elseif prepared == nil and not deferred then
 			_source_snapshots[identity] = data
 		end
+		if data and deferred then prepared_snapshots[identity] = data end
 		if data then
 			local group = forced_group or category_of(path)
 			local meta = type(data.meta) == "table" and data.meta or {}
@@ -363,11 +388,16 @@ function M.load_catalogue(paths, options, prepared_sources)
 
 	Logger.success(LOG, "Loaded %d mapping(s) across %d categor(ies).",
 		#mappings, count_categories(categories))
+	local receipt
+	if deferred and aggregate_committed then
+		receipt = {}; _source_receipts[receipt] = prepared_snapshots
+	end
 	return {
 		mappings = mappings,
 		categories = categories,
 		errors = errors,
 		committed = aggregate_committed,
+		source_receipt = receipt,
 	}
 end
 
@@ -409,18 +439,36 @@ end
 --- included, since no text framing sits between the kernel and the paths.
 --- @param dir string Absolute path to the root directory to scan.
 --- @param max_directory_depth number|nil Deepest level scanned (find -maxdepth).
---- @return table  Array of absolute .toml file paths.
-function M.find_toml_files(dir, max_directory_depth)
+--- @param require_complete boolean|nil Refuse partial enumeration for publication.
+--- @param allow_absent_root boolean|nil An absent root is optional unless false.
+--- @return table Array of absolute .toml paths.
+--- @return boolean complete False when enumeration omitted an unavailable source.
+function M.find_toml_files(dir, max_directory_depth, require_complete, allow_absent_root)
 	if type(dir) ~= "string" or dir == "" then return {} end
 	Logger.trace(LOG, "Scanning '%s' for hotstring packs…", dir)
 
-	local result = {}
-	NativeDirectory.walk(dir, max_directory_depth, function(path, kind)
+	local result, complete = {}, true
+	NativeDirectory.walk(dir, max_directory_depth, function(path, kind, depth)
+		-- A no-follow walk also visits regular files and symlinks at the root;
+		-- neither proves that the requested directory was enumerated.
+		if depth == 0 and kind ~= "directory" then
+			complete = false
+			if require_complete then error("hotstring source enumeration refused: root is not a directory", 0) end
+		end
 		if kind == "file" and path:sub(-5) == ".toml" and M.is_pack_file(path) then result[#result + 1] = path end
-	end, report_unlistable)
+	end, function(path, message, code)
+		report_unlistable(path, message, code)
+		-- An optional root that does not exist is an empty source. An unreadable
+		-- root or a child lost during enumeration cannot prove a complete set.
+		local optional_absence = code == "ENOENT" and path == dir and allow_absent_root ~= false
+		if not optional_absence then
+			complete = false
+			if require_complete then error("hotstring source enumeration refused: " .. tostring(code or message), 0) end
+		end
+	end)
 
 	Logger.done(LOG, "Found %d pack(s) under '%s'.", #result, dir)
-	return result
+	return result, complete
 end
 
 --- Projects no-follow links and depth-boundary directories as diagnostics only.
@@ -566,11 +614,10 @@ end
 --- @return string|nil
 function M.read_file(path)
 	if type(path) ~= "string" or path == "" then return nil end
-	local fh = io.open(path, "r")
-	if not fh then return nil end
-	local text = fh:read("*a")
-	fh:close()
-	return text
+	local text, status, detail = require("toml_codec.writer").read_classified(path)
+	if status == "ok" then return text end
+	if status == "absent" then return nil end
+	error("extension manifest is unreadable: " .. tostring(detail or status), 0)
 end
 
 return M

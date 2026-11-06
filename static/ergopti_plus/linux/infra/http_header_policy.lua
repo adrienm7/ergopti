@@ -55,6 +55,11 @@ end
 function M.validate(name, value)
 	local bytes, err = load_bytes()
 	if not bytes then return nil, err end
+	-- Curl interprets the first colon as the wire field boundary. An invalid
+	-- caller name must not smuggle a sensitive field past redirect filtering.
+	if type(name) ~= "string" or not name:match("^[A-Za-z0-9!#$%%&'*+%.%^_`|~%-]+$") then
+		return false, "HTTP header name is invalid"
+	end
 	for _, byte in pairs(bytes) do
 		if name:find(byte, 1, true) or value:find(byte, 1, true) then
 			return false, "HTTP header contains a forbidden byte"

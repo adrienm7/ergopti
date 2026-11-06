@@ -63,6 +63,14 @@ local function now_ms()
 	return require("infra.monotonic").now_ms()
 end
 
+--- A refused dispatch may still own a started native process. Defer the
+--- logical answer until its exact cleanup receipt has settled.
+local function after_refused_cleanup(run, cleanup, answer)
+	if not cleanup then answer(); return end
+	run.cancellers[#run.cancellers + 1] = function() cleanup.cancel() end
+	pcall(cleanup.on_settled, answer)
+end
+
 --- Starts one probe; publishes its single answer.
 --- @param run table The probe run (see M.start).
 --- @param id string Probe id.
@@ -101,11 +109,7 @@ end
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	local fh = io.open(path, "rb")
-	if not fh then return nil end
-	local content = fh:read("*a")
-	fh:close()
-	return content
+	return require("infra.regular_file_reader").read_source(path)
 end
 
 --- The answer of a failed HTTP request.
@@ -139,7 +143,7 @@ local function github_api(config, run)
 			return
 		end
 		run.cancellers[#run.cancellers + 1] = function() HttpClient.cancel(GITHUB_OWNER) end
-		HttpClient.get(config.url, { ["User-Agent"] = USER_AGENT, ["Accept"] = "application/vnd.github+json" },
+		local started = HttpClient.get(config.url, { ["User-Agent"] = USER_AGENT, ["Accept"] = "application/vnd.github+json" },
 			{ timeout_ms = config.timeout_ms, owner = GITHUB_OWNER, https_only = true }, function(result)
 				if tonumber(result.status) ~= 200 then
 					done(http_failure(result))
@@ -153,6 +157,7 @@ local function github_api(config, run)
 				end
 				done({ state = "ok" }, { network = { github_api = value } })
 			end)
+		if started ~= true then done({ state = "error", detail = "HTTP request refused" }) end
 	end
 end
 
@@ -173,7 +178,7 @@ local function proxy_pac(config, run)
 		local function none() done({ state = "ok" }, { network = { proxy_pac = "No PAC configured" } }) end
 		local function fetch(url)
 			run.cancellers[#run.cancellers + 1] = function() HttpClient.cancel(PAC_OWNER) end
-			HttpClient.get(url, { ["User-Agent"] = USER_AGENT },
+			local started = HttpClient.get(url, { ["User-Agent"] = USER_AGENT },
 				{ timeout_ms = config.timeout_ms, owner = PAC_OWNER }, function(result)
 					local state, text = PacCheck.judge(result.status, result.body, result.error)
 					if state == "ok" then
@@ -182,15 +187,16 @@ local function proxy_pac(config, run)
 						done({ state = "error", detail = text })
 					end
 				end)
+			if started ~= true then done({ state = "error", detail = "HTTP request refused" }) end
 		end
 		local function ask(key, on_output)
 			-- Only GNOME stores a proxy setting there; elsewhere there is none to read.
 			if not Shell.has_command("gsettings") then on_output(nil) return end
-			local handle = Shell.run_async("gsettings", { "get", "org.gnome.system.proxy", key },
+			local handle, _, cleanup = Shell.run_async("gsettings", { "get", "org.gnome.system.proxy", key },
 				{ timeout_ms = config.timeout_ms }, function(result)
 					on_output(result.ok and result.stdout or nil)
 				end)
-			if not handle then on_output(nil) return end
+			if not handle then after_refused_cleanup(run, cleanup, function() on_output(nil) end); return end
 			run.cancellers[#run.cancellers + 1] = function() handle.cancel() end
 		end
 		ask("mode", function(mode)
@@ -221,7 +227,7 @@ local function ai_health(config, state, run)
 			return
 		end
 		run.cancellers[#run.cancellers + 1] = function() HttpClient.cancel(AI_OWNER) end
-		HttpClient.get(llm.get_base_url() .. config.paths[AI_BACKEND], {},
+		local started = HttpClient.get(llm.get_base_url() .. config.paths[AI_BACKEND], {},
 			{ timeout_ms = config.timeout_ms, owner = AI_OWNER }, function(result)
 				local status = tonumber(result.status) or 0
 				if status < 200 or status >= 300 then
@@ -232,6 +238,7 @@ local function ai_health(config, state, run)
 				local version = type(data) == "table" and type(data.version) == "string" and data.version or nil
 				done({ state = "ok" }, { ai = { ai_health = version and (AI_BACKEND .. " " .. version) or ("HTTP " .. status) } })
 			end)
+		if started ~= true then done({ state = "error", detail = "HTTP request refused" }) end
 	end
 end
 
@@ -252,7 +259,7 @@ local function system_details(config, logs_dir, run)
 			done({ state = "ok" }, sections)
 			return
 		end
-		local handle, err = Shell.run_async("df", { "-Pk", logs_dir }, { timeout_ms = config.timeout_ms }, function(result)
+		local handle, err, cleanup = Shell.run_async("df", { "-Pk", logs_dir }, { timeout_ms = config.timeout_ms }, function(result)
 			if not result.ok then
 				done({ state = "error", detail = "df: " .. tostring(result.error) }, sections)
 				return
@@ -263,7 +270,9 @@ local function system_details(config, logs_dir, run)
 			done({ state = "ok" }, sections)
 		end)
 		if not handle then
-			done({ state = "error", detail = "df: " .. tostring(err) }, sections)
+			after_refused_cleanup(run, cleanup, function()
+				done({ state = "error", detail = "df: " .. tostring(err) }, sections)
+			end)
 			return
 		end
 		run.cancellers[#run.cancellers + 1] = function() handle.cancel() end
@@ -333,6 +342,9 @@ local function cpu_load(config, run)
 			done({ state = "ok" }, { system = { cpu_usage = shares.system, process_cpu = shares.process } })
 		end)
 		run.cancellers[#run.cancellers + 1] = function() Timers.cancel(handle) end
+		if not handle or not handle.armed then
+			done({ state = "error", detail = "Timer could not be started" })
+		end
 	end
 end
 
@@ -360,6 +372,9 @@ local function configuration(schema, run, overrides)
 			done(result, sections)
 		end)
 		run.cancellers[#run.cancellers + 1] = function() Timers.cancel(handle) end
+		if not handle or not handle.armed then
+			done({ state = "error", detail = "Timer could not be started" })
+		end
 	end
 end
 
@@ -378,14 +393,12 @@ end
 --- @param paths table The snapshot's paths section.
 --- @param state table Daemon state.
 --- @param publish function(id, result, sections) Receives each answer once.
---- @param options table|nil { local_only = true runs only the probes that read
----   local files; overrides = test replacements for the configuration probe }
+--- @param options table|nil { local_only, overrides, current = function() -> boolean }
 --- @return table run { cancel = function() }
 function M.start(schema, paths, state, publish, options)
 	options = options or {}
 	local run = { cancelled = false, cancellers = {}, publish = publish }
 	local config = schema.probes
-	start_probe(run, "configuration", configuration(schema, run, options.overrides))
 	local function stop()
 		if run.cancelled then return end
 		run.cancelled = true
@@ -394,16 +407,29 @@ function M.start(schema, paths, state, publish, options)
 			if not ok then Logger.error(LOG, "A diagnostics probe could not be cancelled: %s.", tostring(err)) end
 		end
 	end
+	run.cancel = stop
+	local function admitted()
+		if type(options.current) == "function" then
+			local checked, current = pcall(options.current)
+			return checked and current == true
+		end
+		return true
+	end
+	local function launch(id, body)
+		if not admitted() then stop(); return false end
+		start_probe(run, id, body)
+		if not admitted() then stop(); return false end
+		return true
+	end
+	if not launch("configuration", configuration(schema, run, options.overrides)) then return run end
 	if options.local_only == true then
-		run.cancel = stop
 		return run
 	end
-	start_probe(run, "github_api", github_api(config.github_api, run))
-	start_probe(run, "ai_health", ai_health(config.ai_health, state, run))
-	start_probe(run, "system_details", system_details(config.system_details, paths.logs_dir, run))
-	start_probe(run, "cpu_load", cpu_load(config.cpu_load, run))
-	start_probe(run, "proxy_pac", proxy_pac(config.proxy_pac, run))
-	run.cancel = stop
+	if not launch("github_api", github_api(config.github_api, run)) then return run end
+	if not launch("ai_health", ai_health(config.ai_health, state, run)) then return run end
+	if not launch("system_details", system_details(config.system_details, paths.logs_dir, run)) then return run end
+	if not launch("cpu_load", cpu_load(config.cpu_load, run)) then return run end
+	launch("proxy_pac", proxy_pac(config.proxy_pac, run))
 	return run
 end
 

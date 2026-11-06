@@ -47,7 +47,7 @@ function M.with_configuration(body)
 		end
 		for name in pairs(package.loaded) do
 			if name:match("^modules%.llm%.") or name:match("^infra%.llm_") or name == "infra.config_paths"
-				or name == "adapters.storage" or name == "ui.menu.builder" or name == "ui.numeric_prompt.bridge"
+				or name == "adapters.storage" or name == "toml_codec.writer" or name == "ui.menu.builder" or name == "ui.numeric_prompt.bridge"
 				or name == "ui.paths_editor.bridge" then package.loaded[name] = nil end
 		end
 		local Json, Codec = require("json"), require("toml_codec")

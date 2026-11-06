@@ -254,9 +254,8 @@ local function build_ffi_backend()
 		end,
 		read_bits = function(fd, request, count)
 			local bits = native_new("uint8_t[?]", count)
-			if native_ioctl(fd, request, bits) < 0 then
-				return nil, "ioctl failed (errno=" .. tostring(native_errno()) .. ")"
-			end
+			local copied = tonumber(native_ioctl(fd, request, bits))
+			if copied ~= count then return nil, "state ioctl did not acknowledge the full bitset" end
 			return native_string(bits, count)
 		end,
 		read_owned_key_bits = function(fd, request, count)
@@ -308,7 +307,8 @@ local function build_ffi_backend()
 				many[index - 1].revents = 0
 			end
 			local rc = tonumber(native_poll(many, count, timeout_ms))
-			return rc ~= nil and rc > 0
+			if rc == nil or rc < 0 then return nil end
+			return rc > 0
 		end,
 		close = function(fd)
 			if native_close(fd) == 0 then return true end
@@ -428,9 +428,13 @@ end
 function M.device_identity(slot)
 	local st = state(slot)
 	if st.fd == nil or st.close_error then return nil, "device is not open" end
-	local port = _backend and rawget(_backend, "device_number")
+	local backend, fd, generation = _backend, st.fd, st.generation
+	local port = backend and rawget(backend, "device_number")
 	if type(port) ~= "function" then return nil, "no device-number port" end
-	local called, number = pcall(port, st.fd)
+	local called, number = pcall(port, fd)
+	if _native_debt or not rawequal(_backend, backend) or not rawequal(_slots[slot or M.KEYBOARD], st)
+		or not rawequal(st.fd, fd) or st.generation ~= generation or st.close_error
+		or rawget(backend, "device_number") ~= port then return nil, "device changed during identity query" end
 	if not called or type(number) ~= "number" or number < 1 or number % 1 ~= 0 or number >= 2 ^ 53 then
 		return nil, "the descriptor names no character device"
 	end
@@ -550,9 +554,12 @@ end
 --- An eventN can be reused between proc discovery and open; its fd identifies
 --- the device whose complete stream EVIOCGRAB would remove from the desktop.
 --- @param slot string|nil Reader slot.
+--- @param event_type integer|nil 0 for event types, 4 for EV_MSC codes.
 --- @return number|nil mask, string|nil reason
-function M.event_capabilities(slot)
+function M.event_capabilities(slot, event_type)
 	if _busy or _native_debt then return nil, "capability query is unavailable" end
+	local kind = event_type or 0
+	if kind ~= 0 and kind ~= 4 then return nil, "unsupported capability query" end
 	local st = state(slot)
 	if st.fd == nil or st.close_error then return nil, "device is not open" end
 	local backend, fd, generation = _backend, st.fd, st.generation
@@ -572,7 +579,7 @@ function M.event_capabilities(slot)
 	end
 	if not current() then return nil, "original capability provider is unavailable" end
 	_busy = true
-	local called, bytes = pcall(query, fd, ioctl_read_request(EVIOCGBIT_NR, EVENT_TYPE_BYTES), EVENT_TYPE_BYTES)
+	local called, bytes = pcall(query, fd, ioctl_read_request(EVIOCGBIT_NR + kind, EVENT_TYPE_BYTES), EVENT_TYPE_BYTES)
 	_busy = false
 	if not called or type(bytes) ~= "string" or #bytes ~= EVENT_TYPE_BYTES or not current() then
 		return nil, "event capability query was not acknowledged"
@@ -677,8 +684,8 @@ function M.wait_any_readable(timeout_ms)
 	_busy = true
 	local ok, ready = pcall(many, _wait_fds, count, timeout_ms)
 	_busy = false
-	if not ok then return nil end
-	return ready == true
+	if not ok or type(ready) ~= "boolean" then return nil end
+	return ready
 end
 
 --- Checks private provider/session identity, not an unobserved kernel state lease.

@@ -123,6 +123,44 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 		helpers.assert_true(type(err) == "string" and err ~= "")
 		helpers.assert_eq(writes, 0)
 	end)
+	helpers.it("does not follow a foreign staging symlink while saving a tap-hold", function()
+		local writer, path, state = fresh_writer()
+		local victim = os.tmpname()
+		write_file(victim, "original bytes")
+		assert(require("luv").fs_symlink(victim, path .. ".tmp"))
+		local ok, err = pcall(function()
+			helpers.assert_eq(writer.set_tap("left_shift", "paste"), false)
+			helpers.assert_eq(read_file(victim), "original bytes")
+			helpers.assert_eq(state.reloads, 0)
+		end)
+		os.remove(path .. ".tmp"); os.remove(path); os.remove(victim)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("refuses a staging file replaced before tap-hold publication", function()
+		local writer, path, state = fresh_writer()
+		local victim = os.tmpname()
+		write_file(path, '[tap_hold]\nenabled = true\n')
+		write_file(victim, "foreign bytes")
+		local uv, replaced = require("luv"), false
+		local ok, err = pcall(function()
+			local accepted = writer.set_tap("left_shift", "paste", function()
+				if not replaced and uv.fs_lstat(path .. ".tmp") then
+					assert(uv.fs_unlink(path .. ".tmp"))
+					assert(uv.fs_symlink(victim, path .. ".tmp"))
+					replaced = true
+				end
+				return true
+			end)
+			helpers.assert_true(replaced, "the editor guard must run after staging")
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(read_file(path), '[tap_hold]\nenabled = true\n')
+			helpers.assert_eq(read_file(victim), "foreign bytes")
+			helpers.assert_eq(state.reloads, 0)
+		end)
+		os.remove(path .. ".tmp"); os.remove(path); os.remove(victim)
+		if not ok then error(err, 0) end
+	end)
 
 	helpers.it("sets a tap in the shared schema and reloads the engine", function()
 		local writer, path, state = fresh_writer()
@@ -337,6 +375,14 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 		os.remove(path)
 	end)
 
+	helpers.it("refuses a NaN key delay before writing or reloading", function()
+		local writer, path, state = fresh_writer()
+		helpers.assert_eq(writer.set_threshold("caps_lock", 0 / 0), false)
+		helpers.assert_nil(read_or_nil(path))
+		helpers.assert_eq(state.reloads, 0)
+		os.remove(path)
+	end)
+
 	helpers.it("refuses an unknown key, tap or hold, and writes nothing", function()
 		local writer, path, state = fresh_writer()
 		helpers.assert_true(not writer.set_tap("not_a_key", "copy"))
@@ -377,6 +423,58 @@ end)
 -- The first-run wizard's Tap-Holds answer: it names a file of the folder it
 -- sets up, which may not be the running one, and restarts the daemon after.
 helpers.describe("tap-hold writer: the wizard imports only the checked keys", function()
+	helpers.it("refuses a dangling link at the proposed backup name", function()
+		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		local path, victim = os.tmpname(), os.tmpname()
+		os.remove(victim)
+		local original = '[tap_hold]\ninherit_defaults = false\n'
+		write_file(path, original)
+		local backup = path .. ".tap_holds-20260101-000000-1.bak"
+		assert(require("luv").fs_symlink(victim, backup))
+		local date = os.date
+		local ok, err = pcall(function()
+			os.date = function(format, ...)
+				if format == "%Y%m%d-%H%M%S" then return "20260101-000000" end
+				return date(format, ...)
+			end
+			local imported = writer.import_recommended(path, { "caps_lock" }, Loader.preset_keys(DEFAULTS))
+			helpers.assert_eq(imported, false)
+			helpers.assert_nil(read_or_nil(victim), "an unrelated target must never be created")
+			helpers.assert_eq(read_file(path), original)
+		end)
+		os.date = date
+		os.remove(backup); os.remove(path); os.remove(victim)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("removes its own incomplete backup when its write is refused", function()
+		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		local path = os.tmpname()
+		local original = '[tap_hold]\ninherit_defaults = false\n'
+		write_file(path, original)
+		local backup = path .. ".tap_holds-20260101-000000-1.bak"
+		local date, Native = os.date, require("infra.regular_file_writer")
+		local native_open = Native.open
+		local ok, err = pcall(function()
+			os.date = function(format, ...)
+				if format == "%Y%m%d-%H%M%S" then return "20260101-000000" end
+				return date(format, ...)
+			end
+			Native.open = function(target, mode)
+				local fh, detail, code, remove_owned, current = native_open(target, mode)
+				if target ~= backup or not fh then return fh, detail, code, remove_owned, current end
+				return { write = function() return nil, "injected refusal" end,
+					close = function() return fh:close() end }, detail, code, remove_owned, current
+			end
+			local imported = writer.import_recommended(path, { "caps_lock" }, Loader.preset_keys(DEFAULTS))
+			helpers.assert_eq(imported, false)
+			helpers.assert_nil(read_or_nil(backup))
+			helpers.assert_eq(read_file(path), original)
+		end)
+		os.date, Native.open = date, native_open
+		os.remove(backup); os.remove(path)
+		if not ok then error(err, 0) end
+	end)
 
 	--- A throwaway path with no file behind it.
 	local function absent_path()
@@ -601,13 +699,14 @@ helpers.describe("tap-hold writer: staging write and close acknowledgement", fun
 	local function observe_staging(fault)
 		local writer, path, state = fresh_writer()
 		write_file(path, original)
-		local real_open, real_rename, real_remove = io.open, os.rename, os.remove
+		local NativeWriter = require("infra.regular_file_writer")
+		local real_open, real_rename = NativeWriter.open, os.rename
 		local observed = { opens = 0, writes = 0, closes = 0, renames = 0, removals = 0 }
 		local handle, proxy
-		io.open = function(target, mode)
-			if target ~= path .. ".tmp" or mode ~= "w" then return real_open(target, mode) end
+		NativeWriter.open = function(target, mode)
+			if target ~= path .. ".tmp" or mode ~= "wx" then return real_open(target, mode) end
 			observed.opens = observed.opens + 1
-			local opened, err, code = real_open(target, mode)
+			local opened, err, code, remove_owned, current_image = real_open(target, mode)
 			handle = opened
 			if not opened then return nil, err, code end
 			proxy = {
@@ -639,21 +738,18 @@ helpers.describe("tap-hold writer: staging write and close acknowledgement", fun
 					return closed, close_err, close_code
 				end,
 			}
-			return proxy
+			return proxy, nil, nil, function()
+				observed.removals = observed.removals + 1
+				if fault == "cleanup_refused" then return nil, "owned stage removal refused" end
+				return remove_owned()
+			end, current_image
 		end
 		os.rename = function(from, to)
 			if from == path .. ".tmp" and to == path then observed.renames = observed.renames + 1 end
 			return real_rename(from, to)
 		end
-		os.remove = function(target)
-			if target == path .. ".tmp" then
-				observed.removals = observed.removals + 1
-				if fault == "cleanup_refused" then return nil, "owned stage removal refused" end
-			end
-			return real_remove(target)
-		end
 		local call_ok, accepted = pcall(writer.set_tap, "left_shift", "paste")
-		io.open, os.rename, os.remove = real_open, real_rename, real_remove
+		NativeWriter.open, os.rename = real_open, real_rename
 		if handle then pcall(handle.close, handle) end
 		local source, staged = read_or_nil(path), read_or_nil(path .. ".tmp")
 		os.remove(path)

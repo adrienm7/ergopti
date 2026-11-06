@@ -15,8 +15,8 @@
 ---
 --- HOW IT READS, AND WHY EACH WAY:
 --- Battery through /sys/class/power_supply, which is a kernel file and needs no
---- daemon. Lock state and suspend through logind, which is the only thing on a
---- systemd desktop that knows both. Network through the first of nmcli, iwgetid
+--- daemon. Lock state comes from logind; suspension is the difference between
+--- the boot and monotonic clocks. Network uses the first of nmcli, iwgetid
 --- or /proc/net/wireless that answers — three because distributions disagree
 --- about which is installed, and a metric that works on one distribution is a
 --- metric nobody can compare. Audio mute through the first sound stack that
@@ -53,10 +53,12 @@ local LOG = "modules.keystats.system_metrics"
 -- learn the same answer.
 local SAMPLE_INTERVAL_MS = 30000
 
--- A gap between two samples longer than this means the machine was not running
--- in between — it suspended, or the daemon was stopped. Three sample intervals,
--- so a busy machine that merely ran late is never mistaken for one that slept.
+-- Ignore short apparent suspensions within three sample intervals. When the
+-- suspend-aware clock is unavailable, retain the older elapsed-gap heuristic.
 local SLEEP_GAP_MS = SAMPLE_INTERVAL_MS * 3
+
+-- A sampler must never switch time domains within one captured history.
+local _sample_clock_source = nil
 
 -- Where the kernel publishes battery state. A glob rather than a fixed name:
 -- BAT0 and BAT1 are both common, and a machine can have neither.
@@ -78,7 +80,7 @@ local _owner_database, _owner_device, _load_day = nil, nil, nil
 local _event_admit = nil
 
 -- What the previous sample saw, for the transitions.
-local function new_last() return { at_ms = nil, ssid = nil, locked = nil, muted = nil } end
+local function new_last() return { at_ms = nil, ssid = nil, ssid_source = nil, locked = nil, muted = nil } end
 local _last = new_last()
 
 -- The transitions seen since the collector last took them, for events_system:
@@ -111,13 +113,17 @@ end
 local function read_wireless_interface()
 	local fh = io.open(_wireless_path, "r")
 	if not fh then return nil end
-	local line = nil
-	for _ = 1, 3 do
-		line = fh:read("*l")
-		if not line then break end
-	end
-	fh:close()
-	return line and line:match("^%s*(%S+)") or nil
+	local read_ok, line = pcall(function()
+		local current
+		for _ = 1, 3 do
+			current = fh:read("*l")
+			if not current then break end
+		end
+		return current
+	end)
+	local close_ok, closed = pcall(fh.close, fh)
+	if not read_ok or not close_ok or closed ~= true or type(line) ~= "string" then return nil end
+	return line:match("^%s*(%S+)")
 end
 
 --- The network the machine is on.
@@ -129,14 +135,15 @@ end
 local function read_network()
 	if Shell.has_command("nmcli") then
 		local out = Shell.exec_line(
-			"nmcli -t -f active,ssid dev wifi 2>/dev/null | grep '^yes' | head -1")
-		if out and out ~= "" then return out end
+			"LC_ALL=C nmcli --colors no -t -f active,ssid dev wifi 2>/dev/null | grep '^yes:' | head -1")
+		if out and out ~= "" then return out, "nmcli" end
 	end
 	if Shell.has_command("iwgetid") then
 		local out = Shell.exec_line("iwgetid -r 2>/dev/null")
-		if out and out ~= "" then return out end
+		if out and out ~= "" then return out, "iwgetid" end
 	end
-	return read_wireless_interface()
+	local interface = read_wireless_interface()
+	return interface, interface and "interface" or nil
 end
 
 --- Whether the session is locked.
@@ -319,8 +326,29 @@ end
 --- Captures one producer clock and partitions elapsed time at local day cuts.
 --- @return table|nil Current cumulative day, or nil on source refusal.
 function M.sample()
-	local clock = Calendar.capture()
+	local clock = Calendar.capture(true)
+	local boot_ms = clock.boot_ms
+	clock.active_mono_ms = clock.mono_ms
+	if not _sample_clock_source then
+		_sample_clock_source = type(boot_ms) == "number" and "boot" or "monotonic"
+		if _sample_clock_source == "monotonic" then
+			Logger.warn(LOG, "Suspend-aware clock unavailable; sleep intervals may be missed.")
+		end
+	end
+	if _sample_clock_source == "boot" then
+		if type(boot_ms) ~= "number" then
+			Logger.error(LOG, "Suspend-aware clock refused; system sample deferred.")
+			return nil
+		end
+		clock.mono_ms = boot_ms
+	end
 	local now_ms, date = clock.mono_ms, clock.date
+	if _last.at_ms and (now_ms < _last.at_ms
+		or (_sample_clock_source == "boot" and _last.clock
+			and clock.active_mono_ms < _last.clock.active_mono_ms)) then
+		Logger.error(LOG, "System sampling clock moved backwards; sample deferred.")
+		return nil
+	end
 	if _day and _day.date == date and _last.at_ms and (now_ms - _last.at_ms) < SAMPLE_INTERVAL_MS then return _day end
 	assert(type(_event_admit) == "function", "System transition capture has no recording-policy authority")
 	local capture_events = _event_admit()
@@ -328,7 +356,13 @@ function M.sample()
 	local current = retained_day(date)
 	if not current then return nil end
 	local elapsed = _last.at_ms and math.max(0, now_ms - _last.at_ms) or 0
-	local asleep = elapsed > SLEEP_GAP_MS
+	local suspended = elapsed
+	if _sample_clock_source == "boot" and _last.clock then
+		local active = math.max(0, clock.active_mono_ms - _last.clock.active_mono_ms)
+		suspended = math.max(0, elapsed - math.min(elapsed, active))
+	end
+	local asleep = suspended > SLEEP_GAP_MS
+	local sleep_total = asleep and suspended or 0
 	local segments = {}
 	local at, span_date = _last.at_ms, _last.clock and _last.clock.date
 	if at and _last.clock then
@@ -341,22 +375,28 @@ function M.sample()
 	-- Admit every source first: a refused historical load cannot leave half an
 	-- interval credited and then counted again on the next periodic retry.
 	for _, segment in ipairs(segments) do if not retained_day(segment.date) then return nil end end
+	-- Two clock deltas prove the interval totals but not when suspension began.
+	-- Across local day cuts, apportion those totals by segment duration; the
+	-- cumulative rounding conserves every measured millisecond.
+	local credited, sleep_credited = 0, 0
 	for _, segment in ipairs(segments) do
 		local day = _days[segment.date]
-		if asleep then
-			day.sleep_ms = day.sleep_ms + segment.elapsed
-		else
-			local field = _last.locked == true and "locked_ms" or "awake_ms"
-			day[field] = day[field] + segment.elapsed
-			if _last.muted == true then day.audio_muted_ms = day.audio_muted_ms + segment.elapsed end
-		end
+		credited = credited + segment.elapsed
+		local cumulative_sleep = elapsed > 0 and math.floor(sleep_total * credited / elapsed + 0.5) or 0
+		local segment_sleep = cumulative_sleep - sleep_credited
+		sleep_credited = cumulative_sleep
+		local active = segment.elapsed - segment_sleep
+		day.sleep_ms = day.sleep_ms + segment_sleep
+		local field = _last.locked == true and "locked_ms" or "awake_ms"
+		day[field] = day[field] + active
+		if _last.muted == true then day.audio_muted_ms = day.audio_muted_ms + active end
 	end
 	_day = current
 	local function transition(action, metadata)
 		if not capture_events then return end
 		_events[#_events + 1] = { action = action, metadata = metadata, date = clock.date, ts = clock.ts }
 	end
-	if asleep then transition("wake", { asleep_ms = elapsed }) end
+	if asleep then transition("wake", { asleep_ms = sleep_total }) end
 
 	local battery = read_battery()
 	if battery then
@@ -366,10 +406,11 @@ function M.sample()
 		_day.battery_max = _day.battery_max and math.max(_day.battery_max, battery) or battery
 	end
 
-	local ssid = read_network()
-	-- Counted only once both samples have an answer. A transition to or from
-	-- "cannot tell" is a reading about this module, not about the network.
-	if _last.ssid ~= nil and ssid ~= nil and ssid ~= _last.ssid then
+	local ssid, ssid_source = read_network()
+	-- Compare only readings from the same source: nmcli, iwgetid and the
+	-- interface fallback use different identities for the same connection.
+	-- An unreadable sample or a changed reader is not a network transition.
+	if _last.ssid ~= nil and ssid ~= nil and ssid_source == _last.ssid_source and ssid ~= _last.ssid then
 		_day.wifi_changes = _day.wifi_changes + 1
 		-- Without the network's name: it is a fingerprint, never stored.
 		transition("wifi_change")
@@ -382,7 +423,7 @@ function M.sample()
 	end
 
 	_last.at_ms, _last.clock = now_ms, clock
-	_last.ssid = ssid
+	_last.ssid, _last.ssid_source = ssid, ssid_source
 	_last.locked = locked
 	_last.muted = read_muted()
 	return _day
@@ -420,6 +461,7 @@ end
 --- Test seam: forgets everything, the wireless listing's path included.
 function M._reset()
 	_event_admit = nil
+	_sample_clock_source = nil
 	_owner_database, _owner_device, _load_day = nil, nil, nil
 	_day, _days = nil, {}
 	_events = {}

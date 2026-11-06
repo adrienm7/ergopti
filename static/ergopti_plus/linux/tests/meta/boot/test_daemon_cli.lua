@@ -267,6 +267,65 @@ helpers.describe("ergopti_hotstrings CLI", function()
   -- ==========================================================================
 
   helpers.describe("edge cases", function()
+    helpers.it("inspects default catalogue paths without opening special files (cli-config-path)", function()
+      local file = assert(io.open(daemon_path(), "rb"))
+      local source = file:read("*a"); assert(file:close())
+      local first = assert(source:find("local function resolve_config_path(", 1, true))
+      local last = assert(source:find("local function reload_hotstrings(", first, true))
+      local status = {}
+      local env = setmetatable({ DEFAULT_CONFIG_DIR = "/default", require = function(name)
+        if name == "luv" then return { fs_stat = function(path)
+          local item = assert(status[path], "unexpected path")
+          if type(item) == "table" then return item end
+          return nil, "fixture error", item
+        end } end
+        if name == "infra.paths" then return { shared = function() return "/shared" end } end
+        error("unexpected dependency " .. name)
+      end }, { __index = _G })
+      local code = source:sub(first, last - 1) .. "\nreturn resolve_config_path"
+      local chunk
+      if loadstring then chunk = assert(loadstring(code)); setfenv(chunk, env)
+      else chunk = assert(load(code, "daemon config resolution", "t", env)) end
+      local resolve = chunk()
+      status["/default"], status["/shared"] = "ENOENT", { type = "directory" }
+      helpers.assert_eq(resolve(nil), "/default")
+      status["/default"] = { type = "directory" }
+      helpers.assert_eq(resolve(nil), "/default")
+      for _, invalid in ipairs({ "EACCES", "ENOTDIR", { type = "fifo" } }) do
+        status["/default"] = invalid
+        helpers.assert_eq(pcall(resolve, nil), false, "an inaccessible or special default must refuse startup")
+      end
+      helpers.assert_eq(resolve("/explicit"), "/explicit")
+    end)
+
+    helpers.it("rejects missing option values without swallowing the next flag (cli-missing-value)", function()
+      local file = assert(io.open(daemon_path(), "rb"))
+      local source = file:read("*a"); assert(file:close())
+      local first = assert(source:find("local function parse_args()", 1, true))
+      local last = assert(source:find("======= 6/ Config Resolution", first, true))
+      for _, option in ipairs({ "--config", "--device", "--layout", "--keymap" }) do
+        for _, arguments in ipairs({ { option }, { option, "--no-grab" } }) do
+          local env = setmetatable({ arg = arguments, Logger = helpers.make_logger_stub() }, { __index = _G })
+          local code = source:sub(first, last - 1) .. "\nreturn parse_args()"
+          local chunk
+          if loadstring then chunk = assert(loadstring(code)); setfenv(chunk, env)
+          else chunk = assert(load(code, "daemon argument parser", "t", env)) end
+          local ok, reason = pcall(chunk)
+          helpers.assert_eq(ok, false, option .. " must reject a missing value")
+          helpers.assert_true(tostring(reason):find(option, 1, true) ~= nil, "the refusal names the option")
+        end
+      end
+      local env = setmetatable({ arg = { "--config", "./--definitions", "--no-grab" },
+        Logger = helpers.make_logger_stub() }, { __index = _G })
+      local code = source:sub(first, last - 1) .. "\nreturn parse_args()"
+      local chunk
+      if loadstring then chunk = assert(loadstring(code)); setfenv(chunk, env)
+      else chunk = assert(load(code, "daemon argument parser", "t", env)) end
+      local opts = chunk()
+      helpers.assert_eq(opts.config, "./--definitions")
+      helpers.assert_eq(opts.grab, false)
+    end)
+
     helpers.it("bogus flag does not crash", function()
       local out, _ = run_daemon("--bogus-flag-xyz 2>&1")
       -- Accept: Unknown/ignored warning, Erreur/device (crash, not flag-crash), or any output.

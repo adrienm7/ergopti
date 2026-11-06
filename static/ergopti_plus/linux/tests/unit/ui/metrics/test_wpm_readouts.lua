@@ -461,6 +461,92 @@ helpers.describe("wpm readouts: the floating widget", function()
 		end)
 	end)
 
+	helpers.it("(wpm-position-nonfinite) ignores a nonfinite stored coordinate", function()
+		local initial = compact()
+		initial["metrics.wpm_widget_visible"] = true
+		initial["wpm_widget.pos_x"], initial["wpm_widget.pos_y"] = "1e999", 30
+		with_storage(initial, function()
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			assert(Widget.restore())
+			Widget.tick(stats(42), 10)
+			local x, y = Model.default_anchor(canon(), surface.screen_frame())
+			helpers.assert_eq({ surface.draws[1].x, surface.draws[1].y }, { x, y })
+		end)
+	end)
+
+	helpers.it("(wpm-position-nonfinite) refuses malformed native drag coordinates", function()
+		with_storage(compact(), function(store)
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			assert(Widget.start())
+			Widget.tick(stats(42), 10)
+			surface.moved(math.huge, 30)
+			surface.moved({}, 30)
+			helpers.assert_nil(store.values["wpm_widget.pos_x"])
+			helpers.assert_nil(store.values["wpm_widget.pos_y"])
+		end)
+	end)
+
+	helpers.it("(wpm-widget-hide-refusal) retains an ambiguous hide until native acknowledgment", function()
+		with_storage(compact(), function()
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			assert(Widget.start())
+			Widget.tick(stats(42), 10)
+			local original = surface.hide
+			surface.hide = function() surface.visible = false; return false end
+			surface.pointer = { 300, 400 }
+			Widget.tick(stats(0), 10.5)
+			helpers.assert_eq(surface.visible, false)
+			helpers.assert_nil(Widget.configuration_snapshot(), "partially hidden surface is not a stable snapshot")
+			local draws = #surface.draws
+			Widget.tick(stats(42), 11)
+			helpers.assert_eq(#surface.draws, draws, "a refused hide must settle before a new frame")
+			surface.hide = original
+			Widget.tick(stats(42), 12)
+			helpers.assert_true(surface.visible, "after the hide ACK the visible frame is drawn again")
+			helpers.assert_type(Widget.configuration_snapshot(), "table")
+		end)
+	end)
+
+	helpers.it("(wpm-draw-partial) hides a surface when drawing partially fails", function()
+		with_storage(compact(), function()
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			assert(Widget.start())
+			surface.draw = function() surface.visible = true; return false end
+			Widget.tick(stats(42), 10)
+			helpers.assert_eq(surface.hidden, 1, "a failed draw may already have shown the window")
+			helpers.assert_true(not surface.visible)
+		end)
+	end)
+
+	helpers.it("(wpm-draw-partial) retries a refused hide after a failed draw", function()
+		with_storage(compact(), function()
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			assert(Widget.start())
+			surface.draw = function() surface.visible = true; error("draw failed after show") end
+			local attempts = 0
+			surface.hide = function()
+				attempts = attempts + 1
+				if attempts == 1 then return false end
+				surface.visible = false
+				return true
+			end
+			Widget.tick(stats(42), 10)
+			Widget.tick(stats(0), 100)
+			helpers.assert_eq(attempts, 2)
+			helpers.assert_true(not surface.visible)
+		end)
+	end)
+
 	helpers.it("keeps the place the user drags it to, across a restart", function()
 		with_storage(compact(), function(store)
 			local Widget = require("ui.wpm.widget")
@@ -626,6 +712,80 @@ helpers.describe("wpm readouts: the tray readout", function()
 		Readout._set_painter(function(frame, path) painted[#painted + 1] = { frame = frame, path = path }; return true end)
 		return Readout, tray, painted
 	end
+
+	helpers.it("(wpm-tray-hide-refusal) restores a visible frame after a partially refused hide", function()
+		with_storage({}, function()
+			local Readout, tray = setup()
+			assert(Readout.start())
+			Readout.tick(stats(10), 10)
+			local original = tray.update_item
+			tray.update_item = function(handle, options)
+				if options.active == false then handle.active = false; tray.update_item = original; return false end
+				return original(handle, options)
+			end
+			Readout.tick(stats(0), 20)
+			helpers.assert_nil(Readout.configuration_snapshot(), "an ambiguous hide must not become a stable snapshot")
+			helpers.assert_eq(tray.items[1].active, false, "the refused native update may have hidden it")
+			Readout.tick(stats(10), 30)
+			helpers.assert_eq(tray.items[1].active, true, "the visible frame must be republished")
+		end)
+	end)
+
+	helpers.it("(wpm-icon-paint-refusal) never repaints the icon still displayed", function()
+		with_storage({}, function()
+			local Readout, tray = setup()
+			local paths, calls = {}, 0
+			Readout._set_painter(function(_, path)
+				calls = calls + 1
+				paths[calls] = path
+				return calls ~= 2
+			end)
+			assert(Readout.start())
+			Readout.tick(stats(10), 10)
+			local displayed = tray.items[1].icon
+			Readout.tick(stats(20), 20)
+			Readout.tick(stats(30), 30)
+			helpers.assert_true(paths[2] ~= displayed)
+			helpers.assert_true(paths[3] ~= displayed, "a refused paint must keep the current icon immutable")
+		end)
+	end)
+
+	helpers.it("(wpm-icon-paint-refusal) retries an ambiguous tray update before repainting", function()
+		with_storage({}, function()
+			local Readout, tray, paths = setup()
+			assert(Readout.start())
+			Readout.tick(stats(10), 10)
+			local original_update = tray.update_item
+			local calls = 0
+			tray.update_item = function(handle, options)
+				calls = calls + 1
+				if calls == 1 then handle.icon = options.icon; return false end
+				return original_update(handle, options)
+			end
+			Readout.tick(stats(20), 20)
+			local possibly_displayed = tray.items[1].icon
+			Readout.tick(stats(30), 30)
+			helpers.assert_eq(calls, 3, "the ambiguous icon is acknowledged before the next frame")
+			helpers.assert_true(paths[3].path ~= possibly_displayed, "the potentially displayed file stays intact")
+		end)
+	end)
+
+	helpers.it("(wpm-icon-paint-refusal) keeps an unresolved update through stop refusal", function()
+		with_storage({}, function(_, preferences)
+			local Readout, tray = setup()
+			assert(Readout.start())
+			Readout.tick(stats(10), 10)
+			local original = tray.update_item
+			tray.update_item = function() return false end
+			Readout.tick(stats(20), 20)
+			helpers.assert_nil(Readout.configuration_snapshot(), "an ambiguous icon is not a stable snapshot")
+			helpers.assert_eq(Readout.stop(), false)
+			helpers.assert_true(Readout.is_running())
+			helpers.assert_eq(preferences.get("metrics.wpm_menubar_visible"), true)
+			tray.update_item = original
+			helpers.assert_true(Readout.stop())
+		end)
+	end)
 
 	helpers.it("refuses native retirement without losing the live item or preference", function()
 		with_storage({}, function(_, preferences)

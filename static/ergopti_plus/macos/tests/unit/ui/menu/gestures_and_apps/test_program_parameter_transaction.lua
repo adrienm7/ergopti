@@ -78,6 +78,12 @@ local function with_owner(body, options)
 				return publish(previous, on_error) == true
 			end,
 		}
+		if controls.recovery_ack then
+			mutation.recovery_settled = function()
+				observations.recovery_calls = (observations.recovery_calls or 0) + 1
+				return controls.recovery_ack()
+			end
+		end
 		if controls.private_native_exception then
 			local publish_file = files_port.write_if_unchanged
 			files_port.write_if_unchanged = function(path, value, expected, on_error)
@@ -106,6 +112,21 @@ local function with_owner(body, options)
 end
 
 helpers.describe("private program retained compensation owner", function()
+	helpers.it("retains compensation until its participant acknowledges recovery", function()
+		local acknowledged = false
+		with_owner(function(owner, apply, _, _, observed)
+			helpers.assert_eq(apply(), false)
+			helpers.assert_true(owner.pending())
+			helpers.assert_eq(observed.recovery_calls, 1)
+			helpers.assert_eq(owner.retry_restore(), false)
+			helpers.assert_true(owner.pending())
+			acknowledged = true
+			helpers.assert_true(owner.retry_restore())
+			helpers.assert_eq(owner.pending(), false)
+			helpers.assert_eq(observed.recovery_calls, 3)
+		end, { save = "false", recovery_ack = function() return acknowledged end })
+	end)
+
 	helpers.it("keeps actual full publisher exceptions private through its original bound save", function()
 		with_owner(function(owner, apply, inspect, _, observations, global, _, original)
 			helpers.assert_eq(apply(), false)

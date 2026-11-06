@@ -268,7 +268,56 @@ helpers.describe("file_watchers Personal topology", function()
 		helpers.assert_eq(#failures, 0, "every independent private cleanup must acknowledge retirement: " .. table.concat(failures, " | "))
 	end
 
+	for _, nofollow_backend in ipairs({ "native", "pump" }) do
+	helpers.it("(linux-watch-nofollow) " .. nofollow_backend .. " without luaposix never watches a linked directory", function()
+		session(nofollow_backend, function(s)
+			local outside = s.directory(s.root .. "/outside")
+			local external = s.file(outside .. "/external.toml")
+			local regular = s.file(s.personal .. "/regular.toml")
+			local link = s.personal .. "/linked"
+			assert(native_luv.fs_symlink(outside, link))
+			local ok, detail = xpcall(function()
+				s.no_posix = true
+				s.start(); s.settle(0)
+				local linked_watches = s.active(link)
+				s.file(external, '[personal]\nvalue = "outside"\n'); s.settle(0)
+				s.file(regular, '[personal]\nvalue = "inside"\n'); s.settle(1)
+				helpers.assert_eq(linked_watches, 0, "linked directories are outside the loader's source boundary")
+			end, debug.traceback)
+			assert(native_luv.fs_unlink(link))
+			if not ok then error(detail, 0) end
+		end)
+	end)
+		helpers.it("(linux-watch-nofollow) " .. nofollow_backend .. " refuses a linked Personal root", function()
+			session(nofollow_backend, function(s)
+				local outside = s.directory(s.root .. "/outside")
+				local external = s.file(outside .. "/external.toml")
+				local link = s.root .. "/linked-root"
+				assert(native_luv.fs_symlink(outside, link))
+				local ok, detail = xpcall(function()
+					s.personal, s.no_posix = link, true
+					s.start(); s.settle(0)
+					helpers.assert_eq(s.active(link), 0)
+					s.file(external, '[personal]\nvalue = "outside"\n'); s.settle(0)
+				end, debug.traceback)
+				assert(native_luv.fs_unlink(link))
+				if not ok then error(detail, 0) end
+			end)
+		end)
+	end
+
 	for _, backend in ipairs({ "native", "pump" }) do
+		helpers.it("discovers a personal directory created after startup (" .. backend .. ")", function()
+			session(backend, function(s)
+				s.remove_directory(s.personal)
+				s.start()
+				s.directory(s.personal)
+				s.file(s.personal .. "/new.toml")
+				s.settle()
+				s.settle()
+				helpers.assert_true(s.reloads > 0, "creation must trigger a catalogue reload")
+			end)
+		end)
 		helpers.it("(linux-watch-topology) " .. backend .. " admits a moved-in populated tree and its later edits", function()
 			session(backend, function(s)
 				local staging = s.directory(s.root .. "/staging"); local sub = s.directory(staging .. "/nested")

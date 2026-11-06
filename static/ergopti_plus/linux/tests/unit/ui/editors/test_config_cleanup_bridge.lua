@@ -85,6 +85,42 @@ helpers.describe("configuration cleanup WebView (Linux)", function()
 			helpers.assert_eq(context.shown, 2)
 		end)
 	end)
+	helpers.it("retains its session when native close is refused", function()
+		with_bridge({}, function(bridge, context)
+			bridge.open({ path = "/trusted/config.toml" })
+			local page = native_context(context)
+			bridge.on_message("ready", {}, page)
+			local closed = page.close_owned_window
+			page.close_owned_window = function() return false end
+			bridge.on_message({ action = "close", session = "session-1" }, {}, page)
+			helpers.assert_eq(context.sessions[1].closed, 0)
+			bridge.on_message("ready", {}, page)
+			helpers.assert_eq(#context.scripts, 2)
+			page.close_owned_window = closed
+			bridge.on_message({ action = "close", session = "session-1" }, {}, page)
+			helpers.assert_eq(context.sessions[1].closed, 1)
+			helpers.assert_eq(context.hidden, 1)
+		end)
+	end)
+
+	helpers.it("a close callback does not retire its replacement session", function()
+		with_bridge({}, function(bridge, context)
+			bridge.open({ path = "/trusted/config.toml" })
+			local page = native_context(context)
+			bridge.on_message("ready", {}, page)
+			page.close_owned_window = function()
+				context.epoch = nil
+				bridge.on_window_closed(page.epoch)
+				helpers.assert_true(bridge.open({ path = "/trusted/config.toml" }))
+				return true
+			end
+			bridge.on_message({ action = "close", session = "session-1" }, {}, page)
+			helpers.assert_eq(context.sessions[2].closed, 0)
+			bridge.on_message("ready", {}, native_context(context))
+			helpers.assert_eq(#context.scripts, 2)
+		end)
+	end)
+
 	helpers.it("closes only the displayed session and ignores its old close callback after reopen", function()
 		with_bridge({}, function(bridge, context)
 			bridge.open({ path = "/trusted/config.toml" })

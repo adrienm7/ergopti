@@ -219,6 +219,39 @@ helpers.describe("prediction_engine.predict: 'no model selected' guard is not de
 end)
 
 helpers.describe("prediction_engine: durable logical-output callback", function()
+	helpers.it("withholds private text raised by the output observer", function()
+		local restore_focus = install_insecure_focus()
+		local logger = require("logger.shim")
+		local previous_warn, warnings = logger.warn, {}
+		local previous_ollama = package.loaded["modules.llm.api_ollama"]
+		local previous_profiles = package.loaded["modules.llm.profiles"]
+		logger.warn = function(_, format, ...) warnings[#warnings + 1] = string.format(format, ...) end
+		package.loaded["modules.llm.api_ollama"] = {
+			chat = function(_, _, _, _, on_chunk, on_done) on_chunk(" est bien faite"); on_done(" est bien faite", nil) end,
+			cancel = function() end,
+		}
+		package.loaded["modules.llm.profiles"] = {
+			init = function() end, is_enabled = function() return true end,
+			get_current_model = function() return "test-model" end,
+			get_base_url = function() return "http://127.0.0.1:11434" end,
+		}
+		local ok, err = pcall(function()
+			local pe = helpers.load_module("modules.llm.prediction_engine")
+			pe.init({ focus_id = function() return "owned-prediction-window" end,
+				apply_prediction = function() return true end,
+				on_output = function(text) error(text, 0) end })
+			pe.predict("Bonjour //", { app_id = "firefox" })
+			helpers.assert_true(pe.accept(1))
+		end)
+		package.loaded["modules.llm.api_ollama"] = previous_ollama
+		package.loaded["modules.llm.profiles"] = previous_profiles
+		restore_focus()
+		logger.warn = previous_warn
+		if not ok then error(err, 0) end
+		local output = table.concat(warnings, "\n")
+		helpers.assert_contains(output, "Prediction output observer failed")
+		helpers.assert_nil(output:find("est bien faite", 1, true))
+	end)
 	helpers.it("reports output only after the user accepts a parsed suggestion", function()
 		local restore_focus = install_insecure_focus()
 		local observed = nil

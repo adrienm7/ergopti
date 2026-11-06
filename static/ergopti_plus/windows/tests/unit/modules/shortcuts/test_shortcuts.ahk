@@ -381,8 +381,8 @@ Test("Shortcuts: keep-awake retains a refused cancellation hook for retry (AHK-1
 _SPT_AssertRecordingBoundary() {
 	Body := _DriverFuncBody("SearchPath")
 	Code := _DriverMaskNonCode(&Body)
-	AssertTrue(RegExMatch(Code, "i)^\s*SearchPath\(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened\)"),
-		"the search launch and report seams must retain their explicit native defaults")
+	AssertTrue(RegExMatch(Code, "i)^\s*SearchPath\(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened, PathStatusFn := _SearchPathStatus\)"),
+		"the search launch, report and metadata seams must retain their explicit native defaults")
 	AssertFalse(RegExMatch(Code, "i)\bRun\s*\("), "the recording probe must never reach a raw native launch")
 	Assignments := 0, Calls := 0
 	Position := 1

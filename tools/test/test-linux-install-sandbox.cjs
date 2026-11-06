@@ -107,11 +107,57 @@ function runInstaller(scenario) {
 			(scenario.busybox ? 'case "$1" in usermod|groupadd) exit 127 ;; esac\n' : '') +
 			'exit 0'
 	);
+	if (scenario.rootWithoutCaller) {
+		stub(stubs, 'id', '[ "$1" = -u ] && { echo 0; exit 0; }; exec /usr/bin/id "$@"');
+		fs.writeFileSync(
+			path.join(stubs, 'bash'),
+			'#!/bin/bash\ncase "${1:-}" in */setup_permissions.sh) exit 1 ;; esac\nexec /bin/bash "$@"\n',
+			{ mode: 0o755 }
+		);
+	}
+	if (scenario.refuseLibraryScan) {
+		stub(stubs, 'find', 'case "${1:-}" in */lib/ergopti) exit 73 ;; esac\nexec /usr/bin/find "$@"');
+	}
 	stub(
 		stubs,
 		'systemctl',
-		`${log}\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service disabled enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\nexit 1`
+		`${log}\n[ "$2" = is-enabled ] && [ "${scenario.systemdEnabled ? 1 : 0}" = 1 ] && exit 0\n[ "$2" = show ] && { ${scenario.refuseShow ? 'exit 1;' : `printf 'FragmentPath=%s\\nDropInPaths=\\n' "\${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/ergopti-hotstrings.service"; exit 0;`} }\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service ${scenario.systemdEnabled ? 'enabled' : 'disabled'} enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\nexit 1`
 	);
+	if (
+		scenario.refuseUnitPublish ||
+		scenario.refuseLauncherPublish ||
+		scenario.refuseAutostartPublish
+	) {
+		const destination = scenario.refuseUnitPublish
+			? '*/ergopti-hotstrings.service'
+			: scenario.refuseLauncherPublish
+				? '*/bin/ergopti-hotstrings'
+				: '*/ergopti-hotstrings.desktop';
+		stub(
+			stubs,
+			'mv',
+			`for arg in "$@"; do case "$arg" in ${destination}) printf '[fixture] publish-refused\\n' >&2; exit 1 ;; esac; done\nexec /usr/bin/mv "$@"`
+		);
+	}
+	if (scenario.refuseUnitMode || scenario.refuseLauncherMode || scenario.refuseAutostartMode) {
+		const temporary = scenario.refuseUnitMode
+			? '*/.ergopti-service.*'
+			: scenario.refuseLauncherMode
+				? '*/.ergopti-launcher.*'
+				: '*/.ergopti-autostart.*';
+		stub(
+			stubs,
+			'chmod',
+			`for arg in "$@"; do case "$arg" in ${temporary}) printf '[fixture] mode-refused\\n' >&2; exit 1 ;; esac; done\nexec /usr/bin/chmod "$@"`
+		);
+	}
+	if (scenario.protectSystemPrefix) {
+		stub(
+			stubs,
+			'install',
+			'for arg in "$@"; do case "$arg" in /usr|/usr/*) exit 77 ;; esac; done\nexec /usr/bin/install "$@"'
+		);
+	}
 	if (process.platform === 'win32') {
 		stub(
 			stubs,
@@ -169,10 +215,22 @@ function runInstaller(scenario) {
 		TMPDIR: bashPath(sandbox),
 		LANG: 'C.UTF-8'
 	};
+	if (scenario.sudoUid !== undefined) env.SUDO_UID = scenario.sudoUid;
+	if (scenario.omitHome) delete env.HOME;
 	// Git Bash may reconstruct PATH when a child Bash starts. Keep the same
 	// inert command boundary in the installer and its newly installed helpers.
 	const bashEnvironment = path.join(sandbox, 'bash-environment');
-	fs.writeFileSync(bashEnvironment, 'export PATH="$TEST_STUBS:/usr/bin:/bin"\n');
+	fs.writeFileSync(
+		bashEnvironment,
+		'export PATH="$TEST_STUBS:/usr/bin:/bin"\n' +
+			(scenario.refuseUnitWrite
+				? 'printf() { if [[ "$1" = "%s\\n" && "${2:-}" = ExecStart=* ]]; then return 1; fi; builtin printf "$@"; }\n'
+				: '') +
+			(scenario.refuseLauncherWrite ? 'cat() { return 1; }\n' : '') +
+			(scenario.refuseAutostartWrite
+				? 'cat() { local target; target="$(readlink "/proc/$$/fd/1")"; [[ "$target" = */.ergopti-autostart.* ]] && { printf "[fixture] write-refused\\n" >&2; return 1; }; command cat "$@"; }\n'
+				: '')
+	);
 	env.TEST_STUBS = bashPath(stubs);
 	env.BASH_ENV = bashPath(bashEnvironment);
 	const installArgs =
@@ -197,6 +255,7 @@ function runInstaller(scenario) {
 		home,
 		configRoot,
 		stubs,
+		env,
 		calls,
 		cleanup: () => fs.rmSync(sandbox, { recursive: true, force: true })
 	};
@@ -342,6 +401,234 @@ if (process.platform === 'linux') {
 }
 
 const errors = [];
+
+// The standalone uninstaller refuses an installation nested in any checkout.
+// Do not create that unremovable installation, even when the prefix is new.
+for (const viaAlias of [false, true]) {
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		prefixName: `${viaAlias ? 'checkout-alias' : 'checkout'}/new-prefix`,
+		seed(home) {
+			const checkout = path.join(home, 'checkout');
+			fs.mkdirSync(checkout);
+			const initialized = spawnSync('git', ['init', '--quiet', checkout], { encoding: 'utf8' });
+			assert.equal(initialized.status, 0, initialized.stderr);
+			if (viaAlias) fs.symlinkSync(checkout, path.join(home, 'checkout-alias'));
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0, 'a prefix inside a checkout must be refused');
+		assert.equal(fs.existsSync(path.join(run.home, 'checkout/new-prefix')), false);
+		assert.equal(
+			run.calls.some((call) => call.startsWith('sudo ')),
+			false
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// A checkout already inside an installation is user-owned too.
+{
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		seed(home) {
+			const checkout = path.join(home, '.local/lib/ergopti/linux/custom-checkout');
+			fs.mkdirSync(checkout, { recursive: true });
+			const initialized = spawnSync('git', ['init', '--quiet', checkout], { encoding: 'utf8' });
+			assert.equal(initialized.status, 0, initialized.stderr);
+			fs.writeFileSync(path.join(checkout, 'keep'), 'user data\n');
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0, 'an installation containing a checkout must be refused');
+		assert.equal(
+			fs.readFileSync(path.join(run.home, '.local/lib/ergopti/linux/custom-checkout/keep'), 'utf8'),
+			'user data\n'
+		);
+		assert.equal(
+			run.calls.some((call) => call.startsWith('sudo ')),
+			false
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// A linked bin or lib directory redirects publication outside the admitted
+// prefix and cannot later pass the uninstaller's physical-path checks.
+for (const [linked, dangling] of ['bin', 'lib'].flatMap((name) => [
+	[name, false],
+	[name, true]
+])) {
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		seed(home) {
+			const prefix = path.join(home, '.local');
+			const foreign = path.join(home, `foreign-${linked}`);
+			fs.mkdirSync(prefix);
+			fs.mkdirSync(foreign);
+			fs.symlinkSync(foreign, path.join(prefix, linked));
+			if (dangling) fs.rmdirSync(foreign);
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0, `linked ${linked} must be refused`);
+		const foreign = path.join(run.home, `foreign-${linked}`);
+		if (dangling) assert.equal(fs.existsSync(foreign), false);
+		else assert.deepEqual(fs.readdirSync(foreign), []);
+		assert.equal(
+			run.calls.some((call) => call.startsWith('sudo ')),
+			false
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// A refused scan cannot certify that replacing an existing tree is safe.
+{
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		refuseLibraryScan: true,
+		seed(home) {
+			const file = path.join(home, '.local/lib/ergopti/linux/ergopti_hotstrings.lua');
+			fs.mkdirSync(path.dirname(file), { recursive: true });
+			fs.writeFileSync(file, 'retained\n');
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0);
+		assert.match(run.output, /code=scan-refused/);
+		assert.equal(
+			fs.readFileSync(
+				path.join(run.home, '.local/lib/ergopti/linux/ergopti_hotstrings.lua'),
+				'utf8'
+			),
+			'retained\n'
+		);
+		assert.equal(
+			run.calls.some((call) => call.startsWith('sudo ')),
+			false
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// A root shell without a desktop caller cannot enroll UID 0. Refuse before
+// replacing payload files, not at the final permission-setup step.
+for (const sudoUid of [undefined, '0', '999', '65534', 'invalid']) {
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		rootWithoutCaller: true,
+		sudoUid,
+		seed(home) {
+			const file = path.join(home, '.local/lib/ergopti/linux/ergopti_hotstrings.lua');
+			fs.mkdirSync(path.dirname(file), { recursive: true });
+			fs.writeFileSync(file, 'existing installation\n');
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0);
+		assert.match(run.output, /Refusing a non-desktop account/);
+		assert.equal(
+			fs.readFileSync(
+				path.join(run.home, '.local/lib/ergopti/linux/ergopti_hotstrings.lua'),
+				'utf8'
+			),
+			'existing installation\n'
+		);
+		assert.equal(fs.existsSync(path.join(run.home, '.local/bin/ergopti-hotstrings')), false);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// An explicit prefix allows installation even when HOME is unavailable.
+{
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		omitHome: true,
+		prefixName: 'explicit'
+	});
+	try {
+		assert.equal(run.status, 0, run.output);
+		assert.ok(fs.existsSync(path.join(run.home, 'explicit/bin/ergopti-hotstrings')));
+	} finally {
+		run.cleanup();
+	}
+}
+
+// Standalone installs under a system root cannot be removed by the standalone
+// uninstaller and must not write into an OS package's namespace.
+for (const candidate of ['/usr', '/usr/', 'system-alias']) {
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		prefixArgument: candidate,
+		fromHome: candidate === 'system-alias',
+		protectSystemPrefix: true,
+		seed(home) {
+			if (candidate === 'system-alias') fs.symlinkSync('/usr', path.join(home, candidate));
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0);
+		assert.match(run.output, /Refusing a system installation prefix/);
+		assert.equal(
+			run.calls.some((call) => call.startsWith('sudo ')),
+			false
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// A service entry cannot encode control characters in the launcher path. The
+// installer must discover that before copying a payload or asking for access.
+for (const name of ['service\ninvalid', 'service\rinvalid', 'service\tinvalid']) {
+	const run = runInstaller({ desktopProvided: true, prefixName: name });
+	try {
+		assert.notEqual(run.status, 0);
+		assert.equal(fs.existsSync(path.join(run.home, name, 'lib/ergopti')), false);
+		assert.equal(
+			run.calls.some((call) => call.startsWith('sudo ')),
+			false
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
+{
+	const missingPrefix = spawnSync(bashExecutable(), [bashPath(INSTALLER), '--prefix'], {
+		encoding: 'utf8',
+		env: { ...process.env, LC_ALL: 'C' }
+	});
+	assert.equal(missingPrefix.status, 64);
+	assert.match(missingPrefix.stderr, /Missing --prefix value/);
+	assert.doesNotMatch(missingPrefix.stderr, /unbound variable/);
+}
+
+// Lua interprets these bytes inside every module-search template, so a driver
+// installed under either prefix cannot load its own modules.
+for (const prefixName of ['invalid;prefix', 'invalid?prefix']) {
+	const run = runInstaller({ desktopProvided: true, noService: true, prefixName });
+	try {
+		assert.notEqual(run.status, 0);
+		assert.match(run.output, /code=unsupported-prefix/);
+		assert.equal(fs.existsSync(path.join(run.home, prefixName, 'lib/ergopti')), false);
+	} finally {
+		run.cleanup();
+	}
+}
 
 // Runtime configuration and systemd use the same XDG config root. A legacy
 // canonical pack there must retire before the new installed bundle replaces it.
@@ -631,17 +918,344 @@ const errors = [];
 	}
 }
 
-// An update must preserve a choice already made through the startup menu.
+// Refuse foreign or linked launchers and startup entries before replacing the payload.
+for (const kind of [
+	'unit',
+	'desktop',
+	'linked-unit',
+	'linked-desktop',
+	'launcher',
+	'linked-launcher'
+]) {
+	const relative = kind.endsWith('launcher')
+		? '../.local/bin/ergopti-hotstrings'
+		: kind.endsWith('unit')
+			? 'systemd/user/ergopti-hotstrings.service'
+			: 'autostart/ergopti-hotstrings.desktop';
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: kind.endsWith('launcher'),
+		seed(home, configRoot) {
+			const entry = path.join(configRoot, relative);
+			fs.mkdirSync(path.dirname(entry), { recursive: true });
+			if (kind.startsWith('linked-')) {
+				fs.writeFileSync(path.join(home, 'foreign-target'), 'keep target\n');
+				fs.symlinkSync(path.join(home, 'foreign-target'), entry);
+			} else fs.writeFileSync(entry, 'foreign startup\n');
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0, `${kind} must be refused`);
+		const entry = path.join(run.configRoot, relative);
+		if (kind.startsWith('linked-')) {
+			assert.ok(fs.lstatSync(entry).isSymbolicLink());
+			assert.equal(fs.readFileSync(path.join(run.home, 'foreign-target'), 'utf8'), 'keep target\n');
+		} else assert.equal(fs.readFileSync(entry, 'utf8'), 'foreign startup\n');
+		assert.equal(fs.existsSync(path.join(run.home, '.local/lib/ergopti')), false);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// An expected command in a duplicate key or action does not own the main entry.
+for (const kind of [
+	'duplicate',
+	'key-space',
+	'key-tab',
+	'key-return',
+	'key-formfeed',
+	'group-space',
+	'nul-comment',
+	'action-decoy'
+]) {
+	let original;
+	const run = runInstaller({
+		desktopProvided: true,
+		seed(home, configRoot) {
+			const desktop = path.join(configRoot, 'autostart/ergopti-hotstrings.desktop');
+			const launcher = `${bashPath(home)}/.local/bin/ergopti-hotstrings`;
+			fs.mkdirSync(path.dirname(desktop), { recursive: true });
+			const foreign = {
+				duplicate: 'Exec=/other/program',
+				'key-space': ' Exec =/other/program',
+				'key-tab': 'Exec\t=/other/program',
+				'key-return': '\rExec=/other/program',
+				'key-formfeed': 'Exec\f=/other/program',
+				'group-space': ' [Desktop Entry] \nExec=/other/program',
+				'nul-comment': '# user\0data'
+			};
+			original =
+				kind === 'action-decoy'
+					? `[Desktop Entry]\nExec=/other/program\n[Desktop Action Example]\nExec=${launcher} --tray\n`
+					: `[Desktop Entry]\nExec=${launcher} --tray\n${foreign[kind]}\n`;
+			fs.writeFileSync(desktop, original);
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0, `${kind} main entry must be refused`);
+		assert.equal(
+			fs.readFileSync(path.join(run.configRoot, 'autostart/ergopti-hotstrings.desktop'), 'utf8'),
+			original
+		);
+		assert.equal(fs.existsSync(path.join(run.home, '.local/lib/ergopti')), false);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// A valid receipt's last row remains authoritative without a trailing newline.
 {
 	const run = runInstaller({
 		desktopProvided: true,
+		noService: true,
+		seed(home) {
+			const library = path.join(home, '.local/lib/ergopti');
+			const module = path.join(library, 'linux/native_modules/luv.so');
+			fs.mkdirSync(path.dirname(module), { recursive: true });
+			fs.writeFileSync(module, 'previous native module');
+			const digest = createHash('sha256').update(fs.readFileSync(module)).digest('hex');
+			fs.writeFileSync(
+				path.join(library, '.ergopti-owned-files'),
+				`${digest}\tlinux/native_modules/luv.so`
+			);
+		}
+	});
+	try {
+		assert.equal(run.status, 0, run.output);
+		const receipt = fs.readFileSync(
+			path.join(run.home, '.local/lib/ergopti/.ergopti-owned-files'),
+			'utf8'
+		);
+		assert.ok(
+			receipt.includes('\tlinux/native_modules/luv.so\n'),
+			'retained native module remains owned'
+		);
+		verifyOwnership(run, receipt, path.join(run.home, '.local'), false);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// Reinstalling over this prefix's own launcher remains supported.
+{
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		seed(home) {
+			const bin = path.join(home, '.local/bin');
+			fs.mkdirSync(bin, { recursive: true });
+			fs.writeFileSync(
+				path.join(bin, 'ergopti-hotstrings'),
+				`INSTALL_ROOT=${bashPath(home)}/.local/lib/ergopti\nexec bash "\${INSTALL_ROOT}/bin/ergopti-hotstrings" "$@"\n`
+			);
+		}
+	});
+	try {
+		assert.equal(run.status, 0, run.output);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// Skipping service setup on an upgrade must not erase ownership of the startup
+// files that the earlier install left in place.
+{
+	const run = runInstaller({ desktopProvided: true });
+	try {
+		assert.equal(run.status, 0, run.output);
+		const updated = spawnSync(bashExecutable(), [bashPath(INSTALLER), '--no-service'], {
+			env: run.env,
+			encoding: 'utf8',
+			timeout: 60000
+		});
+		assert.equal(updated.status, 0, updated.stderr);
+		verifyOwnership(run);
+		const uninstall = spawnSync(
+			bashExecutable(),
+			[bashPath(path.join(path.dirname(INSTALLER), 'uninstall.sh')), '--check'],
+			{ env: run.env, encoding: 'utf8', timeout: 60000 }
+		);
+		assert.equal(uninstall.status, 0, uninstall.stderr);
+		const unit = path.join(run.configRoot, 'systemd/user/ergopti-hotstrings.service');
+		fs.appendFileSync(unit, '# user modification\n');
+		const modified = spawnSync(
+			bashExecutable(),
+			[bashPath(path.join(path.dirname(INSTALLER), 'uninstall.sh')), '--check'],
+			{ env: run.env, encoding: 'utf8', timeout: 60000 }
+		);
+		assert.notEqual(modified.status, 0, 'a modified service must not be claimed');
+		assert.match(fs.readFileSync(unit, 'utf8'), /# user modification/);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// Replacing owned startup files preserves their pre-existing access modes.
+{
+	const run = runInstaller({
+		desktopProvided: true,
+		seed(home, configRoot) {
+			const wrapper = path.join(home, '.local/bin/ergopti-hotstrings');
+			const unit = path.join(configRoot, 'systemd/user/ergopti-hotstrings.service');
+			const desktop = path.join(configRoot, 'autostart/ergopti-hotstrings.desktop');
+			for (const file of [wrapper, unit, desktop])
+				fs.mkdirSync(path.dirname(file), { recursive: true });
+			fs.writeFileSync(
+				wrapper,
+				`INSTALL_ROOT=${bashPath(home)}/.local/lib/ergopti\nexec bash "\${INSTALL_ROOT}/bin/ergopti-hotstrings" "$@"\n`,
+				{ mode: 0o700 }
+			);
+			fs.writeFileSync(unit, `ExecStart=${bashPath(wrapper)} --tray\n`, { mode: 0o600 });
+			fs.writeFileSync(desktop, `[Desktop Entry]\nExec=${bashPath(wrapper)} --tray\n`, {
+				mode: 0o600
+			});
+		}
+	});
+	try {
+		assert.equal(run.status, 0, run.output);
+		assert.equal(
+			fs.statSync(path.join(run.home, '.local/bin/ergopti-hotstrings')).mode & 0o777,
+			0o700 | (0o111 & ~process.umask())
+		);
+		assert.equal(
+			fs.statSync(path.join(run.configRoot, 'systemd/user/ergopti-hotstrings.service')).mode &
+				0o777,
+			0o600
+		);
+		assert.equal(
+			fs.statSync(path.join(run.configRoot, 'autostart/ergopti-hotstrings.desktop')).mode & 0o777,
+			0o600
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// A failed XDG generation, chmod or publication leaves the previous entry complete.
+for (const fault of ['refuseAutostartWrite', 'refuseAutostartMode', 'refuseAutostartPublish']) {
+	const run = runInstaller({
+		desktopProvided: true,
+		[fault]: true,
+		seed(home, configRoot) {
+			const file = path.join(configRoot, 'autostart/ergopti-hotstrings.desktop');
+			fs.mkdirSync(path.dirname(file), { recursive: true });
+			const previous = `[Desktop Entry]\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\n# previous\n`;
+			fs.writeFileSync(file, previous);
+			const library = path.join(home, '.local/lib/ergopti');
+			fs.mkdirSync(library, { recursive: true });
+			const digest = createHash('sha256').update(previous).digest('hex');
+			fs.writeFileSync(path.join(library, '.ergopti-owned-files'), `${digest}\t@autostart\n`);
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0);
+		const expected =
+			fault === 'refuseAutostartWrite'
+				? 'write'
+				: fault === 'refuseAutostartMode'
+					? 'mode'
+					: 'publish';
+		assert.ok(
+			run.output.includes(`[fixture] ${expected}-refused`),
+			'the intended failure was reached'
+		);
+		const directory = path.join(run.configRoot, 'autostart');
+		assert.match(
+			fs.readFileSync(path.join(directory, 'ergopti-hotstrings.desktop'), 'utf8'),
+			/# previous/
+		);
+		assert.equal(
+			fs.readdirSync(directory).filter((name) => name.startsWith('.ergopti-autostart.')).length,
+			0
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// Failed launcher generation, chmod or publication leaves the old file intact.
+for (const fault of ['refuseLauncherWrite', 'refuseLauncherMode', 'refuseLauncherPublish']) {
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		[fault]: true,
+		seed(home) {
+			const bin = path.join(home, '.local/bin');
+			fs.mkdirSync(bin, { recursive: true });
+			fs.writeFileSync(
+				path.join(bin, 'ergopti-hotstrings'),
+				`INSTALL_ROOT=${bashPath(home)}/.local/lib/ergopti\nexec bash "\${INSTALL_ROOT}/bin/ergopti-hotstrings" "$@"\n# previous launcher\n`
+			);
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0);
+		const bin = path.join(run.home, '.local/bin');
+		assert.match(
+			fs.readFileSync(path.join(bin, 'ergopti-hotstrings'), 'utf8'),
+			/# previous launcher/
+		);
+		assert.equal(
+			fs.readdirSync(bin).filter((name) => name.startsWith('.ergopti-launcher.')).length,
+			0
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// A failed service generation, chmod or publication keeps the previous unit
+// complete and retires its private temporary file.
+for (const fault of ['refuseUnitWrite', 'refuseUnitMode', 'refuseUnitPublish']) {
+	const run = runInstaller({
+		desktopProvided: true,
+		[fault]: true,
+		seed(home, configRoot) {
+			const unit = path.join(configRoot, 'systemd/user/ergopti-hotstrings.service');
+			fs.mkdirSync(path.dirname(unit), { recursive: true });
+			fs.writeFileSync(
+				unit,
+				`[Service]\nExecStart=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\n# previous unit\n`
+			);
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0, 'refused publication must stop installation');
+		assert.equal(
+			fs.readFileSync(path.join(run.configRoot, 'systemd/user/ergopti-hotstrings.service'), 'utf8'),
+			`[Service]\nExecStart=${bashPath(run.home)}/.local/bin/ergopti-hotstrings --tray\n# previous unit\n`
+		);
+		assert.equal(
+			fs
+				.readdirSync(path.join(run.configRoot, 'systemd/user'))
+				.filter((name) => name.startsWith('.ergopti-service.')).length,
+			0,
+			`${fault} must retire its temporary file`
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// An update must preserve a choice already made through the startup menu.
+for (const format of ['plain', 'crlf', 'spaced', 'numeric']) {
+	const run = runInstaller({
+		desktopProvided: true,
+		systemdEnabled: true,
 		seed(home) {
 			const directory = path.join(home, '.config/autostart');
 			fs.mkdirSync(directory, { recursive: true });
-			fs.writeFileSync(
-				path.join(directory, 'ergopti-hotstrings.desktop'),
-				`[Desktop Entry]\nType=Application\nName=Ergopti\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\nHidden=true\nX-Ergopti-Startup=true\n`
-			);
+			let entry = `[Desktop Entry]\nType=Application\nName=Ergopti\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\nHidden=true\nX-Ergopti-Startup=true\n`;
+			if (format === 'crlf') entry = entry.replaceAll('\n', '\r\n');
+			if (format === 'numeric')
+				entry = entry
+					.replace('Hidden=true', 'Hidden=1  ')
+					.replace('X-Ergopti-Startup=true', 'X-Ergopti-Startup=1');
+			if (format === 'spaced')
+				entry = entry
+					.replace('Hidden=true', ' Hidden = true')
+					.replace('X-Ergopti-Startup=true', ' X-Ergopti-Startup = true');
+			fs.writeFileSync(path.join(directory, 'ergopti-hotstrings.desktop'), entry);
 		}
 	});
 	try {
@@ -660,8 +1274,119 @@ const errors = [];
 			path.join(run.home, '.local/lib/ergopti/.ergopti-owned-files'),
 			'utf8'
 		);
-		if ((receipt.match(/\t@autostart\n/g) || []).length !== 1)
-			errors.push('startup receipt must have exactly one owner row');
+		if (/\t@autostart\n/.test(receipt))
+			errors.push('a preexisting unowned startup entry must not be adopted');
+	} finally {
+		run.cleanup();
+	}
+}
+
+// Reinstallation must not claim a user-customized startup entry.
+for (const kind of ['unowned', 'modified', 'owned']) {
+	let oldDigest;
+	const run = runInstaller({
+		desktopProvided: true,
+		seed(home) {
+			const library = path.join(home, '.local/lib/ergopti');
+			const desktop = path.join(home, '.config/autostart/ergopti-hotstrings.desktop');
+			const original = `[Desktop Entry]\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\nHidden=true\nX-Ergopti-Startup=true\n`;
+			oldDigest = createHash('sha256').update(original).digest('hex');
+			fs.mkdirSync(path.dirname(desktop), { recursive: true });
+			fs.writeFileSync(
+				desktop,
+				kind === 'owned' ? original : `${original}# personal startup setting\n`
+			);
+			if (kind !== 'unowned') {
+				fs.mkdirSync(library, { recursive: true });
+				fs.writeFileSync(path.join(library, '.ergopti-owned-files'), `${oldDigest}\t@autostart\n`);
+			}
+		}
+	});
+	try {
+		assert.equal(run.status, 0, run.output);
+		const desktop = path.join(run.home, '.config/autostart/ergopti-hotstrings.desktop');
+		if (kind !== 'owned')
+			assert.match(fs.readFileSync(desktop, 'utf8'), /^# personal startup setting$/m);
+		const receipt = fs.readFileSync(
+			path.join(run.home, '.local/lib/ergopti/.ergopti-owned-files'),
+			'utf8'
+		);
+		const row = receipt.split('\n').find((value) => value.endsWith('\t@autostart'));
+		if (kind === 'unowned') assert.equal(row, undefined);
+		else if (kind === 'modified') assert.equal(row, `${oldDigest}\t@autostart`);
+		else {
+			const digest = createHash('sha256').update(fs.readFileSync(desktop)).digest('hex');
+			assert.equal(row, `${digest}\t@autostart`);
+		}
+	} finally {
+		run.cleanup();
+	}
+}
+
+// A manually created compatible entry has its own startup preference and data.
+{
+	const run = runInstaller({
+		desktopProvided: true,
+		refuseShow: true,
+		seed(home) {
+			const desktop = path.join(home, '.config/autostart/ergopti-hotstrings.desktop');
+			fs.mkdirSync(path.dirname(desktop), { recursive: true });
+			fs.writeFileSync(
+				desktop,
+				`[Desktop Entry]\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\nHidden=true\n# personal manual choice\n`
+			);
+		}
+	});
+	try {
+		assert.equal(run.status, 0, run.output);
+		const desktop = path.join(run.home, '.config/autostart/ergopti-hotstrings.desktop');
+		const content = fs.readFileSync(desktop, 'utf8');
+		assert.match(content, /^Hidden=true$/m);
+		assert.match(content, /^# personal manual choice$/m);
+		const receipt = fs.readFileSync(
+			path.join(run.home, '.local/lib/ergopti/.ergopti-owned-files'),
+			'utf8'
+		);
+		assert.doesNotMatch(receipt, /\t@autostart\n/);
+	} finally {
+		run.cleanup();
+	}
+}
+
+// Existing fallback receipts authorize migration only while bytes still match.
+for (const kind of ['owned', 'modified', 'owned-disabled']) {
+	const run = runInstaller({
+		desktopProvided: true,
+		seed(home) {
+			const desktop = path.join(home, '.config/autostart/ergopti-hotstrings.desktop');
+			const library = path.join(home, '.local/lib/ergopti');
+			const original = `[Desktop Entry]\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\nHidden=${kind === 'owned' ? 'false' : 'true'}\n`;
+			fs.mkdirSync(path.dirname(desktop), { recursive: true });
+			fs.mkdirSync(library, { recursive: true });
+			fs.writeFileSync(desktop, original + (kind === 'modified' ? '# personal setting\n' : ''));
+			fs.writeFileSync(
+				path.join(library, '.ergopti-owned-files'),
+				`${createHash('sha256').update(original).digest('hex')}\t@autostart\n`
+			);
+		}
+	});
+	try {
+		assert.equal(run.status, 0, run.output);
+		const desktop = path.join(run.home, '.config/autostart/ergopti-hotstrings.desktop');
+		const content = fs.readFileSync(desktop, 'utf8');
+		if (kind === 'modified') {
+			assert.match(content, /^# personal setting$/m);
+			assert.match(content, /^Hidden=true$/m);
+		} else {
+			if (kind === 'owned') assert.match(content, /^X-GNOME-Autostart-enabled=true$/m);
+			else assert.match(content, /^Hidden=true$/m);
+			const digest = createHash('sha256').update(content).digest('hex');
+			assert.ok(
+				fs
+					.readFileSync(path.join(run.home, '.local/lib/ergopti/.ergopti-owned-files'), 'utf8')
+					.includes(`${digest}\t@autostart\n`)
+			);
+		}
 	} finally {
 		run.cleanup();
 	}

@@ -164,6 +164,102 @@ return function(helpers, CopyCheck)
 			helpers.assert_eq(w.sends, 0)
 		end)
 
+		helpers.it("a replaced counter read cannot retry or finish its successor", function()
+			local callbacks, reports, sends, checker, replace = {}, {}, 0, nil, true
+			checker = CopyCheck.new({ verify_ms = 250,
+				read_counter = function()
+					if replace then replace = false; checker:stop(); checker:start(41, "new") end
+					return 41
+				end,
+				send_copy = function() sends = sends + 1; return true end,
+				after = function(_, fn) callbacks[#callbacks + 1] = fn; return {} end,
+				cancel = function() end,
+				report = function(outcome) reports[#reports + 1] = outcome end })
+			checker:start(41, "old"); callbacks[1]()
+			helpers.assert_eq(sends, 0)
+			helpers.assert_eq(#reports, 0)
+			helpers.assert_eq(checker:is_pending(), true)
+			callbacks[2](); helpers.assert_eq(sends, 1)
+		end)
+
+		for _, result in ipairs({ false, true }) do
+			helpers.it("a replaced retry cannot finish or arm its successor: " .. tostring(result), function()
+				local callbacks, reports, sends, checker = {}, {}, 0, nil
+				checker = CopyCheck.new({ verify_ms = 250, read_counter = function() return 41 end,
+					send_copy = function()
+						sends = sends + 1
+						if sends == 1 then checker:stop(); checker:start(41, "new"); return result end
+						return true
+					end,
+					after = function(_, fn) callbacks[#callbacks + 1] = fn; return {} end,
+					cancel = function() end,
+					report = function(outcome) reports[#reports + 1] = outcome end })
+				checker:start(41, "old"); callbacks[1]()
+				helpers.assert_eq(#reports, 0)
+				helpers.assert_eq(#callbacks, 2, "only the successor owns a timer")
+				helpers.assert_eq(checker:is_pending(), true)
+				callbacks[2](); helpers.assert_eq(sends, 2)
+			end)
+		end
+
+		helpers.it("a timer returned after replacement is cancelled, without replacing the new timer", function()
+			local callbacks, cancelled, checker, first = {}, {}, nil, true
+			checker = CopyCheck.new({ verify_ms = 250, read_counter = function() return 41 end,
+				send_copy = function() return true end,
+				after = function(_, fn)
+					local handle = {}; callbacks[#callbacks + 1] = fn
+					if first then first = false; checker:stop(); checker:start(41, "new") end
+					return handle
+				end,
+				cancel = function(handle) cancelled[handle] = true end,
+				report = function() end })
+			helpers.assert_eq(checker:start(41, "old"), false)
+			helpers.assert_eq(checker:is_pending(), true)
+			local count = 0; for _ in pairs(cancelled) do count = count + 1 end
+			helpers.assert_eq(count, 1, "the retired timer must be cancelled")
+		end)
+
+		helpers.it("a superseded report cannot overwrite a newer check", function()
+			local callbacks, reports, checker, replace = {}, {}, nil, true
+			checker = CopyCheck.new({ verify_ms = 250, read_counter = function() return 41 end,
+				send_copy = function() return true end,
+				after = function(_, fn) callbacks[#callbacks + 1] = fn; return {} end,
+				cancel = function() end,
+				report = function(outcome, detail)
+					reports[#reports + 1] = { outcome = outcome, source = detail.source }
+					if outcome == CopyCheck.SUPERSEDED and replace then
+						replace = false; checker:start(41, "newest")
+					end
+				end })
+			checker:start(41, "old")
+			helpers.assert_eq(checker:start(41, "middle"), false)
+			helpers.assert_eq(reports[1].outcome, CopyCheck.SUPERSEDED)
+			callbacks[2]()
+			helpers.assert_eq(checker:is_pending(), true, "newest check owns its retry")
+		end)
+
+		helpers.it("counter exceptions settle without a retry", function()
+			local callbacks, reports = {}, {}
+			local checker = CopyCheck.new({ verify_ms = 250,
+				read_counter = function() error("counter refused") end,
+				send_copy = function() error("must not retry") end,
+				after = function(_, fn) callbacks[#callbacks + 1] = fn; return {} end,
+				report = function(outcome) reports[#reports + 1] = outcome end })
+			checker:start(41, "tap"); callbacks[1]()
+			helpers.assert_eq(reports[1], CopyCheck.COUNTER_UNREADABLE)
+			helpers.assert_eq(checker:is_pending(), false)
+		end)
+
+		helpers.it("timer exceptions settle as refused", function()
+			local reports = {}
+			local checker = CopyCheck.new({ verify_ms = 250, read_counter = function() return 41 end,
+				send_copy = function() return true end, after = function() error("timer refused") end,
+				report = function(outcome) reports[#reports + 1] = outcome end })
+			helpers.assert_eq(checker:start(41, "tap"), false)
+			helpers.assert_eq(reports[1], CopyCheck.TIMER_REFUSED)
+			helpers.assert_eq(checker:is_pending(), false)
+		end)
+
 		helpers.it("a refused timer is reported instead of hanging (tap-copy-verified)", function()
 			local reports = {}
 			local checker = CopyCheck.new({

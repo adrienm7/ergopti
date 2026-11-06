@@ -38,39 +38,24 @@ local helpers, with_recorded_shell =
 
 helpers.describe("linux actions: web search", function()
 
-	--- Runs body with xclip absent (io.popen returns nil).
-	local function without_xclip(body)
-		local real_popen = io.popen
-		io.popen = function() return nil end
-		local ok, err = pcall(body)
-		io.popen = real_popen
-		if not ok then error(err, 0) end
-	end
-
-	--- Runs body with xclip returning `selection`.
-	local function with_selection(selection, body)
-		local real_popen = io.popen
-		io.popen = function()
-			return {
-				read = function() return selection end,
-				close = function() return true end,
-			}
-		end
-		local ok, err = pcall(body)
-		io.popen = real_popen
-		if not ok then error(err, 0) end
+	--- Supplies the platform PRIMARY reader during the action.
+	local function with_primary(ok, selection, body)
+		local saved = package.loaded["adapters.clipboard"]
+		package.loaded["adapters.clipboard"] = { read_primary = function() return ok, selection end }
+		local ran, err = pcall(body)
+		package.loaded["adapters.clipboard"] = saved
+		if not ran then error(err, 0) end
 	end
 
 	helpers.it("search-web: refuses an empty selection instead of opening a blank search", function()
-		-- Regression: with xclip missing (notably every Wayland session
-		-- without it), primary_selection() answered "" and the gesture opened
+		-- Regression: when the PRIMARY reader fails, the gesture opened
 		-- the engine with an empty query ÔÇö a wasted tab that answers nothing.
 		local G = helpers.load_module("modules.gestures.manager")
 		G.init({ enabled = false })
 		helpers.assert_true(
 			G.set_action_parameter("tap_3", "search_web", "https://duckduckgo.com/?q=%s"),
 			"the parameter must store before the gesture can run")
-		without_xclip(function()
+		with_primary(false, "", function()
 			with_recorded_shell(function(commands)
 				G.execute_action("search_web", "tap_3")
 				helpers.assert_eq(#commands, 0,
@@ -86,7 +71,7 @@ helpers.describe("linux actions: web search", function()
 		local G = helpers.load_module("modules.gestures.manager")
 		G.init({ enabled = false })
 		G.set_action_parameter("tap_3", "search_web", "https://duckduckgo.com/?q=%s")
-		with_selection("hello world", function()
+		with_primary(true, "hello world", function()
 			with_recorded_shell(function(commands)
 				G.execute_action("search_web", "tap_3")
 				helpers.assert_eq(#commands, 1, "a real selection must open exactly one search")
@@ -94,6 +79,33 @@ helpers.describe("linux actions: web search", function()
 					"the selection must reach the engine URL-encoded")
 			end)
 		end)
+	end)
+
+	helpers.it("search-web reads Wayland PRIMARY through the bounded native adapter", function()
+		local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local read_command
+		package.loaded[names[1]] = nil
+		package.loaded[names[2]] = {
+			has_command = function(name) return name == "wl-paste" end,
+			exec_checked = function(command) read_command = command; return true, "bonjour été" end,
+		}
+		package.loaded[names[3]] = { is_wayland = function() return true end, is_x11 = function() return false end }
+		local ok, err = pcall(function()
+			local G = helpers.load_module("modules.gestures.manager")
+			G.init({ enabled = false })
+			helpers.assert_true(G.set_action_parameter("tap_3", "search_web", "https://duckduckgo.com/?q=%s"))
+			with_recorded_shell(function(commands)
+				G.execute_action("search_web", "tap_3")
+				helpers.assert_eq(#commands, 1)
+				helpers.assert_true(commands[1]:find("q=bonjour%20%C3%A9t%C3%A9", 1, true) ~= nil)
+			end)
+			helpers.assert_true(read_command:find("timeout ", 1, true) ~= nil)
+			helpers.assert_true(read_command:find("wl-paste --primary", 1, true) ~= nil)
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(err, 0) end
 	end)
 
 end)

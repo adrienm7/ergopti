@@ -240,10 +240,13 @@ end
 --- @return table spec
 function M.load(shared_root, driver_root)
 	local function decode(path)
-		local handle = io.open(path, "rb")
+		local handle = require("infra.regular_file_reader").open_source(path)
 		if not handle then error("field run: the declaration is unreadable: " .. path, 0) end
-		local text = handle:read("*a")
-		handle:close()
+		local read, text = pcall(handle.read, handle, "*a")
+		local closed, acknowledged = pcall(handle.close, handle)
+		if not read or type(text) ~= "string" or not closed or not acknowledged then
+			error("field run: the declaration could not be read and closed: " .. path, 0)
+		end
 		local ok, value = pcall(Json.decode, text)
 		if not ok then error("field run: the declaration is not JSON: " .. path, 0) end
 		return value

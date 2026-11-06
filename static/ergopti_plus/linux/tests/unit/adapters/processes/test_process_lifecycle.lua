@@ -89,6 +89,74 @@ local AC = { "a", "c" }
 -- process_every = floor(2.0 / 0.25) = 8: the process poll runs on these ticks.
 local PROCESS_TICK = 8
 
+helpers.it("linux-process-empty-stat: retains baseline on incomplete data but detects actual disappearance", function()
+	with_proc(AB, function(lifecycle, proc, launched, quit)
+		lifecycle.start()
+		local file = assert(io.open(proc.root .. "/102/stat", "wb"))
+		assert(file:close())
+		lifecycle.tick(PROCESS_TICK)
+		helpers.assert_eq(quit, {}, "an empty stat record is not proof of process exit")
+		proc.set(AB)
+		lifecycle.tick(PROCESS_TICK * 2)
+		helpers.assert_eq(launched, {}, "a recovered snapshot must not create a synthetic launch")
+		proc.set({ "a" })
+		lifecycle.tick(PROCESS_TICK * 3)
+		helpers.assert_eq(quit, { "b" }, "a genuinely absent process still produces a quit")
+	end)
+end)
+
+helpers.it("linux-process-lowercase-states: tracks traced tasks and ignores dead tasks", function()
+	with_proc(AB, function(lifecycle, proc, launched, quit)
+		lifecycle.start()
+		proc.set({ "a", "b", { "debuggee", "t" } })
+		lifecycle.tick(PROCESS_TICK)
+		helpers.assert_eq(launched, { "debuggee" }, "Linux traced-stop state t is a live process")
+		proc.set({ "a", "b", { "debuggee", "x" } })
+		lifecycle.tick(PROCESS_TICK * 2)
+		helpers.assert_eq(quit, { "debuggee" }, "Linux dead state x is not a live process")
+	end)
+end)
+
+helpers.describe("linux-process-reentrant-stop", function()
+	helpers.it("linux-process-reentrant-tick: nested polling does not repeat the same launch", function()
+		with_proc(AB, function(lifecycle, proc, launched)
+			local nested = false
+			lifecycle.onAppLaunch(function()
+				if not nested then nested = true; lifecycle.tick(PROCESS_TICK) end
+			end)
+			lifecycle.start(); proc.set(ABC); lifecycle.tick(PROCESS_TICK)
+			helpers.assert_eq(launched, { "c" }, "the same process must not launch twice in one poll")
+		end)
+	end)
+	helpers.it("linux-process-reentrant-stop: stopping during focus notification prevents later listeners", function()
+		local original = package.loaded["adapters.window_info"]
+		local app, delivered = "old", 0
+		package.loaded["adapters.window_info"] = { focused_snapshot = function() return { appId = app, windowTitle = "" }, "x11:1" end }
+		local ok, failure = pcall(function()
+			with_proc(AB, function(lifecycle)
+				lifecycle.onFocusChange(function() lifecycle.stop() end)
+				lifecycle.onFocusChange(function() delivered = delivered + 1 end)
+				lifecycle.start(); app = "new"; lifecycle.tick(1)
+				helpers.assert_eq(delivered, 0, "a stopped poll must not deliver to later listeners")
+			end)
+		end)
+		package.loaded["adapters.window_info"] = original
+		if not ok then error(failure, 0) end
+	end)
+
+	helpers.it("linux-process-reentrant-stop: restarting during a launch callback keeps the new process baseline", function()
+		with_proc(AB, function(lifecycle, proc, launched, quit)
+			lifecycle.onAppLaunch(function(name)
+				if name == "c" then lifecycle.stop(); proc.set(AC); lifecycle.start() end
+			end)
+			lifecycle.start(); proc.set(ABC); lifecycle.tick(PROCESS_TICK)
+			lifecycle.tick(PROCESS_TICK * 2)
+			helpers.assert_eq(launched, { "c" })
+			helpers.assert_eq(quit, {}, "the retired tick cannot overwrite the new baseline")
+		end)
+	end)
+end)
+
 helpers.describe("linux-process-poll-demand", function()
 	local function with_demand(body)
 		local names = { "adapters.window_info", "infra.native_directory", "adapters.process_lifecycle" }
@@ -172,9 +240,29 @@ helpers.describe("linux-native-focus-identity", function()
 			for tick = 1, 5 do lifecycle.tick(tick) end
 			lifecycle.stop()
 			shell._reset_runner()
-			helpers.assert_eq(probes, 10, "five polls need one window ID and one title query each, never a second focus snapshot")
+			helpers.assert_eq(probes, 15, "five polls need one window ID, title and PID query each, never a second focus snapshot")
 		end)
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
+	helpers.it("(linux-focus-separator-collision) distinguishes control bytes inside native metadata", function()
+		local original = package.loaded["adapters.window_info"]
+		local app, title = "editor\1child", "private"
+		package.loaded["adapters.window_info"] = {
+			focused_snapshot = function() return { appId = app, windowTitle = title }, "x11:1" end,
+		}
+		local events = {}
+		local ok, failure = pcall(function()
+			with_proc(AB, function(lifecycle)
+				lifecycle.onFocusChange(function(name, caption) events[#events + 1] = { name, caption } end)
+				lifecycle.start()
+				app, title = "editor", "child\1private"
+				lifecycle.tick(1)
+				helpers.assert_eq(events, { { app, title } }, "distinct metadata must invalidate the focus context")
+			end)
+		end)
+		package.loaded["adapters.window_info"] = original
 		helpers.assert_true(ok, tostring(failure))
 	end)
 
@@ -400,4 +488,54 @@ helpers.describe("process_lifecycle: a failed snapshot fires nothing (ps-storm)"
 		end)
 	end)
 
+end)
+
+for _, fault in ipairs({ "read_throw", "close_false", "close_throw" }) do
+	helpers.it("process snapshot retains baseline after " .. fault, function()
+		with_proc(AB, function(M, proc, launched, quit)
+			M.start()
+			proc.set(AC)
+			local original, closes = io.open, 0
+			io.open = function(path, mode)
+				local file, err, code = original(path, mode)
+				if not file or path ~= proc.root .. "/101/stat" then return file, err, code end
+				return { read = function(_, ...)
+					if fault == "read_throw" then error("injected read failure") end
+					return file:read(...)
+				end, close = function()
+					closes = closes + 1; assert(file:close())
+					if fault == "close_throw" then error("injected close failure") end
+					return fault ~= "close_false"
+				end }
+			end
+			M.tick(PROCESS_TICK)
+			io.open = original
+			helpers.assert_eq(closes, 1, "an acquired process stream must close even after a read exception")
+			helpers.assert_eq(launched, {}, "unacknowledged snapshot must not synthesize launches")
+			helpers.assert_eq(quit, {}, "unacknowledged snapshot must not synthesize quits")
+			M.tick(PROCESS_TICK * 2)
+			helpers.assert_eq(launched, { "c" })
+			helpers.assert_eq(quit, { "b" })
+		end)
+	end)
+end
+
+helpers.it("process polling recovers after an exception during initial snapshot", function()
+	with_proc(AB, function(M, proc, launched, quit)
+		local original = io.open
+		io.open = function(path, mode)
+			if path == proc.root .. "/101/stat" then error("injected initial proc open failure") end
+			return original(path, mode)
+		end
+		local called = pcall(M.start)
+		io.open = original
+		helpers.assert_true(called, "a failed initial process snapshot must not abort polling")
+		M.tick(PROCESS_TICK)
+		helpers.assert_eq(launched, {}, "recovery silently establishes a baseline")
+		helpers.assert_eq(quit, {})
+		proc.set(AC)
+		M.tick(PROCESS_TICK * 2)
+		helpers.assert_eq(launched, { "c" })
+		helpers.assert_eq(quit, { "b" })
+	end)
 end)

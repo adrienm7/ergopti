@@ -52,9 +52,18 @@ function M.open(options)
 	local current_epoch, page_current = rawget(Manager, "current_epoch"), rawget(Manager, "page_current")
 	local eval_js = rawget(Manager, "eval_js")
 	local pause_current = options.is_paused
-	local registry = assert(io.open(assert(Paths.shared("data/keycodes/physical_keys.json")), "r"))
-	local bytes = registry:read("*a"); registry:close()
-	local model = Slots.new(Json.decode(bytes))
+	local path = Paths.shared("data/keycodes/physical_keys.json")
+	local bytes, status
+	if path then bytes, status = require("toml_codec.writer").read_classified(path) end
+	if status ~= "ok" then
+		Logger.error(APP, "Physical key registry could not be read.")
+		return false
+	end
+	local valid, model = pcall(function() return Slots.new(Json.decode(bytes)) end)
+	if not valid or type(model) ~= "table" then
+		Logger.error(APP, "Physical key registry is invalid.")
+		return false
+	end
 	local positions = {}
 	for _, code in ipairs(model.candidates("evdev")) do positions[#positions + 1] = { code = code, available = true } end
 	local scope, candidate = options.scope, { epoch = nil, constructing = true,

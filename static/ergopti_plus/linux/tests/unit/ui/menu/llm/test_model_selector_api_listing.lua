@@ -39,8 +39,8 @@ local function with_rows(opts, body)
 		token_allowed = function() return true end,
 	}
 	package.loaded["modules.llm.api_entries"] = {
-		active = function() return entry end,
-		list = function() return { entry } end,
+		active = function() return opts.current or entry end,
+		list = function() return { opts.current or entry } end,
 		set_active = function(id) calls.set_active[#calls.set_active + 1] = id; return true end,
 		set_model = function(id, model) calls.set_model[#calls.set_model + 1] = id .. ":" .. model; return true end,
 	}
@@ -72,6 +72,76 @@ local function by_name(api)
 end
 
 helpers.describe("model selector API listing on Linux", function()
+	helpers.it("(model-selector-local-owner) passes the page owner to local server rows", function()
+		with_rows({}, function(Rows, calls, dialogs)
+			local owner = function() return true end
+			local captured
+			package.loaded["ui.menu.local_server_rows"] = { page_rows = function(_, _, _, context)
+				captured = context
+				return {}, {}
+			end }
+			local llm = engine(calls)
+			llm.can_configure_local_servers = function() return true end
+			local context = { paused = false, is_paused = function() return false end }
+			Rows.api_page(llm, dialogs, nil, context, nil, owner)
+			helpers.assert_true(captured ~= nil)
+			helpers.assert_eq(captured.page_current, owner)
+			context.paused = true
+			helpers.assert_eq(captured.paused, true)
+		end)
+	end)
+
+	helpers.it("reports a refused backend when selecting a listed API model", function()
+		with_rows({}, function(Rows, calls, dialogs)
+			local llm = engine(calls)
+			llm.set_backend = function() return false end
+			local api = Rows.api_page(llm, dialogs, nil, nil, { e1 = { state = "listed", ids = { "o3" } } })
+			helpers.assert_eq(by_name(api)["openai/o3"].run(), false)
+			helpers.assert_eq(#calls.set_model, 0)
+			helpers.assert_eq(calls.error, true)
+		end)
+	end)
+
+	helpers.it("(model-selector-api-owner) refuses a listed model if backend selection replaces its entry", function()
+		local opts = {}
+		with_rows(opts, function(Rows, calls, dialogs)
+			local llm = engine(calls)
+			llm.set_backend = function()
+				opts.current = { id = "e1", provider = "openai", model = "replacement" }
+				return true
+			end
+			local api = Rows.api_page(llm, dialogs, nil, nil, { e1 = { state = "listed", ids = { "o3" } } })
+			helpers.assert_eq(by_name(api)["openai/o3"].run(), false)
+			helpers.assert_eq(#calls.set_model, 0)
+		end)
+	end)
+
+	helpers.it("(model-selector-api-owner) refuses a typed model after entry replacement", function()
+		local opts = {}
+		with_rows(opts, function(Rows, calls, dialogs)
+			dialogs.prompt = function()
+				opts.current = { id = "e1", provider = "openai", model = "replacement" }
+				return "new-model"
+			end
+			local row = by_name(Rows.api_page(engine(calls), dialogs))["openai"]
+			helpers.assert_eq(row.actions[1].run(), false)
+			helpers.assert_eq(#calls.backend, 0)
+			helpers.assert_eq(#calls.set_model, 0)
+		end)
+	end)
+
+	helpers.it("(model-selector-api-owner) refuses a typed model after its page closes", function()
+		with_rows({}, function(Rows, calls, dialogs)
+			local live = true
+			dialogs.prompt = function() live = false; return "new-model" end
+			local api = Rows.api_page(engine(calls), dialogs, function() end, nil, nil, function() return live end)
+			local row = by_name(api)["openai"]
+			helpers.assert_eq(row.actions[1].run(), false)
+			helpers.assert_eq(#calls.backend, 0)
+			helpers.assert_eq(#calls.set_model, 0)
+		end)
+	end)
+
 	helpers.it("(model-selector-api-listing) lists one row per listed model and selects another one", function()
 		with_rows({}, function(Rows, calls, dialogs)
 			local api = Rows.api_page(engine(calls), dialogs, function() end, nil,

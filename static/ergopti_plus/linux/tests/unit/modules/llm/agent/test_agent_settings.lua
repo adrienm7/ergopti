@@ -19,6 +19,101 @@ local helpers = require("tests.helpers")
 local ActualScenario = require("tests.support.agent_scenario")
 local i18n = require("infra.i18n")
 
+helpers.it("refuses fractional agent count limits", function()
+	local Json = require("json")
+	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
+	local settings = require("modules.llm.agent_settings")
+	for _, item in ipairs({
+		{ "system1", "min_chars" }, { "system1", "max_tokens" },
+		{ "system2", "max_actions" }, { "system2", "max_tokens" },
+		{ false, "max_tools" },
+	}) do
+		local config = assert(Json.decode(source))
+		local holder = item[1] and config[item[1]] or config
+		holder[item[2]] = 1.5
+		local parsed, reason = settings.parse_config(Json.encode(config))
+		helpers.assert_nil(parsed, item[2] .. " must be a whole count")
+		helpers.assert_true(type(reason) == "string")
+	end
+end)
+
+helpers.it("refuses a malformed Jev triage configuration", function()
+	local Json = require("json")
+	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
+	for _, damage in ipairs({
+		function(config) config.system1.jev = nil end,
+		function(config) config.system1.jev.criteria = false end,
+		function(config) config.system1.jev.question_id = "" end,
+	}) do
+		local config = assert(Json.decode(source))
+		damage(config)
+		local parsed, reason = require("modules.llm.agent_settings").parse_config(Json.encode(config))
+		helpers.assert_nil(parsed, "unusable Jev question must not be admitted")
+		helpers.assert_true(type(reason) == "string")
+	end
+end)
+
+helpers.it("refuses malformed action schemas before accepting agent output", function()
+	local Json = require("json")
+	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
+	for _, damage in ipairs({
+		function(config) config.actions.calendar = false end,
+		function(config) config.actions.calendar.start = nil end,
+		function(config) config.actions.calendar.start.required = false end,
+		function(config) config.actions.mail.body.max = false end,
+		function(config) config.actions.mail.body.type = "unsupported" end,
+	}) do
+		local config = assert(Json.decode(source)); damage(config)
+		local parsed, reason = require("modules.llm.agent_settings").parse_config(Json.encode(config))
+		helpers.assert_nil(parsed, "an unusable action schema must not be admitted")
+		helpers.assert_true(type(reason) == "string")
+	end
+end)
+
+helpers.it("refuses missing and invalid agent source labels", function()
+	local Json = require("json")
+	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
+	for _, case in ipairs({ { "selection" }, { "selection", false }, { "typing", "" }, { "command", 5 } }) do
+		local config = assert(Json.decode(source)); config.source_kinds[case[1]] = case[2]
+		local parsed, reason = require("modules.llm.agent_settings").parse_config(Json.encode(config))
+		helpers.assert_nil(parsed, "unusable source label must not be admitted")
+		helpers.assert_true(type(reason) == "string")
+	end
+end)
+
+helpers.it("agent configuration refuses a FIFO rather than blocking", function()
+	local uv = require("luv")
+	local Paths = require("infra.paths")
+	local original_shared, original_settings = Paths.shared, package.loaded["modules.llm.agent_settings"]
+	local source = assert(original_shared("modules/llm/agent.json"))
+	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-agent-config-XXXXXX"))
+	local path = dir .. "/agent.json"
+	local made = os.execute("mkfifo '" .. path .. "'")
+	assert(made == 0 or made == true)
+	package.loaded["modules.llm.agent_settings"] = nil
+	local Settings = require("modules.llm.agent_settings")
+	Paths.shared = function(relative)
+		if relative == "modules/llm/agent.json" then return path end
+		return original_shared(relative)
+	end
+	local exited, process = false, nil
+	process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$2" > "$1"', "fixture", path, source } }, function()
+		exited = true
+		process:close()
+	end))
+	local ok, config = pcall(Settings.config)
+	Paths.shared, package.loaded["modules.llm.agent_settings"] = original_shared, original_settings
+	os.remove(path)
+	os.remove(dir)
+	while not exited do uv.run("once") end
+	assert(ok, config)
+	helpers.assert_nil(config, "a FIFO must not supply the agent configuration")
+end)
+
 --- Decorates a cache-restoration case with an absent genuine native owner.
 --- The inner component journal must retire its actual inserted module entry;
 --- this outer finally restores the pre-test identity, including false/absence.
@@ -192,6 +287,82 @@ end
 -- ======================================
 
 helpers.describe("AI agent settings: stored like every llm.* setting", function()
+	helpers.it("matches Unicode agent exclusions without rewriting their entries (unicode-app-identity)", function()
+		local invalid = string.char(0x80)
+		Scenario.run({ stored = { ["llm.agent_disabled_apps"] = { "Éditeur", "É" .. invalid } } }, function(world)
+			local settings = require("modules.llm.agent_settings")
+			helpers.assert_true(settings.is_app_disabled("éditeur"))
+			helpers.assert_true(settings.is_app_disabled("É" .. invalid))
+			helpers.assert_eq(settings.is_app_disabled("é" .. invalid), false)
+			helpers.assert_eq(world.preferences.get("llm.agent_disabled_apps"), { "Éditeur", "É" .. invalid })
+		end)
+	end)
+	helpers.it("refreshes the bounded agent exclusion index on publication and restore (unicode-app-cache)", function()
+		Scenario.run({}, function()
+			local settings = require("modules.llm.agent_settings")
+			assert(settings.set_disabled_apps({ "Éditeur" }))
+			helpers.assert_true(settings.is_app_disabled("éditeur"))
+			local snapshot = settings.configuration_snapshot()
+			local detached = settings.get_disabled_apps(); detached[1] = "Autre"
+			helpers.assert_true(settings.is_app_disabled("éditeur"))
+			settings.reload_configuration() -- A transaction replaces the values table.
+			assert(settings.set_disabled_apps({ "Autre" }))
+			helpers.assert_eq(settings.is_app_disabled("éditeur"), false)
+			helpers.assert_true(settings.is_app_disabled("autre"))
+			assert(settings.restore_configuration(snapshot))
+			helpers.assert_true(settings.is_app_disabled("éditeur"))
+			helpers.assert_eq(settings.is_app_disabled("autre"), false)
+			require("infra.llm_preferences").set = function() return false end
+			helpers.assert_eq(settings.set_disabled_apps({ "Autre" }), false)
+			helpers.assert_true(settings.is_app_disabled("éditeur"), "refused persistence retains the published index")
+		end)
+	end)
+	helpers.it("checks legacy exclusions beyond the bounded index (unicode-app-cache)", function()
+		Scenario.run({}, function()
+			local settings = require("modules.llm.agent_settings")
+			local apps = {}; for index = 1, 200 do apps[index] = "application" .. index end
+			apps[201] = "Éditeur"
+			assert(settings.set_disabled_apps(apps))
+			helpers.assert_true(settings.is_app_disabled("éditeur"), "the index must not truncate old lists")
+		end)
+	end)
+	helpers.it("matches excluded applications across identifier case changes (agent-apps-identity)", function()
+		Scenario.run({}, function()
+			local settings = require("modules.llm.agent_settings")
+			assert(settings.set_disabled_apps({ "Firefox" }))
+			helpers.assert_true(settings.is_app_disabled("firefox"), "a changed identifier case must not re-enable agent triage")
+		end)
+	end)
+	helpers.it("keeps one exclusion for equivalent application identifiers", function()
+		Scenario.run({}, function(world)
+			local settings = require("modules.llm.agent_settings")
+			helpers.assert_true(settings.set_disabled_apps({ "Firefox", "firefox.exe" }))
+			helpers.assert_eq(settings.get_disabled_apps(), { "Firefox" }, "equivalent names must share one menu row")
+			helpers.assert_eq(world.preferences.get("llm.agent_disabled_apps"), { "Firefox" })
+			helpers.assert_true(settings.is_app_disabled("firefox"))
+			helpers.assert_true(settings.set_disabled_apps({}))
+			helpers.assert_eq(settings.is_app_disabled("firefox"), false)
+		end)
+	end)
+
+	helpers.it("projects old equivalent exclusions as one removable row", function()
+		Scenario.run({ stored = { ["llm.agent_disabled_apps"] = { "Firefox", "firefox.exe" } } }, function()
+			local settings = require("modules.llm.agent_settings")
+			helpers.assert_eq(settings.get_disabled_apps(), { "Firefox" })
+			helpers.assert_true(settings.is_app_disabled("firefox"))
+		end)
+	end)
+
+	helpers.it("preserves excluded applications when an agent list has a hole (agent-apps-sparse)", function()
+		Scenario.run({}, function(world)
+			local settings = require("modules.llm.agent_settings")
+			assert(settings.set_disabled_apps({ "firefox", "bank" }))
+			local accepted = settings.set_disabled_apps({ [1] = "firefox", [3] = "bank" })
+			helpers.assert_eq(accepted, false)
+			helpers.assert_true(settings.is_app_disabled("bank"), "a hole cannot erase a protected app")
+			helpers.assert_eq(world.preferences.get("llm.agent_disabled_apps"), { "firefox", "bank" })
+		end)
+	end)
 
 	helpers.it("round-trips both systems, the mode and the excluded apps through the preferences", function()
 		Scenario.run({ stored = { ["llm.agent_system2"] = "" } }, function(world)
@@ -904,6 +1075,7 @@ helpers.describe("Linux Agent complete excluded-applications frame (agent-disabl
 		{ apps = {}, last = "editor", count = 2, boundary = false, current = true },
 		{ apps = { "editor" }, last = false, count = 3, boundary = true, current = false },
 		{ apps = { "editor" }, last = "editor", count = 3, boundary = true, current = false },
+		{ apps = { "Firefox" }, last = "firefox", count = 3, boundary = true, current = false },
 		{ apps = { "editor" }, last = "terminal", count = 4, boundary = true, current = true },
 		{ apps = { "z", "a" }, last = false, count = 4, boundary = true, current = false },
 	}) do

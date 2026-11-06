@@ -257,7 +257,8 @@ local function observe_add_command(mode)
 				-- os.execute reports exit 69.
 				if mode == "consume_unavailable" then return 69 * 256 end
 				if mode == "pause_after_consume" then context.paused = true end
-				return mode == "consume_no" and 1 or 0
+				-- LuaJIT returns the raw POSIX wait status for exit 1.
+				return mode == "consume_no" and 256 or 0
 			end
 			if command:find("dialog_host.lua' --error", 1, true) ~= nil then
 				observed.errors = observed.errors + 1

@@ -60,7 +60,8 @@ end
 ---   is_active    fn() -> boolean  feature on, shortcuts on, script not paused.
 ---   get_pair     fn(char) -> { left, right }|nil  the shared wrap-pair lookup.
 ---   read_primary fn() -> ok, text  the PRIMARY selection.
----   type_text    fn(text, owner) -> boolean  types over the retained selection;
+---   type_text    fn(text, owner, on_attempt) -> delivered, attempted  types over
+---     the retained selection and calls on_attempt before a payload DOWN;
 ---     owner.current() checks activity and ownership, owner.cached() only RAM.
 ---   context_epoch fn() -> integer|nil  optional pure-memory ownership revision;
 ---     a missing or invalid result refuses selection reads and replacement. }
@@ -70,7 +71,7 @@ function M.new(opts)
 	check_opts(opts)
 
 	-- nil while no selection can exist; otherwise the PRIMARY content read when
-	-- the window opened ("" when nothing, or nothing readable, was published).
+	-- the window opened ("" when the reader confirms nothing was published).
 	local baseline, baseline_epoch = nil, nil
 	local context_epoch = opts.context_epoch
 	-- Native reads and policy callbacks may reenter a selection event. Only its
@@ -91,13 +92,22 @@ function M.new(opts)
 		return owner == generation and actual == epoch
 	end
 
+	local function read_primary()
+		local called, ok, text = pcall(opts.read_primary)
+		if not called then
+			pcall(Logger.warn, LOG, "PRIMARY selection read failed; passing the input through.")
+			return false, nil
+		end
+		return ok, text
+	end
+
 	--- Opens the selection window, remembering what PRIMARY held before it.
 	local function open_window(owner, epoch)
-		local ok, text = opts.read_primary()
-		if not current(owner, epoch) then return end
+		local ok, text = read_primary()
+		if not current(owner, epoch) or ok ~= true or type(text) ~= "string" then return end
 		local active = opts.is_active()
 		if not current(owner, epoch) or not active then return end
-		baseline = (ok and type(text) == "string") and text or ""
+		baseline = text
 		baseline_epoch = epoch
 	end
 
@@ -177,8 +187,8 @@ function M.new(opts)
 		local active = opts.is_active()
 		if not current(owner, epoch) or not active then return false end
 
-		local ok, selected = opts.read_primary()
-		if not current(owner, epoch) or not ok or type(selected) ~= "string" or selected == "" then return false end
+		local ok, selected = read_primary()
+		if not current(owner, epoch) or ok ~= true or type(selected) ~= "string" or selected == "" then return false end
 		if selected == window then
 			Logger.debug(LOG, "PRIMARY unchanged since the selection window opened — typing '%s'.", char)
 			return false
@@ -197,13 +207,19 @@ function M.new(opts)
 			-- native focus or PRIMARY reads for individual key-down admissions.
 			cached = function() return current(owner, epoch) end,
 		}
-		local typed_ok, typed = pcall(opts.type_text, left .. selected .. right, publication)
+		local attempted = false
+		local typed_ok, typed, reported_attempt = pcall(opts.type_text, left .. selected .. right, publication,
+			function() attempted = true end)
+		attempted = attempted or reported_attempt == true
 		if not typed_ok then
-			Logger.error(LOG, "Selection wrap raised before typing: %s — the symbol is typed instead.",
-				tostring(typed))
-			return false
+			Logger.error(LOG, "Selection wrap raised: %s.", tostring(typed))
+			return attempted
 		end
 		if typed ~= true then
+			if attempted then
+				Logger.warn(LOG, "Selection wrap stopped after attempting output; the original symbol is suppressed.")
+				return true
+			end
 			Logger.warn(LOG, "Selection wrap was refused — the symbol is typed instead.")
 			return false
 		end

@@ -37,6 +37,18 @@ local helpers, make_temp_config_root, storage_cohort_fixture =
 -- ===================================================
 
 helpers.describe("storage adapter preserves corrupt input for recovery", function()
+	helpers.it("storage recovery does not block when a candidate becomes a FIFO", function()
+		if not pcall(require, "luv") or package.config:sub(1, 1) ~= "/" then return end
+		local root = make_temp_config_root()
+		local Shell = require("adapters.shell_runner")
+		local fixture = helpers.driver_root() .. "/tests/fixtures/native_storage_recovery_fifo_race.lua"
+		local command = "timeout 4 " .. Shell.quote(assert(arg and arg[-1])) .. " " .. Shell.quote(fixture)
+			.. " " .. Shell.quote(root)
+		local result = os.execute(command)
+		assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
+		helpers.assert_true(result == true or result == 0, "recovery must avoid blocking and preserve the corrupt file")
+	end)
+
 	helpers.it("moves invalid JSON aside before creating a new durable store", function()
 		local temp_root = make_temp_config_root()
 		local store_path = temp_root .. "/" .. FOLDER .. "/storage.json"
@@ -79,6 +91,30 @@ end)
 
 
 helpers.describe("native script storage cohorts", function()
+	helpers.it("refuses malformed UTF-8 in source or updates without changing real storage", function()
+		local malformed = { "\195", "\128", "\192\128", "\237\160\128", "\244\144\128\128" }
+		for _, bytes in ipairs(malformed) do
+			local source = '{"foreign":"' .. bytes .. '","setting":"old"}'
+			storage_cohort_fixture(source, function(storage, _, path, _, _, read)
+				helpers.assert_eq(storage.set("setting", "new"), false)
+				helpers.assert_eq(read(path), source)
+			end)
+			local valid = '{"setting":"old"}'
+			storage_cohort_fixture(valid, function(storage, _, path, _, _, read)
+				helpers.assert_eq(storage.set("setting", bytes), false)
+				helpers.assert_eq(read(path), valid)
+				helpers.assert_eq(storage.set(bytes, "value"), false)
+				helpers.assert_eq(read(path), valid)
+					helpers.assert_eq(storage.set("setting", { [bytes] = "value" }), false)
+					helpers.assert_eq(read(path), valid)
+			end)
+		end
+		storage_cohort_fixture('{"setting":"old"}', function(storage)
+			helpers.assert_true(storage.set("setting", "café 日本語 🎉"))
+			helpers.assert_eq(storage.get("setting"), "café 日本語 🎉")
+		end)
+	end)
+
 	helpers.it("script-storage-cohort exact alias gates and primary pending admission", function()
 		storage_cohort_fixture('{"a":false,"foreign":4}', function(storage, _, path, _, _, read)
 			local owner, other = { pending = function() return false end }, {}

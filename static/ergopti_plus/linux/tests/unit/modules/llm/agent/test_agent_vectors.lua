@@ -171,6 +171,77 @@ end)
 -- ============================================
 
 helpers.describe("agent actions stay inside the closed schema", function()
+	helpers.it("reads the full probability token before deciding whether to act", function()
+		local config = read_json("modules/llm/agent.json")
+		local result = Agent.parse_system1(config, "INTENT: calendar\nPROBABILITY: 0.7e-9")
+		helpers.assert_not_nil(result)
+		helpers.assert_eq(result.probability, 0.7e-9)
+		helpers.assert_eq(Agent.should_act(result, 0.7), false, "a tiny probability cannot trigger the agent")
+		helpers.assert_nil(Agent.parse_system1(config, "INTENT: mail\nPROBABILITY: 0.9%"))
+		helpers.assert_nil(Agent.parse_system1(config, "INTENT: calendar_other\nPROBABILITY: 0.9"),
+			"an unknown compound intent is not the calendar intent")
+	end)
+
+	helpers.it("rejects malformed Unicode in model-generated action text", function()
+		local config = read_json("modules/llm/agent.json")
+		for _, invalid in ipairs({
+			string.char(0xe0, 0x80, 0x80),
+			string.char(0xed, 0xa0, 0x80),
+			string.char(0xf4, 0x90, 0x80, 0x80),
+		}) do
+			local action = Agent.validate_action(config, { type = "reminder", title = invalid }, { tools = {} })
+			helpers.assert_nil(action, "ill-formed UTF-8 cannot become a calendar title")
+		end
+	end)
+
+	helpers.it("rejects malformed Unicode in model-generated email addresses", function()
+		local config = read_json("modules/llm/agent.json")
+		local invalid = "a" .. string.char(0xed, 0xa0, 0x80) .. "@example.com"
+		local action = Agent.validate_action(config, { type = "mail", body = "Hello", to = { invalid } }, { tools = {} })
+		helpers.assert_nil(action, "an email address cannot contain malformed UTF-8")
+	end)
+
+	helpers.it("encodes a lone carriage return in calendar text as a line break", function()
+		local config = read_json("modules/llm/agent.json")
+		local action = assert(Agent.validate_action(config, { type = "reminder", title = "first\rsecond" }, { tools = {} }))
+		local payload = Agent.ics(config, action, "test", "20260101T000000Z")
+		helpers.assert_contains(payload, "SUMMARY:first\\nsecond\r\n")
+		helpers.assert_nil(payload:find("first\rsecond", 1, true), "the iCalendar field cannot contain a bare CR")
+	end)
+
+	helpers.it("encodes reserved characters in calendar attendee addresses", function()
+		local config = read_json("modules/llm/agent.json")
+		local action = assert(Agent.validate_action(config, {
+			type = "calendar", title = "Meeting", start = "2026-10-01T14:00",
+			attendees = { "alice?tag@example.com", "bob#team@example.com", "carol+work@example.com" },
+		}, { tools = {} }))
+		local payload = Agent.ics(config, action, "test", "20260101T000000Z")
+		helpers.assert_contains(payload, "ATTENDEE:mailto:alice%3Ftag@example.com\r\n")
+		helpers.assert_contains(payload, "ATTENDEE:mailto:bob%23team@example.com\r\n")
+		helpers.assert_contains(payload, "ATTENDEE:mailto:carol%2Bwork@example.com\r\n")
+	end)
+
+	helpers.it("normalizes a lone carriage return in a mailto body", function()
+		local config = read_json("modules/llm/agent.json")
+		local action = assert(Agent.validate_action(config, { type = "mail", body = "first\rsecond" }, { tools = {} }))
+		helpers.assert_eq(Agent.mailto(action), "mailto:?body=first%0D%0Asecond")
+	end)
+
+	helpers.it("rejects a recipient object instead of silently dropping its address", function()
+		local config = read_json("modules/llm/agent.json")
+		local action = Agent.validate_action(config, { type = "mail", body = "Hello",
+			to = { address = "paul@example.com" } }, { tools = {} })
+		helpers.assert_nil(action, "recipients must be a list, not an object that becomes empty")
+		local sparse = Agent.validate_action(config, { type = "mail", body = "Hello",
+			to = { [1] = "paul@example.com", [3] = "anne@example.com" } }, { tools = {} })
+		helpers.assert_nil(sparse, "a recipient after a hole must not disappear")
+		local parsed, rejected = Agent.parse_actions(config,
+			'ACTIONS: [{"type":"mail","body":"Hello","to":{"address":"paul@example.com"}}]',
+			json.decode, { tools = {}, is_null = json.is_null })
+		helpers.assert_eq(#parsed, 0)
+		helpers.assert_eq(#rejected, 1)
+	end)
+
 	helpers.it("refuses a type, a field or a shortcut the schema does not name", function()
 		local config = read_json("modules/llm/agent.json")
 		local opts = { tools = { "Mode focus" }, is_null = json.is_null }

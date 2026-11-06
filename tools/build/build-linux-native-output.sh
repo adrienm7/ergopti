@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
+IFS= read -r -d '' REPO_ROOT < <(CDPATH= cd -Pe -- "${SCRIPT_DIR}/../.." && printf '%s\0' "$PWD")
 SOURCE_DIR="${REPO_ROOT}/static/ergopti_plus/linux/native/archive_output"
 OUTPUT_DIR="${REPO_ROOT}/build/linux/linux/bin"
 
@@ -19,7 +19,7 @@ done
 
 [[ "$(uname -s)" == Linux ]] || { echo "Native archive output requires Linux" >&2; exit 1; }
 [[ "$SOURCE_DIR" == /* && "$OUTPUT_DIR" == /* ]] || { echo "Absolute owned build directories required" >&2; exit 1; }
-SOURCE_DIR="$(cd "$SOURCE_DIR" && pwd -P)"
+IFS= read -r -d '' SOURCE_DIR < <(CDPATH= cd -Pe -- "$SOURCE_DIR" && printf '%s\0' "$PWD")
 for source_name in archive_publication.c archive_publication.h; do
 	[[ -f "${SOURCE_DIR}/${source_name}" && ! -L "${SOURCE_DIR}/${source_name}" ]] || {
 		echo "Ordinary native backend source required" >&2; exit 1;
@@ -29,7 +29,7 @@ done
 TASK_COMPILER="${CC:-cc}"
 command -v "$TASK_COMPILER" >/dev/null || { echo "Native C compiler unavailable" >&2; exit 1; }
 mkdir -p "$OUTPUT_DIR"
-OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd -P)"
+IFS= read -r -d '' OUTPUT_DIR < <(CDPATH= cd -Pe -- "$OUTPUT_DIR" && printf '%s\0' "$PWD")
 DESTINATION="${OUTPUT_DIR}/libergopti_archive_publication.so"
 [[ ! -e "$DESTINATION" && ! -L "$DESTINATION" ]] || { echo "Native backend destination occupied" >&2; exit 1; }
 STAGE_DIR="$(mktemp -d "${OUTPUT_DIR}/.ergopti-native-output.XXXXXX")"
@@ -55,6 +55,19 @@ else
 	# Failure/cancellation does not prove every compiler descendant retired.
 	# Retain this owned stage for the external build-process owner to settle.
 	exit "$TASK_COMPILE_STATUS"
+fi
+if [[ ! -f "${STAGE_DIR}/libergopti_archive_publication.so" \
+	|| -L "${STAGE_DIR}/libergopti_archive_publication.so" \
+	|| ! -s "${STAGE_DIR}/libergopti_archive_publication.so" ]]; then
+	echo "Native compiler did not produce a nonempty ordinary file" >&2
+	exit 1
+fi
+# This is only a basic format admission: the runtime still verifies the ABI.
+ELF_MAGIC="$(od -An -tx1 -N4 -- "${STAGE_DIR}/libergopti_archive_publication.so")"
+ELF_MAGIC="${ELF_MAGIC//[[:space:]]/}"
+if [ "$ELF_MAGIC" != 7f454c46 ]; then
+	echo "Native compiler output is not ELF" >&2
+	exit 1
 fi
 chmod 755 "${STAGE_DIR}/libergopti_archive_publication.so"
 # Atomic no-replace publication, including a concurrent destination arrival.

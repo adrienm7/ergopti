@@ -186,13 +186,26 @@ function M.new(options)
 			if not ok or receipt ~= true then release(); return false end
 			held[#held + 1] = port
 		end
+		local click_receipt
+		if not provider and type(parameters.capture_click_configuration) == "function" then
+			click_receipt = parameters.capture_click_configuration(owner, slot)
+			if not click_receipt then release(); return false end
+		end
 		retiring = true
 		if parameters.stop_programs() ~= true then return false end
 		retiring = false
 		local accepted, _, candidate = transaction.apply("program_binding", "configured")
 		if transaction.pending() then return false end
-		if accepted == true then inverse_source = { status = "ok", content = candidate } end
+		if accepted == true then
+			inverse_source = { status = "ok", content = candidate }
+			if click_receipt and parameters.seal_click_configuration(owner, click_receipt) ~= true then
+				recover(); return false
+			end
+		end
 		if release() ~= true then recover(); return false end
+		if accepted == true and click_receipt then
+			parameters.commit_click_configuration(owner, click_receipt)
+		end
 		transaction.release()
 		return accepted == true
 	end

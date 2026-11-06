@@ -128,6 +128,21 @@ helpers.describe("xkb_rmlvo: system defaults", function()
 		helpers.assert_nil(R.parse_localectl("   System Locale: LANG=C\n       VC Keymap: n/a\n"))
 	end)
 
+	helpers.it("ignores commented keyboard defaults", function()
+		local R = helpers.load_module("infra.xkb_rmlvo")
+		local desc = R.parse_keyboard_defaults('XKBLAYOUT="fr"\n# Example: XKBLAYOUT="us"\n')
+		helpers.assert_eq(desc.layout, "fr")
+	end)
+
+	helpers.it("reads single-quoted shell keyboard defaults and trailing comments", function()
+		local R = helpers.load_module("infra.xkb_rmlvo")
+		local desc = R.parse_keyboard_defaults("XKBLAYOUT='fr' # chosen layout\nXKBVARIANT='bepo'\nXKBOPTIONS='caps:escape'\n")
+		helpers.assert_true(desc ~= nil)
+		helpers.assert_eq(desc.layout, "fr")
+		helpers.assert_eq(desc.variant, "bepo")
+		helpers.assert_eq(desc.options, "caps:escape")
+	end)
+
 	helpers.it("reads /etc/default/keyboard", function()
 		local R = helpers.load_module("infra.xkb_rmlvo")
 		local desc = R.parse_keyboard_defaults(

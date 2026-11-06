@@ -215,6 +215,59 @@ if (program) program.dispatch('click');
 vm.runInContext("doConfirm('run_program')", context);
 check(posted.length === 0, 'neither click nor direct confirm may acquire an unavailable program');
 
+// A search which finds only an unavailable action still has a visible result.
+byId.search.value = 'program';
+byId.search.dispatch('input');
+const searchProgram = byId.list.children.find((row) => row.dataset.id === 'run_program');
+check(
+	searchProgram && searchProgram.classList.contains('disabled'),
+	'matching unavailable action remains visible'
+);
+check(byId.empty.hidden === true, 'a visible disabled match must not be called an empty search');
+check(
+	vm.runInContext('visible.length', context) === 0,
+	'disabled matches remain outside keyboard navigation'
+);
+if (searchProgram) searchProgram.dispatch('click');
+check(posted.length === 0, 'search must not make an unavailable action clickable');
+byId.search.value = 'no-such-action';
+byId.search.dispatch('input');
+check(byId.empty.hidden === false, 'a search with no matching action still reports no results');
+
+// Input methods and pasted text may use canonically equivalent Unicode forms.
+const french = JSON.parse(
+	fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/data/locales/fr.json'), 'utf8')
+);
+context.frenchActionLabel = french['sg_actions.eject_all_disks'];
+vm.runInContext(
+	`init({ title: 'T', cancelLabel: 'Cancel', current: 'none', noneLabel: 'Nothing', items: [
+		{ type: 'action', id: 'eject_all_disks', label: frenchActionLabel }
+	] })`,
+	context
+);
+byId.search.value = 'e\u0301jecter';
+byId.search.dispatch('input');
+check(
+	byId.list.children.some((row) => row.dataset.id === 'eject_all_disks'),
+	'a decomposed query must find the canonically equivalent localized action label'
+);
+
+context.frenchActionLabel = french['sg_actions.eject_all_disks'].normalize('NFD');
+vm.runInContext(
+	`init({ title: 'T', cancelLabel: 'Cancel', current: 'none', noneLabel: 'Nothing', items: [
+		{ type: 'action', id: 'eject_all_disks', label: frenchActionLabel }
+	] })`,
+	context
+);
+byId.search.value = 'Éjecter';
+byId.search.dispatch('input');
+const normalizedResult = byId.list.children.find((row) => row.dataset.id === 'eject_all_disks');
+check(normalizedResult, 'a composed query must find a decomposed localized label');
+check(
+	normalizedResult && normalizedResult.text().includes(context.frenchActionLabel),
+	'normalization must not rewrite the displayed label'
+);
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] action picker disabled rows:\x1b[0m');
 	for (const e of errors) console.error('    - ' + e);

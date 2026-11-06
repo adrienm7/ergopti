@@ -53,6 +53,7 @@ local function world(options)
 		probe = function(host, port, timeout_ms, callback)
 			w.tcp_probes = w.tcp_probes or {}
 			w.tcp_probes[#w.tcp_probes + 1] = { host = host, port = port, timeout_ms = timeout_ms }
+			if w.on_tcp_probe then w.on_tcp_probe(w, host, port) end
 			local probe_child = { settled = false }
 			function probe_child.is_settled() return probe_child.settled end
 			function probe_child.on_settled(listener) probe_child.listener = listener; return true end
@@ -596,4 +597,155 @@ end)
 it("the shared probe deadline is the timings registry's one second", function()
 	local Timings = require("infra.timings")
 	eq(Timings.ms("llm", "managed_proxy_probe_timeout_ms"), 1000)
+end)
+
+it("bounds PAC probes by the remaining startup budget (pac-probe-budget)", function()
+	local w = world({ remaining = 75, receipt = { ok = true,
+		proxies = { "http://down.corp.example:3128", "direct://" } } })
+	assert(w:run().ok)
+	eq(w.tcp_probes[1].timeout_ms, 75)
+end)
+
+it("does not try another PAC relay once startup expires (pac-probe-budget)", function()
+	local w = world({ receipt = { ok = true, proxies = {
+		"http://down.corp.example:3128", "http://other.corp.example:3128", "direct://" } },
+		on_tcp_probe = function(state) state.remaining = 0; state.authorized = false end })
+	local result = w:run()
+	eq(#w.tcp_probes, 1)
+	eq(result.ok, false)
+end)
+
+it("does not launch a PAC probe when reading the budget revokes its owner (pac-probe-budget)", function()
+	local w = world()
+	local revoke, operation, results = false, nil, {}
+	local budget = { remaining_ms = function()
+		if revoke then operation:cancel(); return 0 end
+		return 1000
+	end }
+	operation = w.port(budget, function() return true end, function(result) results[#results + 1] = result end)
+	revoke = true
+	w.callback({ ok = true, proxies = { "http://down.corp.example:3128", "direct://" } })
+	eq(w.tcp_probes, nil)
+	eq(#results, 0, "the revoked owner must not publish")
+	eq(w.child.cancelled, true)
+	eq(operation:is_settled(), false, "the original lookup still owns its retirement")
+end)
+
+it("retains one settlement observer while a cancelled lookup is still owned (pac-observer-bound)", function()
+	local w = world()
+	w:run()
+	local observers, delivered = {}, 0
+	w.child.on_settled = function(listener) observers[#observers + 1] = listener; return true end
+	w.operation:on_settled(function() error("controlled listener failure") end)
+	w.operation:on_settled(function() delivered = delivered + 1 end)
+	for _ = 1, 1000 do w.operation:cancel() end
+	eq(#observers, 1)
+	eq(delivered, 0)
+	eq(w.operation:is_settled(), false)
+	w.child.settled = true
+	assert(pcall(observers[1]), "one failing listener cannot abort native settlement")
+	eq(delivered, 1)
+	eq(w.operation:is_settled(), true)
+end)
+
+it("retries an explicitly refused settlement subscription without duplicating an admitted one (pac-observer-bound)", function()
+	local w = world()
+	w:run()
+	local calls, observer, delivered = 0, nil, 0
+	w.child.on_settled = function(listener)
+		calls = calls + 1
+		if calls == 1 then return false end
+		observer = listener
+		return true
+	end
+	w.operation:on_settled(function() delivered = delivered + 1 end)
+	w.operation:cancel()
+	w.operation:cancel()
+	w.operation:cancel()
+	eq(calls, 2)
+	eq(delivered, 0)
+	w.child.settled = true
+	observer()
+	eq(delivered, 1)
+end)
+
+it("retires a PAC result even when its result observer throws (pac-observer-bound)", function()
+	local w = world({ origins = { ORIGINS[1] } })
+	local op = w.port({ remaining_ms = function() return 1000 end }, function() return true end,
+		function() error("controlled result observer failure") end)
+	local settled = 0
+	op:on_settled(function() settled = settled + 1 end)
+	w.child.settled = true
+	assert(pcall(w.callback, { ok = true, proxies = { "direct://" } }), "result observer cannot escape")
+	eq(op:is_settled(), true)
+	eq(settled, 1)
+end)
+
+it("handles inline settlement and an uncertain observer registration without duplicates (pac-observer-bound)", function()
+	local inline = world()
+	inline:run()
+	local delivered = 0
+	inline.operation:on_settled(function() delivered = delivered + 1 end)
+	inline.child.on_settled = function(listener) inline.child.settled = true; listener(); return true end
+	inline.operation:cancel()
+	eq(delivered, 1)
+	eq(inline.operation:is_settled(), true)
+
+	local uncertain = world()
+	uncertain:run()
+	local calls, retained = 0, nil
+	uncertain.child.on_settled = function(listener)
+		calls = calls + 1; retained = listener; error("registration outcome unknown")
+	end
+	uncertain.operation:cancel()
+	uncertain.operation:cancel()
+	eq(calls, 1, "an unknown registration cannot safely be duplicated")
+	eq(uncertain.operation:is_settled(), false)
+	uncertain.child.settled = true
+	retained()
+	eq(uncertain.operation:is_settled(), true)
+end)
+
+it("retires real native handles when both observers and diagnostics throw (pac-observer-logger)", function()
+	local logger, uv = require("logger.shim"), require("luv")
+	local old_error = logger.error
+	logger.error = function() error("controlled logger failure") end
+	local tested, reason = pcall(function()
+		local function native_child(w)
+			local handle, listener = assert(uv.new_timer()), nil
+			w.child.on_settled = function(fn) listener = fn; return true end
+			local function close()
+				uv.close(handle, function()
+					w.child.settled = true
+					if listener then listener() end
+				end)
+				return true
+			end
+			w.child.cancel = close
+			return close
+		end
+		local function pump(done)
+			local until_ns = uv.hrtime() + 2000000000
+			while not done() and uv.hrtime() < until_ns do uv.run("once") end
+			assert(done(), "native close did not retire")
+		end
+		local cancelled = world(); cancelled:run(); native_child(cancelled)
+		local notified = 0
+		cancelled.operation:on_settled(function() error("controlled observer failure") end)
+		cancelled.operation:on_settled(function() notified = notified + 1 end)
+		cancelled.operation:cancel()
+		pump(function() return cancelled.operation:is_settled() end)
+		eq(notified, 1, "one failed observer cannot suppress the next")
+		local finished = world({ origins = { ORIGINS[1] } })
+		local op = finished.port({ remaining_ms = function() return 1000 end }, function() return true end,
+			function() error("controlled result failure") end)
+		local close = native_child(finished)
+		local retired = 0; op:on_settled(function() retired = retired + 1 end)
+		assert(pcall(finished.callback, { ok = true, proxies = { "direct://" } }))
+		close()
+		pump(function() return op:is_settled() end)
+		eq(retired, 1, "failed result diagnostics must not skip physical retirement")
+	end)
+	logger.error = old_error
+	assert(tested, reason)
 end)

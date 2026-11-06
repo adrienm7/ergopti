@@ -230,6 +230,7 @@ function M.session(reader, sqlite_path, today, pacer)
 		if end_date == "" then end_date = nil end
 		local through = reader.split_bounds(start_date, end_date, today).historical_end
 		local historical_json = EMPTY_NGRAMS_JSON
+		local historical_data = nil
 		local history_complete = true
 		local serial = nil
 		if not start_date or start_date <= through then
@@ -281,6 +282,21 @@ function M.session(reader, sqlite_path, today, pacer)
 				end
 			end
 			historical_json = json
+			historical_data = data
+		end
+		-- Future-dated rows can already exist after a local clock rollback. They
+		-- are outside the past-only cache fingerprint and must be read afresh.
+		local future_requested = (end_date and end_date > today)
+			or (start_date and start_date > today and not end_date)
+		if future_requested then
+			local first = reader.next_day(today)
+			if start_date and start_date > first then first = start_date end
+			local future, complete = reader.read_ngrams(sqlite_path, first, end_date, apps, pacer)
+			local merged = reader.merge_ngrams({}, historical_data or {}, pacer)
+			reader.merge_ngrams(merged, future, pacer)
+			historical_json = PacedJson.encode(merged, pacer)
+			history_complete = history_complete == true and complete == true
+			serial = nil
 		end
 		local today_idx, today_complete = reader.read_today_split(sqlite_path, start_date, end_date, apps, pacer, today)
 		local range_complete = history_complete == true and today_complete == true

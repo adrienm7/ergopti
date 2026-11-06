@@ -114,7 +114,7 @@ end
 --- @param list any
 --- @return table|nil
 local function string_set(list)
-	if type(list) ~= "table" then return nil end
+	if type(list) ~= "table" or require("json").is_null(list) then return nil end
 	local set = {}
 	for _, value in ipairs(list) do
 		if type(value) ~= "string" then return nil end

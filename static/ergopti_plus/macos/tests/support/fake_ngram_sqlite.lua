@@ -51,6 +51,18 @@ function M.new(tables)
 	end
 
 	local function query(sql)
+		local date_source = sql:match("SELECT DISTINCT date FROM ([%w_]+)")
+		if date_source then
+			local filter, seen, result = parse_filter(sql), {}, {}
+			for _, row in ipairs(tables[date_source] or {}) do
+				if admitted(row, filter) and not seen[row.date] then
+					seen[row.date] = true
+					result[#result + 1] = { date = row.date }
+				end
+			end
+			table.sort(result, function(a, b) return a.date < b.date end)
+			return result
+		end
 		local bounded = sql:match("SELECT %(SELECT MIN%(date%) FROM ([%w_]+)%)")
 		if bounded then
 			local lo, hi = nil, nil

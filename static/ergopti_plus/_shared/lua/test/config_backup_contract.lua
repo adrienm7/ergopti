@@ -150,7 +150,7 @@ function M.register(helpers, env)
 			},
 			io = fs.io,
 			json = json,
-			clock = function()
+			clock = opts.clock or function()
 				tick = math.min(tick + 1, #times)
 				local stamp = times[tick]
 				return { stamp = stamp, iso = stamp:gsub("^(%d%d%d%d)(%d%d)(%d%d)%-(%d%d)(%d%d)(%d%d)$",
@@ -403,6 +403,15 @@ function M.register(helpers, env)
 			helpers.assert_eq(created.id, "pre-install-20260930-101500-v1-1000000000000000000000000000000")
 		end)
 
+		helpers.it("orders same-second collision suffixes numerically without confusing tag digits", function()
+			for _, tag in ipairs({ "", "release-9" }) do
+				local owner = fixture()
+				local last
+				for _ = 1, 11 do last = assert(owner.create("pre_install", { tag = tag })) end
+				helpers.assert_eq(owner.latest("pre_install").id, last.id)
+			end
+		end)
+
 		helpers.it("offers the newest complete backup of a kind", function()
 			local owner = fixture({ times = { "20260930-101500", "20260930-111500", "20260930-121500" } })
 			assert(owner.create("pre_install", { tag = "v1" }))
@@ -440,6 +449,33 @@ function M.register(helpers, env)
 				helpers.assert_eq(latest and latest.id, healthy.id)
 				helpers.assert_eq(owner.restore(damaged.id), false)
 			end
+		end)
+
+		helpers.it("never offers or restores a backup with a corrupt creation timestamp", function()
+			for _, case in ipairs({ {}, { value = false }, { value = {} }, { value = "not-a-date" },
+				{ value = "9999-99-99T99:99:99Z" }, { value = "2026-02-29T12:00:00Z" } }) do
+				local owner, fs, _, json = fixture({ times = { "20260930-101500", "20260930-111500" } })
+				local valid = assert(owner.create("pre_install", { tag = "valid" }))
+				local broken = assert(owner.create("pre_install", { tag = "broken" }))
+				fs.files[broken.path .. "/backup.json"] = json.encode({ schema_version = 1, id = broken.id,
+					kind = "pre_install", created_at = case.value, files = broken.files })
+				local latest = owner.latest("pre_install")
+				helpers.assert_eq(latest and latest.id, valid.id)
+				local writes = #fs.writes
+				helpers.assert_eq(owner.restore(broken.id), false)
+				helpers.assert_eq(#fs.writes, writes)
+			end
+		end)
+
+		helpers.it("does not publish a backup when its clock returns an invalid creation time", function()
+			local owner, fs = fixture({ clock = function()
+				return { stamp = "20260930-101500", iso = "2026-02-29T10:15:00Z" }
+			end })
+			local writes = #fs.writes
+			local record, reason = owner.create("pre_install")
+			helpers.assert_nil(record)
+			helpers.assert_eq(reason, "clock")
+			helpers.assert_eq(#fs.writes, writes)
 		end)
 
 		helpers.it("restores after backing the replaced configuration up", function()
@@ -516,6 +552,24 @@ function M.register(helpers, env)
 				helpers.assert_eq(restored, false, "a corrupt inventory must not report a successful restore")
 				helpers.assert_eq(reason, "missing")
 				helpers.assert_eq(#fs.writes, writes, "invalid inventory must not write configuration or pre-backup")
+			end
+		end)
+
+		helpers.it("refuses a non-array or sparse manifest file list before any write", function()
+			for _, files in ipairs({
+				{ unexpected = { root = "config", path = "config.toml" } },
+				{ [1] = { root = "config", path = "config.toml" },
+					[3] = { root = "config", path = "layers.toml" } },
+			}) do
+				local owner, fs, _, json = fixture()
+				local record = assert(owner.create("pre_install", {}))
+				fs.files[record.path .. "/backup.json"] = json.encode({ schema_version = 1, id = record.id,
+					kind = "pre_install", created_at = record.created_at, files = files })
+				local writes = #fs.writes
+				local restored, reason = owner.restore(record.id)
+				helpers.assert_eq(restored, false)
+				helpers.assert_eq(reason, "missing")
+				helpers.assert_eq(#fs.writes, writes, "a truncated manifest must not publish a restore")
 			end
 		end)
 	end)

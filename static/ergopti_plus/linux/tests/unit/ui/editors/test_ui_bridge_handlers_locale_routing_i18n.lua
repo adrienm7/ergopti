@@ -94,6 +94,19 @@ helpers.describe("ui.bridge_handlers", function()
     -- send and this bridge did not answer (set_priority, clear_priority,
     -- set_all_grey, close) went unnoticed: the suite was green and comparing
     -- nothing.
+    helpers.it("(hotstrings-setting-validation) refuses malformed colours and fractional priorities", function()
+      local s2, seen = build_mock_state(), {}
+      s2.config.set_override = function(...) seen[#seen + 1] = { ... }; return true end
+      for _, color in ipairs({ "blue", "#xyz", "#12", "#123456789" }) do
+        handler.on_message({ action = "set_color", category = "accents", hex = color }, s2)
+      end
+      handler.on_message({ action = "set_priority", category = "accents", priority = 2.5 }, s2)
+      helpers.assert_eq(#seen, 0, "malformed settings must not reach persistence")
+      handler.on_message({ action = "set_color", category = "accents", hex = "#123abc" }, s2)
+      handler.on_message({ action = "set_priority", category = "accents", priority = 2 }, s2)
+      helpers.assert_eq(#seen, 2)
+    end)
+
     helpers.it("'set_color' records the override for the category the user clicked", function()
       local seen = {}
       local s2 = build_mock_state()
@@ -118,6 +131,17 @@ helpers.describe("ui.bridge_handlers", function()
       handler.on_message({ action = "set_color", category = "accents", section = "", hex = "#00ff00" }, s2)
       helpers.assert_eq(seen[1].sec, nil, "the empty string must become nil, not a section key")
     end)
+		helpers.it("(hotstring-config-input) refuses malformed section identifiers instead of editing the category", function()
+			local seen, s2 = {}, build_mock_state()
+			s2.config.set_override = function(...) seen[#seen + 1] = { ... }; return true end
+			for _, action in ipairs({ "set_delay", "clear_delay", "set_color", "clear_color", "set_tooltip", "clear_tooltip", "set_priority", "clear_priority" }) do
+				for _, section in ipairs({ false, 3, {} }) do
+					handler.on_message({ action = action, category = "accents", section = section,
+						ms = 300, hex = "#123456", show_tooltip = true, priority = 1 }, s2)
+				end
+			end
+			helpers.assert_eq(#seen, 0)
+		end)
     helpers.it("'set_priority' accepts a value in range and refuses one outside it", function()
       local seen = {}
       local s2 = build_mock_state()
@@ -134,6 +158,22 @@ helpers.describe("ui.bridge_handlers", function()
       handler.on_message({ action = "set_priority", category = "accents", priority = 500 }, s2)
       helpers.assert_eq(#seen, 1, "an out-of-range priority must be refused, not clamped")
     end)
+
+		helpers.it("(hotstring-config-input) refuses non-finite numbers and malformed tooltip values", function()
+			local seen, s2 = {}, build_mock_state()
+			s2.config.set_override = function(...) seen[#seen + 1] = { ... }; return true end
+			for _, value in ipairs({ "nan", "1e999", "-1e999", true, {} }) do
+				handler.on_message({ action = "set_priority", category = "accents", priority = value }, s2)
+				handler.on_message({ action = "set_delay", category = "accents", ms = value }, s2)
+			end
+			for _, value in ipairs({ "yes", 1, {} }) do
+				handler.on_message({ action = "set_tooltip", category = "accents", show_tooltip = value }, s2)
+			end
+			helpers.assert_eq(#seen, 0)
+			handler.on_message({ action = "set_tooltip", category = "accents", show_tooltip = false }, s2)
+			helpers.assert_eq(#seen, 1)
+			helpers.assert_eq(seen[1][4], false)
+		end)
     helpers.it("'clear_priority' removes the override rather than writing a default", function()
       local seen = {}
       local s2 = build_mock_state()
@@ -154,6 +194,7 @@ helpers.describe("ui.bridge_handlers", function()
       end
       s2.config.set_override = function(cat, sec, field, value)
         seen[#seen + 1] = { cat = cat, sec = sec, value = value }
+				return true
       end
       handler.on_message({ action = "set_all_grey" }, s2)
 
@@ -168,6 +209,39 @@ helpers.describe("ui.bridge_handlers", function()
       -- the user as a button that half-worked.
       helpers.assert_eq(sections_cleared, 2, "and every per-section colour override must be wiped")
     end)
+		helpers.it("(hotstrings-grey-refusal) stops and reports a refused colour write", function()
+			local s2, notices, calls = build_mock_state(), {}, 0
+			s2.config.get_categories = function() return { accents = { sections_order = { "acute" } } } end
+			s2.config.get_neutral_color = function() return "#6e6e73" end
+			s2.config.set_override = function() calls = calls + 1; return false end
+			s2.notify_error = function(key) notices[#notices + 1] = key end
+			handler.on_message({ action = "set_all_grey" }, s2)
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(notices, { "healthcheck.status.failed" })
+		end)
+		helpers.it("(hotstrings-grey-refusal) reports a later failure after a partial repaint", function()
+			local s2, notices, calls = build_mock_state(), {}, 0
+			s2.config.get_categories = function() return { accents = { sections_order = { "acute", "grave" } } } end
+			s2.config.get_neutral_color = function() return "#6e6e73" end
+			s2.config.set_override = function() calls = calls + 1; return calls == 1 end
+			s2.notify_error = function(key) notices[#notices + 1] = key end
+			local result = handler.on_message({ action = "set_all_grey" }, s2)
+			helpers.assert_eq(result, { grey = false })
+			helpers.assert_eq(calls, 2)
+			helpers.assert_eq(notices, { "healthcheck.status.failed" })
+		end)
+		helpers.it("(hotstrings-grey-refusal) never writes a replacement configuration", function()
+			local s2, calls, foreign = build_mock_state(), 0, 0
+			s2.config.get_categories = function() return { accents = { sections_order = { "acute" } } } end
+			s2.config.get_neutral_color = function() return "#6e6e73" end
+			s2.config.set_override = function()
+				calls = calls + 1
+				s2.config = { set_override = function() foreign = foreign + 1 end }
+				return true
+			end
+			handler.on_message({ action = "set_all_grey" }, s2)
+			helpers.assert_eq({ calls, foreign }, { 1, 0 })
+		end)
     helpers.it("'set_all_grey' changes nothing when the neutral colour cannot be read", function()
       local seen = {}
       local s2 = build_mock_state()
@@ -179,12 +253,68 @@ helpers.describe("ui.bridge_handlers", function()
       -- a shade nothing else in the product uses.
       helpers.assert_eq(#seen, 0, "a missing neutral colour must stop the repaint, not invent one")
     end)
+    helpers.it("(hotstrings-reset-refusal) refuses a partial reset when personal files are present", function()
+      local s2, notices, clears = build_mock_state(), {}, 0
+      local personal = require("hotstrings.personal_files").describe({ "independent.toml" }).id
+      s2.config.get_categories = function() return { accents = {}, [personal] = { sections_order = { "work" } } } end
+      s2.config.clear_override = function() clears = clears + 1; return true end
+      s2.notify_error = function(key) notices[#notices + 1] = key end
+      local result = handler.on_message({ action = "reset_all" }, s2)
+      helpers.assert_eq(result, { reset = false })
+      helpers.assert_eq(clears, 0, "no other setting is changed by the refused batch")
+      helpers.assert_eq(notices, { "hs_config.reset_all_personal_unavailable" })
+    end)
+
+    helpers.it("(hotstrings-reset-refusal) does not notify a successor page", function()
+      local s2, notices, clears, epoch = build_mock_state(), 0, 0, 1
+      local personal = require("hotstrings.personal_files").describe({ "independent.toml" }).id
+      s2.config.get_categories = function() return { [personal] = {} } end
+      s2.config.clear_override = function() clears = clears + 1; return true end
+      s2.notify_error = function() notices = notices + 1 end
+      local previous, logger = package.loaded["ui.webview_manager"], require("logger.shim")
+      local old_error = logger.error
+      package.loaded["ui.webview_manager"] = { current_epoch = function() return epoch end }
+      logger.error = function() epoch = 2 end
+      local ok, result = pcall(handler.on_message, { action = "reset_all" }, s2,
+        { app_name = "hotstrings_config_window", epoch = 1 })
+      logger.error, package.loaded["ui.webview_manager"] = old_error, previous
+      helpers.assert_true(ok, tostring(result))
+      helpers.assert_eq(result, { reset = false })
+      helpers.assert_eq({ notices, clears }, { 0, 0 })
+    end)
+
+    helpers.it("(hotstrings-reset-refusal) reports a refused category reset", function()
+      local s2, notices, calls = build_mock_state(), {}, 0
+      s2.config.get_categories = function() return { accents = { sections_order = { "common" } } } end
+      s2.config.clear_override = function() calls = calls + 1; return false end
+      s2.notify_error = function(key) notices[#notices + 1] = key end
+      local result = handler.on_message({ action = "reset_all" }, s2)
+      helpers.assert_eq(result, { reset = false })
+      helpers.assert_eq(calls, 1, "no subsequent changes follow the refusal")
+      helpers.assert_eq(notices, { "healthcheck.status.failed" })
+    end)
+
+    helpers.it("(hotstrings-reset-refusal) stops when the page is replaced during reset", function()
+      local s2, notices, calls, epoch = build_mock_state(), 0, 0, 1
+      s2.config.get_categories = function() return { accents = { sections_order = { "common" } } } end
+      s2.config.clear_override = function() calls = calls + 1; epoch = 2; return true end
+      s2.notify_error = function() notices = notices + 1 end
+      local previous = package.loaded["ui.webview_manager"]
+      package.loaded["ui.webview_manager"] = { current_epoch = function() return epoch end }
+      local ok, result = pcall(handler.on_message, { action = "reset_all" }, s2,
+        { app_name = "hotstrings_config_window", epoch = 1 })
+      package.loaded["ui.webview_manager"] = previous
+      helpers.assert_true(ok, tostring(result))
+      helpers.assert_eq(result, { reset = false })
+      helpers.assert_eq({ calls, notices }, { 1, 0 })
+    end)
+
     helpers.it("'reset_all' clears every category's overrides", function()
       local cleared = {}
       local s2 = build_mock_state()
       s2.config.reset_defaults = function() end
       s2.config.get_categories = function() return { accents = {}, code = {} } end
-      s2.config.clear_override = function(id) cleared[#cleared + 1] = id end
+      s2.config.clear_override = function(id) cleared[#cleared + 1] = id; return true end
       handler.on_message({ action = "reset_all" }, s2)
       helpers.assert_eq(#cleared, 2, "every category must be reset, not the first one found")
     end)
@@ -212,6 +342,9 @@ helpers.describe("ui.bridge_handlers", function()
   helpers.describe("changelog_bridge", function()
     local handler = helpers.load_module("ui.changelog.bridge")
     local original_handler = handler
+    -- The document fixture narrows the timing API; initialize the updater
+    -- against the real timing registry before the fixture installs its double.
+    require("modules.updater.manager")
     local native_document = require("tests.support.document_fixture").new("changelog", original_handler, build_mock_state())
     handler = native_document.proxy()
     local state = build_mock_state()
@@ -438,6 +571,45 @@ helpers.describe("ui.bridge_handlers", function()
     local handler = helpers.load_module("ui.hotstring_editor.bridge")
     local state = build_mock_state()
 
+		helpers.it("(hotstring-save-alert-owner) does not send a stale save error to the replacement page", function()
+			local original, pushed = package.loaded["ui.webview_manager"], {}
+			package.loaded["ui.webview_manager"] = { current_epoch = function() return 42 end,
+				eval_js = function(_, js) pushed[#pushed + 1] = js; return true end }
+			local ok, result = pcall(handler.on_message, { action = "save", data = { sections = {} } }, state,
+				{ app_name = "hotstring_editor", epoch = 41 })
+			package.loaded["ui.webview_manager"] = original
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(#pushed, 0)
+		end)
+
+		helpers.it("(hotstring-save-alert-owner) does not send an error to a page with native cleanup debt", function()
+			local original, pushed = package.loaded["ui.webview_manager"], {}
+			package.loaded["ui.webview_manager"] = { current_epoch = function() return 41 end,
+				page_current = function() return false end,
+				eval_js = function(_, js) pushed[#pushed + 1] = js; return true end }
+			local ok, result = pcall(handler.on_message, { action = "save", data = { sections = {} } }, state,
+				{ app_name = "hotstring_editor", epoch = 41 })
+			package.loaded["ui.webview_manager"] = original
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(#pushed, 0)
+		end)
+
+		helpers.it("(hotstring-save-alert-owner) still alerts the live requesting page", function()
+			local original, pushed = package.loaded["ui.webview_manager"], {}
+			package.loaded["ui.webview_manager"] = { current_epoch = function() return 41 end,
+				page_current = function() return true end,
+				eval_js = function(_, js) pushed[#pushed + 1] = js; return true end }
+			local ok, result = pcall(handler.on_message, { action = "save", data = { sections = {} } }, state,
+				{ app_name = "hotstring_editor", epoch = 41 })
+			package.loaded["ui.webview_manager"] = original
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(#pushed, 1)
+			helpers.assert_contains(pushed[1], "showAlert")
+		end)
+
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "hsEditor")
     end)
@@ -502,9 +674,10 @@ helpers.describe("ui.bridge_handlers", function()
           data = {
             sections_order = { "work" },
             sections = { work = { description = "Work", entries = {
-              { trigger = "btw", output = "by the way", is_word = true,
-                is_case_sensitive = true, is_case_sensitive_strict = true },
-              { trigger = "omw", output = "on my way" },
+              { trigger = "btw", output = "by the way", is_word = true, auto_expand = false,
+                is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true },
+              { trigger = "omw", output = "on my way", is_word = false, auto_expand = false,
+                is_case_sensitive = false, final_result = false, is_case_sensitive_strict = false },
             } } },
           },
         }, state, context)
@@ -529,7 +702,8 @@ helpers.describe("ui.bridge_handlers", function()
           data = {
             sections_order = { "english" },
             sections = { english = { description = "English", entries = {
-              { trigger = "ty", output = "thank you" },
+              { trigger = "ty", output = "thank you", is_word = false, auto_expand = false,
+                is_case_sensitive = false, final_result = false, is_case_sensitive_strict = false },
             } } },
           },
         }, state, context)
@@ -539,7 +713,7 @@ helpers.describe("ui.bridge_handlers", function()
         helpers.assert_eq(entries[1].trigger, "ty", "and it must be the entry it sent")
       end)
     end)
-    helpers.it("'save' drops an entry with no trigger instead of writing it", function()
+    helpers.it("'save' refuses a model containing an entry with no trigger", function()
       local reader, writer, captured = make_spies(true)
       with_opened_spies(reader, writer, state, function(h, context)
         local result = h.on_message({
@@ -552,11 +726,8 @@ helpers.describe("ui.bridge_handlers", function()
             } } },
           },
         }, state, context)
-        helpers.assert_true(result.saved, "the genuine writer must acknowledge the displayed model")
-        local entries = captured.data.sections.work.entries
-        helpers.assert_eq(#entries, 1,
-          "a triggerless entry can never fire, and on disk it is a row nobody can delete from the UI")
-        helpers.assert_eq(entries[1].trigger, "ok", "the real entry survives")
+        helpers.assert_eq(result.saved, false, "an incomplete row must not erase the existing file")
+        helpers.assert_eq(captured.data, nil, "the writer must not receive a partial model")
       end)
     end)
     helpers.it("'save' reports failure when the write fails", function()
@@ -581,6 +752,18 @@ helpers.describe("ui.bridge_handlers", function()
         { action = "save_pref", data = { key = "../../evil", value = 1 } }, state)
       helpers.assert_true(refused ~= nil and refused.saved == false,
         "an undeclared preference key must be refused, not written")
+    end)
+    helpers.it("(hotstring-pref-invalid) falls back for mistyped stored preferences", function()
+      local previous_storage = package.loaded["adapters.storage"]
+      local previous_handler = package.loaded["ui.hotstring_editor.bridge"]
+      local values = { ["hotstring_editor.compact_view"] = "false",
+        ["hotstring_editor.auto_close"] = 1, ["hotstring_editor.default_section"] = { "foreign" } }
+      package.loaded["adapters.storage"] = { get = function(key) return values[key] end }
+      package.loaded["ui.hotstring_editor.bridge"] = nil
+      local bridge = require("ui.hotstring_editor.bridge")
+      local observed = { bridge.get_pref("compact_view"), bridge.get_pref("auto_close"), bridge.get_pref("default_section") }
+      package.loaded["adapters.storage"], package.loaded["ui.hotstring_editor.bridge"] = previous_storage, previous_handler
+      helpers.assert_eq(observed, { false, false, "" })
     end)
     helpers.it("'save_pref' reports a storage failure and rejects the wrong value type", function()
       local previous_storage = package.loaded["adapters.storage"]
@@ -639,3 +822,33 @@ helpers.describe("ui.bridge_handlers", function()
 end)
 
 restore_loaded()
+
+helpers.it("download window refuses FIFO managed network policy without blocking", function()
+	local uv, Paths = require("luv"), require("infra.paths")
+	local previous_bridge, previous_manager, original_shared = package.loaded["ui.download_window.bridge"],
+		package.loaded["ui.webview_manager"], Paths.shared
+	local source = assert(original_shared("modules/network/managed_network.json"))
+	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-download-fifo-XXXXXX"))
+	local path = dir .. "/policy.json"
+	local made = os.execute("mkfifo '" .. path .. "'"); assert(made == 0 or made == true)
+	local shown = 0
+	package.loaded["ui.webview_manager"] = { show = function() shown = shown + 1; return false end, hide = function() end }
+	package.loaded["ui.download_window.bridge"] = nil
+	local Bridge = require("ui.download_window.bridge")
+	Paths.shared = function(relative)
+		if relative == "modules/network/managed_network.json" then return path end
+		return original_shared(relative)
+	end
+	local exited, code, process = false, nil, nil
+	process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$2" > "$1"', "fixture", path, source } }, function(result)
+		code, exited = result, true; process:close()
+	end))
+	local called = pcall(Bridge.show, { kind = "app_update", label = "Update" })
+	Paths.shared, package.loaded["ui.download_window.bridge"], package.loaded["ui.webview_manager"] =
+		original_shared, previous_bridge, previous_manager
+	os.remove(path); os.remove(dir)
+	while not exited do uv.run("once") end
+	helpers.assert_true(code ~= 0, "loading the policy opened the FIFO")
+	helpers.assert_eq(called, false, "invalid policy must refuse admission")
+	helpers.assert_eq(shown, 0)
+end)

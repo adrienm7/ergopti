@@ -134,7 +134,8 @@ end
 --- Wall-clock time of a backup, in UTC.
 --- @return table { stamp, iso }
 local function clock()
-	return { stamp = os.date("!%Y%m%d-%H%M%S"), iso = os.date("!%Y-%m-%dT%H:%M:%SZ") }
+	local now = os.time()
+	return { stamp = os.date("!%Y%m%d-%H%M%S", now), iso = os.date("!%Y-%m-%dT%H:%M:%SZ", now) }
 end
 
 

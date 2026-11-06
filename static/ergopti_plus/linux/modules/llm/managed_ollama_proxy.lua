@@ -142,7 +142,7 @@ function M.new(deps)
 		-- `inner` is the current lookup child; the operation settles once the
 		-- logical answer is out and that child is physically retired.
 		local operation = { finished = false, listeners = {} }
-		local inner, step = nil, 0
+		local inner, step, watched = nil, 0, nil
 		function operation:is_settled()
 			if inner then return inner.is_settled() == true end
 			return self.finished
@@ -150,18 +150,34 @@ function M.new(deps)
 		local function release()
 			local listeners = operation.listeners
 			operation.listeners = {}
-			for _, listener in ipairs(listeners) do listener() end
+			for _, listener in ipairs(listeners) do
+				local ok = pcall(listener)
+				if not ok then pcall(Logger.error, LOG, "Managed Ollama proxy settlement listener failed.") end
+			end
 		end
 		function operation:on_settled(listener)
 			if type(listener) ~= "function" then return false end
 			if not self.finished then self.listeners[#self.listeners + 1] = listener; return true end
 			-- Once the answer is out the current child is the last one.
 			if inner and inner.is_settled() ~= true then return inner.on_settled(listener) end
-			listener()
+			local ok = pcall(listener)
+			if not ok then pcall(Logger.error, LOG, "Managed Ollama proxy settlement listener failed.") end
 			return true
 		end
 		local function settle_later()
-			if inner and inner.is_settled() ~= true then inner.on_settled(release) else release() end
+			local child = inner
+			if not child or child.is_settled() == true then watched = nil; release(); return end
+			if watched == child then return end
+			-- Reserve before registration: the child can report settlement inline.
+			watched = child
+			local called, accepted = pcall(child.on_settled, function()
+				if watched ~= child then return end
+				watched = nil
+				if inner ~= child then settle_later() else release() end
+			end)
+			-- A literal refusal can be retried. A throw has unknown registration
+			-- state, so keep the reservation rather than duplicating observers.
+			if called and accepted == false and watched == child then watched = nil end
 		end
 		function operation:cancel()
 			self.finished = true
@@ -173,7 +189,8 @@ function M.new(deps)
 		local function finish(result)
 			if operation.finished then return end
 			operation.finished = true
-			done(result)
+			local ok = pcall(done, result)
+			if not ok then pcall(Logger.error, LOG, "Managed Ollama proxy result listener failed.") end
 			settle_later()
 		end
 		local rows = deps.environment()
@@ -316,7 +333,25 @@ function M.new(deps)
 		--- @param index number Origin index.
 		--- @param choices table Ordered selections of the shared policy.
 		--- @param at number Entry to try.
+		local function probe_budget()
+			if operation.finished then return nil end
+			local remaining = budget.remaining_ms()
+			-- Reading the master budget can synchronously revoke this operation.
+			if operation.finished then return nil end
+			if type(remaining) ~= "number" or remaining <= 0 then
+				finish({ ok = false, error = "proxy_timeout" })
+				return nil
+			end
+			if not authorized() then
+				if not operation.finished then finish({ ok = false, error = "proxy_cancelled" }) end
+				return nil
+			end
+			if operation.finished then return nil end
+			return remaining
+		end
 		choose = function(index, choices, at)
+			local remaining = probe_budget()
+			if not remaining then return end
 			local choice = choices[at]
 			local function keep(route)
 				entries[index] = { origin = origins[index], route = route }
@@ -333,11 +368,12 @@ function M.new(deps)
 			end
 			step = step + 1
 			local mine = step
-			local child, probe_error = deps.probe(host, port, deps.probe_timeout_ms, function(reachable, reason)
-				if operation.finished then return end
+			local timeout = math.ceil(math.min(deps.probe_timeout_ms, remaining))
+			local child, probe_error = deps.probe(host, port, timeout, function(reachable, reason)
+				if not probe_budget() then return end
 				if reachable then keep(choice.proxy); return end
 				Logger.warn(LOG, "Managed Ollama proxy entry %d of origin %d unreachable (%s within %d ms): next PAC entry.",
-					at, index, tostring(reason), deps.probe_timeout_ms)
+					at, index, tostring(reason), timeout)
 				choose(index, choices, at + 1)
 			end)
 			if not child then

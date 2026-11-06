@@ -38,10 +38,8 @@ local normalise_name = ModelCatalogue.normalise_name
 local function load_catalogue()
 	if _catalogue then return _catalogue end
 	local path = Paths.shared("modules/llm/models.json")
-	local handle = path and io.open(path, "r") or nil
-	if not handle then return nil end
-	local body = handle:read("*a")
-	handle:close()
+	local body = path and require("infra.regular_file_reader").read_source(path) or nil
+	if not body then return nil end
 	local ok, decoded = pcall(Json.decode, body)
 	if not ok or type(decoded) ~= "table" then
 		Logger.error(LOG, "Shared model catalogue could not be decoded.")
@@ -51,9 +49,8 @@ local function load_catalogue()
 	return _catalogue
 end
 
-local function installed_lookup(frame)
+local function installed_lookup(models)
 	local lookup = {}
-	local models = frame.llm_ports.get_cached_models()
 	for _, name in ipairs(type(models) == "table" and models or {}) do
 		lookup[normalise_name(name)] = true
 	end
@@ -111,8 +108,20 @@ local function ollama_install(frame, blocked, ollama_ok)
 	return { state = "available", failed_key = frame.install_refused }
 end
 
-local function build_payload(frame)
-	local installed = installed_lookup(frame)
+local projection_current
+
+local function build_payload(frame, force_unknown)
+	local models, inventory_known, inventory_identity
+	if force_unknown then models, inventory_known = {}, false
+	else
+		local ok
+		ok, models, inventory_known, inventory_identity = pcall(frame.llm_ports.get_cached_models_status)
+		if not ok then models, inventory_known, inventory_identity = {}, false, nil end
+	end
+	if inventory_known ~= true or type(inventory_identity) ~= "table" then
+		models, inventory_known, inventory_identity = {}, false, nil
+	end
+	local installed = installed_lookup(models)
 	local current = frame.llm_ports.get_current_model() or ""
 	local backend = type(frame.llm.get_backend) == "function" and frame.llm.get_backend() or "ollama"
 	local runs = {}
@@ -127,13 +136,13 @@ local function build_payload(frame)
 		end
 	end
 	local custom = {}
-	for _, name in ipairs(frame.llm_ports.get_cached_models() or {}) do
+	for _, name in ipairs(type(models) == "table" and models or {}) do
 		if not in_catalogue[normalise_name(name)] then
 			custom[#custom + 1] = { name = name, runtime_name = name, custom = true, installed = true }
 		end
 	end
 	local api = _bound and require("ui.menu.llm_backend_rows").api_page(frame.llm, _bound.dialogs,
-		_bound.on_changed, _bound.context, frame.listings) or { rows = {}, providers = {}, tools = {} }
+		_bound.on_changed, _bound.context, frame.listings, function() return projection_current(frame) end) or { rows = {}, providers = {}, tools = {} }
 	local api_active = nil
 	for _, row in ipairs(api.rows) do if row.current then api_active = row.name end end
 	local blocked = require("ui.menu.llm_config_guard").reason()
@@ -170,13 +179,18 @@ local function build_payload(frame)
 	end
 	local rows, urls = {}, {}
 	for _, row in ipairs(payload.models) do
+		if row.backend == "ollama" and inventory_known ~= true then
+			row.available = false
+			row.inventory_unknown = true
+			row.hint_key = "model_browser.inventory_unavailable"
+		end
 		-- A pull still running keeps its percentage across a new payload.
 		local percent = row.backend == "ollama" and frame.progress[row.runtime_name] or nil
 		if percent ~= nil then row.pending, row.progress = "download", percent end
 		rows[(row.backend or "") .. "\0" .. row.name] = row
 		if type(row.url) == "string" and row.url ~= "" then urls[row.url] = true end
 	end
-	return payload, rows, urls, runs
+	return payload, rows, urls, runs, models, inventory_known == true, inventory_identity
 end
 
 local function retained(frame)
@@ -187,7 +201,7 @@ local function retained(frame)
 	return true
 end
 
-local function projection_current(frame)
+projection_current = function(frame)
 	if not retained(frame) then return false end
 	local ports = frame.manager_ports
 	local state, epoch = ports.get_daemon_state(), ports.current_epoch(APP_NAME)
@@ -197,16 +211,45 @@ local function projection_current(frame)
 	return ports.document_owner_retained(frame.document) == true and retained(frame)
 end
 
-local function push_payload(frame)
-	if not projection_current(frame) then return false, nil end
-	local payload, rows, urls, runs = build_payload(frame)
-	if not projection_current(frame) then return false, nil end
+--- Checks that the model observation still belongs to the current runtime.
+local function inventory_current(frame, models, known, identity)
+	local ok, current, current_known, current_identity = pcall(frame.llm_ports.get_cached_models_status)
+	if not ok or (current_known == true) ~= known or type(current) ~= "table" then return false end
+	if not known then return true end
+	if type(identity) ~= "table" or not rawequal(identity, current_identity) then return false end
+	if type(models) ~= "table" or #models ~= #current then return false end
+	for index, name in ipairs(models) do if current[index] ~= name then return false end end
+	return true
+end
+
+local function push_payload(frame, force_unknown)
+	frame.projection_serial = (frame.projection_serial or 0) + 1
+	local serial = frame.projection_serial
+	local function owned_projection()
+		return frame.projection_serial == serial and projection_current(frame) and frame.projection_serial == serial
+	end
+	if not owned_projection() then return false, nil end
+	local payload, rows, urls, runs, models, known, identity = build_payload(frame, force_unknown)
+	if not owned_projection() then return false, nil end
 	local ok_json, encoded = pcall(Json.encode, payload)
-	if not ok_json or type(encoded) ~= "string" or not projection_current(frame) then return false, nil end
+	if not ok_json or type(encoded) ~= "string" or not owned_projection() then return false, nil end
+	if not force_unknown and not inventory_current(frame, models, known, identity) then
+		if frame.projection_serial ~= serial then return false, nil end
+		return push_payload(frame, true)
+	end
+	if frame.projection_serial ~= serial then return false, nil end
 	local called, accepted = pcall(frame.manager_ports.eval_owned_js, APP_NAME, frame.document,
 		"if(window.injectModels)window.injectModels(" .. encoded .. ")")
-	local pushed = called and accepted == true and projection_current(frame)
-	if pushed then frame.rows, frame.urls, frame.runs = rows, urls, runs end
+	local pushed = called and accepted == true and owned_projection()
+	if pushed and not force_unknown and not inventory_current(frame, models, known, identity) then
+		if frame.projection_serial ~= serial then return false, nil end
+		return push_payload(frame, true)
+	end
+	if frame.projection_serial ~= serial then return false, nil end
+	if pushed then
+		frame.rows, frame.urls, frame.runs = rows, urls, runs
+		frame.inventory_known, frame.inventory_identity = known, identity
+	end
 	return pushed, payload
 end
 
@@ -218,15 +261,20 @@ local function next_listing(frame, list)
 	local queue = frame.listing_queue
 	if type(queue) ~= "table" or #queue == 0 or not projection_current(frame) then return false end
 	local entry = table.remove(queue, 1)
-	local called, err = pcall(list, entry, function(listing)
-		if not projection_current(frame) then return end
+	local delivered = false
+	local called, dispatched = pcall(list, entry, function(listing)
+		if delivered or not projection_current(frame) then return end
+		delivered = true
 		frame.listings[entry.id] = type(listing) == "table" and listing or { state = "failed", reason = "unavailable" }
 		push_payload(frame)
 		next_listing(frame, list)
 	end)
-	if not called then
-		Logger.error(LOG, "Remote model listing dispatch failed: %s", tostring(err))
+	if (not called or dispatched == false) and not delivered then
+		Logger.error(LOG, "Remote model listing could not be dispatched.")
+		if not projection_current(frame) then return false end
+		delivered = true
 		frame.listings[entry.id] = { state = "failed", reason = "unavailable" }
+		push_payload(frame)
 		return next_listing(frame, list)
 	end
 	return true
@@ -263,7 +311,7 @@ local function capture_projection(state, context)
 		if type(manager[name]) ~= "function" then return nil end
 		frame.manager_ports[name] = manager[name]
 	end
-	for _, name in ipairs({ "get_cached_models", "get_current_model", "refresh_models" }) do
+	for _, name in ipairs({ "get_cached_models", "get_cached_models_status", "get_current_model", "refresh_models" }) do
 		if type(state.llm[name]) ~= "function" then return nil end
 		frame.llm_ports[name] = state.llm[name]
 	end
@@ -317,7 +365,7 @@ function M.on_message(payload, state, context)
 		local fn = frame.runs[key]
 		if type(fn) ~= "function" or not projection_current(frame) then return false end
 		local ok, result = pcall(fn)
-		if not ok then Logger.error(LOG, "Model selector action failed: %s", tostring(result)) end
+		if not ok then Logger.error(LOG, "Model selector action %s raised an error.", payload.action) end
 		return ok and result ~= false
 	end
 	local function changed()
@@ -374,7 +422,11 @@ function M.on_message(payload, state, context)
 			and frame.llm_ports.download_model(payload.name, payload.name, function(succeeded)
 				if succeeded then changed() end
 			end) == true
-		Logger.info(LOG, "Model added via the selector page: %s.", payload.name)
+		if downloading then
+			Logger.info(LOG, "Model download requested via the selector page: %s.", payload.name)
+		else
+			Logger.warn(LOG, "Model download could not be started via the selector page: %s.", payload.name)
+		end
 		return { downloading = downloading }
 	end
 	if type(payload.name) ~= "string" then return nil end
@@ -394,29 +446,61 @@ function M.on_message(payload, state, context)
 	if backend ~= "ollama" then return { selected = false } end
 	if payload.action ~= "open_url" and not ollama_ready() then return { selected = false } end
 
+	local function installed_now()
+		if not projection_current(frame) then return nil end
+		local ok, models, known, identity = pcall(frame.llm_ports.get_cached_models_status)
+		if not ok or known ~= true or type(models) ~= "table" or frame.inventory_known ~= true
+			or not rawequal(identity, frame.inventory_identity) or not projection_current(frame) then return nil end
+		-- The document probe above can itself retire the inventory source. Read
+		-- it again after that callback and use only pure retained-frame checks
+		-- before handing the decision to its immediate caller.
+		ok, models, known, identity = pcall(frame.llm_ports.get_cached_models_status)
+		if not ok or known ~= true or type(models) ~= "table" or not rawequal(identity, frame.inventory_identity)
+			or not retained(frame) then return nil end
+		local target = normalise_name(row.runtime_name)
+		for _, model in ipairs(models) do
+			if type(model) ~= "string" then return nil end
+			if normalise_name(model) == target then return retained(frame) and true or nil end
+		end
+		if not retained(frame) then return nil end
+		return false
+	end
 	if payload.action == "select_model" then
-		-- Only an installed model can be made active; a missing one offers its download.
-		if row.installed ~= true then return { selected = false } end
+		-- Only a still-installed model can be made active.
+		local live_installed = installed_now()
+		if row.installed ~= true or live_installed ~= true then
+			if live_installed ~= nil and projection_current(frame) then push_payload(frame) end
+			return { selected = false }
+		end
 		local selected = type(frame.llm_ports.set_model) == "function" and projection_current(frame)
 		if selected and type(frame.llm.get_backend) == "function" and frame.llm.get_backend() ~= "ollama" then
-			selected = frame.llm.set_backend("ollama") == true
+			selected = projection_current(frame)
+				and frame.llm.set_backend("ollama", function() return projection_current(frame) end) == true
 		end
-		selected = selected and frame.llm_ports.set_model(row.runtime_name) == true
+		selected = selected and installed_now() == true and frame.llm_ports.set_model(row.runtime_name) == true
 		if selected then changed() end
 		local closed = selected and close_owned(context) or false
 		return { selected = selected, closed = closed, model = row.runtime_name }
 	end
 	if payload.action == "download_model" then
-		if row.installed == true then return { downloading = false } end
-		local downloading = type(frame.llm_ports.download_model) == "function" and projection_current(frame)
+		local live_installed = installed_now()
+		if row.installed == true or live_installed ~= false then
+			if live_installed ~= nil and projection_current(frame) then push_payload(frame) end
+			return { downloading = false }
+		end
+		local downloading = type(frame.llm_ports.download_model) == "function"
 			and frame.llm_ports.download_model(row.runtime_name, row.name, function(succeeded)
 				if succeeded then changed() end
 			end) == true
 		return { selected = false, downloading = downloading, model = row.runtime_name }
 	end
 	if payload.action == "delete_model" or payload.action == "remove_custom_model" then
-		if row.installed ~= true or not _bound or type(_bound.delete_model) ~= "function" then return { deleted = false } end
-		return { deleted = _bound.delete_model(row.runtime_name) == true }
+		local live_installed = installed_now()
+		if row.installed ~= true or not _bound or type(_bound.delete_model) ~= "function" or live_installed ~= true then
+			if live_installed ~= nil and projection_current(frame) then push_payload(frame) end
+			return { deleted = false }
+		end
+		return { deleted = _bound.delete_model(row.runtime_name, function() return installed_now() == true end) == true }
 	end
 
 	if payload.action == "open_url" and type(payload.url) == "string" then

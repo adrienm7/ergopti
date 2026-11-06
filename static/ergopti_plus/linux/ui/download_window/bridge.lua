@@ -75,10 +75,8 @@ end
 local function contract()
 	if not _contract then
 		local path = require("infra.paths").shared("modules/network/managed_network.json")
-		local file = assert(io.open(path, "rb"), "managed network policy unavailable")
-		local ok, source = pcall(file.read, file, "*a")
-		local closed = file:close()
-		assert(ok and closed, "managed network policy read or close refused")
+		local source, status = require("toml_codec.writer").read_classified(path)
+		assert(status == "ok", "managed network policy read or close refused")
 		_contract = require("network.failure").new(Json.decode(source))
 	end
 	return _contract
@@ -244,7 +242,18 @@ function M.show(opts)
 		if type(host.bring_to_front) == "function" then host.bring_to_front(APP_NAME) end
 		return nil
 	end
-	if _session then invalidate_failure(_session); _session.retired = true; host.hide(APP_NAME) end
+	if _session then
+		local previous = _session
+		local epoch = previous.page_epoch
+		local closed = epoch == nil or host.hide(APP_NAME, epoch) == true
+		if _session ~= previous then return nil end
+		if not closed then
+			Logger.warn(LOG, "The previous download window could not close; its session is retained.")
+			return nil
+		end
+		invalidate_failure(previous)
+		previous.retired = true
+	end
 	contract()
 
 	_serial = _serial + 1
@@ -275,10 +284,11 @@ function M.show(opts)
 	}
 	_session = session
 	if host.show(APP_NAME) ~= true then
-		_session = nil
+		if _session == session then _session = nil end
 		Logger.error(LOG, "Download progress native window could not be opened.")
 		return nil
 	end
+	if _session ~= session then return nil end
 	session.page_epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
 	return session.id
 end
@@ -341,15 +351,21 @@ function M.focus(session_id)
 	local session = _session
 	if not session or session.id ~= session_id or session.retired then return false end
 	local host = manager()
-	if not host or type(host.show) ~= "function" then return false end
+	if not host or host ~= session.host or type(host.show) ~= "function" then return false end
 	if type(host.is_visible) == "function" and host.is_visible(APP_NAME) == true then
-		if type(host.bring_to_front) == "function" then host.bring_to_front(APP_NAME) end
-		session.page_epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
+		if _session ~= session or session.retired or type(host.bring_to_front) ~= "function"
+			or host.bring_to_front(APP_NAME) ~= true then return false end
+		local epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
+		if _session ~= session or session.retired or manager() ~= host then return false end
+		session.page_epoch = epoch
 		return true
 	end
+	if _session ~= session or session.retired or manager() ~= host then return false end
 	session.ready = false
 	if host.show(APP_NAME) ~= true then return false end
-	session.page_epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
+	local epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
+	if _session ~= session or session.retired or manager() ~= host then return false end
+	session.page_epoch = epoch
 	return true
 end
 

@@ -30,7 +30,11 @@ no EV_ABS; a touchpad is never taken), forwards every report through the
 virtual device (created with the relative axes for that reason) and turns a
 bound notch into its key press and release, dropping the high-resolution twin.
 The grab ends with the layer, after the last forwarded button is released, or
-the desktop keeps a button down. `adapters/keyboard_hook.lua`'s main chunk is
+the desktop keeps a button down. `EVIOCGRAB` does not label reports already
+queued at acquisition or release. The current grab state, event timestamps and
+an `EAGAIN` read do not by themselves establish an atomic boundary with the
+ioctl; changes to this handoff must account for reports on both sides.
+`adapters/keyboard_hook.lua`'s main chunk is
 at LuaJIT's 200-local ceiling ("main function has more than 200 local
 variables" at load): new hook state goes into an existing table such as
 `LayerPointer`, never into new top-level locals.

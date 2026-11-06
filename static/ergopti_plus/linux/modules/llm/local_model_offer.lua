@@ -141,7 +141,8 @@ function M.handle(failure, opts)
 	if not current() then return true end
 	if not ok or accepted == nil then
 		Logger.warn(LOG, "Missing-model confirmation could not be shown: %s.", model)
-		deps.notify(label("llm.local_model.missing_notice", model), title)
+		local notified, sent = pcall(deps.notify, label("llm.local_model.missing_notice", model), title)
+		if not notified or sent ~= true then Logger.warn(LOG, "Missing-model notification was refused: %s.", model) end
 		return true
 	end
 	if accepted ~= true then return true end

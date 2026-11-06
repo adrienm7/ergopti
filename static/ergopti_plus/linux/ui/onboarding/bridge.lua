@@ -61,14 +61,15 @@ local function webview(state)
 	return dependency(state, "webview_manager", "ui.webview_manager")
 end
 
-local function push(state, function_name, payload)
+local function push(state, function_name, payload, current)
 	local manager = webview(state)
-	if not manager or type(manager.eval_js) ~= "function" then return false end
+	if not manager or type(manager.eval_js) ~= "function" or current and not current() then return false end
 	local ok, encoded = pcall(Json.encode, payload)
 	if not ok or type(encoded) ~= "string" then
 		Logger.error(LOG, "Could not encode the %s onboarding payload.", function_name)
 		return false
 	end
+	if current and not current() then return false end
 	local pushed, accepted = pcall(manager.eval_js, APP_NAME,
 		"if(window." .. function_name .. ") window." .. function_name .. "(" .. encoded .. ")")
 	return pushed and accepted == true
@@ -80,10 +81,11 @@ end
 --- @param state table Daemon state and optional test-injected authorities.
 --- @param strings table|nil Locale strings.
 --- @return boolean true when the live window was retitled.
-local function retitle(state, strings)
+local function retitle(state, strings, current)
 	local manager = webview(state)
 	local label = type(strings) == "table" and strings[WINDOW_TITLE_KEY] or nil
-	if not manager or type(manager.set_title) ~= "function" or type(label) ~= "string" then
+	if not manager or type(manager.set_title) ~= "function" or type(label) ~= "string"
+		or current and not current() then
 		return false
 	end
 	local ok, applied = pcall(manager.set_title, APP_NAME, label)
@@ -105,11 +107,8 @@ end
 --- @return string|nil content
 local function read_shared(relative)
 	local path = Paths.shared(relative)
-	local fh = path and io.open(path, "r") or nil
-	if not fh then return nil end
-	local content = fh:read("*a")
-	fh:close()
-	return content
+	if not path then return nil end
+	return require("infra.regular_file_reader").read_source(path)
 end
 
 local function locale_strings(code)
@@ -176,17 +175,22 @@ end
 --- @return table|nil values Empty for absent files, nil when one is unreadable.
 local function values_of(state, path)
 	local values = {}
-	local fh, err, code = io.open(path, "r")
+	local reader = require("infra.regular_file_reader")
+	local fh, err, code = reader.open_source(path)
 	if fh then
-		local raw = fh:read("*a")
-		fh:close()
+		local read, raw = pcall(fh.read, fh, "*a")
+		local closed, accepted = pcall(fh.close, fh)
+		if not read or type(raw) ~= "string" or not closed or accepted ~= true then
+			Logger.error(LOG, "The configuration in force could not be read and closed.")
+			return nil
+		end
 		local ok, parsed = pcall(TomlCodec.decode, raw)
 		if not ok or type(parsed) ~= "table" then
 			Logger.error(LOG, "The configuration in force could not be decoded.")
 			return nil
 		end
 		values = M.config_values(parsed)
-	elseif code ~= 2 then
+	elseif code ~= reader.ENOENT then
 		Logger.error(LOG, "The configuration in force could not be read: %s.", tostring(err))
 		return nil
 	end
@@ -541,14 +545,14 @@ local function finish(state, answers)
 	return result
 end
 
-local function pick_config_dir(state, current)
+local function pick_config_dir(state, current, page_current)
 	local shell = dependency(state, "shell", "adapters.shell_runner")
 	local config_paths = dependency(state, "config_paths", "infra.config_paths")
 	local i18n = dependency(state, "i18n", "infra.i18n")
 	if not shell or not config_paths then return { picked = false } end
 	local normalized = ConfigDirPicker.pick(shell, config_paths, i18n, current)
-	if not normalized then return { picked = false } end
-	push(state, "setConfigDir", normalized)
+	if not normalized or not page_current() then return { picked = false } end
+	push(state, "setConfigDir", normalized, page_current)
 	return { picked = true, path = normalized }
 end
 
@@ -556,7 +560,7 @@ end
 --- @param payload any String or action table from host_bridge.js.
 --- @param state table Daemon state and optional test-injected authorities.
 --- @return table|nil Diagnostic response; the page receives pushes through eval_js.
-function M.on_message(payload, state)
+function M.on_message(payload, state, context)
 	state = type(state) == "table" and state or {}
 	if type(payload) ~= "table" then
 		local ok, decoded = pcall(Json.decode, tostring(payload))
@@ -565,6 +569,24 @@ function M.on_message(payload, state)
 	end
 
 	local action = payload.action
+	local manager = webview(state)
+	local epoch = type(context) == "table" and context.epoch or nil
+	local epoch_read, native_current = manager and manager.current_epoch, manager and manager.page_current
+	local function page_current()
+		if epoch == nil then return true end
+		if context.app_name ~= APP_NAME or type(epoch_read) ~= "function" or not manager
+			or webview(state) ~= manager or manager.current_epoch ~= epoch_read then return false end
+		local ok, observed = pcall(epoch_read, APP_NAME)
+		if not ok or observed ~= epoch or webview(state) ~= manager or manager.current_epoch ~= epoch_read then return false end
+		if action == "ready" then return true end
+		if type(native_current) ~= "function" or manager.page_current ~= native_current then return false end
+		local checked, live = pcall(native_current, APP_NAME, epoch)
+		if not checked or live ~= true or manager.page_current ~= native_current or manager.current_epoch ~= epoch_read then return false end
+		local reread, final = pcall(epoch_read, APP_NAME)
+		return reread and final == epoch and webview(state) == manager
+			and manager.current_epoch == epoch_read and manager.page_current == native_current
+	end
+	if not page_current() then return nil end
 	if (action == "ready" or action == "loadExistingConfig") and _finish_gate.busy() then
 		return { pushed = false }
 	end
@@ -576,8 +598,8 @@ function M.on_message(payload, state)
 	if action == "ready" then
 		local data = build_init_data(state)
 		if not data then return { pushed = false } end
-		return { pushed = push(state, "initData", data), data = data,
-			titled = retitle(state, data.strings) }
+		return { pushed = push(state, "initData", data, page_current), data = data,
+			titled = retitle(state, data.strings, page_current) }
 	elseif action == "previewLocale" then
 		local i18n = dependency(state, "i18n", "infra.i18n")
 		if not locale_available(i18n, payload.locale) then return { pushed = false } end
@@ -585,12 +607,12 @@ function M.on_message(payload, state)
 		if not strings then return { pushed = false } end
 		return { pushed = push(state, "applyStrings", {
 			locale = payload.locale, strings = strings,
-		}), titled = retitle(state, strings) }
+		}, page_current), titled = retitle(state, strings, page_current) }
 	elseif action == "localeSelected" then
 		local i18n = dependency(state, "i18n", "infra.i18n")
 		return { accepted = locale_available(i18n, payload.locale) }
 	elseif action == "pickConfigDir" then
-		return pick_config_dir(state, payload.current)
+		return pick_config_dir(state, payload.current, page_current)
 	elseif action == "resolveMetricsPath" then
 		-- The store lives in the data directory and does not follow the chosen
 		-- configuration folder; answering keeps the page on the keystats's path.
@@ -600,7 +622,7 @@ function M.on_message(payload, state)
 			return { pushed = false }
 		end
 		local path = config_paths.metrics_path()
-		return { pushed = push(state, "setMetricsPath", { request = payload.request, path = path }),
+		return { pushed = push(state, "setMetricsPath", { request = payload.request, path = path }, page_current),
 			path = path }
 	elseif action == "loadExistingConfig" then
 		-- The pages restart from the chosen folder's config.toml: its values when
@@ -613,7 +635,7 @@ function M.on_message(payload, state)
 		end
 		local ok_values, values = pcall(values_of, state, chosen .. "/" .. CONFIG_FILE)
 		if not ok_values or not values then return { loaded = false } end
-		return { loaded = push(state, "applyCurrentValues", { request = payload.request, values = values }),
+		return { loaded = push(state, "applyCurrentValues", { request = payload.request, values = values }, page_current),
 			values = values }
 	elseif action == "finish" then
 		return finish(state, payload.answers)

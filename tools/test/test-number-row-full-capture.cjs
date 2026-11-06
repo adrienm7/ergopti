@@ -96,16 +96,39 @@ function validate(input) {
 		'windows: the action must save the full capture'
 	);
 
-	// Linux: every tool of the cascade captures the whole desktop at once.
+	// Linux: inspect the file-saving owner and every branch of its cascade.
 	const linux = stripComments(input.linux, '.lua');
-	const command =
-		(linux.match(/\["screenshot_fullscreen_save"\]\s*=\s*"((?:[^"\\]|\\.)*)"/) || [])[1] || '';
-	check(command.includes('%s'), 'linux: the full capture must save to a file');
+	const helper =
+		/local function screenshot_to_file\(capture\)\s*return\s*"\{ : > %s && "\s*\.\.\s*capture\s*\.\.\s*" %s && \[ -s %s \]; \}"\s*end/.test(
+			linux
+		);
+	const expression =
+		(linux.match(
+			/\["screenshot_fullscreen_save"\]\s*=([\s\S]*?)(?=,\s*\["screenshot_region_clipboard"\])/
+		) || [])[1] || '';
+	const branches = expression.split(/\s*\.\.\s*"\s*\|\|\s*"\s*\.\.\s*/);
+	const commands = branches.map(
+		(branch) => (branch.trim().match(/^screenshot_to_file\("([^"\\]*)"\)$/) || [])[1]
+	);
+	check(
+		helper && commands.length === 4 && commands.every(Boolean),
+		'linux: the full capture must save to a file'
+	);
+	const tools = commands.map((command) => command?.split(/\s+/)[0]);
+	check(
+		tools.join(',') === 'grim,gnome-screenshot,spectacle,maim',
+		'linux: the full capture must retain every fallback in order'
+	);
 	// Area (-a, -g, -r, -s, slurp), window (-i, -w) and single-monitor (-m)
 	// options of grim, gnome-screenshot, spectacle and maim.
-	const flags = [...command.matchAll(/(?:^|\s)-([A-Za-z]+)/g)].map((match) => match[1]).join('');
+	const flags = commands
+		.flatMap((command) => [...(command || '').matchAll(/(?:^|\s)-([A-Za-z]+)/g)])
+		.map((match) => match[1])
+		.join('');
 	check(
-		command !== '' && !/slurp/.test(command) && !/[agimrsw]/.test(flags),
+		commands.every(Boolean) &&
+			!commands.some((command) => /slurp/.test(command)) &&
+			!/[agimrsw]/.test(flags),
 		'linux: the full capture must not ask for an area, a window or a selection'
 	);
 	return { errors, checks };
@@ -182,10 +205,33 @@ const mutations = [
 			copy.ahk = copy.ahk.replace(/GESTURE_SM_CXVIRTUALSCREEN/g, 'GESTURE_SM_CXSCREEN');
 		}
 	],
-	[
+	...[
+		['grim', 'grim -g region'],
+		['gnome-screenshot -f', 'gnome-screenshot -af'],
+		['spectacle -bno', 'spectacle -bnro'],
+		['maim', 'maim -s']
+	].map(([original, replacement]) => [
 		'linux: the full capture must not',
 		(copy) => {
-			copy.linux = copy.linux.replace('"grim %s ||', '"grim -g \\"$(slurp)\\" %s ||');
+			copy.linux = copy.linux.replace(
+				`screenshot_to_file("${original}")`,
+				`screenshot_to_file("${replacement}")`
+			);
+		}
+	]),
+	[
+		'linux: the full capture must save to a file',
+		(copy) => {
+			copy.linux = copy.linux.replace(' %s && [ -s %s ]; }', ' && true; }');
+		}
+	],
+	[
+		'linux: the full capture must retain every fallback',
+		(copy) => {
+			copy.linux = copy.linux.replace(
+				'screenshot_to_file("maim"),',
+				'screenshot_to_file("other"),'
+			);
 		}
 	]
 ];

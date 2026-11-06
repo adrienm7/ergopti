@@ -351,7 +351,7 @@ helpers.describe("healthcheck checked save receipts (linux)", function()
 		local saved_fs = package.loaded["adapters.file_system"]
 		local saved_shell = package.loaded["adapters.shell_runner"]
 		local writes, directories = {}, {}
-		package.loaded["adapters.file_system"] = { write = function(path, text)
+		package.loaded["adapters.file_system"] = { write_new = function(path, text)
 			writes[#writes + 1] = { path = path, text = text }
 			return write(path, text)
 		end }
@@ -369,6 +369,54 @@ helpers.describe("healthcheck checked save receipts (linux)", function()
 		package.loaded["adapters.shell_runner"] = saved_shell
 		helpers.assert_true(ok, tostring(result))
 		return result, calls, writes, directories
+	end
+
+	helpers.it("repeated diagnostic saves preserve the earlier report", function()
+		local Report = helpers.load_module("ui.healthcheck.report")
+		local dir = os.tmpname()
+		os.remove(dir)
+		local calls, overrides = {}, nil
+		overrides = recording(calls)
+		overrides.save = nil
+		local snapshot, config = host_snapshot(false), documents()
+		local document = Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key))
+		local paths = { diagnostics_dir = dir, logs_dir = dir }
+		local function save()
+			return completed(Report, { action = "save", text = document.text, name = document.name }, paths,
+				config, Report.redaction_context(overrides), overrides, snapshot)
+		end
+		local first = save()
+		helpers.assert_eq(first.ok, true)
+		local file = assert(io.open(first.path, "ab")); file:write("\nuser annotation\n"); file:close()
+		local second = save()
+		local original = assert(io.open(first.path, "rb")); local bytes = original:read("*a"); original:close()
+		os.remove(first.path); if second.path then os.remove(second.path) end; os.remove(dir)
+		helpers.assert_eq(second.ok, true)
+		helpers.assert_true(first.path ~= second.path, "each export needs a distinct file")
+		helpers.assert_true(bytes:find("user annotation", 1, true) ~= nil)
+	end)
+
+	for _, kind in ipairs({ "symlink", "hardlink", "fifo" }) do
+		helpers.it("diagnostic save does not open a colliding " .. kind, function()
+			local Report = helpers.load_module("ui.healthcheck.report")
+			local dir = os.tmpname(); os.remove(dir); assert(os.execute("mkdir -p '" .. dir .. "'") == 0)
+			local calls, overrides = {}, nil; overrides = recording(calls); overrides.save = nil
+			local snapshot, config = host_snapshot(false), documents()
+			local document = Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key))
+			local target, collision = dir .. "/protected", dir .. "/" .. document.name
+			local f = assert(io.open(target, "wb")); f:write("protected"); f:close()
+			local command = kind == "symlink" and ("ln -s '" .. target .. "' '" .. collision .. "'")
+				or kind == "hardlink" and ("ln '" .. target .. "' '" .. collision .. "'")
+				or ("mkfifo '" .. collision .. "'")
+			assert(os.execute(command) == 0)
+			local answer = completed(Report, { action = "save", text = document.text, name = document.name },
+				{ diagnostics_dir = dir, logs_dir = dir }, config, Report.redaction_context(overrides), overrides, snapshot)
+			local check = assert(io.open(target, "rb")); local bytes = check:read("*a"); check:close()
+			os.remove(collision); os.remove(target); if answer.path then os.remove(answer.path) end; os.remove(dir)
+			helpers.assert_eq(answer.ok, true)
+			helpers.assert_true(answer.path ~= collision)
+			helpers.assert_eq(bytes, "protected")
+		end)
 	end
 
 	helpers.it("save requires the filesystem's completed write receipt (report-save-receipt)", function()
@@ -827,4 +875,25 @@ helpers.describe("opt-in day log in the report actions (day-log-host)", function
 		helpers.assert_eq({ ok.found, ok.size, ok.text }, { true, 3, "abc" })
 		helpers.assert_true(not pcall(DayLogHost.read_file, "x", 100, fake(5, "abc")), "a short read is an error")
 	end)
+end)
+
+helpers.it("diagnostic path existence checks do not read a FIFO", function()
+	local uv = require("luv")
+	local Report = require("ui.healthcheck.report")
+	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-diagnostic-fifo-XXXXXX"))
+	local path = dir .. "/log"
+	local made = os.execute("mkfifo '" .. path .. "'"); assert(made == 0 or made == true)
+	local exited, code, process = false, nil, nil
+	process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; printf synthetic > "$1"', "fixture", path } }, function(result)
+		code, exited = result, true; process:close()
+	end))
+	local opened, outcome = 0, nil
+	Report.perform({ action = "open_path", id = "log_today" }, { log_today = path }, {}, {}, {
+		open = function(target, done) opened = opened + 1; helpers.assert_eq(target, path); done({ ok = true, code = 0 }) end,
+	}, nil, { current = function() return true end, complete = function(result) outcome = result end })
+	os.remove(path); os.remove(dir)
+	while not exited do uv.run("once") end
+	helpers.assert_true(code ~= 0, "checking existence opened the FIFO")
+	helpers.assert_eq(opened, 1)
+	helpers.assert_true(outcome and outcome.ok)
 end)

@@ -9,23 +9,6 @@ local helpers = require("tests.helpers")
 -- The application folder under every XDG base, from the shared registry.
 local FOLDER = require("app_dirs").linux.folder_name
 
-local function memory_storage(stored, refuses)
-	return {
-		get = function(key) return stored[key] end,
-		path = function() return "/virtual/storage.json" end,
-		set = function(key, value) if refuses then return false end; stored[key] = value; return true end,
-		acquire_owned = function() return true end,
-		capture_owned = function() return { before = stored.locale } end,
-		publish_owned = function(_, _, updates)
-			if refuses then return false end
-			stored.locale = updates.locale.value; return true
-		end,
-		restore_owned = function(_, receipt) stored.locale = receipt.before; return true end,
-		release_owned = function() return true end,
-		forget_owned = function() return true end,
-	}
-end
-
 helpers.describe("i18n persistence", function()
 
   -- ==========================================================================
@@ -55,6 +38,21 @@ helpers.describe("i18n persistence", function()
   -- ==========================================================================
 
   helpers.describe("locale discovery", function()
+    helpers.it("(locale-order-close) falls back when the order stream close is refused", function()
+      local reader, directory, paths = require("infra.regular_file_reader"), require("infra.native_directory"), require("infra.paths")
+      local original_open, original_entries, original_shared = reader.open_source, directory.entries, paths.shared
+      reader.open_source = function()
+        return { read = function() return '{"order":["fr","en"]}' end, close = function() return nil, "close failed" end }
+      end
+      directory.entries = function() return { { name = "fr.json", kind = "file" }, { name = "en.json", kind = "file" } } end
+      paths.shared = function(name) if name == "data" or name == "data/locales" then return "/synthetic" end; return original_shared(name) end
+      local ok, err = pcall(function()
+        local i18n = helpers.load_module("infra.i18n")
+        helpers.assert_eq(i18n.list_locales(), { "en", "fr" })
+      end)
+      reader.open_source, directory.entries, paths.shared = original_open, original_entries, original_shared
+      if not ok then error(err, 0) end
+    end)
     helpers.it("native-locale-catalog: only actual locale files establish availability", function()
       local shell = require("adapters.shell_runner")
       helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"),
@@ -106,142 +104,33 @@ helpers.describe("i18n persistence", function()
   -- ==========================================================================
 
   helpers.describe("locale persistence", function()
-		helpers.it("linux locale success publishes through the real owned storage receipt", function()
-			local lfs = require("lfs")
-			local root = os.tmpname(); os.remove(root); assert(lfs.mkdir(root))
-			assert(lfs.mkdir(root .. "/ergopti_plus"))
-			local path = root .. "/config.toml"
-			local file = assert(io.open(path, "wb")); file:write('[script]\nlocale = "fr"\n'); file:close()
-			local Paths = require("infra.config_paths")
-			local prior_config, prior_home, prior_storage = Paths.config, Paths.config_home, package.loaded["adapters.storage"]
-			Paths.config = function(name) if name == "config.toml" then return path end return prior_config(name) end
-			Paths.config_home = function() return root end
-			package.loaded["adapters.storage"] = nil
-			local storage = require("adapters.storage")
-			local original_publish, backup, competing, collision, foreign = storage.publish_owned, nil, nil, nil, nil
-			storage.publish_owned = function(owner, receipt, updates, backup_path, files)
-				backup = backup_path
-				competing = storage.set("locale", "ja")
-				foreign = storage.set("unrelated", "preserved")
-				if not collision then
-					collision = backup_path
-					local occupied = assert(io.open(collision, "wb")); occupied:write("foreign backup"); occupied:close()
-				end
-				return original_publish(owner, receipt, updates, backup_path, files)
-			end
-			local ok, err = xpcall(function()
-				local i18n = helpers.load_module("infra.i18n")
-				i18n.init()
-				helpers.assert_eq(i18n.persist_locale("en"), false, "occupied backup is not replaced")
-				local occupied = assert(io.open(collision, "rb")); local contents = occupied:read("*a"); occupied:close()
-				helpers.assert_eq(contents, "foreign backup")
-				helpers.assert_true(i18n.persist_locale("en"), "the next attempt owns a fresh backup name")
-				helpers.assert_true(backup ~= collision)
-				helpers.assert_eq(competing, false)
-				helpers.assert_true(foreign, "a distinct settings alias may still commit")
-				helpers.assert_eq(storage.get("unrelated"), "preserved")
-				helpers.assert_eq(storage.get("locale"), "en")
-				helpers.assert_eq(i18n.get_locale(), "en")
-				local saved = assert(io.open(backup, "rb")); saved:close()
-			end, debug.traceback)
-			storage.publish_owned = original_publish
-			Paths.config, Paths.config_home, package.loaded["adapters.storage"] = prior_config, prior_home, prior_storage
-			package.loaded["infra.i18n"] = nil
-			if backup then os.remove(backup) end
-			if collision then os.remove(collision) end
-			os.remove(root .. "/ergopti_plus/storage.json"); lfs.rmdir(root .. "/ergopti_plus")
-			os.remove(path); lfs.rmdir(root)
-			if not ok then error(err, 0) end
-		end)
-		helpers.it("linux locale rollback uses the real storage cohort", function()
-			local lfs = require("lfs")
-			local root = os.tmpname(); os.remove(root); assert(lfs.mkdir(root))
-			local path = root .. "/config.toml"
-			local original = '[script]\nlocale = "fr" # original\n'
-			local file = assert(io.open(path, "wb")); file:write(original); file:close()
-			local Paths = require("infra.config_paths")
-			local prior_config, prior_home, prior_storage = Paths.config, Paths.config_home, package.loaded["adapters.storage"]
-			Paths.config = function(name) if name == "config.toml" then return path end return prior_config(name) end
-			Paths.config_home = function() return root end
-			package.loaded["adapters.storage"] = nil
-			local storage = require("adapters.storage")
-			local original_publish, competing, after_commit, backup = storage.publish_owned, nil, false, nil
-			local external_edit, candidate = false, nil
-			storage.publish_owned = function(owner, receipt, updates, backup_path, files)
-				competing = storage.set("locale", "ja")
-				if after_commit then
-					backup = backup_path
-					helpers.assert_true(original_publish(owner, receipt, updates, backup_path, files))
-					if external_edit then
-						local source = assert(io.open(path, "rb")); candidate = source:read("*a"); source:close()
-						local foreign = assert(io.open(path, "wb")); foreign:write('[script]\nlocale = "ja"\n'); foreign:close()
-					end
-				end
-				return false
-			end
-			local ok, err = xpcall(function()
-				local i18n = helpers.load_module("infra.i18n")
-				i18n.init()
-				helpers.assert_eq(i18n.persist_locale("en"), false)
-				helpers.assert_eq(competing, false, "cooperating writes must be fenced")
-				local read = assert(io.open(path, "rb")); local actual = read:read("*a"); read:close()
-				helpers.assert_eq(actual, original)
-				after_commit = true
-				helpers.assert_eq(i18n.persist_locale("en"), false)
-				helpers.assert_nil(storage.get("locale"), "a mutated-then-refused native receipt is restored")
-				helpers.assert_nil(io.open(storage.path(), "rb"), "the prior absence must be restored on disk")
-				read = assert(io.open(path, "rb")); actual = read:read("*a"); read:close()
-				helpers.assert_eq(actual, original)
-				external_edit = true
-				helpers.assert_eq(i18n.persist_locale("en"), false)
-				read = assert(io.open(path, "rb")); actual = read:read("*a"); read:close()
-				helpers.assert_eq(actual, '[script]\nlocale = "ja"\n', "rollback preserves another writer")
-				helpers.assert_eq(i18n.persist_locale("en"), false, "unsettled exact inverse blocks new changes")
-				local replace = assert(io.open(path, "wb")); replace:write(candidate); replace:close()
-				external_edit, after_commit = false, false
-				helpers.assert_eq(i18n.persist_locale("en"), false)
-				read = assert(io.open(path, "rb")); actual = read:read("*a"); read:close()
-				helpers.assert_eq(actual, original, "retry restores the retained exact predecessor")
-			end, debug.traceback)
-			storage.publish_owned = original_publish
-			Paths.config, Paths.config_home, package.loaded["adapters.storage"] = prior_config, prior_home, prior_storage
-			package.loaded["infra.i18n"] = nil
-			if lfs.attributes(root .. "/ergopti_plus", "mode") == "directory" then
-				for name in lfs.dir(root .. "/ergopti_plus") do
-					if name:sub(1, #"storage.json.locale-") == "storage.json.locale-" then
-						os.remove(root .. "/ergopti_plus/" .. name)
-					end
-				end
-			end
-			os.remove(root .. "/ergopti_plus/storage.json"); lfs.rmdir(root .. "/ergopti_plus")
-			os.remove(path); lfs.rmdir(root)
-			if not ok then error(err, 0) end
-		end)
-		helpers.it("linux locale refusal preserves configured source bytes", function()
-			local path = os.tmpname()
-			local original = '[script]\nlocale = "fr" # original\n'
-			local file = assert(io.open(path, "wb")); file:write(original); file:close()
-			local Paths = require("infra.config_paths")
-			local prior_config, prior_storage = Paths.config, package.loaded["adapters.storage"]
-			Paths.config = function(name) if name == "config.toml" then return path end return prior_config(name) end
-			package.loaded["adapters.storage"] = memory_storage({ locale = "fr" }, true)
-			local ok, err = xpcall(function()
-				local i18n = helpers.load_module("infra.i18n")
-				i18n.init()
-				helpers.assert_eq(i18n.persist_locale("en"), false)
-				local read = assert(io.open(path, "rb")); local actual = read:read("*a"); read:close()
-				helpers.assert_eq(actual, original, "a refused storage write must not persist the requested locale in config")
-			end, debug.traceback)
-			Paths.config, package.loaded["adapters.storage"] = prior_config, prior_storage
-			package.loaded["infra.i18n"] = nil; os.remove(path)
-			if not ok then error(err, 0) end
-		end)
+    local function stub_scope_for_store()
+      return {
+        retry_locale = function() return true end,
+        edit_locale = function(value)
+          if require("adapters.storage").set("locale", value) ~= true then return false end
+          local native = require("infra.i18n")
+          local token = { pending = function() return false end }
+          assert(native.scope_acquire(token))
+          local receipt = assert(native.scope_capture(token))
+          local applied = native.scope_apply(token, receipt, value)
+          assert(native.scope_release(token))
+          assert(native.scope_forget(token, receipt))
+          return applied
+        end,
+      }
+    end
     helpers.it("set_locale + get_locale round-trips", function()
       -- An in-memory store that acknowledges every write: the round trip must
       -- not depend on whichever storage adapter an earlier test file left loaded.
       local saved_storage = package.loaded["adapters.storage"]
+      local saved_scope = package.loaded["infra.script_scope"]
+      package.loaded["infra.script_scope"] = stub_scope_for_store()
       local stored = {}
-      package.loaded["adapters.storage"] = memory_storage(stored, false)
+      package.loaded["adapters.storage"] = {
+        get = function(key) return stored[key] end,
+        set = function(key, value) stored[key] = value; return true end,
+      }
       local ok, err = pcall(function()
         local i18n = helpers.load_module("infra.i18n")
         i18n.init()
@@ -258,13 +147,19 @@ helpers.describe("i18n persistence", function()
         helpers.assert_eq(i18n.get_locale(), before, "locale restored")
       end)
       package.loaded["adapters.storage"] = saved_storage
+      package.loaded["infra.script_scope"] = saved_scope
       package.loaded["infra.i18n"] = nil
       if not ok then error(err, 0) end
     end)
 
 		helpers.it("does not publish a locale whose durable write failed", function()
 			local saved_storage = package.loaded["adapters.storage"]
-			package.loaded["adapters.storage"] = memory_storage({ locale = "fr" }, true)
+			local saved_scope = package.loaded["infra.script_scope"]
+			package.loaded["infra.script_scope"] = stub_scope_for_store()
+			package.loaded["adapters.storage"] = {
+				get = function() return "fr" end,
+				set = function() return false end,
+			}
 			local ok, err = pcall(function()
 				local i18n = helpers.load_module("infra.i18n")
 				i18n.init()
@@ -275,6 +170,7 @@ helpers.describe("i18n persistence", function()
 					"the active locale must remain aligned with durable storage")
 			end)
 			package.loaded["adapters.storage"] = saved_storage
+			package.loaded["infra.script_scope"] = saved_scope
 			package.loaded["infra.i18n"] = nil
 			if not ok then error(err, 0) end
 		end)
@@ -366,18 +262,26 @@ end)
 
 helpers.describe("i18n explicit wizard persistence", function()
 	local function with_owned_store(options, body)
-		local names = { "infra.i18n", "infra.locale", "adapters.storage", "infra.config_paths" }
+		local names = { "infra.i18n", "infra.locale", "adapters.storage", "infra.config_paths", "infra.script_settings", "ui.error_dialog.bridge" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local root = os.tmpname()
 		os.remove(root)
 		local made = os.execute("mkdir -p " .. string.format("%q", root .. "/" .. FOLDER))
 		helpers.assert_true(made == true or made == 0)
+		local config = root .. "/config/config.toml"
+		if options.config then
+			local created = os.execute("mkdir -p " .. string.format("%q", root .. "/config"))
+			assert(created == true or created == 0)
+			local cf = assert(io.open(config, "wb")); assert(cf:write(options.config)); assert(cf:close())
+		end
 		local path = root .. "/" .. FOLDER .. "/storage.json"
 		local seed = '{"locale":"zz_UNSUPPORTED","future":{"retained":true}}\n'
 		local fh = assert(io.open(path, "wb"))
 		assert(fh:write(seed)); assert(fh:close())
 		local original_rename = os.rename
+		local logger = require("logger.shim")
+		local original_level = logger.get_level()
 		local attempts = 0
 		local observations = nil
 		local ok, err = xpcall(function()
@@ -388,27 +292,31 @@ helpers.describe("i18n explicit wizard persistence", function()
 				config = function(name) return root .. "/config/" .. name end }
 			package.loaded["infra.locale"] = nil
 			package.loaded["adapters.storage"] = nil
+			package.loaded["infra.script_settings"] = nil
+			package.loaded["ui.error_dialog.bridge"] = nil
 			package.loaded["infra.i18n"] = nil
 			local i18n = require("infra.i18n")
 			i18n.init()
 			os.rename = function(from, to)
 				if from == path .. ".tmp" and to == path then
 					attempts = attempts + 1
+					if options.on_publish then options.on_publish(config) end
 					if options.rename == "throw" then error("owned rename refused") end
 					if options.rename == "false" then return nil, "owned rename refused", 13 end
 				end
-				return original_rename(from, to)
+				local renamed, detail, errno = original_rename(from, to)
+				if renamed and from == path .. ".tmp" and to == path and options.after_publish then options.after_publish(config, path) end
+				return renamed, detail, errno
 			end
 			observations = body(i18n, path, seed)
 		end, debug.traceback)
 		os.rename = original_rename
+		logger.set_level(original_level)
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-		for name in require("lfs").dir(root .. "/ergopti_plus") do
-			if name:sub(1, #"storage.json.locale-") == "storage.json.locale-" then
-				os.remove(root .. "/ergopti_plus/" .. name)
-			end
-		end
 		os.remove(path .. ".tmp"); os.remove(path)
+		os.remove(config); os.execute("rm -f " .. string.format("%q", root .. "/config") .. "/*.bak")
+		os.execute("rm -f " .. string.format("%q", root .. "/" .. FOLDER) .. "/*.bak")
+		if options.config then os.execute("rmdir " .. string.format("%q", root .. "/config")) end
 		os.execute("rmdir " .. string.format("%q", root .. "/" .. FOLDER))
 		os.execute("rmdir " .. string.format("%q", root))
 		if not ok then error(err, 0) end
@@ -420,6 +328,182 @@ helpers.describe("i18n explicit wizard persistence", function()
 		local raw = assert(fh:read("*a")); assert(fh:close())
 		return raw
 	end
+
+	helpers.it("(error-dialog-atomic) keeps source and state on storage refusal", function()
+		local initial = '[script]\nshow_error_dialog = true\n'
+		local observed = with_owned_store({ config = initial, rename = "false" }, function(_, path)
+			local dialog = require("ui.error_dialog.bridge")
+			local before = dialog.is_enabled()
+			local accepted = dialog.set_enabled(false)
+			return { accepted = accepted, before = before, active = dialog.is_enabled(),
+				config = read(require("infra.config_paths").config("config.toml")), stored = require("json").decode(read(path))["script.show_error_dialog"] }
+		end)
+		helpers.assert_eq(observed, { accepted = false, before = true, active = true, config = initial })
+	end)
+
+	helpers.it("(error-dialog-atomic) disables an already scheduled report", function()
+		local observed = with_owned_store({}, function()
+			local dialog = require("ui.error_dialog.bridge")
+			local scheduled
+			dialog.defer = function(fn) scheduled = fn; return true end
+			assert(dialog.init())
+			dialog.on_error("fixture", "failure", "failure")
+			local had_schedule = type(scheduled) == "function"
+			local accepted = dialog.set_enabled(false)
+			if scheduled then scheduled() end
+			return { scheduled = had_schedule, accepted = accepted, enabled = dialog.is_enabled() }
+		end)
+		helpers.assert_eq(observed, { scheduled = true, accepted = true, enabled = false })
+	end)
+
+	helpers.it("(error-dialog-atomic) retains and settles a refused inverse", function()
+		local initial, published = '[script]\nshow_error_dialog = true\n', nil
+		local once = true
+		local observed = with_owned_store({ config = initial, after_publish = function(config, path)
+			if not once then return end
+			once = false
+			published = read(path)
+			local cf = assert(io.open(config, "wb")); assert(cf:write(initial .. "# concurrent\n")); assert(cf:close())
+			local sf = assert(io.open(path, "wb")); assert(sf:write('{"script.show_error_dialog":true}')); assert(sf:close())
+		end }, function(_, path)
+			local dialog = require("ui.error_dialog.bridge")
+			local accepted = dialog.set_enabled(false)
+			local pending = require("infra.scope_registry").pending()
+			local config = read(require("infra.config_paths").config("config.toml"))
+			local sf = assert(io.open(path, "wb")); assert(sf:write(published)); assert(sf:close())
+			local recovered = dialog.set_enabled(false)
+			return { accepted = accepted, pending = pending, config = config, recovered = recovered,
+				still_pending = require("infra.scope_registry").pending() }
+		end)
+		helpers.assert_eq(observed, { accepted = false, pending = true, config = initial .. "# concurrent\n",
+			recovered = true, still_pending = false })
+	end)
+
+	helpers.it("(error-dialog-atomic) publishes configured and stored state together", function()
+		local initial = '[script]\nshow_error_dialog = true\n'
+		local observed = with_owned_store({ config = initial }, function(_, path)
+			local dialog = require("ui.error_dialog.bridge")
+			local accepted = dialog.set_enabled(false)
+			return { accepted = accepted, active = dialog.is_enabled(),
+				config = read(require("infra.config_paths").config("config.toml")), stored = require("json").decode(read(path))["script.show_error_dialog"] }
+		end)
+		helpers.assert_eq(observed, { accepted = true, active = false, config = '[script]\nshow_error_dialog = false\n', stored = false })
+	end)
+
+	helpers.it("(log-level-atomic) leaves the source and logger unchanged on storage refusal", function()
+		local initial = '[script]\nlog_level = "INFO"\n'
+		local observed = with_owned_store({ config = initial, rename = "false" }, function(_, path)
+			local settings = require("infra.script_settings")
+			local before = settings.current()
+			local accepted = settings.set("ERROR")
+			return { accepted = accepted, before = before, active = settings.current(),
+				config = read(require("infra.config_paths").config("config.toml")), stored = require("json").decode(read(path))["script.log_level"] }
+		end)
+		helpers.assert_eq(observed, { accepted = false, before = "INFO", active = "INFO", config = initial })
+	end)
+
+	helpers.it("(log-level-atomic) retains a failed inverse without overwriting concurrent data", function()
+		local initial, published = '[script]\nlog_level = "INFO"\n', nil
+		local once = true
+		local observed = with_owned_store({ config = initial, after_publish = function(config, path)
+			if not once then return end
+			once = false
+			published = read(path)
+			local cf = assert(io.open(config, "wb")); assert(cf:write('[script]\nlog_level = "DEBUG"\n')); assert(cf:close())
+			local sf = assert(io.open(path, "wb")); assert(sf:write('{"script.log_level":"WARNING"}')); assert(sf:close())
+		end }, function(_, path)
+			local settings = require("infra.script_settings")
+			local accepted = settings.set("ERROR")
+			local pending = require("infra.scope_registry").pending()
+			local config = read(require("infra.config_paths").config("config.toml"))
+			local sf = assert(io.open(path, "wb")); assert(sf:write(published)); assert(sf:close())
+			local recovered = settings.set("ERROR")
+			return { accepted = accepted, pending = pending, config = config, recovered = recovered,
+				still_pending = require("infra.scope_registry").pending() }
+		end)
+		helpers.assert_eq(observed, { accepted = false, pending = true, config = '[script]\nlog_level = "DEBUG"\n',
+			recovered = true, still_pending = false })
+	end)
+
+	helpers.it("(log-level-atomic) publishes configured and stored levels together", function()
+		local initial = '[script]\nlog_level = "INFO"\n'
+		local observed = with_owned_store({ config = initial }, function(_, path)
+			local settings = require("infra.script_settings")
+			local accepted = settings.set("ERROR")
+			return { accepted = accepted, active = settings.current(),
+				config = read(require("infra.config_paths").config("config.toml")), stored = require("json").decode(read(path))["script.log_level"] }
+		end)
+		helpers.assert_eq(observed, { accepted = true, active = "ERROR", config = '[script]\nlog_level = "ERROR"\n', stored = "ERROR" })
+	end)
+
+	helpers.it("(locale-atomic) preserves a configured row when storage refuses", function()
+		local initial = '[script]\nlocale = "fr"\n'
+		local observed = with_owned_store({ config = initial, rename = "false" }, function(i18n)
+			local accepted = i18n.persist_locale("en")
+			return { accepted = accepted, active = i18n.get_locale(), config = read(require("infra.config_paths").config("config.toml")) }
+		end)
+		helpers.assert_eq(observed, { accepted = false, active = "fr", config = initial })
+	end)
+
+	helpers.it("(locale-atomic) commits both configured and stored locale", function()
+		local initial = '[script]\nlocale = "fr"\n'
+		local observed = with_owned_store({ config = initial }, function(i18n, path)
+			local accepted = i18n.persist_locale("en")
+			return { accepted = accepted, active = i18n.get_locale(),
+				config = read(require("infra.config_paths").config("config.toml")), stored = require("json").decode(read(path)).locale }
+		end)
+		helpers.assert_eq(observed, { accepted = true, active = "en", config = '[script]\nlocale = "en"\n', stored = "en" })
+	end)
+
+	helpers.it("(locale-atomic) never creates an absent source", function()
+		local observed = with_owned_store({}, function(i18n)
+			local accepted = i18n.persist_locale("en")
+			local file = io.open(require("infra.config_paths").config("config.toml"), "rb")
+			if file then file:close() end
+			return { accepted = accepted, absent = file == nil, active = i18n.get_locale() }
+		end)
+		helpers.assert_eq(observed, { accepted = true, absent = true, active = "en" })
+	end)
+
+	helpers.it("(locale-atomic) leaves an existing source without a locale row unchanged", function()
+		local initial = '[script]\nlog_level = "INFO"\n'
+		local observed = with_owned_store({ config = initial }, function(i18n)
+			local accepted = i18n.persist_locale("en")
+			return { accepted = accepted, config = read(require("infra.config_paths").config("config.toml")), active = i18n.get_locale() }
+		end)
+		helpers.assert_eq(observed, { accepted = true, config = initial, active = "en" })
+	end)
+
+	helpers.it("(locale-atomic) preserves a concurrent edit and compensates storage", function()
+		local initial, concurrent = '[script]\nlocale = "fr"\n', '[script]\nlocale = "de"\n'
+		local observed = with_owned_store({ config = initial, on_publish = function(path)
+			local file = assert(io.open(path, "wb")); assert(file:write(concurrent)); assert(file:close())
+		end }, function(i18n, path, seed)
+			local accepted = i18n.persist_locale("en")
+			return { accepted = accepted, active = i18n.get_locale(), config = read(require("infra.config_paths").config("config.toml")), storage = read(path) == seed }
+		end)
+		helpers.assert_eq(observed, { accepted = false, active = "fr", config = concurrent, storage = true })
+	end)
+
+	helpers.it("(locale-atomic) retains compensation debt until the storage owner can restore", function()
+		local initial, published = '[script]\nlocale = "fr"\n', nil
+		local once = true
+		local observed = with_owned_store({ config = initial, after_publish = function(config, path)
+			if not once then return end
+			once = false
+			published = read(path)
+			local cf = assert(io.open(config, "wb")); assert(cf:write('[script]\nlocale = "de"\n')); assert(cf:close())
+			local sf = assert(io.open(path, "wb")); assert(sf:write('{"locale":"es"}')); assert(sf:close())
+		end }, function(i18n, path)
+			local rejected = i18n.persist_locale("en")
+			local pending = require("infra.scope_registry").pending()
+			local sf = assert(io.open(path, "wb")); assert(sf:write(published)); assert(sf:close())
+			local recovered = i18n.persist_locale("en")
+			return { rejected = rejected, pending = pending, recovered = recovered,
+				still_pending = require("infra.scope_registry").pending() }
+		end)
+		helpers.assert_eq(observed, { rejected = false, pending = true, recovered = true, still_pending = false })
+	end)
 
 	for _, code in ipairs({ "fr", "en" }) do
 		for _, mode in ipairs({ "false", "throw" }) do

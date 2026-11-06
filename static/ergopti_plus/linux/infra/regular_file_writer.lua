@@ -13,6 +13,15 @@ local O_NONBLOCK, O_CLOEXEC = 2048, 524288 -- Linux open flags.
 local EIO, EINVAL = 5, 22 -- Linux errno receipts.
 local AT_EMPTY_PATH, STATX_TYPE, S_IFREG = 4096, 1, 32768 -- Linux descriptor/type query.
 local AT_FDCWD, AT_SYMLINK_NOFOLLOW, STATX_INO = -100, 256, 256 -- Exclusive creation identity.
+-- An uncertain close cannot safely be retried: the integer may already have
+-- been recycled. Retain one opaque debt and refuse further diagnostic leases.
+local diagnostic_close_debt
+
+--- Whether a diagnostic descriptor close lacks a definitive native acknowledgement.
+--- @return boolean pending
+function M.diagnostic_pin_close_pending()
+	return diagnostic_close_debt ~= nil
+end
 
 --- Opens without truncating and returns operations for this owned descriptor.
 --- @param path string
@@ -38,6 +47,14 @@ local function native_open(path, mode)
 			regular = function() identity = uv.fs_fstat(fd); return identity and identity.type == "file" end,
 			close = function() return uv.fs_close(fd) end,
 			regular_path = function() local current = lstat(path); return current and current.type == "file" end,
+			same_owned = function()
+				local current = uv.fs_lstat(path)
+				return identity and current and current.type == "file"
+					and type(identity.ino) == "number" and type(identity.dev) == "number"
+					and identity.ino >= 0 and identity.dev >= 0 and identity.ino % 1 == 0 and identity.dev % 1 == 0
+					and identity.ino < 2 ^ 53 and identity.dev < 2 ^ 53
+					and current.ino == identity.ino and current.dev == identity.dev or false
+			end,
 			remove_owned = function()
 				local current = uv.fs_lstat(path)
 				-- Native IDs must be nonnegative exact integers, including LuaJIT doubles.
@@ -94,6 +111,14 @@ local function native_open(path, mode)
 			local mode_bits = tonumber(record.mode)
 			return mode_bits - mode_bits % 4096 == S_IFREG
 		end,
+		same_owned = function()
+			local current = ffi.new("struct ergopti_write_statx")
+			return identity ~= nil and math.floor(tonumber(identity.mask) / STATX_INO) % 2 == 1
+				and statx(AT_FDCWD, path, AT_SYMLINK_NOFOLLOW, mask, current) == 0
+				and math.floor(tonumber(current.mask) / STATX_INO) % 2 == 1
+				and current.inode == identity.inode and current.dev_major == identity.dev_major
+				and current.dev_minor == identity.dev_minor
+		end,
 		remove_owned = function()
 			local current = ffi.new("struct ergopti_write_statx")
 			if not identity or math.floor(tonumber(identity.mask) / STATX_INO) % 2 ~= 1
@@ -110,14 +135,20 @@ end
 --- The admission descriptor is released on every classification/open receipt.
 --- @param path string
 --- @param mode string Buffered stream mode, "w", "a" or create-only "wx".
+--- @param keep_created_on_failure boolean|nil Retain diagnostic output and its descriptor through verification.
 --- @return file*|nil stream
 --- @return string|nil failure
 --- @return number|string|nil errno
 --- @return function|nil remove_owned Exclusive creation's identity-checked cleanup.
 --- @return function|nil current_image Exclusive staging's regular-path byte proof.
-function M.open(path, mode)
+--- @return function|nil same_owned Exclusive creation's physical identity check.
+--- @return function|nil release_pin Diagnostic create's retained descriptor close.
+function M.open(path, mode, keep_created_on_failure)
 	if type(path) ~= "string" or path == "" or path:find("\0", 1, true) or (mode ~= "w" and mode ~= "a" and mode ~= "wx") then
 		return nil, "invalid native write path or mode", EINVAL
+	end
+	if mode == "wx" and keep_created_on_failure and diagnostic_close_debt then
+		return nil, "a diagnostic identity descriptor close remains unconfirmed", EIO
 	end
 	local open_image
 	if mode == "wx" then
@@ -133,16 +164,42 @@ function M.open(path, mode)
 		-- Only here may mode "w" truncate; mode "a" retains native append behavior.
 		opened, stream, detail, open_errno = pcall(io.open, "/proc/self/fd/" .. tostring(fd), mode == "wx" and "w" or mode)
 	end
-	local close_ok, closed = pcall(operations.close)
+	if mode == "wx" and keep_created_on_failure and stream then
+		-- Closing a buffered stream after a failed write could flush old bytes
+		-- over a later same-inode writer, even if the path is never unlinked.
+		local configured, unbuffered = pcall(stream.setvbuf, stream, "no")
+		if not configured or unbuffered ~= true then
+			pcall(stream.close, stream)
+			stream, detail, open_errno = nil, "unbuffered export stream unavailable", EIO
+		end
+	end
+	-- A diagnostic create keeps the original descriptor alive until the caller
+	-- finishes comparing the destination. Otherwise an unlinked inode can be
+	-- reused for a successor before its identity is checked.
+	local pinned = mode == "wx" and keep_created_on_failure and opened and not not stream
+	local close_ok, closed = true, true
+	if not pinned then close_ok, closed = pcall(operations.close) end
+	local function release_pin()
+		if not pinned then return false end
+		pinned = false -- A failed close has an unknown native outcome; do not retry.
+		local called, result = pcall(operations.close)
+		if not called or result ~= true then
+			diagnostic_close_debt = { descriptor = fd }
+			return false
+		end
+		return true
+	end
 	local function remove_owned()
 		-- This fences observed succession; metadata plus unlink is not an OS CAS.
 		local called, removed = pcall(operations.remove_owned)
 		return called and removed == true
 	end
-	if mode == "wx" and (not inspected or not regular or not opened or not stream or not close_ok or not closed) then
+	if mode == "wx" and not keep_created_on_failure
+		and (not inspected or not regular or not opened or not stream or not close_ok or not closed) then
 		remove_owned()
 	end
 	if not close_ok or not closed then
+		if mode == "wx" and keep_created_on_failure then diagnostic_close_debt = { descriptor = fd } end
 		if stream then pcall(stream.close, stream) end
 		return nil, "native write descriptor close failed", EIO
 	end
@@ -154,14 +211,25 @@ function M.open(path, mode)
 			if type(expected_bytes) ~= "string" then return false end
 			local inspected_path, regular_path = pcall(operations.regular_path)
 			if not inspected_path or regular_path ~= true then return false end
-			local acquired, image = pcall(open_image, path)
+			local acquired, image
+			if pinned then
+				-- The name may be swapped away and back while we read. Inspect the
+				-- original pinned inode, not another regular file at that name.
+				acquired, image = pcall(io.open, "/proc/self/fd/" .. tostring(fd), "r")
+			else
+				acquired, image = pcall(open_image, path)
+			end
 			if not acquired or not image then return false end
-			local read_ok, bytes = pcall(image.read, image, "*a")
+			local read_ok, bytes, read_error = pcall(image.read, image, #expected_bytes + 1)
 			local closed_ok, image_closed = pcall(image.close, image)
-			-- Equal bytes in a replacement regular file are allowed; this is not an external CAS.
-			return read_ok and bytes == expected_bytes and closed_ok and image_closed == true
+			-- A zero-byte file returns nil at EOF, without a read error.
+			if read_ok and bytes == nil and read_error == nil then bytes = "" end
+			-- Unpinned staging permits equal bytes at a replacement path. Diagnostic
+			-- callers separately check the pinned inode's identity around this read.
+			return read_ok and type(bytes) == "string" and bytes == expected_bytes and closed_ok and image_closed == true
 		end
-		return stream, detail, open_errno, remove_owned, current_image
+		return stream, detail, open_errno, remove_owned, current_image, operations.same_owned,
+			keep_created_on_failure and release_pin or nil
 	end
 	return stream, detail, open_errno
 end

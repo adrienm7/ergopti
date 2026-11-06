@@ -152,7 +152,8 @@ local function pause_handoff_fixture(body)
 	end
 	local function restart(paused, run, cgroup)
 		return Restarter.restart({ wrapper = LAUNCHER, args = { "--tray", "space ' apostrophe" },
-			paused = paused, pid = 123, cgroup = cgroup or SESSION_CGROUP, run = run })
+			paused = paused, pid = 123, start_tick = "12345", boot_id = "01234567-89ab-cdef-0123-456789abcdef",
+			cgroup = cgroup or SESSION_CGROUP, run = run })
 	end
 	local ok, failure = xpcall(function()
 		body({ path = path, read = read, write = write, restart = restart, files = Files })

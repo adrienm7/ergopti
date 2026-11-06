@@ -487,6 +487,20 @@ end)
 
 
 helpers.describe("evdev_reader: open descriptor capabilities", function()
+	helpers.it("queries the MSC code bitmap on the owned descriptor (msc-capability-query)", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = recorder()
+		local request
+		backend.read_event_bits = function(_, value, count)
+			request = value
+			return string.char(0x14, 0, 0, 0):sub(1, count)
+		end
+		reader._set_backend(backend); assert(reader.open("/dev/input/event3"))
+		local mask = reader.event_capabilities(nil, 4)
+		assert(reader.close()); reader._reset_backend()
+		helpers.assert_eq(request, 0x80044524)
+		helpers.assert_eq(mask, 0x14, "MSC_SCAN and MSC_GESTURE are separately visible")
+	end)
 	helpers.it("queries event types on the exact open fd before any grab", function()
 		local reader = helpers.load_module("adapters.evdev_reader")
 		local backend, log = recorder()
@@ -588,6 +602,39 @@ helpers.describe("evdev_reader: capability query ownership", function()
 end)
 
 helpers.describe("evdev_reader: device identity (linux-media-key-metrics)", function()
+	helpers.it("does not report an old device number after the descriptor is replaced", function()
+		for _, reuse in ipairs({ false, true }) do
+			local reader = helpers.load_module("adapters.evdev_reader")
+			local backend = recorder()
+			local fd = 10
+			backend.open = function() if not reuse then fd = fd + 1 end; return fd end
+			backend.device_number = function()
+				assert(reader.close("probe"))
+				assert(reader.open("/dev/input/event3", "probe"))
+				return 3393
+			end
+			reader._set_backend(backend)
+			assert(reader.open("/dev/input/event3", "probe"))
+			helpers.assert_nil(reader.device_identity("probe"), "the old descriptor cannot identify its successor")
+			backend.device_number = function() return 777 end
+			helpers.assert_eq(reader.device_identity("probe"), "777")
+			reader._reset_backend()
+		end
+	end)
+
+	helpers.it("does not publish a device number after its query port is replaced", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = recorder()
+		backend.device_number = function()
+			backend.device_number = function() return 777 end
+			return 3393
+		end
+		reader._set_backend(backend)
+		assert(reader.open("/dev/input/event3", "probe"))
+		helpers.assert_nil(reader.device_identity("probe"))
+		helpers.assert_eq(reader.device_identity("probe"), "777")
+		reader._reset_backend()
+	end)
 	helpers.it("names the open descriptor's device number, never its path", function()
 		local reader = helpers.load_module("adapters.evdev_reader")
 		local backend = recorder()

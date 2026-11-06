@@ -37,11 +37,39 @@ end
 --- across a restart reads it too, infra/reload_timing.lua).
 M.wall_ms = wall_ms
 
+-- CLOCK_BOOTTIME includes suspended time; Linux CLOCK_MONOTONIC (luv.hrtime)
+-- does not. Only the system-state sampler requests this additional clock.
+local CLOCK_BOOTTIME = 7
+local ok_ffi, ffi = pcall(require, "ffi")
+local boot_clock
+if ok_ffi then
+	local declared = pcall(ffi.cdef, [[
+		typedef struct { long tv_sec; long tv_nsec; } ergopti_metrics_timespec;
+		int clock_gettime(int, ergopti_metrics_timespec *);
+	]])
+	if declared then
+		local allocated, result = pcall(ffi.new, "ergopti_metrics_timespec[1]")
+		if allocated then boot_clock = result end
+	end
+end
+
+--- Reads elapsed milliseconds including suspension, or nil when unavailable.
+--- @return number|nil milliseconds
+function M.boot_ms()
+	if not boot_clock then return nil end
+	local called, status = pcall(function() return ffi.C.clock_gettime(CLOCK_BOOTTIME, boot_clock) end)
+	if not called or status ~= 0 then return nil end
+	return tonumber(boot_clock[0].tv_sec) * MS_PER_SECOND
+		+ math.floor(tonumber(boot_clock[0].tv_nsec) / 1000000)
+end
+
 --- Captures a single calendar observation for one producer invocation.
---- @return table { wall_ms, mono_ms, date, ts }.
-function M.capture()
+--- @param include_boot boolean|nil Include elapsed time across suspension.
+--- @return table { wall_ms, mono_ms, boot_ms?, date, ts }.
+function M.capture(include_boot)
 	local wall, mono = wall_ms(), math.floor(Monotonic.now_ms())
 	return {
+		boot_ms = include_boot and M.boot_ms() or nil,
 		wall_ms = wall, mono_ms = mono,
 		date = os.date("%Y-%m-%d", math.floor(wall / MS_PER_SECOND)),
 		ts = os.date("!%Y-%m-%d %H:%M:%S", math.floor(wall / MS_PER_SECOND)),
@@ -63,7 +91,11 @@ end
 --- @param visit function Receives mono_ms, previous_date, next_date, wall_ms.
 function M.boundaries(previous, current, visit)
 	if previous.date == current.date then return end
-	if current.wall_ms < previous.wall_ms then
+	-- The local timezone may have changed since the previous observation.
+	-- Its saved date then cannot be reconstructed with today's timezone rules;
+	-- close at the new observation rather than inventing a past midnight.
+	local previous_local = os.date("%Y-%m-%d", math.floor(previous.wall_ms / MS_PER_SECOND))
+	if current.wall_ms < previous.wall_ms or previous_local ~= previous.date then
 		visit(current.mono_ms, previous.date, current.date, current.wall_ms)
 		return
 	end

@@ -159,7 +159,14 @@ _check_deps
 
 # Build the LuaJIT module search path: driver sources first so they can
 # shadow shared fallbacks, then the shared library layer.
-export LUA_PATH="${DRIVER_ROOT}/?.lua;${DRIVER_ROOT}/?/init.lua;${SHARED_LUA}/?.lua;${SHARED_LUA}/?/init.lua;;"
+unset ERGOPTI_LITERAL_DRIVER_ROOT ERGOPTI_LITERAL_SHARED_ROOT ERGOPTI_LITERAL_DIRECT ERGOPTI_LITERAL_DAEMON ERGOPTI_LITERAL_NATIVE_MODULES
+case "$DRIVER_ROOT$SHARED_LUA" in
+	*[\;\?]*)
+		export ERGOPTI_LITERAL_DRIVER_ROOT="$DRIVER_ROOT"
+		export ERGOPTI_LITERAL_SHARED_ROOT="$SHARED_LUA"
+		export LUA_PATH=';;' ;;
+	*) export LUA_PATH="${DRIVER_ROOT}/?.lua;${DRIVER_ROOT}/?/init.lua;${SHARED_LUA}/?.lua;${SHARED_LUA}/?/init.lua;;" ;;
+esac
 
 # Hand off to the daemon; exec replaces the shell process so signal handling
 # (SIGTERM, SIGHUP) reaches LuaJIT directly.

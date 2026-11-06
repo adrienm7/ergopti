@@ -12,16 +12,17 @@ local SOURCE = '# retained header\n[hotstrings]\npreview_colored_tooltips = true
 
 --- Runs a body with the actual scalar owner routed to private independent bytes.
 --- @param body function Receives owner, settings, private path and sandbox.
-local function with_preferences(body)
+local function with_preferences(body, source, fresh_writer)
 	local Sandbox = require("test.config_unused_keys_contract").sandbox
 	local loaded = {}; for name, value in pairs(package.loaded) do loaded[name] = value end
 	local ok, err = pcall(function()
-		Sandbox.with_config(SOURCE, function(path)
+		Sandbox.with_config(source or SOURCE, function(path)
 			local paths = {}; for key, value in pairs(require("infra.config_paths")) do paths[key] = value end
 			paths.config = function() return path end
 			package.loaded["infra.config_paths"] = paths
 			package.loaded["infra.hotstring_preferences"] = nil
 			package.loaded["modules.hotstrings.preview_settings"] = nil
+			if fresh_writer then package.loaded["toml_codec.writer"] = nil end
 			local Preferences = require("infra.hotstring_preferences")
 			assert(Preferences.refresh())
 			body(Preferences, require("modules.hotstrings.preview_settings"), path, Sandbox)
@@ -169,6 +170,60 @@ local function with_recording_notifier(body)
 end
 
 helpers.describe("preview bubble toggles notify like the macOS menu", function()
+	helpers.it("does not duplicate the current preview write's case-twin notice", function()
+		with_preferences(function(_, _, path, sandbox)
+			local writer = require("toml_codec.writer")
+			local reports, notices, execute = 0, 0, os.execute
+			writer.set_case_twin_reporter(function() reports = reports + 1 end)
+			local rows, _, observed = menu_controls(false)
+			os.execute = function(command) if command:find("dialog_host.lua", 1, true) then notices = notices + 1; return 0 end; return execute(command) end
+			local called, result = pcall(rows[1].fn)
+			os.execute = execute
+			helpers.assert_true(called); helpers.assert_eq(result, false)
+			helpers.assert_eq({ reports, notices, observed.redraws }, { 1, 0, 0 })
+			helpers.assert_eq(sandbox.read_bytes(path), '[hotstrings]\npreview_star_enabled = false\nPREVIEW_STAR_ENABLED = true\n')
+		end, '[hotstrings]\npreview_star_enabled = false\nPREVIEW_STAR_ENABLED = true\n', true)
+	end)
+	helpers.it("does not claim a saved toggle was reverted when its post-save callback raises", function()
+		with_preferences(function(_, Settings, path, sandbox)
+			Settings.init(function() error("inert post-save failure") end)
+			local rows = menu_controls(false)
+			local execute, notices = os.execute, 0
+			os.execute = function(command)
+				if command:find("dialog_host.lua", 1, true) then notices = notices + 1; return 0 end
+				return execute(command)
+			end
+			local ok = pcall(rows[1].fn)
+			os.execute = execute
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(notices, 0)
+			helpers.assert_true(sandbox.read_bytes(path) ~= SOURCE)
+			helpers.assert_eq(Settings.get("star"), true)
+		end)
+	end)
+	helpers.it("reports real persistence refusals for every preview toggle", function()
+		with_preferences(function(_, _, path, sandbox)
+			local rows, _, observations = menu_controls(false)
+			local rename, execute, notices, attempts = os.rename, os.execute, 0, 0
+			os.rename = function(from, to)
+				if to == path then attempts = attempts + 1; return false, "inert refusal" end
+				return rename(from, to)
+			end
+			os.execute = function(command)
+				if command:find("dialog_host.lua", 1, true) then notices = notices + 1; return 0 end
+				return execute(command)
+			end
+			local ok, err = pcall(function()
+				for _, index in ipairs({ 1, 2, 3, 5 }) do helpers.assert_eq(rows[index].fn(), false) end
+			end)
+			os.rename, os.execute = rename, execute
+			helpers.assert_true(ok, tostring(err))
+			helpers.assert_eq(attempts, 4)
+			helpers.assert_eq(notices, 4)
+			helpers.assert_eq(observations.redraws, 0)
+			helpers.assert_eq(sandbox.read_bytes(path), SOURCE)
+		end)
+	end)
 	helpers.it("announces the new state of the coloured bubble and nothing when the write is refused", function()
 		with_preferences(function(Preferences, _, _, _)
 			with_recording_notifier(function(sent)
@@ -315,11 +370,11 @@ end)
 helpers.describe("magic preview exact receipt boundary", function()
 	helpers.it("refuses nil and truthy nonboolean callback receipts without publishing refresh", function()
 		with_preferences(function(_, Settings, path, sandbox)
-			local original = Settings.toggle
+			local original = Settings.toggle_with_notice
 			local observations = {}
 			local passed, err = pcall(function()
 				for _, kind in ipairs({ "nil", "number" }) do
-					Settings.toggle = function(name)
+					Settings.toggle_with_notice = function(name)
 						if name ~= "star" then return original(name) end
 						if kind == "nil" then return nil end
 						return 2
@@ -329,9 +384,9 @@ helpers.describe("magic preview exact receipt boundary", function()
 					observations[#observations + 1] = { entered = entered, result = result, redraws = calls.redraws }
 				end
 			end)
-			Settings.toggle = original
+			Settings.toggle_with_notice = original
 			if not passed then error(err, 0) end
-			helpers.assert_eq(Settings.toggle, original)
+			helpers.assert_eq(Settings.toggle_with_notice, original)
 			helpers.assert_eq(#observations, 2)
 			for _, observation in ipairs(observations) do
 				helpers.assert_eq(observation.entered, true)
@@ -381,10 +436,10 @@ helpers.describe("declared autocorrection and AI presence receipt", function()
 		end
 		helpers.it("requires exact true rather than nil or a truthy number for " .. name, function()
 			with_preferences(function(_, Settings, path, sandbox)
-				local original = Settings.toggle; local observations = {}
+				local original = Settings.toggle_with_notice; local observations = {}
 				local passed, err = pcall(function()
 					for _, mode in ipairs({ "nil", "number" }) do
-						Settings.toggle = function(candidate)
+						Settings.toggle_with_notice = function(candidate)
 							if candidate ~= name then return original(candidate) end
 							if mode == "nil" then return nil end
 							return 2
@@ -394,9 +449,9 @@ helpers.describe("declared autocorrection and AI presence receipt", function()
 						observations[#observations + 1] = { entered = entered, receipt = receipt, redraws = observed.redraws }
 					end
 				end)
-				Settings.toggle = original
+				Settings.toggle_with_notice = original
 				if not passed then error(err, 0) end
-				helpers.assert_eq(Settings.toggle, original)
+				helpers.assert_eq(Settings.toggle_with_notice, original)
 				helpers.assert_eq(#observations, 2)
 				for _, observed in ipairs(observations) do
 					helpers.assert_eq(observed.entered, true)

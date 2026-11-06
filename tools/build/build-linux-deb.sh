@@ -18,8 +18,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if ! "$SKIP_DEB" && ! command -v dpkg-deb >/dev/null 2>&1; then
+  echo "[ERR] dpkg-deb is required to build a .deb; use --skip-deb for staging only." >&2
+  exit 69
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+IFS= read -r -d '' PROJECT_ROOT < <(cd -- "$SCRIPT_DIR/../.." && printf '%s\0' "$PWD")
 # The external hosts are declared once in _shared/data/identifiers.json.
 # shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
 . "$PROJECT_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
@@ -198,7 +203,9 @@ cat > "$DEB_ROOT/DEBIAN/postinst" << 'POSTINST_EOF'
 #!/bin/bash
 set -e
 
-bash /usr/lib/ergopti/install/setup_permissions.sh --active-sessions
+case "${1:-}" in
+  configure) bash /usr/lib/ergopti/install/setup_permissions.sh --active-sessions ;;
+esac
 POSTINST_EOF
 chmod 755 "$DEB_ROOT/DEBIAN/postinst"
 echo "  DEBIAN/postinst"
@@ -235,18 +242,26 @@ if [ "$SKIP_DEB" = true ]; then
   exit 0
 fi
 
-if ! command -v dpkg-deb &>/dev/null; then
-  echo ""
-  echo "=== Structure complete (dpkg-deb not available) ==="
-  echo "DEB root: $DEB_ROOT"
-  echo "Files: $(find "$DEB_ROOT" -type f | wc -l)"
-  print_packaging_command "Run on Linux to package:"
-  exit 0
-fi
-
 echo ""
 echo "Building .deb package..."
-dpkg-deb --root-owner-group --build "$DEB_ROOT" "$DEB_FILE"
+DEB_STAGE="$(mktemp -d "$BUILD_DIR/.ergopti-deb.XXXXXX")"
+DEB_STAGE_FILE="$DEB_STAGE/${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
+cleanup_deb_stage() {
+  status=$?
+  trap - EXIT
+  if [ -e "$DEB_STAGE_FILE" ] || [ -L "$DEB_STAGE_FILE" ]; then
+    rm -f -- "$DEB_STAGE_FILE" || status=1
+  fi
+  rmdir -- "$DEB_STAGE" || status=1
+  exit "$status"
+}
+trap cleanup_deb_stage EXIT
+dpkg-deb --root-owner-group --build "$DEB_ROOT" "$DEB_STAGE_FILE"
+[ -f "$DEB_STAGE_FILE" ] && [ ! -L "$DEB_STAGE_FILE" ] && [ -s "$DEB_STAGE_FILE" ] || {
+  echo "[ERR] dpkg-deb did not produce a nonempty package file." >&2
+  exit 1
+}
+mv -T -- "$DEB_STAGE_FILE" "$DEB_FILE"
 
 if [ -f "$DEB_FILE" ]; then
   deb_size=$(du -h "$DEB_FILE" | cut -f1)

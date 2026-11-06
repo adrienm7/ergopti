@@ -31,6 +31,22 @@ end
 
 helpers.describe("webview pages: messages and replies cross the bridge", function()
 
+	helpers.it("(webview-private-error) never logs data contained in a bridge exception", function()
+		local logger, lines = require("logger.shim"), {}
+		local original_error, original_handler = logger.error, package.loaded["ui.personal_info_editor.bridge"]
+		logger.error = function(_, fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end
+		package.loaded["ui.personal_info_editor.bridge"] = { bridge_name = "hsPersonalInfo",
+			on_message = function(payload) error("failure: " .. payload.secret) end }
+		local ok, err = pcall(function()
+			local wm = require("ui.webview_manager")
+			helpers.assert_nil(wm.route_message("personal_info_editor", "hsPersonalInfo", { secret = "secret-canary" }))
+			helpers.assert_true(#lines > 0, "the bridge failure is diagnosed")
+			helpers.assert_true(not table.concat(lines, "\n"):find("secret-canary", 1, true))
+		end)
+		logger.error, package.loaded["ui.personal_info_editor.bridge"] = original_error, original_handler
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("decodes an object a page posts", function()
 		local wm = require("ui.webview_manager")
 		local message = wm._js_value_to_lua_for_test(

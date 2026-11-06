@@ -34,8 +34,9 @@ end
 --- Runs one case with the HTTP adapter scripted.
 --- @param test function Receives the loaded module and the queued requests.
 local function isolated(test)
+	local names = { "adapters.http_client", "modules.llm.api_remote" }
 	local saved = {}
-	for _, name in ipairs({ "adapters.http_client", "modules.llm.api_remote" }) do saved[name] = package.loaded[name] end
+	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local calls = {}
 	package.loaded["adapters.http_client"] = {
 		post = function(url, headers, body, callback)
@@ -49,9 +50,22 @@ local function isolated(test)
 		remote._reset_for_test()
 		test(remote, calls)
 	end)
-	for name, value in pairs(saved) do package.loaded[name] = value end
-	if saved["modules.llm.api_remote"] == nil then package.loaded["modules.llm.api_remote"] = nil end
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end
+end
+
+for _, initial in ipairs({ "absent", "false" }) do
+	helpers.it("remote usage fixture restores an " .. initial .. " HTTP owner", function()
+		local previous = package.loaded["adapters.http_client"]
+		local expected
+		if initial == "false" then expected = false end
+		package.loaded["adapters.http_client"] = expected
+		local ok, detail = pcall(isolated, function() end)
+		local restored = package.loaded["adapters.http_client"]
+		package.loaded["adapters.http_client"] = previous
+		assert(ok, detail)
+		helpers.assert_true(rawequal(restored, expected), "fixture must restore the exact prior cache value")
+	end)
 end
 
 --- Sends one completion and returns what the terminal callback received.

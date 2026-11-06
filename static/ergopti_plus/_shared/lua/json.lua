@@ -14,6 +14,7 @@
 -- above 255 and truncates 128-255 to one byte, so every \uXXXX escape outside
 -- ASCII decoded to the wrong character on the one interpreter this driver runs.
 local utf8_lib = (type(utf8) == "table" and utf8.char) and utf8 or require("compat.utf8")
+local strict_utf8 = require("compat.utf8")
 
 local M = {}
 
@@ -118,7 +119,8 @@ local function decode(raw, lossless, source_members)
 			if stop > pos then
 				local run = raw:sub(pos, stop - 1)
 				-- Lossless mode refuses raw control characters inside a string.
-				if lossless and (run:find("[\1-\31]") or run:find("\0", 1, true)) then return nil end
+				if lossless and (run:find("[\1-\31]") or run:find("\0", 1, true)
+					or (run:find("[\128-\255]") and not strict_utf8.len(run))) then return nil end
 				res[#res + 1] = run
 			end
 			local ch = raw:sub(stop, stop)

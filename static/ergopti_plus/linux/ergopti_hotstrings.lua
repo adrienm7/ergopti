@@ -62,11 +62,68 @@ end)()
 
 -- Prepend the script directory and the shared Lua library to the search path.
 local SHARED_LUA_DIR = SCRIPT_DIR .. "/../_shared/lua"
-package.path = SCRIPT_DIR .. "/?.lua;" ..
-               SCRIPT_DIR .. "/modules/hotstrings/?.lua;" ..
-               SHARED_LUA_DIR .. "/?.lua;" ..
-               SHARED_LUA_DIR .. "/?/init.lua;" ..
-               package.path
+local literal_driver = os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT")
+local literal_direct = false
+if literal_driver and literal_driver ~= "" then
+	-- A host program may start a different checkout with our environment.
+	-- Accept the roots only when they name this entry point's own directory.
+	local ffi = require("ffi")
+	ffi.cdef[[char *realpath(const char *, char *); void free(void *); int unsetenv(const char *);]]
+	local actual, claimed = ffi.C.realpath(SCRIPT_DIR, nil), ffi.C.realpath(literal_driver, nil)
+	local same = actual ~= nil and claimed ~= nil and ffi.string(actual) == ffi.string(claimed)
+	if actual ~= nil then ffi.C.free(actual) end
+	if claimed ~= nil then ffi.C.free(claimed) end
+	if not same then
+		for _, name in ipairs({ "ERGOPTI_LITERAL_DRIVER_ROOT", "ERGOPTI_LITERAL_SHARED_ROOT",
+			"ERGOPTI_LITERAL_DIRECT", "ERGOPTI_LITERAL_DAEMON", "ERGOPTI_LITERAL_NATIVE_MODULES" }) do
+			assert(ffi.C.unsetenv(name) == 0, "cannot clear stale literal root")
+		end
+		literal_driver = nil
+	end
+end
+-- `luajit ergopti_hotstrings.lua` may spell the source as "." even when
+-- its working directory contains a template delimiter.
+if (not literal_driver or literal_driver == "") and SCRIPT_DIR:sub(1, 1) ~= "/"
+	and type(jit) == "table" and jit.os == "Linux" then
+	local ffi = require("ffi")
+	ffi.cdef[[char *getcwd(char *, size_t); void free(void *);]]
+	local cwd = assert(ffi.C.getcwd(nil, 0), "cannot resolve working directory")
+	local absolute = ffi.string(cwd) .. "/" .. SCRIPT_DIR
+	ffi.C.free(cwd)
+	if absolute:find("[;?]") then SCRIPT_DIR = absolute end
+end
+if (not literal_driver or literal_driver == "") and SCRIPT_DIR:find("[;?]") then
+	-- Direct `luajit path/to/ergopti_hotstrings.lua` is a supported entry
+	-- point too.  Give app-owned child entry points the same literal roots.
+	local ffi = require("ffi")
+	ffi.cdef[[char *getcwd(char *buf, size_t size); void free(void *); int setenv(const char *, const char *, int);]]
+	if SCRIPT_DIR:sub(1, 1) ~= "/" then
+		local cwd = assert(ffi.C.getcwd(nil, 0), "cannot resolve working directory")
+		SCRIPT_DIR = ffi.string(cwd) .. "/" .. SCRIPT_DIR
+		ffi.C.free(cwd)
+	end
+	SHARED_LUA_DIR = SCRIPT_DIR .. "/../_shared/lua"
+	local probe = io.open(SHARED_LUA_DIR .. "/toml_codec/source_open.lua", "rb")
+	if probe then probe:close() else SHARED_LUA_DIR = SCRIPT_DIR .. "/_shared/lua" end
+	assert(ffi.C.setenv("ERGOPTI_LITERAL_DRIVER_ROOT", SCRIPT_DIR, 1) == 0, "cannot export driver root")
+	assert(ffi.C.setenv("ERGOPTI_LITERAL_SHARED_ROOT", SHARED_LUA_DIR, 1) == 0, "cannot export shared root")
+	assert(ffi.C.setenv("ERGOPTI_LITERAL_DIRECT", "1", 1) == 0, "cannot export source mode")
+	literal_driver = SCRIPT_DIR
+	literal_direct = true
+end
+if literal_driver and literal_driver ~= "" then
+	local shared = assert(os.getenv("ERGOPTI_LITERAL_SHARED_ROOT"), "literal shared root unavailable")
+	assert(loadfile(literal_driver .. "/infra/literal_module_loader.lua"))().install(literal_driver, shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), literal_direct and "direct" or "daemon")
+	local ffi = require("ffi")
+	ffi.cdef[[int setenv(const char *, const char *, int);]]
+	assert(ffi.C.setenv("ERGOPTI_LITERAL_DAEMON", "1", 1) == 0, "cannot export daemon search order")
+else
+	package.path = SCRIPT_DIR .. "/?.lua;" ..
+	               SCRIPT_DIR .. "/modules/hotstrings/?.lua;" ..
+	               SHARED_LUA_DIR .. "/?.lua;" ..
+	               SHARED_LUA_DIR .. "/?/init.lua;" ..
+	               package.path
+end
 
 --- Prints the CLI usage. Deliberately ENGLISH, not translated.
 ---
@@ -368,6 +425,14 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "screen capture cleanup",
+			wait_for_ack = true,
+			stop = function()
+				local owner = package.loaded["adapters.screen_capture"]
+				return not owner or owner.shutdown() == true
+			end,
+		},
+		{
 			name = "layout install and activation helpers",
 			wait_for_ack = true,
 			stop = (function()
@@ -485,9 +550,14 @@ local shutdown = ShutdownCoordinator.new({
 		},
 		{
 			name = "tooltip preview",
-			stop = function()
-				if tooltip_preview and type(tooltip_preview.destroy) == "function" then tooltip_preview.destroy() end
-			end,
+			wait_for_ack = true,
+			stop = (function()
+				local owner = tooltip_preview
+				local destroy = owner and owner.destroy
+				return function()
+					return not owner or (type(destroy) == "function" and destroy() == true)
+				end
+			end)(),
 		},
 		{
 			name = "gesture reader",
@@ -600,6 +670,11 @@ local function parse_args()
 	local i = 1
 	while i <= #arg do
 		local a = arg[i]
+		if a == "--config" or a == "--device" or a == "--layout" or a == "--keymap" then
+			if type(arg[i + 1]) ~= "string" or arg[i + 1] == "" or arg[i + 1]:match("^%-%-") then
+				error("Missing value for " .. a, 0)
+			end
+		end
 		if     a == "--dry-run"               then opts.dry_run = true
 		elseif a == "--verbose" or a == "-v"  then opts.verbose = true
 		elseif a == "--tray"                  then opts.tray    = true
@@ -626,25 +701,22 @@ local function resolve_config_path(config_path)
 	if type(config_path) == "string" and config_path ~= "" then
 		return config_path
 	end
-	-- Check the XDG-compliant user config directory.
-	local fh = io.open(DEFAULT_CONFIG_DIR, "r")
-	if fh then
-		fh:close()
-		return DEFAULT_CONFIG_DIR
+	-- Inspect directory metadata without opening a FIFO or other special file.
+	-- Only proven absence permits falling back to the bundled catalogue.
+	local function is_directory(path)
+		local stat, _, code = require("luv").fs_stat(path)
+		if stat then
+			if stat.type ~= "directory" then error("Hotstring catalogue path is not a directory", 0) end
+			return true
+		end
+		if code == "ENOENT" then return false end
+		error("Hotstring catalogue directory inspection failed: " .. tostring(code), 0)
 	end
-	-- Fall back to bundled shared hotstrings.
-	-- One level up, not two: SCRIPT_DIR is the driver root and _shared is its
-	-- sibling. The old "../../" resolved outside the tree, so this fallback
-	-- never found the bundled hotstrings and silently returned the default dir.
-	local Paths = require("infra.paths")
-	local shared = Paths.shared("modules/hotstrings")
-	if not shared then return DEFAULT_CONFIG_DIR end
-	local fh2 = io.open(shared, "r")
-	if fh2 then
-		fh2:close()
-		return shared
-	end
-	return nil
+	-- Keep the optional personal location even when absent. The config loader
+	-- always loads the bundled catalogue separately, and this path must remain
+	-- stable if the user creates their folder during this daemon session.
+	is_directory(DEFAULT_CONFIG_DIR)
+	return DEFAULT_CONFIG_DIR
 end
 
 --- Reloads the hotstring catalogue in this process. This is not the Reload
@@ -712,6 +784,7 @@ end
 local perform_reload, reload_in_flight, abandon_reload = require("infra.reload_restart").new({ gestures = gestures,
 	restart = function(reason) return restart_daemon(reason, privacy_owners.script_actions.is_paused()) end,
 	cancel = function() return require("infra.daemon_restart").cancel() end })
+privacy_owners.reload_in_flight = reload_in_flight
 
 
 --- Emits facts prepared before capture only after actual driver readiness.
@@ -856,8 +929,13 @@ local function main()
 	BootProfiler.stage("config")
 	require("toml_codec.writer").set_sparse_defaults(
 		require("infra.config_paths").config("config.toml"), require("infra.manifest_reader"))
-	require("toml_codec.writer").set_case_twin_reporter(function(message)
-		require("adapters.notifier").send(message, { level = "error" })
+	require("toml_codec.writer").set_case_twin_reporter(function(message, admission)
+		local notifier = require("adapters.notifier")
+		if admission ~= nil then
+			local called, current = pcall(admission)
+			if not called or current ~= true then return false end
+		end
+		return notifier.send(message, { level = "error" })
 	end)
 	-- 8.0) Version config.toml before anything reads or writes it: the gesture
 	-- and shortcut managers below load the migrated file, and a file the wizard
@@ -951,7 +1029,17 @@ local function main()
 	if committed ~= true then
 		Logger.warn(LOG, "The startup hotstring catalogue is unavailable; unrelated app features continue.")
 	elseif type(receipt) ~= "table" or receipt.complete ~= true then
-		Logger.warn(LOG, "Common autocorrection is unavailable; %d unrelated hotstring mapping(s) loaded.", mapping_count)
+		local personal_unavailable = false
+		if type(receipt) == "table" and type(receipt.unavailable) == "table" then
+			for _, source in ipairs(receipt.unavailable) do
+				if source == "personal-sources" then personal_unavailable = true end
+			end
+		end
+		if personal_unavailable then
+			Logger.warn(LOG, "Some hotstring sources are unavailable; %d available mapping(s) loaded.", mapping_count)
+		else
+			Logger.warn(LOG, "Common autocorrection is unavailable; %d unrelated hotstring mapping(s) loaded.", mapping_count)
+		end
 	else
 		Logger.info(LOG, "%d hotstring mapping(s) loaded (%d parse error(s)).",
 			mapping_count, hotstrings_config.parse_error_count())
@@ -961,7 +1049,13 @@ local function main()
 
 	-- 8.3) Initialise the full keystats.
 	BootProfiler.stage("keystats")
-	keystats.init({})
+	local metrics_initialized = keystats.init({})
+	if metrics_initialized == false and notifier then
+		local notice_i18n = RuntimeGuard.optional_require("infra.i18n")
+		if notice_i18n then
+			pcall(function() notifier.send(notice_i18n.get("dialog.metrics.storage_unavailable"), { level = "warning" }) end)
+		end
+	end
 	BootProfiler.stage_done("keystats")
 
 	-- 8.4) Resolve the input device.
@@ -1041,18 +1135,25 @@ local function main()
 	-- reader, whose lifecycle is its own: a reader that fails and stops must not
 	-- take the tap actions with it.
 	local action_catalogue = gestures
-	TapHold.init({
+	privacy_owners.tap_hold_called, privacy_owners.tap_hold_initialized = pcall(function() return TapHold.init({
 		keyboard_hook = keyboard_hook,
 		dry_run = opts.dry_run,
+		capture_copy_owner = function()
+			local guard = privacy_owners.context
+			if not guard or type(guard.capture_text_owner) ~= "function" then return nil end
+			return guard.capture_text_owner()
+		end,
 		execute_action = function(action, binding)
 			if not action_catalogue then error("the action catalogue (gestures module) is not loaded") end
-			action_catalogue.execute_action(action, binding)
+			local accepted = action_catalogue.execute_action(action, binding)
+			if accepted == false then return false end
 			-- The command's keys (Ctrl+V for paste) go straight to the virtual
 			-- keyboard and never reach the hook: hotstrings.tap_hold_resets_word
 			-- decides here whether the next key starts a word.
 			local effect = WordReset.apply_tap_action(engine, binding)
 			if effect == "word_start" then _undoable = nil end
 			Logger.debug(LOG, "Tap action '%s' — hotstring word %s.", tostring(action), effect)
+			return accepted
 		end,
 		-- Every action the catalogue runs here, not only the gesture picker's
 		-- list: a tap set to one of the others must not read as unsupported.
@@ -1068,6 +1169,18 @@ local function main()
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
 		user_path = require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
 	})
+	end)
+	if not privacy_owners.tap_hold_called or privacy_owners.tap_hold_initialized ~= true then
+		if not privacy_owners.tap_hold_called then
+			Logger.error(LOG, "Tap-hold initialization failed: %s.", tostring(privacy_owners.tap_hold_initialized))
+		end
+		shutdown.request("tap-hold startup refused", "tap-hold startup refused")
+		if shutdown.is_pending() then
+			event_loop.run({ onIdle = shutdown.poll, onPeriodic = shutdown.poll, periodSec = 0.25 })
+		end
+		if shutdown.is_pending() then error("Tap-hold startup cleanup remains unacknowledged", 0) end
+		error("Tap-hold initialization refused; refusing input capture", 0)
+	end
 	-- The tray's tap-hold rows write the user's file through this and reload
 	-- the engine live. A hold that enters the recommended layer creates the
 	-- configuration folder's layers.toml when it has none.
@@ -1177,12 +1290,30 @@ local function main()
 		end,
 	})
 	privacy_owners.context = secure_focus_guard
+	-- Attribute time only after the native field and its application/title have
+	-- been joined. Until then the previous context is retired and no new interval
+	-- may start, including when the asynchronous probe settles after startup.
+	local function publish_admitted_focus()
+		if secure_focus_guard.blocks_text() then return false end
+		local context = secure_focus_guard.current_context()
+		if type(context) ~= "table" or type(context.app_id) ~= "string" or context.app_id == ""
+			or keystats.is_unrecorded_app(context.app_id) then return false end
+		local now = math.floor(Monotonic.now_ms())
+		keystats.set_window_title(context.app_id, context.title, now)
+		keystats.on_app_focus(context.app_id, now)
+		return true
+	end
+	local function refresh_admitted_focus(immediate)
+		local admitted = secure_focus_guard.refresh(immediate)
+		if admitted then publish_admitted_focus() end
+		return admitted
+	end
 	-- Close the input path before the hook starts, then publish a conclusive
 	-- initial answer if the accessibility service is already usable.
 	if not privacy_owners.watch.start() or not privacy_owners.watch.wait_ready() then
 		Logger.warn(LOG, "Native accessibility focus watcher unavailable; text automation and metrics stay closed.")
 	end
-	secure_focus_guard.prime()
+	if secure_focus_guard.prime() then publish_admitted_focus() end
 	local physical_privacy_admission = nil
 	if input_capture_gate ~= nil then error("input capture gate already initialised") end
 	input_capture_gate = InputCaptureGate.new({
@@ -1348,11 +1479,15 @@ local function main()
 			if not (hotstrings_config and type(hotstrings_config.resolve) == "function") then return true end
 			local ok_delay, resolved = pcall(hotstrings_config.resolve, result.group, result.section)
 			local delay_sec = ok_delay and type(resolved) == "table" and tonumber(resolved.delay) or nil
-			if delay_sec and not ExpansionDelay.allows(result, delay_sec, Monotonic.resolution_ms(),
+			if not delay_sec or delay_sec ~= delay_sec or delay_sec == math.huge or delay_sec < 0 then
+				Logger.error(LOG, "Expansion delay could not be resolved — the match was refused.")
+				return false
+			end
+			if not ExpansionDelay.allows(result, delay_sec, Monotonic.resolution_ms(),
 				key_is_complex, previous_key_was_complex, result.group) then
 				Logger.debug(LOG,
-					"Expired: '%s' waited %.2fs for its expander, its category allows %.2fs.",
-					tostring(result.trigger),
+					"Expired: trigger of %d byte(s) waited %.2fs for its expander, its category allows %.2fs.",
+					#(result.trigger or ""),
 					(tonumber(result.expander_gap_ms) or math.huge) / 1000, delay_sec)
 				return false
 			end
@@ -1392,6 +1527,7 @@ local function main()
 		-- A bare Enter in a terminal submitted the line: the next prompt is
 		-- empty, and a Backspace there deletes nothing (word_reset rule 7).
 		if not result then WordReset.apply_typed_newline(engine, ch, app_id) end
+		local queued_input, expansion_committed = nil, false
 		if result then
 			-- A private mapping's trigger is a fragment of its own secret — the
 			-- first six characters of the IBAN, the first five digits of the SSN —
@@ -1408,7 +1544,7 @@ local function main()
 				utf8.len(result.trigger or "") or #(result.trigger or ""),
 				utf8.len(result.replacement or "") or #(result.replacement or ""),
 				result.backspace_count)
-			local expansion_committed = opts.dry_run
+			expansion_committed = opts.dry_run
 			if not opts.dry_run then
 				injector._begin_injection()
 				local replay_terminator = result.replay_terminator
@@ -1424,7 +1560,7 @@ local function main()
 					replay_terminator,
 					destination
 				)
-				local queued_input = injector._end_injection()
+				queued_input = injector._end_injection()
 				expansion_committed = ok_delivery and type(delivery) == "table"
 					and delivery.ok == true
 				local delivery_error = ok_delivery and type(delivery) == "table"
@@ -1448,17 +1584,6 @@ local function main()
 						-- character an immediate Backspace actually removes.
 						replayed    = replay_terminator,
 					} or nil
-					-- Replay queued input only after output committed. On failure the
-					-- hook emergency-ungrabs and the logical text position is unknown.
-					for _, queued in ipairs(queued_input) do
-						local queued_ch = type(queued) == "table" and queued.char or queued
-						local queued_scancode = type(queued) == "table" and queued.scancode or nil
-						local ok, err = pcall(on_char, queued_ch, queued_scancode)
-						if not ok then
-							-- The character itself is typed text and stays out of the log.
-							Logger.error(LOG, "Error replaying a queued character: %s", tostring(err))
-						end
-					end
 				else
 					-- An uncommitted output leaves the line in an unknown state: the
 					-- next key must not borrow a word start it cannot prove.
@@ -1614,6 +1739,17 @@ local function main()
 			end
 		end
 
+		-- Finish the triggering character's prediction work before newer input.
+		-- The matcher already reflects the committed expansion, so queued input
+		-- can itself match or chain without reversing the AI's character order.
+		if expansion_committed then
+			for _, queued in ipairs(queued_input or {}) do
+				local queued_ch = type(queued) == "table" and queued.char or queued
+				local queued_scancode = type(queued) == "table" and queued.scancode or nil
+				local ok, err = pcall(on_char, queued_ch, queued_scancode)
+				if not ok then Logger.error(LOG, "Error replaying a queued character: %s", tostring(err)) end
+			end
+		end
 
 	end
 	on_char = input_capture_gate.guard(handle_char)
@@ -1703,7 +1839,8 @@ local function main()
 					current = function() return authorized() and destination.current() and authorized() end,
 					cached = function() return authorized() and destination.cached() and authorized() end,
 				}
-				local result = injector.inject(candidate.deletes, candidate.to_type, false, nil, publication)
+				-- Generated text may contain the user's context; never put it in trace logs.
+				local result = injector.inject(candidate.deletes, candidate.to_type, true, nil, publication)
 				return type(result) == "table" and result.ok == true and publication.cached()
 			end,
 			-- Revalidate the original range before injection, then retain its exact
@@ -2003,7 +2140,7 @@ local function main()
 		end,
 		get_pair = function(char) return shortcuts and shortcuts.get_wrap_pair(char) or nil end,
 		read_primary = require("adapters.clipboard").read_primary,
-		type_text = function(text, owner)
+		type_text = function(text, owner, on_payload_attempt)
 			if opts.dry_run then return false end
 			if type(owner) ~= "table" or type(owner.current) ~= "function"
 				or type(owner.cached) ~= "function" then return false end
@@ -2018,13 +2155,20 @@ local function main()
 				current = function() return retained(current) and destination.current() and retained(current) end,
 				cached = function() return retained(cached) and destination.cached() and retained(cached) end,
 			}
-			local result = injector.inject(0, text, false, nil, publication)
-			if type(result) ~= "table" or result.ok ~= true then return false end
-			-- The caret moved over replaced text: what the engine buffered no longer
-			-- describes the line, and what precedes the caret is not known.
-			_undoable = nil
-			engine:reset(false)
-			return true
+			local attempted = false
+			local injected, result = pcall(injector.inject, 0, text, true, nil, publication, function()
+				attempted = true
+				if type(on_payload_attempt) == "function" then on_payload_attempt() end
+			end)
+			if injected and type(result) == "table" then attempted = attempted or result.payload_attempted == true end
+			if (attempted or (injected and type(result) == "table" and result.ok == true)) and publication.current() then
+				-- Invalidate the original caret state only while it is still owned;
+				-- a reentrant focus change may already have a successor buffer.
+				_undoable = nil
+				engine:reset(false)
+			end
+			if not injected then error(result, 0) end
+			return type(result) == "table" and result.ok == true, attempted
 		end,
 	})
 	privacy_owners.end_wrap_selection = wrap_on_type.end_selection_window
@@ -2037,6 +2181,7 @@ local function main()
 	-- paused daemon can always be resumed from the keyboard.
 	local script_chords = require("modules.shortcuts.script_chords")
 	script_chords.init({
+		pause_epoch = script_actions.pause_epoch,
 		is_paused = function() return opts.dry_run or script_actions.is_paused() end,
 		defer = function(fn) return event_loop.defer(fn) end,
 	})
@@ -2046,6 +2191,7 @@ local function main()
 	-- the consumption callback below, before wrap-on-type sees the key.
 	local tap_keys = require("modules.shortcuts.tap_keys")
 	tap_keys.init({
+		pause_epoch = script_actions.pause_epoch,
 		is_active = function(action)
 			return shortcuts ~= nil and shortcuts.is_enabled() and not script_actions.is_paused()
 				and (action == nil or not opts.dry_run or require("modules.shortcuts.script_actions").is_script_action(action))
@@ -2125,9 +2271,9 @@ local function main()
 	-- The metrics count clicks, wheel turns and distance from the same stream.
 	-- The manager names the event's pointer kind: main() is at LuaJIT's
 	-- 60-upvalue limit.
-	local function on_pointer_event(kind_of_event, code, value)
-		keystats.record_pointer(kind_of_event, code, value)
-		if kind_of_event == "frame" then return end
+	local function on_pointer_event(kind_of_event, code, value, source)
+		keystats.record_pointer(kind_of_event, code, value, source)
+		if kind_of_event == "frame" or kind_of_event == "reset" or kind_of_event == "dropped" then return end
 		if not (shortcuts and shortcuts.is_caps_word_active()) then return end
 		shortcuts.caps_word_observe_pointer_event(kind_of_event, code)
 	end
@@ -2263,6 +2409,7 @@ local function main()
 	local function consume_bound_chord(detail)
 		local shortcuts_on = shortcuts ~= nil and shortcuts.is_enabled()
 		local consumed = keyboard_shortcuts.consume(detail, {
+			pause_epoch = script_actions.pause_epoch,
 			only_script = opts.dry_run or script_actions.is_paused() or not shortcuts_on,
 			defer = function(fn) return event_loop.defer(fn) end,
 			admission = function()
@@ -2451,7 +2598,8 @@ local function main()
 			-- shell out "kill -HUP $$", which signals the /bin/sh os.execute
 			-- spawned — never this process — so Reload logged success and
 			-- reloaded nothing.
-			on_reload     = function() perform_reload("the tray menu") end,
+			on_reload     = function() return perform_reload("the tray menu") end,
+			reload_in_flight = privacy_owners.reload_in_flight,
 			-- Opens one category's TOML in the user's editor. The category submenu
 			-- offers it because a pack is a file people edit, and finding it by
 			-- hand means knowing whether it came from the bundle or the user's own
@@ -2629,6 +2777,13 @@ local function main()
 			tooltip_preview.init({
 				style = style,
 				config = hotstrings_config,
+				on_render_failed = function()
+					if rawequal(package.loaded["ui.tooltip.preview"], tooltip_preview)
+						and rawequal(package.loaded["ui.tooltip.llm"], llm_overlay)
+						and llm_overlay and type(llm_overlay.revoke_presentation) == "function" then
+						llm_overlay.revoke_presentation()
+					end
+				end,
 				on_expire = function()
 					if prediction_engine and type(prediction_engine.on_hotstring_expired) == "function" then
 						prediction_engine.on_hotstring_expired(engine:ai_context():text(), {
@@ -2641,7 +2796,10 @@ local function main()
 				-- suggestion in the same turn.
 				on_hidden = function()
 					TimerScheduler.after(0, function()
-						if llm_overlay then llm_overlay.redraw() end
+						if rawequal(package.loaded["ui.tooltip.preview"], tooltip_preview)
+							and llm_overlay and type(llm_overlay.redraw_if_preview_hidden) == "function" then
+							llm_overlay.redraw_if_preview_hidden()
+						end
 					end)
 				end,
 			})
@@ -2659,6 +2817,9 @@ local function main()
 						return tooltip_preview.showing_rows()
 					end,
 					showing = tooltip_preview.is_showing,
+					prepare = tooltip_preview.retry_render_cleanup,
+					ready = tooltip_preview.render_ready,
+					revision = tooltip_preview.render_revision,
 					covered = tooltip_preview.note_covered,
 					redraw = tooltip_preview.redraw,
 				},
@@ -2694,26 +2855,20 @@ local function main()
 	if not privacy_owners.startup_checkpoint() then return end
 	-- 8.10b) Let a magic-key change actually reach the engine.
 	--
-	-- MagicKey.set() has always fired an _on_change callback after persisting, and
-	-- until 2026-08-05 nobody registered one — so changing the key from the menu
-	-- relabelled the row, relabelled the 21 locales through the provider above,
-	-- and left every expansion listening for the old character. That is worse than
-	-- the feature being absent: the interface reports success and the product
-	-- silently disagrees with it.
-	--
-	-- The dynamic rules bake the character into their triggers at registration
-	-- time, so they have to be rebuilt; the catalogue reload covers the rest.
-	MagicKey.init(function(new_char)
-		Logger.info(LOG, "Magic key changed to '%s' — re-registering.", tostring(new_char))
-		if hotstrings_config.set_magic_key(new_char, MagicKey.default()) ~= true then
-			Logger.error(LOG, "Magic-key change refused by the catalogue — mappings remain unchanged.")
-			return
-		end
-		if dyn_hotstrings then
-			dyn_hotstrings.init({ trigger_char = new_char })
-		end
-		reload_hotstrings("the magic key")
-		if rebuild_tray_menu then rebuild_tray_menu() end
+	-- The scope publishes the preference only after both matchers accept it,
+	-- retaining a refused inverse under the same ownership as other hotstrings.
+	MagicKey.init(nil, function(new_char)
+		local committed = require("infra.hotstrings_scope").apply_magic(new_char, {
+			config = hotstrings_config, preferences = require("infra.hotstring_preferences"),
+			dynamic = dyn_hotstrings, magic_key = MagicKey,
+			reload = function() return reload_hotstrings("the magic key") end,
+			after_restore = function()
+				if rebuild_tray_menu then rebuild_tray_menu() end
+				return true
+			end,
+		})
+		if committed and rebuild_tray_menu then rebuild_tray_menu() end
+		return committed == true
 	end)
 
 	if not privacy_owners.startup_checkpoint() then return end
@@ -2912,14 +3067,8 @@ local function main()
 			if llm_overlay then llm_overlay.hide() end
 			engine:reset(false)
 			_cached_app_id = (type(appName) == "string" and appName ~= "" and appName) or nil
-			-- The private-browsing verdict is computed HERE, off the input path.
-			-- The title was previously received and discarded, which is why the
-			-- driver had no private-browsing filter at all.
-			-- The title itself, which was received and discarded. The apps dashboard
-			-- groups a day by window — the difference between "four hours in the
-			-- editor" and "four hours across three files" — and this driver had
-			-- nothing to group by. Handed over AFTER the private-window verdict, so
-			-- a title that marks an incognito session is judged before it is stored.
+			-- Close the previous title using the existing transition policy. The
+			-- privacy fence below retires the tentative new title until admission.
 			keystats.set_window_title(_cached_app_id, windowTitle,
 				math.floor(Monotonic.now_ms()))
 			-- And the secure-field verdict, likewise. adapters/secure_field_detector
@@ -2932,10 +3081,7 @@ local function main()
 			--
 			-- Here rather than per keystroke, deliberately: the probe spawns an AT-SPI
 			-- query, and the focused element is what it can answer about.
-			secure_focus_guard.prime()
-			if _cached_app_id then
-				keystats.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
-			end
+			if secure_focus_guard.prime() then publish_admitted_focus() end
 		end)
 		-- start() seeds its change detector with the current window and therefore
 		-- does not emit an initial callback. Prime the keystats explicitly so a
@@ -2950,11 +3096,8 @@ local function main()
 		-- Primed here too. Without it the first window of the session — which on a
 		-- login that restores a password manager is exactly the window that matters
 		-- — is recorded until the user switches away from it.
-		secure_focus_guard.prime()
+		if secure_focus_guard.prime() then publish_admitted_focus() end
 		if not privacy_owners.startup_checkpoint() then return end
-		if type(_cached_app_id) == "string" and _cached_app_id ~= "" then
-			keystats.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
-		end
 		process_lifecycle.start()
 	end
 
@@ -2993,7 +3136,7 @@ local function main()
 		-- Raw navigation invalidates synchronously. Dispatch/retry stays periodic
 		-- after the shared focus-settle deadline; idle consumes retained results.
 		-- Unknown and probe failure stay fail-closed.
-		secure_focus_guard.refresh(false)
+		refresh_admitted_focus(false)
 		if file_watchers then
 			local owner = file_watchers
 			local function retire()
@@ -3204,7 +3347,7 @@ local function main()
 			privacy_owners.watch.pump()
 			RuntimeGuard.call("metrics SQLite flush acknowledgement", keystats.pump_flush)
 			-- Consume owned results promptly; fresh dispatch/retry stays periodic.
-			if secure_focus_guard.has_context_operation() then secure_focus_guard.refresh(false) end
+			if secure_focus_guard.has_context_operation() then refresh_admitted_focus(false) end
 			if not RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop) then return end
 			-- The touchpad, on the same tick as the keyboard. Cheap when nothing is
 			-- reading: gestures.pump() returns 0 immediately unless start_reading()
@@ -3236,7 +3379,6 @@ local function main()
 	-- harmless.
 	shutdown.request("event loop returned")
 	if shutdown.is_pending() then error("Native shutdown cleanup remains unacknowledged after event-loop return", 0) end
-	if tooltip_preview then tooltip_preview.destroy() end
 	if llm_overlay then llm_overlay.hide() end
 	if injector.close_fast_channel() ~= true then error("Final output retirement remains unacknowledged", 0) end
 	if file_watchers then file_watchers.stop() end

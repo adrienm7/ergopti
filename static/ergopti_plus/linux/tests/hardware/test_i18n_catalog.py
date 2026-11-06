@@ -19,6 +19,7 @@ local paths = require('infra.paths')
 local original = paths.shared
 paths.shared = function(name)
   if name == 'data/locales' then return catalog end
+  if name == 'data' and mode:match('^order%-') then return catalog .. '/..' end
   return original(name)
 end
 local i18n = require('infra.i18n')
@@ -59,6 +60,54 @@ print('CATALOG_RESULT ' .. require('json').encode({
 
 
 class NativeLocaleCatalogTests(unittest.TestCase):
+    def test_order_file_refusal_falls_back_without_blocking(self):
+        driver = Path(DRIVER).resolve()
+        for kind in ("fifo", "directory", "missing", "regular"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                catalog = root / "locales"
+                catalog.mkdir()
+                for code in ("en", "fr", "de"):
+                    (catalog / (code + ".json")).write_text("{}\n", encoding="utf-8")
+                order = root / "locale_order.json"
+                if kind == "fifo":
+                    os.mkfifo(order)
+                elif kind == "directory":
+                    order.mkdir()
+                elif kind == "regular":
+                    order.write_text('{"order":["fr","en","de"]}', encoding="utf-8")
+                script = root / "probe.lua"
+                script.write_text(PROBE, encoding="utf-8")
+                environment = dict(
+                    os.environ,
+                    HOME=str(root),
+                    XDG_CONFIG_HOME=str(root),
+                    XDG_STATE_HOME=str(root),
+                    XDG_DATA_HOME=str(root),
+                    XDG_CACHE_HOME=str(root),
+                    XDG_RUNTIME_DIR=str(root),
+                )
+                result = subprocess.run(
+                    [RUNTIME, str(script), str(driver), str(catalog), "order-" + kind],
+                    env=environment,
+                    capture_output=True,
+                    text=True,
+                    timeout=3,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                receipt = json.loads(
+                    next(
+                        line.removeprefix("CATALOG_RESULT ")
+                        for line in result.stdout.splitlines()
+                        if line.startswith("CATALOG_RESULT ")
+                    )
+                )
+                self.assertTrue(receipt["ok"], receipt["reason"])
+                self.assertEqual(
+                    receipt["codes"],
+                    ["fr", "en", "de"] if kind == "regular" else ["de", "en", "fr"],
+                )
+
     def test_native_locale_catalog_authority(self):
         driver = Path(DRIVER).resolve()
         order = json.loads((driver.parent / "_shared/data/locale_order.json").read_text())["order"]

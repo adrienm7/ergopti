@@ -30,6 +30,25 @@ helpers.describe("Local server fingerprint (local-server-fingerprint)", function
 end)
 
 helpers.describe("Linux local server catalogue fingerprints (local-server-fingerprint)", function()
+	helpers.it("reports an unreadable cloud catalogue before refusing local discovery", function()
+		local Reader, Logger = require("infra.regular_file_reader"), require("logger.shim")
+		local open, report, errors = Reader.open_source, Logger.error, {}
+		Reader.open_source = function(path, ...)
+			if path:match("api_providers%.json$") then return nil end
+			return open(path, ...)
+		end
+		Logger.error = function(_, message) errors[#errors + 1] = message end
+		local ok, err = pcall(function()
+			local catalogue = helpers.load_module("modules.llm.local_server_catalogue")
+			local order, _, published = catalogue.load({})
+			helpers.assert_eq(#order, 0)
+			helpers.assert_eq(published, false)
+			helpers.assert_true(#errors > 0, "refusal must be diagnosed")
+		end)
+		Reader.open_source, Logger.error = open, report
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("the catalogue port hands the shared controller every shared address's fingerprint", function()
 		local restore = helpers.keep_loaded({ "modules.llm.local_server_catalogue" })
 		local ok, err = pcall(function()

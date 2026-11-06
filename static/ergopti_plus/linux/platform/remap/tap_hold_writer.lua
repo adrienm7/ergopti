@@ -115,19 +115,22 @@ end
 local function back_up(path, text)
 	_backup_sequence = _backup_sequence + 1
 	local backup = string.format("%s.tap_holds-%s-%d.bak", path, os.date("%Y%m%d-%H%M%S"), _backup_sequence)
-	local existing = io.open(backup, "r")
-	if existing then
-		existing:close()
+	local opened, fh, _, _, remove_owned, current_image = pcall(require("infra.regular_file_writer").open, backup, "wx")
+	if not opened or not fh then return nil end
+	if type(remove_owned) ~= "function" or type(current_image) ~= "function" then
+		pcall(fh.close, fh)
+		if type(remove_owned) == "function" then pcall(remove_owned) end
 		return nil
 	end
-	local fh = io.open(backup, "w")
-	if not fh then return nil end
-	fh:write(text)
-	fh:close()
-	local check = io.open(backup, "r")
-	local copied = check and check:read("*a")
-	if check then check:close() end
-	return copied == text and backup or nil
+	local wrote, result = pcall(fh.write, fh, text)
+	local closed, close_result = pcall(fh.close, fh)
+	if not wrote or (result ~= true and result ~= fh) or not closed or close_result ~= true then
+		pcall(remove_owned)
+		return nil
+	end
+	local checked, current = pcall(current_image, text)
+	if not checked or current ~= true then return nil end
+	return backup
 end
 
 --- The TOML spelling of one scalar or array.
@@ -216,20 +219,27 @@ local function write_document(path, document, shapes, expected_source, guard)
 		return false
 	end
 	local tmp = path .. ".tmp"
-	local fh, err = io.open(tmp, "w")
-	if not fh then
-		Logger.error(LOG, "Cannot write '%s' (%s) — the change was not saved.", tmp, tostring(err))
+	local opened, fh, err, _, remove_owned, current_image = pcall(require("infra.regular_file_writer").open, tmp, "wx")
+	if not opened or not fh or type(remove_owned) ~= "function" or type(current_image) ~= "function" then
+		if opened and fh then
+			pcall(fh.close, fh)
+			if type(remove_owned) == "function" then pcall(remove_owned) end
+		end
+		Logger.error(LOG, "Cannot write '%s' (%s) — the change was not saved.", tmp, tostring(opened and err or fh))
 		return false
+	end
+	local function discard()
+		local called, removed, detail = pcall(remove_owned)
+		if not called or removed ~= true then
+			Logger.error(LOG, "Cannot remove refused staging file '%s' (%s).", tmp, tostring(called and detail or removed))
+		end
 	end
 	local write_ok, written, write_err = pcall(fh.write, fh, text)
 	local close_ok, closed, close_err = pcall(fh.close, fh)
 	-- Lua 5.1 returns true from file:write; later Lua returns that same file.
 	local write_ack = write_ok and (written == true or written == fh)
 	if not write_ack or not close_ok or closed ~= true then
-		local removed, remove_err = os.remove(tmp)
-		if not removed then
-			Logger.error(LOG, "Cannot remove refused staging file '%s' (%s).", tmp, tostring(remove_err))
-		end
+		discard()
 		local detail = not write_ok and written or (not write_ack and write_err)
 			or (not close_ok and closed) or close_err or "write or close acknowledgement refused"
 		Logger.error(LOG, "Cannot complete staging file '%s' (%s) — the change was not saved.", tmp, tostring(detail))
@@ -238,19 +248,22 @@ local function write_document(path, document, shapes, expected_source, guard)
 	local current, status = TomlWriter.read_classified(path)
 	if expected_source and (status ~= expected_source.status
 		or (status == "ok" and current ~= expected_source.content)) then
-		local removed, remove_err = os.remove(tmp)
-		if not removed then Logger.error(LOG, "Cannot remove refused staging file '%s' (%s).", tmp, tostring(remove_err)) end
+		discard()
 		Logger.error(LOG, "'%s' changed before tap-hold publication — the source is preserved.", path)
 		return false
 	end
 	if not edit_current(guard) then
-		local removed, remove_err = os.remove(tmp)
-		if not removed then Logger.error(LOG, "Cannot remove refused staging file '%s' (%s).", tmp, tostring(remove_err)) end
+		discard()
+		return false
+	end
+	local checked, owned = pcall(current_image, text)
+	if not checked or owned ~= true then
+		Logger.error(LOG, "Tap-hold staging image is no longer owned — the change was not saved.")
 		return false
 	end
 	local ok, rename_err = os.rename(tmp, path)
 	if not ok then
-		os.remove(tmp)
+		discard()
 		Logger.error(LOG, "Cannot replace '%s' (%s) — the change was not saved.", path, tostring(rename_err))
 		return false
 	end
@@ -534,7 +547,7 @@ end
 --- @return boolean
 function M.set_threshold(key_id, seconds, guard)
 	if not valid_key(key_id, "set_threshold") then return false end
-	if seconds ~= nil and (type(seconds) ~= "number" or seconds <= 0 or seconds > MAX_THRESHOLD_SECONDS) then
+	if seconds ~= nil and (type(seconds) ~= "number" or seconds ~= seconds or seconds <= 0 or seconds > MAX_THRESHOLD_SECONDS) then
 		Logger.error(LOG, "set_threshold: %s s is outside 0..%d s — nothing written.",
 			tostring(seconds), MAX_THRESHOLD_SECONDS)
 		return false

@@ -28,6 +28,12 @@ APPDIR="$1"
 DESTINATION="$2"
 SOURCE="$APPDIR/usr"
 
+for directory in "$SOURCE" "$SOURCE/bin" "$SOURCE/lib" "$SOURCE/share"; do
+	if [ ! -d "$directory" ] || [ -L "$directory" ]; then
+		echo "[ERR] Private runtime source directory is not a direct directory: $directory" >&2
+		exit 1
+	fi
+done
 if [ ! -x "$SOURCE/bin/luajit" ] || [ ! -f "$SOURCE/lib/ergopti/network-runtime-env.sh" ]; then
 	echo "[ERR] No staged private runtime in $APPDIR: run tools/build/build-linux-appimage.sh first." >&2
 	exit 1
@@ -41,13 +47,44 @@ mkdir -p "$DESTINATION/lib"
 cp -a "$SOURCE/bin" "$DESTINATION/bin"
 cp -a "$SOURCE/share" "$DESTINATION/share"
 # Everything under lib except the driver tree, which is the packager's.
-for entry in "$SOURCE/lib"/* "$SOURCE/lib"/.[!.]*; do
+for entry in "$SOURCE/lib"/* "$SOURCE/lib"/.[!.]* "$SOURCE/lib"/..?*; do
 	[ -e "$entry" ] || [ -L "$entry" ] || continue
 	[ "$(basename -- "$entry")" = ergopti ] && continue
 	cp -a "$entry" "$DESTINATION/lib/"
 done
 # The launcher scripts are the packager's; only the runtime's programs stay.
 rm -f "$DESTINATION/bin/ergopti"
+
+# Admission must not succeed only because a symlink reaches a build-host file.
+# Preserve normal internal aliases, but require every link to resolve inside the
+# copied prefix, where it will remain valid after the package is installed.
+IFS= read -r -d '' COPIED_PREFIX < <(CDPATH= cd -Pe -- "$DESTINATION" && printf '%s\0' "$PWD")
+{
+	# A process substitution's EOF does not acknowledge its producer. Retain
+	# this PID before per-link queries replace $! and require its actual status.
+	LINK_SCAN_PID=$!
+	while IFS= read -r -d '' link; do
+		if ! IFS= read -r -d '' literal_target < <(readlink -z -- "$link"); then
+			echo "[ERR] Private runtime link cannot be read: $link" >&2
+			exit 1
+		fi
+		case "$literal_target" in
+			/*) echo "[ERR] Private runtime contains a nonrelocatable absolute link: $link" >&2; exit 1 ;;
+		esac
+		if ! IFS= read -r -d '' target < <(readlink -ze -- "$link"); then
+			echo "[ERR] Private runtime contains an unresolved link: $link" >&2
+			exit 1
+		fi
+		case "$target" in
+			"$COPIED_PREFIX"|"$COPIED_PREFIX"/*) ;;
+			*) echo "[ERR] Private runtime link leaves the copied prefix: $link" >&2; exit 1 ;;
+		esac
+	done
+	if ! wait "$LINK_SCAN_PID"; then
+		echo '[ERR] Private runtime link inventory could not be completed.' >&2
+		exit 1
+	fi
+} < <(find "$DESTINATION" -type l -print0)
 
 # Admission through the environment the installed launcher sources: every part
 # it requires must be in the copy.

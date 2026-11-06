@@ -39,15 +39,16 @@ end
 --- @param platform string Canonical platform tag.
 --- @param aliases table Canonical path -> native alias/field owner records.
 --- @param mode string Recommended or clear.
+--- @param only table|nil Optional set of directly owned paths for explicit edits.
 --- @return table plan Detached direct plan with platform-available operations.
-function M.plan(manifest, platform, aliases, mode)
+function M.plan(manifest, platform, aliases, mode, only)
 	assert(type(aliases) == "table", "script scope needs its native alias map")
 	local plan = manifest.direct_scope_plan("global", mode)
 	local rows, selected = {}, {}
 	for _, row in ipairs(plan.operations) do
 		local path = row.section .. "." .. row.key
 		local entry = entry_for(manifest, path)
-		if available(entry, platform) then
+		if available(entry, platform) and (only == nil or only[path] == true) then
 			local owner = aliases[path]
 			assert(type(owner) == "table" and type(owner.alias) == "string" and owner.alias ~= ""
 				and type(owner.native) == "table", "available direct scope row has no native owner: " .. path)
@@ -62,6 +63,7 @@ function M.plan(manifest, platform, aliases, mode)
 	end
 	table.sort(keys)
 	plan.operations = rows
+	if only ~= nil then plan.presets = {} end
 	return plan, keys
 end
 
@@ -82,7 +84,7 @@ function M.new(options)
 	assert(type(options) == "table" and type(options.token) == "table"
 		and type(options.storage_backup_path) == "function", "script scope needs its native token and backup owner")
 	local manifest, platform, aliases = options.manifest, options.platform, options.aliases
-	local _, paths = M.plan(manifest, platform, aliases, "clear")
+	local _, paths = M.plan(manifest, platform, aliases, "clear", options.only)
 	local Storage, token, keys = options.storage, options.token, {}
 	for _, method in ipairs({ "acquire_owned", "release_owned", "capture_owned", "publish_owned", "restore_owned", "forget_owned" }) do
 		assert(type(Storage[method]) == "function", "script settings owner lacks " .. method)
@@ -159,7 +161,7 @@ function M.new(options)
 	local runtime, active = { fences = fences }, nil
 	runtime.manifest = { scope_plan = function(scope, mode)
 		assert(scope == "global", "script owner cannot acquire another scope")
-		return M.plan(manifest, platform, aliases, mode)
+		return M.plan(manifest, platform, aliases, mode, options.only)
 	end }
 	function runtime.capture(_, source)
 		if not context_matches() then return nil end
@@ -172,9 +174,10 @@ function M.new(options)
 			local descriptor, entry = captured[path], entry_for(manifest, path)
 			local cell = stored[descriptor.alias]
 			assert(type(cell) == "table" and type(cell.present) == "boolean", "script native source is incomplete")
-			if cell.present then validate(entry, cell.value, platform) end
+			-- Explicit repairs retain the raw previous value for exact compensation.
+			if cell.present and not options.allow_invalid_source then validate(entry, cell.value, platform) end
 			local configured = source_value(document, path)
-			if configured ~= nil then validate(entry, configured, platform) end
+			if configured ~= nil and not options.allow_invalid_source then validate(entry, configured, platform) end
 			local native = descriptor.native.scope_capture(token)
 			if type(native) ~= "table" or not context_matches() then return nil end
 			snapshot.fields[path] = native

@@ -180,10 +180,8 @@ load_sources = function()
 	local ok_paths, Paths = pcall(require, "infra.paths")
 	local path = ok_paths and Paths.shared("modules/updater/defaults.json") or nil
 	if not path then return nil, "shared updater defaults path is unavailable" end
-	local handle = io.open(path, "rb")
-	if not handle then return nil, "shared updater defaults are unreadable" end
-	local raw = handle:read("*a")
-	handle:close()
+	local raw, status = require("toml_codec.writer").read_classified(path)
+	if status ~= "ok" then return nil, "shared updater defaults are unreadable" end
 	local ok_json, decoded = pcall(Json.decode, raw)
 	if not ok_json then return nil, "shared updater defaults are not valid JSON" end
 	local sources, err = ReleaseSources.resolve(decoded)
@@ -200,7 +198,13 @@ end
 --- @param callback function Receives status, body, err.
 local function default_http_get(url, headers, timeout_ms, callback)
 	local HttpClient = require("adapters.http_client")
-	HttpClient.get(url, headers, {
+	local completed = false
+	local function finish(status, body, err)
+		if completed then return end
+		completed = true
+		callback(status, body, err)
+	end
+	local started = HttpClient.get(url, headers, {
 		owner = HTTP_OWNER,
 		timeout_ms = timeout_ms,
 		max_body_bytes = MAX_CHANGELOG_BYTES,
@@ -208,8 +212,9 @@ local function default_http_get(url, headers, timeout_ms, callback)
 		https_only = true,
 	}, function(result)
 		result = type(result) == "table" and result or {}
-		callback(result.status, result.body, result.ok == true and nil or result.error)
+		finish(result.status, result.body, result.ok == true and nil or result.error)
 	end)
+	if started == false then finish(nil, nil, "HTTP request refused") end
 end
 
 --- Default page channel: the host->page response hook of the shared UI.

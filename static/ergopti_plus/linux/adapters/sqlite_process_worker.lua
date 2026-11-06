@@ -1,4 +1,11 @@
 --- adapters/sqlite_process_worker.lua
+-- The application-owned child is invoked directly, without a global Lua init.
+local literal_driver = os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT")
+if literal_driver and literal_driver ~= "" then
+	local literal_shared = assert(os.getenv("ERGOPTI_LITERAL_SHARED_ROOT"), "literal shared root unavailable")
+	assert(loadfile(literal_driver .. "/infra/literal_module_loader.lua"))().install(literal_driver, literal_shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), os.getenv("ERGOPTI_LITERAL_DIRECT") == "1" and "child-direct" or (os.getenv("ERGOPTI_LITERAL_DAEMON") == "1" and "daemon" or nil))
+end
+
 --- ==============================================================================
 --- MODULE: Parent-bound SQLite Launcher
 --- DESCRIPTION:
@@ -28,7 +35,11 @@ function M.run(parent_pid, database)
 	assert(tonumber(ffi.C.getppid()) == parent, "SQLite parent already exited")
 	local source = debug.getinfo(1, "S").source:gsub("^@", "")
 	local root = assert(source:match("^(.*)/adapters/sqlite_process_worker%.lua$"), "SQLite worker source unavailable")
-	package.path = root .. "/?.lua;" .. package.path
+	if literal_driver then
+		assert(package.loaded["infra.literal_module_loader"]).prepend({ { root, ".lua" } })
+	else
+		package.path = root .. "/?.lua;" .. package.path
+	end
 	local private = require("infra.private_sqlite_file")
 	assert(private.admit(database), "SQLite private file admission refused")
 	-- SQLite creates rollback journals and WAL/SHM after replacing this process.

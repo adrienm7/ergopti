@@ -36,9 +36,16 @@ local function _build_reload(ctx)
 				return
 			end
 			Logger.info(LOG, "Reload requested from the tray menu…")
-			local ok, err = pcall(ctx.on_reload)
-			if not ok then
-				Logger.error(LOG, "Reload callback raised: %s.", tostring(err))
+			local ok, result = pcall(ctx.on_reload)
+			local pending = false
+			if ok and result == false and type(ctx.reload_in_flight) == "function" then
+				local checked, active = pcall(ctx.reload_in_flight)
+				pending = checked and active == true
+			end
+			if not ok or (result == false and not pending) then
+				Logger.error(LOG, "Reload request was refused: %s.", tostring(result))
+				local notified, err = pcall(function() return require("ui.reload_refusal").notify() end)
+				if not notified or err == false then Logger.warn(LOG, "Reload refusal notification could not be shown.") end
 			end
 		end,
 	})

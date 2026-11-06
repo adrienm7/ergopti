@@ -24,9 +24,9 @@ local _brands = nil
 local function brands()
 	if _brands then return _brands end
 	local path = Paths.shared("modules/llm/backends.json")
-	local fh = path and io.open(path, "r")
-	local root = fh and Json.decode(fh:read("*a")) or nil
-	if fh then fh:close() end
+	local text, status
+	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	local root = status == "ok" and Json.decode(text) or nil
 	if type(root) ~= "table" or type(root.backends) ~= "table" then
 		error("backends.json is missing or malformed: " .. tostring(path), 0)
 	end

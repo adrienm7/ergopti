@@ -39,6 +39,18 @@ local STAMP_PATTERN = "^%d%d%d%d%d%d%d%d%-%d%d%d%d%d%d$"
 local ISO_PATTERN = "^%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%dZ$"
 local ROOT_ID_PATTERN = "^[a-z][a-z_]*$"
 
+--- A backup timestamp is a real UTC civil time, not merely sortable text.
+local function valid_iso(value)
+	if type(value) ~= "string" or not value:match(ISO_PATTERN) then return false end
+	local year, month, day, hour, minute, second = value:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)T(%d%d):(%d%d):(%d%d)Z$")
+	year, month, day = tonumber(year), tonumber(month), tonumber(day)
+	hour, minute, second = tonumber(hour), tonumber(minute), tonumber(second)
+	if year < 1 or month < 1 or month > 12 or hour > 23 or minute > 59 or second > 60 then return false end
+	local days = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
+	if month == 2 and (year % 400 == 0 or (year % 4 == 0 and year % 100 ~= 0)) then days[2] = 29 end
+	return day >= 1 and day <= days[month]
+end
+
 
 
 
@@ -330,7 +342,7 @@ function M.new(options)
 		Logger.start(LOG, "Backing up the configuration (%s)…", kind)
 		local time = clock()
 		if type(time) ~= "table" or type(time.stamp) ~= "string" or not time.stamp:match(STAMP_PATTERN)
-			or type(time.iso) ~= "string" or not time.iso:match(ISO_PATTERN) then
+			or not valid_iso(time.iso) then
 			Logger.error(LOG, "Configuration backup refused: the clock gave no usable time.")
 			return nil, "clock"
 		end
@@ -441,7 +453,7 @@ function M.new(options)
 		if type(record) ~= "table" or decode_err then return nil, "unreadable manifest" end
 		if record.schema_version ~= M.SCHEMA_VERSION or record.id ~= id
 			or type(record.files) ~= "table" or rules.kinds[record.kind] == nil
-			or type(record.created_at) ~= "string" or not record.created_at:match(ISO_PATTERN)
+			or not valid_iso(record.created_at)
 			or type(record.tag) ~= "string" or type(record.from_version) ~= "string" then
 			return nil, "unexpected manifest"
 		end

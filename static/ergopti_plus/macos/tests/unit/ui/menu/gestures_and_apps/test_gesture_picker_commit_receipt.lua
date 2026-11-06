@@ -49,6 +49,9 @@ local function with_gesture(mode, conflict, scenario)
 					DEFAULT_STATE = { gestures = true },
 					get_action = function() return controls.assigned end,
 					set_action = function(_, value) controls.assigned, state.action = value, value; return true end,
+					-- A changed click binding is held until publication settles.
+					begin_click_binding_change = function(slot) return { slot = slot } end,
+					finish_click_binding_change = function() return true end,
 					get_sg_names = function() return { "none", "lookup" } end,
 					get_action_label = function(value) return value end,
 					get_action_parameter_spec = function() return nil end,

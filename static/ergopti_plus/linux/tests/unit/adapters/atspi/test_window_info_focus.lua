@@ -235,12 +235,40 @@ helpers.describe("window_info: X11", function()
 		wi.getFocused()
 		local after_first = #log
 		for _ = 1, 5 do wi.getFocused() end
-		-- The window ID and title must stay current; the owning process needs
-		-- resolving only when either changes or its identity is still unknown.
-		helpers.assert_eq(#log - after_first, 10,
-			"an unchanged window needs only the identity and title probes, got "
+		-- The fallback must refresh the PID as well: the X server may recycle
+		-- an ID while another process opens a window with the same title.
+		helpers.assert_eq(#log - after_first, 15,
+			"an unchanged window needs its ID, title and PID probes, got "
 				.. tostring(#log - after_first) .. " for five calls")
 		restore()
+	end)
+
+	helpers.it("(linux-focus-reused-xid) detects a new owner in the xdotool fallback", function()
+		local Shell = helpers.load_module("adapters.shell_runner")
+		local ds = helpers.load_module("infra.display_server")
+		ds._set_for_test("x11", "xfce")
+		package.loaded["infra.display_server"] = ds
+		local previous = package.loaded["adapters.x11_focus"]
+		package.loaded["adapters.x11_focus"] = { has_transport = function() return false end }
+		local pid = 101
+		Shell._set_runner(function(command)
+			if command:find("getactivewindow", 1, true) then return "0x100\n" end
+			if command:find("getwindowname", 1, true) then return "Documents\n" end
+			if command:find("getwindowpid", 1, true) then return tostring(pid) .. "\n" end
+			if command:find("/proc/101/comm", 1, true) then return "first-app\n" end
+			if command:find("/proc/202/comm", 1, true) then return "second-app\n" end
+			return ""
+		end)
+		local ok, err = pcall(function()
+			local window = helpers.load_module("adapters.window_info")
+			window._reset_state()
+			helpers.assert_eq(window.getFocused().appId, "first-app")
+			pid = 202
+			helpers.assert_eq(window.getFocused().appId, "second-app")
+		end)
+		package.loaded["adapters.x11_focus"] = previous
+		restore()
+		assert(ok, err)
 	end)
 
 	helpers.it("re-resolves the identity when the title changes", function()
@@ -267,6 +295,34 @@ helpers.describe("window_info: X11", function()
 			"a changed title must invalidate the cached identity — otherwise the "
 				.. "first application of the session owns every keystroke that follows")
 		restore()
+	end)
+
+	helpers.it("(linux-focus-reused-xid) resolves the new owner when an XID and title are reused", function()
+		local previous = package.loaded["adapters.x11_focus"]
+		local pid = 101
+		package.loaded["adapters.x11_focus"] = {
+			has_transport = function() return true end,
+			query = function() return "0x100", "Documents", pid end,
+		}
+		local ok, err = pcall(function()
+			local window = under("x11", "xfce", {
+				{ "/proc/101/comm", "first-app\n" },
+				{ "/proc/202/comm", "second-app\n" },
+			})
+			local first, identity = window.focused_snapshot()
+			helpers.assert_eq(first.appId, "first-app")
+			helpers.assert_eq(identity, "x11:101:0x100")
+			pid = 202
+			local second, next_identity = window.focused_snapshot()
+			helpers.assert_eq(second.appId, "second-app")
+			helpers.assert_eq(next_identity, "x11:202:0x100")
+			pid = nil
+			local unknown = window.focused_snapshot()
+			helpers.assert_eq(unknown.appId, "", "a missing native PID cannot inherit the former owner")
+		end)
+		package.loaded["adapters.x11_focus"] = previous
+		restore()
+		assert(ok, err)
 	end)
 
 	helpers.it("answers empty when there is no focused window", function()
@@ -407,6 +463,53 @@ helpers.describe("window_info: Wayland", function()
 		helpers.assert_eq(info.windowTitle, "Ergopti — Mozilla Firefox",
 			"the focused leaf, not the first one")
 		helpers.assert_eq(info.appId, "firefox", "app_id is the Wayland-native identity")
+		restore()
+	end)
+
+	helpers.it("(linux-wayland-null-focus) uses XWayland class when sway app_id is null", function()
+		local tree = '{"focused":true,"id":7,"pid":4321,"name":"Editor",'
+			.. '"app_id":null,"window_properties":{"class":"editor"}}'
+		local wi = under("wayland", "sway", {
+			{ "command -v 'swaymsg'", true }, { "swaymsg -t get_tree", tree },
+		})
+		helpers.assert_eq(wi.getFocused().appId, "editor")
+		helpers.assert_eq(wi.getFocused().appId, "editor", "repeated polls cannot manufacture new identities")
+		restore()
+	end)
+
+	helpers.it("(linux-wayland-null-focus) resolves a null niri app_id from its process", function()
+		local wi = under("wayland", "niri", {
+			{ "command -v 'niri'", true },
+			{ "niri msg --json", '{"id":7,"pid":4321,"title":null,"app_id":null}' },
+			{ "/proc/4321/comm", "editor\n" },
+		})
+		local info = wi.getFocused()
+		helpers.assert_eq(info.appId, "editor")
+		helpers.assert_eq(info.windowTitle, "")
+		restore()
+	end)
+
+	helpers.it("(linux-wayland-null-focus) resolves a null Hyprland class from its process", function()
+		local wi = under("wayland", "Hyprland", {
+			{ "command -v 'hyprctl'", true },
+			{ "hyprctl activewindow", '{"address":"0x123","pid":4321,"title":null,"class":null}' },
+			{ "/proc/4321/comm", "editor\n" },
+		})
+		local info = wi.getFocused()
+		helpers.assert_eq(info.appId, "editor")
+		helpers.assert_eq(info.windowTitle, "")
+		restore()
+	end)
+
+	helpers.it("(linux-wayland-null-focus) does not query procfs for a null PID", function()
+		local wi, log = under("wayland", "niri", {
+			{ "command -v 'niri'", true },
+			{ "niri msg --json", '{"id":7,"pid":null,"title":null,"app_id":null}' },
+		})
+		helpers.assert_eq(wi.getFocused().appId, "")
+		for _, command in ipairs(log) do
+			helpers.assert_true(not command:find("/proc/", 1, true), "null is not a process identifier")
+		end
 		restore()
 	end)
 
@@ -680,3 +783,29 @@ helpers.describe("window_info: X11 window list (linux-x11-window-list-app-ids)",
 		helpers.assert_eq(parsed, { { id = "0x0100000a", pid = 99, title = "A title  with  spaces" } })
 	end)
 end)
+
+for _, fault in ipairs({ "read_throw", "close_false", "close_throw" }) do
+	helpers.it("window list refuses an incomplete process name " .. fault, function()
+		local wi = under("x11", "xfce", {
+			{ "command -v 'wmctrl'", true }, { "wmctrl -lp", WMCTRL_LIST },
+		})
+		local original, closes = io.open, 0
+		io.open = function(path, mode)
+			if path ~= "/proc/1337/comm" then return original(path, mode) end
+			return { read = function()
+				if fault == "read_throw" then error("injected read failure") end
+				return "synthetic-browser\n"
+			end, close = function()
+				closes = closes + 1
+				if fault == "close_throw" then error("injected close failure") end
+				return fault ~= "close_false"
+			end }
+		end
+		local called, windows = pcall(wi.getAll)
+		io.open = original
+		wi._reset_state(); restore()
+		helpers.assert_true(called, "one process disappearing must not abort the window list")
+		helpers.assert_eq(windows[1].appId, "", "an unacknowledged process name is unknown")
+		helpers.assert_eq(closes, 1)
+	end)
+end

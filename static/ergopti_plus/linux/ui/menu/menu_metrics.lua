@@ -17,6 +17,7 @@ local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
 local plain_markup = require("ui.menu.menu_dialogs").plain_markup
+local show_error = require("ui.menu.menu_dialogs").show_error
 
 local LOG = "ui.menu.menu_metrics"
 
@@ -227,12 +228,20 @@ local function _manifest_metrics_rows(ctx, k)
 		-- item.fn only on a row with no submenu, so the parent cannot carry it.
 		[require("config_keys").COMMAND.SCOPE_RESTORE] = restore_metrics_scope,
 		[require("config_keys").COMMAND.METRICS_TOGGLE] = function()
-			if type(k.set_enabled) ~= "function" then
+			if type(k.set_enabled) ~= "function" or type(k.is_enabled) ~= "function" then
 				Logger.error(LOG, "The keystats exposes no set_enabled — the gate does nothing.")
-				return
+				return false
 			end
-			k.set_enabled(not (type(k.is_enabled) == "function" and k.is_enabled()))
+			local read, enabled = pcall(k.is_enabled)
+			if not read or type(enabled) ~= "boolean" then return false end
+			local saved = k.set_enabled(not enabled)
+			if saved ~= true then
+				Logger.error(LOG, "Metrics collection setting could not be saved.")
+				show_error(i18n_safe("dialog.personal_info.save_failed_title"), i18n_safe("common.error_title"))
+				return false
+			end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
 		end,
 		-- `command` rows since 2026-08-07: the label and the greying are the
 		-- manifest's, so this driver supplies only the window each one opens.

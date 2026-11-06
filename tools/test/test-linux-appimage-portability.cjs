@@ -73,6 +73,8 @@ for (const [name, exceeds] of [
 	['GLIBC_2.36', true],
 	['GLIBC_3.0', true],
 	['GLIBC_PRIVATE', true],
+	['GLIBC_ABI_DT_RELR', true],
+	['GLIBC_ABI_UNKNOWN', true],
 	['GLIBC_2.35', false],
 	['GLIBC_2.34', false],
 	['GLIBC_2.2.5', false],
@@ -131,6 +133,24 @@ passed++;
 		'/nix/store/abc-glibc/lib/ld-linux-x86-64.so.2'
 	);
 	assert.equal(Ceiling.parseInterpreter('There is no dynamic section in this file.'), null);
+	assert.equal(
+		Ceiling.parseInterpreter(
+			'      [Requesting program interpreter: /lib64/ld-linux-x86-64.so.2 bad]'
+		),
+		'/lib64/ld-linux-x86-64.so.2 bad',
+		'the complete interpreter is compared, including spaces'
+	);
+	assert.equal(
+		Ceiling.parseInterpreter('  [Requesting program interpreter: /lib64/ld-linux-x86-64.so.2]bad]'),
+		'/lib64/ld-linux-x86-64.so.2]bad'
+	);
+	assert.throws(
+		() =>
+			Ceiling.parseInterpreter(
+				'  [Requesting program interpreter: /lib64/ld-linux-x86-64.so.2\nbad]'
+			),
+		/unreadable program interpreter/
+	);
 	for (const name of [
 		'libc.so.6',
 		'libm.so.6',
@@ -192,6 +212,17 @@ passed++;
 			),
 			['ld-linux-x86-64.so.2', 'libc.so.6'],
 			'a staged C library or loader is refused'
+		);
+		fs.unlinkSync(path.join(tree, 'usr/lib/libc.so.6'));
+		fs.unlinkSync(path.join(tree, 'usr/lib/ld-linux-x86-64.so.2'));
+		fs.symlinkSync('libluv.so.1', path.join(tree, 'usr/lib/libc.so.6'));
+		fs.symlinkSync('missing-target', path.join(tree, 'usr/lib/ld-linux-x86-64.so.2'));
+		assert.deepEqual(
+			Ceiling.checkTree([tree], noNeeds, readInterpreter).bundledLibc.map((file) =>
+				path.basename(file)
+			),
+			['ld-linux-x86-64.so.2', 'libc.so.6'],
+			'recipient library aliases are refused without following their targets'
 		);
 	} finally {
 		fs.rmSync(tree, { recursive: true, force: true });
@@ -492,12 +523,113 @@ if (process.platform === 'linux') {
 	const { bashExecutable } = require('../lib/git-bash.cjs');
 	const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-libc-preflight-'));
 	try {
-		const appDir = path.join(sandbox, 'AppDir');
+		// A requested image cannot succeed merely because its producer is absent.
+		const missingProducer = path.join(sandbox, 'missing-appimagetool.sh');
+		fs.writeFileSync(
+			missingProducer,
+			'command() { if [ "$1" = -v ] && [ "$2" = appimagetool ]; then return 1; fi; builtin command "$@"; }\n'
+		);
+		const isolatedBuild = path.join(sandbox, 'missing-producer-build');
+		fs.mkdirSync(path.join(isolatedBuild, 'AppDir'), { recursive: true });
+		const sentinel = path.join(isolatedBuild, 'AppDir/sentinel');
+		fs.writeFileSync(sentinel, 'previous state\n');
+		const unavailable = spawnSync(
+			bashExecutable(),
+			[path.join(ROOT, 'tools/build/build-linux-appimage.sh')],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, BASH_ENV: missingProducer, ERGOPTI_LINUX_BUILD_DIR: isolatedBuild }
+			}
+		);
+		assert.equal(unavailable.status, 69, unavailable.stderr);
+		assert.match(unavailable.stderr, /appimagetool/);
+		assert.equal(fs.readFileSync(sentinel, 'utf8'), 'previous state\n');
+		const stagingOnly = spawnSync(
+			bashExecutable(),
+			[path.join(ROOT, 'tools/build/build-linux-appimage.sh'), '--skip-appimage'],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, BASH_ENV: missingProducer, ERGOPTI_LINUX_BUILD_DIR: isolatedBuild }
+			}
+		);
+		assert.notEqual(stagingOnly.status, 69, 'staging alone does not require appimagetool');
+		assert.match(stagingOnly.stdout, /Driver bundle not found/);
+
+		// Replaying the real producer tail must retain the last good output on failure.
+		const publicationRoot = path.join(sandbox, 'appimage-publication');
+		fs.mkdirSync(publicationRoot);
+		const artifact = path.join(publicationRoot, 'ergopti.AppImage');
+		fs.writeFileSync(artifact, 'previous image\n');
+		fs.writeFileSync(`${artifact}.zsync`, 'previous metadata\n');
+		const publicationStart = builder.indexOf('echo "Building AppImage..."');
+		const publicationEnd = builder.indexOf('\nif [ -f "$APPIMAGE_FILE" ]; then', publicationStart);
+		assert.ok(publicationStart >= 0 && publicationEnd > publicationStart);
+		const publication = spawnSync(
+			bashExecutable(),
+			[
+				'-c',
+				`set -euo pipefail\nappimagetool() { printf partial > "$4"; return 42; }\n${builder.slice(publicationStart, publicationEnd)}`
+			],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: {
+					...process.env,
+					BUILD_DIR: publicationRoot,
+					APPDIR: '/unused-appdir',
+					ARCH: 'x86_64',
+					UPDATE_INFORMATION: 'fixture',
+					APPIMAGE_ASSET: 'ergopti.AppImage',
+					APPIMAGE_FILE: artifact,
+					APPIMAGE_CHECK: '/unused-check'
+				}
+			}
+		);
+		assert.notEqual(publication.status, 0);
+		assert.equal(fs.readFileSync(artifact, 'utf8'), 'previous image\n');
+		assert.equal(fs.readFileSync(`${artifact}.zsync`, 'utf8'), 'previous metadata\n');
+		const success = spawnSync(
+			bashExecutable(),
+			[
+				'-c',
+				`set -euo pipefail\nappimagetool() { printf image > "$4"; printf metadata > "$4.zsync"; }\nnode() { :; }\n${builder.slice(publicationStart, publicationEnd)}`
+			],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: {
+					...process.env,
+					BUILD_DIR: publicationRoot,
+					APPDIR: '/unused-appdir',
+					ARCH: 'x86_64',
+					UPDATE_INFORMATION: 'fixture',
+					APPIMAGE_ASSET: 'ergopti.AppImage',
+					APPIMAGE_FILE: artifact,
+					APPIMAGE_CHECK: '/unused-check'
+				}
+			}
+		);
+		assert.equal(success.status, 0, success.stderr);
+		assert.equal(fs.readFileSync(artifact, 'utf8'), 'image');
+		assert.equal(fs.readFileSync(`${artifact}.zsync`, 'utf8'), 'metadata');
+		assert.deepEqual(fs.readdirSync(publicationRoot).sort(), [
+			'ergopti.AppImage',
+			'ergopti.AppImage.zsync'
+		]);
+
+		const appDir = path.join(sandbox, 'AppDir\n');
 		const write = (relative, text, mode = 0o755) => {
 			fs.mkdirSync(path.dirname(path.join(appDir, relative)), { recursive: true });
 			fs.writeFileSync(path.join(appDir, relative), text, { mode });
 		};
 		write('AppRun', appRunSource);
+		const wrapperSource = builder
+			.split(`cat > "$APPDIR/usr/bin/ergopti" << 'WRAPPER_EOF'\n`)[1]
+			.split('\nWRAPPER_EOF')[0];
+		write('usr/bin/ergopti', wrapperSource);
+
 		write('usr/lib/ergopti/libc-preflight.sh', preflight, 0o644);
 		write(
 			'usr/lib/ergopti/network-runtime-env.sh',
@@ -547,13 +679,27 @@ if (process.platform === 'linux') {
 		// 2.9 is older than 2.35: the comparison is numeric.
 		assert.equal(launch('glibc 2.9', 'de_DE', false).status, Preflight.REFUSAL_EXIT);
 		assert.match(launch('glibc 2.34', 'xx_XX', false).stderr, /this system has glibc 2\.34\./);
+		fs.symlinkSync(bashExecutable(), path.join(bin, 'bash'));
+		try {
+			const wrapper = spawnSync(path.join(appDir, 'usr/bin/ergopti'), [], {
+				encoding: 'utf8',
+				env: { PATH: bin, FAKE_LIBC: 'glibc 2.35' }
+			});
+			assert.equal(wrapper.status, 0, wrapper.stderr);
+			assert.equal(
+				wrapper.stdout,
+				`launched ${appDir}/usr/lib/ergopti/ergopti_hotstrings.lua --tray\n`
+			);
+		} finally {
+			fs.unlinkSync(path.join(bin, 'bash'));
+		}
 		for (const libc of ['glibc 2.35', 'glibc 2.43', 'glibc 3.0']) {
 			const admitted = launch(libc, 'en_US.UTF-8', true);
 			assert.equal(admitted.status, 0, `${libc}: ${admitted.stderr}`);
 			assert.equal(admitted.stderr, '');
-			assert.match(
+			assert.equal(
 				admitted.stdout,
-				/^launched \S+\/usr\/lib\/ergopti\/ergopti_hotstrings\.lua --tray\n$/
+				`launched ${appDir}/usr/lib/ergopti/ergopti_hotstrings.lua --tray\n`
 			);
 		}
 	} finally {
@@ -628,6 +774,7 @@ function elfWith(updateInformation, sectionName = Update.UPDATE_SECTION) {
 	info.write(updateInformation, 'utf8');
 	const header = Buffer.alloc(64);
 	Buffer.from([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1]).copy(header);
+	header.writeUInt16LE(62, 0x12); // EM_X86_64
 	const namesAt = 64;
 	const infoAt = namesAt + names.length;
 	const tableAt = infoAt + info.length;
@@ -662,14 +809,21 @@ function zsyncFor(length, overrides = {}) {
 		Length: String(length),
 		'Hash-Lengths': '2,2,4',
 		URL: Update.APPIMAGE_ASSET,
-		'SHA-1': '0123456789abcdef0123456789abcdef01234567',
+		'SHA-1': require('node:crypto').createHash('sha1').update(image).digest('hex'),
 		...overrides
 	};
 	const text = Object.entries(fields)
 		.filter(([, value]) => value !== null)
 		.map(([key, value]) => `${key}: ${value}`)
 		.join('\n');
-	return Buffer.concat([Buffer.from(`${text}\n\n`, 'latin1'), Buffer.from([1, 2, 3, 4])]);
+	const sizes = /^\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*$/.exec(fields['Hash-Lengths'] ?? '1,4,16');
+	const weak = sizes && Number(sizes[2]) >= 1 && Number(sizes[2]) <= 4 ? Number(sizes[2]) : 2;
+	const strong = sizes && Number(sizes[3]) >= 3 && Number(sizes[3]) <= 16 ? Number(sizes[3]) : 4;
+	const blocksize = Number(fields.Blocksize) > 0 ? Number(fields.Blocksize) : 2048;
+	return Buffer.concat([
+		Buffer.from(`${text}\n\n`, 'latin1'),
+		Update.zsyncBlockSums(image, blocksize, weak, strong)
+	]);
 }
 
 assert.equal(
@@ -677,6 +831,8 @@ assert.equal(
 	'gh-releases-zsync|adrienm7|ergopti|latest|ErgoptiPlus-*x86_64.AppImage.zsync'
 );
 assert.equal(Update.APPIMAGE_ASSET, APPIMAGE_ASSET);
+// zsyncmake 0.6.2 -b 512 on the three bytes "abc", including final-block padding.
+assert.equal(Update.zsyncBlockSums(Buffer.from('abc'), 512, 2, 3).toString('hex'), '4ad8259805');
 assert.ok(
 	Update.globMatches(
 		Update.parseUpdateInformation(Update.UPDATE_INFORMATION).pattern,
@@ -687,7 +843,66 @@ assert.ok(!Update.globMatches('ErgoptiPlus-*x86_64.AppImage.zsync', 'ErgoptiPlus
 assert.throws(() => Update.parseUpdateInformation('zsync|a|b|c|d'), /gh-releases-zsync/);
 const image = elfWith(Update.UPDATE_INFORMATION);
 assert.equal(Update.readEmbeddedUpdateInformation(image), Update.UPDATE_INFORMATION);
+const truncatedNames = Buffer.from(image);
+const sectionTable = Number(truncatedNames.readBigUInt64LE(0x28));
+truncatedNames.writeBigUInt64LE(1n, sectionTable + 2 * 64 + 0x20);
+assert.throws(
+	() => Update.readEmbeddedUpdateInformation(truncatedNames),
+	/section.*name|name.*section/i
+);
+const unterminatedNames = Buffer.from(image);
+unterminatedNames.writeBigUInt64LE(
+	BigInt(1 + Update.UPDATE_SECTION.length),
+	sectionTable + 2 * 64 + 0x20
+);
+assert.throws(() => Update.readEmbeddedUpdateInformation(unterminatedNames), /section.*name/i);
+
 assert.deepEqual(Update.verify(image, zsyncFor(image.length)), []);
+const corruptBlocks = zsyncFor(image.length);
+corruptBlocks[corruptBlocks.length - 1] ^= 1;
+assert.ok(
+	Update.verify(image, corruptBlocks).some((problem) =>
+		/block checksums do not match/.test(problem)
+	)
+);
+const largeImage = Buffer.concat([image, Buffer.alloc(4 * 1024 * 1024)]);
+const tinyTruncated = Buffer.from(
+	[
+		'zsync: 0.6.2',
+		`Filename: ${Update.APPIMAGE_ASSET}`,
+		`URL: ${Update.APPIMAGE_ASSET}`,
+		`Length: ${largeImage.length}`,
+		'Blocksize: 1',
+		'Hash-Lengths: 2,2,4',
+		`SHA-1: ${require('node:crypto').createHash('sha1').update(largeImage).digest('hex')}`,
+		'',
+		'x'
+	].join('\n')
+);
+assert.ok(
+	Update.verify(largeImage, tinyTruncated).some((problem) =>
+		/truncated block checksums/.test(problem)
+	),
+	'truncated tiny blocks are rejected before constructing millions of records'
+);
+const wrongArch = Buffer.from(image);
+wrongArch.writeUInt16LE(183, 0x12); // EM_AARCH64
+const wrongArchHash = require('node:crypto').createHash('sha1').update(wrongArch).digest('hex');
+assert.ok(
+	Update.verify(wrongArch, zsyncFor(wrongArch.length, { 'SHA-1': wrongArchHash })).some((problem) =>
+		/architecture/i.test(problem)
+	)
+);
+for (const lengths of [null, '1,1,3', '2,4,16', '1, 4, 16'])
+	assert.deepEqual(Update.verify(image, zsyncFor(image.length, { 'Hash-Lengths': lengths })), []);
+const multipleBlocks = zsyncFor(image.length, { Blocksize: '512' });
+assert.deepEqual(Update.verify(image, multipleBlocks), []);
+assert.ok(
+	Update.verify(image, multipleBlocks.subarray(0, -1)).some((problem) =>
+		/truncated block checksums/.test(problem)
+	)
+);
+
 for (const [what, badImage, badZsync, expected] of [
 	['an AppImage built without -u', elfWith(''), zsyncFor(image.length), /differs from/],
 	[
@@ -716,10 +931,37 @@ for (const [what, badImage, badZsync, expected] of [
 	],
 	['a zsync of another size', image, zsyncFor(image.length + 1), /Length/],
 	['a zsync without a hash', image, zsyncFor(image.length, { 'SHA-1': null }), /SHA-1/],
+	['a zsync with zero block size', image, zsyncFor(image.length, { Blocksize: '0' }), /Blocksize/],
+	[
+		'a zsync with non-power-of-two blocks',
+		image,
+		zsyncFor(image.length, { Blocksize: '3' }),
+		/Blocksize/
+	],
+	...['0,2,4', '3,2,4', '1,0,4', '1,5,4', '1,2,2', '1,2,17', 'bad'].map((lengths) => [
+		`invalid hash lengths ${lengths}`,
+		image,
+		zsyncFor(image.length, { 'Hash-Lengths': lengths }),
+		/Hash-Lengths/
+	]),
+	['truncated checksum records', image, zsyncFor(image.length).subarray(0, -1), /block checksums/],
+
+	[
+		'a zsync with malformed block size',
+		image,
+		zsyncFor(image.length, { Blocksize: 'NaN' }),
+		/Blocksize/
+	],
+	[
+		'a zsync for different bytes',
+		image,
+		zsyncFor(image.length, { 'SHA-1': '0'.repeat(40) }),
+		/SHA-1.*match/
+	],
 	[
 		'a zsync with no blocks',
 		image,
-		Buffer.from(zsyncFor(image.length).subarray(0, -4)),
+		Buffer.from(zsyncFor(image.length).subarray(0, -6)),
 		/no block checksums/
 	],
 	['a zsync with no header end', image, Buffer.from('zsync: 0.6.2\n'), /terminating blank line/],
@@ -739,7 +981,10 @@ passed++;
 const packager = read('tools/build/build-linux-appimage.sh');
 assert.match(packager, /--print-update-information/);
 assert.match(packager, /appimagetool -u "\$UPDATE_INFORMATION" "\$APPDIR" "\$APPIMAGE_ASSET"/);
-assert.match(packager, /node "\$APPIMAGE_CHECK" "\$APPIMAGE_FILE" "\$APPIMAGE_FILE\.zsync"/);
+assert.match(
+	packager,
+	/node "\$APPIMAGE_CHECK" "\$APPIMAGE_STAGE\/\$APPIMAGE_ASSET" "\$APPIMAGE_STAGE\/\$APPIMAGE_ASSET\.zsync"/
+);
 assert.ok(
 	!/Ergopti-\$\{VERSION\}/.test(packager),
 	'the AppImage keeps the release name from the start'

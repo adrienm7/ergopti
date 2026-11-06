@@ -142,6 +142,35 @@ local function assert_no_retired(rows)
 	helpers.assert_true(seen > 10, "the walk must have seen the tree, or the absence proves nothing")
 end
 
+helpers.describe("word delimiter admission", function()
+	helpers.it("reports an existing delimiter instead of silently refusing it", function()
+		local config = fake_config(true, true)
+		local menu = hotstrings_menu(config)
+		local function find(rows)
+			for _, row in ipairs(rows or {}) do
+				if row.title == require("infra.i18n").get("menu.hotstrings.add_delimiter") then return row end
+				local found = find(row.menu); if found then return found end
+			end
+		end
+		local add = find(menu)
+		helpers.assert_true(add ~= nil)
+		local modal = require("ui.modal")
+		local previous, execute, calls, command = modal.run, os.execute, 0, nil
+		os.execute = function(text) command = text; return true end
+		modal.run = function(fn)
+			calls = calls + 1
+			if calls == 1 then return true, "," end
+			if calls == 3 then return fn() end
+			return true
+		end
+		local ok, err = pcall(add.fn)
+		modal.run, os.execute = previous, execute
+		assert(ok, err)
+		helpers.assert_eq(calls, 3, "entry, consumption question, then error dialog")
+		helpers.assert_true(command:find(string.format(require("infra.i18n").get("editor.hotstrings.err_id_exists"), ","), 1, true) ~= nil)
+	end)
+end)
+
 helpers.describe("hotstring bulk controls are one checkbox each (linux)", function()
 	for _, posture in ipairs({ true, false }) do
 		for _, enabled in ipairs({ true, false }) do

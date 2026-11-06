@@ -24,10 +24,10 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-package-recipe-')
 process.on('exit', () => fs.rmSync(scratch, { recursive: true, force: true }));
 const BUILD = path.join(scratch, "build root '\n literal");
 const env = { ...process.env, ERGOPTI_BUILD_VERSION: '1.0.3', ERGOPTI_LINUX_BUILD_DIR: BUILD };
-function run(script, args = []) {
+function run(script, args = [], extraEnv = {}) {
 	return spawnSync(bashExecutable(), [path.join(ROOT, 'tools/build', script), ...args], {
 		cwd: ROOT,
-		env,
+		env: { ...env, ...extraEnv },
 		encoding: 'utf8',
 		timeout: 120000,
 		maxBuffer: 4 * 1024 * 1024
@@ -44,6 +44,35 @@ assert.equal(
 // Both packagers carry the AppImage's private runtime; its native content is
 // the oldest-LTS stager's to prove, so an existence fixture stands in here.
 stageAppDir(BUILD);
+{
+	const installer = path.join(BUILD, 'install.sh');
+	const before = fs.readFileSync(installer);
+	try {
+		const refused = run('build-linux-bundle-archive.sh', ['install.sh']);
+		assert.notEqual(refused.status, 0, 'the bundle may not overwrite its own installer input');
+		assert.deepEqual(fs.readFileSync(installer), before);
+	} finally {
+		fs.writeFileSync(installer, before);
+	}
+	if (process.platform === 'linux') {
+		for (const suffix of ['', '.sha256']) {
+			const foreign = path.join(scratch, `foreign-bundle${suffix || '-archive'}`);
+			const output = path.join(BUILD, `linked.tar.gz${suffix}`);
+			fs.writeFileSync(foreign, 'user data\n');
+			fs.symlinkSync(foreign, output);
+			const refused = run('build-linux-bundle-archive.sh', ['linked.tar.gz']);
+			assert.notEqual(refused.status, 0, 'linked bundle outputs must be refused');
+			assert.equal(fs.readFileSync(foreign, 'utf8'), 'user data\n');
+			if (suffix) assert.equal(fs.existsSync(path.join(BUILD, 'linked.tar.gz')), false);
+			fs.unlinkSync(output);
+		}
+	}
+	const unusual = '--bundle.tar.gz';
+	const builtBundle = run('build-linux-bundle-archive.sh', [unusual]);
+	assert.equal(builtBundle.status, 0, builtBundle.stderr || builtBundle.stdout);
+	assert.ok(fs.statSync(path.join(BUILD, unusual)).size > 0);
+	assert.ok(fs.statSync(path.join(BUILD, `${unusual}.sha256`)).size > 0);
+}
 let refusals = 0;
 for (const format of ['deb', 'rpm']) {
 	const script = `build-linux-${format}.sh`;
@@ -80,7 +109,17 @@ for (const format of ['deb', 'rpm']) {
 		);
 		refusals++;
 	}
-	const valid = run(script, stagingArgs(format));
+	const missingProducer = path.join(scratch, `${format}-missing-producer.sh`);
+	const executable = format === 'deb' ? 'dpkg-deb' : 'rpmbuild';
+	fs.writeFileSync(
+		missingProducer,
+		`command() { if [ "$1" = -v ] && [ "$2" = ${executable} ]; then return 1; fi; builtin command "$@"; }\n`
+	);
+	const missing = run(script, [], { BASH_ENV: missingProducer });
+	assert.equal(missing.status, 69, `${script} must fail when ${executable} is unavailable`);
+	assert.match(missing.stderr, new RegExp(executable));
+	assert.equal(fs.statSync(marker).ino, before.ino, 'missing producer must not replace staging');
+	const valid = run(script, stagingArgs(format), { BASH_ENV: missingProducer });
 	assert.equal(valid.status, 0, valid.stderr || valid.stdout || valid.error?.message);
 	assert.ok(valid.stdout.includes(`Structure complete (${skip})`));
 	assert.equal(
@@ -88,10 +127,32 @@ for (const format of ['deb', 'rpm']) {
 		false,
 		'a valid explicit staging request must still rebuild its owned tree'
 	);
+	if (format === 'deb') {
+		const oldOutput = path.join(BUILD, 'ergopti_1.0.3_amd64.deb');
+		fs.writeFileSync(oldOutput, 'previous package\n');
+		const silentProducer = path.join(scratch, 'silent-dpkg-deb.sh');
+		fs.writeFileSync(silentProducer, 'dpkg-deb() { return 0; }\n');
+		const missingOutput = run(script, [], { BASH_ENV: silentProducer });
+		assert.notEqual(missingOutput.status, 0, 'a stale archive cannot certify a new package');
+		assert.equal(fs.readFileSync(oldOutput, 'utf8'), 'previous package\n');
+		const refusedPublication = path.join(scratch, 'refused-deb-publication.sh');
+		fs.writeFileSync(
+			refusedPublication,
+			'dpkg-deb() { printf "new package\\n" > "${!#}"; }\n' +
+				'mv() { case "${!#}" in *.deb) return 1 ;; esac; command mv "$@"; }\n'
+		);
+		const refused = run(script, [], { BASH_ENV: refusedPublication });
+		assert.notEqual(refused.status, 0, 'a failed publication must fail the build');
+		assert.equal(fs.readFileSync(oldOutput, 'utf8'), 'previous package\n');
+		assert.equal(
+			fs.readdirSync(BUILD).filter((name) => name.startsWith('.ergopti-deb.')).length,
+			0
+		);
+	}
 	console.log(`PASS package-argument-admission-${format}`);
 }
 try {
-	const alias = path.join(scratch, "project root '\n literal");
+	const alias = path.join(scratch, "project root '\n literal\n");
 	fs.symlinkSync(ROOT, alias, 'dir');
 	for (const format of ['deb', 'rpm']) {
 		const staged = spawnSync(

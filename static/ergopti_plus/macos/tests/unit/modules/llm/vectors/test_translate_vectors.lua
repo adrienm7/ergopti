@@ -37,6 +37,11 @@ helpers.describe("translation helpers replay the shared translate corpus", funct
 	local corpus = read_json("tests/corpus/llm/translate_vectors.json")
 	local config = read_json("modules/llm/translate.json")
 	local names = read_json("data/locale_names.json")
+	helpers.it("preserves Markdown and code in translation content", function()
+		for _, answer in ipairs({ "TRANSLATION: **Bonjour** `x**2`", "**TRANSLATION:** **Bonjour** `x**2`" }) do
+			helpers.assert_eq(Translate.extract(config, answer), "**Bonjour** `x**2`")
+		end
+	end)
 
 	for _, v in ipairs(corpus.parse_vectors) do
 		helpers.it("parse vector '" .. v.id .. "'", function()

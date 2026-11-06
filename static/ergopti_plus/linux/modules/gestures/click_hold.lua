@@ -124,8 +124,43 @@ function M.new(active)
 		return owner.pump()
 	end
 
+	--- Retires only the binding that acquired this button; another shortcut may
+	--- own a different hold of the same global action.
+	function owner.retire_binding(button, binding)
+		local state = states[button]
+		if type(binding) ~= "string" or not state or state.binding ~= binding then return true end
+		state.wanted = false
+		if not busy then owner.pump() end
+		return states[button] == nil
+	end
+
+	-- Capture the exact physical obligation, not just its reusable binding name.
+	-- Finalization is harmless if this obligation has already been replaced.
+	function owner.capture_binding_retirement(button, binding)
+		local state = states[button]
+		if not state or state.binding ~= binding then return function() end end
+		return function()
+			if states[button] ~= state then return end
+			state.wanted = false
+			if not busy then owner.pump() end
+		end
+	end
+
+	--- Captures the exact current holds for retirement after durable publication.
+	--- @return function retire Successor holds remain owned by their own bindings.
+	function owner.capture_retirement()
+		local captured = { ["1"] = states["1"], ["3"] = states["3"] }
+		return function()
+			for _, button in ipairs({ "1", "3" }) do
+				local state = captured[button]
+				if state and states[button] == state then state.wanted = false end
+			end
+			if not busy then owner.pump() end
+		end
+	end
+
 	--- Accepts one toggle without waiting for any native child in the callback.
-	function owner.toggle(button)
+	function owner.toggle(button, binding)
 		if (button ~= "1" and button ~= "3") or busy or retiring then return false end
 		local state = states[button]
 		if state then
@@ -136,7 +171,7 @@ function M.new(active)
 		busy = true
 		local captured = epoch
 		if not admitted() or epoch ~= captured then busy = false; return false end
-		state = { wanted = true }
+		state = { wanted = true, binding = binding }
 		states[button] = state -- The obligation precedes fallible native admission.
 		dispatch(button, state, true)
 		busy = false

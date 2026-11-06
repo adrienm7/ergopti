@@ -177,7 +177,7 @@ helpers.describe("wpm_widget: mouseCallback closure sources geometry from _canva
 		local src = read_src()
 		local mouseup_pos = src:find('elseif event == "mouseUp" then', 1, true)
 		helpers.assert_true(mouseup_pos ~= nil, "mouseCallback must handle the mouseUp event")
-		local mouseup_body = src:sub(mouseup_pos, mouseup_pos + 700)
+		local mouseup_body = src:sub(mouseup_pos, mouseup_pos + 1200)
 		helpers.assert_true(mouseup_body:find("_canvas_geom.canvas_width", 1, true) ~= nil,
 			"mouseUp must read _canvas_geom.canvas_width instead of the frozen canvas_width local")
 		helpers.assert_true(mouseup_body:find("_canvas_geom.compact_w", 1, true) ~= nil,

@@ -17,6 +17,19 @@ local function engine()
 end
 
 helpers.describe("modifier consumers: independent causal wire and capture expectations", function()
+	helpers.it("an unissued remapper release cannot lift a physical owner", function()
+		local broker = require("adapters.modifier_broker").controlled()
+		local physical, remapper, rows = {}, {}, {}
+		local function emit(code, value) rows[#rows + 1] = { code, value }; return true end
+		helpers.assert_true(broker.edge(physical, 29, 1, emit).ok)
+		local unmatched = broker.edge(remapper, 29, 0, emit)
+		helpers.assert_true(unmatched.ok)
+		helpers.assert_eq(unmatched.disposition, "unmatched")
+		helpers.assert_eq(rows, { { 29, 1 } })
+		helpers.assert_true(broker.edge(physical, 29, 0, emit).ok)
+		helpers.assert_eq(rows, { { 29, 1 }, { 29, 0 } })
+	end)
+
 	helpers.it("three sources produce one first down and one final up while retaining every physical edge", function()
 		Fixture.with_session(nil, function(s)
 			s.queue("a", 42, 1, 1); s.queue("b", 42, 1, 2); s.queue("c", 42, 1, 3)

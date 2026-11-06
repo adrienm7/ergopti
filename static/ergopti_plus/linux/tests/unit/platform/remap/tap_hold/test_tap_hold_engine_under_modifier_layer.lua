@@ -18,6 +18,34 @@ local helpers, Engine, DOWN, UP, REPEAT, SHIFT, CTRL, ALT, CAPS, ENTER, BACKSPAC
 
 
 helpers.describe("tap-hold engine: under a modifier and on the layer", function()
+	helpers.it("keeps a physical blocker down until both source keyboards release it", function()
+		local e = engine({ left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } })
+		local a = { source = "a", generation = 1 }
+		local b = { source = "b", generation = 1 }
+		e:process(CAPS, DOWN, 0, a); e:process(CAPS, DOWN, 1, b); e:process(CAPS, UP, 2, a)
+		helpers.assert_eq(trail(e:process(ALT, DOWN, 3, b)), "", "the remaining CapsLock still blocks the one-shot")
+		e:process(ALT, UP, 4, b); e:process(CAPS, UP, 5, b)
+		helpers.assert_eq(trail(e:process(ALT, DOWN, 6, b)), "42↓", "the last release removes the blocker")
+	end)
+	helpers.it("releases held chord keys in reverse press order during retirement", function()
+		for _, order in ipairs({ { SHIFT, CTRL, ALT }, { CTRL, SHIFT, ALT }, { ALT, CTRL, SHIFT },
+			{ SHIFT, ALT, CTRL }, { CTRL, ALT, SHIFT }, { ALT, SHIFT, CTRL } }) do
+			local e = engine({})
+			e:combination_hold({ mods = order })
+			local releases = e:release_all()
+			helpers.assert_eq({ releases[1].code, releases[2].code, releases[3].code }, { order[3], order[2], order[1] })
+		end
+	end)
+
+	helpers.it("retires shared and reacquired holds in their current press order", function()
+		local e = engine({})
+		local _, first = e:combination_hold({ mods = { CTRL, SHIFT } })
+		e:combination_hold({ mods = { CTRL } })
+		helpers.assert_eq(trail(e:combination_release(first)), "42↑")
+		e:combination_hold({ mods = { SHIFT } })
+		helpers.assert_eq(trail(e:release_all()), "42↑ 29↑")
+		helpers.assert_eq(trail(e:release_all()), "")
+	end)
 
 	local TAB = 15
 	local WITH_TAB = {

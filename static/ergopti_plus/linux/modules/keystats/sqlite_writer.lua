@@ -38,6 +38,7 @@ local TextUtils = require("text_utils")
 local Logger        = require("logger.shim")
 local SqliteCommand = require("modules.keystats.sqlite_command")
 local TextCipher    = require("modules.keystats.text_cipher")
+local MigrationPlan = require("keystats.text_migration")
 local EventIdPolicy = require("sqlite.event_id_policy")
 local Json          = require("json")
 local NativePath    = require("native_path")
@@ -127,7 +128,7 @@ end
 --- Runs a SQL statement against the database via the sqlite3 CLI.
 --- @param sql string Complete SQL statement(s) to execute.
 --- @return boolean True on success.
-local function _exec(sql, media_owned)
+local function _exec(sql, media_owned, strict_terminal)
 	if _flush_owner and not _flush_owner:is_settled() then return false end
 	if not _db_path or not _available then return false end
 
@@ -149,13 +150,17 @@ local function _exec(sql, media_owned)
 		return false
 	end
 	local output
-	if media_owned then
+	if media_owned or strict_terminal then
 		local read_ok, body = pcall(pipe.read, pipe, "*a")
 		local close_ok, closed = pcall(pipe.close, pipe)
 		if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
-			_media_terminal_debt = { pipe = pipe, close_acknowledged = close_ok and closed == true }
-			_db_path = nil
-			Logger.error(LOG, "Semantic media terminal observation failed; exact owner and pending events remain unresolved.")
+			if media_owned then
+				_media_terminal_debt = { pipe = pipe, close_acknowledged = close_ok and closed == true }
+				_db_path = nil
+				Logger.error(LOG, "Semantic media terminal observation failed; exact owner and pending events remain unresolved.")
+			else
+				Logger.error(LOG, "SQLite backup process was not completely observed and closed.")
+			end
 			return false
 		end
 		output = body
@@ -202,8 +207,12 @@ local function _query_output(sql)
 	if not cmd then return nil end
 	local pipe = io.popen(cmd, "r")
 	if not pipe then return nil end
-	local output = pipe:read("*a")
-	pipe:close()
+	local read_ok, output = pcall(pipe.read, pipe, "*a")
+	local close_ok, closed = pcall(pipe.close, pipe)
+	if not read_ok or type(output) ~= "string" or not close_ok or closed ~= true then
+		Logger.warn(LOG, "SQLite query could not be completely read and closed.")
+		return nil
+	end
 	local accepted, body, reason = SqliteCommand.read_exit_receipt(output)
 	if not accepted then
 		Logger.warn(LOG, "SQLite read refused: %s.", reason)
@@ -308,6 +317,33 @@ local function _ensure_media_schema()
 	return true
 end
 
+-- Exact SQL emitted into sqlite_master by the shipped pre-Linux schema, plus
+-- the equivalent legacy registry used by the native migration fixture.
+-- A whitelist avoids guessing which unrecognized CHECK or column constraint
+-- is safe to discard during the table rebuild.
+local LEGACY_DEVICE_SCHEMAS = {
+	[ [==[CREATE TABLE devices (
+	device_id                  TEXT PRIMARY KEY,
+	name                       TEXT NOT NULL,
+	os                         TEXT NOT NULL CHECK (os IN ('darwin','windows')),
+	os_version                 TEXT,
+	host_signature             TEXT NOT NULL,
+	created_at                 TEXT NOT NULL,
+	updated_at                 TEXT NOT NULL,
+	-- Watermark of the data.sql file under by_device/<device_id>/ that the
+	-- LOCAL db.sqlite has already ingested. Tracked per device because the
+	-- local sqlite cumulates events from every device's data.sql.
+	imported_data_sql_size     INTEGER NOT NULL DEFAULT 0,
+	imported_data_sql_sha256   TEXT
+)]==] .. "\n" ] = true,
+	[ [==[CREATE TABLE devices (
+ device_id TEXT PRIMARY KEY, name TEXT NOT NULL,
+ os TEXT NOT NULL CHECK(os IN ('darwin','windows')), os_version TEXT,
+ host_signature TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ imported_data_sql_size INTEGER NOT NULL DEFAULT 0, imported_data_sql_sha256 TEXT
+)]==] .. "\n" ] = true,
+}
+
 --- Upgrades databases created before Linux was accepted by devices.os.
 --- The raw event tables deliberately have no foreign keys, but registration
 --- must still succeed so the database remains portable across all three OSes.
@@ -315,8 +351,34 @@ local function _ensure_linux_device_schema()
 	-- sqlite_master preserves multiline DDL. The scalar helper reads only its
 	-- first line, so it missed the existing Linux CHECK and rebuilt the current
 	-- registry on every start, dropping indexes and requiring a write lock.
-	local current_sql = _query_output("SELECT sql FROM sqlite_master WHERE type='table' AND name='devices';") or ""
+	local current_sql = _query_output("SELECT sql FROM sqlite_master WHERE type='table' AND name='devices';")
+	if current_sql == nil then
+		Logger.error(LOG, "Cannot inspect the existing device registry schema.")
+		return false
+	end
 	if current_sql:find("linux", 1, true) then return true end
+	if not LEGACY_DEVICE_SCHEMAS[current_sql] then
+		Logger.error(LOG, "Cannot safely upgrade an unrecognized legacy device registry schema.")
+		return false
+	end
+	-- Rebuilding drops indexes and triggers attached to devices, and SQLite's
+	-- rename can rewrite dependent foreign keys or views to the old name.
+	-- Refuse when such schema or an extra column may exist; preserve user extensions.
+	local dependencies = _query_scalar([[
+SELECT (SELECT count(*) FROM sqlite_master
+        WHERE (type='index' AND tbl_name='devices' AND sql IS NOT NULL)
+           OR type IN ('trigger','view'))
+     + (SELECT count(*) FROM sqlite_master AS m JOIN pragma_foreign_key_list(m.name) AS f
+        WHERE m.type='table' AND f."table"='devices')
+     + (SELECT count(*) FROM pragma_index_list('devices') WHERE origin='u')
+     + (SELECT CASE WHEN group_concat(name, '|') =
+          'device_id|name|os|os_version|host_signature|created_at|updated_at|imported_data_sql_size|imported_data_sql_sha256'
+          THEN 0 ELSE 1 END FROM pragma_table_xinfo('devices'));
+]])
+	if dependencies ~= "0" then
+		Logger.error(LOG, "Cannot safely upgrade the device registry with dependent or unreadable schema.")
+		return false
+	end
 	return _exec([[
 BEGIN;
 ALTER TABLE devices RENAME TO devices_pre_linux;
@@ -362,6 +424,42 @@ function M.flush_transport_available()
 	return require("infra.sqlite_batch_process").is_available() == true
 end
 
+--- Reserves a private, unique folder for this attempt. Earlier backups are
+--- retained: their existence does not prove they describe the current store.
+local function reserve_migration_backup()
+	local loaded, uv = pcall(require, "luv")
+	if not loaded or type(uv.fs_mkdtemp) ~= "function" or type(uv.fs_lstat) ~= "function"
+		or type(uv.getuid) ~= "function" then return nil end
+	local uid_ok, uid = pcall(uv.getuid)
+	if not uid_ok or type(uid) ~= "number" then return nil end
+	local prefix = _db_path .. TokenEncoding.BACKUP_SUFFIX .. "."
+	local made, dir = pcall(uv.fs_mkdtemp, prefix .. "XXXXXX")
+	if not made or type(dir) ~= "string" or dir:sub(1, #prefix) ~= prefix or #dir ~= #prefix + 6
+		or dir:sub(#prefix + 1):find("[/%z]") then return nil end
+	local checked, stat = pcall(uv.fs_lstat, dir)
+	if not checked or type(stat) ~= "table" or stat.type ~= "directory" or stat.uid ~= uid
+		or type(stat.mode) ~= "number" or stat.mode % 512 ~= 448
+		or type(stat.dev) ~= "number" or stat.dev < 0 or stat.dev % 1 ~= 0 or stat.dev >= 2 ^ 53
+		or type(stat.ino) ~= "number" or stat.ino < 0 or stat.ino % 1 ~= 0 or stat.ino >= 2 ^ 53 then return nil end
+	return { path = dir .. "/snapshot.sqlite", dir = dir, dev = stat.dev, ino = stat.ino, uid = uid, uv = uv }
+end
+
+--- Rechecks the reserved directory and the completed private snapshot before
+--- changing the original. Metadata checks fence observed replacement; they do
+--- not claim an atomic compare-and-swap against same-user concurrent changes.
+local function migration_backup_current(backup)
+	local uv = backup.uv
+	local checked, directory, file = pcall(function()
+		return uv.fs_lstat(backup.dir), uv.fs_lstat(backup.path)
+	end)
+	return checked and type(directory) == "table" and directory.type == "directory"
+		and directory.dev == backup.dev and directory.ino == backup.ino and directory.uid == backup.uid
+		and type(directory.mode) == "number" and directory.mode % 512 == 448
+		and type(file) == "table" and file.type == "file" and file.uid == backup.uid
+		and type(file.mode) == "number" and file.mode % 512 == 384
+		and file.nlink == 1 and type(file.size) == "number" and file.size > 0
+end
+
 --- Moves a store to the current n-gram token encoding, once. This database is
 --- the only copy of its derived keys: unlike Windows and macOS there is no ledger
 --- replay, so the keys are rewritten in place. VACUUM INTO first leaves a
@@ -370,8 +468,19 @@ end
 --- beside old ones would make a later retry escape them twice.
 --- @return boolean True once the store holds the current encoding.
 function M.ensure_token_encoding()
-	local recorded = _query_scalar("SELECT value FROM meta WHERE key='ngram_token_encoding';")
-	if recorded == tostring(TokenEncoding.VERSION) then return true end
+	-- Hex preserves embedded NUL/newline and a prefix distinguishes an absent
+	-- row from a present empty or NULL marker.
+	local version_output = _query_output("SELECT 'version:' || hex(CAST(value AS BLOB)) FROM meta WHERE key='ngram_token_encoding';")
+	if version_output == nil then
+		Logger.error(LOG, "Cannot read the n-gram key migration version.")
+		return false
+	end
+	local current_hex = tostring(TokenEncoding.VERSION):gsub(".", function(ch) return string.format("%02X", ch:byte()) end)
+	if version_output == "version:" .. current_hex .. "\n" then return true end
+	if version_output ~= "" and version_output ~= "version:31\n" then
+		Logger.error(LOG, "The n-gram key migration version is unsupported.")
+		return false
+	end
 	local keys = {}
 	for table_name in pairs(TokenEncoding.MIGRATED_FAMILIES) do
 		local output = _query_output("SELECT DISTINCT hex(token) FROM " .. table_name .. " WHERE instr(token,'[')>0;")
@@ -387,11 +496,13 @@ function M.ensure_token_encoding()
 	end
 	local statements = TokenEncoding.migration_statements(keys)
 	if #statements > 0 then
-		local backup = _db_path .. TokenEncoding.BACKUP_SUFFIX
-		local fh = io.open(backup, "rb")
-		if fh then
-			fh:close()
-		elseif not _exec("VACUUM INTO '" .. backup:gsub("'", "''") .. "';") then
+		local backup = reserve_migration_backup()
+		if not backup then
+			Logger.error(LOG, "Cannot reserve a private metrics migration backup.")
+			return false
+		end
+		if not _exec("VACUUM INTO '" .. backup.path:gsub("'", "''") .. "';", false, true)
+			or not migration_backup_current(backup) then
 			Logger.error(LOG, "Cannot back the metrics store up before migrating its n-gram keys.")
 			return false
 		end
@@ -411,29 +522,30 @@ end
 --- canonical schema on first open.
 --- @param db_path string Absolute path to the .sqlite file (e.g. ~/.local/share/ergopti/metrics.sqlite).
 --- @return boolean True on success.
+--- @return string|nil failure "sqlite_unavailable" or "store_refused".
 function M.open_db(db_path)
 	if M.has_private_file_debt() then
 		Logger.error(LOG, "Private SQLite file cleanup remains unresolved; reopening is refused.")
-		return false
+		return false, "store_refused"
 	end
-	if _flush_owner and not _flush_owner:is_settled() then return false end
+	if _flush_owner and not _flush_owner:is_settled() then return false, "store_refused" end
 	if _media_terminal_debt ~= nil then
 		Logger.error(LOG, "Cannot reopen SQLite while semantic media terminal ownership is unresolved.")
-		return false
+		return false, "store_refused"
 	end
 	if type(db_path) ~= "string" or db_path == "" then
 		Logger.error(LOG, "open_db(): db_path must be a non-empty string.")
-		return false
+		return false, "store_refused"
 	end
 
 	-- Bootstrap and schema admission belong to the open store. Repointing it
 	-- would reuse the old admission and a later refusal would lose that owner.
 	if _db_path ~= nil and _db_path ~= db_path then
 		Logger.error(LOG, "Cannot switch SQLite stores before explicitly closing the current store.")
-		return false
+		return false, "store_refused"
 	end
 
-	if not _check_sqlite3() then return false end
+	if not _check_sqlite3() then return false, "sqlite_unavailable" end
 
 	_db_path = db_path
 
@@ -447,7 +559,7 @@ function M.open_db(db_path)
 	if not private then
 		Logger.error(LOG, "SQLite permissions admission refused: %s.", privacy_error)
 		_db_path = nil
-		return false
+		return false, "store_refused"
 	end
 
 	-- Bootstrap schema on first open.
@@ -456,26 +568,28 @@ function M.open_db(db_path)
 		if not schema then
 			Logger.error(LOG, "Schema bootstrap failed — cannot open database.")
 			_db_path = nil
-			return false
+			return false, "store_refused"
 		end
 
 		-- Check if the DB file already exists (has a non-zero size).
 		local fh, detail, code = RegularFileReader.open(_db_path)
 		local existed = false
 		if fh then
-			local size, seek_error = fh:seek("end")
-			local closed, close_error = fh:close()
-			if type(size) ~= "number" or closed ~= true then
+			local seek_ok, size, seek_error = pcall(fh.seek, fh, "end")
+			local close_ok, closed, close_error = pcall(fh.close, fh)
+			if not seek_ok or type(size) ~= "number" or size < 0 or not close_ok or closed ~= true then
+				local detail = not seek_ok and size or (type(size) ~= "number" and seek_error)
+					or (not close_ok and closed) or close_error
 				Logger.error(LOG, "Cannot inspect and close the existing SQLite database at %s: %s.",
-					_db_path, ErrorDescription.describe(type(size) ~= "number" and seek_error or close_error))
+					_db_path, ErrorDescription.describe(detail))
 				_db_path = nil
-				return false
+				return false, "store_refused"
 			end
 			existed = size > 0
 		elseif code ~= RegularFileReader.ENOENT then
 			Logger.error(LOG, "Cannot inspect the SQLite database at %s: %s.", _db_path, ErrorDescription.describe(detail))
 			_db_path = nil
-			return false
+			return false, "store_refused"
 		end
 
 		if not existed then
@@ -483,7 +597,7 @@ function M.open_db(db_path)
 			if not _exec(schema) then
 				Logger.error(LOG, "Schema execution failed.")
 				_db_path = nil
-				return false
+				return false, "store_refused"
 			end
 			Logger.success(LOG, "Schema bootstrapped successfully.")
 		end
@@ -492,14 +606,14 @@ function M.open_db(db_path)
 		Logger.error(LOG, "Unable to upgrade device registry for Linux support.")
 		_bootstrapped = false
 		_db_path = nil
-		return false
+		return false, "store_refused"
 	end
 
 	if not _ensure_media_schema() then
 		_media_policy = nil
 		_bootstrapped = false
 		_db_path = nil
-		return false
+		return false, "store_refused"
 	end
 
 	-- This admission belongs to the successfully opened store. A failed
@@ -667,8 +781,11 @@ _raw_sql.typing = function(device_id, events, first_id, derived)
 		-- cost every query a decryption it does not need.
 		local raw_text = ev.text or ""
 		local raw_json = ev.events_json or "[]"
-		local enc_text = TextCipher.encrypt(device_id, event_id, raw_text)
-		local enc_json = TextCipher.encrypt(device_id, tostring(event_id) .. "j", raw_json)
+		local text_id = MigrationPlan.iv_event_id(event_id, "text")
+		local json_id = MigrationPlan.iv_event_id(event_id, "events_json")
+		if not text_id or not json_id then return nil end
+		local enc_text = TextCipher.encrypt(device_id, text_id, raw_text)
+		local enc_json = TextCipher.encrypt(device_id, json_id, raw_json)
 		if enc_text == nil or enc_json == nil then
 			-- Encryption is on but could not run. Storing the plaintext would
 			-- silently defeat the setting the user turned on, so drop the batch.

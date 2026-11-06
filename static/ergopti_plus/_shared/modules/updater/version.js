@@ -57,6 +57,7 @@ function comparePrereleaseId(a, b) {
 	if (aNum && bNum) {
 		return compareDecimal(a, b);
 	}
+	if (aNum !== bNum) return aNum ? -1 : 1;
 	if (a > b) return 1;
 	if (a < b) return -1;
 	return 0;

@@ -46,6 +46,7 @@ local function load_bridge(controls)
 			context.starts = context.starts + 1
 			context.publish = publish
 			context.local_only = options and options.local_only
+			if context.on_probe_start then context.on_probe_start() end
 			return { cancel = function() context.cancels = context.cancels + 1 end }
 		end,
 	}
@@ -108,6 +109,74 @@ local function page(context)
 end
 
 helpers.describe("diagnostics bridge (linux): the page's messages", function()
+	helpers.it("(healthcheck-ready-owner) drops a snapshot when the page closes during collection", function()
+		with_bridge(nil, function(bridge, context)
+			local old = page(context)
+			local build = bridge.build_snapshot
+			bridge.build_snapshot = function(...)
+				bridge.build_snapshot = build
+				context.epoch = nil
+				bridge.on_window_closed(old.epoch)
+				return build(...)
+			end
+			helpers.assert_nil(bridge.on_message("ready", {}, old))
+			helpers.assert_eq(context.starts, 0)
+		end)
+	end)
+
+	helpers.it("(healthcheck-ready-owner) preserves the replacement opened during collection", function()
+		with_bridge(nil, function(bridge, context)
+			local old = page(context)
+			local build = bridge.build_snapshot
+			bridge.build_snapshot = function(...)
+				bridge.build_snapshot = build
+				context.epoch = 8
+				bridge.on_window_closed(old.epoch)
+				helpers.assert_eq(bridge.on_message("ready", {}, page(context)).type, "init")
+				return build(...)
+			end
+			helpers.assert_nil(bridge.on_message("ready", {}, old))
+			helpers.assert_eq(context.starts, 1, "only the replacement starts probes")
+			bridge.on_window_closed(context.epoch)
+			helpers.assert_eq(context.cancels, 1, "the replacement retains its probes")
+		end)
+	end)
+
+	helpers.it("(healthcheck-probe-start-owner) cancels a run returned after its page closes", function()
+		with_bridge(nil, function(bridge, context)
+			local old = page(context)
+			context.on_probe_start = function()
+				context.on_probe_start = nil
+				context.epoch = nil
+				bridge.on_window_closed(old.epoch)
+			end
+			helpers.assert_nil(bridge.on_message("ready", {}, old))
+			helpers.assert_eq(context.starts, 1)
+			helpers.assert_eq(context.cancels, 1, "the returned run must be cancelled")
+		end)
+	end)
+
+	helpers.it("(healthcheck-probe-start-owner) retains the replacement run when the old start returns", function()
+		with_bridge(nil, function(bridge, context)
+			local old, stale = page(context), nil
+			context.on_probe_start = function()
+				context.on_probe_start = nil
+				stale = context.publish
+				context.epoch = 8
+				bridge.on_window_closed(old.epoch)
+				helpers.assert_eq(bridge.on_message("ready", {}, page(context)).type, "init")
+			end
+			helpers.assert_nil(bridge.on_message("ready", {}, old))
+			helpers.assert_eq(context.starts, 2)
+			helpers.assert_eq(context.cancels, 1, "only the old run was cancelled")
+			local before = #context.pushed
+			stale("configuration", { state = "ok" }, {})
+			helpers.assert_eq(#context.pushed, before, "the old run cannot publish")
+			bridge.on_window_closed(context.epoch)
+			helpers.assert_eq(context.cancels, 2, "replacement run remains cancellable")
+		end)
+	end)
+
 	helpers.it("answers ready with a quick version 2 snapshot starting only the local probes", function()
 		with_bridge(nil, function(bridge, context)
 			local answer = bridge.on_message("ready", {}, page(context))

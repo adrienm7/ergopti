@@ -79,7 +79,8 @@ function RealBackend.fetch(device_id, after_id, limit)
 	local rows = {}
 	for _, line in ipairs(lines) do
 		local row_id, values = Plan.parse_hex_row(line)
-		if row_id then rows[#rows + 1] = { id = row_id, values = values } end
+		if row_id == nil then return nil end
+		rows[#rows + 1] = { id = row_id, values = values }
 	end
 	return rows
 end

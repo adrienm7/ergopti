@@ -58,8 +58,14 @@ function M.new(ports)
 	--- @param decision table Admitted decision.
 	--- @return boolean started
 	local function start(decision)
-		if decision.abandon_reload then ports.abandon_reload() end
-		if not ports.shutdown.is_requested() then ports.apply_pause_layout() end
+		if decision.abandon_reload then
+			local called, err = pcall(ports.abandon_reload)
+			if not called then Logger.error(LOG, "Reload cancellation raised: %s.", tostring(err)) end
+		end
+		if not ports.shutdown.is_requested() then
+			local called, err = pcall(ports.apply_pause_layout)
+			if not called then Logger.error(LOG, "Quit layout switch raised: %s.", tostring(err)) end
+		end
 		local accepted = ports.shutdown.request("tray quit")
 		-- A relay restart had already started the shutdown: abandoning it left the
 		-- exit running with nothing to follow it, which is what Quit asked for.

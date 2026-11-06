@@ -77,10 +77,8 @@ local function read_shared_json(relative)
 	if not ok_paths or not Paths then return nil end
 	local root = Paths.shared_root()
 	if not root then return nil end
-	local handle = io.open(root .. "/" .. relative, "r")
-	if not handle then return nil end
-	local body = handle:read("*a")
-	handle:close()
+	local body, status = require("toml_codec.writer").read_classified(root .. "/" .. relative)
+	if status ~= "ok" then return nil end
 	local ok_bridge, Bridge = pcall(require, "infra.llm_bridge")
 	if not ok_bridge or not Bridge or not Bridge.json_decode then return nil end
 	local ok, parsed = pcall(Bridge.json_decode, body)

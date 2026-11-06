@@ -171,7 +171,15 @@ local function scenario(opts, body)
 				handle:write(IMAGE)
 				handle:close()
 				world.captures[#world.captures + 1] = capture
-				return { path = capture.path, dir = capture.dir, cancel = function() capture.cancelled = true end }
+				capture.settle = function() os.remove(capture.path); os.remove(capture.dir) end
+				local handle = { path = capture.path, dir = capture.dir, cancel = function() capture.cancelled = true end,
+					discard = function() capture.settle(); return true end }
+				if opts.delayed_capture_cleanup then
+					handle.discard = function() capture.cleanup_registered = true; return true end
+				elseif opts.malformed_capture then
+					handle.discard = nil
+				end
+				return handle
 			end,
 		})
 		world.engine = engine
@@ -205,6 +213,35 @@ local function scenario(opts, body)
 		if not ok then error(err, 0) end
 	end, { initial = stored })
 end
+
+helpers.it("vision configuration refuses a FIFO rather than blocking", function()
+	local uv = require("luv")
+	local Paths = require("infra.paths")
+	local original_shared, original_request = Paths.shared, package.loaded["modules.llm.vision_request"]
+	local source = assert(original_shared("modules/llm/vision.json"))
+	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-vision-XXXXXX"))
+	local path = dir .. "/vision.json"
+	local made = os.execute("mkfifo '" .. path .. "'")
+	assert(made == 0 or made == true)
+	package.loaded["modules.llm.vision_request"] = nil
+	local Request = require("modules.llm.vision_request")
+	Paths.shared = function(relative)
+		if relative == "modules/llm/vision.json" then return path end
+		return original_shared(relative)
+	end
+	local exited, process = false, nil
+	process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$2" > "$1"', "fixture", path, source } }, function()
+		exited = true
+		process:close()
+	end))
+	local ok, config = pcall(Request.config)
+	Paths.shared, package.loaded["modules.llm.vision_request"] = original_shared, original_request
+	os.remove(path)
+	os.remove(dir)
+	while not exited do uv.run("once") end
+	assert(ok, config)
+	helpers.assert_nil(config, "a FIFO must not supply the vision configuration")
+end)
 
 helpers.describe("screen answers: missing local model admission", function()
 	helpers.it("offers the absent vision model before transmitting the screenshot", function()
@@ -342,6 +379,57 @@ helpers.describe("screen actions: a region read by an API model, answered by the
 		end)
 	end)
 
+	helpers.it("refuses a FIFO screenshot without sending its contents", function()
+		scenario({}, function(world)
+			local uv = require("luv")
+			helpers.assert_true(world.handlers.llm_screen_region("tap_3", "openai|gpt-4.1-mini"))
+			local capture = world.captures[1]
+			assert(os.remove(capture.path))
+			local made = os.execute("mkfifo '" .. capture.path .. "'")
+			assert(made == 0 or made == true)
+			-- Release a blocking reader so the regression fails rather than hanging.
+			local exited, process = false, nil
+			process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; printf x > "$1"', "fixture", capture.path } }, function()
+				exited = true
+				process:close()
+			end))
+			capture.on_done({ status = "ok", scaled = true })
+			while not exited do uv.run("once") end
+			helpers.assert_eq(#world.posts, 0, "special files must not be sent as screenshots")
+			helpers.assert_eq(uv.fs_lstat(capture.path), nil)
+			helpers.assert_eq(uv.fs_lstat(capture.dir), nil)
+		end)
+	end)
+
+	helpers.it("does not block checking an undeletable FIFO screenshot", function()
+		scenario({}, function(world)
+			local uv = require("luv")
+			helpers.assert_true(world.handlers.llm_screen_region("tap_3", "openai|gpt-4.1-mini"))
+			local capture = world.captures[1]
+			assert(os.remove(capture.path))
+			local made = os.execute("mkfifo '" .. capture.path .. "'")
+			assert(made == 0 or made == true)
+			local exited, exit_code, process = false, nil, nil
+			process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; printf x > "$1"', "fixture", capture.path } }, function(code)
+				exit_code, exited = code, true
+				process:close()
+			end))
+			local remove = os.remove
+			os.remove = function(path)
+				if path == capture.path then return nil, "injected deletion failure" end
+				return remove(path)
+			end
+			local ok, err = pcall(capture.on_done, { status = "ok", scaled = true })
+			os.remove = remove
+			remove(capture.path)
+			remove(capture.dir)
+			while not exited do uv.run("once") end
+			assert(ok, err)
+			helpers.assert_true(exit_code ~= 0, "cleanup opened the FIFO and consumed the writer")
+			helpers.assert_eq(#world.posts, 0)
+		end)
+	end)
+
 	helpers.it("captures, reads, drafts three answers in order, and types the accepted one", function()
 		scenario({}, function(world)
 			helpers.assert_eq(world.handlers.llm_screen_region("tap_3", "openai|gpt-4.1-mini"), true)
@@ -396,6 +484,22 @@ helpers.describe("screen actions: a region read by an API model, answered by the
 		end)
 	end)
 
+	helpers.it("keeps operators in screen transcription and generated fixes", function()
+		scenario({}, function(world)
+			world.handlers.llm_screen_full("tap_3", "openai")
+			world.captures[1].on_done({ status = "ok", scaled = false })
+			world.respond(1, "**SCREEN:** result = x**2")
+			world.wait_for(2)
+			helpers.assert_eq(world.posts[2].body.messages[2].content, "SCREEN:\nresult = x**2")
+			world.respond(2, "ANSWER: result = x**2")
+			world.wait_for(3); world.respond(3, "ANSWER: second")
+			world.wait_for(4); world.respond(4, "ANSWER: third")
+			helpers.assert_eq(offered(world)[1], "result = x**2")
+			helpers.assert_true(world.engine.handle_shortcut({ key = "1", mods = {} }))
+			helpers.assert_eq(world.typed[1].text, "result = x**2")
+		end)
+	end)
+
 	helpers.it("keeps the order when one answer fails and offers the others", function()
 		scenario({}, function(world)
 			world.handlers.llm_screen_full("tap_3", "openai")
@@ -433,7 +537,7 @@ helpers.describe("screen actions: a region read by an API model, answered by the
 				helpers.assert_eq(request.opts.stream, false)
 				helpers.assert_eq(request.opts.line_mode, false, "multi-line answers are not cut")
 				helpers.assert_eq(request.messages[2].content, "SCREEN:\n" .. SCREEN)
-				request.on_done("ANSWER: **local " .. index .. "**", nil)
+				request.on_done("**ANSWER:** local " .. index, nil)
 			end
 			helpers.assert_eq(table.concat(offered(world), "|"), "local 1|local 2|local 3")
 		end)
@@ -618,6 +722,31 @@ end)
 -- ======= 4/ One flow at a time ================
 -- ==============================================
 -- ==============================================
+
+helpers.describe("screen capture cleanup ownership", function()
+	helpers.it("refuses a capture without an explicit cleanup owner", function()
+		scenario({ malformed_capture = true }, function(world)
+			helpers.assert_eq(world.handlers.llm_screen_full("tap_3", "openai"), false)
+			local capture = world.captures[1]
+			helpers.assert_true(capture.cancelled)
+			helpers.assert_true(exists(capture.path), "unproven capture cannot be deleted before retirement")
+			helpers.assert_eq(#world.posts, 0)
+			capture.settle()
+		end)
+	end)
+
+	helpers.it("keeps a cancelled image until its capture owner settles", function()
+		scenario({ delayed_capture_cleanup = true }, function(world)
+			world.handlers.llm_screen_full("tap_3", "openai")
+			local capture = world.captures[1]
+			world.engine.drop_vision("typing")
+			helpers.assert_true(capture.cancelled and capture.cleanup_registered)
+			helpers.assert_true(exists(capture.path), "the engine cannot race the child by deleting early")
+			capture.settle()
+			helpers.assert_eq(exists(capture.dir), false)
+		end)
+	end)
+end)
 
 helpers.describe("screen actions: a newer action supersedes the previous one", function()
 

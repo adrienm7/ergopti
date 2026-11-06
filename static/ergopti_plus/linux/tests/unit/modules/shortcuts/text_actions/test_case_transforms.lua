@@ -23,7 +23,7 @@ local function with_manager(selected, body)
 	local previous = {}
 	for key, name in pairs(names) do previous[key] = package.loaded[name] end
 
-	local state = { selected = selected, replacement = nil }
+	local state = { selected = selected, replacement = nil, injected = {} }
 	package.loaded[names.clipboard] = {
 		transform_selection = function(transform)
 			state.replacement = transform(state.selected)
@@ -33,17 +33,17 @@ local function with_manager(selected, body)
 	}
 	package.loaded[names.event_loop] = { sleep_ms = function() return true end, defer = function() return true end }
 	package.loaded[names.combo] = { press = function() return true end }
-	package.loaded[names.injector] = { inject = function() return { ok = true } end }
+	package.loaded[names.injector] = { inject = function(_, text) state.injected[#state.injected + 1] = text; return { ok = true } end }
 	package.loaded[names.keystats] = { record_shortcut = function() return true end }
 	-- No keyboard is captured here: a CapsWord session locks a fake CapsLock.
 	package.loaded[names.hook] = require("tests.support.caps_word_lock_hook_fake").new()
 	package.loaded[names.manager] = nil
 
 	local ok, err = pcall(function()
-		TextOwnerFixture.with(function(guard)
+		TextOwnerFixture.with(function(guard, focus_state, _, _, watch)
 			local manager = require(names.manager)
 			manager.init({ persist = false, capture_text_owner = guard.capture_text_owner })
-			body(manager, state, guard.capture_text_owner)
+			body(manager, state, guard.capture_text_owner, focus_state, watch)
 		end)
 	end)
 	for key, name in pairs(names) do package.loaded[name] = previous[key] end
@@ -59,6 +59,33 @@ helpers.describe("shortcut case transforms", function()
 			state.selected = state.replacement
 			helpers.assert_true(manager.transform_uppercase())
 			helpers.assert_eq(state.replacement, "été strasse москва")
+		end)
+	end)
+
+	helpers.it("retains the real text owner while a command runs asynchronously", function()
+		with_manager("unused", function(_, state, _, focus, watch)
+			local names = { "modules.gestures.user_actions", "adapters.shell_runner" }
+			local saved = {}
+			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local callback
+			package.loaded[names[2]] = { run_async = function(_, _, _, done)
+				callback = done
+				return { cancel = function() return true end, on_settled = function() return true end }
+			end }
+			package.loaded[names[1]] = nil
+			local ok, err = pcall(function()
+				local actions = require(names[1])
+				helpers.assert_true(actions.run_command({ command = "echo result", mode = "hidden", output = "type" }, 500))
+				callback({ ok = true, stdout = "first result" })
+				helpers.assert_eq(state.injected, { "first result" }, "unchanged focus still receives output")
+				helpers.assert_true(actions.run_command({ command = "echo result", mode = "hidden", output = "type" }, 500))
+				focus.path = "/field/successor"
+				watch.barrier()
+				callback({ ok = true, stdout = "private result" })
+				helpers.assert_eq(state.injected, { "first result" })
+			end)
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			if not ok then error(err, 0) end
 		end)
 	end)
 
@@ -514,7 +541,7 @@ helpers.describe("shared selection helper command ownership", function()
 				helpers.assert_eq(effects.chords, vector.chords)
 				if vector.clipboard then
 					helpers.assert_eq(effects.reads, 1)
-					helpers.assert_eq(effects.injections, { { 0, vector.clipboard, false } })
+					helpers.assert_eq(effects.injections, { { 0, vector.clipboard, true } })
 				else
 					helpers.assert_eq(effects.reads, 0)
 					helpers.assert_eq(#effects.injections, 0)
@@ -596,7 +623,7 @@ helpers.describe("shared selection helper command ownership", function()
 				helpers.assert_eq(row.fn(), true)
 				helpers.assert_eq(effects.reads, 2)
 				helpers.assert_eq(#effects.injections, failure == "refuse_read" and 1 or 2)
-				helpers.assert_eq(effects.injections[#effects.injections], { 0, "été Straße Москва", false })
+				helpers.assert_eq(effects.injections[#effects.injections], { 0, "été Straße Москва", true })
 			end)
 		end)
 	end

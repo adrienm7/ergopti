@@ -57,7 +57,7 @@ end
 helpers.describe("Linux gesture scope transaction", function()
 	helpers.it("gesture-master-close: refused native stop preserves file and retains its inverse", function()
 		with_scope(function(_, gestures, _, path)
-			gestures.stop_reading = function() return false end
+			require("adapters.evdev_reader").close = function() return false end
 			helpers.assert_eq(gestures.set_enabled(false), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
 			helpers.assert_true(gestures.is_enabled())

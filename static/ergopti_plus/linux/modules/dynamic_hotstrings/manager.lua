@@ -22,6 +22,7 @@
 
 local M = {}
 local TableUtil = require("table_util")
+local UnicodeCase = require("unicode_case")
 
 local Logger = require("logger.shim")
 local ManifestReader = require("infra.manifest_reader")
@@ -125,10 +126,14 @@ end
 --- @param path string Absolute path to personal_info.toml.
 --- @return table info, table letters
 local function _parse_personal_info_toml(path)
-	local fh = io.open(path, "r")
-	if not fh then return {}, {} end
-	local content = fh:read("*a")
-	fh:close()
+	local content, status, detail = TomlWriter.read_classified(path)
+	if status ~= "ok" then
+		if status ~= "absent" then
+			Logger.error(LOG, "personal_info.toml at '%s' is unreadable (%s) — @-tag shortcuts disabled.",
+				path, tostring(detail or status))
+		end
+		return {}, {}
+	end
 
 	-- Delegate all TOML parsing to the shared codec; decode returns nil on a
 	-- spec violation.
@@ -158,7 +163,10 @@ end
 --- @param opts table|nil { trigger_char?, personal_info_path? }
 function M.init(opts)
 	_info_generation = _info_generation + 1
-	UserCode.invalidate("dynamic initialization")
+	if UserCode.invalidate("dynamic initialization") ~= true then
+		Logger.error(LOG, "Dynamic initialization refused while programmable cancellation remains pending.")
+		return false
+	end
 	local options = type(opts) == "table" and opts or {}
 
 	-- Resolve trigger character (default "★").
@@ -277,8 +285,24 @@ function M.resolve_combo(tag)
 	-- Lower-cased because the single-letter rules are registered lower-cased and
 	-- typing "@NP" must mean what "@np" means.
 	for _, raw_letter in ipairs(letters) do
-		local letter = raw_letter:lower()
-		local field = _letters[letter]
+		local letter = UnicodeCase.lower(raw_letter)
+		-- Combos are case-insensitive; single-field registered rules remain
+		-- exact. If equivalent aliases name different fields, refusing the
+		-- entire combo avoids silently putting a different value in a form.
+		-- Case conversion can expand one codepoint (e.g. İ): do not normalize
+		-- the user's keys or admit the resulting multi-codepoint spelling.
+		local single_lower = strict_codepoint_length(letter) == 1
+		local upper = single_lower and UnicodeCase.upper(letter) or nil
+		local single_upper = upper and strict_codepoint_length(upper) == 1
+		local field
+		for alias, candidate in pairs(_letters) do
+			if strict_codepoint_length(alias) == 1 and (alias == raw_letter
+				or single_lower and UnicodeCase.lower(alias) == letter
+				or single_upper and UnicodeCase.upper(alias) == upper) then
+				if field and field ~= candidate then return {} end
+				field = candidate
+			end
+		end
 		if not field then return {} end
 		local value = _info[field]
 		if type(value) ~= "string" or value == "" then return {} end
@@ -939,7 +963,7 @@ function M.prefix_mappings()
 		Logger.error(LOG, "prefix_rules module unavailable — no prefix expansion is registered.")
 		return {}
 	end
-	return Prefix.build(_info, M.is_rule_enabled)
+	return Prefix.build(_info, M.is_rule_enabled, _trigger_char)
 end
 
 --- Whether one engine section may fire.

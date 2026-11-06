@@ -79,6 +79,7 @@ install.xdg_autostart=autostart XDG: {1}
 launch.already_running=Ergopti+ już działa w tej sesji ({1} jest zajęty); to uruchomienie zostało odrzucone.
 launch.authorization_failed=Autoryzacja dostępu do wejścia została anulowana lub nie powiodła się.
 launch.groups_unavailable=Sesja nie mogła uzyskać skonfigurowanych grup wejścia.
+launch.session_lock_invalid=Katalog blokady sesji musi być ścieżką bezwzględną.
 launcher.dependencies_installed=Zależności zainstalowane.
 launcher.driver_missing=Błąd: nie znaleziono katalogu sterownika Linux: {1}
 launcher.install_deps_hint=Uruchom: ergopti-hotstrings --install-deps

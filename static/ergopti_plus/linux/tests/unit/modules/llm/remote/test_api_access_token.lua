@@ -36,6 +36,7 @@ local function with_remote(body)
 	local calls, clock = {}, { now = 1000, ticks = {} }
 	package.loaded["adapters.timer_scheduler"] = {
 		after = function(_, fn)
+			if clock.throw_schedule then clock.ticks[#clock.ticks + 1] = fn; error("scheduler unavailable") end
 			clock.ticks[#clock.ticks + 1] = fn
 			return { armed = true }
 		end,
@@ -43,6 +44,18 @@ local function with_remote(body)
 	package.loaded["adapters.http_client"] = {
 		post = function(url, headers, request_body, callback)
 			calls[#calls + 1] = { url = url, headers = headers, body = request_body, callback = callback }
+			if clock.sync_refusal then callback({ ok = false, status = 401 }); return false end
+			if clock.sync_success_refused then
+				callback({ ok = clock.sync_success_refused ~= "bad_envelope", status = 200,
+					body = '{"access_token":"not-sent","expires_in":3600}' })
+				return false
+			end
+			if clock.post_exception then
+				if clock.post_exception == "after_callback" then
+					callback({ ok = true, status = 200, body = '{"access_token":"early","expires_in":3600}' })
+				end
+				error("unknown native dispatch state")
+			end
 			return true
 		end,
 		get = function() return false end,
@@ -258,6 +271,90 @@ helpers.describe("Access-token providers: the shipped rows", function()
 			helpers.assert_eq(endpoint.headers.Authorization, "Bearer ya29.sa")
 		end)
 	end)
+
+	helpers.it("a scheduler exception settles the token exchange and permits a later retry", function()
+		with_remote(function(remote, calls, clock)
+			local entry = { id = "sa", provider = "vertex", model = "google/gemini-3.5-flash",
+				token = service_account_key(),
+				base_url = "https://aiplatform.googleapis.com/v1/projects/p1/locations/global/endpoints/openapi" }
+			clock.throw_schedule = true
+			local answer
+			remote.prepare_access(entry, function(ok, reason) answer = { ok, reason } end)
+			helpers.assert_eq(answer[1], false)
+			helpers.assert_true(type(answer[2]) == "string" and answer[2] ~= "")
+			drain_ticks(clock)
+			helpers.assert_eq(#calls, 0, "a callback retained by a failed scheduler must be inert")
+			clock.throw_schedule = false
+			clock.now = clock.now + 61
+			remote.prepare_access(entry, function() end)
+			helpers.assert_true(#clock.ticks > 0, "the refused exchange must not remain pending")
+			drain_ticks(clock)
+			helpers.assert_eq(#calls, 1)
+		end)
+	end)
+
+	helpers.it("quarantines a throwing token transport even if a callback arrives", function()
+		for _, variant in ipairs({ "before_callback", "after_callback" }) do
+			with_remote(function(remote, calls, clock)
+				clock.post_exception = variant
+				local first, later
+				remote.prepare_access(ENTRY, function(ok, reason) first = { ok, reason } end)
+				helpers.assert_eq(first[1], false)
+				helpers.assert_contains(first[2], "transport state is unknown")
+				answer(calls, 1, 200, { access_token = "late", expires_in = 3600 })
+				clock.now = clock.now + 120
+				clock.post_exception = nil
+				remote.prepare_access(ENTRY, function(ok, reason) later = { ok, reason } end)
+				helpers.assert_eq(later, first)
+				helpers.assert_eq(#calls, 1, "an unknown transport must not overlap a retry")
+				helpers.assert_eq(remote.prewarm_access(ENTRY), false)
+			end)
+		end
+	end)
+
+	helpers.it("preserves a synchronous token refusal as the cached reason", function()
+		with_remote(function(remote, _, clock)
+			clock.sync_refusal = true
+			local first, later
+			remote.prepare_access(ENTRY, function(ok, reason) first = { ok, reason } end)
+			remote.prepare_access(ENTRY, function(ok, reason) later = { ok, reason } end)
+			helpers.assert_eq(first[1], false)
+			helpers.assert_eq(first[2], "the token exchange answered HTTP 401")
+			helpers.assert_eq(later, first)
+		end)
+	end)
+
+	helpers.it("refuses synchronous success when the token dispatch returns false", function()
+		for _, variant in ipairs({ "success", "bad_envelope" }) do
+			with_remote(function(remote, calls, clock)
+				clock.sync_success_refused = variant
+				local first, later
+				remote.prepare_access(ENTRY, function(ok, reason) first = { ok, reason } end)
+				remote.prepare_access(ENTRY, function(ok, reason) later = { ok, reason } end)
+				helpers.assert_eq(first[1], false)
+				helpers.assert_eq(later, first)
+				helpers.assert_eq(#calls, 1)
+			end)
+		end
+	end)
+
+	helpers.it("reports failed quarantined waiters without logging their error text", function()
+		with_remote(function(remote, _, clock)
+			local entry = { id = "sa", provider = "vertex", model = "google/gemini-3.5-flash",
+				token = service_account_key(),
+				base_url = "https://aiplatform.googleapis.com/v1/projects/p1/locations/global/endpoints/openapi" }
+			clock.post_exception = "before_callback"
+			local received
+			remote.prepare_access(entry, function() error("private waiter payload") end)
+			remote.prepare_access(entry, function(ok, reason) received = { ok, reason } end)
+			drain_ticks(clock)
+			helpers.assert_eq(received[1], false)
+			local log = table.concat(clock.logs, "\n")
+			helpers.assert_contains(log, "Access token waiter failed.")
+			helpers.assert_true(not log:find("private waiter payload", 1, true))
+		end)
+	end)
+
 end)
 
 

@@ -443,6 +443,26 @@ local function with_bindings(callback)
 end
 
 helpers.describe("private user program real gesture and keyboard bindings", function()
+	helpers.it("waits for hidden shell commands to retire before program settlement", function()
+		with_bindings(function(manager)
+			local actions = require("modules.gestures.user_actions")
+			helpers.assert_true(actions.set_paused(false))
+			helpers.assert_true(actions.run_command({ command = "sleep 10", mode = "hidden", output = "none" }, 500))
+			local stopped = manager.stop_programs()
+			local notified = 0
+			helpers.assert_true(manager.when_programs_settled(function() notified = notified + 1 end))
+			if not stopped then
+				helpers.assert_eq(notified, 0, "a pending native process must retain shutdown ownership")
+				helpers.assert_true(actions.busy())
+			end
+			local deadline = Native.hrtime() + 3e9
+			while notified == 0 and Native.hrtime() < deadline do Native.run("nowait") end
+			helpers.assert_eq(notified, 1)
+			helpers.assert_eq(actions.busy(), false)
+			helpers.assert_true(manager.stop_programs())
+		end)
+	end)
+
 	helpers.it("persists and dispatches the same typed program through gesture and keyboard owners", function()
 		with_bindings(function(manager, keyboard, path)
 			local Json = require("json")

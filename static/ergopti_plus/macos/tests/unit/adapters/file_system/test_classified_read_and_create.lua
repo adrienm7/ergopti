@@ -342,6 +342,43 @@ helpers.describe("adapters.file_system: classified reads and create-only publica
 		end)
 	end)
 
+	helpers.it("create-only closes its staged file and refuses write or close failure", function()
+		for _, failure in ipairs({ "write", "close" }) do
+			with_fixture(function(fixture)
+				local path = os.tmpname():gsub("\\", "/"); os.remove(path)
+				local link_calls, close_calls = 0, 0
+				local adapter = fixture.make_adapter(nil, nil, { [path] = true }, function()
+					link_calls = link_calls + 1
+					return true
+				end)
+				local real_open = io.open
+				io.open = function(target, mode)
+					local file, err = real_open(target, mode)
+					if not file or mode ~= "w" or not target:match("/payload$") then return file, err end
+					return {
+						write = function(_, text)
+							if failure == "write" then return nil, "write refused" end
+							return file:write(text)
+						end,
+						close = function()
+							close_calls = close_calls + 1
+							local closed = file:close()
+							if failure == "close" then return nil, "close refused" end
+							return closed
+						end,
+					}
+				end
+				local called, created = pcall(adapter.create_if_absent, path, "new report")
+				io.open = real_open
+				os.remove(path)
+				helpers.assert_true(called)
+				helpers.assert_eq(created, false)
+				helpers.assert_eq(close_calls, 1)
+				helpers.assert_eq(link_calls, 0)
+			end)
+		end
+	end)
+
 	helpers.it("does not overwrite a target created between absence proof and publication", function()
 		with_fixture(function(fixture)
 			local target = os.tmpname():gsub("\\", "/")

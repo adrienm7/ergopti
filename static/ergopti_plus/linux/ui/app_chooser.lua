@@ -78,9 +78,10 @@ end
 --- Opens the file dialog over the desktop entries.
 --- @param shell table Shell-runner authority (exec_checked, quote).
 --- @param title string Already-translated dialog title.
+--- @param opts table|nil Test ports for native resolution and notice.
 --- @return string|nil id The chosen desktop-file id.
 --- @return string|nil error_message Why nothing was chosen.
-function M.pick(shell, title)
+function M.pick(shell, title, opts)
 	if type(shell) ~= "table" or type(shell.exec_checked) ~= "function" or type(shell.quote) ~= "function" then
 		return nil, "shell runner is unavailable"
 	end
@@ -100,6 +101,26 @@ function M.pick(shell, title)
 	if not chosen or chosen == "" then return nil, "application selection was cancelled" end
 	local id = M.desktop_id(chosen)
 	if not id then return nil, "the chosen file is not a desktop entry" end
+	local resolve = type(opts) == "table" and opts.resolve or nil
+	if resolve == nil then
+		local loaded, owner = pcall(require, "ui.desktop_application_resolution")
+		resolve = loaded and type(owner) == "table" and owner.resolve or nil
+	end
+	local called, resolved, status = false, nil, nil
+	if type(resolve) == "function" then called, resolved, status = pcall(resolve, id) end
+	if not called or status ~= "found" or absolute_path(resolved) ~= absolute_path(chosen) then
+		local notify = type(opts) == "table" and opts.notify or function()
+			local message = require("infra.i18n").get("dialog.app_picker.selection_unverified")
+			local command = require("ui.native_dialog").command() .. " --error --no-markup --title="
+				.. shell.quote(title) .. " --text=" .. shell.quote(message) .. " 2>/dev/null"
+			return require("ui.modal").run(function() return shell.exec_checked(command) end) == true
+		end
+		local delivered, accepted = pcall(notify)
+		if not delivered or accepted ~= true then
+			require("logger.shim").error("ui.app_chooser", "Application selection verification was refused.")
+		end
+		return nil, "the selected application is not the effective native desktop entry"
+	end
 	return id
 end
 

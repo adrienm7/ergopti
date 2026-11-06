@@ -68,20 +68,20 @@ local DEFAULT_EFFECTS = {
 	save = function(dir, name, text)
 		local Shell = require("adapters.shell_runner")
 		if not Shell.run("mkdir -p " .. Shell.quote(dir)) then return nil, "cannot create " .. dir end
-		local path = dir .. "/" .. name
-		-- The filesystem adapter owns buffered write and close receipts: only a
-		-- completed file may be reported as saved and revealed to the user.
-		if require("adapters.file_system").write(path, text) ~= true then
-			return nil, "cannot complete writing " .. path
+		local stem, extension = name:match("^(.*)(%.[^.]+)$")
+		stem, extension = stem or name, extension or ""
+		local files = require("adapters.file_system")
+		for index = 0, 999 do
+			local path = dir .. "/" .. stem .. (index == 0 and "" or "-" .. index) .. extension
+			local written, reason = files.write_new(path, text)
+			if written == true then return path end
+			if reason ~= "EEXIST" and reason ~= 17 then return nil, "cannot complete writing " .. path end
 		end
-		return path
+		return nil, "no unused diagnostic report name"
 	end,
 	exists = function(path)
-		local fh = io.open(path, "rb")
-		if fh then fh:close() return true end
-		-- A folder cannot be opened as a file on every system; ask the shell
-		local Shell = require("adapters.shell_runner")
-		return Shell.run("test -e " .. Shell.quote(path))
+		local called, kind = pcall(require("infra.native_directory").target_kind, path)
+		return called and kind ~= nil
 	end,
 	-- No portable "select this file" exists across file managers; the folder
 	-- holding it is the next best thing

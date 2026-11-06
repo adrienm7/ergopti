@@ -78,6 +78,24 @@ helpers.describe("model profile recommendation: shared policy", function()
 		helpers.assert_eq(recommendation.recommend_from("Large", catalogue, policy), "batch_advanced")
 	end)
 
+	helpers.it("skips malformed catalogue entries without losing a valid recommendation", function()
+		local recommendation = helpers.load_module("modules.llm.model_profile")
+		local catalogue = { 42, { families = 12 }, { families = { false, { models = 1 },
+			{ models = { 42, { name = "Valid", type = "completion" } } } } } }
+		local policy = { advanced_min_parameters_b = 2, batch_min_parameters_b = 4 }
+		local logger = require("logger.shim")
+		local original, warnings = logger.warn, {}
+		logger.warn = function(_, message) warnings[#warnings + 1] = message end
+		local ok, err = pcall(function()
+			helpers.assert_eq(recommendation.recommend_from("Valid", catalogue, policy), "raw")
+			helpers.assert_eq(recommendation.recommend_from("unknown:7b", catalogue, policy), "batch_advanced")
+			helpers.assert_eq(#warnings, 2)
+			helpers.assert_eq(warnings[1], "Model catalogue contains invalid entries; those entries were ignored.")
+		end)
+		logger.warn = original
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("recognises an Ollama tag and falls back to its size suffix", function()
 		local recommendation = helpers.load_module("modules.llm.model_profile")
 		local catalogue = {

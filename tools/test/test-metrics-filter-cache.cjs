@@ -25,7 +25,7 @@ function test(name, callback) {
 	console.log(`ok ${name}`);
 }
 
-function appsFixture() {
+function appsFixture(realRender = false) {
 	const context = vm.createContext({
 		window: {},
 		document: {
@@ -46,7 +46,12 @@ function appsFixture() {
 		assert.ok(index.includes(`src="${name}"`), `${name} must be loaded by the actual page`);
 		vm.runInContext(read(`metrics_apps/${name}`), context);
 	}
-	vm.runInContext('initDashboard = () => {}; renderDashboard = () => {};', context);
+	vm.runInContext(
+		realRender
+			? 'initDashboard = () => {};'
+			: 'initDashboard = () => {}; renderDashboard = () => {};',
+		context
+	);
 	return {
 		context,
 		set: (code) => vm.runInContext(code, context),
@@ -476,7 +481,10 @@ assert.equal(passed, 12, 'all original seven and five selection regressions must
 			{},
 			{}
 		);
-		vm.runInContext('renderDayTimeline(); renderTopSessionsTable();', context);
+		context.renderDayTimeline({ rich: { timeline_day: { date: hostile, rows: [] } } });
+		context.renderTopSessionsTable({
+			rich: { sessions: { rows: [{ date: hostile, app: 'Editor', ms: 1000, chars: 3 }] } }
+		});
 		context.renderTopDaysTable({ rich: { by_date: { [hostile]: { chars: 3 } } } });
 		for (const [id, element] of Object.entries(elements)) {
 			assert.ok(element.innerHTML.includes('&lt;img'), `${id} must preserve escaped date text`);
@@ -488,7 +496,10 @@ assert.equal(passed, 12, 'all original seven and five selection regressions must
 			{},
 			{}
 		);
-		vm.runInContext('renderDayTimeline(); renderTopSessionsTable();', context);
+		context.renderDayTimeline({ rich: { timeline_day: { date: '2026-10-11', rows: [] } } });
+		context.renderTopSessionsTable({
+			rich: { sessions: { rows: [{ date: '2026-10-11', app: 'Editor', ms: 1000, chars: 3 }] } }
+		});
 		context.renderTopDaysTable({ rich: { by_date: { '2026-10-11': { chars: 3 } } } });
 		for (const element of Object.values(elements))
 			assert.ok(element.innerHTML.includes('11/10/2026'));
@@ -1187,7 +1198,10 @@ for (const host of ['windows', 'macos', 'linux']) {
 					!html.includes(`<title>${vector.future} — `),
 					'a UTC date change must not insert tomorrow'
 				);
-				if (vector.archived) assert.ok(html.includes(`<title>${vector.archived} — 2 car.</title>`));
+				if (vector.archived) {
+					const unit = page.context.escapeHtml(page.context._t('ui_apps.col_chars'));
+					assert.ok(html.includes(`<title>${vector.archived} — 2 ${unit}</title>`));
+				}
 				assert.equal(
 					page.diagnostics.some((entry) => entry.level === 'error'),
 					false
@@ -1318,7 +1332,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 			assert.deepEqual(Array.from(chart.data.labels), vector.labels);
 			assert.deepEqual(
 				Array.from(chart.data.datasets[0].data),
-				vector.period === 'day' ? [0.17, 0.33] : [2, 1]
+				vector.period === 'day' ? [600000 / 3600000, 1200000 / 3600000] : [2, 1]
 			);
 			assert.equal(page.context.getAggregatedData().rich.date_range.days, vector.dates.length);
 			assert.equal(
@@ -1459,7 +1473,9 @@ for (const host of ['windows', 'macos', 'linux']) {
 				publishTypingPage(page, host, manifest);
 				assert.equal(
 					page.elements.get('records_streak').innerHTML,
-					vector.expected ? `${vector.expected} jour${vector.expected > 1 ? 's' : ''}` : '—'
+					vector.expected
+						? `${page.context.escape_html(page.context._t('ui_apps.label_days'))} ${vector.expected}`
+						: '—'
 				);
 				assert.equal(
 					page.diagnostics.some((entry) => entry.level === 'error'),
@@ -4136,4 +4152,1182 @@ test('reserved app labels remain distinct from system data in both dashboards', 
 	);
 });
 
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of [
+		{
+			name: 'two-hour clock rollback',
+			zone: 'Antarctica/Troll',
+			now: '2026-10-25T01:30:00Z',
+			start: '2026-10-25',
+			end: '2026-10-25',
+			first: '01:05',
+			second: '02:35'
+		},
+		{
+			name: 'clock rollback across midnight',
+			zone: 'Antarctica/Casey',
+			now: '2010-03-04T15:30:00Z',
+			start: '2010-03-04',
+			end: '2010-03-05',
+			first: '23:05',
+			second: '01:35'
+		}
+	])
+		test(`${host} last-hour chart keeps both buckets across ${vector.name}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.zone;
+			try {
+				const page = typingChartPage(host, vector.now);
+				publishTypingPage(page, host, typingHourManifest(vector));
+				page.elements.get('quick_range').value = 'last_hour';
+				runTypingControlChange(page, 'quick_range');
+				assert.deepEqual(
+					JSON.parse(vm.runInContext('app_state.range_request_selection', page.context)),
+					[vector.start, vector.end, ['Editor']]
+				);
+				const activity = page.lastChart('wpm_chart');
+				assert.deepEqual(
+					Array.from(activity.data.datasets[0].data, (point) => point.y),
+					[7, 3]
+				);
+				for (const point of activity.data.datasets[0].data) {
+					assert.ok(activity.options.scales.x.min <= point.x);
+					assert.ok(activity.options.scales.x.max >= point.x);
+				}
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} session duration and character records stay independent`, () => {
+		const page = loadMetricsAppsPage(host);
+		for (const id of [
+			'app_drilldown_modal',
+			'app_modal_title',
+			'app_modal_tiles',
+			'app_modal_hourly',
+			'app_modal_dests',
+			'app_modal_layouts',
+			'app_modal_records',
+			'app_modal_assist',
+			'top_sessions_tbody'
+		])
+			page.elements.set(id, page.context.document.createElement('div'));
+		page.context.Chart = class {
+			destroy() {}
+		};
+		page.elements.get('app_modal_hourly').getContext = () => ({});
+		vm.runInContext("currentPeriod = 'all';", page.context);
+		publishLoadedAppsData(page, host, {
+			'2026-10-01': { Editor: { session_longest_ms: 120000, session_longest_chars: 10 } },
+			'2026-10-02': { Editor: { session_longest_ms: 60000, session_longest_chars: 200 } }
+		});
+		const agg = page.context.getAggregatedData();
+		assert.equal(agg.apps.Editor.session_longest_ms, 120000);
+		assert.equal(agg.apps.Editor.session_longest_chars, 200);
+		assert.equal(agg.rich.sessions.longest_chars, 200);
+		page.context.openAppDrilldown('Editor');
+		const records = page.elements.get('app_modal_records').innerHTML;
+		assert.ok(records.includes(page.context._t('ui_typing.lbl_longest_chars')));
+		assert.match(records, /200/);
+		assert.doesNotMatch(records, /200 car\./);
+		assert.match(read('metrics_apps/index.html'), /data-i18n="ui_typing\.lbl_longest_chars"/);
+		page.context.renderTopSessionsTable();
+		assert.match(page.elements.get('top_sessions_tbody').innerHTML, /200/);
+	});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} displays one minus for a negative net output`, () => {
+		const page = typingChartPage(host, '2026-01-01T12:30:00Z');
+		publishTypingPage(page, host, {
+			'2026-01-01': { Editor: { ...liveTypingApp(1), hs_chars: 1, hs_input_chars: 5 } }
+		});
+		const details = page.elements.get('global_details').innerHTML;
+		assert.match(details, />-3<\/strong>/);
+		assert.doesNotMatch(details, />--3<\/strong>/);
+		assert.equal(vm.runInContext('format_number_plain(-1234.5)', page.context), '-1\u00a0234,5');
+		assert.match(vm.runInContext('format_number(-1234.5)', page.context), />-1\u00a0234,5<\/span>/);
+		assert.equal(vm.runInContext('format_number_plain(-1200000)', page.context), '-1,2\u00a0M');
+		assert.equal(vm.runInContext('format_number_plain(1234.5)', page.context), '1\u00a0234,5');
+	});
+}
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} preserves fractional milliseconds in the exact table tooltip`, () => {
+		const page = loadMetricsTypingPage(host);
+		freezePageClock(page, '2026-10-27T12:00:00Z');
+		const manifest = { '2026-10-27': { 'Editor.exe': { chars: 2, time: 2469 } } };
+		publishTypingPage(page, host, manifest);
+		deliverTypingManifest(page, host, manifest, {
+			range: { historical: {}, today: { 'Editor.exe': { c: { a: { c: 2, t: 2469 } } } } }
+		});
+		vm.runInContext("app_state.current_tab = 'c';", page.context);
+		page.context.render_current_tab();
+		page.timers.at(-1)();
+		const html = page.elements.get('metrics_table_body').innerHTML;
+		assert.ok(html.includes('title="1\u202f234,5">1\u00a0234,5</span> ms'), html);
+		assert.match(
+			vm.runInContext('format_number(1000000.1234)', page.context),
+			/title="1\u202f000\u202f000,1234"/
+		);
+	});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} top sessions honor selected period and category`, () => {
+		const page = loadMetricsAppsPage(host);
+		page.elements.set('top_sessions_tbody', page.context.document.createElement('tbody'));
+		publishLoadedAppsData(page, host, {
+			'2026-10-01': {
+				OldEditor: { category: 'Productivity', session_longest_ms: 900000 },
+				Editor: { category: 'Entertainment', session_longest_ms: 720000 }
+			},
+			'2026-10-02': {
+				Editor: { category: 'Productivity', session_longest_ms: 120000 },
+				Browser: { category: 'Entertainment', session_longest_ms: 600000 }
+			}
+		});
+		vm.runInContext(
+			"currentPeriod = 'day'; currentSelectedDate = '2026-10-02'; currentCategoryFilter = new Set([getAppCategory('Editor', 'Productivity').type]);",
+			page.context
+		);
+		const agg = page.context.getAggregatedData();
+		assert.deepEqual(Object.keys(agg.apps), ['Editor']);
+		page.context.renderTopSessionsTable(agg);
+		const rows = page.elements.get('top_sessions_tbody').innerHTML;
+		assert.match(rows, /Editor/);
+		assert.doesNotMatch(rows, /OldEditor|Browser/);
+		vm.runInContext("currentPeriod = 'all';", page.context);
+		page.context.renderTopSessionsTable(page.context.getAggregatedData());
+		const allRows = page.elements.get('top_sessions_tbody').innerHTML;
+		assert.match(allRows, /OldEditor/);
+		assert.doesNotMatch(allRows, /12m|Browser/);
+		vm.runInContext('currentWeekdayFilter = new Set();', page.context);
+		page.context.renderTopSessionsTable(page.context.getAggregatedData());
+		assert.doesNotMatch(page.elements.get('top_sessions_tbody').innerHTML, /Editor|Browser/);
+	});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} day timeline honors selected weekday and category`, () => {
+		const page = loadMetricsAppsPage(host);
+		page.elements.set('day_timeline_container', page.context.document.createElement('div'));
+		publishLoadedAppsData(page, host, {
+			'2026-10-01': {
+				Editor: { category: 'Productivity', app_time_ms: 60000, hourly: { 12: { c: 4 } } }
+			},
+			'2026-10-02': {
+				Browser: { category: 'Entertainment', app_time_ms: 60000, hourly: { 12: { c: 4 } } },
+				Editor: { category: 'Productivity', app_time_ms: 120000, hourly: { 12: { c: 4 } } }
+			}
+		});
+		vm.runInContext(
+			"currentPeriod = 'all'; currentSelectedDate = '2026-10-02'; currentCategoryFilter = new Set([getAppCategory('Editor', 'Productivity').type]);",
+			page.context
+		);
+		page.context.renderDayTimeline(page.context.getAggregatedData());
+		let timeline = page.elements.get('day_timeline_container').innerHTML;
+		assert.match(timeline, /Editor/);
+		assert.doesNotMatch(timeline, /Browser/);
+		vm.runInContext('currentWeekdayFilter = new Set([3]);', page.context);
+		page.context.renderDayTimeline(page.context.getAggregatedData());
+		timeline = page.elements.get('day_timeline_container').innerHTML;
+		assert.match(timeline, /01\/10\/2026/);
+		assert.doesNotMatch(timeline, /02\/10\/2026|Browser/);
+		vm.runInContext('currentWeekdayFilter = new Set();', page.context);
+		page.context.renderDayTimeline(page.context.getAggregatedData());
+		assert.doesNotMatch(page.elements.get('day_timeline_container').innerHTML, /Editor|Browser/);
+	});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} app modal excludes days with a rejected app category`, () => {
+		const page = loadMetricsAppsPage(host);
+		for (const id of [
+			'app_drilldown_modal',
+			'app_modal_title',
+			'app_modal_tiles',
+			'app_modal_hourly',
+			'app_modal_dests',
+			'app_modal_layouts',
+			'app_modal_records',
+			'app_modal_assist'
+		])
+			page.elements.set(id, page.context.document.createElement('div'));
+		const charts = [];
+		page.context.Chart = class {
+			constructor(_port, config) {
+				charts.push(config);
+			}
+			destroy() {}
+		};
+		page.elements.get('app_modal_hourly').getContext = () => ({});
+		publishLoadedAppsData(page, host, {
+			'2026-10-01': {
+				Editor: {
+					category: 'Entertainment',
+					chars: 99,
+					hourly: { 12: { c: 99 } },
+					layouts_seen: { HiddenLayout: 99 }
+				}
+			},
+			'2026-10-02': {
+				Editor: {
+					category: 'Productivity',
+					chars: 2,
+					hourly: { 12: { c: 2 } },
+					layouts_seen: { VisibleLayout: 2 }
+				}
+			}
+		});
+		vm.runInContext(
+			"currentPeriod = 'all'; currentCategoryFilter = new Set([getAppCategory('Editor', 'Productivity').type]);",
+			page.context
+		);
+		const agg = page.context.getAggregatedData();
+		assert.equal(agg.apps.Editor.chars, 2);
+		page.context.window._lastAggData = agg;
+		page.context.openAppDrilldown('Editor');
+		assert.equal(charts[0].data.datasets[0].data[12], 2);
+		const layouts = page.elements.get('app_modal_layouts').innerHTML;
+		assert.match(layouts, /VisibleLayout/);
+		assert.doesNotMatch(layouts, /HiddenLayout/);
+	});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} activity calendar ignores hidden days for its colour scale`, () => {
+		const page = loadMetricsAppsPage(host);
+		page.elements.set('activity_calendar_container', page.context.document.createElement('div'));
+		vm.runInContext(
+			`Date = class extends Date { constructor(...args) { super(...(args.length ? args : ['2026-11-05T12:00:00'])); } static now() { return new Date('2026-11-05T12:00:00').getTime(); } };`,
+			page.context
+		);
+		const visible = { '2025-11-06': { Editor: { chars: 100 } } };
+		const colour = () => {
+			page.context.renderActivityCalendar();
+			const html = page.elements.get('activity_calendar_container').innerHTML;
+			const match = html.match(/fill="([^"]+)"><title>6\/11\/2025 — 100 [^<]+<\/title>/);
+			assert.ok(match, 'the visible day is rendered with its real count');
+			return match[1];
+		};
+		publishLoadedAppsData(page, host, visible);
+		const baseline = colour();
+		publishLoadedAppsData(
+			page,
+			host,
+			{ ...visible, '2025-11-05': { Editor: { chars: 100000 } } },
+			{},
+			2
+		);
+		assert.equal(vm.runInContext("manifestData['2025-11-05'].Editor.chars", page.context), 100000);
+		assert.equal(
+			colour(),
+			baseline,
+			'a masked day outside the year cannot alter the visible scale'
+		);
+	});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} day timeline contains estimated hours within its grid`, () => {
+		const page = loadMetricsAppsPage(host);
+		page.elements.set('day_timeline_container', page.context.document.createElement('div'));
+		publishLoadedAppsData(page, host, {
+			'2026-10-02': { Editor: { app_time_ms: 10800000, hourly: { 12: { c: 1 } } } }
+		});
+		vm.runInContext("currentPeriod = 'day'; currentSelectedDate = '2026-10-02';", page.context);
+		page.context.renderDayTimeline(page.context.getAggregatedData());
+		const html = page.elements.get('day_timeline_container').innerHTML;
+		const bar = html.match(
+			/<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)" height="18"[^>]*><title>Editor/
+		);
+		assert.ok(bar, 'the actual SVG includes the application contribution');
+		assert.ok(
+			Number(bar[1]) + Number(bar[2]) <= 38 + 720,
+			'the bar stays inside the one-hour track'
+		);
+		assert.match(html, /Editor · 3h/);
+		publishLoadedAppsData(
+			page,
+			host,
+			{
+				'2026-10-02': {
+					Editor: { app_time_ms: 3600000, hourly: { 12: { c: 1 } } },
+					Other: { app_time_ms: 1800000, hourly: { 12: { c: 1 } } }
+				}
+			},
+			{},
+			2
+		);
+		page.context.renderDayTimeline(page.context.getAggregatedData());
+		const two = page.elements.get('day_timeline_container').innerHTML;
+		const bars = [
+			...two.matchAll(
+				/<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)" height="18"[^>]*><title>(?:Editor|Other)/g
+			)
+		];
+		assert.equal(bars.length, 2);
+		assert.ok(bars.every((m) => Number(m[1]) + Number(m[2]) <= 38 + 720));
+		assert.equal(Number(bars[0][2]) / Number(bars[1][2]), 2);
+	});
+}
+
+test('apps daily charts retain sub-minute focus and category time', () => {
+	const fixture = appsFixture();
+	const context = fixture.context;
+	vm.runInContext(read('metrics_apps/charts.js'), context);
+	const canvases = {
+		daily_trio_chart: { getContext: () => 'trio' },
+		daily_categories_chart: { getContext: () => 'categories' }
+	};
+	context.document.getElementById = (id) => canvases[id] || null;
+	const charts = {};
+	context.Chart = class {
+		constructor(owner, config) {
+			charts[owner] = config;
+		}
+		destroy() {}
+	};
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': { Editor: { category: 'development', app_time_ms: 1000, chars: 1 } },
+			'2026-10-26': { Editor: { category: 'development', app_time_ms: 10000, chars: 1 } },
+			'2026-10-27': { Editor: { category: 'development', app_time_ms: 18000, chars: 1 } }
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	const aggregate = fixture.get();
+	context.renderDailyTrajectories(aggregate);
+	for (const [index, ms] of [1000, 10000, 18000].entries()) {
+		assert.equal(charts.trio.data.datasets[0].data[index], ms / 3600000);
+		assert.equal(charts.categories.data.datasets[0].data[index], ms / 3600000);
+	}
+});
+test('apps overview charts retain sub-minute durations', () => {
+	const fixture = appsFixture();
+	const context = fixture.context;
+	const canvases = {
+		apps_bar_chart: { getContext: () => 'apps' },
+		category_pie_chart: { getContext: () => 'categories' },
+		timeline_stacked_chart: { getContext: () => 'timeline' },
+		timeline_chart_title: {}
+	};
+	context.document.getElementById = (id) => canvases[id] || null;
+	const charts = {};
+	context.Chart = class {
+		constructor(owner, config) {
+			charts[owner] = config;
+		}
+		destroy() {}
+	};
+	context.window.bootstrapMetricsAppsData(
+		{ '2026-10-27': { Editor: { category: 'development', app_time_ms: 10000 } } },
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	const aggregate = fixture.get();
+	const apps = [
+		{ name: 'Editor', category: 'development', score: 0, timeMs: aggregate.apps.Editor.time_ms }
+	];
+	context.updateCharts(apps, aggregate);
+	assert.equal(charts.apps.data.datasets[0].data[0], 10000 / 3600000);
+	assert.equal(charts.categories.data.datasets[0].data[0], 10000 / 3600000);
+	assert.equal(charts.timeline.data.datasets[0].data[0], 10000 / 3600000);
+});
+test('apps hourly speed chart retains slow observed typing', () => {
+	const fixture = appsFixture();
+	const context = fixture.context;
+	vm.runInContext(read('metrics_apps/charts.js'), context);
+	context.document.getElementById = (id) =>
+		id === 'cpm_by_hour_chart' ? { getContext: () => 'hourly' } : null;
+	let chart;
+	context.Chart = class {
+		constructor(_owner, config) {
+			chart = config;
+		}
+		destroy() {}
+	};
+	const chartLibrary = vm.createContext({});
+	vm.runInContext(read('vendor/chart.umd.js'), chartLibrary);
+	context.Chart.defaults = chartLibrary.Chart.defaults;
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': { Editor: { chars: 1, app_time_ms: 180000, hourly: { 12: { c: 1 } } } }
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	context.renderCpmByHourChart(fixture.get());
+	assert.equal(chart.data.datasets[0].data[12], 1);
+	assert.equal(chart.data.datasets[1].data[12], 1 / 3);
+	const label = chart.options.plugins.tooltip.callbacks.label;
+	assert.equal(
+		label({ dataset: { label: 'CPM', yAxisID: 'y_cpm' }, parsed: { y: 1 / 3 } }),
+		'CPM: 0'
+	);
+});
+test('apps category speed chart retains slow observed typing', () => {
+	const fixture = appsFixture(true);
+	const context = fixture.context;
+	vm.runInContext(read('dom_utils.js'), context);
+	vm.runInContext(read('metrics_apps/modal.js'), context);
+	vm.runInContext(read('metrics_apps/charts.js'), context);
+	const elements = {
+		'kpi-switches': {},
+		'kpi-unlocks': {},
+		'kpi-wifi': {},
+		cpm_by_category_chart: { getContext: () => 'categories' },
+		'render-error-banner': {}
+	};
+	context.document.getElementById = (id) => elements[id] || null;
+	context.document.createElement = () => ({ style: {}, appendChild() {}, addEventListener() {} });
+	let chart;
+	context.Chart = class {
+		constructor(_owner, config) {
+			chart = config;
+		}
+		destroy() {}
+	};
+	const chartLibrary = vm.createContext({});
+	vm.runInContext(read('vendor/chart.umd.js'), chartLibrary);
+	context.Chart.defaults = chartLibrary.Chart.defaults;
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': {
+				Editor: { category: 'development', chars: 1, app_time_ms: 180000, hourly: { 12: { c: 1 } } }
+			}
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	context.renderDashboard();
+	assert.ok(
+		!elements['render-error-banner'].textContent,
+		elements['render-error-banner'].textContent
+	);
+	assert.equal(chart.data.datasets[0].data[0], 1 / 3);
+	assert.equal(
+		chart.options.plugins.tooltip.callbacks.label({
+			dataset: { label: 'CPM' },
+			parsed: { y: 1 / 3 }
+		}),
+		'CPM: 0'
+	);
+});
+test('apps daily active-ratio chart retains small observed ratios', () => {
+	const fixture = appsFixture();
+	const context = fixture.context;
+	vm.runInContext(read('metrics_apps/charts.js'), context);
+	context.document.getElementById = (id) =>
+		id === 'daily_active_ratio_chart' ? { getContext: () => 'ratio' } : null;
+	let chart;
+	context.Chart = class {
+		constructor(_owner, config) {
+			chart = config;
+		}
+		destroy() {}
+	};
+	const chartLibrary = vm.createContext({});
+	vm.runInContext(read('vendor/chart.umd.js'), chartLibrary);
+	context.Chart.defaults = chartLibrary.Chart.defaults;
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': { Editor: { chars: 2, time: 30, app_time_ms: 180000 } },
+			'2026-10-26': { Editor: { chars: 2, time: 5996, app_time_ms: 10000 } },
+			'2026-10-27': { Editor: { chars: 2, time: 6000, app_time_ms: 10000 } }
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	context.renderDailyTrajectories(fixture.get());
+	assert.equal(chart.data.datasets[0].data[0], (30 / 180000) * 100);
+	assert.equal(
+		chart.data.datasets[0].backgroundColor[1],
+		chart.data.datasets[0].backgroundColor[2]
+	);
+	assert.equal(
+		chart.options.plugins.tooltip.callbacks.label({
+			dataset: { label: 'Actif' },
+			parsed: { y: (30 / 180000) * 100 }
+		}),
+		'Actif: 0'
+	);
+});
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} metrics app charts use current localized weekday and month labels`, () => {
+		const page = loadMetricsAppsPage(host);
+		for (const id of [
+			'hour_weekday_heatmap_container',
+			'ribbon_container',
+			'activity_calendar_container',
+			'category-filter-buttons',
+			'weekday-filter-buttons',
+			'day_timeline_container',
+			'kpi-tx-autorepeat-detail'
+		])
+			page.elements.set(id, page.context.document.createElement('div'));
+		vm.runInContext(
+			`Date = class extends Date { constructor(...args) { super(...(args.length ? args : ['2026-11-05T12:00:00'])); } };`,
+			page.context
+		);
+		page.context.window._i18n_strings['ui_typing.heatmap_day_mon'] = '<Mon-local>';
+		page.context.window._i18n_strings['ui_typing.calendar_month_10'] = '<Nov-local>';
+		page.context.window._i18n_strings['ui_apps.col_day'] = 'Day-local';
+		page.context.window._i18n_strings['ui_apps.col_chars'] = 'Chars-local';
+		page.context.window._i18n_strings['ui_apps.kpi_no_data'] = 'None-local';
+		page.context.window._i18n_strings['ui_apps.h2_autorepeat'] = 'Repeat-local';
+		publishLoadedAppsData(page, host, {
+			'2026-11-02': {
+				Editor: { app_time_ms: 60000, chars: 10, auto_repeat_count: 2, hourly: { 12: { c: 1 } } }
+			}
+		});
+		page.context.renderHourWeekdayHeatmap(page.context.getAggregatedData());
+		page.context.renderActivityCalendar();
+		page.context.renderRibbon(page.context.getAggregatedData());
+		page.context.renderDayTimeline(page.context.getAggregatedData());
+		page.context.rebuildFilterButtons();
+		page.context.renderDashboard();
+		const heatmap = page.elements.get('hour_weekday_heatmap_container').innerHTML;
+		const calendar = page.elements.get('activity_calendar_container').innerHTML;
+		assert.match(heatmap, /&lt;Mon-local&gt;/);
+		assert.doesNotMatch(heatmap, /<Mon-local>/);
+		assert.match(page.elements.get('ribbon_container').innerHTML, /&lt;Mon-local&gt;/);
+		assert.match(page.elements.get('weekday-filter-buttons').innerHTML, /&lt;Mon-local&gt;/);
+		assert.match(calendar, /&lt;Nov-local&gt;/);
+		assert.doesNotMatch(calendar, /<Nov-local>/);
+		assert.match(heatmap, /Chars-local/);
+		assert.match(calendar, /Chars-local/);
+		assert.match(page.elements.get('ribbon_container').innerHTML, /00h — 0<\/title>/);
+		assert.doesNotMatch(page.elements.get('ribbon_container').innerHTML, /None-local/);
+		assert.match(page.elements.get('day_timeline_container').innerHTML, /Day-local/);
+		assert.match(page.elements.get('kpi-tx-autorepeat-detail').textContent, /Repeat-local/);
+	});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} locale updates redraw metrics without losing category selection`, () => {
+		const page = loadMetricsAppsPage(host);
+		for (const id of [
+			'hour_weekday_heatmap_container',
+			'category-filter-buttons',
+			'weekday-filter-buttons'
+		])
+			page.elements.set(id, page.context.document.createElement('div'));
+		publishLoadedAppsData(page, host, {
+			'2026-11-02': {
+				Editor: { category: 'Productivity', chars: 1, hourly: { 12: { c: 1 } } },
+				Browser: { category: 'Entertainment', chars: 1, hourly: { 12: { c: 1 } } },
+				Custom: { category: 'Personal Work', chars: 1, hourly: { 12: { c: 1 } } }
+			}
+		});
+		vm.runInContext(
+			"currentPeriod = 'all'; currentCategoryFilter = new Set([getAppCategory('Editor', 'Productivity').type]); renderDashboard();",
+			page.context
+		);
+		assert.deepEqual(Object.keys(page.context.getAggregatedData().apps), ['Editor']);
+		const listener = page.listeners.find((entry) => entry.name === 'i18n:applied');
+		assert.ok(listener, 'the loaded page must handle a late locale delivery');
+		page.context.CustomEvent = class {
+			constructor(type) {
+				this.type = type;
+			}
+		};
+		page.context.document.dispatchEvent = (event) => {
+			for (const entry of page.listeners) if (entry.name === event.type) entry.callback(event);
+		};
+		page.context.window._i18n_locale = 'en';
+		page.context.window.i18n_apply({
+			'app_category.productivity': 'Productivity EN',
+			'app_category.entertainment': 'Entertainment EN',
+			'ui_typing.heatmap_day_mon': 'Monday EN'
+		});
+		assert.deepEqual(Object.keys(page.context.getAggregatedData().apps), ['Editor']);
+		assert.match(page.elements.get('weekday-filter-buttons').innerHTML, /Monday EN/);
+		assert.match(page.elements.get('hour_weekday_heatmap_container').innerHTML, /Monday EN/);
+		vm.runInContext('currentCategoryFilter = new Set();', page.context);
+		page.context.window.i18n_apply({ 'ui_typing.heatmap_day_mon': 'Monday again' });
+		assert.deepEqual(Object.keys(page.context.getAggregatedData().apps), []);
+		vm.runInContext("currentCategoryFilter = new Set(['Personal Work']);", page.context);
+		page.context.window.i18n_apply({ 'ui_typing.heatmap_day_mon': 'Monday final' });
+		assert.deepEqual(Object.keys(page.context.getAggregatedData().apps), ['Custom']);
+	});
+}
+
+test('apps radial top eight use the same focus ranking as the top-app bars', () => {
+	const fixture = appsFixture(true);
+	const context = fixture.context;
+	for (const name of ['dom_utils.js', 'metrics_apps/modal.js', 'metrics_apps/charts.js'])
+		vm.runInContext(read(name), context);
+	const elements = {
+		'kpi-switches': {},
+		'kpi-unlocks': {},
+		'kpi-wifi': {},
+		'render-error-banner': {},
+		radial_top8_chart: { getContext: () => 'radial' },
+		apps_bar_chart: { getContext: () => 'bar' }
+	};
+	context.document.getElementById = (id) => elements[id] || null;
+	context.document.createElement = () => ({ style: {}, appendChild() {}, addEventListener() {} });
+	const charts = {};
+	context.Chart = class {
+		constructor(owner, config) {
+			charts[owner] = config;
+		}
+		destroy() {}
+	};
+	const apps = {};
+	for (let i = 1; i <= 9; i++) apps[`App${String(i).padStart(2, '0')}`] = { app_time_ms: i * 1000 };
+	context.window.bootstrapMetricsAppsData({ '2026-10-25': apps }, {}, {});
+	fixture.set("currentPeriod = 'all';");
+	context.renderDashboard();
+	assert.ok(
+		!elements['render-error-banner'].textContent,
+		elements['render-error-banner'].textContent
+	);
+	assert.deepEqual(Array.from(charts.radial.data.labels), [
+		'App09',
+		'App08',
+		'App07',
+		'App06',
+		'App05',
+		'App04',
+		'App03',
+		'App02'
+	]);
+	assert.deepEqual(Array.from(charts.bar.data.labels), [
+		'App09',
+		'App08',
+		'App07',
+		'App06',
+		'App05',
+		'App04',
+		'App03'
+	]);
+});
+test('apps error ranking admits a qualifying application with no corrections', () => {
+	const fixture = appsFixture(true);
+	const context = fixture.context;
+	for (const name of ['dom_utils.js', 'metrics_apps/modal.js', 'metrics_apps/charts.js'])
+		vm.runInContext(read(name), context);
+	const elements = {
+		'kpi-switches': {},
+		'kpi-unlocks': {},
+		'kpi-wifi': {},
+		'render-error-banner': {},
+		'kpi-tx-error-app': {},
+		'kpi-tx-error-app-detail': {}
+	};
+	context.document.getElementById = (id) => elements[id] || null;
+	context.document.createElement = () => ({ style: {}, appendChild() {}, addEventListener() {} });
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': { Editor: { chars: 200, bs_total: 0, app_time_ms: 20000 } }
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	context.renderDashboard();
+	assert.ok(
+		!elements['render-error-banner'].textContent,
+		elements['render-error-banner'].textContent
+	);
+	assert.equal(elements['kpi-tx-error-app'].textContent, 'Editor');
+	assert.equal(elements['kpi-tx-error-app-detail'].textContent, '0.0 % de backspaces');
+});
+test('apps recovery ranking admits qualifying zero-delay corrections', () => {
+	const fixture = appsFixture(true);
+	const context = fixture.context;
+	for (const name of ['dom_utils.js', 'metrics_apps/modal.js', 'metrics_apps/charts.js'])
+		vm.runInContext(read(name), context);
+	const elements = {
+		'kpi-switches': {},
+		'kpi-unlocks': {},
+		'kpi-wifi': {},
+		'render-error-banner': {},
+		'kpi-tx-recovery-app': {},
+		'kpi-tx-recovery-app-detail': {}
+	};
+	context.document.getElementById = (id) => elements[id] || null;
+	context.document.createElement = () => ({ style: {}, appendChild() {}, addEventListener() {} });
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': { Editor: { chars: 5, recovery_time_count: 5, recovery_time_sum_ms: 0 } }
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	context.renderDashboard();
+	assert.ok(
+		!elements['render-error-banner'].textContent,
+		elements['render-error-banner'].textContent
+	);
+	assert.equal(elements['kpi-tx-recovery-app'].textContent, 'Editor');
+	assert.equal(elements['kpi-tx-recovery-app-detail'].textContent, '0 ms en moyenne');
+});
+test('apps burst histogram labels the open-ended class above 500', () => {
+	const fixture = appsFixture();
+	const context = fixture.context;
+	vm.runInContext(read('metrics_apps/charts.js'), context);
+	context.document.getElementById = (id) =>
+		id === 'burst_histogram_chart' ? { getContext: () => 'bursts' } : null;
+	let chart;
+	context.Chart = class {
+		constructor(_owner, config) {
+			chart = config;
+		}
+		destroy() {}
+	};
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': { Editor: { burst_length_buckets: { 500: 2, '500+': 1 } } }
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	context.renderBurstHistogram(fixture.get());
+	assert.deepEqual(Array.from(chart.data.labels), ['≤ 500', '> 500']);
+	assert.deepEqual(Array.from(chart.data.datasets[0].data), [2, 1]);
+});
+test('apps transition diagram keeps prototype-named applications on both sides', () => {
+	const fixture = appsFixture();
+	const context = fixture.context;
+	vm.runInContext(read('dom_utils.js'), context);
+	vm.runInContext(read('metrics_apps/charts.js'), context);
+	const container = {};
+	context.document.getElementById = (id) => (id === 'sankey_container' ? container : null);
+	const manifest = JSON.parse(
+		'{"2026-10-25":{"Editor":{"app_time_ms":1000,"switches_to":{"__proto__":1}},"__proto__":{"app_time_ms":2000,"switches_to":{"Editor":1,"Other":1}}}}'
+	);
+	context.window.bootstrapMetricsAppsData(manifest, {}, {});
+	fixture.set("currentPeriod = 'all';");
+	context.renderSankey(fixture.get());
+	assert.ok(container.innerHTML.includes('Editor → __proto__ (1)'));
+	assert.ok(container.innerHTML.includes('__proto__ → Editor (1)'));
+	assert.doesNotMatch(container.innerHTML, /NaN|\[object Object\]/);
+});
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} typing session record localizes character units`, () => {
+		const page = loadMetricsTypingPage(host);
+		page.context.window._i18n_strings['ui_typing.col_chars'] = '<chars-local>';
+		page.context.window._i18n_strings['ui_typing.unit_richness'] = '<rich-local>';
+		publishTypingPage(page, host, {
+			'2026-10-01': {
+				Editor: {
+					chars: 10,
+					session_count_total: 1,
+					session_longest_ms: 60000,
+					session_longest_chars: 10,
+					session_total_active_ms: 60000,
+					burst_count_total: 1,
+					burst_max_chars: 10,
+					burst_length_buckets: { 10: 1, 500: 1, '500+': 1 }
+				}
+			}
+		});
+		page.elements.get('date_start').value = '2026-10-01';
+		page.elements.get('date_end').value = '2026-10-01';
+		page.context.render_sessions_kpi();
+		const record = page.elements.get('sessions_longest_chars').innerHTML;
+		assert.match(record, /&lt;chars-local&gt;/);
+		assert.doesNotMatch(record, /<chars-local>/);
+		vm.runInContext('app_state.data.w = { hello: { count: 2 } };', page.context);
+		page.context.render_lexical_kpi();
+		assert.match(page.elements.get('lexical_val').innerHTML, /&lt;rich-local&gt;/);
+		page.context.render_rhythm_kpi();
+		assert.match(page.elements.get('rhythm_distribution_container').innerHTML, /≤ 500/);
+		assert.match(page.elements.get('rhythm_distribution_container').innerHTML, /> 500/);
+		assert.doesNotMatch(page.elements.get('rhythm_distribution_container').innerHTML, /500\+/);
+		page.context.render_records_kpi();
+		page.context.render_apps_kpi();
+		for (const id of [
+			'lexical_avg_len',
+			'lexical_distribution_container',
+			'rhythm_max_chars',
+			'rhythm_distribution_container',
+			'records_burst_chars',
+			'records_best_day',
+			'apps_top_volume'
+		]) {
+			const html = page.elements.get(id).innerHTML;
+			assert.match(html, /&lt;chars-local&gt;/, `${id} uses the localized unit`);
+			assert.doesNotMatch(html, /<chars-local>/, `${id} escapes its localized unit`);
+		}
+	});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} late locale delivery redraws typing record units`, () => {
+		const page = loadMetricsTypingPage(host);
+		page.context.CustomEvent = class {
+			constructor(type) {
+				this.type = type;
+			}
+		};
+		page.context.document.dispatchEvent = (event) => {
+			for (const entry of page.listeners) if (entry.name === event.type) entry.callback(event);
+		};
+		assert.doesNotThrow(() =>
+			page.context.window.i18n_apply({ 'ui_typing.col_chars': 'Initial-unit' })
+		);
+
+		publishTypingPage(page, host, {
+			'2026-10-01': {
+				Editor: {
+					chars: 10,
+					session_count_total: 1,
+					session_longest_chars: 10,
+					session_total_active_ms: 60000
+				}
+			}
+		});
+		page.elements.get('date_start').value = '2026-10-01';
+		page.elements.get('date_end').value = '2026-10-01';
+		page.context.render_sessions_kpi();
+		assert.doesNotMatch(page.elements.get('sessions_longest_chars').innerHTML, /New-unit/);
+		page.context.window.i18n_apply({ 'ui_typing.col_chars': 'New-unit' });
+		assert.match(page.elements.get('sessions_longest_chars').innerHTML, /New-unit/);
+	});
+}
+
+test('apps muted duration is not presented as a focus-time percentage', () => {
+	const fixture = appsFixture(true);
+	const context = fixture.context;
+	for (const name of ['dom_utils.js', 'metrics_apps/modal.js', 'metrics_apps/charts.js'])
+		vm.runInContext(read(name), context);
+	const elements = {
+		'kpi-switches': {},
+		'kpi-unlocks': {},
+		'kpi-wifi': {},
+		'render-error-banner': {},
+		'kpi-sys-mute-detail': {}
+	};
+	context.document.getElementById = (id) => elements[id] || null;
+	context.document.createElement = () => ({ style: {}, appendChild() {}, addEventListener() {} });
+	context.window._i18n_strings = { 'ui_apps.kpi_pct_focus_time': '{pct}% du temps focus' };
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': {
+				Editor: { app_time_ms: 1000, category: 'Dev' },
+				Other: { app_time_ms: 29000, category: 'Other' },
+				_system: { audio_muted_ms: 30000 }
+			}
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all'; currentCategoryFilter = new Set(['Dev']);");
+	context.renderDashboard();
+	assert.ok(
+		!elements['render-error-banner'].textContent,
+		elements['render-error-banner'].textContent
+	);
+	assert.equal(elements['kpi-sys-mute-detail'].textContent, '');
+	fixture.set("currentCategoryFilter = new Set(['absent']);");
+	context.renderDashboard();
+	assert.equal(elements['kpi-sys-mute-detail'].textContent, '');
+});
+for (const host of ['linux', 'macos', 'windows']) {
+	test(`${host} SFB doubling tooltip reports actual bigram count`, () => {
+		const page = loadMetricsTypingPage(host);
+		freezePageClock(page, '2026-10-25T12:00:00Z');
+		const container = page.context.document.createElement('div');
+		page.elements.set('sfb_heatmap_container', container);
+		const manifest = { '2026-10-25': { Editor: { chars: 4 } } };
+		publishTypingPage(page, host, manifest);
+		deliverTypingManifest(page, host, manifest, {
+			range: {
+				historical: {},
+				today: {
+					Editor: {
+						bg: { aa: { c: 2 }, aq: { c: 1 } },
+						c: { a: { c: 3 }, q: { c: 1 } },
+						kc: { 0: { c: 3 }, 12: { c: 1 } },
+						sc_kb: { 30: { c: 3 }, 16: { c: 1 } }
+					}
+				}
+			}
+		});
+		page.context.render_sfb_kpi();
+		assert.equal(
+			vm.runInContext(
+				'_sfb_heatmap_full.sfb_pairs_by_kc["0"].reduce((sum, pair) => sum + pair.count, 0)',
+				page.context
+			),
+			3
+		);
+		assert.match(container.innerHTML, />aa<\/td><td[^>]*><b>2<\/b><\/td><td[^>]*>67%<\/td>/);
+		assert.match(container.innerHTML, />aq<\/td><td[^>]*><b>1<\/b><\/td><td[^>]*>33%<\/td>/);
+		assert.match(container.innerHTML, />aa<\/td>.*?66\.67%<\/td>/);
+		assert.match(container.innerHTML, />aq<\/td>.*?33\.33%<\/td>/);
+		assert.match(container.innerHTML, />aa<\/td>.*?66\.7%<\/td>/);
+		assert.match(container.innerHTML, />aq<\/td>.*?33\.3%<\/td>/);
+		page.context.toggle_sfb_same_key();
+		assert.match(container.innerHTML, />aa<\/td><td[^>]*><b>2<\/b>/);
+		page.context.toggle_sfb_heatmap_same_key();
+		assert.doesNotMatch(container.innerHTML, />aa<\/td><td[^>]*><b>2<\/b>/);
+		assert.match(container.innerHTML, />aq<\/td><td[^>]*><b>1<\/b><\/td><td[^>]*>100%<\/td>/);
+		assert.match(container.innerHTML, />aq<\/td>.*?100\.00%<\/td>/);
+	});
+}
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} typing records and calendar format dates in the active locale`, () => {
+		const page = loadMetricsTypingPage(host);
+		freezePageClock(page, '2026-05-01T12:00:00Z');
+		page.context.window._i18n_locale = 'fr';
+		publishTypingPage(page, host, {
+			'2026-04-01': {
+				Editor: { chars: 10, session_longest_ms: 60000 }
+			}
+		});
+		page.context.render_records_kpi();
+		page.context._render_activity_calendar();
+		assert.match(page.elements.get('records_session').innerHTML, /avr/);
+		page.context.CustomEvent = class {
+			constructor(type) {
+				this.type = type;
+			}
+		};
+		page.context.document.dispatchEvent = (event) => {
+			for (const entry of page.listeners) if (entry.name === event.type) entry.callback(event);
+		};
+		page.context.window._i18n_locale = 'en';
+		page.context.window.i18n_apply({ 'ui_apps.label_days': 'Days:' });
+		assert.match(page.elements.get('records_session').innerHTML, /Apr/);
+		assert.match(page.elements.get('records_streak').innerHTML, /Days: 1/);
+		assert.match(page.elements.get('activity_calendar_container').innerHTML, /April 1, 2026/);
+	});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} narrow character-mix segment identifies its category on hover`, () => {
+		const page = loadMetricsTypingPage(host);
+		page.context.window._i18n_strings['ui_typing.charmix_digits'] = '<digits-label>';
+		page.context.window._i18n_strings['ui_typing.charmix_letters'] = '<letters-label>';
+		publishTypingPage(page, host, {
+			'2026-10-01': {
+				Editor: { chars: 100, char_letter: 99, char_digit: 1 }
+			}
+		});
+		page.elements.get('date_start').value = '2026-10-01';
+		page.elements.get('date_end').value = '2026-10-01';
+		page.context.render_charmix_kpi();
+		const html = page.elements.get('charmix_bar_container').innerHTML;
+		assert.match(html, /title="&lt;digits-label&gt; 1\.00%"/);
+		assert.doesNotMatch(html, /<digits-label>/);
+		assert.match(html, /title="&lt;letters-label&gt; 99\.00%"/);
+		assert.match(page.elements.get('charmix_val').innerHTML, /&lt;letters-label&gt;/);
+		assert.doesNotMatch(html, /<letters-label>/);
+	});
+}
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of [
+		{ locale: 'ja', finger: '小指左', hand: '左' },
+		{ locale: 'ja', finger: '小指左', hand: '—', counterpart: '薬指右' },
+		{ locale: 'fr', finger: 'Auriculaire G', hand: 'G' },
+		{ locale: 'no', finger: 'Lillefinger H', hand: 'H' },
+		{ locale: 'he', finger: 'זרת L', hand: '—' }
+	])
+		test(`${host} SFB keeps full ${vector.locale} finger labels and only known hands`, () => {
+			const page = loadMetricsTypingPage(host);
+			if (vector.locale === 'ja') {
+				page.context.CustomEvent = class {
+					constructor(type) {
+						this.type = type;
+					}
+				};
+				page.context.document.dispatchEvent = (event) => {
+					for (const entry of page.listeners) if (entry.name === event.type) entry.callback(event);
+				};
+				assert.doesNotThrow(() => page.context.window.i18n_apply({}));
+			}
+
+			publishTypingPage(page, host, { '2026-10-01': { Editor: { chars: 2 } } });
+			page.context.window._i18n_strings = JSON.parse(
+				fs.readFileSync(path.join(root, `../data/locales/${vector.locale}.json`), 'utf8')
+			);
+			if (vector.counterpart)
+				page.context.window._i18n_strings['ui_typing.finger.l_pinky'] = vector.counterpart;
+			page.context.window.keycode_layout = { 12: 'a', 0: 'q' };
+			page.elements.get('date_start').value = '2026-10-01';
+			page.elements.get('date_end').value = '2026-10-01';
+			const raw = { bg: { aq: { c: 1 } }, sc_kb: { 16: { c: 1 } }, kc: { 12: { c: 1 } } };
+			const history = host === 'macos' ? raw : page.context.window.translate_win_today(raw);
+			assert.equal(page.context.receive_range_data({ historical: history, today: {} }), true);
+			const rows = JSON.parse(vm.runInContext('JSON.stringify(_sfb_data)', page.context));
+			assert.equal(rows.length, 1);
+			assert.equal(rows[0].finger, vector.finger);
+			assert.equal(rows[0].hand, vector.hand);
+			if (vector.locale === 'fr') {
+				page.context.CustomEvent = class {
+					constructor(type) {
+						this.type = type;
+					}
+				};
+				page.context.document.dispatchEvent = (event) => {
+					for (const entry of page.listeners) if (entry.name === event.type) entry.callback(event);
+				};
+				const japanese = JSON.parse(
+					fs.readFileSync(path.join(root, '../data/locales/ja.json'), 'utf8')
+				);
+				page.context.window.i18n_apply(japanese);
+				const updated = JSON.parse(vm.runInContext('JSON.stringify(_sfb_data)', page.context));
+				assert.equal(updated[0].finger, '小指左');
+				assert.equal(updated[0].hand, '左');
+			}
+		});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} late locale delivery redraws character composition`, () => {
+		const page = loadMetricsTypingPage(host);
+		page.context.CustomEvent = class {
+			constructor(type) {
+				this.type = type;
+			}
+		};
+		page.context.document.dispatchEvent = (event) => {
+			for (const entry of page.listeners) if (entry.name === event.type) entry.callback(event);
+		};
+		assert.doesNotThrow(() => page.context.window.i18n_apply({}));
+		publishTypingPage(page, host, {
+			'2026-10-01': { Editor: { chars: 100, char_letter: 99, char_digit: 1 } }
+		});
+		page.elements.get('date_start').value = '2026-10-01';
+		page.elements.get('date_end').value = '2026-10-01';
+		page.context.render_charmix_kpi();
+		page.context.window.i18n_apply({ 'ui_typing.charmix_letters': 'Letters-local' });
+		assert.match(page.elements.get('charmix_bar_container').innerHTML, /Letters-local/);
+	});
+}
+
+test('linux rhythm displays a measured zero inter-key delay', () => {
+	const page = loadMetricsTypingPage('linux');
+	freezePageClock(page, '2026-10-25T12:00:00Z');
+	const manifest = {
+		'2026-10-25': {
+			Editor: {
+				chars: 3,
+				burst_count_total: 1,
+				burst_inter_delay_count: 1,
+				burst_inter_delay_sum: 0,
+				burst_inter_delay_sumsq: 0
+			}
+		}
+	};
+	publishTypingPage(page, 'linux', manifest);
+	page.context.render_rhythm_kpi();
+	assert.equal(page.elements.get('rhythm_mean_delay').innerHTML, '0 ms');
+	const empty = loadMetricsTypingPage('linux');
+	freezePageClock(empty, '2026-10-25T12:00:00Z');
+	publishTypingPage(empty, 'linux', {
+		'2026-10-25': { Editor: { chars: 1, burst_count_total: 1 } }
+	});
+	empty.context.render_rhythm_kpi();
+	assert.equal(empty.elements.get('rhythm_mean_delay').innerHTML, '—');
+});
+test('apps focus latency displays measured zero and distinguishes absence', () => {
+	const fixture = appsFixture(true);
+	const context = fixture.context;
+	for (const name of ['dom_utils.js', 'metrics_apps/modal.js', 'metrics_apps/charts.js'])
+		vm.runInContext(read(name), context);
+	const tbody = {
+		children: [],
+		appendChild(child) {
+			this.children.push(child);
+		}
+	};
+	const elements = {
+		'kpi-switches': {},
+		'kpi-unlocks': {},
+		'kpi-wifi': {},
+		'render-error-banner': {},
+		'apps-tbody': tbody,
+		'kpi-tx-focus-lat': {},
+		app_drilldown_modal: { style: {} },
+		app_modal_title: {},
+		app_modal_tiles: {},
+		app_modal_hourly: { getContext: () => 'hourly' },
+		app_modal_dests: {},
+		app_modal_layouts: {},
+		app_modal_records: {},
+		app_modal_assist: {}
+	};
+	context.document.getElementById = (id) => elements[id] || null;
+	context.document.createElement = () => ({
+		style: {},
+		children: [],
+		appendChild(child) {
+			this.children.push(child);
+		},
+		addEventListener() {}
+	});
+	context.Chart = class {
+		destroy() {}
+	};
+	context.window._i18n_strings = {
+		'ui_apps.value_ms': '{n} ms',
+		'ui_apps.tile_focus_lat': 'Focus'
+	};
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': {
+				Editor: {
+					chars: 1,
+					app_time_ms: 1000,
+					focus_to_first_key_count: 1,
+					focus_to_first_key_sum_ms: 0
+				},
+				Other: { chars: 1, app_time_ms: 500 }
+			}
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	context.renderDashboard();
+	assert.ok(!elements['render-error-banner'].textContent);
+	assert.equal(elements['kpi-tx-focus-lat'].textContent, '0 ms');
+	assert.equal(tbody.children[0].children[6].textContent, '0 ms');
+	assert.equal(tbody.children[1].children[6].textContent, '—');
+	context.openAppDrilldown('Editor');
+	assert.match(elements['app_modal_tiles'].innerHTML, />Focus<\/div>\s*<div[^>]*>0 ms<\/div>/);
+	context.openAppDrilldown('Other');
+	assert.match(elements['app_modal_tiles'].innerHTML, />Focus<\/div>\s*<div[^>]*>—<\/div>/);
+});
+for (const host of ['linux', 'macos', 'windows'])
+	test(`${host} dominant category preserves a colon in the fallback name`, () => {
+		const previousTimezone = process.env.TZ;
+		process.env.TZ = 'UTC';
+		try {
+			const page = loadMetricsAppsPage(host);
+			freezePageClock(page, '2026-10-27T12:00:00Z');
+			page.elements.set('kpi-dom-cat', page.context.document.createElement('span'));
+			vm.runInContext("currentPeriod = 'all';", page.context);
+			publishLoadedAppsData(
+				page,
+				host,
+				{ '2026-10-25': { Editor: { app_time_ms: 1000 } } },
+				{},
+				1,
+				{ Editor: { type: 'Work : Code', score: 0 } }
+			);
+			assert.equal(page.elements.get('kpi-dom-cat').textContent, 'Work : Code');
+		} finally {
+			if (previousTimezone === undefined) delete process.env.TZ;
+			else process.env.TZ = previousTimezone;
+		}
+	});
 console.log(`${passed} passed, 0 failed.`);

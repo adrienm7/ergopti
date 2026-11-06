@@ -19,6 +19,7 @@ local FIXTURE_MODULES = {
 	"infra.i18n",
 	"infra.keycodes",
 	"infra.paths",
+	"adapters.storage",
 	"adapters.graphics_renderer",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
@@ -57,6 +58,8 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			local admission_fence = nil
 
 			local original_settings_set = hs_stub.settings.set
+			original_settings_set("ergopti.wpm_widget.pos_x", "1e999")
+			original_settings_set("ergopti.wpm_widget.pos_y", 50)
 			hs_stub.settings.set = function(key, value)
 				observed.settings_writes = observed.settings_writes + 1
 				return original_settings_set(key, value)
@@ -171,6 +174,8 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			helpers.assert_eq(#timer_handles, 1)
 			helpers.assert_eq(#tap_handles, 1)
 			helpers.assert_eq(#canvases, 1)
+			helpers.assert_true(canvases[1].current_frame.x ~= math.huge,
+				"a nonfinite stored coordinate must use the default anchor")
 			helpers.assert_true(type(canvases[1].mouse_callback) == "function")
 
 			local event = {
@@ -190,6 +195,11 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			canvases[1].mouse_callback(canvases[1], "mouseUp", 1, 0, 0)
 			helpers.assert_eq(observed.settings_writes, 2,
 				"the retained canvas callback must have a live positive control")
+			local prior_x = canvases[1].current_frame.x
+			canvases[1].current_frame.x = math.huge
+			canvases[1].mouse_callback(canvases[1], "mouseUp", 1, 0, 0)
+			helpers.assert_eq(observed.settings_writes, 2, "invalid native coordinates must not be persisted")
+			canvases[1].current_frame.x = prior_x
 			-- Begin another drag but deliberately omit mouseUp. PAUSE destroys this
 			-- canvas, so its release callback can never settle the module-level lease.
 			canvases[1].mouse_callback(canvases[1], "mouseDown", 1, 0, 0)

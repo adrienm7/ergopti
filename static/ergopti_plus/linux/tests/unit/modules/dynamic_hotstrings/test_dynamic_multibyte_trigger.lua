@@ -144,7 +144,6 @@ local UNKNOWN_CONTEXT_MARKERS = {
 	"reset = function()",
 	"if remaining >= 1 then",
 	"invalidated = true",
-	"local result = injector.inject(0, text, false, nil, publication)",
 	"onDesync = function()",
 }
 
@@ -192,6 +191,35 @@ helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)
 		helpers.assert_eq(count, #UNKNOWN_CONTEXT_MARKERS)
 	end)
 
+	helpers.it("wrap output resets unknown context only when delivery was attempted and ownership survives", function()
+		local source = daemon_source()
+		local first = assert(source:find("local function retained(check)", 1, true))
+		local last = assert(source:find("if not injected then error(result, 0) end", first, true))
+		local body = source:sub(first, last - 1)
+		local compile = loadstring or load
+		local run = assert(compile("return function(owner, destination, injector, engine)\n"
+			.. "local current, cached = owner.current, owner.cached\n"
+			.. "local text, on_payload_attempt, _undoable = 'x', nil, true\n"
+			.. body .. "\nend", "@wrap-output-reset"))()
+		local function check(attempted, success, owned, expected)
+			local owner = { current = function() return owned end, cached = function() return owned end }
+			local destination = { current = function() return owned end, cached = function() return owned end }
+			local resets = {}
+			local engine = { reset = function(_, boundary) resets[#resets + 1] = boundary == false and "unknown" or "other" end }
+			local injector = { inject = function(_, _, _, _, _, on_attempt)
+				if attempted then on_attempt() end
+				return { ok = success }
+			end }
+			run(owner, destination, injector, engine)
+			helpers.assert_eq(#resets, expected and 1 or 0)
+			if expected then helpers.assert_eq(resets[1], "unknown") end
+		end
+		check(true, false, true, true) -- failed after payload attempt still invalidates
+		check(false, true, true, true) -- committed output invalidates too
+		check(false, false, true, false) -- failure before output preserves context
+		check(true, false, false, false) -- successor focus owns its own buffer
+	end)
+
 	helpers.it("every daemon reset names whether a word starts", function()
 		local source = daemon_source()
 		local plain, explicit = 0, 0
@@ -228,11 +256,42 @@ helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)
 end)
 
 helpers.describe("Linux builtin dynamic word-start owners", function()
+	helpers.it("dynamic family fixture owns different paths in concurrent processes", function()
+		local uv = require("luv")
+		local code = "package.path = " .. string.format("%q", package.path) .. "; " .. [[
+			package.loaded["infra.hotstring_preferences"] = { _set_file_for_test = function() return true end }
+			os.time = function() return 42 end
+			math.random = function() return 123456 end
+			local restore, path = require("tests.support.dynamic_hotstrings_fixture").route()
+			print(path)
+			restore()
+		]]
+		local outputs, completed, closed = { "", "" }, 0, 0
+		for index = 1, 2 do
+			local pipe = assert(uv.new_pipe(false))
+			local child
+			child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code }, stdio = { nil, pipe, nil } },
+				function(status, signal)
+					assert(status == 0 and signal == 0, "fixture child failed")
+					completed = completed + 1
+					child:close()
+				end))
+			pipe:read_start(function(err, chunk)
+				assert(not err, err)
+				if chunk then outputs[index] = outputs[index] .. chunk
+				else pipe:read_stop(); pipe:close(); closed = closed + 1 end
+			end)
+		end
+		while completed < 2 or closed < 2 do uv.run("once") end
+		helpers.assert_true(outputs[1] ~= "" and outputs[2] ~= "", "both processes must return a path")
+		helpers.assert_true(outputs[1] ~= outputs[2], "process-local clocks and random generators cannot own a path")
+	end)
+
 	helpers.it("the actual daemon captures boundary with its buffer before prediction callbacks", function()
 		with_manager(function(manager, injections)
 			local source = daemon_source()
 			local first = assert(source:find("if prediction_engine or (dyn_hotstrings and dyn_hotstrings.is_enabled()) then", 1, true))
-			local last = assert(source:find("\n\n\n\tend\n\ton_char", first, true))
+			local last = assert(source:find("\t\t-- Finish the triggering character's prediction work", first, true))
 			local slice = source:sub(first, last - 1)
 			local compile = loadstring or load
 			local actor = assert(compile("return function(engine, prediction_engine, dyn_hotstrings, keystats)\n"

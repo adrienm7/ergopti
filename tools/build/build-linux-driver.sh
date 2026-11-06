@@ -31,7 +31,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
+# NUL framing retains a newline at the end of the checkout directory name.
+IFS= read -r -d '' REPO_ROOT < <(CDPATH= cd -Pe -- "${SCRIPT_DIR}/../.." && printf '%s\0' "$PWD")
 
 # ----------------------------------------------------------------------------
 # Copy only repository-owned files, with optional root-relative exclusions.
@@ -58,6 +59,67 @@ BUILD_DIR="${ERGOPTI_LINUX_BUILD_DIR:-${REPO_ROOT}/build/linux}"
 case "$BUILD_DIR" in
   /?*) ;;
   *) echo "[ERR] ERGOPTI_LINUX_BUILD_DIR must be an absolute path, got '$BUILD_DIR'" >&2; exit 1 ;;
+esac
+
+# The output is removed below. Admit its physical location before creating it,
+# including when its last components do not exist yet.
+if [ -e "$BUILD_DIR" ] || [ -L "$BUILD_DIR" ]; then
+  [ -d "$BUILD_DIR" ] && [ ! -L "$BUILD_DIR" ] || {
+    echo "[ERR] Linux build output must be a direct directory: $BUILD_DIR" >&2; exit 1;
+  }
+  IFS= read -r -d '' RESOLVED_BUILD < <(CDPATH= cd -Pe -- "$BUILD_DIR" && printf '%s\0' "$PWD")
+  BUILD_GIT_PROBE="$RESOLVED_BUILD"
+else
+  BUILD_PARENT="$BUILD_DIR"
+  while [ ! -e "$BUILD_PARENT" ] && [ ! -L "$BUILD_PARENT" ]; do
+    BUILD_PARENT="${BUILD_PARENT%/*}"
+    [ -n "$BUILD_PARENT" ] || BUILD_PARENT=/
+  done
+  [ -d "$BUILD_PARENT" ] || { echo "[ERR] Linux build output parent is not a directory: $BUILD_PARENT" >&2; exit 1; }
+  IFS= read -r -d '' BUILD_GIT_PROBE < <(CDPATH= cd -Pe -- "$BUILD_PARENT" && printf '%s\0' "$PWD")
+  if [ "$BUILD_PARENT" = / ]; then BUILD_SUFFIX="/${BUILD_DIR#/}"; else BUILD_SUFFIX="${BUILD_DIR#"$BUILD_PARENT"}"; fi
+  case "/$BUILD_SUFFIX/" in
+    */../*|*/./*) echo "[ERR] Linux build output has unresolved path components: $BUILD_DIR" >&2; exit 1 ;;
+  esac
+  RESOLVED_BUILD="${BUILD_GIT_PROBE%/}$BUILD_SUFFIX"
+fi
+
+while [[ "$RESOLVED_BUILD" != / && "$RESOLVED_BUILD" == */ ]]; do RESOLVED_BUILD="${RESOLVED_BUILD%/}"; done
+[ "$RESOLVED_BUILD" != / ] || { echo "[ERR] Refusing the filesystem root as build output." >&2; exit 1; }
+if [ -e "$RESOLVED_BUILD/.git" ] || [ -L "$RESOLVED_BUILD/.git" ]; then
+  echo "[ERR] Refusing a Git checkout as build output: $BUILD_DIR" >&2; exit 1
+fi
+# Check physical ancestors directly: a failed Git query cannot establish that
+# an existing directory is outside a sibling checkout.
+BUILD_ANCESTOR="$BUILD_GIT_PROBE"
+while :; do
+  if [ -e "${BUILD_ANCESTOR%/}/.git" ] || [ -L "${BUILD_ANCESTOR%/}/.git" ]; then
+    if [ "$BUILD_ANCESTOR" != "$REPO_ROOT" ]; then
+      echo "[ERR] Linux build output belongs to another Git checkout: $BUILD_DIR" >&2; exit 1
+    fi
+    break
+  fi
+  [ "$BUILD_ANCESTOR" = / ] && break
+  BUILD_ANCESTOR="${BUILD_ANCESTOR%/*}"
+  [ -n "$BUILD_ANCESTOR" ] || BUILD_ANCESTOR=/
+done
+# Also retain Git's discovery for nonstandard layouts when it is available;
+# refusal of that query never overrides the direct ancestor checks above.
+if IFS= read -r -d '' BUILD_GIT_ROOT < <(git -C "$BUILD_GIT_PROBE" rev-parse --show-toplevel 2>/dev/null && printf '\0'); then
+  BUILD_GIT_ROOT="${BUILD_GIT_ROOT%$'\n'}"
+  if [ "$BUILD_GIT_ROOT" != "$REPO_ROOT" ]; then
+    echo "[ERR] Linux build output belongs to another Git checkout: $BUILD_DIR" >&2; exit 1
+  fi
+fi
+case "$REPO_ROOT/" in
+  "$RESOLVED_BUILD/"*) echo "[ERR] Linux build output contains the source checkout: $BUILD_DIR" >&2; exit 1 ;;
+esac
+case "$RESOLVED_BUILD/" in
+  "$REPO_ROOT/"*)
+    case "$RESOLVED_BUILD/" in
+      "$REPO_ROOT/build/"*) [ "$RESOLVED_BUILD" != "$REPO_ROOT/build" ] || { echo "[ERR] Refusing the shared build root." >&2; exit 1; } ;;
+      *) echo "[ERR] Linux build output overlaps source files: $BUILD_DIR" >&2; exit 1 ;;
+    esac ;;
 esac
 
 echo "=== Ergopti Linux driver assembly ==="
@@ -369,26 +431,35 @@ else
 	# Keep the path outside Lua source: quotes, backslashes and newlines are
 	# valid Linux filename bytes, not Lua lexical syntax.
 	_lua_with_path() {
-		local lua_code="$1"
-		ERGOPTI_LINUX_BUILD_ROOT="$BUILD_DIR_FWD" "$LUA_BIN" -e "
-			local build_dir = assert(os.getenv('ERGOPTI_LINUX_BUILD_ROOT'))
-			-- Normalize to the OS path separator (Lua package.config).
-			local sep = package.config:sub(1,1)
-			if sep == '\\\\' then build_dir = build_dir:gsub('/', '\\\\') end
-			local driver_root = build_dir .. sep .. 'linux'
-			local shared_lua  = build_dir .. sep .. '_shared' .. sep .. 'lua'
-			package.path = driver_root .. sep .. '?.lua;' ..
-			               driver_root .. sep .. '?' .. sep .. 'init.lua;' ..
-			               shared_lua  .. sep .. '?.lua;' ..
-			               shared_lua  .. sep .. '?' .. sep .. 'init.lua;' ..
-			               (package.path or '')
-			${lua_code}
-		" 2>&1
+		local lua_code="$1" lua_command
+		lua_command="$(command -v "$LUA_BIN")" || return 1
+		case "$lua_command" in
+			/*) ;;
+			*/*) lua_command="$PWD/$lua_command" ;;
+		esac
+		# Lua treats ; and ? as search-path syntax, including in absolute paths.
+		# Resolve relative templates after entering the staged build directory.
+		(
+			cd -- "$BUILD_DIR_FWD" || exit 1
+			"$lua_command" -e "
+				local sep = package.config:sub(1,1)
+				local driver_root = 'linux'
+				local shared_lua = '_shared' .. sep .. 'lua'
+				package.path = driver_root .. sep .. '?.lua;' ..
+				               driver_root .. sep .. '?' .. sep .. 'init.lua;' ..
+				               shared_lua .. sep .. '?.lua;' ..
+				               shared_lua .. sep .. '?' .. sep .. 'init.lua;' ..
+				               (package.path or '')
+				${lua_code}
+			"
+		) 2>&1
 	}
 
 	# Test 1: --help must exit 0
 	echo "  Test: --help exits 0..."
-	if ${LUA_BIN} "${BUILD_DIR}/linux/ergopti_hotstrings.lua" --help >/dev/null 2>&1; then
+	LUA_HELP_COMMAND="$(command -v "$LUA_BIN")"
+	case "$LUA_HELP_COMMAND" in /*) ;; */*) LUA_HELP_COMMAND="$PWD/$LUA_HELP_COMMAND" ;; esac
+	if (cd -- "${BUILD_DIR}/linux" && "$LUA_HELP_COMMAND" ergopti_hotstrings.lua --help) >/dev/null 2>&1; then
 		echo "    OK — --help exits 0"
 	else
 		echo "    FAIL — --help exited non-zero"

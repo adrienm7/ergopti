@@ -200,15 +200,8 @@ local function catalogue_keys()
 		Logger.error(LOG, "Cannot locate the shared tree — no key catalogue, so no slots are offered.")
 		return nil
 	end
-	local handle = io.open(path, "r")
-	if not handle then
-		_catalogue = false
-		Logger.error(LOG, "Cannot read '%s' — no slots are offered.", path)
-		return nil
-	end
-	local read_ok, body = pcall(handle.read, handle, "*a")
-	local close_ok, closed = pcall(handle.close, handle)
-	if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
+	local body, status = require("toml_codec.writer").read_classified(path)
+	if status ~= "ok" then
 		_catalogue = false
 		Logger.error(LOG, "The key catalogue at '%s' was not completely read and closed — no slots are offered.", path)
 		return nil
@@ -254,11 +247,8 @@ local function physical_slots()
 		and getmetatable(PhysicalSlots) == nil and rawequal(rawget(PhysicalSlots, "new"), PhysicalSlotConstructor),
 		"physical-key constructor ownership changed")
 	local path = assert(Paths.shared("data/keycodes/physical_keys.json"), "physical-key registry path unavailable")
-	local file = assert(io.open(path, "rb"))
-	local read_ok, raw = pcall(file.read, file, "*a")
-	local close_ok, closed = pcall(file.close, file)
-	assert(read_ok and type(raw) == "string" and close_ok and closed == true,
-		"physical-key registry was not completely read and closed")
+	local raw, status = require("toml_codec.writer").read_classified(path)
+	assert(status == "ok" and type(raw) == "string", "physical-key registry was not completely read and closed")
 	_physical_slots, _physical_binding_publication = PhysicalSlotConstructor(require("json").decode(raw))
 	return _physical_slots
 end
@@ -555,7 +545,23 @@ function M.set_action(slot_id, action_id)
 	-- Explicit None is a personal native-behavior claim. Scope removal alone
 	-- restores absence; it must never be confused with selecting this action.
 	local operation = require("shortcuts.assignment").operation(slot_id, action_id, owns_slot, Gestures.is_assignable)
-	local committed, detail = Writer.batch_write(path, { operation })
+	local assignments, explicit, generation = _assignments, _explicit_assignments, _dispatch_generation
+	local bytes, status = Writer.read_classified(path)
+	if status ~= "ok" and status ~= "absent" then return false end
+	local ok, expected = pcall(function() return M.configuration_candidate(Codec.decode(bytes or "")) end)
+	if not ok or type(expected) ~= "table" or type(expected.assignments) ~= "table"
+		or type(expected.explicit_assignments) ~= "table" or _assignments ~= assignments
+		or _explicit_assignments ~= explicit or _dispatch_generation ~= generation or _configuration_owner ~= nil then return false end
+	local function same(left, right)
+		for key, value in pairs(left) do if right[key] ~= value then return false end end
+		for key, value in pairs(right) do if left[key] ~= value then return false end end
+		return true
+	end
+	if not same(assignments, expected.assignments) or not same(explicit, expected.explicit_assignments) then
+		Logger.warn(LOG, "Keyboard shortcut configuration changed externally; reload shortcuts before editing.")
+		return false
+	end
+	local committed, detail = Writer.batch_write(path, { operation }, nil, { status = status, content = bytes })
 	if committed ~= true then
 		Logger.error(LOG, "set_action(): could not persist '%s': %s.", slot_id, tostring(detail))
 		return false
@@ -852,9 +858,24 @@ function M.consume(detail, opts)
 	if not hit or hit.held_back or _configuration_owner ~= nil or entry_generation ~= _dispatch_generation then return false, nil end
 	local generation = _dispatch_generation
 	local admission_reader, decision_reader = opts.admission, M.magic_editor_decision
+	local pause_reader, pause_epoch = opts.pause_epoch, nil
+	local script_action = ScriptActions.is_script_action(hit.action)
+	if not script_action and pause_reader ~= nil then
+		if type(pause_reader) ~= "function" then return false, nil end
+		local called, epoch = pcall(pause_reader)
+		if not called or type(epoch) ~= "number" then return false, nil end
+		pause_epoch = epoch
+	end
+	local function pause_current()
+		if script_action or pause_reader == nil then return true end
+		if opts.pause_epoch ~= pause_reader then return false end
+		local called, epoch = pcall(pause_reader)
+		return called and epoch == pause_epoch and opts.pause_epoch == pause_reader
+	end
 	-- Ordinary chords have the same live gates as contextual bindings. A pause
 	-- or a modal capture can begin after the key was claimed but before delivery.
 	local function delivery_current()
+		if not pause_current() then return false end
 		if hit.physical or hit.decision then
 			return _configuration_owner == nil and generation == _dispatch_generation
 		end
@@ -870,8 +891,8 @@ function M.consume(detail, opts)
 		if not called or type(admission) ~= "table" or not owner_current() then return false end
 		if type(admission.master) ~= "boolean" or type(admission.paused) ~= "boolean"
 			or admission.inhibited ~= false then return false end
-		return ScriptActions.is_script_action(hit.action)
-			or (admission.master == true and admission.paused == false)
+		return pause_current() and (script_action
+			or (admission.master == true and admission.paused == false))
 	end
 	if not delivery_current() then return false, nil end
 	-- A scheduled callback has no delivery rights until its original queue ACK.

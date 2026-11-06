@@ -32,7 +32,7 @@ end
 local function check(name, test)
 	checks = checks + 1
 	local ok, err = xpcall(test, debug.traceback)
-	if active then active.cancel(); active = nil end
+	if active then active.cancel(); active.discard(); active = nil end
 	uv.run()
 	if ok then print("PASS " .. name) else
 		failures = failures + 1
@@ -66,8 +66,8 @@ local function capture(base)
 	assert(width > 0 and height > 0)
 	if outcome.scaled then assert(math.max(width, height) <= 128, "installed downscale did not constrain the actual PNG") end
 	assert(not uv.loop_alive(), "capture retained native process ownership")
-	assert(uv.fs_unlink(active.path))
-	assert(uv.fs_rmdir(active.dir))
+	assert(active.discard(), "exact capture cleanup must be registered")
+	assert(not Screen.cleanup_pending(), "completed capture staging must retire")
 	active = nil
 end
 

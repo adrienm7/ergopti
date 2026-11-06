@@ -1,4 +1,11 @@
 --- ui/dialog_host.lua
+-- The application-owned child is invoked directly, without a global Lua init.
+local literal_driver = os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT")
+if literal_driver and literal_driver ~= "" then
+	local literal_shared = assert(os.getenv("ERGOPTI_LITERAL_SHARED_ROOT"), "literal shared root unavailable")
+	assert(loadfile(literal_driver .. "/infra/literal_module_loader.lua"))().install(literal_driver, literal_shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), os.getenv("ERGOPTI_LITERAL_DIRECT") == "1" and "child-direct" or (os.getenv("ERGOPTI_LITERAL_DAEMON") == "1" and "daemon" or nil))
+end
+
 
 --- ==============================================================================
 --- MODULE: Owned Native Dialog Host (Linux)
@@ -30,6 +37,7 @@ M.EXIT_ACCEPTED = 0
 M.EXIT_CANCELLED = 1
 M.EXIT_USAGE = 2
 M.EXIT_UNAVAILABLE = 69
+M.EXIT_IO_ERROR = 74
 
 --- The dialog kinds, one of which every command line names exactly once.
 M.KINDS = { question = true, info = true, warning = true, error = true, entry = true, list = true,
@@ -76,13 +84,18 @@ local LIST_DEFAULT_WIDTH, LIST_DEFAULT_HEIGHT = 420, 360
 function M.parse(argv)
 	assert(type(argv) == "table", "argv must be a table")
 	local request = { kind = nil, options = {}, columns = {}, values = {} }
-	local index = 1
+	local index, positional = 1, false
 	while index <= #argv do
 		local word = argv[index]
 		if type(word) ~= "string" then return nil, "argument " .. index .. " is not a string" end
-		local name, value = word:match("^%-%-([%a][%w%-]*)=(.*)$")
-		if not name then name = word:match("^%-%-([%a][%w%-]*)$") end
-		if name == nil then
+		local name, value
+		if not positional then
+			name, value = word:match("^%-%-([%a][%w%-]*)=(.*)$")
+			if not name then name = word:match("^%-%-([%a][%w%-]*)$") end
+		end
+		if not positional and word == "--" then
+			positional = true
+		elseif name == nil then
 			request.values[#request.values + 1] = word
 		elseif M.KINDS[name] and value == nil then
 			if request.kind then return nil, "two dialog kinds: " .. request.kind .. " and " .. name end
@@ -513,8 +526,12 @@ function M.main(argv, io_out, io_err, binder)
 		status, answer = run_file(lib, request)
 	end
 	if answer ~= nil then
-		out:write(answer, "\n")
-		out:flush()
+		local called, written = pcall(out.write, out, answer, "\n")
+		local flushed, accepted = pcall(out.flush, out)
+		if not called or not written or not flushed or not accepted then
+			pcall(err.write, err, "ergopti dialog: could not publish the answer\n")
+			return M.EXIT_IO_ERROR
+		end
 	end
 	return status
 end

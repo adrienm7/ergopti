@@ -38,6 +38,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local TomlCodec = require("toml_codec")
+local Writer = require("toml_codec.writer")
 local HoldOptions = require("tap_hold.hold_options")
 local KeyCatalog = require("tap_hold.key_catalog")
 local Manifest = require("infra.manifest_reader")
@@ -80,10 +81,9 @@ local USER_FILE_NAME = "tap_hold.toml"
 --- @param path string
 --- @return table|nil parsed, string|nil err ("absent" when the file does not exist)
 local function read_toml(path, with_shapes)
-	local fh = io.open(path, "r")
-	if not fh then return nil, "absent" end
-	local text = fh:read("*a")
-	fh:close()
+	local text, status = Writer.read_classified(path)
+	if status == "absent" then return nil, "absent" end
+	if status ~= "ok" or type(text) ~= "string" then return nil, "unreadable" end
 	local parsed, shapes
 	if with_shapes then
 		parsed, shapes = TomlCodec.decode_with_shapes(text)
@@ -156,8 +156,8 @@ local function validated(key_id, fields, hold_picker, origin, global_seconds)
 		key.enabled = false
 	end
 	-- The key's own delay when it has a usable one, else the global delay.
-	local seconds = tonumber(key.time_activation_seconds)
-	if not seconds or seconds <= 0 or seconds > MAX_THRESHOLD_SECONDS then
+	local seconds = key.time_activation_seconds
+	if type(seconds) ~= "number" or seconds ~= seconds or seconds <= 0 or seconds > MAX_THRESHOLD_SECONDS then
 		if key.time_activation_seconds ~= nil then
 			outdated(TIME_FIELD, string.format("%s is outside 0..%d s; the global delay %.3f s is used",
 				tostring(key.time_activation_seconds), MAX_THRESHOLD_SECONDS, global_seconds))

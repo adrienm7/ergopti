@@ -50,6 +50,64 @@ local LoneTap = require("tap_hold.lone_tap")
 local InputEvent = require("infra.input_event")
 
 local M = {}
+-- Only the installed wrapper supplies the hook-backed port. Pure engine users
+-- have no native authority and can leave it unset.
+local roll_origin_ports = setmetatable({}, { __mode = "k" })
+local roll_replay_origins = setmetatable({}, { __mode = "k" })
+local roll_origins = setmetatable({}, { __mode = "k" })
+local roll_journaling = setmetatable({}, { __mode = "k" })
+
+--- Installs the original source-capture port only while the engine is idle.
+function M:set_roll_origin_capture(capture, current)
+	if type(capture) ~= "function" or type(current) ~= "function" or self.undecided
+		or next(self.held) or next(self.key_refs) or next(self.layer_keys) or next(self.instant_down)
+		or next(self.native_keys) or next(self.passed_down) or next(self.physical_down) or next(self.one_shot_keys)
+		or next(self.one_shot_swallowed) or self.one_shot_until ~= nil
+		or roll_origins[self] and next(roll_origins[self]) then return false end
+	roll_origin_ports[self] = { capture = capture, current = current }
+	return true
+end
+
+--- Marks an origin delivered only after its exact journal step is acknowledged.
+function M:commit_roll_origin(token)
+	local pending = roll_origins[self]
+	if not pending or not pending[token] then return false end
+	pending[token] = nil
+	return true, next(pending) == nil
+end
+
+--- Returns the original uncommitted origins for the wrapper's retirement.
+function M:take_roll_origins()
+	local pending, result = roll_origins[self], {}
+	if pending then
+		for token in pairs(pending) do result[#result + 1] = token end
+	end
+	roll_origins[self] = nil
+	return result
+end
+
+local function capture_roll_origin(self, code, at_ms, receipt)
+	local replay = roll_replay_origins[self]
+	if replay and replay.code == code and replay.at_ms == at_ms then return replay end
+	local source = type(receipt) == "table" and { source = receipt.source, generation = receipt.generation,
+		source_owner = receipt.source_owner } or nil
+	local ports = roll_origin_ports[self]
+	if not ports then return { code = code, at_ms = at_ms, receipt = source } end
+	local ok, token = pcall(ports.capture, code, at_ms)
+	if not ok or type(token) ~= "table" then return nil end
+	local pending = roll_origins[self] or {}
+	roll_origins[self] = pending
+	pending[token] = true
+	return { code = code, at_ms = at_ms, token = token, receipt = source }
+end
+
+local function roll_origin_current(self, origin)
+	local ports = roll_origin_ports[self]
+	if not ports then return true end
+	if not origin or not origin.token then return false end
+	local ok, current = pcall(ports.current, origin.token)
+	return ok and current == true
+end
 
 local UP, DOWN, REPEAT = 0, 1, 2
 
@@ -210,6 +268,7 @@ function M.new(opts)
 		native_keys = {},    -- configured keys pressed under a modifier: themselves until released
 		instant_down = {},   -- keys with a tap and no hold, down since their tap fired
 		key_refs = {},       -- code -> how many of this engine's holders keep it down
+		key_order = {},      -- first-acquired keys, for reverse-order retirement
 		passed_down = {},    -- keys that went through untouched and are down (the hand's)
 		modifiers_down = {}, -- modifier keys that went through untouched, and are down
 		physical_down = {},  -- every physical key down now, whatever this engine made of it
@@ -334,6 +393,11 @@ end
 --- kernel, and the first release must not lift it under the others.
 local output_holders = setmetatable({}, { __mode = "k" })
 local source_holds = setmetatable({}, { __mode = "k" })
+local layer_sources = setmetatable({}, { __mode = "k" })
+local instant_sources = setmetatable({}, { __mode = "k" })
+local native_sources = setmetatable({}, { __mode = "k" })
+local pass_observations = setmetatable({}, { __mode = "k" })
+local source_physical = setmetatable({}, { __mode = "k" })
 
 --- Retains producer custody separately from the stable public event shape.
 local function hold_row(self, out, code, value)
@@ -351,9 +415,14 @@ function M:output_holder(row)
 	return nil
 end
 
-local function custody(self, code, value, physical)
+local function custody(self, code, value, physical, out)
+	local row = { code = code, value = value, physical = physical == true, holder = "hold" }
+	if roll_journaling[self] then
+		if out then out[#out + 1] = row end
+		return row
+	end
 	self.output_custody = self.output_custody or {}
-	self.output_custody[#self.output_custody + 1] = { code = code, value = value, physical = physical == true, holder = "hold" }
+	self.output_custody[#self.output_custody + 1] = row
 end
 
 --- Returns explicit suppressed ownership edges; never invents a native ACK.
@@ -368,7 +437,8 @@ local function press(self, out, code)
 	local refs = (self.key_refs[code] or 0) + 1
 	self.key_refs[code] = refs
 	if refs == 1 then
-		if self.passed_down[code] then custody(self, code, DOWN)
+		self.key_order[#self.key_order + 1] = code
+		if self.passed_down[code] then custody(self, code, DOWN, false, out)
 		else hold_row(self, out, code, DOWN) end
 	end
 end
@@ -382,7 +452,10 @@ local function release(self, out, code)
 		return
 	end
 	self.key_refs[code] = nil
-	if self.passed_down[code] then custody(self, code, UP)
+	for index = #self.key_order, 1, -1 do
+		if self.key_order[index] == code then table.remove(self.key_order, index); break end
+	end
+	if self.passed_down[code] then custody(self, code, UP, false, out)
 	else hold_row(self, out, code, UP) end
 end
 
@@ -418,10 +491,12 @@ end
 --- again, and is lifted by whichever of the two lets go last.
 --- @return table|nil nil to pass the event unchanged, {} to swallow it
 local function pass(self, code, value)
+	local observation = pass_observations[self]
+	if observation and observation.code == code and observation.value == value then observation.forwarded = true end
 	if value == REPEAT then return nil end
 	if MODIFIER_KEYS[code] then self.modifiers_down[code] = value == DOWN or nil end
 	self.passed_down[code] = value == DOWN or nil
-	if self.key_refs[code] then custody(self, code, value, true); return {} end
+	if self.key_refs[code] then local row = custody(self, code, value, true); return row and { row } or {} end
 	return nil
 end
 
@@ -783,14 +858,26 @@ end
 --- Runs one event through the engine and appends what comes out, the event
 --- itself when the engine passes it unchanged.
 --- @return string|table|nil tap As M:process returns it.
-local function replay(self, out, code, value, now_ms)
-	local events, tap, binding = self:process(code, value, now_ms)
-	if events == nil then
-		out[#out + 1] = { code = code, value = value, physical = true }
-	else
-		for _, event in ipairs(events) do out[#out + 1] = event end
+local function replay(self, out, code, value, now_ms, origin)
+	local receipt = origin and origin.receipt
+	if type(receipt) == "table" and type(receipt.source) == "string" then
+		receipt = { source = receipt.source, generation = receipt.generation, source_owner = receipt.source_owner,
+			source_current = true, physical_down = self.physical_down }
 	end
-	return tap, binding
+	local previous, previous_journaling, previous_pass = roll_replay_origins[self], roll_journaling[self], pass_observations[self]
+	roll_replay_origins[self], pass_observations[self] = origin, nil
+	if roll_origin_ports[self] then roll_journaling[self] = true end
+	local ok, events, tap, binding, journal = pcall(self.process, self, code, value, now_ms, receipt)
+	roll_replay_origins[self], roll_journaling[self], pass_observations[self] = previous, previous_journaling, previous_pass
+	if not ok then error(events, 0) end
+	local rows = {}
+	if events == nil then
+		rows[1] = { code = code, value = value, physical = true }
+	else
+		for _, event in ipairs(events) do rows[#rows + 1] = event end
+	end
+	for _, event in ipairs(rows) do out[#out + 1] = event end
+	return tap, binding, rows, journal
 end
 
 --- Decides an undecided roll key and replays the keys struck meanwhile, in
@@ -799,10 +886,14 @@ end
 --- @param decision string "tap" or "hold".
 --- @param released boolean|nil True when the key itself came up.
 --- @return table out, string|table|nil tap As M:process returns them.
-local function resolve_roll(self, code, decision, now_ms, released)
+local function resolve_roll_body(self, code, decision, now_ms, released)
 	local config, state = self.by_code[code], self.held[code]
 	local out, tap, binding = {}, nil, nil
 	local queue = state.queue
+	if not roll_origin_current(self, state.origin) then return {}, nil, nil, { refused = true } end
+	for _, queued in ipairs(queue) do
+		if not roll_origin_current(self, queued) then return {}, nil, nil, { refused = true } end
+	end
 	state.undecided, state.queue = nil, nil
 	self.undecided = nil
 	if released then self.held[code] = nil end
@@ -825,34 +916,60 @@ local function resolve_roll(self, code, decision, now_ms, released)
 			tap = type_key_tap(self, out, config, roll_tap == "" and code or M.KEY_TAPS[roll_tap], now_ms)
 		end
 	end
-	for _, queued_code in ipairs(queue) do
-		local queued_tap, queued_binding = replay(self, out, queued_code, DOWN, now_ms)
+	local journal = { { rows = out, tap = tap, binding = binding, origin = state.origin and state.origin.token } }
+	-- Keep the first segment detached: replay appends to the legacy output too.
+	journal[1].rows = {}; for _, event in ipairs(out) do journal[1].rows[#journal[1].rows + 1] = event end
+	for _, queued in ipairs(queue) do
+		local queued_tap, queued_binding, rows, nested = replay(self, out, queued.code, DOWN, queued.at_ms, queued)
+		if nested and nested.refused then return out, tap, binding, nested end
+		if nested then for _, segment in ipairs(nested) do journal[#journal + 1] = segment end
+		else journal[#journal + 1] = { rows = rows, tap = queued_tap, binding = queued_binding, origin = queued.token } end
 		if tap == nil then tap, binding = queued_tap, queued_binding end
 	end
-	return out, tap, binding
+	return out, tap, binding, roll_origin_ports[self] and journal or nil
+end
+
+
+-- Custody transitions generated while resolving belong to the same ordered,
+-- acknowledged segment as the rest of that original input's output.
+local function resolve_roll(self, code, decision, now_ms, released)
+	local previous = roll_journaling[self]
+	if roll_origin_ports[self] then roll_journaling[self] = true end
+	local ok, rows, tap, binding, journal = pcall(resolve_roll_body, self, code, decision, now_ms, released)
+	roll_journaling[self] = previous
+	if not ok then error(rows, 0) end
+	return rows, tap, binding, journal
 end
 
 --- Another key's event while a roll key is undecided.
 --- @return boolean handled False for an event of a key that was down before
 ---   the roll key: its repeats and its release are its own.
 --- @return table|nil out, string|table|nil tap As M:process returns them.
-local function roll_other_key(self, pending, code, value, now_ms)
+local function roll_other_key(self, pending, code, value, now_ms, receipt)
 	local state = self.held[pending]
 	if value == DOWN then
-		state.queue[#state.queue + 1] = code
+		local origin = capture_roll_origin(self, code, now_ms, receipt)
+		if not origin then return true, {}, nil, nil, { refused = true } end
+		state.queue[#state.queue + 1] = origin
 		-- A second key struck before either came up: typing rolling on.
 		if #state.queue >= 2 then return true, resolve_roll(self, pending, "tap", now_ms) end
 		return true, {}
 	end
 	local waiting = false
-	for _, queued_code in ipairs(state.queue) do waiting = waiting or queued_code == code end
+	local queued_origin
+	for _, queued in ipairs(state.queue) do if queued.code == code then waiting, queued_origin = true, queued end end
 	if not waiting then return false end
 	if value == REPEAT then return true, {} end
 	-- Struck and let go while the roll key is still down: its hold.
-	local out, tap, binding = resolve_roll(self, pending, "hold", now_ms)
-	local released_tap, released_binding = replay(self, out, code, UP, now_ms)
+	local out, tap, binding, journal = resolve_roll(self, pending, "hold", now_ms)
+	if journal and journal.refused then return true, out, tap, binding, journal end
+	local released_tap, released_binding, rows, nested = replay(self, out, code, UP, now_ms, queued_origin)
+	if journal then
+		if nested then for _, segment in ipairs(nested) do journal[#journal + 1] = segment end
+		else journal[#journal + 1] = { rows = rows, tap = released_tap, binding = released_binding, origin = queued_origin.token } end
+	end
 	if tap == nil then tap, binding = released_tap, released_binding end
-	return true, out, tap, binding
+	return true, out, tap, binding, journal
 end
 
 --- Presses a layer chord for `code` and remembers it until the key comes up.
@@ -883,19 +1000,19 @@ end
 --- @return string|table|nil tap What to run after them: a catalogue action, or
 ---   { type_text } for text the layout cannot type
 --- @return string|nil binding Exact tap_hold__ source of a catalogue action.
-local function process(self, code, value, now_ms)
+local function process(self, code, value, now_ms, scoped, receipt, skip_layer, skip_native)
 	local config = self.by_code[code]
 	local out = {}
-	if value == DOWN then
+	if not scoped and value == DOWN then
 		self.physical_down[code] = true
-	elseif value == UP then
+	elseif not scoped and value == UP then
 		self.physical_down[code] = nil
 	end
 
 	-- A roll key not yet decided: the keys struck meanwhile wait for it.
 	if self.undecided and code ~= self.undecided then
-		local handled, events, tap, binding = roll_other_key(self, self.undecided, code, value, now_ms)
-		if handled then return events, tap, binding end
+		local handled, events, tap, binding, journal = roll_other_key(self, self.undecided, code, value, now_ms, receipt)
+		if handled then return events, tap, binding, journal end
 	end
 
 	-- A release is activity too, as on Windows (hook_dispatcher's _OnKeyUp): a
@@ -908,7 +1025,7 @@ local function process(self, code, value, now_ms)
 
 	-- A key pressed on the layer keeps its chord until it is released, even if
 	-- the layer key comes up first.
-	local on_layer = self.layer_keys[code]
+	local on_layer = not skip_layer and self.layer_keys[code]
 	if on_layer then
 		if value == REPEAT then
 			if #on_layer.keys > 0 then
@@ -923,7 +1040,7 @@ local function process(self, code, value, now_ms)
 
 	-- Tab, Enter and their kind pressed while a modifier was down are the key
 	-- itself (Ctrl+Tab, Shift+Tab), as on Windows, until released.
-	if self.native_keys[code] then
+	if not skip_native and self.native_keys[code] then
 		if value == UP then self.native_keys[code] = nil end
 		return pass(self, code, value)
 	end
@@ -974,7 +1091,9 @@ local function process(self, code, value, now_ms)
 			cancel_taps(self, code)
 			-- A roll key takes nothing yet: the next events decide (resolve_roll).
 			if config.roll then
-				self.held[code] = { down_at = now_ms, cancelled = false, emitted = {}, undecided = true, queue = {} }
+				local origin = capture_roll_origin(self, code, now_ms, receipt)
+				if not origin then self.native_keys[code] = true; return pass(self, code, value) end
+				self.held[code] = { down_at = now_ms, cancelled = false, emitted = {}, undecided = true, queue = {}, origin = origin }
 				self.undecided = code
 				return out
 			end
@@ -1097,6 +1216,88 @@ function M:process(code, value, now_ms, receipt)
 	local native_owner = source and rawget(receipt, "source_owner") or nil
 	local scoped = type(source) == "string" and source ~= "" and type(generation) == "number"
 	if scoped and native_owner and rawget(receipt, "source_current") ~= true then return {} end
+	if scoped then
+		-- The hook observes even physical edges the pair policy did not pass to
+		-- this engine. Direct users without that snapshot track each source here.
+		local snapshot = rawget(receipt, "physical_down")
+		if type(snapshot) == "table" then
+			self.physical_down = {}
+			for key, down in pairs(snapshot) do if down == true then self.physical_down[key] = true end end
+		else
+			local sources = source_physical[self] or {}; source_physical[self] = sources
+			local down = sources[code] or {}; sources[code] = down
+			if value == DOWN then down[source] = true elseif value == UP then down[source] = nil end
+			self.physical_down[code] = next(down) ~= nil and true or nil
+		end
+	end
+	-- Instant actions keep their own press and repeat lifetime per source.
+	local instant_groups = instant_sources[self]
+	local instant_group = scoped and instant_groups and instant_groups[code] or nil
+	local instant_owner = instant_group and instant_group[source] or nil
+	if instant_owner then
+		if instant_owner.generation ~= generation or not rawequal(instant_owner.native_owner, native_owner) then return {} end
+		if value == DOWN then return {} end
+		if value == UP then
+			cancel_taps(self, code)
+			instant_group[source] = nil
+			if next(instant_group) == nil then instant_groups[code] = nil; self.instant_down[code] = nil end
+			return {}
+		end
+		if value == REPEAT then
+			cancel_taps(self, code)
+			if instant_owner.swallowed then return {} end
+			return fire_instant(self, {}, self.by_code[code], now_ms)
+		end
+	end
+	local layer_groups = layer_sources[self]
+	local layer_group = scoped and layer_groups and layer_groups[code] or nil
+	local existing_holds = scoped and source_holds[self] and source_holds[self][code] or nil
+	local layer_owner = layer_group and layer_group[source] or nil
+	local hold_owner = existing_holds and existing_holds[source] or nil
+	local bypass_layer = hold_owner ~= nil
+
+	-- Native pass-through selected under a layer/modifier is likewise owned
+	-- per keyboard: one release cannot retire the surviving key's repeats.
+	local native_groups = native_sources[self]
+	local native_group = scoped and native_groups and native_groups[code] or nil
+	local bypass_native = native_group ~= nil and native_group[source] == nil
+	if native_group then
+		local own = native_group[source]
+		if own and (own.generation ~= generation or not rawequal(own.native_owner, native_owner)) then return {} end
+		if own then
+			if value == DOWN then return {} end
+			if value == UP then
+				cancel_taps(self, code)
+				native_group[source] = nil
+				local remaining = next(native_group) ~= nil
+				if not remaining then native_groups[code] = nil; self.native_keys[code] = nil end
+				local rows = pass(self, code, value)
+				if remaining then
+					self.passed_down[code] = true
+					if MODIFIER_KEYS[code] then self.modifiers_down[code] = true end
+				end
+				return rows
+			end
+			if value == REPEAT then cancel_taps(self, code); return pass(self, code, value) end
+		elseif value ~= DOWN and not layer_owner and not hold_owner then return {} end
+	end
+	-- A mapped chord is shared only by sources that pressed while its layer
+	-- was active. A later source follows its own current configuration.
+	if layer_group and not bypass_layer then
+		local own = layer_owner
+		if own and (own.generation ~= generation or not rawequal(own.native_owner, native_owner)) then return {} end
+		if value == DOWN then
+			if own then return {} end
+			if self.layer_depth <= 0 then bypass_layer = true
+			else layer_group[source] = { generation = generation, native_owner = native_owner }; return {} end
+		elseif not own then return {}
+		elseif value == UP then
+			layer_group[source] = nil
+			if next(layer_group) ~= nil then cancel_taps(self, code); return {} end
+			layer_groups[code] = nil
+			return process(self, code, value, now_ms, scoped, receipt)
+		end
+	end
 	local groups = source_holds[self]
 	if scoped and not groups then groups = {}; source_holds[self] = groups end
 	local group = groups and groups[code]
@@ -1105,8 +1306,62 @@ function M:process(code, value, now_ms, receipt)
 		if own and (own.generation ~= generation or not rawequal(own.native_owner, native_owner)) then return {} end
 		if value == DOWN then
 			if own then return {} end
+			-- A new physical source selects the active layer before sharing an
+			-- older source's held tap-hold state.
+			local layer_spec = self.layer_depth > 0 and self.nav_layer[code]
+			if layer_spec and not layer_group then
+				cancel_taps(self, nil)
+				local rows = press_layer_key(self, code, layer_spec)
+				layer_groups = layer_groups or {}; layer_sources[self] = layer_groups
+				layer_groups[code] = { [source] = { generation = generation, native_owner = native_owner } }
+				return rows
+			end
+			local config = self.by_code[code]
+			if self.layer_depth > 0 and not layer_spec and config and config.swallowed_on_layer then
+				cancel_taps(self, nil)
+				instant_groups = instant_groups or {}; instant_sources[self] = instant_groups
+				instant_group = instant_group or {}; instant_groups[code] = instant_group
+				instant_group[source] = { generation = generation, native_owner = native_owner, swallowed = true }
+				return {}
+			end
+			if self.layer_depth > 0 and not layer_spec and config and not config.swallowed_on_layer then
+				cancel_taps(self, nil)
+				self.native_keys[code] = true
+				native_groups = native_groups or {}; native_sources[self] = native_groups
+				native_group = native_group or {}; native_groups[code] = native_group
+				native_group[source] = { generation = generation, native_owner = native_owner }
+				return pass(self, code, value)
+			end
 			local original = self.held[code]
-			if not original or original.undecided then return {} end
+			if not original then return {} end
+			if original.undecided then
+				-- The second source is a concurrent physical hold, not another tap
+				-- of the first source. Capture its own DOWN before deciding the roll.
+				local origin = capture_roll_origin(self, code, now_ms, receipt)
+				if not origin or source_holds[self] ~= groups or groups[code] ~= group
+					or group[source] ~= nil or self.held[code] ~= original then
+					return {}, nil, nil, { refused = true }
+				end
+				local out, tap, binding, journal = resolve_roll(self, code, "hold", now_ms)
+				if journal and journal.refused then return out, tap, binding, journal end
+				if source_holds[self] ~= groups or groups[code] ~= group
+					or group[source] ~= nil or self.held[code] ~= original then
+					return {}, nil, nil, { refused = true }
+				end
+				original.cancelled = true
+				local state = { down_at = now_ms, cancelled = true, emitted = {},
+					layer = original.layer, hold_pending = original.hold_pending }
+				local extra = {}
+				for _, mod in ipairs(original.emitted) do
+					press(self, extra, mod); state.emitted[#state.emitted + 1] = mod
+				end
+				if state.layer then self.layer_depth = self.layer_depth + 1 end
+				group[source] = { state = state, generation = generation, native_owner = native_owner }
+				self.physical_down[code] = true
+				for _, row in ipairs(extra) do out[#out + 1] = row end
+				if journal then journal[#journal + 1] = { rows = extra, origin = origin.token } end
+				return out, tap, binding, journal
+			end
 			local out, state = {}, { down_at = now_ms, cancelled = true, emitted = {},
 				layer = original.layer, hold_pending = original.hold_pending }
 			for _, other in pairs(group) do other.state.cancelled = true end
@@ -1120,19 +1375,51 @@ function M:process(code, value, now_ms, receipt)
 		elseif not own then return {}
 		elseif value == UP then
 			self.held[code], group[source] = own.state, nil
-			local out, tap, binding = process(self, code, value, now_ms)
-			if source_holds[self] ~= groups or groups[code] ~= group then return out, tap, binding end
+			local out, tap, binding, journal = process(self, code, value, now_ms, scoped, receipt, bypass_layer, bypass_native)
+			if source_holds[self] ~= groups or groups[code] ~= group then return out, tap, binding, journal end
 			local _, remaining = next(group)
 			if remaining then self.held[code], self.physical_down[code] = remaining.state, true
 			else groups[code] = nil end
-			return out, tap, binding
+			return out, tap, binding, journal
 		end
 	end
-	local out, tap, binding = process(self, code, value, now_ms)
+	-- Another source holding an instant key must not hide this new DOWN from
+	-- normal layer and modifier precedence. Restore its aggregate flag afterward.
+	local separate_instant = scoped and value == DOWN and instant_group ~= nil and instant_owner == nil
+	if separate_instant then self.instant_down[code] = nil end
+	local out, tap, binding, journal
+	local observation
+	if bypass_layer or bypass_native or (scoped and value == DOWN) then
+		local previous = pass_observations[self]
+		observation = { code = code, value = value, forwarded = false }
+		pass_observations[self] = observation
+		local ok
+		ok, out, tap, binding, journal = pcall(process, self, code, value, now_ms, scoped, receipt, bypass_layer, bypass_native)
+		pass_observations[self] = previous
+		if not ok then error(out, 0) end
+	else
+		out, tap, binding, journal = process(self, code, value, now_ms, scoped, receipt)
+	end
+	local acquired_instant = scoped and value == DOWN and self.instant_down[code] == true
+	if acquired_instant then
+		instant_groups = instant_groups or {}; instant_sources[self] = instant_groups
+		instant_group = instant_group or {}; instant_groups[code] = instant_group
+		instant_group[source] = { generation = generation, native_owner = native_owner }
+	end
+	if separate_instant and not acquired_instant then self.instant_down[code] = true end
+	if scoped and value == DOWN and ((not bypass_native and self.native_keys[code]) or (observation and observation.forwarded)) then
+		native_groups = native_groups or {}; native_sources[self] = native_groups
+		native_group = native_group or {}; native_groups[code] = native_group
+		native_group[source] = { generation = generation, native_owner = native_owner }
+	end
+	if scoped and value == DOWN and self.layer_keys[code] and not layer_group and not bypass_layer then
+		layer_groups = layer_sources[self] or {}; layer_sources[self] = layer_groups
+		layer_groups[code] = { [source] = { generation = generation, native_owner = native_owner } }
+	end
 	if scoped and source_holds[self] == groups and value == DOWN and self.held[code] and not group then
 		groups[code] = { [source] = { state = self.held[code], generation = generation, native_owner = native_owner } }
 	end
-	return out, tap, binding
+	return out, tap, binding, journal
 end
 
 --- A click, its release or a wheel turn: it makes every held tap-hold key a
@@ -1197,7 +1484,8 @@ function M:tick(now_ms)
 	local out = {}
 	local pending = self.undecided
 	if pending and now_ms - self.held[pending].down_at > self.by_code[pending].threshold_ms then
-		local events, tap, binding = resolve_roll(self, pending, "hold", now_ms)
+		local events, tap, binding, journal = resolve_roll(self, pending, "hold", now_ms)
+		if roll_origin_ports[self] and journal then return { { roll_journal = journal } } end
 		for _, event in ipairs(events) do
 			event.owner = pending
 			out[#out + 1] = event
@@ -1226,17 +1514,23 @@ end
 --- Releases everything this engine holds down and forgets its state.
 --- @return table events Key-ups, in the reverse of the order they went down.
 function M:release_all()
+	native_sources[self] = nil
+	instant_sources[self] = nil
+	layer_sources[self] = nil
 	source_holds[self] = nil
+	source_physical[self] = nil
 	local out = {}
 	-- Every key this engine holds down, once, whoever of it holds it.
 	-- Keys the hand still holds stay down: they are the kernel's to release.
-	for code in pairs(self.key_refs) do
-		if self.passed_down[code] then custody(self, code, UP)
+	for index = #self.key_order, 1, -1 do
+		local code = self.key_order[index]
+		if self.passed_down[code] then custody(self, code, UP, false, out)
 		else hold_row(self, out, code, UP) end
 	end
 	self.held, self.layer_keys, self.layer_depth = {}, {}, 0
 	self.undecided = nil
 	self.one_shot_until, self.one_shot_keys, self.key_refs = nil, {}, {}
+	self.key_order = {}
 	input_arms[self] = nil
 	self.one_shot_swallowed, self.instant_down = {}, {}
 	self.native_keys, self.modifiers_down, self.passed_down = {}, {}, {}

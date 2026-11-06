@@ -423,6 +423,13 @@ jobs:
             ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr
           if-no-files-found: error
 
+      - name: Qualify X11 input source activation
+        if: ${{ !cancelled() && matrix.group == 'native' }}
+        run: |
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends x11-xkb-utils
+          python3 static/ergopti_plus/linux/tests/hardware/run_x11_input_source_switch.py
+        timeout-minutes: 2
+
       # The integration group on THIS distribution's own LuaJIT, as one row per
       # distribution with an archive installation lot: the same container,
       # image, preparation and ordinary user as the Unit stage's distribution
@@ -961,6 +968,7 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_text_migration_literal_receipts.lua
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_text_migration_exact_ids.lua
           else
               exit 1
           fi
@@ -3927,6 +3935,7 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          python3 tests/hardware/test_screen_capture_resize.py
           xvfb-run -a luajit tests/hardware/run_screen_path_receipts.lua
           else
               exit 1

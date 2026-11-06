@@ -214,12 +214,19 @@ function M.new(opts)
 
 	-- When the first finger landed, so a hold can be told from a tap.
 	local _started_at = nil
+	local _last_frame_at, _clock_invalid = nil, false
 	local _dropping = false -- invalid queue contents through the next SYN_REPORT
 
 	--- Discards everything and returns to "no fingers down".
-	local function reset()
-		_slots = {}
-		_current_slot = 0
+	local function reset(keep_device)
+		if keep_device then
+			-- evdev retains both per-slot axis values and the selected slot across
+			-- contacts, and suppresses unchanged values in later reports.
+			for _, slot in pairs(_slots) do slot.id = nil end
+		else
+			_slots = {}
+			_current_slot = 0
+		end
 		_touching = false
 		_peak_fingers = 0
 		_peak_since = nil
@@ -234,6 +241,7 @@ function M.new(opts)
 		_origin_x, _origin_y = nil, nil
 		_last_x, _last_y = nil, nil
 		_started_at = nil
+		_last_frame_at, _clock_invalid = nil, false
 	end
 
 	--- The mean position of every live contact, or nil when there is none.
@@ -294,9 +302,8 @@ function M.new(opts)
 				if not slot then slot = {} ; _slots[_current_slot] = slot end
 				if code == ABS_MT_TRACKING_ID then
 					slot.id = value
-					-- -1 retires the slot. Its position is dropped with it so a stale
-					-- coordinate cannot contribute to the next gesture's centroid.
-					if value < 0 then slot.x, slot.y = nil, nil end
+					-- The kernel retains axis values after a slot is retired and may
+					-- omit them when the next contact lands at the same position.
 				elseif code == ABS_MT_POSITION_X then
 					slot.x = value
 				elseif code == ABS_MT_POSITION_Y then
@@ -328,13 +335,18 @@ function M.new(opts)
 		if code ~= SYN_REPORT then return nil end
 
 		local cx, cy = centroid()
+		local now = frame_time(event)
+		if _last_frame_at and now < _last_frame_at then _clock_invalid = true end
+		if _touching or _started_at then _last_frame_at = now end
 
 		if _touching then
+			-- Contact duration begins with the touch, even when its position is
+			-- reported in a later frame. Waiting for coordinates can turn a long
+			-- stationary hold into a short tap.
+			if not _started_at then _started_at = now end
 			if cx and cy then
-				local now = frame_time(event)
 				if not _origin_x then
 					_origin_x, _origin_y = cx, cy
-					_started_at = now
 				end
 				_last_x, _last_y = cx, cy
 
@@ -398,21 +410,25 @@ function M.new(opts)
 		-- A contact held across loss can publish finger-count changes on lift,
 		-- without another BTN_TOUCH down. Only a fresh observed start owns a tap.
 		if _peak_fingers == 0 or _started_at == nil then
-			reset()
+			reset(true)
 			return nil
 		end
 
 		local fingers = _peak_fingers
 		local dx, dy = _travel_x, _travel_y
 		local direction = direction_of(dx, dy)
-		local now = frame_time(event)
 		local elapsed = (_started_at and now - _started_at) or 0
 		local started_at = _started_at
 		local aborted = _aborted
+		local clock_invalid = _clock_invalid
 
-		reset()
+		reset(true)
+		if _last_scroll_end_at and started_at < _last_scroll_end_at then _last_scroll_end_at = nil end
 
-		if aborted then
+		if clock_invalid then
+			Logger.debug(LOG, "Gesture ignored: its frame clock moved backwards.")
+			return nil
+		elseif aborted then
 			Logger.debug(LOG, "%d-finger gesture continued as a scrolling pair; ignored.", fingers)
 			_last_scroll_end_at = now
 			return nil

@@ -81,6 +81,68 @@ _GKO_Released() {
 		_GKO_Require(!Hook.InProgress, "every actual InputHook must be stopped before the receipt")
 }
 
+HotPath_Now() => 0
+HotPath_LogIfSlow(*) => 0
+GestureActionParameterSpec(*) => ""
+GestureActionIsAssignable(Name) => Name == "none" || Name == "left_click_toggle" || Name == "right_click_toggle"
+ConfigCommitUpdates(*) {
+	global _GKO
+	if _GKO.HasOwnProp("DuringWrite") && IsObject(_GKO.DuringWrite)
+		_GKO.DuringWrite.Call()
+	return _GKO.Commit
+}
+
+_GKO_AttemptBinding(Button, Binding) {
+	global _GKO
+	_GKO.GateAccepted := _GestureRunAction(Button == "Left" ? "left_click_toggle" : "right_click_toggle", Binding)
+}
+
+_GKO_Assignment() {
+	global _GKO, GestureLeftClickHeld, GestureRightClickHeld, GestureKeyboardHook, GestureAssignments, GestureActionParameters
+	Button := InStr(_GKO.Mode, "assignment-left", true) == 1 ? "Left" : "Right"
+	Other := Button == "Left" ? "Right" : "Left"
+	Action := Button == "Left" ? "left_click_toggle" : "right_click_toggle"
+	Binding := "gesture__tap_3"
+	OtherBinding := "gesture__tap_4"
+	Accepted := _GestureRunAction(Action, Binding)
+	_GKO_Require(Accepted, "the original binding must acquire the actual hold owner")
+	_GKO.Hooks.Push(GestureKeyboardHook)
+	Accepted := _GestureRunAction(Other == "Left" ? "left_click_toggle" : "right_click_toggle", OtherBinding)
+	_GKO_Require(Accepted, "the other binding must acquire its distinct hold")
+	_GKO.Hooks.Push(GestureKeyboardHook)
+	GestureAssignments := Map("tap_3", Action), GestureActionParameters := Map()
+	_GKO.Commit := false
+	_GKO_Require(!GestureSaveAssignment("tap_3", "none"),
+		"refused persistence must refuse the assignment")
+	_GKO_Require(GestureLeftClickHeld && GestureRightClickHeld && _GKO.Events.Length == 2,
+		"failed persistence must preserve both actual owners")
+	_GKO.Commit := true
+	_GKO_Require(GestureSaveAssignment("tap_3", Action), "an unchanged assignment may persist")
+	GestureAssignments["tap_9"] := Action
+	_GKO_Require(GestureSaveAssignment("tap_9", "none"), "a different slot may persist")
+	_GKO_Require(GestureLeftClickHeld && GestureRightClickHeld && _GKO.Events.Length == 2,
+		"unchanged and unrelated bindings must preserve both holds")
+	if InStr(_GKO.Mode, "up-refusal", true)
+		_GKO.RefuseUp := Button
+	_GKO_Require(GestureSaveAssignment("tap_3", "none"),
+		"durable assignment stays committed even if cleanup refuses")
+	_GKO_Require(GestureAssignments["tap_3"] == "none", "the durable assignment must publish")
+	TargetHeld := Button == "Left" ? GestureLeftClickHeld : GestureRightClickHeld
+	OtherHeld := Other == "Left" ? GestureLeftClickHeld : GestureRightClickHeld
+	_GKO_Require(OtherHeld, "the other binding's hold must survive")
+	_GKO_Require(TargetHeld == (InStr(_GKO.Mode, "up-refusal", true) > 0), "the target retains ownership only when native Up refuses")
+	if !InStr(_GKO.Mode, "up-refusal", true) {
+		_GKO_Require(Other == "Left" ? GestureReleaseLeftClick() : GestureReleaseRightClick(), "the other test hold must settle")
+		GestureAssignments := Map("tap_3", "none"), GestureActionParameters := Map()
+		_GKO.GateAccepted := true
+		_GKO.DuringWrite := _GKO_AttemptBinding.Bind(Button, Binding)
+		Before := _GKO.Events.Length
+		_GKO_Require(GestureSaveAssignment("tap_3", Action), "the gate fixture assignment must commit")
+		_GKO_Require(!_GKO.GateAccepted && _GKO.Events.Length == Before, "the old action cannot acquire inside its assignment writer")
+		_GKO.DuringWrite := 0
+	}
+}
+
 _GKO_Replacement() {
 	global _GKO, GestureKeyboardHook, GestureLeftClickHeld, GestureRightClickHeld
 	First := InStr(_GKO.Mode, "left-right", true) ? "Left" : "Right"
@@ -153,6 +215,8 @@ _GKO_Main() {
 		Suspend(false)
 		if InStr(_GKO.Mode, "paused-", true) == 1
 			_GKO_PausedRefusal()
+		else if InStr(_GKO.Mode, "assignment-", true) == 1
+			_GKO_Assignment()
 		else
 			_GKO_Replacement()
 	} catch Any as Failure {

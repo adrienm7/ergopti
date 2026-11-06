@@ -79,6 +79,7 @@ install.xdg_autostart=démarrage automatique XDG : {1}
 launch.already_running=Ergopti+ tourne déjà dans cette session ({1} est verrouillé) ; ce lancement a été refusé.
 launch.authorization_failed=L’autorisation d’accès au clavier a été annulée ou a échoué.
 launch.groups_unavailable=La session n’a pas pu obtenir ses groupes d’accès au clavier configurés.
+launch.session_lock_invalid=Le dossier du verrou de session doit être un chemin absolu.
 launcher.dependencies_installed=Dépendances installées.
 launcher.driver_missing=Erreur : répertoire du driver Linux introuvable : {1}
 launcher.install_deps_hint=Lancez : ergopti-hotstrings --install-deps

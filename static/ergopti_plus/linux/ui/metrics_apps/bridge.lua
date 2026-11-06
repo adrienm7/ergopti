@@ -17,6 +17,11 @@ local Logger = require("logger.shim")
 local LOG = "bridge.metrics_apps"
 local Flush = require("ui.metrics_flush_bridge")
 
+local function native_category_prompt(title, text, initial)
+	return require("ui.text_prompt").ask(title, require("ui.native_dialog").plain_markup(text), initial)
+end
+M._category_prompt = native_category_prompt
+
 local function default_push(payload, state, context)
 	return Flush.push("metrics_apps", M.bridge_name, payload, state, context)
 end
@@ -102,23 +107,24 @@ local function handle(payload, state, request)
 	if action == "export" then
 		if state.keystats and type(state.keystats.export_json) == "function" then
 			local ok, json = pcall(state.keystats.export_json)
-			return with_payload({ exported = ok, json = ok and json or nil })
+			local exported = ok and type(json) == "string"
+			return with_payload({ exported = exported, json = exported and json or nil })
 		end
 		return with_payload({ exported = false })
 	end
 
-	if action == "pause" then
-		if state.keystats and type(state.keystats.suppress) == "function" then
-			state.keystats.suppress()
-		end
-		return with_payload({ suppressed = true })
-	end
-
-	if action == "resume" then
-		if state.keystats and type(state.keystats.unsuppress) == "function" then
-			state.keystats.unsuppress()
-		end
-		return with_payload({ suppressed = false })
+	if action == "pause" or action == "resume" then
+		local stats = state.keystats
+		local operation = stats and (action == "pause" and stats.suspend_collection or stats.resume_collection)
+		if type(operation) ~= "function" or type(stats.is_collection_suspended) ~= "function"
+			or type(stats.is_suppressed) ~= "function" then return with_payload({ supported = false }) end
+		local called, accepted = pcall(operation)
+		if not called or accepted == false or not request.valid() then return with_payload({ supported = false }) end
+		local read_pause, suspended = pcall(stats.is_collection_suspended)
+		local read_secure, secure = pcall(stats.is_suppressed)
+		if not read_pause or not read_secure or type(suspended) ~= "boolean" or type(secure) ~= "boolean"
+			or suspended ~= (action == "pause") then return with_payload({ supported = false }) end
+		return with_payload({ suspended = suspended, suppressed = suspended or secure })
 	end
 
 	-- The category editor. This is the one control on the page that writes
@@ -127,11 +133,41 @@ local function handle(payload, state, request)
 	-- agg_app_day and the dashboard groups by it, so the effect was a control
 	-- that looked like it worked and silently discarded its input.
 	if action == "edit" then
+		if (payload.app ~= nil and type(payload.app) ~= "string")
+			or (payload.cat ~= nil and type(payload.cat) ~= "string")
+			or (payload.score ~= nil and not require("keystats.app_category_store").score_valid(payload.score)) then
+			Logger.warn(LOG, "Application category edit refused invalid input.")
+			return with_payload({ saved = false })
+		end
 		local app_name = tostring(payload.app or "")
 		local category = tostring(payload.cat or "")
 		if state.keystats and type(state.keystats.set_app_category) == "function" then
-			local ok = state.keystats.set_app_category(app_name, category, tonumber(payload.score) or 0)
-			return with_payload({ saved = ok == true })
+			local stats = state.keystats
+			local capture, setter = stats.capture_app_category_edit, stats.set_app_category
+			local function refused(key)
+				if request.valid() and type(state.notify_error) == "function" then pcall(state.notify_error, key) end
+				return with_payload({ saved = false })
+			end
+			if type(capture) ~= "function" or app_name == "" then return refused("healthcheck.status.failed") end
+			local receipt = capture()
+			if not request.valid() then return nil end
+			if type(receipt) ~= "table" then return refused("healthcheck.status.failed") end
+			local i18n = require("infra.i18n")
+			local chosen = M._category_prompt(i18n.get("metrics_apps.new_category_title"),
+				string.format(i18n.get("metrics_apps.new_category_prompt"), app_name), category)
+			if chosen == nil or not request.valid() then return nil end
+			local score_text = M._category_prompt(i18n.get("metrics_apps.score_title"),
+				string.format(i18n.get("metrics_apps.score_prompt"), app_name), tostring(payload.score or 0))
+			if score_text == nil or not request.valid() then return nil end
+			local score = tonumber(score_text)
+			if not require("keystats.app_category_store").score_valid(score) then
+				return refused("metrics_apps.score_error")
+			end
+			if not chosen:find("%S") then return refused("healthcheck.status.failed") end
+			if stats.capture_app_category_edit ~= capture or stats.set_app_category ~= setter or state.keystats ~= stats then return nil end
+			local ok = setter(app_name, chosen, score, receipt)
+			if ok ~= true then return refused("healthcheck.status.failed") end
+			return with_payload({ saved = true })
 		end
 		Logger.error(LOG, "Category edit for '%s' arrived but the keystats cannot store it.", app_name)
 		return with_payload({ saved = false })
@@ -174,6 +210,7 @@ function M.on_window_closed(epoch) Requests.close(epoch) end
 function M._reset()
 	Requests.reset()
 	M._push = default_push
+	M._category_prompt = native_category_prompt
 end
 
 return M

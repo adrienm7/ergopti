@@ -38,6 +38,7 @@ local rightClickHeld = false
 local leftClickHeld  = false
 local rightClickParent = nil
 local leftClickParent  = nil
+local held_receipts = { left = nil, right = nil }
 
 local rightMouseTap           = nil
 local rightMouseTapCommitted  = false
@@ -79,6 +80,7 @@ end
 --- @param side string Either "left" or "right".
 --- @param held boolean New exact button ownership state.
 local function set_side_held(side, held)
+	if not held then held_receipts[side] = nil end
 	if side == "left" then
 		leftClickHeld = held
 	else
@@ -720,7 +722,7 @@ end
 --- Acquires both eventtaps before publishing mouseDown or held state.
 --- @param side string Either "left" or "right".
 --- @return boolean committed True only after every native effect committed.
-local function acquire_hold(side, parent)
+local function acquire_hold(side, parent, binding)
 	local scope_id = type(parent) == "string" and parent ~= ""
 		and parent or DEFAULT_ACTION_PARENT
 	local attempt = begin_hold_acquisition(scope_id)
@@ -728,6 +730,7 @@ local function acquire_hold(side, parent)
 		Logger.error(LOG, "Synthetic %s-click hold refused during another acquisition.", side)
 		return false
 	end
+	attempt.side, attempt.binding = side, binding
 	local candidates = attempt.candidates
 	if retry_tap_cleanup(scope_id) ~= true then
 		return reject_hold_acquisition(side,
@@ -859,6 +862,7 @@ local function acquire_hold(side, parent)
 			-- The OS may own the down event, so retain explicit release ownership
 			set_side_parent(side, scope_id)
 			set_side_held(side, true)
+			held_receipts[side] = attempt
 		end
 		Logger.error(LOG, "Synthetic %s-Click mouseDown post failed: %s.",
 			label, tostring(post_error))
@@ -872,6 +876,7 @@ local function acquire_hold(side, parent)
 	end
 
 	set_side_held(side, true)
+	held_receipts[side] = attempt
 	hold_acquisitions[scope_id] = nil
 	if active_hold_acquisition == attempt then active_hold_acquisition = nil end
 	Logger.info(LOG, "Synthetic %s-Click HELD.", label)
@@ -954,9 +959,28 @@ function M.force_cleanup(parent)
 	return settled and not matching_hold
 end
 
+--- Captures only the hold or in-flight acquisition made by this exact binding.
+--- @return table|nil receipt
+function M.capture_binding(parent, binding, action)
+	local side = action == "left_click_toggle" and "left" or action == "right_click_toggle" and "right" or nil
+	if not side or type(binding) ~= "string" then return nil end
+	local receipt = held_receipts[side] or hold_acquisitions[parent]
+	if receipt and receipt.parent == parent and receipt.binding == binding and receipt.side == side then return receipt end
+	return nil
+end
+
+--- Retires only the captured operation; a successor must remain untouched.
+--- @return boolean settled
+function M.retire_binding(receipt)
+	if type(receipt) ~= "table" then return true end
+	if hold_acquisitions[receipt.parent] == receipt then return invalidate_hold_acquisition(receipt.parent) end
+	if held_receipts[receipt.side] ~= receipt then return true end
+	return release_hold(receipt.side, " after binding change")
+end
+
 --- Toggles a held synthetic right-click.
 --- @return boolean committed True only when the requested state transition commits.
-function M.toggle_right_click(parent)
+function M.toggle_right_click(parent, binding)
 	local scope_id = type(parent) == "string" and parent ~= ""
 		and parent or DEFAULT_ACTION_PARENT
 	if rightClickHeld then
@@ -969,12 +993,12 @@ function M.toggle_right_click(parent)
 		return release_hold("right", "")
 	end
 	Logger.debug(LOG, "Enabling right-click hold mode…")
-	return acquire_hold("right", scope_id)
+	return acquire_hold("right", scope_id, binding)
 end
 
 --- Toggles a held synthetic left-click.
 --- @return boolean committed True only when the requested state transition commits.
-function M.toggle_left_click(parent)
+function M.toggle_left_click(parent, binding)
 	local scope_id = type(parent) == "string" and parent ~= ""
 		and parent or DEFAULT_ACTION_PARENT
 	if leftClickHeld then
@@ -987,7 +1011,7 @@ function M.toggle_left_click(parent)
 		return release_hold("left", "")
 	end
 	Logger.debug(LOG, "Enabling left-click hold mode…")
-	return acquire_hold("left", scope_id)
+	return acquire_hold("left", scope_id, binding)
 end
 
 --- Releases every held click before a non-toggle tap action fires.

@@ -113,6 +113,28 @@ helpers.describe("keyboard_hook: lock state is seeded at acquisition", function(
 		helpers.assert_eq(table.concat(chars), "1", "held-state replay and LED seeding must apply one lock toggle")
 	end)
 
+	for _, failed in ipairs({ "LED", "pressed-key" }) do
+		helpers.it("retires capture when the " .. failed .. " snapshot fails during dropped-report recovery", function()
+			local hook = load(0x01)
+			local chars, forwarded, queried, stopped = {}, {}, false, false
+			local emergency = hook.emergency_stop
+			hook.emergency_stop = function(...) stopped = true; return emergency(...) end
+			hook._test_drive({ { type = 0, code = 3, value = 0 }, { type = 0, code = 0, value = 0 },
+				{ type = 1, code = 79, value = 1 }, { type = 1, code = 79, value = 0 } }, {
+				liveXkb = true,
+				keyState = function(count) if failed == "pressed-key" then queried = true; return nil end; return string.rep("\0", count) end,
+				ledState = function(count) if failed == "LED" then queried = true; return nil end; return "\1" .. string.rep("\0", count - 1) end,
+				onChar = function(char) chars[#chars + 1] = char end,
+				onEmitRaw = function(code, value) forwarded[#forwarded + 1] = { code, value }; return true end,
+			}, true)
+			hook.emergency_stop = emergency
+			helpers.assert_true(queried and stopped, "a refused snapshot must invoke actual emergency retirement")
+			helpers.assert_eq(chars, {}, "an unknown snapshot cannot yield decoded text")
+			helpers.assert_eq(forwarded, {}, "later key events must not escape the retired capture")
+			helpers.assert_eq(hook.isRunning(), false)
+		end)
+	end
+
 	helpers.it("locks the capture state when the LED is on", function()
 		local hook, updates = load(0x02) -- bit LED_CAPSL (1)
 		helpers.assert_true(hook._seed_caps_lock_for_test("/dev/input/event3"))
