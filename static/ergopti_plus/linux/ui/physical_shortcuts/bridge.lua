@@ -116,7 +116,7 @@ function M.open(options)
 	end
 	local constructed, window = pcall(function()
 		return Window.new({model=model,catalogue=Gestures,parameter_section="gesture_parameters",
-			positions=positions,translate=I18n.get,label=Gestures.get_action_label,position_field="evdev",
+			positions=positions,translate=I18n.get,platform="linux",label=Gestures.get_action_label,position_field="evdev",
 			page_current=current,send=send,capture=scope.capture_editor_inventory,current=scope.editor_source_current,
 			commit=function(rows,receipt) return scope.edit(rows,receipt) end,
 			position_available=function()

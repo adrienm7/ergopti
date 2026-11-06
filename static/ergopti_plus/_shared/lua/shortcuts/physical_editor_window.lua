@@ -9,7 +9,10 @@
 
 local Editor = require("shortcuts.physical_editor")
 local Json = require("json")
+local KeyNames = require("keycodes.key_names")
 local M = {}
+-- The page's modifier checkboxes, in their display order.
+local MODIFIERS = { "ctrl", "alt", "shift", "super" }
 local LABELS = {
 	title = "physical_shortcuts.window_title", ["position-label"] = "physical_shortcuts.position",
 	["manual-hint"] = "physical_shortcuts.manual_hint", capture = "physical_shortcuts.capture",
@@ -22,13 +25,32 @@ local LABELS = {
 	unavailable = "physical_shortcuts.position_unavailable", window_unavailable = "physical_shortcuts.window_unavailable",
 }
 
+--- Names every modifier and position the page shows from the shared key name
+--- table in the user's language (« Ctrl gauche », « Pavé num. 7 »). The page
+--- used to print the ids themselves (`super`, `KeyA`) in every locale.
+--- @param packet table The init packet: its positions and entries.
+--- @param platform string "windows", "macos" or "linux".
+--- @param translate function Takes a locale key, returns its text.
+--- @return table names { modifiers = id → name, positions = code → name }.
+function M.names(packet, platform, translate)
+	local names = { modifiers = {}, positions = {} }
+	for _, id in ipairs(MODIFIERS) do names.modifiers[id] = KeyNames.label(id, platform, translate) end
+	for _, list in ipairs({ packet.positions, packet.entries }) do
+		for _, record in ipairs(list) do
+			names.positions[record.code] = KeyNames.physical_label(record.code, platform, translate)
+		end
+	end
+	return names
+end
+
 --- Creates a shared protocol over a still-owned native page.
---- @param options table Editor ports plus page_current, send, close and translate.
+--- @param options table Editor ports plus platform, page_current, send, close and translate.
 --- @return table window Exact session message and close operations.
 function M.new(options)
 	for _, name in ipairs({ "page_current", "send", "close", "translate" }) do
 		assert(type(options[name]) == "function", "physical window port is incomplete")
 	end
+	assert(type(options.platform) == "string", "physical window needs its platform")
 	local window, editor, ready, busy, retired = {}, nil, false, false, false
 	local close_requested, editor_closed, editor_retiring, native_closed = false, false, false, false
 	local native_close = options.close
@@ -80,6 +102,12 @@ function M.new(options)
 				packet = { entries = {}, positions = {}, capture = false, readonly = true,
 					reason = called and reason == "source_changed" and "source_changed" or "window_unavailable" }
 			end
+			local named, names = pcall(M.names, packet, options.platform, options.translate)
+			if not named then
+				packet = { entries = {}, positions = {}, capture = false, readonly = true, reason = "window_unavailable" }
+				names = M.names(packet, options.platform, options.translate)
+			end
+			packet.names = names
 			packet.entries, packet.positions = Json.array(packet.entries), Json.array(packet.positions)
 			packet.strings = {}
 			for key, name in pairs(LABELS) do packet.strings[key] = options.translate(name) end

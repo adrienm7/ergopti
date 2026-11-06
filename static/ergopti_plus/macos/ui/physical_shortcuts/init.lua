@@ -232,7 +232,7 @@ function M.open(options)
 	end
 	local window_constructed, window = pcall(function()
 		return Window.new({model=model,catalogue=gestures,parameter_section=ConfigKeys.KEY.GESTURES_ACTION_PARAMETERS,
-			positions=positions,translate=I18n.get,label=gestures.get_action_label,page_current=current,send=send,
+			positions=positions,translate=I18n.get,platform="macos",label=gestures.get_action_label,page_current=current,send=send,
 				position_field="hs",position_available=available_position,
 				capture_position=function(guard, receive)
 					if not observation_current() or retire_observation() ~= true or not available_position() then return nil end

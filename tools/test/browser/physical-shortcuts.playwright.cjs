@@ -74,8 +74,15 @@ const assert = (condition, label) => {
 				'unavailable'
 			])
 				strings[key] = key;
+			// The host names keys from the shared key name table; the page never
+			// shows an id (`super`) or a W3C code (`KeyJ`).
+			const keyNames = {
+				modifiers: { ctrl: 'Ctrl', alt: 'Alt', shift: 'Maj', super: 'Win' },
+				positions: { Backquote: '²', KeyJ: 'J', KeyK: 'K' }
+			};
 			const packet = {
 				strings,
+				names: keyNames,
 				entries: [],
 				positions: [
 					{ code: 'Backquote', available: false, reason: 'unavailable' },
@@ -85,6 +92,15 @@ const assert = (condition, label) => {
 				capture: false
 			};
 			await page.evaluate((data) => init(data), packet);
+			assert(
+				JSON.stringify(
+					await page
+						.locator('#position option')
+						.evaluateAll((nodes) => nodes.map((x) => x.textContent))
+				) === JSON.stringify(['² — unavailable', 'J', 'K']) &&
+					(await page.locator('#modifiers label').last().textContent()) === 'Win',
+				'Positions and modifiers read as key names, not codes'
+			);
 			assert(await page.locator('#capture').isDisabled(), 'Physical capture honestly unavailable');
 			assert(
 				await page.locator('#empty').isVisible(),
@@ -175,6 +191,10 @@ const assert = (condition, label) => {
 				(await page.locator('#editor').isHidden()) && (await page.locator('.entry').count()) === 1,
 				'Committed inventory replaces displayed list'
 			);
+			assert(
+				(await page.locator('.entry span').first().textContent()) === 'Ctrl + K → None',
+				'An entry reads its key names'
+			);
 			await page.locator('.entry button').first().click();
 			assert(
 				(await page.locator('#position').inputValue()) === 'KeyK' &&
@@ -210,6 +230,7 @@ const assert = (condition, label) => {
 			);
 			await page.evaluate((data) => init({ ...data, readonly: true, reason: 'source_changed' }), {
 				strings,
+				names: keyNames,
 				entries: [],
 				positions: [],
 				capture: false
