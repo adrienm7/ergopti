@@ -186,6 +186,7 @@ class ConfigKey {
 	static UPDATER_CHANNEL := "updater.channel"
 	static UPDATER_CHECK_INTERVAL_SECONDS := "updater.check_interval_seconds"
 	static _META := "_meta"
+	static _META_LINUX_LEGACY_STORAGE_IMPORTED := "_meta.linux_legacy_storage_imported"
 	static _META_SCHEMA_VERSION := "_meta.schema_version"
 }
 
@@ -248,6 +249,7 @@ class ConfigLeaf {
 	static KEYBOARD := "keyboard"
 	static KEYS := "keys"
 	static LAYOUT := "layout"
+	static LINUX_LEGACY_STORAGE_IMPORTED := "linux_legacy_storage_imported"
 	static LLM := "llm"
 	static LOCALE := "locale"
 	static LOG_LEVEL := "log_level"

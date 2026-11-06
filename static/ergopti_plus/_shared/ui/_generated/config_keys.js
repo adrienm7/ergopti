@@ -198,6 +198,7 @@
 			UPDATER_CHANNEL: "updater.channel",
 			UPDATER_CHECK_INTERVAL_SECONDS: "updater.check_interval_seconds",
 			_META: "_meta",
+			_META_LINUX_LEGACY_STORAGE_IMPORTED: "_meta.linux_legacy_storage_imported",
 			_META_SCHEMA_VERSION: "_meta.schema_version",
 		}),
 		LEAF: strict('LEAF', {
@@ -259,6 +260,7 @@
 			KEYBOARD: "keyboard",
 			KEYS: "keys",
 			LAYOUT: "layout",
+			LINUX_LEGACY_STORAGE_IMPORTED: "linux_legacy_storage_imported",
 			LLM: "llm",
 			LOCALE: "locale",
 			LOG_LEVEL: "log_level",
