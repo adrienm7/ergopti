@@ -124,6 +124,22 @@ end
 local _policy = assert(compile_state(M.DEFAULT_STATE), "the manifest CapsWord defaults do not compile")
 local _values = owned_values(M.DEFAULT_STATE)
 
+-- The one owner that must re-time a running session when the policy changes.
+local _observer = nil
+
+--- Registers (or, with nil, clears) the callback run after every accepted
+--- policy change, including the rollback of a refused save.
+--- @param observer function|nil Callback taking no argument.
+--- @return boolean accepted
+function M.set_observer(observer)
+	if observer ~= nil and type(observer) ~= "function" then
+		Logger.error(LOG, "CapsWord policy observer must be a function or nil.")
+		return false
+	end
+	_observer = observer
+	return true
+end
+
 --- Applies the CapsWord settings of one menu state.
 --- @param state table Menu state (flat keys).
 --- @return boolean applied True when the state compiled and is now current.
@@ -143,6 +159,10 @@ function M.apply_state(state)
 	Logger.debug(LOG, "CapsWord auto-off: delay=%ss, delimiters=[%s], pointer=[%s].",
 		tostring(state[M.IDLE_KEY]), table.concat(state[M.TERMINATORS_KEY], ","),
 		table.concat(enabled, ","))
+	if _observer then
+		local ok, err = pcall(_observer)
+		if not ok then Logger.error(LOG, "CapsWord policy observer raised: %s.", tostring(err)) end
+	end
 	return true
 end
 
