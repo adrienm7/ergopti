@@ -658,7 +658,11 @@ character the action is called after instead (the historical rule) made Ergopti'
 and 6 conflicting sequences (a plain `^` and the circumflex dead key sharing
 `<asciicircum>`). The base keysym stays first when a key sends it, so every other
 line of the shipped Ergopti files is unchanged; the Ergopti+ magic key
-(`base_level_only`) still names its action's letter inside a dead state.
+(`base_level_only`) also ends its action's sequences on the keysym its base
+level sends (★), so ^ then ★ types j as on macOS. A text keysym with no
+`<when>` in a state gets an explicit fallback line typing the terminator then
+its text (macOS semantics), since native Compose would cancel; an explicit
+`<when>`, even typing nothing, and a chained-dead-key prefix get none.
 Action: pin a new dead-key shape with a vector in
 `_shared/tests/corpus/keylayout/xkb_conversion_vectors.json` (both converters
 replay it) and keep `test_registry_conversion.py`'s written-keysym check green.
