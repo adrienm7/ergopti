@@ -1,7 +1,12 @@
 {
-	"description": "Which layout a pause, a resume or a quit switches to. Replayed by _shared/lua/layout/pause_switch_policy.lua (macOS and Linux) and _shared/modules/features/pause_switch_policy.ahk (Windows). An absent settings key is an unset value; the expected target is absent when nothing switches.",
+	"description": "Which layout a pause, a resume or a quit switches to, and which of those events a driver start applies (the startup switch macOS made first). Replayed by _shared/lua/layout/pause_switch_policy.lua (macOS and Linux) and _shared/modules/features/pause_switch_policy.ahk (Windows). An absent settings key is an unset value; the expected target is absent when nothing switches.",
 	"events": ["pause", "resume", "quit"],
 	"invalid_events": ["", "Pause", "suspend", "reload", "exit"],
+	"startup": [
+		{ "id": "a start running applies the resume layout", "paused": false, "event": "resume" },
+		{ "id": "a start paused applies the pause layout", "paused": true, "event": "pause" }
+	],
+	"invalid_startup_states": ["true", "", 2, [true]],
 	"targets": [
 		{
 			"id": "layout id",

@@ -36,6 +36,20 @@ _PSP_Events() {
 		AssertEqual(Row.Get("target", ""), PauseSwitchPolicyTarget(Row["settings"], Row["event"]), Row["id"])
 }
 
+_PSP_AssertStartupRefused(Value) {
+	AssertThrows(() => PauseSwitchPolicyStartupEvent(Value), "startup state refused")
+}
+
+/** A start running applies the resume layout, a start paused the pause one. */
+_PSP_Startup() {
+	Corpus := _PSP_Corpus()
+	AssertEqual(2, Corpus["startup"].Length, "complete startup vectors")
+	for Row in Corpus["startup"]
+		AssertEqual(Row["event"], PauseSwitchPolicyStartupEvent(Row["paused"]), Row["id"])
+	for Value in Corpus["invalid_startup_states"]
+		_PSP_AssertStartupRefused(Value)
+}
+
 ; One refusal per call: the closure reads a parameter, never a loop variable.
 _PSP_AssertUnknownEvent(Event) {
 	AssertThrows(() => PauseSwitchPolicyTarget(Map("enabled", true, "on_pause", "x"), Event),
@@ -69,5 +83,6 @@ _PSP_Manifest() {
 
 Test("pause switch policy: targets are layout ids or no change", _PSP_Targets)
 Test("pause switch policy: the shared event vectors", _PSP_Events)
+Test("pause switch policy: the startup event follows the live pause state", _PSP_Startup)
 Test("pause switch policy: unknown events and settings are refused", _PSP_Refusals)
 Test("pause switch policy: the manifest declares the settings it reads", _PSP_Manifest)

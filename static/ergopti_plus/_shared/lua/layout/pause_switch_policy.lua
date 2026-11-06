@@ -2,7 +2,8 @@
 -- ============================================================================
 -- MODULE: Pause Switch Policy
 -- DESCRIPTION:
--- Decides which keyboard layout a pause, a resume or a quit switches to, from
+-- Decides which keyboard layout a pause, a resume, a quit or a start switches
+-- to, from
 -- the three [layout] settings declared in the features manifest. Twin of
 -- _shared/modules/features/pause_switch_policy.ahk; both replay
 -- tests/corpus/layouts/pause_switch_vectors.json. Drivers keep the native
@@ -44,6 +45,16 @@ end
 function M.target_id(value)
 	if type(value) ~= "string" or value == "" then return nil end
 	return value
+end
+
+--- The event a driver start applies: a start running selects the resume
+--- layout and a start paused the pause one, so the keyboard is on the layout
+--- the live state asks for whichever layout the session opened on.
+--- @param paused boolean Whether the driver is paused once its start settled.
+--- @return string event "pause" or "resume".
+function M.startup_event(paused)
+	if type(paused) ~= "boolean" then error("the startup pause state must be a boolean", 2) end
+	return paused and "pause" or "resume"
 end
 
 --- The layout an event switches to, or nil when nothing switches: the switch
