@@ -101,7 +101,8 @@ local function with_manager(bindings, events, body)
 		helpers.assert_true(M.enable(), "a live reader must enable dispatch")
 		body(M, pressed)
 	end, debug.traceback)
-	for name, value in pairs(saved) do package.loaded[name] = value end
+	-- By name: a module that was not loaded is a nil value pairs() never visits.
+	for _, name in ipairs({ EMITTER, MANAGER, READER }) do package.loaded[name] = saved[name] end
 	if not ok then error(failure, 0) end
 end
 
