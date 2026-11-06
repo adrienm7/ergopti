@@ -387,6 +387,28 @@ function findVacuousAbsence(file, src) {
  *     file contributes zero tests and the suite total silently shrinks.
  * 3c (Lua): an `it("…", function() end)` with an empty body.
  */
+let sharedAhkBlocks = null;
+
+/**
+ * Every AHK function of the scanned trees by name. The AHK suite is one process
+ * with one global namespace, so a test may delegate to an asserting helper that
+ * another test file defines; the delegation walk still has to reach an assertion.
+ * @returns {Map<string, {name: string, start: number, text: string}>} By name.
+ */
+function sharedAhkFunctionBlocks() {
+	if (sharedAhkBlocks) return sharedAhkBlocks;
+	sharedAhkBlocks = new Map();
+	for (const tree of TREES) {
+		if (tree.ext !== '.ahk') continue;
+		for (const file of walk(tree.dir, tree.ext)) {
+			for (const [name, blk] of ahkAllFunctionBlocks(fs.readFileSync(file, 'utf8'))) {
+				if (!sharedAhkBlocks.has(name)) sharedAhkBlocks.set(name, blk);
+			}
+		}
+	}
+	return sharedAhkBlocks;
+}
+
 function findDeadTests(file, src, ext) {
 	const out = [];
 
@@ -421,7 +443,8 @@ function findDeadTests(file, src, ext) {
 		// regex reads that as a test asserting nothing.
 		for (const m of block.text.matchAll(/\b([A-Za-z_]\w*)\b/g)) {
 			if (m[1] === block.name) continue;
-			if (byName.has(m[1]) && proves(byName.get(m[1]), depth - 1, seen)) return true;
+			const next = byName.get(m[1]) ?? sharedAhkFunctionBlocks().get(m[1]);
+			if (next && proves(next, depth - 1, seen)) return true;
 		}
 		return false;
 	};
@@ -733,7 +756,12 @@ function findUnflooredScans(file, src, ext) {
 		// happily cross a newline, so testing the joined text reported a loop in
 		// blocks that contain none and pointed the finding at an unrelated line.
 		const rows = block.text.split(/\r?\n/);
-		const idx = rows.findIndex((l) => LOOP.test(l));
+		// A gmatch over a string literal, or one whose pattern is `.`, walks characters
+		// to drive input (`("12345"):gmatch(".")` types five keys): nothing is matched
+		// against a moving target, so there is no scan to floor.
+		const LITERAL_RECEIVER =
+			/\(\s*(?:"[^"\n]*"|'[^'\n]*')\s*\)\s*:\s*(?:gmatch|gfind)\s*\(|:\s*(?:gmatch|gfind)\s*\(\s*(?:"\."|'\.')\s*\)/;
+		const idx = rows.findIndex((l) => LOOP.test(l) && !LITERAL_RECEIVER.test(l));
 		if (idx < 0) continue;
 
 		// Two shapes count as a floor, and both are common here.
@@ -794,9 +822,13 @@ function findUnflooredScans(file, src, ext) {
 		// guarded set — `if cond then flagged = true end` — so anchoring at the end
 		// of the line found nothing at all, which is how this class stayed invisible
 		// through four earlier widenings of exactly this recogniser.
-		for (const m of block.text.matchAll(/\b(\w+)\s*=\s*(?:true|false)\s*(?:end\b|\}|$)/gm)) {
+		for (const m of block.text.matchAll(/\b(\w+)\s*:?=\s*(?:true|false)\s*(?:end\b|\}|$)/gm)) {
 			collectors.add(m[1]);
 		}
+		// An AHK scan that keeps where its match was found (`Result := Call.Pos`) is
+		// floored by asserting that position is positive: a pattern matching nothing
+		// leaves it at zero.
+		for (const m of block.text.matchAll(/\b(\w+)\s*:=\s*\w+\.Pos\b/g)) collectors.add(m[1]);
 		if (!floored) {
 			for (const c of collectors) {
 				// Compared against anything, not only a literal: `Stages.Count ==
@@ -817,7 +849,9 @@ function findUnflooredScans(file, src, ext) {
 						// the floor, and a stricter one than any count: it ties the loop to
 						// the exact shape it was supposed to find, so an empty scan leaves
 						// the flag false and the assertion fails.
-						`|(?:Assert\\w*|assert_\\w+)\\s*\\(\\s*${c}\\s*[,)]`
+						`|(?:Assert\\w*|assert_\\w+)\\s*\\(\\s*${c}\\s*[,)]` +
+						// A position kept from the match: positive means something matched.
+						`|(?:Assert\\w*|assert_\\w+)\\s*\\(\\s*${c}\\s*(?:>|>=)\\s*\\d`
 				);
 				if (re.test(src)) {
 					floored = true;
