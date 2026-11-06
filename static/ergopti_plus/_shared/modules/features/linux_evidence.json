@@ -416,6 +416,35 @@
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua",
 				"static/ergopti_plus/linux/tests/unit/infra/scope/test_key_combinations_scope_acknowledged_ordered_pair.lua"
 			]
+		},
+		"layout_emulation": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/keymap/layout_emulation.lua",
+				"static/ergopti_plus/linux/infra/layout_emulation_preferences.lua",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_layouts.lua",
+				"static/ergopti_plus/_shared/lua/layouts/keylayout_emulation.lua",
+				"static/ergopti_plus/_shared/lua/layouts/emulation_settings.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_layout_emulation.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_keylayout_emulation.lua"
+			],
+			"members": [
+				"layout.emulated_layout",
+				"layout.ergopti_variant",
+				"layout.ergopti_base",
+				"layout.ergopti_alt_gr",
+				"layout.emulate_number_row",
+				"layout.emulate_top_row",
+				"layout.emulate_home_row",
+				"layout.emulate_bottom_row"
+			]
 		}
 	},
 	"overrides": {

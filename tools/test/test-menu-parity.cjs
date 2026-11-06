@@ -763,9 +763,9 @@ const OPENS_SUBMENU = {
 	// « CapsWord : désactivation automatique », the same submenu on the three drivers.
 	caps_word_auto_off: 'caps_word_auto_off_group',
 	accented_letters: 'accented_letters_group',
-	// « Rangées émulées », the row switches of the Windows emulation; the Lua
-	// drivers emulate no layout and draw the parent row greyed with its reason.
-	layout_emulated_rows: { menu: 'layout_emulated_rows_group', platforms: ['ahk'] },
+	// « Rangées émulées », the row switches of the layout emulation, the same
+	// submenu on the three drivers since 2026-11-06.
+	layout_emulated_rows: { menu: 'layout_emulated_rows_group', platforms: ['ahk', 'hs', 'linux'] },
 	hotstring_extensions: [
 		{
 			menu: 'hotstring_extension_content_frame',

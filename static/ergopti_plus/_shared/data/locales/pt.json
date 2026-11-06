@@ -1779,6 +1779,8 @@
 	"menu.layout.manage": "Gerir disposições…",
 	"menu.layout.emulated_status": "Disposição emulada: {1}",
 	"menu.layout.emulated_none": "Disposição emulada: nenhuma",
+	"menu.layout.emulation_failed": "não pode ser emulado, consulte o registo",
+	"menu.layout.emulation_not_saved": "Não foi possível guardar a escolha do esquema emulado.",
 	"menu.layout.none_installed": "Nenhuma disposição instalada",
 	"menu.layout.add_consent": "%s adicionado. O macOS pode pedir-lhe que permita este teclado: aceite para escrever com ele.",
 	"menu.layout.add_fail": "Falha ao adicionar — veja o console.",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "“{1}” está pronto no menu de aplicativos. Ele mantém seu próprio perfil em {2}.",
 	"apps.cloner.err_source_unreadable": "Este aplicativo não pode ser clonado: seu inicializador não indica nenhum programa.",
 	"apps.encryptor.drop_hint": "Solte arquivos aqui para criptografá-los, ou arquivos .enc para descriptografá-los.",
-	"apps.cloner.msg_no_isolation": "Este programa não tem opção de perfil separado: no Windows, o clone é um segundo atalho que inicia o mesmo programa com as mesmas configurações."
+	"apps.cloner.msg_no_isolation": "Este programa não tem opção de perfil separado: no Windows, o clone é um segundo atalho que inicia o mesmo programa com as mesmas configurações.",
+	"inventory.behavior.layout_emulation": "Escreve o .keylayout escolhido sobre o esquema do sistema; os três controladores reproduzem um mesmo corpus de teclas.",
+	"inventory.behavior.dead_native_lifetime": "O sistema nativo gere a composição pendente; captura e reposição são independentes de um prazo comum do controlador."
 }

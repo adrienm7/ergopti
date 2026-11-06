@@ -3912,52 +3912,128 @@
 								"id": "emulated_layout",
 								"kind": "choice",
 								"label_key": "onboarding.layout.emulated_layout",
-								"available": false,
+								"available": true,
 								"choices": [
 									{
 										"value": "none",
-										"label_key": "onboarding.layout.emulated_none"
+										"label_key": "onboarding.layout.emulated_none",
+										"writes": [
+											{
+												"path": "layout.emulated_layout",
+												"value": "",
+												"default": ""
+											},
+											{
+												"path": "layout.ergopti_base",
+												"value": false,
+												"default": false
+											},
+											{
+												"path": "layout.ergopti_variant",
+												"value": "none",
+												"default": "none"
+											}
+										]
 									},
 									{
 										"value": "ergopti",
-										"label_key": "onboarding.layout.emulated_ergopti"
+										"label_key": "onboarding.layout.emulated_ergopti",
+										"writes": [
+											{
+												"path": "layout.emulated_layout",
+												"value": "",
+												"default": ""
+											},
+											{
+												"path": "layout.ergopti_base",
+												"value": true,
+												"default": false
+											},
+											{
+												"path": "layout.ergopti_variant",
+												"value": "ergopti",
+												"default": "none"
+											}
+										]
 									},
 									{
 										"value": "ergopti_plus",
-										"label_key": "onboarding.layout.emulated_ergopti_plus"
+										"label_key": "onboarding.layout.emulated_ergopti_plus",
+										"writes": [
+											{
+												"path": "layout.emulated_layout",
+												"value": "",
+												"default": ""
+											},
+											{
+												"path": "layout.ergopti_base",
+												"value": true,
+												"default": false
+											},
+											{
+												"path": "layout.ergopti_variant",
+												"value": "ergopti_plus",
+												"default": "none"
+											}
+										]
 									}
-								],
-								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+								]
 							},
 							{
 								"id": "alt_gr_emulation",
 								"kind": "check",
 								"label_key": "layout.ergoptialtgr",
-								"available": false,
+								"available": true,
 								"choices": [
 									{
-										"value": true
+										"value": true,
+										"writes": [
+											{
+												"path": "layout.ergopti_alt_gr",
+												"value": true,
+												"default": false
+											}
+										]
 									},
 									{
-										"value": false
+										"value": false,
+										"writes": [
+											{
+												"path": "layout.ergopti_alt_gr",
+												"value": false,
+												"default": false
+											}
+										]
 									}
-								],
-								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+								]
 							},
 							{
 								"id": "number_row_emulation",
 								"kind": "check",
 								"label_key": "onboarding.layout.number_row_emulation",
-								"available": false,
+								"available": true,
 								"choices": [
 									{
-										"value": true
+										"value": true,
+										"writes": [
+											{
+												"path": "layout.emulate_number_row",
+												"value": true,
+												"default": true
+											}
+										]
 									},
 									{
-										"value": false
+										"value": false,
+										"writes": [
+											{
+												"path": "layout.emulate_number_row",
+												"value": false,
+												"default": true
+											}
+										]
 									}
-								],
-								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+								]
 							},
 							{
 								"id": "number_row_order",
@@ -5235,52 +5311,128 @@
 								"id": "emulated_layout",
 								"kind": "choice",
 								"label_key": "onboarding.layout.emulated_layout",
-								"available": false,
+								"available": true,
 								"choices": [
 									{
 										"value": "none",
-										"label_key": "onboarding.layout.emulated_none"
+										"label_key": "onboarding.layout.emulated_none",
+										"writes": [
+											{
+												"path": "layout.emulated_layout",
+												"value": "",
+												"default": ""
+											},
+											{
+												"path": "layout.ergopti_base",
+												"value": false,
+												"default": false
+											},
+											{
+												"path": "layout.ergopti_variant",
+												"value": "none",
+												"default": "none"
+											}
+										]
 									},
 									{
 										"value": "ergopti",
-										"label_key": "onboarding.layout.emulated_ergopti"
+										"label_key": "onboarding.layout.emulated_ergopti",
+										"writes": [
+											{
+												"path": "layout.emulated_layout",
+												"value": "",
+												"default": ""
+											},
+											{
+												"path": "layout.ergopti_base",
+												"value": true,
+												"default": false
+											},
+											{
+												"path": "layout.ergopti_variant",
+												"value": "ergopti",
+												"default": "none"
+											}
+										]
 									},
 									{
 										"value": "ergopti_plus",
-										"label_key": "onboarding.layout.emulated_ergopti_plus"
+										"label_key": "onboarding.layout.emulated_ergopti_plus",
+										"writes": [
+											{
+												"path": "layout.emulated_layout",
+												"value": "",
+												"default": ""
+											},
+											{
+												"path": "layout.ergopti_base",
+												"value": true,
+												"default": false
+											},
+											{
+												"path": "layout.ergopti_variant",
+												"value": "ergopti_plus",
+												"default": "none"
+											}
+										]
 									}
-								],
-								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+								]
 							},
 							{
 								"id": "alt_gr_emulation",
 								"kind": "check",
 								"label_key": "layout.ergoptialtgr",
-								"available": false,
+								"available": true,
 								"choices": [
 									{
-										"value": true
+										"value": true,
+										"writes": [
+											{
+												"path": "layout.ergopti_alt_gr",
+												"value": true,
+												"default": false
+											}
+										]
 									},
 									{
-										"value": false
+										"value": false,
+										"writes": [
+											{
+												"path": "layout.ergopti_alt_gr",
+												"value": false,
+												"default": false
+											}
+										]
 									}
-								],
-								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+								]
 							},
 							{
 								"id": "number_row_emulation",
 								"kind": "check",
 								"label_key": "onboarding.layout.number_row_emulation",
-								"available": false,
+								"available": true,
 								"choices": [
 									{
-										"value": true
+										"value": true,
+										"writes": [
+											{
+												"path": "layout.emulate_number_row",
+												"value": true,
+												"default": true
+											}
+										]
 									},
 									{
-										"value": false
+										"value": false,
+										"writes": [
+											{
+												"path": "layout.emulate_number_row",
+												"value": false,
+												"default": true
+											}
+										]
 									}
-								],
-								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+								]
 							},
 							{
 								"id": "number_row_order",

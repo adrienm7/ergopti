@@ -2362,37 +2362,29 @@
 		},
 		{
 			"type": "section_header",
-			"i18n": "menu.layout.header_layers",
+			"i18n": "menu.layout.header_layers"
+		},
+		{
+			"type": "list",
+			"id": "layout_emulation",
 			"platforms": [
-				"ahk"
+				"hs",
+				"linux"
 			],
 			"unavailable": "hide"
 		},
 		{
 			"type": "list",
-			"id": "layout_features_base",
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.lists_windows_only_settings"
+			"id": "layout_features_base"
 		},
 		{
 			"type": "list",
-			"id": "layout_features_altgr",
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.lists_windows_only_settings"
+			"id": "layout_features_altgr"
 		},
 		{
 			"type": "group",
 			"id": "layout_emulated_rows",
-			"i18n": "menu.layout.emulated_rows",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.layout_emulation_is_windows_only"
+			"i18n": "menu.layout.emulated_rows"
 		},
 		{
 			"type": "choice",
@@ -2514,42 +2506,22 @@
 		{
 			"type": "feature",
 			"path": "layout.emulate_number_row",
-			"i18n": "menu.layout.emulate_number_row",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.layout_emulation_is_windows_only"
+			"i18n": "menu.layout.emulate_number_row"
 		},
 		{
 			"type": "feature",
 			"path": "layout.emulate_top_row",
-			"i18n": "menu.layout.emulate_top_row",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.layout_emulation_is_windows_only"
+			"i18n": "menu.layout.emulate_top_row"
 		},
 		{
 			"type": "feature",
 			"path": "layout.emulate_home_row",
-			"i18n": "menu.layout.emulate_home_row",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.layout_emulation_is_windows_only"
+			"i18n": "menu.layout.emulate_home_row"
 		},
 		{
 			"type": "feature",
 			"path": "layout.emulate_bottom_row",
-			"i18n": "menu.layout.emulate_bottom_row",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.layout_emulation_is_windows_only"
+			"i18n": "menu.layout.emulate_bottom_row"
 		}
 	],
 	"accented_letters_group": [

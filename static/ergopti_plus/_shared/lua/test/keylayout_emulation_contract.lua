@@ -38,6 +38,9 @@ function M.register(helpers, shared)
 	end
 	local models = {}
 
+	--- A layout registry snapshot listing the shipped index.
+	local function index_snapshot() return { index = index, installed = {} } end
+
 	--- The compiled model of a shipped registry layout.
 	local function model(id)
 		if models[id] then return models[id] end
@@ -146,6 +149,68 @@ function M.register(helpers, shared)
 			local live = Emulation.new_session(model("ergol"), rows)
 			ok = pcall(Emulation.decide, live, "KeyQ", false, false, false, false, false, false)
 			helpers.assert_true(not ok, "an unconfigured session raises")
+		end)
+
+		helpers.it("reads the [layout] settings the way Windows selects the layout", function()
+			local Settings = require("layouts.emulation_settings")
+			local default_for = require("infra.manifest_reader").default_for
+			local reported = {}
+			local function report(segments) reported[#reported + 1] = table.concat(segments, ".") end
+			local empty = Settings.resolve({}, default_for, report)
+			helpers.assert_true(not Settings.active(empty), "an empty configuration emulates nothing")
+			local builtin = Settings.resolve({ layout = { ergopti_base = true } }, default_for, report)
+			helpers.assert_eq(builtin.id, "ergopti", "the built-in variant none types Ergopti")
+			local plus = Settings.resolve({ layout = { ergopti_base = true, ergopti_variant = "ergopti_plus" } },
+				default_for, report)
+			helpers.assert_eq(plus.id, "ergopti_plus", "the plus variant")
+			local registry = Settings.resolve({ layout = { emulated_layout = "bepo", ergopti_variant = "ergopti_plus",
+				ergopti_alt_gr = true, emulate_top_row = false, direct_access_digits = "digits" } }, default_for, report)
+			helpers.assert_eq(registry.id, "bepo", "a registry layout supersedes the variant")
+			helpers.assert_true(Settings.active(registry), "AltGr alone keeps it active")
+			helpers.assert_eq(registry.layout.emulate_top_row, false, "a row switch")
+			helpers.assert_eq(registry.number_row, "digits", "the number-row ordering")
+			local outdated = Settings.resolve({ layout = { ergopti_base = "yes", emulated_layout = "Bad Id" } },
+				default_for, report)
+			helpers.assert_true(not Settings.active(outdated), "outdated leaves read as their defaults")
+			helpers.assert_eq(#reported, 2, "each outdated leaf is reported")
+			helpers.assert_eq(Settings.choice_values("ergopti_plus")["layout.ergopti_variant"], "ergopti_plus",
+				"a built-in choice writes the variant")
+			helpers.assert_eq(Settings.choice_values("bepo")["layout.emulated_layout"], "bepo", "a registry choice")
+			helpers.assert_eq(Settings.choice_values("none")["layout.ergopti_base"], false, "none clears the base layer")
+			helpers.assert_nil(Settings.choice_values("Not An Id"), "an invalid choice")
+		end)
+
+		helpers.it("lists the emulation choices with the current one ticked", function()
+			local Settings = require("layouts.emulation_settings")
+			local Menu = require("layouts.emulation_menu")
+			local default_for = require("infra.manifest_reader").default_for
+			local chosen
+			local function rows_for(layout, status)
+				return Menu.choice_rows({ t = function(key) return key end,
+					settings = Settings.resolve({ layout = layout }, default_for),
+					status = status or { active = true }, snapshot = index_snapshot(),
+					choose = function(choice) chosen = choice end })
+			end
+			local rows = rows_for({ emulated_layout = "bepo", ergopti_base = true })
+			helpers.assert_eq(#rows, 1, "one submenu")
+			local checked, labels = {}, {}
+			for _, item in ipairs(rows[1].items) do
+				labels[#labels + 1] = item.label
+				if item.checked then checked[#checked + 1] = item.label end
+			end
+			helpers.assert_eq(checked, { "bépo" }, "the registry layout is ticked")
+			helpers.assert_eq(labels[1], "onboarding.layout.emulated_none", "none comes first")
+			rows[1].items[1].action()
+			helpers.assert_eq(chosen, "none", "a row chooses its value")
+			local off = rows_for({})
+			helpers.assert_true(off[1].items[1].checked, "nothing emulated ticks none")
+			local failed = rows_for({ emulated_layout = "missing", ergopti_base = true }, { error = "unreadable" })
+			helpers.assert_true(failed[1].label:find("menu.layout.emulation_failed", 1, true) ~= nil,
+				"a layout that cannot be emulated says so")
+			local switch = Menu.switch_row({ t = function(key) return key end, label_key = "k", checked = true,
+				toggle = function(value) chosen = value end })
+			switch.action()
+			helpers.assert_eq(chosen, false, "a switch row toggles its value")
 		end)
 
 		helpers.it("tells printable outputs from control placeholders", function()

@@ -1779,6 +1779,8 @@
 	"menu.layout.manage": "管理布局…",
 	"menu.layout.emulated_status": "模拟键盘布局：{1}",
 	"menu.layout.emulated_none": "模拟键盘布局：无",
+	"menu.layout.emulation_failed": "无法模拟，请查看日志",
+	"menu.layout.emulation_not_saved": "无法保存所模拟布局的选择。",
 	"menu.layout.none_installed": "未安装布局",
 	"menu.layout.add_consent": "已添加 %s。macOS 可能会请您允许此键盘：请接受以便用它输入。",
 	"menu.layout.add_fail": "添加失败——请查看控制台。",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "“{1}”已出现在应用程序菜单中。它在 {2} 中保留自己的配置文件。",
 	"apps.cloner.err_source_unreadable": "无法克隆此应用程序：其启动器未指定任何程序。",
 	"apps.encryptor.drop_hint": "将文件拖放到此处进行加密，或拖放 .enc 文件进行解密。",
-	"apps.cloner.msg_no_isolation": "此程序没有单独配置文件的选项：在 Windows 上，其克隆是以相同设置启动同一程序的第二个快捷方式。"
+	"apps.cloner.msg_no_isolation": "此程序没有单独配置文件的选项：在 Windows 上，其克隆是以相同设置启动同一程序的第二个快捷方式。",
+	"inventory.behavior.layout_emulation": "在系统布局之上输入所选的 .keylayout；三个驱动程序重放同一套按键语料。",
+	"inventory.behavior.dead_native_lifetime": "原生操作系统管理待定组合；捕获和重置规则与驱动程序共用超时不同。"
 }

@@ -1779,6 +1779,8 @@
 	"menu.layout.manage": "配列を管理…",
 	"menu.layout.emulated_status": "エミュレートする配列: {1}",
 	"menu.layout.emulated_none": "エミュレートする配列: なし",
+	"menu.layout.emulation_failed": "エミュレートできません。ログを確認してください",
+	"menu.layout.emulation_not_saved": "エミュレートする配列の選択を保存できませんでした。",
 	"menu.layout.none_installed": "インストール済みの配列はありません",
 	"menu.layout.add_consent": "%s を追加しました。macOS からこのキーボードを許可するよう求められることがあります。入力に使うには許可してください。",
 	"menu.layout.add_fail": "追加に失敗しました — コンソールを確認してください。",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "「{1}」がアプリケーションメニューに用意されました。専用のプロファイルを {2} に保持します。",
 	"apps.cloner.err_source_unreadable": "このアプリケーションは複製できません：ランチャーにプログラムが指定されていません。",
 	"apps.encryptor.drop_hint": "暗号化するファイル、または復号する .enc ファイルをここにドロップしてください。",
-	"apps.cloner.msg_no_isolation": "このプログラムには個別のプロファイルを使うオプションがありません。Windows では、クローンは同じ設定で同じプログラムを起動する 2 つ目のショートカットになります。"
+	"apps.cloner.msg_no_isolation": "このプログラムには個別のプロファイルを使うオプションがありません。Windows では、クローンは同じ設定で同じプログラムを起動する 2 つ目のショートカットになります。",
+	"inventory.behavior.layout_emulation": "選択した .keylayout をシステムの配列の上で入力します。3つのドライバーが同じ打鍵コーパスを再生します。",
+	"inventory.behavior.dead_native_lifetime": "待機中の合成はネイティブOSが管理します。取得とリセットの規則はドライバー共通のタイムアウトとは別です。"
 }

@@ -1779,6 +1779,8 @@
 	"menu.layout.manage": "Administrer layouts…",
 	"menu.layout.emulated_status": "Emuleret tastaturlayout: {1}",
 	"menu.layout.emulated_none": "Emuleret tastaturlayout: intet",
+	"menu.layout.emulation_failed": "kan ikke emuleres, se loggen",
+	"menu.layout.emulation_not_saved": "Valget af emuleret tastaturlayout kunne ikke gemmes.",
 	"menu.layout.none_installed": "Intet layout installeret",
 	"menu.layout.add_consent": "%s er tilføjet. macOS kan bede dig tillade dette tastatur: accepter for at skrive med det.",
 	"menu.layout.add_fail": "Tilføjelse mislykkedes — se konsol.",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "“{1}” er klar i programmenuen. Den har sin egen profil i {2}.",
 	"apps.cloner.err_source_unreadable": "Programmet kan ikke klones: dets starter angiver intet program.",
 	"apps.encryptor.drop_hint": "Slip filer her for at kryptere dem, eller .enc-filer for at dekryptere dem.",
-	"apps.cloner.msg_no_isolation": "Programmet har ingen indstilling for en separat profil: på Windows er klonen en ekstra genvej, der starter det samme program med de samme indstillinger."
+	"apps.cloner.msg_no_isolation": "Programmet har ingen indstilling for en separat profil: på Windows er klonen en ekstra genvej, der starter det samme program med de samme indstillinger.",
+	"inventory.behavior.layout_emulation": "Skriver den valgte .keylayout oven på systemets layout; de tre drivere afspiller ét korpus af tastetryk.",
+	"inventory.behavior.dead_native_lifetime": "Det native system styrer afventende komposition; registrering og nulstilling er adskilt fra en fælles tidsgrænse i driveren."
 }

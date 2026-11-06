@@ -1779,6 +1779,8 @@
 	"menu.layout.manage": "Gestionar distribuciones…",
 	"menu.layout.emulated_status": "Distribución emulada: {1}",
 	"menu.layout.emulated_none": "Distribución emulada: ninguna",
+	"menu.layout.emulation_failed": "no se puede emular, consulta el registro",
+	"menu.layout.emulation_not_saved": "No se pudo guardar la elección de la distribución emulada.",
 	"menu.layout.none_installed": "Ninguna distribución instalada",
 	"menu.layout.add_consent": "%s añadida. macOS puede pedirte que permitas este teclado: acéptalo para escribir con él.",
 	"menu.layout.add_fail": "Error al añadir — ver consola.",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "«{1}» está listo en su menú de aplicaciones. Conserva su propio perfil en {2}.",
 	"apps.cloner.err_source_unreadable": "Esta aplicación no se puede clonar: su lanzador no indica ningún programa.",
 	"apps.encryptor.drop_hint": "Suelte aquí archivos para cifrarlos, o archivos .enc para descifrarlos.",
-	"apps.cloner.msg_no_isolation": "Este programa no tiene opción de perfil separado: en Windows, su clon es un segundo acceso directo que inicia el mismo programa con la misma configuración."
+	"apps.cloner.msg_no_isolation": "Este programa no tiene opción de perfil separado: en Windows, su clon es un segundo acceso directo que inicia el mismo programa con la misma configuración.",
+	"inventory.behavior.layout_emulation": "Escribe el .keylayout elegido sobre la distribución del sistema; los tres controladores reproducen un mismo corpus de pulsaciones.",
+	"inventory.behavior.dead_native_lifetime": "El sistema nativo gestiona la composición pendiente; las reglas de captura y reinicio son independientes de un plazo común del controlador."
 }

@@ -1779,6 +1779,8 @@
 	"menu.layout.manage": "Layouts verwalten…",
 	"menu.layout.emulated_status": "Emuliertes Tastaturlayout: {1}",
 	"menu.layout.emulated_none": "Emuliertes Tastaturlayout: keines",
+	"menu.layout.emulation_failed": "kann nicht emuliert werden, siehe Protokoll",
+	"menu.layout.emulation_not_saved": "Die Wahl des emulierten Layouts konnte nicht gespeichert werden.",
 	"menu.layout.none_installed": "Kein Layout installiert",
 	"menu.layout.add_consent": "%s ist hinzugefügt. macOS fragt eventuell, ob diese Tastatur erlaubt werden soll: Bestätigen Sie, um damit zu tippen.",
 	"menu.layout.add_fail": "Hinzufügen fehlgeschlagen — Konsole prüfen.",
@@ -4133,5 +4135,7 @@
 	"apps.cloner.msg_created": "„{1}“ ist in Ihrem Anwendungsmenü bereit. Es behält sein eigenes Profil in {2}.",
 	"apps.cloner.err_source_unreadable": "Diese Anwendung kann nicht geklont werden: Ihr Starter nennt kein Programm.",
 	"apps.encryptor.drop_hint": "Legen Sie hier Dateien ab, um sie zu verschlüsseln, oder .enc-Dateien, um sie zu entschlüsseln.",
-	"apps.cloner.msg_no_isolation": "Dieses Programm hat keine Option für ein eigenes Profil: Unter Windows ist sein Klon eine zweite Verknüpfung, die dasselbe Programm mit denselben Einstellungen startet."
+	"apps.cloner.msg_no_isolation": "Dieses Programm hat keine Option für ein eigenes Profil: Unter Windows ist sein Klon eine zweite Verknüpfung, die dasselbe Programm mit denselben Einstellungen startet.",
+	"inventory.behavior.layout_emulation": "Tippt das gewählte .keylayout über dem Systemlayout; die drei Treiber spielen ein gemeinsames Tastenanschlag-Korpus ab.",
+	"inventory.behavior.dead_native_lifetime": "Das native System verwaltet ausstehende Komposition; Erfassungs- und Rücksetzregeln sind von einem gemeinsamen Treiberzeitlimit getrennt."
 }

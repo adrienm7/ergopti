@@ -794,18 +794,18 @@ swipe_5_horiz = 3.5
 
 
 [layout]
-platform.ahk.ergopti_base = false
+ergopti_base = false
 direct_access_digits = "native"
 platform.hs.virtual_keyboard = "auto"
 number_row_reorder_edges = false
-platform.ahk.ergopti_alt_gr = false
-platform.ahk.ergopti_variant = "none"
-platform.ahk.emulate_number_row = true
-platform.ahk.emulate_top_row = true
-platform.ahk.emulate_home_row = true
-platform.ahk.emulate_bottom_row = true
+ergopti_alt_gr = false
+ergopti_variant = "none"
+emulate_number_row = true
+emulate_top_row = true
+emulate_home_row = true
+emulate_bottom_row = true
 platform.ahk.ctrl_magic_save = false
-platform.ahk.emulated_layout = ""
+emulated_layout = ""
 pause_switch_enabled = false
 on_pause = ""
 on_resume = ""

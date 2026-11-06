@@ -41,6 +41,7 @@ local LLMBridge  = require("modules.keymap.llm_bridge")
 local CoreStateM = require("modules.keymap.state")
 local TerminatorReplay = require("modules.keymap.terminator_replay")
 local MagicKeySource = require("modules.keymap.magic_key_source")
+local LayoutEmulation = require("modules.keymap.layout_emulation")
 local Terminators = require("keymap.terminators")
 local Perf       = require("infra.perf")
 local HotPath    = require("infra.hotpath_profiler")
@@ -1590,6 +1591,9 @@ local _interceptor_error_logged = {}
 -- Declared above onKeyDownRaw for the same reason; cleared after every call.
 local _key_down_context = { keycode = nil, stale = false }
 
+-- Whether the layout emulation owner was started (once per Lua VM, M.start).
+local _layout_emulation_started = false
+
 -- The tap-hold copy watch (modules/keymap/tap_copy.lua), built by M.start.
 local function onKeyDownRaw(e, provenance, provenance_status)
 	-- A stale internal loopback has lost the live transaction identity required to
@@ -1678,6 +1682,11 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 		pcall(KeyEventHealth.note_stale_pass)
 		return false
 	end
+
+	-- The layout emulation: the key-down carries what the [layout] chosen layout
+	-- types on this physical key, over the selected input source, as on Windows.
+	-- Before the magic key, which keeps its unshifted press (the engine passes it).
+	if LayoutEmulation.key_down(e, keyCode) then return true end
 
 	-- The physical magic key: a plain press of the chosen key types the magic key.
 	-- The event itself carries it from here, so the one-shot Shift, the buffer and
@@ -2840,6 +2849,19 @@ function M.start()
 	end
 	if not _one_shot_shift then
 		_one_shot_shift = require("adapters.one_shot_shift").new({ magic = M.get_trigger_char })
+	end
+	if not _layout_emulation_started then
+		_layout_emulation_started = true
+		-- A layout that cannot be emulated is logged by its owner and leaves the
+		-- system layout typing; it never stops the keymap.
+		local started, emulation_err = pcall(LayoutEmulation.start, {
+			is_paused = function() return CoreState.processing_paused == true end,
+			magic_code = function()
+				if MagicKeySource.keycode() == nil or not magic_key_replace_on() then return nil end
+				return MagicKeySource.get()
+			end,
+		})
+		if not started then Logger.error(LOG, "Layout emulation start failed: %s.", tostring(emulation_err)) end
 	end
 	if not _tap_copy then _tap_copy = build_tap_copy() end
 	ControlSentinels.set_listener("keymap.one_shot_shift", function(signal)

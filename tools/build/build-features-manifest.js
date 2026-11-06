@@ -337,8 +337,10 @@ function validate(features) {
 			);
 		}
 		// superseded_reason_key: a feature an emulated registry layout replaces
-		// (the Ergopti emulation, the digit-row swap). Only the Windows driver
-		// emulates layouts, and its master gate can only turn a boolean off.
+		// (the Ergopti emulation, the digit-row swap). The Windows master gate
+		// reads it and can only turn a boolean off; the Lua drivers type the
+		// same layers through the shared emulation, so the row may also be
+		// declared for them (maintainer, 2026-11-06), never without Windows.
 		if (f.superseded_reason_key !== undefined) {
 			if (
 				typeof f.superseded_reason_key !== 'string' ||
@@ -356,10 +358,10 @@ function validate(features) {
 			if (
 				(f.type !== 'boolean' && !helperVariant) ||
 				!Array.isArray(f.platforms) ||
-				f.platforms.join(',') !== 'ahk'
+				!f.platforms.includes('ahk')
 			) {
 				throw new Error(
-					`feature ${f.path} declares superseded_reason_key but is not a Windows-only boolean or the exact helper-backed variant`
+					`feature ${f.path} declares superseded_reason_key but is not a Windows boolean or the exact helper-backed variant`
 				);
 			}
 		}
