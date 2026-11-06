@@ -1751,6 +1751,9 @@ type = "enum"
 enum_values = ["wait", "both"]
 description_key = "menu.llm.while_hotstring_tooltip"
 
+# A finished prediction is typed into the document instead of offered, after
+# the same checks an accept makes; one variant only, and a rewrite or an
+# erasing correction keeps its offer. It is not token-by-token streaming.
 [[features.llm.trigger]]
 id = "inline_autotype"
 default = false
@@ -1758,9 +1761,8 @@ recommended = false
 family = "setting"
 type = "boolean"
 description_key = "menu.llm.trigger.inline_autotype"
-platforms = ["ahk"]
-requires = { windows = ["ollama", "webview2"] }
-reason_key = "platform_reason.inline_autotype_is_windows"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = ["mlx", "ollama"], linux = ["evdev", "ollama", "uinput"], windows = ["ollama", "webview2"] }
 
 [[features.llm.trigger]]
 id = "secure_filter_enabled"

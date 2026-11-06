@@ -50,6 +50,12 @@ local DEFINITIONS = {
 		path = KEY.LLM_TRIGGER_AFTER_HOTSTRING,
 		type = "boolean",
 	},
+	-- A finished prediction is typed into the document instead of offered
+	-- (the Windows inline mode, prediction_engine.lua).
+	inline_autotype = {
+		path = KEY.LLM_TRIGGER_INLINE_AUTOTYPE,
+		type = "boolean",
+	},
 	-- What an automatic prediction does while a hotstring tooltip shows; the
 	-- manifest owns its values ("wait", "both").
 	while_hotstring_tooltip = {

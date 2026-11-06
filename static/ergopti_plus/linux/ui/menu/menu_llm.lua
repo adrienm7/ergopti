@@ -356,6 +356,7 @@ local function _build_llm(ctx)
 				[require("config_keys").COMMAND.LLM_SECURE_FIELD_FILTER] = function() return privacy_command(secure_source, require("config_keys").LEAF.SECURE_FILTER_ENABLED) end,
 				[require("config_keys").COMMAND.LLM_INSTANT_ON_WORD_END] = function() return toggle(require("config_keys").LEAF.INSTANT_ON_WORD_END) end,
 				[require("config_keys").COMMAND.LLM_AFTER_HOTSTRING] = function() return toggle(require("config_keys").LEAF.AFTER_HOTSTRING) end,
+				[require("config_keys").COMMAND.LLM_INLINE_AUTOTYPE] = function() return toggle(require("config_keys").LEAF.INLINE_AUTOTYPE) end,
 				[require("config_keys").COMMAND.LLM_WHILE_HOTSTRING_TOOLTIP] = function(value)
 					local leaf = require("config_keys").LEAF.WHILE_HOTSTRING_TOOLTIP
 					local current = TriggerSettings.get(leaf)
@@ -372,6 +373,7 @@ local function _build_llm(ctx)
 				["llm_secure_field_filter_ready"] = function() return PrivacyPolicy.ready(secure_source) end,
 				["llm_instant_on_word_end_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.INSTANT_ON_WORD_END) end,
 				["llm_after_hotstring_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.AFTER_HOTSTRING) end,
+				["llm_inline_autotype_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.INLINE_AUTOTYPE) end,
 				[require("config_keys").KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP] = function()
 					return TriggerSettings.get(require("config_keys").LEAF.WHILE_HOTSTRING_TOOLTIP)
 				end,

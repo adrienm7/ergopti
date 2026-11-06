@@ -324,7 +324,13 @@
 				"key": "inline_autotype",
 				"sample": true
 			},
-			"hs": null
+			"hs": {
+				"flat_key": "llm_inline_autotype",
+				"section": "llm",
+				"path": "trigger",
+				"key": "inline_autotype",
+				"sample": true
+			}
 		},
 		{
 			"id": "url_bar_filter",

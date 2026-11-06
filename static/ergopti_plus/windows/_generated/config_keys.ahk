@@ -440,6 +440,7 @@ class MenuCommand {
 	static LLM_GENERATION_TEMPERATURE_RESET := "llm_generation_temperature_reset"
 	static LLM_INDENTATION := "llm_indentation"
 	static LLM_INFO_BAR := "llm_info_bar"
+	static LLM_INLINE_AUTOTYPE := "llm_inline_autotype"
 	static LLM_INSTALL_WARNING := "llm_install_warning"
 	static LLM_INSTANT_ON_WORD_END := "llm_instant_on_word_end"
 	static LLM_MODEL_SELECTOR := "llm_model_selector"

@@ -24,29 +24,29 @@ Edit `_shared/modules/features/behaviors.json` after reviewing the named owners,
 ## hotstrings.backspace_restore
 
 - windows: [static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk](../static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk) — `_OnPrefixKeyDown`, SHA-256 `a62494bbaa6e6cb4f74b4c58c8476eb29c4c72b5d762c08b5736cd4fbd5b0fd5`.
-- macos: [static/ergopti_plus/macos/modules/keymap/init.lua](../static/ergopti_plus/macos/modules/keymap/init.lua) — `hotstrings.shortcut_resets_word`, SHA-256 `ca58752f4bff750256caf387a7be1e49f554a61e57261bbb88f993ba1d956f5f`.
+- macos: [static/ergopti_plus/macos/modules/keymap/init.lua](../static/ergopti_plus/macos/modules/keymap/init.lua) — `hotstrings.shortcut_resets_word`, SHA-256 `963bba50d4cafb52a2a88702dff1bb3432cb3e55c9cbc2955c29cdded4293e5a`.
 - linux: [static/ergopti_plus/linux/ergopti_hotstrings.lua](../static/ergopti_plus/linux/ergopti_hotstrings.lua) — `local undo = _undoable`, SHA-256 `1dd3095e84171ab6dbc4a5bf1269a7c1cdab11881395b183c5352fd95d368eb9`.
 
 ## hotstrings.repeat_activation_window
 
 - windows: [static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk](../static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk) — `HSE_TryRepeatKey(MagicKey)`, SHA-256 `4d09b8735fbc38a046f31ca25abef5a7d287bf66ee6d46111d0b0bdba2c75d45`.
-- macos: [static/ergopti_plus/macos/modules/keymap/expander.lua](../static/ergopti_plus/macos/modules/keymap/expander.lua) — `function M.try_repeat_feature`, SHA-256 `8980c996eee776ab255fc7dad362b7599ef6219b684c7072ae6530f7fe593857`; [static/ergopti_plus/macos/modules/keymap/init.lua](../static/ergopti_plus/macos/modules/keymap/init.lua) — `hotstrings.shortcut_resets_word`, SHA-256 `ca58752f4bff750256caf387a7be1e49f554a61e57261bbb88f993ba1d956f5f`.
+- macos: [static/ergopti_plus/macos/modules/keymap/expander.lua](../static/ergopti_plus/macos/modules/keymap/expander.lua) — `function M.try_repeat_feature`, SHA-256 `8980c996eee776ab255fc7dad362b7599ef6219b684c7072ae6530f7fe593857`; [static/ergopti_plus/macos/modules/keymap/init.lua](../static/ergopti_plus/macos/modules/keymap/init.lua) — `hotstrings.shortcut_resets_word`, SHA-256 `963bba50d4cafb52a2a88702dff1bb3432cb3e55c9cbc2955c29cdded4293e5a`.
 - linux: [static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua](../static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua) — `function M.resolve`, SHA-256 `7ac497766961b3c735c4d8eb1ac9a60117f3011301c61499d6ddccf743b086ea`; [static/ergopti_plus/linux/ergopti_hotstrings.lua](../static/ergopti_plus/linux/ergopti_hotstrings.lua) — `local undo = _undoable`, SHA-256 `1dd3095e84171ab6dbc4a5bf1269a7c1cdab11881395b183c5352fd95d368eb9`.
 
 ## deadkeys.composition
 
 - windows: [static/ergopti_plus/windows/modules/keymap/layout.ahk](../static/ergopti_plus/windows/modules/keymap/layout.ahk) — `DeadKey(Mapping)`, SHA-256 `a17138aaf6f33716723ac32d702e099db9c70aa6f07f4166aa837a75473e13af`; [static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk](../static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk) — `KeylayoutEmulation_PressNative`, SHA-256 `218eed54b84581e8276ab42fa7f050f260102ee16c08485249d2f24630271535`.
-- macos: [static/ergopti_plus/macos/modules/keymap/init.lua](../static/ergopti_plus/macos/modules/keymap/init.lua) — `local chars = e:getCharacters(false)`, SHA-256 `ca58752f4bff750256caf387a7be1e49f554a61e57261bbb88f993ba1d956f5f`.
+- macos: [static/ergopti_plus/macos/modules/keymap/init.lua](../static/ergopti_plus/macos/modules/keymap/init.lua) — `local chars = e:getCharacters(false)`, SHA-256 `963bba50d4cafb52a2a88702dff1bb3432cb3e55c9cbc2955c29cdded4293e5a`.
 - linux: [static/ergopti_plus/linux/adapters/xkb_capture.lua](../static/ergopti_plus/linux/adapters/xkb_capture.lua) — `local function resolve_press(keycode)`, SHA-256 `5ed9e04682f32a7c5bb810b8f45171609e0b0dcd7dfbb5374319ad02f9d1bcfa`; [static/ergopti_plus/linux/adapters/keyboard_hook.lua](../static/ergopti_plus/linux/adapters/keyboard_hook.lua) — `local function _dispatch_post_remap(ev, source)`, SHA-256 `3fcda4f946961e756489c0a22875cfa96059771ac3e5bb4f575fca8978e62f0a`.
 
 ## deadkeys.unmapped_continuation
 
 - windows: [static/ergopti_plus/windows/modules/keymap/layout.ahk](../static/ergopti_plus/windows/modules/keymap/layout.ahk) — `DeadKey(Mapping)`, SHA-256 `a17138aaf6f33716723ac32d702e099db9c70aa6f07f4166aa837a75473e13af`; [static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk](../static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk) — `KeylayoutEmulation_PressNative`, SHA-256 `218eed54b84581e8276ab42fa7f050f260102ee16c08485249d2f24630271535`.
-- macos: [static/ergopti_plus/macos/modules/keymap/init.lua](../static/ergopti_plus/macos/modules/keymap/init.lua) — `local chars = e:getCharacters(false)`, SHA-256 `ca58752f4bff750256caf387a7be1e49f554a61e57261bbb88f993ba1d956f5f`.
+- macos: [static/ergopti_plus/macos/modules/keymap/init.lua](../static/ergopti_plus/macos/modules/keymap/init.lua) — `local chars = e:getCharacters(false)`, SHA-256 `963bba50d4cafb52a2a88702dff1bb3432cb3e55c9cbc2955c29cdded4293e5a`.
 - linux: [static/ergopti_plus/linux/adapters/xkb_capture.lua](../static/ergopti_plus/linux/adapters/xkb_capture.lua) — `local function resolve_press(keycode)`, SHA-256 `5ed9e04682f32a7c5bb810b8f45171609e0b0dcd7dfbb5374319ad02f9d1bcfa`.
 
 ## deadkeys.pending_lifetime
 
 - windows: [static/ergopti_plus/windows/modules/keymap/layout.ahk](../static/ergopti_plus/windows/modules/keymap/layout.ahk) — `DeadKey(Mapping)`, SHA-256 `a17138aaf6f33716723ac32d702e099db9c70aa6f07f4166aa837a75473e13af`; [static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk](../static/ergopti_plus/windows/modules/keymap/keylayout/keylayout_emulation.ahk) — `KeylayoutEmulation_PressNative`, SHA-256 `218eed54b84581e8276ab42fa7f050f260102ee16c08485249d2f24630271535`.
-- macos: [static/ergopti_plus/macos/modules/keymap/init.lua](../static/ergopti_plus/macos/modules/keymap/init.lua) — `local chars = e:getCharacters(false)`, SHA-256 `ca58752f4bff750256caf387a7be1e49f554a61e57261bbb88f993ba1d956f5f`.
+- macos: [static/ergopti_plus/macos/modules/keymap/init.lua](../static/ergopti_plus/macos/modules/keymap/init.lua) — `local chars = e:getCharacters(false)`, SHA-256 `963bba50d4cafb52a2a88702dff1bb3432cb3e55c9cbc2955c29cdded4293e5a`.
 - linux: [static/ergopti_plus/linux/adapters/xkb_capture.lua](../static/ergopti_plus/linux/adapters/xkb_capture.lua) — `local function resolve_press(keycode)`, SHA-256 `5ed9e04682f32a7c5bb810b8f45171609e0b0dcd7dfbb5374319ad02f9d1bcfa`; [static/ergopti_plus/linux/adapters/keyboard_hook.lua](../static/ergopti_plus/linux/adapters/keyboard_hook.lua) — `local function _dispatch_post_remap(ev, source)`, SHA-256 `3fcda4f946961e756489c0a22875cfa96059771ac3e5bb4f575fca8978e62f0a`.

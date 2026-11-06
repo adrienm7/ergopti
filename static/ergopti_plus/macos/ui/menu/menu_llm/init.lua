@@ -183,6 +183,7 @@ M.DEFAULT_STATE = {
 		llm_streaming           = llm_mod.DEFAULT_STATE.llm_streaming,
 		llm_streaming_multi     = llm_mod.DEFAULT_STATE.llm_streaming_multi,
 		llm_instant_on_word_end = llm_mod.DEFAULT_STATE.llm_instant_on_word_end,
+		llm_inline_autotype     = llm_mod.DEFAULT_STATE.llm_inline_autotype,
 		-- The AI agent's settings (modules/llm/agent_runner.lua); its top-level
 		-- menu is built by ui/menu/menu_llm/agent_panel.lua
 		llm_agent_system1       = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_SYSTEM1),

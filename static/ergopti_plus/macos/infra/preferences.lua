@@ -162,6 +162,7 @@ local KEY_MAP = {
 	llm_debounce                         = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.DEBOUNCE_MS, units_per_state = 1000, never = true },
 	llm_min_request_interval             = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.MIN_REQUEST_INTERVAL_MS, units_per_state = 1000 },
 	llm_instant_on_word_end              = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.INSTANT_ON_WORD_END },
+	llm_inline_autotype                  = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.INLINE_AUTOTYPE },
 	llm_after_hotstring                  = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.AFTER_HOTSTRING },
 	llm_while_hotstring_tooltip          = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.WHILE_HOTSTRING_TOOLTIP },
 	llm_url_bar_filter_enabled           = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.URL_BAR_FILTER_ENABLED },

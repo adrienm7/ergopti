@@ -303,6 +303,9 @@ local auto_raise_temperature  = LLM_DEFAULTS.llm_auto_raise_temp
 local is_streaming_enabled       = LLM_DEFAULTS.llm_streaming
 local is_streaming_multi_enabled = LLM_DEFAULTS.llm_streaming_multi  -- Show each variant as it streams in
 local instant_on_word_end        = LLM_DEFAULTS.llm_instant_on_word_end  -- Bypass debounce at word boundaries
+-- Inline mode (llm.trigger.inline_autotype): a finished prediction is typed
+-- through the acceptance path instead of offered, as on Windows.
+local inline_autotype            = LLM_DEFAULTS.llm_inline_autotype
 -- What an automatic prediction does while a hotstring tooltip shows
 -- (llm.trigger.while_hotstring_tooltip); nil reads the manifest default.
 local while_hotstring_tooltip    = nil
@@ -918,6 +921,11 @@ function M.set_llm_streaming_multi(v)
 	Logger.debug(LOG, "Streaming multi: %s.", is_streaming_multi_enabled and "on" or "off")
 end
 
+function M.set_llm_inline_autotype(v)
+	inline_autotype = (v == true)
+	Logger.debug(LOG, "Inline auto-type: %s.", inline_autotype and "on" or "off")
+end
+
 function M.set_llm_instant_on_word_end(v)
 	instant_on_word_end = (v == true)
 	Logger.debug(LOG, "Instant on word end: %s.", instant_on_word_end and "on" or "off")
@@ -1046,6 +1054,7 @@ function M.get_llm_runtime_setting(key)
 	if key == "llm_nav_modifiers" then return true, navigation_mods end
 	if key == "llm_val_modifiers" then return true, validation_mods end
 	if key == ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END then return true, instant_on_word_end end
+	if key == ConfigKeys.COMMAND.LLM_INLINE_AUTOTYPE then return true, inline_autotype end
 	if key == ConfigKeys.COMMAND.LLM_WHILE_HOTSTRING_TOOLTIP then return true, current_while_hotstring_tooltip() end
 	if key == "llm_url_bar_filter_enabled" then return true, url_bar_filter_enabled end
 	if key == "llm_secure_field_filter_enabled" then
@@ -1680,6 +1689,10 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	-- Live mode redirects the automatic typing trigger only: a forced request is
 	-- an explicit action (or the chain it owns) and keeps its own profile
 	local live = (request == nil and force_trigger ~= true) and _live or nil
+	-- Inline mode asks for one variant: typing several would be chaos. Live
+	-- mode keeps its offer (it rewrites what is typed).
+	local inline = inline_autotype == true and live == nil
+	if inline then request_count = 1 end
 	local entry_request_counter = llm_request_counter
 	local entry_fetch_counter = fetch_request_counter
 
@@ -1917,6 +1930,9 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	end
 	if not predispatch_is_current() then return end
 	if Rewrite.is_rewrite_profile(request_profile_now) then
+		-- A rewrite erases what the user typed: it is never applied without the
+		-- user's own accept, whatever inline mode says.
+		inline = false
 		local rewrite_ok, rewrite_skip = pcall(M._apply_rewrite_params, params, buffer)
 		if not rewrite_ok then
 			Logger.error(LOG, "Rewrite request parameters raised — request aborted: %s", tostring(rewrite_skip))
@@ -2117,6 +2133,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 			runtime_available       = runtime_available,
 			on_ui_unavailable       = close_current_request,
 			on_request_terminal     = function() retire_request_log(my_fetch_id) end,
+			on_final_predictions    = inline and function(preds) M._inline_accept(preds, my_fetch_id) end or nil,
 		})
 	end, debug.traceback)
 	if not callbacks_ok or type(on_success_cb) ~= "function" or type(on_fail_cb) ~= "function" then
@@ -2913,6 +2930,48 @@ function M.reset(options)
 	log_request_cancellation(cancelled_log_id, "reset")
 	reset_is_current()
 	return cleanup_committed
+end
+
+--- Inline mode: types the first finished prediction through the bridge's
+--- acceptance, once the callback that painted it has returned (its state sync
+--- would otherwise restore the consumed pool). A prediction that erases typed
+--- text (a correction) keeps its offer, and a request superseded meanwhile
+--- types nothing.
+--- @param preds table The final predictions, as painted.
+--- @param fetch_id number The request they answer.
+--- @param deps table|nil Test seam: { after, bridge, is_current }.
+--- @return boolean scheduled
+function M._inline_accept(preds, fetch_id, deps)
+	deps = deps or {}
+	local first = type(preds) == "table" and preds[1] or nil
+	if type(first) ~= "table" or type(first.to_type) ~= "string" then return false end
+	if (tonumber(first.deletes) or 0) > 0 then
+		Logger.info(LOG, "Inline mode leaves an erasing prediction to the tooltip.")
+		return false
+	end
+	local is_current = deps.is_current or function()
+		return runtime_available() and fetch_request_counter == fetch_id and predictions_visible
+			and pending_predictions[1] == first
+	end
+	local after = deps.after or require("infra.deferred_work").after
+	local scheduled = after(0, function()
+		if not is_current() then
+			Logger.debug(LOG, "Inline prediction #%s superseded before typing.", tostring(fetch_id))
+			return
+		end
+		local bridge = deps.bridge or package.loaded["modules.keymap.llm_bridge"]
+		if type(bridge) ~= "table" or type(bridge.apply_prediction) ~= "function" then
+			Logger.error(LOG, "Inline mode cannot type: the keymap bridge is not loaded.")
+			return
+		end
+		Logger.info(LOG, "Inline mode: typing the finished prediction (%d byte(s)).", #first.to_type)
+		local ok, applied = xpcall(bridge.apply_prediction, debug.traceback, 1)
+		if not ok or applied ~= true then
+			Logger.warn(LOG, "Inline prediction was not typed: %s.", tostring(applied))
+		end
+	end, "llm.inline_autotype")
+	if scheduled ~= true then Logger.error(LOG, "Inline prediction typing could not be scheduled.") end
+	return scheduled == true
 end
 
 --- Captures the prediction at the given index for an apply operation and
