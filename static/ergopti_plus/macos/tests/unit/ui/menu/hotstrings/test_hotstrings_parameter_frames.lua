@@ -412,6 +412,11 @@ local function with_word_reset(body, idle_seconds, prompt_answer)
 		keymap.set_shortcut_resets_word = function(value)
 			set[#set + 1] = { "shortcut", value }; shortcut = value; return true
 		end
+		local tap_hold = true
+		keymap.is_tap_hold_resets_word_enabled = function() return tap_hold end
+		keymap.set_tap_hold_resets_word = function(value)
+			set[#set + 1] = { "tap_hold", value }; tap_hold = value; return true
+		end
 		f.context.do_reload = function() return true end
 		local dialog = require("infra.dialog_util")
 		local prompt, alert = dialog.text_prompt, dialog.block_alert
@@ -532,21 +537,20 @@ helpers.describe("hotstrings word-reset rows", function()
 		end, 3)
 	end)
 
-	helpers.it("greys the tap-hold row with its Karabiner reason and gives it no command", function()
-		with_word_reset(function(f)
+	helpers.it("draws the tap-hold row live from the keymap and saves its change (macos-tap-hold-word-reset)", function()
+		with_word_reset(function(f, set)
 			local label = f.captions("menu.hotstrings.tap_hold_resets_word")
 			local found
 			for _, row in ipairs(assert(f.build()).menu) do
 				if type(row.title) == "string" and row.title:sub(1, #label) == label then found = row end
 			end
-			assert(found, "the tap-hold row must be drawn greyed, not hidden")
-			helpers.assert_eq(found.disabled, true)
-			helpers.assert_nil(found.fn, "Karabiner owns tap-hold on macOS: the row has no command")
-			local reason = f.captions("platform_reason.tap_hold_word_reset_not_on_macos")
-			local cut = reason:find(":", 1, true)
-			local head = (cut and reason:sub(1, cut - 1) or reason):gsub("%s+$", "")
-			helpers.assert_true(found.title:find(head, 1, true) ~= nil,
-				"the greyed row names why it is unavailable: " .. found.title)
+			assert(found, "the tap-hold row must be drawn")
+			helpers.assert_true(found.disabled ~= true, "Karabiner marks the tap-hold output: the row is live")
+			helpers.assert_eq(found.checked, true, "the row reads the keymap's live value")
+			found.fn()
+			helpers.assert_eq(set, { { "tap_hold", false } })
+			helpers.assert_eq(f.context.state.tap_hold_resets_word, false)
+			helpers.assert_eq(f.calls.writes, 1, "the change is saved once")
 		end, 3)
 	end)
 

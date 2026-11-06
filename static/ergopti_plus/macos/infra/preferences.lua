@@ -113,6 +113,7 @@ local KEY_MAP = {
 	click_resets_word                    = { sec = "hotstrings"                                        },
 	arrow_resets_word                    = { sec = "hotstrings"                                        },
 	shortcut_resets_word                 = { sec = "hotstrings"                                        },
+	tap_hold_resets_word                 = { sec = "hotstrings"                                        },
 	personal_info                       = { sec = "hotstrings", path = "modules", key = "personal_info" },
 	preview_ai_enabled                   = { sec = "hotstrings"                                        },
 	preview_autocorrect_enabled          = { sec = "hotstrings"                                        },
@@ -648,6 +649,10 @@ local SCALAR_VALUE_RULES = {
 	shortcut_resets_word = function(value)
 		if type(value) == "boolean" then return true end
 		return false, "the shortcut reset is not a boolean"
+	end,
+	tap_hold_resets_word = function(value)
+		if type(value) == "boolean" then return true end
+		return false, "the tap-hold reset is not a boolean"
 	end,
 	llm_agent_mode = function(value)
 		if Agent.MODES[value] then return true end

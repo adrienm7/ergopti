@@ -152,6 +152,14 @@ function M.new(defaults, delays_default)
 		-- (the word continues) until keymap/init.lua seeds them the same way.
 		arrow_resets_word          = false,
 		shortcut_resets_word       = false,
+		-- Whether a tap-hold key's own command, or a shortcut struck while the
+		-- navigation layer is on, starts a new word
+		-- (hotstrings.tap_hold_resets_word). Karabiner tells that output apart
+		-- with tagged F20 sentinels (modules/keymap/control_sentinels.lua); the
+		-- two fields below are what they said last.
+		tap_hold_resets_word       = false,
+		tap_hold_command_pending   = false,
+		nav_layer_active           = false,
 		-- The timeout the keyDown tap applies, projected from IDLE_RESET_SEC.
 		WORD_TIMEOUT_SEC           = 0,
 		-- How many expansions a chain of hotstrings may hold

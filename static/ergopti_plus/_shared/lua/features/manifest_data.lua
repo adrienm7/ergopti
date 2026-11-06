@@ -105,7 +105,7 @@ M.features = {
 		path = "hotstrings.shortcut_resets_word", id = "shortcut_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.shortcut_resets_word", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
-		path = "hotstrings.tap_hold_resets_word", id = "tap_hold_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.tap_hold_resets_word", platforms = { "ahk", "linux" }, recommended = true, family = "setting", reason_key = "platform_reason.tap_hold_word_reset_not_on_macos",
+		path = "hotstrings.tap_hold_resets_word", id = "tap_hold_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.tap_hold_resets_word", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
 		path = "hotstrings.cascade_max_arrows", id = "cascade_max_arrows", section = "hotstrings", default = 3, type = "number", description_key = "menu.hotstrings.cascade_max_arrows", platforms = { "ahk", "hs", "linux" }, recommended = 3, family = "setting", preset_values = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 },

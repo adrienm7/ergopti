@@ -790,21 +790,6 @@
 		}
 	},
 	{
-		"path": "hotstrings_params_group.tap_hold_resets_word",
-		"visibility": "grey",
-		"labels": {
-			"fr": "Un tap ou un hold sur une touche tap-hold commence un nouveau mot",
-			"en": "A tap or hold of a tap-hold key starts a new word"
-		},
-		"platforms": { "windows": true, "macos": false, "linux": true },
-		"reasons": {
-			"macos": {
-				"en": "Not on macOS: Karabiner-Elements runs the tap-holds there, and what they send arrives like keys typed on the keyboard, so a shortcut sent by a tap-hold follows the shortcut option.",
-				"fr": "Pas sous macOS : Karabiner-Elements y gère les tap-holds, et ce qu’ils envoient arrive comme des touches tapées au clavier, donc un raccourci envoyé par un tap-hold suit l’option des raccourcis."
-			}
-		}
-	},
-	{
 		"path": "gestures_menu.system_gesture_status",
 		"visibility": "hide",
 		"labels": { "fr": "system_gesture_status", "en": "system_gesture_status" },

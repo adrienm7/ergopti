@@ -227,14 +227,11 @@
 		},
 		"platforms": {
 			"windows": true,
-			"macos": false,
+			"macos": true,
 			"linux": true
 		},
-		"reason_key": "platform_reason.tap_hold_word_reset_not_on_macos",
-		"reason": {
-			"fr": "Pas sous macOS : Karabiner-Elements y gère les tap-holds, et ce qu’ils envoient arrive comme des touches tapées au clavier, donc un raccourci envoyé par un tap-hold suit l’option des raccourcis.",
-			"en": "Not on macOS: Karabiner-Elements runs the tap-holds there, and what they send arrives like keys typed on the keyboard, so a shortcut sent by a tap-hold follows the shortcut option."
-		}
+		"reason_key": null,
+		"reason": null
 	},
 	{
 		"path": "hotstrings.cascade_max_arrows",

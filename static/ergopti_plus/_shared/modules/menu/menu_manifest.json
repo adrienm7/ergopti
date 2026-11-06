@@ -2843,12 +2843,6 @@
 			"type": "check",
 			"id": "tap_hold_resets_word",
 			"i18n": "menu.hotstrings.tap_hold_resets_word",
-			"platforms": [
-				"ahk",
-				"linux"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.tap_hold_word_reset_not_on_macos",
 			"checked_when": [
 				"hotstrings_tap_hold_resets_word"
 			]

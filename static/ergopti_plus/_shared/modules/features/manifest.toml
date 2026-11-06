@@ -597,19 +597,18 @@ description_key = "menu.hotstrings.shortcut_resets_word"
 # (copy, paste, a window switch…) and every shortcut struck under its held
 # modifier or layer. A tap that types its key (Space, Enter, Tab, Backspace…)
 # keeps that key's effect, a Shift or AltGr hold is typing, and an arrow from
-# the navigation layer follows arrow_resets_word. Not on macOS: Karabiner-
-# Elements runs the tap-holds there and its output reaches the driver as the
-# keyboard's own keys, so a shortcut it sends follows shortcut_resets_word.
+# the navigation layer follows arrow_resets_word. On macOS Karabiner-Elements
+# runs the tap-holds and marks their output with tagged F20 sentinels
+# (_shared/lua/keymap/control_signals.lua), which the keymap reads.
 [[features.hotstrings]]
 id = "tap_hold_resets_word"
-platforms = ["ahk", "linux"]
-requires = { linux = ["evdev", "uinput"], windows = [] }
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
 family = "setting"
 type = "boolean"
 description_key = "menu.hotstrings.tap_hold_resets_word"
-reason_key = "platform_reason.tap_hold_word_reset_not_on_macos"
 
 # The cascade: how many hotstring expansions (arrows) a chain may hold. The
 # setting counts ARROWS: 1 is a single expansion (`a` -> `b`, the text a
