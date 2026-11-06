@@ -149,6 +149,34 @@ assert(next(manager.get_info()) == nil)
       if not ok then error(err, 0) end
     end)
 
+    helpers.it("reads and saves the personal file in the effective configuration directory (PIL-002)", function()
+      local directory = os.tmpname()
+      os.remove(directory)
+      assert(os.execute("mkdir -p '" .. directory .. "'"))
+      local path = directory .. "/personal_info.toml"
+      local fh = assert(io.open(path, "w"))
+      fh:write('[info]\nfirst_name = "Effective"\n\n[letters]\np = "first_name"\n')
+      fh:close()
+      local previous = package.loaded["adapters.storage"]
+      package.loaded["adapters.storage"] = { get = function() return directory end }
+      local ok, err = pcall(function()
+        helpers.assert_true(dh.init({ trigger_char = "★" }))
+        helpers.assert_eq(dh.get_info().first_name, "Effective",
+          "init without an explicit path must follow the configuration-directory override")
+        helpers.assert_true(dh.save_info({ first_name = "Saved" }))
+        local saved = assert(io.open(path, "r"))
+        local decoded = require("toml_codec").decode(saved:read("*a"))
+        saved:close()
+        helpers.assert_eq(decoded.info.first_name, "Saved")
+      end)
+      package.loaded["adapters.storage"] = previous
+      os.remove(path)
+      os.remove(path .. ".tmp")
+      os.execute("rmdir '" .. directory .. "'")
+      dh.init({ trigger_char = "\\", personal_info_path = "/definitely/missing/personal_info.toml" })
+      if not ok then error(err, 0) end
+    end)
+
     helpers.it("atomically persists editor values and refreshes live aliases", function()
       local path = os.tmpname()
       local fh = assert(io.open(path, "w"))
