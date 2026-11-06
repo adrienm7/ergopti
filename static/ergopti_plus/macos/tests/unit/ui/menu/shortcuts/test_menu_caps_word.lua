@@ -53,6 +53,18 @@ local function find(items, title)
 end
 
 helpers.describe("CapsWord auto-off menu (caps_word_auto_off_group)", function()
+	-- CWS-002: the policy ends CapsWord on the literal ★ whatever the magic key
+	-- is renamed to, so the checkbox must not caption the renamed key.
+	helpers.it("(cws-002) captions the star delimiter with the literal ★ after a magic-key rename", function()
+		local h = fresh()
+		h.ctx.applyTriggerChar = function(text) return (text:gsub("★", "§")) end
+		local items = index_items(require("ui.menu.menu_caps_word").build(h.ctx))
+		local label = require("infra.i18n").get("terminators.label_star")
+		helpers.assert_true(label:find("★", 1, true) ~= nil, "control: the shipped caption names ★")
+		helpers.assert_true(find(items, label) ~= nil, "the star row keeps the literal ★")
+		helpers.assert_true(find(items, (label:gsub("★", "§"))) == nil, "no row names the renamed key")
+	end)
+
 	helpers.it("draws the presets, the delimiter catalogue and every pointer kind", function()
 		local h = fresh()
 		local i18n = require("infra.i18n")

@@ -46,7 +46,7 @@ local function with_menu(source, body)
 				ctx = { commands = {}, state_getters = {},
 					on_menu_changed = function() context.changes = context.changes + 1 end },
 				ManifestMenu = require("infra.manifest_menu"),
-				MagicKey = { get = function() return "★" end },
+				MagicKey = { get = function() return context.magic or "★" end },
 			})
 			context.i18n = i18n.get
 			context.build = builder
@@ -86,6 +86,19 @@ local function read(path)
 end
 
 helpers.describe("caps word auto-off menu (Linux)", function()
+	-- CWS-002: the policy ends CapsWord on the literal ★ whatever the magic key
+	-- is renamed to, so the checkbox must not caption the renamed key.
+	helpers.it("(cws-002) captions the star delimiter with the literal ★ after a magic-key rename", function()
+		with_menu(nil, function(c)
+			c.magic = "§"
+			local rows = c.build()
+			local label = c.i18n("terminators.label_star")
+			helpers.assert_true(label:find("★", 1, true) ~= nil, "control: the shipped caption names ★")
+			helpers.assert_not_nil(find(rows, label), "the star row keeps the literal ★")
+			helpers.assert_nil(find(rows, (label:gsub("★", "§"))), "no row names the renamed key")
+		end)
+	end)
+
 	helpers.it("caps word auto-off menu, draws one checkbox per delimiter and per declared pointer kind", function()
 		with_menu(nil, function(c)
 			local rows = assert(c.build(), "the group builds")
