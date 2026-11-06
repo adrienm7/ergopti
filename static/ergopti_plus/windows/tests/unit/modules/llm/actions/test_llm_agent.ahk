@@ -805,6 +805,33 @@ _LAG_AiOffRefuses() {
 }
 Test("LLM agent: the manual actions refuse with the AI off, not with its backend not ready (ai-off-picker)", _LAG_AiOffRefuses)
 
+; An accepted connector runs on a timer thread; a pause or the AI switch that lands
+; before it starts must stop it, as for ordinary accepted text (accepted-agent policy).
+_LAG_AcceptedConnectorHonoursPauseAndAiOff() {
+	Screen := _LTN_Screen(LAG_SELECTION)
+	_LAG_Run(_LAG_Menu("action", "", "cerebras"), Screen, _Body)
+	_Body(Fx, Lines, Sent) {
+		global _LLM_Menu
+		_LAG_Invoke("llm_agent_selection")
+		Fx.Remote[1]["on_success"].Call(LAG_ANSWER)
+		Final := _LPP_LastFinalRender()
+		_LLM_Menu["enabled"] := false
+		AssertFalse(Final.slots[1].OnAccept.Call(), "the AI switched off before the connector starts")
+		AssertEqual(0, Fx.Connector.Length, "no connector ran")
+		_LLM_Menu["enabled"] := true
+		Suspend(true)
+		try
+			AssertFalse(Final.slots[1].OnAccept.Call(), "paused before the connector starts")
+		finally
+			Suspend(false)
+		AssertEqual(0, Fx.Connector.Length, "still no connector ran")
+		AssertTrue(Final.slots[1].OnAccept.Call(), "the same acceptance runs when the script is live")
+		AssertEqual(1, Fx.Connector.Length, "the connector ran once")
+	}
+}
+Test("LLM agent: an accepted connector does not run after a pause or AI-off (accepted-agent-policy)",
+	_LAG_AcceptedConnectorHonoursPauseAndAiOff)
+
 _LAG_AnswersRefusedOrFailing() {
 	Screen := _LTN_Screen(LAG_SELECTION)
 	_LAG_Run(_LAG_Menu("action", "", "cerebras"), Screen, _Body)

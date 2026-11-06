@@ -626,6 +626,15 @@ _LLM_Agent_Show(Flow, Actions) {
 ; @returns {Boolean} True when the connector succeeded.
 _LLM_Agent_Accept(Flow, Action) {
 	global _LLM_Agent_ConnectorFn
+	; The accepted connector runs on a fresh timer thread, so a pause or the AI
+	; switch can land between the Tab and this call. Ordinary accepted text is
+	; refused in that window by its final output admission; the connector is
+	; held to the same rule rather than acting while the script is off.
+	if A_IsSuspended || !LLM_Menu_AiEnabled() {
+		LoggerInfo("LLM", "AI agent #{1}: the accepted {2} connector was not run ({3}).", Flow["generation"],
+			Action["type"], A_IsSuspended ? "paused" : "AI off")
+		return false
+	}
 	if Flow["auto"]
 		_LLM_Agent_SettleOffer(true)
 	Connector := HasMethod(_LLM_Agent_ConnectorFn, "Call") ? _LLM_Agent_ConnectorFn : LLM_AgentConnector_Execute
