@@ -432,6 +432,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.accessibility_copies",
+		contract = { "parse", "find" },
+		-- The Accessibility wait asks it for the other copies before any reset.
+		wired    = true,
+	},
+	{
 		id       = "adapters.screen_capture",
 		contract = { "permission_state", "last_known_permission", "request_permission", "open_permission_settings",
 			"clipboard_change_count", "clipboard_has_image", "copy_image_file_to_clipboard" },
