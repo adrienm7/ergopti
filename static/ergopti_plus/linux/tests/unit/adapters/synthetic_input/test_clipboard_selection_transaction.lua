@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 
 --- Runs one isolated clipboard transaction against a simulated desktop session.
 --- @param kind string "x11" or "wayland"
@@ -28,6 +29,7 @@ local function with_session(kind, selection, body)
 	function shell.has_command() return true end
 	function shell.exec() return shell.current end
 	function shell.exec_checked(command)
+		if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY, nil end
 		shell.reads[#shell.reads + 1] = command
 		return true, shell.current, nil
 	end
@@ -260,6 +262,7 @@ helpers.describe("clipboard selection transaction", function()
 			with_session(kind, "selected", function(clipboard, shell, _, _, emit, sleep_ms)
 				local original, reads = shell.exec_checked, 0
 				shell.exec_checked = function(command)
+					if ClipboardTargets.is_listing(command) then return original(command) end
 					reads = reads + 1
 					local ok, text, reason = original(command)
 					if reads == 2 then shell.current = "new user copy" end
@@ -277,6 +280,7 @@ helpers.describe("clipboard selection transaction", function()
 		with_session("x11", "selected", function(clipboard, shell, _, _, emit, sleep_ms)
 			local original, reads = shell.exec_checked, 0
 			shell.exec_checked = function(command)
+				if ClipboardTargets.is_listing(command) then return original(command) end
 				reads = reads + 1
 				if reads == 3 then return false, "", "reader failed" end
 				return original(command)

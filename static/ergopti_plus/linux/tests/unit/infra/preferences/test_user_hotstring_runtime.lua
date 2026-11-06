@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local Atspi = require("adapters.atspi_focus")
 local Detector = require("adapters.secure_field_detector")
 local FocusGuard = require("modules.keystats.focus_guard")
@@ -340,7 +341,10 @@ helpers.describe("programmable native Linux runtime", function()
 			Shell.has_command = function() return true end
 			-- A completed write is what the next read sees, as on a real clipboard.
 			local clipboard = "owned original clipboard"
-			Shell.exec_checked = function() return true, clipboard end
+			Shell.exec_checked = function(command)
+				if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
+				return true, clipboard
+			end
 			Shell.with_exact_stdin = function(command, content)
 				writes[#writes + 1] = content; return command
 			end

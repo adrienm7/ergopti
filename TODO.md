@@ -276,7 +276,8 @@ Evidence: [12-scope flow review](docs/audits/platform-parity/2026-11-04-flows/re
 
 ### Linux
 
-- [ ] **[CODE] LCP-001:** Clipboard borrowers restore only text and silently discard other original formats. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-clipboard/report.md).
+- [x] **[CODE] LCP-001:** Clipboard borrowers restore only text and silently discard other original formats. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-clipboard/report.md). Done (aligned on Windows/macOS: nothing is lost): every borrower lists the clipboard formats (xclip TARGETS, wl-paste --list-types) and refuses before its first write when anything beyond text is present; xsel, which cannot list formats, refuses too. Restoring the extra formats themselves needs a native multi-target selection owner (wl-copy and xclip offer one type): follow-up below.
+- [ ] **[CODE] Linux multi-format clipboard restore:** a small native owner serving every saved target (X11 selection owner, Wayland data-control/data-device) would let Linux borrowers run on rich clipboards instead of refusing them (LCP-001).
 - [ ] **[CODE] LCP-002:** Text transformations overwrite an intervening external clipboard copy. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-clipboard/report.md).
 - [ ] **[CODE] LCP-003:** Case and wrap transformations can replace a changed selection in the same text field. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-clipboard/report.md).
 - [ ] **[CODE] LCP-004:** URI clipboard probing can send Ctrl+C to an unvalidated terminal, including an unchanged terminal through make_executable_selection. [Evidence and required boundary regression](docs/audits/platform-parity/2026-11-04-flows/linux-clipboard/report.md).

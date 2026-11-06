@@ -8,6 +8,7 @@
 --- belongs to the separate GTK proof; these cases claim no kernel input coverage.
 --- ==============================================================================
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 
 --- Runs a complete offer/accept workflow and restores every imported module.
 --- @param action string Transition to deliver, or stable.
@@ -91,7 +92,8 @@ local function scenario(action, phase, body)
 		local clipboard = "SAVED"
 		package.loaded["adapters.shell_runner"] = {
 			has_command = function() return true end,
-			exec_checked = function()
+			exec_checked = function(command)
+				if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
 				state.clipboard_reads = state.clipboard_reads + 1
 				transition("read"); return true, clipboard
 			end,

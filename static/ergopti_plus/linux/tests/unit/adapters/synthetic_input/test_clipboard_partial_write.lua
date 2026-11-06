@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 -- Resolve transitive constructors before publishing controlled desktop ports.
 require("adapters.clipboard")
 
@@ -21,7 +22,10 @@ local function with_session(options, body)
 	local pending
 	package.loaded["adapters.shell_runner"] = {
 		has_command = function() return true end,
-		exec_checked = function() return true, state.current end,
+		exec_checked = function(command)
+			if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
+			return true, state.current
+		end,
 		with_exact_stdin = function(_, text) pending = text; return "controlled clipboard setter" end,
 		run = function()
 			local text = pending

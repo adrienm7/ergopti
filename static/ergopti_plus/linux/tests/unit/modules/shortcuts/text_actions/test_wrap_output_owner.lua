@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local Fixture = require("tests.support.text_owner_fixture")
 
 --- Loads Main's actual wrap callback and its publication wiring.
@@ -70,6 +71,7 @@ local function with_wrap(options, body)
 		package.loaded["adapters.shell_runner"] = {
 			has_command = function() return true end,
 			exec_checked = function(command)
+				if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
 				if command:find("primary", 1, true) then state.reads = state.reads + 1; return true, state.primary end
 				transition("clipboard-read"); return true, state.clipboard
 			end,
