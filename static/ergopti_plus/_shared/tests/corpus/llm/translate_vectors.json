@@ -146,6 +146,16 @@
 			"text": "Hola,\n¿qué tal?"
 		},
 		{
+			"id": "bold_body",
+			"block": "TRANSLATION: **important**",
+			"text": "**important**"
+		},
+		{
+			"id": "bold_tag_and_body",
+			"block": "**TRANSLATION:** **important**",
+			"text": "**important**"
+		},
+		{
 			"id": "preamble",
 			"block": "Sure.\nTRANSLATION:\n  明日会いましょう  ",
 			"text": "明日会いましょう"

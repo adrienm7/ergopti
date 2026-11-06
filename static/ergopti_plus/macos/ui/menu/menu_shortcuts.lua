@@ -579,11 +579,8 @@ function M.build(ctx)
 				i18n.get("dialog.shortcuts.chatgpt_prompt"),
 				state.chatgpt_url, i18n.get("button.ok"), i18n.get("button.cancel"))
 			if ok_p and clicked == i18n.get("button.ok") and type(url) == "string" and url ~= "" then
-				state.chatgpt_url = url
-				if type(shortcuts.set_chatgpt_url) == "function" then
-					pcall(shortcuts.set_chatgpt_url, url)
-				end
-				if ctx.save_prefs() ~= true then return false end
+				if type(ctx.commit_chatgpt_url) ~= "function"
+					or ctx.commit_chatgpt_url(url) ~= true then return false end
 				ctx.updateMenu()
 			end
 		end or nil
@@ -648,12 +645,10 @@ function M.build(ctx)
 						action   = (not paused) and (function(a) return function()
 							local function assign()
 								if a == "run_program" then ctx.updateMenu(); return true end
-								state.script_control_shortcuts[slot_id] = a
-								if type(script_control.set_shortcut_action) == "function" then
-									pcall(script_control.set_shortcut_action, slot_id, a)
-								end
-								if ctx.save_prefs() ~= true then return false end
+								if type(ctx.commit_script_action) ~= "function"
+									or ctx.commit_script_action(slot_id, a) ~= true then return false end
 								ctx.updateMenu()
+								return true
 							end
 
 							-- open_url / search_web do nothing without their parameter:
@@ -668,9 +663,9 @@ function M.build(ctx)
 								if type(prefix) ~= "string" then
 									Logger.error(LOG, "The script binding prefix is missing — refusing to "
 										.. "store '%s' under a binding key dispatch will not read.", tostring(a))
-									return
+									return false
 								end
-								DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+								return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 									local mutation = {
 										section = require("config_keys").KEY.SHORTCUTS_SCRIPT_CONTROL, key = slot_id,
 										read = function()
@@ -695,10 +690,9 @@ function M.build(ctx)
 										ctx.updateMenu()
 									end
 								end, "menu_shortcuts.action_parameter")
-								return
 							end
 
-							assign()
+							return assign()
 						end end)(act) or nil,
 					})
 				end

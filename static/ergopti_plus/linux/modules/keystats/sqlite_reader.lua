@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local M = {}
+local ManifestKeys = require("keystats.manifest_keys")
 
 local Logger = require("logger.shim")
 local Utils = require("keystats.utils")
@@ -159,6 +160,7 @@ local function new_entry()
 end
 
 local function get_entry(manifest, date, app)
+	app = ManifestKeys.encode(app)
 	manifest[date] = manifest[date] or {}
 	manifest[date][app] = manifest[date][app] or new_entry()
 	return manifest[date][app]

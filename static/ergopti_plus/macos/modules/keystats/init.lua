@@ -206,6 +206,7 @@ local CoreState = {
 	last_flush_time       = hs.timer.absoluteTime() / 1000000,
 	current_session_pause = 0,
 	session_start_time    = 0,
+	session_generation    = 0,
 	session_last_active   = 0,
 	is_micro_idle         = false,
 
@@ -989,7 +990,7 @@ local function handle_key(event_obj)
 		table.sort(active_mods)
 
 		local shift_side = flags.capslock and "capslock"
-			or (_keymap_mod and type(_keymap_mod.get_shift_side) == "function"
+			or (flags.shift and _keymap_mod and type(_keymap_mod.get_shift_side) == "function"
 				and _keymap_mod.get_shift_side()
 				or "none")
 
@@ -1418,6 +1419,7 @@ function M.reset_session()
 			duration_ms = math.max(0, CoreState.session_last_active - CoreState.session_start_time),
 		})
 	end
+	CoreState.session_generation = CoreState.session_generation + 1
 	CoreState.session_start_time  = 0
 	CoreState.session_last_active = 0
 	CoreState.is_micro_idle       = false
@@ -1538,16 +1540,19 @@ local function build_deferred_synthetic_snapshot(operation)
 		end
 	end
 
-	for _ = 1, operation.deletes do
-		remove_effective_timestamp_at_or_before(operation.timestamp_ms)
-	end
-	insert_effective_timestamps(operation.timestamp_ms, char_count)
-	if char_count > 0 then
-		CoreState.session_last_active = math.max(
-			CoreState.session_last_active or 0, operation.timestamp_ms)
-		if CoreState.session_start_time == 0
-			or CoreState.session_start_time > operation.timestamp_ms then
-			CoreState.session_start_time = operation.timestamp_ms
+	-- A queued historical snapshot must not reopen a session reset meanwhile.
+	if operation.session_generation == CoreState.session_generation then
+		for _ = 1, operation.deletes do
+			remove_effective_timestamp_at_or_before(operation.timestamp_ms)
+		end
+		insert_effective_timestamps(operation.timestamp_ms, char_count)
+		if char_count > 0 then
+			CoreState.session_last_active = math.max(
+				CoreState.session_last_active or 0, operation.timestamp_ms)
+			if CoreState.session_start_time == 0
+				or CoreState.session_start_time > operation.timestamp_ms then
+				CoreState.session_start_time = operation.timestamp_ms
+			end
 		end
 	end
 
@@ -1582,6 +1587,7 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, physical
 		deletes = deletes and math.max(0, math.floor(deletes)) or 0,
 		is_private = is_private == true,
 		timestamp_ms = timestamp_ms,
+		session_generation = CoreState.session_generation,
 	}
 
 	-- `physical_echo` remains in the public signature for compatibility; immutable

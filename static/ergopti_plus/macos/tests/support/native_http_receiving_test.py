@@ -49,8 +49,14 @@ def frame(tag,payload):
     else: os.write(1,framed)
 headers=[]
 status=200
+if mode=='latin1-header': headers=[['X-Example','caf\u00e9']]
+if mode=='nonlatin-header': headers=[['X-Example','\u6f22']]
 if mode=='redirect':
     status=302; headers=[['Location','https://second.example/next?route=two']]
+if mode=='redirect-body':
+    status=302; headers=[['Location','https://second.example/next?route=two']]
+if mode=='redirect-without-location': status=302
+if mode=='not-modified': status=304; headers=[['Content-Length','100']]
 if mode=='downgrade':
     status=302; headers=[['Location','http://second.example/blocked?route=insecure']]
 if mode=='boolean-version':
@@ -64,7 +70,7 @@ frame(b'H',{'version':1,'status':status,'headers':headers})
 if mode=='hold': time.sleep(30)
 if mode=='progress':
     for _ in range(300): frame(b'D',b'x');time.sleep(.03)
-elif mode not in ('redirect','truncated'): frame(b'D',b'N\x00LF')
+elif mode not in ('redirect','truncated','not-modified'): frame(b'D',b'N\x00LF')
 if mode=='truncated': sys.exit(0)
 if mode=='invalid-terminal':
     frame(b'C',{'version':1,'success':True,'reason':'certificate'});sys.exit(0)
@@ -299,6 +305,97 @@ class ActualHTTPXReceiving(unittest.TestCase):
         self.native_resolver.stop()
         NativePipeReceiving.tearDown(self)
 
+    def test_not_modified_may_describe_representation_size_without_a_body(self):
+        import httpx
+
+        with httpx.Client(transport=self.managed.ManagedHTTPTransport(1)) as client:
+            response = client.get("https://first.example/not-modified")
+            self.assertEqual(response.status_code, 304)
+            self.assertEqual(response.content, b"")
+            self.assertEqual(response.headers["content-length"], "100")
+
+    def test_disabled_redirect_keeps_response_body_and_next_request(self):
+        import httpx
+
+        with httpx.Client(
+            transport=self.managed.ManagedHTTPTransport(1), follow_redirects=False
+        ) as client:
+            response = client.get("https://first.example/redirect-body")
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.content, b"N\x00LF")
+            self.assertEqual(
+                str(response.next_request.url), "https://second.example/next?route=two"
+            )
+
+    def test_native_get_with_body_is_refused_without_starting_a_worker(self):
+        import httpx
+
+        ledger = Path(self.temporary.name) / "requests.jsonl"
+        os.environ["RECEIVING_LEDGER"] = str(ledger)
+        with httpx.Client(transport=self.managed.ManagedHTTPTransport(1)) as client:
+            for method in ("GET", "HEAD"):
+                for body in (b"payload", iter([b"payload"])):
+                    request = httpx.Request(method, "https://first.example/ok", content=body)
+                    with self.assertRaises(httpx.UnsupportedProtocol):
+                        client.send(request)
+            request = httpx.Request(
+                "GET", "https://first.example/ok", headers={"Content-Length": "9"}
+            )
+            with self.assertRaises(httpx.UnsupportedProtocol):
+                client.send(request)
+        self.assertFalse(ledger.exists(), "the body must not be silently discarded")
+
+    def test_redirect_without_location_keeps_the_final_response_body(self):
+        import httpx
+
+        with httpx.Client(
+            transport=self.managed.ManagedHTTPTransport(1), follow_redirects=True
+        ) as client:
+            response = client.get("https://first.example/redirect-without-location")
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.content, b"N\x00LF")
+
+    def test_duplicate_request_headers_are_coalesced_for_the_native_worker(self):
+        import httpx
+
+        ledger = Path(self.temporary.name) / "requests.jsonl"
+        os.environ["RECEIVING_LEDGER"] = str(ledger)
+        with httpx.Client(transport=self.managed.ManagedHTTPTransport(1)) as client:
+            response = client.get(
+                "https://first.example/ok",
+                headers=[
+                    ("Cookie", "a=1"),
+                    ("cookie", "b=2"),
+                    ("X-Example", "a"),
+                    ("x-example", "b"),
+                ],
+            )
+            self.assertEqual(response.content, b"N\x00LF")
+        headers = json.loads(ledger.read_text().splitlines()[0])["headers"]
+        cookies = [value for name, value in headers if name.lower() == "cookie"]
+        examples = [value for name, value in headers if name.lower() == "x-example"]
+        self.assertEqual(cookies, ["a=1; b=2"])
+        self.assertEqual(examples, ["a, b"])
+
+    def test_httpx_accepts_latin1_response_header_without_losing_worker(self):
+        import httpx
+
+        owner = self.managed.ManagedHTTPTransport(1)
+        with httpx.Client(transport=owner) as client:
+            response = client.get("https://first.example/latin1-header")
+            self.assertEqual(response.headers["X-Example"], "café")
+            self.assertEqual(response.content, b"N\x00LF")
+        self.assertEqual(owner.active, set())
+
+    def test_httpx_rejects_unrepresentable_header_and_retires_worker(self):
+        import httpx
+
+        owner = self.managed.ManagedHTTPTransport(1)
+        with httpx.Client(transport=owner) as client:
+            with self.assertRaises(httpx.RemoteProtocolError):
+                client.get("https://first.example/nonlatin-header")
+            self.assertEqual(owner.active, set())
+
     def test_actual_httpx_redirect_uses_full_target_and_strips_cross_origin_auth(self):
         import httpx
 
@@ -403,6 +500,149 @@ class ManagedTransportAdmissionReceiving(unittest.TestCase):
         self.owner.close()
         self.factory.stop()
         self.environment.stop()
+
+    def test_reentrant_shutdown_during_native_acquisition_cannot_publish_a_response(self):
+        process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        self.addCleanup(lambda: process.poll() is None and (process.kill(), process.wait()))
+        shutdown_errors = []
+
+        class Response:
+            status = 200
+            headers = []
+
+            def close(self):
+                process.kill()
+                process.wait()
+
+        def acquire(*args):
+            try:
+                self.owner.close()
+            except RuntimeError as error:
+                shutdown_errors.append(error)
+            return Response()
+
+        with mock.patch.object(self.owner.policy, "route", return_value=("direct", None)):
+            with mock.patch.object(self.managed.Native, "open_request", side_effect=acquire):
+                with self.assertRaises(self.httpx.ConnectError):
+                    self.owner.handle_request(self.httpx.Request("GET", "https://first.example/"))
+        self.assertEqual(
+            len(shutdown_errors), 1, "in-flight construction cannot be reported settled"
+        )
+        self.assertIsNotNone(process.returncode)
+        self.assertEqual(self.owner.active, set())
+
+    def test_reentrant_shutdown_during_relay_construction_cannot_send(self):
+        shutdown_errors = []
+
+        def acquire(*args, **kwargs):
+            try:
+                self.owner.close()
+            except RuntimeError as error:
+                shutdown_errors.append(error)
+            return self.explicit
+
+        self.factory_mock.side_effect = acquire
+        with self.assertRaises(self.httpx.ConnectError):
+            self.owner.handle_request(self.httpx.Request("GET", "http://origin.invalid/a"))
+        self.assertEqual(len(shutdown_errors), 1)
+        self.assertTrue(self.pool_closed.is_set())
+        self.assertEqual(self.connections, [])
+
+    def test_reentrant_shutdown_during_relay_request_retires_late_stream(self):
+        process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        self.addCleanup(lambda: process.poll() is None and (process.kill(), process.wait()))
+        shutdown_errors = []
+
+        class Stream(self.httpx.SyncByteStream):
+            def __iter__(self):
+                return iter(())
+
+            def close(self):
+                if process.poll() is None:
+                    process.kill()
+                    process.wait()
+
+        class Relay:
+            def handle_request(inner_self, request):
+                try:
+                    self.owner.close()
+                except RuntimeError as error:
+                    shutdown_errors.append(error)
+                return self.httpx.Response(200, stream=Stream())
+
+            def close(inner_self):
+                pass
+
+        self.owner.explicit["http://relay.invalid:3128"] = Relay()
+        with self.assertRaises(self.httpx.ConnectError):
+            self.owner.handle_request(self.httpx.Request("GET", "http://origin.invalid/a"))
+        self.assertEqual(len(shutdown_errors), 1)
+        self.assertIsNotNone(process.returncode)
+        self.assertEqual(self.owner.active, set())
+
+    def test_late_relay_stream_close_refusal_is_retained_for_retry(self):
+        class Stream(self.httpx.SyncByteStream):
+            calls = 0
+
+            def __iter__(self):
+                return iter(())
+
+            def close(self):
+                self.calls += 1
+                if self.calls == 1:
+                    raise OSError("cleanup refused")
+
+        stream = Stream()
+
+        class Relay:
+            def handle_request(inner_self, request):
+                try:
+                    self.owner.close()
+                except RuntimeError:
+                    pass
+                return self.httpx.Response(200, stream=stream)
+
+            def close(inner_self):
+                pass
+
+        self.owner.explicit["http://relay.invalid:3128"] = Relay()
+        with self.assertRaises(OSError):
+            self.owner.handle_request(self.httpx.Request("GET", "http://origin.invalid/a"))
+        self.assertIn(stream, self.owner.active)
+        self.owner.close()
+        self.assertEqual(stream.calls, 2)
+        self.assertEqual(self.owner.active, set())
+
+    def test_refused_redirect_close_keeps_worker_owned_for_shutdown_retry(self):
+        process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        self.addCleanup(lambda: process.poll() is None and (process.kill(), process.wait()))
+
+        class Response:
+            status = 302
+            headers = [("Location", "https://other.example/")]
+            calls = 0
+
+            def close(self):
+                self.calls += 1
+                if self.calls == 1:
+                    raise OSError("temporary cleanup refusal")
+                process.kill()
+                process.wait()
+
+        native = Response()
+        with mock.patch.object(self.owner.policy, "route", return_value=("direct", None)):
+            with mock.patch.object(self.managed.Native, "open_request", return_value=native):
+                response = self.owner.handle_request(
+                    self.httpx.Request("GET", "https://first.example/")
+                )
+                with self.assertRaises(OSError):
+                    response.close()
+        self.assertEqual(len(self.owner.active), 1)
+        self.assertIsNone(process.poll())
+        self.owner.close()
+        self.assertEqual(native.calls, 2)
+        self.assertIsNotNone(process.returncode)
+        self.assertEqual(self.owner.active, set())
 
     def test_shutdown_cannot_finish_before_inflight_relay_header_acquisition(self):
         entered = threading.Event()

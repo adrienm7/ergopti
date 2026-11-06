@@ -18,6 +18,7 @@ local M = {}
 
 local hs         = hs
 local pasteboard = hs.pasteboard
+local Clipboard  = require("adapters.clipboard")
 local JsonCodec  = require("adapters.json_codec")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
@@ -484,10 +485,10 @@ local function capture_text_clipboard(owner, include_plain)
 	if not before_ok or before == nil then
 		return false, "native clipboard generation unavailable before snapshot"
 	end
-	local snapshot_ok, snapshot = call_text_boundary(owner, pasteboard.readAllData)
-	if not snapshot_ok or (snapshot ~= nil and type(snapshot) ~= "table") then
-		return false, snapshot_ok and "readAllData returned " .. type(snapshot) or snapshot
-	end
+	local snapshot_ok, snapshot, captured, snapshot_count = call_text_boundary(owner, Clipboard.save, true)
+	if not snapshot_ok then return false, snapshot end
+	if captured ~= true then return false, "clipboard snapshot incomplete or unavailable" end
+	if snapshot_count ~= before then return false, "clipboard changed during snapshot capture" end
 	local plain = nil
 	if include_plain then
 		local plain_ok
@@ -710,49 +711,8 @@ local function text_case()
 	return _text_case
 end
 
---- Tells whether a codepoint joins the character before it on screen, so one
---- arrow press moves over both: combining marks, variation selectors, emoji
---- skin-tone modifiers, tag characters and the zero-width joiner.
---- @param code number The codepoint.
---- @return boolean joins
-local function joins_previous(code)
-	return (code >= 0x0300 and code <= 0x036F) or (code >= 0x1AB0 and code <= 0x1AFF)
-		or (code >= 0x1DC0 and code <= 0x1DFF) or (code >= 0x20D0 and code <= 0x20FF)
-		or (code >= 0xFE20 and code <= 0xFE2F) or (code >= 0xFE00 and code <= 0xFE0F)
-		or (code >= 0xE0100 and code <= 0xE01EF) or (code >= 0x1F3FB and code <= 0x1F3FF)
-		or (code >= 0xE0020 and code <= 0xE007F) or code == 0x200D
-end
-
---- Counts the arrow presses that move over a text. macOS moves the caret over
---- one composed character sequence per press, not one UTF-16 unit or one
---- codepoint: é written e + U+0301, 👍🏽, ❤️, a ZWJ family and a flag are one
---- press each, as is CR LF. Counting codepoints left a combined character, or
---- the start of the text, out of the reselection.
---- @param text string Valid UTF-8.
---- @return number steps Arrow presses from the end of the text to its start.
-local function cursor_steps(text)
-	local steps, previous, regional_open = 0, nil, false
-	for _, code in utf8.codes(text) do
-		local joined = false
-		if previous == nil then
-			joined = false
-		elseif joins_previous(code) or previous == 0x200D then
-			joined = true
-		elseif code == 0x0A and previous == 0x0D then
-			joined = true
-		elseif code >= 0x1F1E6 and code <= 0x1F1FF and regional_open then
-			joined = true
-		end
-		if code >= 0x1F1E6 and code <= 0x1F1FF then
-			regional_open = not joined
-		elseif not joined then
-			regional_open = false
-		end
-		if not joined then steps = steps + 1 end
-		previous = code
-	end
-	return steps
-end
+-- The keymap's Backspace tracker uses the same composed-text boundaries.
+local cursor_steps = require("infra.composed_text").count
 M._cursor_steps = cursor_steps
 
 --- Asynchronous text-transform engine.
@@ -820,7 +780,20 @@ end
 --- @param continuation_check function|table|nil Refuses delayed business work when it no longer returns true.
 --- @return boolean started
 local function do_transform(transform_func, parent, on_declined, on_empty, continuation_check)
-	local continuation_current, continuation_cached = TextContinuation.new(continuation_check)
+	local generic = continuation_check == nil
+	if generic then
+		continuation_check = TextContinuation.capture_destination()
+		if not continuation_check then
+			Logger.warn(LOG, "Text transform refused: destination is not classified.")
+			return false
+		end
+	end
+	local check_current, continuation_cached = TextContinuation.new(continuation_check)
+	local initial_phase = generic
+	local function continuation_current()
+		if initial_phase and continuation_cached then return continuation_cached() end
+		return check_current()
+	end
 	if not continuation_current() then return false end
 	local scope = text_scope(parent)
 	if scope.paused == true then return false end
@@ -1156,9 +1129,11 @@ local function do_transform(transform_func, parent, on_declined, on_empty, conti
 		abort_transform("clipboard clear", clear_error)
 		return false
 	end
-	return dispatch_stage(function(tx)
+	local started = dispatch_stage(function(tx)
 		return SyntheticInput.emit_key_stroke({ "cmd" }, "c", KEYSTROKE_NO_DELAY_US, tx)
 	end, COPY_SETTLE_SEC, "selection copy", copy_stage)
+	initial_phase = false
+	return started
 end
 
 
@@ -1175,6 +1150,13 @@ end
 function M.paste_as_plain_text(parent)
 	local scope = text_scope(parent)
 	if scope.paused == true then return false end
+	local destination = TextContinuation.capture_destination()
+	if not destination then
+		Logger.warn(LOG, "Plain-text paste refused: destination is not classified.")
+		return false
+	end
+	local destination_current, destination_cached = TextContinuation.new(destination)
+	if not destination_cached() then return false end
 	if _plain_paste_in_flight then
 		Logger.debug(LOG, "Plain-text paste ignored — a previous action still owns the clipboard.")
 		return false
@@ -1327,13 +1309,18 @@ function M.paste_as_plain_text(parent)
 
 	local paste_armed, paste_timer_error = schedule_plain_timer(
 		PASTE_SETTLE_SEC, "paste", function()
+			if not destination_current() then
+				abort_plain_paste("destination", "focus changed")
+				return
+			end
 			local expected_count = owner.clipboard_count
 			local function cached()
 				return active and generation == _plain_paste_generation
 					and text_owner_authorized(owner) and owner.cleanup_only ~= true
 					and owner.clipboard_owned == true and owner.clipboard_count == expected_count
+					and destination_cached()
 			end
-			local publication = clipboard_publication(owner, nil, cached)
+			local publication = clipboard_publication(owner, destination_current, cached)
 			local started, detail = TextDispatch.start(SyntheticInput, owner, publication, function(tx)
 				SyntheticInput.on_dispatched(tx, function(finished, batch)
 					if owner.synthetic_tx == finished and batch.native_down_attempted == true then
@@ -1366,6 +1353,10 @@ function M.paste_as_plain_text(parent)
 		return false
 	end
 
+	if not destination_cached() then
+		abort_plain_paste("destination", "focus changed")
+		return false
+	end
 	local ok_write, write_result = call_text_boundary(owner, function()
 		-- Snapshot or timer acquisition alone does not own a clipboard mutation.
 		admit_initial_clipboard_mutation(owner, initial_count)
@@ -1376,6 +1367,10 @@ function M.paste_as_plain_text(parent)
 	end)
 	if not ok_write or write_result ~= true then
 		abort_plain_paste("clipboard write", write_result)
+		return false
+	end
+	if not destination_cached() then
+		abort_plain_paste("destination", "focus changed")
 		return false
 	end
 	return true
@@ -1993,6 +1988,13 @@ function M.wrap_selection(sel, left, right, parent)
 		defer_wrap_diagnostic("error", "Wrap declined: invalid selection or delimiter arguments.")
 		return false
 	end
+	local destination = TextContinuation.capture_destination()
+	if not destination then
+		defer_wrap_diagnostic("debug", "Wrap declined: destination is not classified.")
+		return false
+	end
+	local destination_current, destination_cached = TextContinuation.new(destination)
+	if not destination_cached() then return false end
 	local owner = acquire_text_owner("wrap", scope.id)
 	if not owner then return false end
 
@@ -2251,6 +2253,7 @@ function M.wrap_selection(sel, left, right, parent)
 	transaction.prior_empty = prior_or_error == nil or next(prior_or_error) == nil
 	owner.clipboard_prior = prior_or_error or {}
 
+	if not destination_cached() then return rollback("destination", "focus changed") end
 	local write_ok, write_result = call_text_boundary(owner, function()
 		admit_initial_clipboard_mutation(owner, initial_count)
 		-- A throwing native write may already have changed the clipboard.
@@ -2264,6 +2267,7 @@ function M.wrap_selection(sel, left, right, parent)
 	if not write_ok or write_result ~= true then
 		return rollback("clipboard write", write_result)
 	end
+	if not destination_cached() then return rollback("destination", "focus changed") end
 
 	-- Arm restoration before publishing Cmd+V. If allocation fails, rolling the
 	-- clipboard back and passing the user's physical symbol is still possible.
@@ -2272,8 +2276,9 @@ function M.wrap_selection(sel, left, right, parent)
 		return rollback("restore timer", timer_error)
 	end
 
-	local publication = clipboard_publication(owner, nil, function()
-		return transaction.active and transaction.generation == _wrap_generation
+	if not destination_cached() then return rollback("destination", "focus changed") end
+	local publication = clipboard_publication(owner, destination_current, function()
+		return transaction.active and transaction.generation == _wrap_generation and destination_cached()
 	end)
 	local producer_ok, producer_or_error = call_text_boundary(owner,
 		SyntheticInput.begin, "shortcuts.text.wrap", "action", publication)
@@ -2319,6 +2324,7 @@ function M.wrap_selection(sel, left, right, parent)
 		end)
 	if not observe_ok then return rollback("paste completion observer", observe_error) end
 	owner.synthetic_completion_registered = true
+	if not destination_cached() then return rollback("destination", "focus changed") end
 	local emit_ok, emitted_or_error = call_text_boundary(owner,
 		SyntheticInput.emit_guarded_key_stroke, { "cmd" }, "v", owner.synthetic_tx)
 	if not emit_ok or emitted_or_error ~= true then

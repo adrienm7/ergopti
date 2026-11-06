@@ -30,6 +30,7 @@ local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Manifest = require("infra.manifest_reader")
 local ConfigKeys = require("config_keys")
+local ContextBuffer = require("llm.context_buffer")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 
 local LOG = "modules.llm.settings"
@@ -47,7 +48,7 @@ local BOUNDS = {
 	-- from and predicts the language rather than the user. The upper bound is
 	-- where a local model's prompt handling starts to cost more than the
 	-- prediction saves.
-	context_length = { min = 80, max = 4000, integer = true },
+	context_length = { min = 80, max = ContextBuffer.MAX_CONTEXT_LENGTH, integer = true },
 	min_words = { min = 1, max = 20, integer = true },
 	max_words = { min = 0, max = 10000, integer = true },
 }

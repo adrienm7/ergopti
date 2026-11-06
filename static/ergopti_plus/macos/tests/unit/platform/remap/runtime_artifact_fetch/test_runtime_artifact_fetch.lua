@@ -118,6 +118,58 @@ end
 -- ==================================
 
 helpers.describe("owned runtime artifact fetch: the first start", function()
+	helpers.it("does not join a different pin to an in-flight download (owned-artifact-pin-owner)", function()
+		local _, _, Fetch = fake()
+		local pending, commands = nil, 0
+		local fetcher = Fetch.new({
+			exec = function(_, _, _, callback) commands = commands + 1; pending = callback end,
+			exists = function() return false end, read = function() return nil end,
+			write = function() return true end, expand = function(path) return path:gsub("^~", "/Users/test") end,
+		})
+		local first, same, different
+		local initial = pin()
+		fetcher.ensure(initial, function(ok, reason) first = { ok, reason } end)
+		fetcher.ensure(pin(), function(ok, reason) same = { ok, reason } end)
+		local next_pin = pin(); next_pin.version = "16.3.1"
+		fetcher.ensure(next_pin, function(ok, reason) different = { ok, reason } end)
+		helpers.assert_eq(different, { false, "artifact_busy" }, "a different pin cannot share the old result")
+		helpers.assert_eq(commands, 1)
+		pending(1, "", "injected refusal")
+		helpers.assert_eq(first, { false, Fetch.REASON.STORE })
+		helpers.assert_eq(same, first)
+	end)
+
+	helpers.it("keeps the admitted pin when the caller mutates its table (owned-artifact-pin-owner)", function()
+		local _, _, Fetch = fake()
+		local pending, curl_args
+		local fetcher = Fetch.new({
+			exec = function(executable, args, _, callback)
+				if executable == "/bin/rm" then pending = callback
+				elseif executable == "/usr/bin/curl" then curl_args = args; callback(1, "", "offline")
+				else callback(0, "", "") end
+			end,
+			exists = function() return false end, read = function() return nil end,
+			write = function() return true end, expand = function(path) return path:gsub("^~", "/Users/test") end,
+		})
+		local initial = pin()
+		local url = initial.source_url
+		fetcher.ensure(initial, function() end)
+		initial.source_url = "https://example.invalid/substituted"
+		initial.size = 1
+		pending(0, "", "")
+		helpers.assert_eq(curl_args[#curl_args], url)
+		helpers.assert_contains(table.concat(curl_args, " "), "--max-filesize 4096")
+	end)
+	helpers.it("refuses dot path versions before any filesystem command (owned-artifact-version-path)", function()
+		for _, version in ipairs({ ".", "..", "1.2.3..bad" }) do
+			local fetcher, world, Fetch = fake()
+			local candidate = pin(); candidate.version = version
+			local result = ensure(fetcher, candidate)
+			helpers.assert_eq(result.ok, false)
+			helpers.assert_eq(result.value, Fetch.REASON.UNPINNED)
+			helpers.assert_eq(#world.commands, 0, "untrusted version must not reach rm")
+		end
+	end)
 	helpers.it("downloads, verifies, extracts and keeps the pinned artifact in Ergopti's own folder", function()
 		local fetcher, world = fake()
 		local result = ensure(fetcher, pin())

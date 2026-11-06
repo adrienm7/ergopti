@@ -14,7 +14,7 @@ local function with_delivery(cached, callback)
 		"modules.keystats.context_tracker" }, function()
 		package.loaded["adapters.file_system"] = {
 			read_with_status = function(path)
-				if path:find("ergopti_metrics_apps_cache.json", 1, true) then
+				if path:find("ergopti_metrics_apps_cache_v3.json", 1, true) then
 					if cached then return "cache", "ok" end
 					return nil, "absent"
 				end

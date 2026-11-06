@@ -93,6 +93,36 @@ local function effective(path)
 end
 
 helpers.describe("tap-hold writer: a tray change reaches the engine", function()
+	helpers.it("refuses a recommended layer when its source stream fails to close", function()
+		local original_open, closes = io.open, 0
+		io.open = function(path, mode)
+			local file, err = original_open(path, mode)
+			if not file or not path:match("layer_actions%.toml$") then return file, err end
+			return {
+				read = function(_, ...) return file:read(...) end,
+				close = function() closes = closes + 1; file:close(); return nil, "close refused" end,
+			}
+		end
+		local ok = pcall(require("keymap.layer_preset").read, require("infra.paths").shared_root(),
+			require("toml_codec").decode)
+		io.open = original_open
+		helpers.assert_eq(ok, false)
+		helpers.assert_eq(closes, 1)
+	end)
+	helpers.it("refuses an unreadable recommended layer without writing", function()
+		local writes = 0
+		local result, err = require("keymap.layer_preset").import_if_absent({
+			shared_root = require("infra.paths").shared_root(), config_dir = "/unreadable",
+			toml_decode = require("toml_codec").decode,
+			file_adapter = {
+				read_with_status = function() return nil, "error", "permission denied" end,
+				write_if_unchanged = function() writes = writes + 1; return true end,
+			},
+		})
+		helpers.assert_nil(result)
+		helpers.assert_true(type(err) == "string" and err ~= "")
+		helpers.assert_eq(writes, 0)
+	end)
 
 	helpers.it("sets a tap in the shared schema and reloads the engine", function()
 		local writer, path, state = fresh_writer()

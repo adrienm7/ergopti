@@ -326,8 +326,9 @@ function buildAggregatedData() {
 		const byWk =
 			result.rich.by_weekday[dow] || (result.rich.by_weekday[dow] = { time_ms: 0, chars: 0 });
 
-		for (const [appName, appData] of Object.entries(dayData)) {
-			if (appName === '_sys' || appName === '_system') continue;
+		for (const [appKey, appData] of Object.entries(dayData)) {
+			if (appKey === '_sys' || appKey === '_system') continue;
+			const appName = metricsManifestLabel(appKey);
 
 			// #53 category filter — skip apps not in the allowed set
 			if (currentCategoryFilter) {

@@ -1714,29 +1714,38 @@ _Updater_NormalizeTag(Tag) {
 }
 
 ; Semver helpers — canonical algorithm in _shared/modules/updater/version.js.
-; Parses "2.5.0-dev.3" into { Maj, Min, Pat, PreParts } or 0 on failure.
+; Parses "2.5.0-dev.3" into decimal strings { Maj, Min, Pat, PreParts } or 0 on failure.
 _Updater_ParseVersion(Tag) {
 	Norm := _Updater_NormalizeTag(Tag)
 	if !RegExMatch(Norm, "^(?P<maj>\d+)\.(?P<min>\d+)\.(?P<pat>\d+)(?:-(?P<pre>.+))?$", &M)
 		return 0
 	PreParts := 0
+	if M.pre != "" && (SubStr(M.pre, 1, 1) == "." || SubStr(M.pre, StrLen(M.pre), 1) == "." || InStr(M.pre, ".."))
+		return 0
 	if M.pre != "" {
 		PreParts := []
 		for , Part in StrSplit(M.pre, ".")
 			PreParts.Push(Part)
 	}
-	return { Maj: Integer(M.maj), Min: Integer(M.min), Pat: Integer(M.pat), PreParts: PreParts }
+	return { Maj: M.maj, Min: M.min, Pat: M.pat, PreParts: PreParts }
+}
+
+; Compares arbitrary-length decimal strings without numeric conversion.
+_Updater_CompareDecimal(A, B) {
+	ai := RegExReplace(A, "^0+", ""), bi := RegExReplace(B, "^0+", "")
+	if (StrLen(ai) != StrLen(bi))
+		return StrLen(ai) > StrLen(bi) ? 1 : -1
+	Cmp := StrCompare(ai, bi, true)
+	return (Cmp > 0) ? 1 : (Cmp < 0) ? -1 : 0
 }
 
 ; Compares two prerelease identifier segments (numeric when all digits).
 _Updater_ComparePreId(A, B) {
-	if RegExMatch(A, "^\d+$") and RegExMatch(B, "^\d+$") {
-		ai := Integer(A), bi := Integer(B)
-		if (ai > bi)
-			return 1
-		if (ai < bi)
-			return -1
-		return 0
+	aNumeric := RegExMatch(A, "^\d+$"), bNumeric := RegExMatch(B, "^\d+$")
+	if (aNumeric != bNumeric)
+		return aNumeric ? -1 : 1
+	if (aNumeric and bNumeric) {
+		return _Updater_CompareDecimal(A, B)
 	}
 	Cmp := StrCompare(A, B)
 	return (Cmp > 0) ? 1 : (Cmp < 0) ? -1 : 0
@@ -1777,12 +1786,11 @@ _Updater_CompareVersions(A, B) {
 		; lock-step by the version-compare parity gate (D-1)
 		return 0
 	}
-	if (Pa.Maj != Pb.Maj)
-		return (Pa.Maj > Pb.Maj) ? 1 : -1
-	if (Pa.Min != Pb.Min)
-		return (Pa.Min > Pb.Min) ? 1 : -1
-	if (Pa.Pat != Pb.Pat)
-		return (Pa.Pat > Pb.Pat) ? 1 : -1
+	for , Key in ["Maj", "Min", "Pat"] {
+		Cmp := _Updater_CompareDecimal(Pa.%Key%, Pb.%Key%)
+		if (Cmp != 0)
+			return Cmp
+	}
 	return _Updater_ComparePre(Pa.PreParts, Pb.PreParts)
 }
 
@@ -2167,6 +2175,8 @@ _Updater_ParseListCache(Text, Url) {
 	Body := Parts[4]
 	if (SubStr(LTrim(Body, " `t`r`n"), 1, 1) != "[" || SubStr(RTrim(Body, " `t`r`n"), -1) != "]")
 		return 0
+	if !(_Updater_DecodeRelease(Body) is Array)
+		return 0
 	return { Etag: Parts[3], Json: Body }
 }
 
@@ -2476,7 +2486,12 @@ _Updater_IsAllowedManualUrl(Url) {
 	if Suffix == ""
 		return true
 	Boundary := SubStr(Suffix, 1, 1)
-	return Boundary == "/" || Boundary == "?" || Boundary == "#"
+	if !(Boundary == "/" || Boundary == "?" || Boundary == "#")
+		return false
+	try Path := UriDecode(RegExReplace(Suffix, "[?#].*$"))
+	catch
+		return false
+	return !RegExMatch(Path, "(?:^|/)\.\.(?:/|$)|[\\\x00-\x1f\x7f]")
 }
 
 _Updater_OpenManualUrl(ResolveUrlFn, Request := unset, IsSuspended := unset, NotifyFn := 0, RunFn := 0) {
@@ -2605,9 +2620,12 @@ _Updater_RateLimitDetail(Status, Remaining, Reset) {
 	if (Status != 403 && Status != 429) || Remaining != "0"
 		return ""
 	When := ""
-	if RegExMatch(Reset, "^\d+$")
-		When := ", it resets at "
+	if RegExMatch(Reset, "^\d+$") {
+		try When := ", it resets at "
 			. FormatTime(DateAdd("19700101000000", Integer(Reset), "Seconds"), "yyyy-MM-dd HH:mm:ss") . " UTC"
+		catch
+			When := ""
+	}
 	return Format("HTTP {1}: the GitHub API rate limit is exhausted{2}", Status, When)
 }
 

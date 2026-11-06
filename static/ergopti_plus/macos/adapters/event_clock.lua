@@ -51,6 +51,7 @@ M.STALE_PHYSICAL_EVENT_MS = 500
 local _scale = nil
 local _ages = {}
 local _age_head = 0
+local _last_stamp = nil
 
 --- Reads one event's raw stamp without letting a malformed event raise.
 --- @param event userdata|table hs.eventtap event.
@@ -95,8 +96,13 @@ function M.lateness_ms(event)
 	end
 	if best_age == nil then return nil, stamp end
 	_scale = best_scale
-	_age_head = _age_head % M.FLOOR_WINDOW + 1
-	_ages[_age_head] = best_age
+	-- The same Quartz event crosses several taps. It must contribute only one
+	-- sample, or its repeated observations can evict the entire fresh floor.
+	if stamp ~= _last_stamp then
+		_age_head = _age_head % M.FLOOR_WINDOW + 1
+		_ages[_age_head] = best_age
+		_last_stamp = stamp
+	end
 	local floor = best_age
 	for _, age in pairs(_ages) do
 		if age < floor then floor = age end
@@ -134,6 +140,7 @@ function M.reset()
 	_scale = nil
 	_ages = {}
 	_age_head = 0
+	_last_stamp = nil
 end
 
 return M

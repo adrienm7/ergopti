@@ -1098,7 +1098,7 @@ function M.set_override(category, section, field, value)
 	category = ConfigSchema.normalize_category(category)
 	section = ConfigSchema.normalize_section(section)
 	if field == "color" and not ConfigSchema.is_color(value) then
-		Logger.error(LOG, "set_override(): color must contain 3 to 8 hexadecimal digits.")
+		Logger.error(LOG, "set_override(): color must contain 3, 4, 6 or 8 hexadecimal digits.")
 		return false
 	end
 	if field == "delay" and not ConfigSchema.is_delay(value) then

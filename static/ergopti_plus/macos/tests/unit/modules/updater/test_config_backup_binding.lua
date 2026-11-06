@@ -33,6 +33,9 @@ local function with_binding(tree, body)
 			path_status = function(path)
 				local kind = tree[path]
 				if not kind then return "absent" end
+				if kind == "unreadable" then return "error", "permission denied" end
+				if kind == "invalid_attributes" then return "present", nil end
+				if kind == "invalid_mode" then return "present", {} end
 				local mode = kind:find("^link_") and "link" or (kind == "dir" and "directory" or (kind == "fifo" and "named pipe" or "file"))
 				return "present", { mode = mode }
 			end,
@@ -85,6 +88,21 @@ local function with_binding(tree, body)
 end
 
 helpers.describe("config_backup binding (macOS)", function()
+	helpers.it("refuses a listing when an entry cannot be classified", function()
+		for _, kind in ipairs({ "unreadable", "invalid_attributes", "invalid_mode" }) do
+			with_binding({ ["/cfg"] = "dir", ["/cfg/settings.toml"] = kind }, function(Binding)
+				local entries, reason = Binding._list("/cfg")
+				helpers.assert_nil(entries, "unknown entries must not disappear from a backup")
+				helpers.assert_true(type(reason) == "string" and reason ~= "")
+				Binding._overrides = { roots = { { id = "config", dir = "/cfg" } },
+					clock = function() return { stamp = "20261104-120000", iso = "2026-11-04T12:00:00Z" } end }
+				local owner = assert(Binding.owner())
+				local backup, detail = owner.create("pre_install", { tag = "v1.0.0" })
+				helpers.assert_nil(backup, "an incomplete snapshot must not publish a backup")
+				helpers.assert_true(type(detail) == "string" and detail:find("cannot classify", 1, true) ~= nil)
+			end)
+		end
+	end)
 	helpers.it("backs up the configuration folder under the shared rules", function()
 		with_binding({}, function(Binding)
 			local owner = assert(Binding.owner())

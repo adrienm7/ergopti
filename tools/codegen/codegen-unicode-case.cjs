@@ -28,10 +28,32 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const EXPECTED_UNICODE_VERSION = '17.0';
 const ROOT = path.resolve(__dirname, '..', '..');
 const OUT = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'lua', 'unicode_case', 'data.lua');
+const FOLD_SOURCE = path.join(ROOT, 'tools', 'codegen', 'unicode', 'CaseFolding-17.0.0.txt');
+const FOLD_SHA256 = 'ff8d8fefbf123574205085d6714c36149eb946d717a0c585c27f0f4ef58c4183';
+const foldBytes = fs.readFileSync(FOLD_SOURCE);
+if (crypto.createHash('sha256').update(foldBytes).digest('hex') !== FOLD_SHA256) {
+	throw new Error('Unicode 17.0.0 CaseFolding.txt does not match the reviewed official source');
+}
+// Unicode simple case folding uses exactly statuses C and S. F is the distinct
+// full-fold mapping (which may expand), and T is the Turkic-specific mapping.
+const simpleFold = [];
+for (const line of foldBytes.toString('utf8').split(/\r?\n/)) {
+	const record = line.match(/^([0-9A-F]+);\s*([CSFT]);\s*([0-9A-F ]+);/);
+	if (!record || (record[2] !== 'C' && record[2] !== 'S')) continue;
+	const mapped = record[3].trim().split(/\s+/);
+	if (mapped.length !== 1) throw new Error('simple case fold must retain one scalar');
+	simpleFold.push([
+		String.fromCodePoint(parseInt(record[1], 16)),
+		String.fromCodePoint(parseInt(mapped[0], 16))
+	]);
+}
+if (simpleFold.length < 1400)
+	throw new Error('Unicode simple case fold is unexpectedly incomplete');
 
 if (process.versions.unicode !== EXPECTED_UNICODE_VERSION) {
 	throw new Error(
@@ -65,6 +87,7 @@ const title = [];
 const boundary = [];
 const wordSeparator = [];
 const caseIgnorable = [];
+const cased = [];
 for (let codepoint = 0; codepoint <= 0x10ffff; codepoint++) {
 	if (codepoint >= 0xd800 && codepoint <= 0xdfff) continue;
 	const character = String.fromCodePoint(codepoint);
@@ -73,6 +96,7 @@ for (let codepoint = 0; codepoint <= 0x10ffff; codepoint++) {
 	if (/^[\p{White_Space}\p{P}]$/u.test(character)) boundary.push(character);
 	if (/^[\p{White_Space}\p{Pd}]$/u.test(character)) wordSeparator.push(character);
 	if (/^\p{Case_Ignorable}$/u.test(character)) caseIgnorable.push(character);
+	if (/^\p{Cased}$/u.test(character)) cased.push(character);
 	if (uppercase !== character) {
 		upper.push([character, uppercase]);
 		const titlecase = titlecaseCharacter(character);
@@ -87,12 +111,13 @@ if (
 	title.length < 1500 ||
 	boundary.length < 800 ||
 	wordSeparator.length < 45 ||
-	caseIgnorable.length < 2700
+	caseIgnorable.length < 2700 ||
+	cased.length < 4500
 ) {
 	throw new Error(
 		`case data unexpectedly small: upper=${upper.length}, lower=${lower.length}, ` +
 			`title=${title.length}, boundary=${boundary.length}, wordSeparator=${wordSeparator.length}, ` +
-			`caseIgnorable=${caseIgnorable.length}`
+			`caseIgnorable=${caseIgnorable.length}, cased=${cased.length}`
 	);
 }
 if (
@@ -134,7 +159,8 @@ const lines = [
 for (const [name, rows] of [
 	['upper', upper],
 	['lower', lower],
-	['title', title]
+	['title', title],
+	['simple_fold', simpleFold]
 ]) {
 	lines.push(`\t${name} = {`);
 	for (const [from, to] of rows) lines.push(`\t\t[${quote(from)}] = ${quote(to)},`);
@@ -143,7 +169,8 @@ for (const [name, rows] of [
 for (const [name, characters] of [
 	['boundary', boundary],
 	['word_separator', wordSeparator],
-	['case_ignorable', caseIgnorable]
+	['case_ignorable', caseIgnorable],
+	['cased', cased]
 ]) {
 	lines.push(`\t${name} = {`);
 	for (const character of characters) lines.push(`\t\t[${quote(character)}] = true,`);
@@ -158,5 +185,5 @@ console.log(
 	`[OK] Unicode ${EXPECTED_UNICODE_VERSION}: ${upper.length} upper, ${lower.length} lower, ` +
 		`${title.length} title mappings, ${boundary.length} word boundaries, ` +
 		`${wordSeparator.length} title-case word separators, ` +
-		`${caseIgnorable.length} case-ignorable characters.`
+		`${caseIgnorable.length} case-ignorable characters, ${cased.length} cased characters.`
 );

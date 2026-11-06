@@ -32,6 +32,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		local transition_pending = true
 		local registrations = {}
 		local requirement_capabilities = {}
+		local live_url = "https://before.example/"
 		local models_mgr = {
 			create_requirement_owner = function(label)
 				local capability = { label = label }
@@ -49,7 +50,8 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			disable = function() return true end,
 			is_enabled = function() return true end,
 			set_wrap_pairs_getter = function() return true end,
-			set_chatgpt_url = function() return true end,
+			set_chatgpt_url = function(url) live_url = url; return true end,
+			get_chatgpt_url = function() return live_url end,
 			start = function() return true end,
 			stop = function() return true end,
 			is_started = function() return false end,
@@ -88,6 +90,16 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		local shortcuts = helpers.load_with_stubs("modules.shortcuts")
+		local url_state = { chatgpt_url = live_url }
+		local url_owner = require("ui.menu.chatgpt_url_transaction").new({
+			state = url_state, shortcuts = shortcuts, paused = function() return false end,
+			admission = function(_, callback) return callback() end,
+			save_prefs = function() return true end,
+		})
+		helpers.assert_eq(url_owner.set("https://after.example/"), true,
+			"the real facade must expose the URL getter needed by the preference owner")
+		helpers.assert_eq(live_url, "https://after.example/")
+		helpers.assert_eq(url_state.chatgpt_url, "https://after.example/")
 		helpers.assert_true(shortcuts.is_pause_transition_pending(),
 			"the real facade must expose the live ScriptControl transition owner")
 		transition_pending = false

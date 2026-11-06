@@ -9,6 +9,23 @@ local helpers = require("tests.helpers")
 -- The application folder under every XDG base, from the shared registry.
 local FOLDER = require("app_dirs").linux.folder_name
 
+local function memory_storage(stored, refuses)
+	return {
+		get = function(key) return stored[key] end,
+		path = function() return "/virtual/storage.json" end,
+		set = function(key, value) if refuses then return false end; stored[key] = value; return true end,
+		acquire_owned = function() return true end,
+		capture_owned = function() return { before = stored.locale } end,
+		publish_owned = function(_, _, updates)
+			if refuses then return false end
+			stored.locale = updates.locale.value; return true
+		end,
+		restore_owned = function(_, receipt) stored.locale = receipt.before; return true end,
+		release_owned = function() return true end,
+		forget_owned = function() return true end,
+	}
+end
+
 helpers.describe("i18n persistence", function()
 
   -- ==========================================================================
@@ -89,15 +106,142 @@ helpers.describe("i18n persistence", function()
   -- ==========================================================================
 
   helpers.describe("locale persistence", function()
+		helpers.it("linux locale success publishes through the real owned storage receipt", function()
+			local lfs = require("lfs")
+			local root = os.tmpname(); os.remove(root); assert(lfs.mkdir(root))
+			assert(lfs.mkdir(root .. "/ergopti_plus"))
+			local path = root .. "/config.toml"
+			local file = assert(io.open(path, "wb")); file:write('[script]\nlocale = "fr"\n'); file:close()
+			local Paths = require("infra.config_paths")
+			local prior_config, prior_home, prior_storage = Paths.config, Paths.config_home, package.loaded["adapters.storage"]
+			Paths.config = function(name) if name == "config.toml" then return path end return prior_config(name) end
+			Paths.config_home = function() return root end
+			package.loaded["adapters.storage"] = nil
+			local storage = require("adapters.storage")
+			local original_publish, backup, competing, collision, foreign = storage.publish_owned, nil, nil, nil, nil
+			storage.publish_owned = function(owner, receipt, updates, backup_path, files)
+				backup = backup_path
+				competing = storage.set("locale", "ja")
+				foreign = storage.set("unrelated", "preserved")
+				if not collision then
+					collision = backup_path
+					local occupied = assert(io.open(collision, "wb")); occupied:write("foreign backup"); occupied:close()
+				end
+				return original_publish(owner, receipt, updates, backup_path, files)
+			end
+			local ok, err = xpcall(function()
+				local i18n = helpers.load_module("infra.i18n")
+				i18n.init()
+				helpers.assert_eq(i18n.persist_locale("en"), false, "occupied backup is not replaced")
+				local occupied = assert(io.open(collision, "rb")); local contents = occupied:read("*a"); occupied:close()
+				helpers.assert_eq(contents, "foreign backup")
+				helpers.assert_true(i18n.persist_locale("en"), "the next attempt owns a fresh backup name")
+				helpers.assert_true(backup ~= collision)
+				helpers.assert_eq(competing, false)
+				helpers.assert_true(foreign, "a distinct settings alias may still commit")
+				helpers.assert_eq(storage.get("unrelated"), "preserved")
+				helpers.assert_eq(storage.get("locale"), "en")
+				helpers.assert_eq(i18n.get_locale(), "en")
+				local saved = assert(io.open(backup, "rb")); saved:close()
+			end, debug.traceback)
+			storage.publish_owned = original_publish
+			Paths.config, Paths.config_home, package.loaded["adapters.storage"] = prior_config, prior_home, prior_storage
+			package.loaded["infra.i18n"] = nil
+			if backup then os.remove(backup) end
+			if collision then os.remove(collision) end
+			os.remove(root .. "/ergopti_plus/storage.json"); lfs.rmdir(root .. "/ergopti_plus")
+			os.remove(path); lfs.rmdir(root)
+			if not ok then error(err, 0) end
+		end)
+		helpers.it("linux locale rollback uses the real storage cohort", function()
+			local lfs = require("lfs")
+			local root = os.tmpname(); os.remove(root); assert(lfs.mkdir(root))
+			local path = root .. "/config.toml"
+			local original = '[script]\nlocale = "fr" # original\n'
+			local file = assert(io.open(path, "wb")); file:write(original); file:close()
+			local Paths = require("infra.config_paths")
+			local prior_config, prior_home, prior_storage = Paths.config, Paths.config_home, package.loaded["adapters.storage"]
+			Paths.config = function(name) if name == "config.toml" then return path end return prior_config(name) end
+			Paths.config_home = function() return root end
+			package.loaded["adapters.storage"] = nil
+			local storage = require("adapters.storage")
+			local original_publish, competing, after_commit, backup = storage.publish_owned, nil, false, nil
+			local external_edit, candidate = false, nil
+			storage.publish_owned = function(owner, receipt, updates, backup_path, files)
+				competing = storage.set("locale", "ja")
+				if after_commit then
+					backup = backup_path
+					helpers.assert_true(original_publish(owner, receipt, updates, backup_path, files))
+					if external_edit then
+						local source = assert(io.open(path, "rb")); candidate = source:read("*a"); source:close()
+						local foreign = assert(io.open(path, "wb")); foreign:write('[script]\nlocale = "ja"\n'); foreign:close()
+					end
+				end
+				return false
+			end
+			local ok, err = xpcall(function()
+				local i18n = helpers.load_module("infra.i18n")
+				i18n.init()
+				helpers.assert_eq(i18n.persist_locale("en"), false)
+				helpers.assert_eq(competing, false, "cooperating writes must be fenced")
+				local read = assert(io.open(path, "rb")); local actual = read:read("*a"); read:close()
+				helpers.assert_eq(actual, original)
+				after_commit = true
+				helpers.assert_eq(i18n.persist_locale("en"), false)
+				helpers.assert_nil(storage.get("locale"), "a mutated-then-refused native receipt is restored")
+				helpers.assert_nil(io.open(storage.path(), "rb"), "the prior absence must be restored on disk")
+				read = assert(io.open(path, "rb")); actual = read:read("*a"); read:close()
+				helpers.assert_eq(actual, original)
+				external_edit = true
+				helpers.assert_eq(i18n.persist_locale("en"), false)
+				read = assert(io.open(path, "rb")); actual = read:read("*a"); read:close()
+				helpers.assert_eq(actual, '[script]\nlocale = "ja"\n', "rollback preserves another writer")
+				helpers.assert_eq(i18n.persist_locale("en"), false, "unsettled exact inverse blocks new changes")
+				local replace = assert(io.open(path, "wb")); replace:write(candidate); replace:close()
+				external_edit, after_commit = false, false
+				helpers.assert_eq(i18n.persist_locale("en"), false)
+				read = assert(io.open(path, "rb")); actual = read:read("*a"); read:close()
+				helpers.assert_eq(actual, original, "retry restores the retained exact predecessor")
+			end, debug.traceback)
+			storage.publish_owned = original_publish
+			Paths.config, Paths.config_home, package.loaded["adapters.storage"] = prior_config, prior_home, prior_storage
+			package.loaded["infra.i18n"] = nil
+			if lfs.attributes(root .. "/ergopti_plus", "mode") == "directory" then
+				for name in lfs.dir(root .. "/ergopti_plus") do
+					if name:sub(1, #"storage.json.locale-") == "storage.json.locale-" then
+						os.remove(root .. "/ergopti_plus/" .. name)
+					end
+				end
+			end
+			os.remove(root .. "/ergopti_plus/storage.json"); lfs.rmdir(root .. "/ergopti_plus")
+			os.remove(path); lfs.rmdir(root)
+			if not ok then error(err, 0) end
+		end)
+		helpers.it("linux locale refusal preserves configured source bytes", function()
+			local path = os.tmpname()
+			local original = '[script]\nlocale = "fr" # original\n'
+			local file = assert(io.open(path, "wb")); file:write(original); file:close()
+			local Paths = require("infra.config_paths")
+			local prior_config, prior_storage = Paths.config, package.loaded["adapters.storage"]
+			Paths.config = function(name) if name == "config.toml" then return path end return prior_config(name) end
+			package.loaded["adapters.storage"] = memory_storage({ locale = "fr" }, true)
+			local ok, err = xpcall(function()
+				local i18n = helpers.load_module("infra.i18n")
+				i18n.init()
+				helpers.assert_eq(i18n.persist_locale("en"), false)
+				local read = assert(io.open(path, "rb")); local actual = read:read("*a"); read:close()
+				helpers.assert_eq(actual, original, "a refused storage write must not persist the requested locale in config")
+			end, debug.traceback)
+			Paths.config, package.loaded["adapters.storage"] = prior_config, prior_storage
+			package.loaded["infra.i18n"] = nil; os.remove(path)
+			if not ok then error(err, 0) end
+		end)
     helpers.it("set_locale + get_locale round-trips", function()
       -- An in-memory store that acknowledges every write: the round trip must
       -- not depend on whichever storage adapter an earlier test file left loaded.
       local saved_storage = package.loaded["adapters.storage"]
       local stored = {}
-      package.loaded["adapters.storage"] = {
-        get = function(key) return stored[key] end,
-        set = function(key, value) stored[key] = value; return true end,
-      }
+      package.loaded["adapters.storage"] = memory_storage(stored, false)
       local ok, err = pcall(function()
         local i18n = helpers.load_module("infra.i18n")
         i18n.init()
@@ -120,10 +264,7 @@ helpers.describe("i18n persistence", function()
 
 		helpers.it("does not publish a locale whose durable write failed", function()
 			local saved_storage = package.loaded["adapters.storage"]
-			package.loaded["adapters.storage"] = {
-				get = function() return "fr" end,
-				set = function() return false end,
-			}
+			package.loaded["adapters.storage"] = memory_storage({ locale = "fr" }, true)
 			local ok, err = pcall(function()
 				local i18n = helpers.load_module("infra.i18n")
 				i18n.init()
@@ -262,6 +403,11 @@ helpers.describe("i18n explicit wizard persistence", function()
 		end, debug.traceback)
 		os.rename = original_rename
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		for name in require("lfs").dir(root .. "/ergopti_plus") do
+			if name:sub(1, #"storage.json.locale-") == "storage.json.locale-" then
+				os.remove(root .. "/ergopti_plus/" .. name)
+			end
+		end
 		os.remove(path .. ".tmp"); os.remove(path)
 		os.execute("rmdir " .. string.format("%q", root .. "/" .. FOLDER))
 		os.execute("rmdir " .. string.format("%q", root))

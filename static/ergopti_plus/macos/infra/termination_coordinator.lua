@@ -49,6 +49,8 @@ local M = {}
 
 local Logger = require("infra.logger")
 local EmergencyExit = require("infra.emergency_exit")
+local ErrorDescription = require("error_description")
+local NumberPolicy = require("number_policy")
 
 local LOG = "infra.termination_coordinator"
 
@@ -60,6 +62,13 @@ local _deps = nil
 local _transaction = nil
 local _admission_abort = nil
 local _admission_abort_active = false
+local _deadline_cleanup = {}
+local _deadline_cleanup_active = false
+
+--- Confirms the documented native timer receipt; table doubles may return true.
+local function stopped_deadline(timer, ok, result)
+	return ok and (result == timer or (type(timer) == "table" and result == true))
+end
 
 --- Hands one stage of a transition to the reload breadcrumb. A diagnostic only:
 --- neither its absence nor its failure changes the transition.
@@ -70,14 +79,36 @@ local function breadcrumb(transaction, stage)
 	pcall(_deps.record_stage, transaction.kind, stage)
 end
 
+--- Retries exact deadline timers whose native stop did not settle. Their
+--- callbacks remain inert because the owning transaction was already fenced.
+--- @return boolean settled Whether every retained timer stopped.
+local function retry_deadline_cleanup()
+	if _deadline_cleanup_active then return false end
+	_deadline_cleanup_active = true
+	local settled = true
+	for index = #_deadline_cleanup, 1, -1 do
+		local timer = _deadline_cleanup[index]
+		local ok, result = pcall(function() return timer:stop() end)
+		if stopped_deadline(timer, ok, result) then
+			table.remove(_deadline_cleanup, index)
+		else
+			settled = false
+		end
+	end
+	_deadline_cleanup_active = false
+	return settled
+end
+
 --- Stops a reload's deadline timer once its transaction has settled or become
---- an exit. A refused stop is retained: the callback checks its transaction.
+--- an exit. A refused stop is retained for exact retry.
 --- @param transaction table The transition.
 local function disarm_reload_deadline(transaction)
 	local timer = transaction.reload_deadline
 	if timer == nil then return end
 	transaction.reload_deadline = nil
-	if type(timer) == "table" and type(timer.stop) == "function" then pcall(timer.stop, timer) end
+	-- Hammerspoon timers are userdata, while test doubles may be tables.
+	local ok, result = pcall(function() return timer:stop() end)
+	if not stopped_deadline(timer, ok, result) then _deadline_cleanup[#_deadline_cleanup + 1] = timer end
 end
 
 local function require_state(func_name)
@@ -95,7 +126,7 @@ local function notify_aborted(transaction, detail)
 	end, debug.traceback)
 	if not callback_ok then
 		Logger.error(LOG, "Controlled %s abort callback failed: %s.",
-			transaction.kind, tostring(callback_err))
+			transaction.kind, ErrorDescription.describe(callback_err))
 	end
 end
 
@@ -150,7 +181,7 @@ local function abort_transaction(transaction, detail, legacy_notify)
 		pcall(_deps.clear_reload)
 		transaction.reload_marked = false
 	end
-	pcall(Logger.error, LOG, "Controlled %s aborted: %s.", transaction.kind, tostring(detail))
+	pcall(Logger.error, LOG, "Controlled %s aborted: %s.", transaction.kind, ErrorDescription.describe(detail))
 	if transaction.admission ~= nil then
 		transaction.abort_detail = detail
 		_admission_abort = transaction
@@ -197,7 +228,7 @@ end
 local reload_natively
 
 local function fail_after_teardown(transaction, detail)
-	transaction.terminal_failure = tostring(detail or "post-teardown failure")
+	transaction.terminal_failure = ErrorDescription.describe(detail or "post-teardown failure")
 	-- A reload whose local teardown failed before the log drain replaces the
 	-- whole Lua state anyway: the native reload discards what the partial
 	-- teardown left, exactly as the reload deadline does without any teardown.
@@ -224,7 +255,7 @@ local function invoke_terminal(transaction)
 	local finalizer_ok, finalizer_result = xpcall(_deps.finalize_teardown, debug.traceback)
 	if not finalizer_ok or finalizer_result ~= true then
 		return fail_after_teardown(transaction,
-			"post-drain finalizer failed: " .. tostring(finalizer_result))
+			"post-drain finalizer failed: " .. ErrorDescription.describe(finalizer_result))
 	end
 	breadcrumb(transaction, "finalized")
 	if transaction.kind == "reload" then
@@ -234,7 +265,7 @@ local function invoke_terminal(transaction)
 		end, debug.traceback)
 		if not reload_ok then
 			breadcrumb(transaction, "hs_reload_raised")
-			transaction.terminal_failure = tostring(reload_result)
+			transaction.terminal_failure = ErrorDescription.describe(reload_result)
 			return force_post_teardown_exit(transaction)
 		end
 		breadcrumb(transaction, "hs_reload_returned")
@@ -257,7 +288,7 @@ local function invoke_terminal(transaction)
 	-- terminal ownership contract and requires the non-zero native backstop.
 	transaction.terminal_failure = exit_ok
 		and "native exit returned unexpectedly"
-		or tostring(exit_result)
+		or ErrorDescription.describe(exit_result)
 	return force_post_teardown_exit(transaction)
 end
 
@@ -274,14 +305,14 @@ local function begin_drain(transaction)
 		local callback_ok, callback_err = xpcall(function()
 			if drained ~= true then
 				fail_after_teardown(transaction,
-					"native logger ACK drain failed: " .. tostring(detail))
+					"native logger ACK drain failed: " .. ErrorDescription.describe(detail))
 				return
 			end
 			invoke_terminal(transaction)
 		end, debug.traceback)
 		if not callback_ok then
 			fail_after_teardown(transaction,
-				"native logger drain callback raised: " .. tostring(callback_err))
+				"native logger drain callback raised: " .. ErrorDescription.describe(callback_err))
 		end
 	end
 
@@ -292,7 +323,7 @@ local function begin_drain(transaction)
 		if not callback_fired then
 			return fail_after_teardown(transaction,
 				"native logger drain was not committed: "
-					.. tostring(begin_ok and begin_err or accepted_or_err))
+					.. ErrorDescription.describe(begin_ok and begin_err or accepted_or_err))
 		end
 		return transaction.completion_ok == true
 	end
@@ -322,16 +353,16 @@ end
 --- @return boolean continued
 local function continue_after_teardown(transaction)
 	if transaction.teardown_failure_detail ~= nil then
-		local failure = tostring(transaction.teardown_failure_detail)
+		local failure = ErrorDescription.describe(transaction.teardown_failure_detail)
 		if transaction.teardown_completed ~= true then
 			failure = failure .. "; local teardown also failed: "
-				.. tostring(transaction.teardown_result)
+				.. ErrorDescription.describe(transaction.teardown_result)
 		end
 		return fail_after_teardown(transaction, failure)
 	end
 	if transaction.teardown_completed ~= true then
 		return fail_after_teardown(transaction,
-			"local teardown failed: " .. tostring(transaction.teardown_result))
+			"local teardown failed: " .. ErrorDescription.describe(transaction.teardown_result))
 	end
 	return begin_drain(transaction)
 end
@@ -370,9 +401,9 @@ local function run_teardown_attempt(transaction)
 			if _transaction == transaction and not transaction.settled then
 				settle_teardown(transaction, false, resume_result)
 				Logger.error(LOG, "Local teardown readiness callback raised: %s.",
-					tostring(resume_result))
+					ErrorDescription.describe(resume_result))
 				return fail_after_teardown(transaction,
-					"local teardown readiness callback raised: " .. tostring(resume_result))
+					"local teardown readiness callback raised: " .. ErrorDescription.describe(resume_result))
 			end
 			return false
 		end
@@ -461,7 +492,7 @@ end
 --- @param detail any Causal failure detail.
 --- @return boolean Always false if fatal_exit unexpectedly returns.
 local function teardown_then_fail_after_fence(transaction, detail)
-	transaction.teardown_failure_detail = tostring(detail)
+	transaction.teardown_failure_detail = ErrorDescription.describe(detail)
 	local _teardown_completed, _teardown_detail, pending = teardown_once(transaction)
 	if pending then return true end
 	return continue_after_teardown(transaction)
@@ -474,7 +505,7 @@ local function begin_terminal_sequence(transaction)
 		local marked_ok, marked_or_err = xpcall(_deps.mark_reload, debug.traceback)
 		if not marked_ok or marked_or_err ~= true then
 			return teardown_then_fail_after_fence(transaction,
-				"reload sentinel could not be committed: " .. tostring(marked_or_err))
+				"reload sentinel could not be committed: " .. ErrorDescription.describe(marked_or_err))
 		end
 		transaction.reload_marked = true
 		breadcrumb(transaction, "reload_marked")
@@ -484,7 +515,7 @@ local function begin_terminal_sequence(transaction)
 	if pending then return true end
 	if not teardown_completed then
 		return fail_after_teardown(transaction,
-			"local teardown failed: " .. tostring(teardown_result))
+			"local teardown failed: " .. ErrorDescription.describe(teardown_result))
 	end
 	return begin_drain(transaction)
 end
@@ -510,7 +541,7 @@ local function begin_input_drain(transaction)
 		end, debug.traceback)
 		if not ok or result ~= true then
 			fail_after_teardown(transaction,
-				"synthetic input drain callback failed: " .. tostring(result))
+				"synthetic input drain callback failed: " .. ErrorDescription.describe(result))
 		end
 	end
 	local begin_ok, accepted_or_err = xpcall(function()
@@ -519,7 +550,7 @@ local function begin_input_drain(transaction)
 	if not begin_ok or accepted_or_err ~= true then
 		if not callback_fired then
 			return teardown_then_fail_after_fence(transaction,
-				"synthetic input drain was not committed: " .. tostring(accepted_or_err))
+				"synthetic input drain was not committed: " .. ErrorDescription.describe(accepted_or_err))
 		end
 		return transaction.completion_ok == true
 	end
@@ -542,10 +573,10 @@ local function finish_transaction(transaction, fenced, detail)
 			-- An owned reload keeps its exact abort: its caller compensates.
 			return reload_natively(transaction, "reload_fence_refused", string.format(
 				"Controlled reload: the exact Karabiner revocation was not proven (%s); reloading natively, the guardian fences the lease on the worker's EOF.",
-				tostring(detail)))
+				ErrorDescription.describe(detail)))
 		end
 		abort_transaction(transaction,
-			"exact Karabiner revocation was not proven: " .. tostring(detail))
+			"exact Karabiner revocation was not proven: " .. ErrorDescription.describe(detail))
 		return
 	end
 	transaction.fenced = true
@@ -559,7 +590,7 @@ local function finish_transaction(transaction, fenced, detail)
 	end, debug.traceback)
 	if not logged_ok then
 		return teardown_then_fail_after_fence(transaction,
-			"post-fence logger failed: " .. tostring(logged_or_error))
+			"post-fence logger failed: " .. ErrorDescription.describe(logged_or_error))
 	end
 	transaction.completion_ok = begin_input_drain(transaction)
 end
@@ -586,9 +617,10 @@ reload_natively = function(transaction, stage, message)
 	local reload_ok, reload_result = xpcall(function()
 		return _deps.reload(table.unpack(transaction.arguments, 1, transaction.arguments.n))
 	end, debug.traceback)
+	transaction.native_reload_scheduled = reload_ok
 	if reload_ok then return end
 	breadcrumb(transaction, "hs_reload_raised")
-	transaction.terminal_failure = tostring(reload_result)
+	transaction.terminal_failure = ErrorDescription.describe(reload_result)
 	xpcall(function() return _deps.fatal_exit(_deps.fatal_exit_code) end, debug.traceback)
 end
 
@@ -608,17 +640,31 @@ end
 local function arm_reload_deadline(transaction)
 	local armed, timer = pcall(_deps.schedule, _deps.reload_deadline_seconds, function()
 		local ok, err = xpcall(expire_reload, debug.traceback, transaction)
-		if not ok then pcall(Logger.error, LOG, "Controlled reload deadline raised: %s.", tostring(err)) end
+		if not ok then pcall(Logger.error, LOG, "Controlled reload deadline raised: %s.", ErrorDescription.describe(err)) end
 	end)
-	if armed and timer ~= nil then
+	local handle_ok, stop = pcall(function() return timer and timer.stop end)
+	-- A scheduler can deliver the deadline before returning its handle. The
+	-- callback already replaced this transaction; retire the returned timer and
+	-- never proceed to request a lease on behalf of the retired transaction.
+	if transaction.settled then
+		if armed and handle_ok and type(stop) == "function" then
+			transaction.reload_deadline = timer
+			disarm_reload_deadline(transaction)
+		end
+		return true
+	end
+	if armed and handle_ok and type(stop) == "function" then
 		transaction.reload_deadline = timer
+		return true
 	else
-		pcall(Logger.error, LOG, "Controlled reload deadline could not be armed: %s.", tostring(timer))
+		pcall(Logger.error, LOG, "Controlled reload deadline could not be armed: %s.", ErrorDescription.describe(timer))
+		return false
 	end
 end
 
 local function request(kind, reason, arguments, exit_code, on_aborted, require_fresh, prepared_admission)
 	if not require_state("request_" .. kind) then return false end
+	retry_deadline_cleanup()
 	if type(reason) ~= "string" or reason == "" then
 		Logger.error(LOG, "Controlled %s requires a non-empty reason.", kind)
 		return false
@@ -660,7 +706,7 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 				end, debug.traceback)
 				if not teardown_ok or teardown_result ~= true then
 					return fail_after_teardown(_transaction,
-						"reload-to-exit quit-only teardown failed: " .. tostring(teardown_result))
+						"reload-to-exit quit-only teardown failed: " .. ErrorDescription.describe(teardown_result))
 				end
 			end
 		end
@@ -686,7 +732,15 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 	}
 	_transaction = transaction
 	breadcrumb(transaction, "accepted")
-	if kind == "reload" then arm_reload_deadline(transaction) end
+	if kind == "reload" then
+		local armed = arm_reload_deadline(transaction)
+		if transaction.settled then return transaction.native_reload_scheduled == true end
+		if not armed then
+			-- Without the deadline, a lost fence or drain can strand the driver with
+			-- remaps revoked indefinitely. Refuse while rollback is still safe.
+			return abort_transaction(transaction, "reload deadline unavailable", false)
+		end
+	end
 	-- Who asked is the first question about any reload or quit in a user log, and
 	-- the reason was stored on the transaction without ever being written out.
 	-- Protected: a failing logger has no other sink to report to, and must never
@@ -719,7 +773,7 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 				-- post-fence rule as a partially completed teardown. Do not depend on
 				-- the logger here: it may be the callback component that raised.
 				teardown_then_fail_after_fence(transaction,
-					"post-fence lease callback raised: " .. tostring(callback_err))
+					"post-fence lease callback raised: " .. ErrorDescription.describe(callback_err))
 				return
 			end
 			if not transaction.settled then
@@ -736,14 +790,14 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 		if callback_fired then
 			if transaction.fenced == true and not transaction.settled then
 				return teardown_then_fail_after_fence(transaction,
-					"lease request raised after exact fence: " .. tostring(accepted_or_err))
+					"lease request raised after exact fence: " .. ErrorDescription.describe(accepted_or_err))
 			end
 			-- A synchronous callback may already have completed a reload, invoked the
 			-- fatal backstop, or rejected the fence. Never log through a possibly
 			-- finalized sink nor orphan an already-owned transition afterwards.
 			if transaction.settled then return transaction.completion_ok == true end
 		end
-		return abort_transaction(transaction, "lease request raised: " .. tostring(accepted_or_err), false)
+		return abort_transaction(transaction, "lease request raised: " .. ErrorDescription.describe(accepted_or_err), false)
 	end
 	if accepted_or_err ~= true and not callback_fired then
 		return abort_transaction(transaction, "lease request was rejected", false)
@@ -786,11 +840,11 @@ function M.init(deps)
 		Logger.error(LOG, "M.init(): optional record_stage must be a function.")
 		return false
 	end
-	if type(deps.user_exit_deadline_seconds) ~= "number" or deps.user_exit_deadline_seconds <= 0 then
+	if NumberPolicy.timer_delay_ms(deps.user_exit_deadline_seconds) == nil or deps.user_exit_deadline_seconds <= 0 then
 		Logger.error(LOG, "M.init(): user_exit_deadline_seconds must be a positive number.")
 		return false
 	end
-	if type(deps.reload_deadline_seconds) ~= "number" or deps.reload_deadline_seconds <= 0 then
+	if NumberPolicy.timer_delay_ms(deps.reload_deadline_seconds) == nil or deps.reload_deadline_seconds <= 0 then
 		Logger.error(LOG, "M.init(): reload_deadline_seconds must be a positive number.")
 		return false
 	end
@@ -804,6 +858,12 @@ end
 --- @return boolean initialized
 function M.is_initialized()
 	return _deps ~= nil
+end
+
+--- Retries retained native reload-deadline cleanup without logging.
+--- @return boolean settled Whether every retained timer stopped.
+function M.retry_deadline_cleanup()
+	return retry_deadline_cleanup()
 end
 
 --- Requests a reload only after the exact lease fence settles.

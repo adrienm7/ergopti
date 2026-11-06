@@ -161,7 +161,8 @@ class NativeGoEvidenceTests(unittest.TestCase):
         added = identities["required_failure_stage_subtests"]
         self.assertEqual(len(original), 74)
         self.assertEqual(len(set(original)), 74)
-        subjects = original + ADDED_IDENTITIES
+        added_304 = ["TestNotModifiedRepresentationLengthDoesNotRequireBody"]
+        subjects = original + ADDED_IDENTITIES + added_304
         self.assertEqual(len(added), 17)
         self.assertEqual(len(set(added)), 17)
         events = [{"Action": "start", "Package": PACKAGE}]
@@ -176,10 +177,10 @@ class NativeGoEvidenceTests(unittest.TestCase):
             self.fail("The frozen original failure-stage subtests must be explicitly enrolled")
         self.assertEqual(POLICY["required_passes"], subjects)
         self.assertEqual(
-            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (91, 50, 41)
+            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (92, 51, 41)
         )
         self.assertEqual((fact["failed"], fact["skipped"], fact["package_completed"]), (0, 0, True))
-        for name in added + ADDED_IDENTITIES:
+        for name in added + ADDED_IDENTITIES + added_304:
             for mutation in (
                 "missing",
                 "fail",

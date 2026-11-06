@@ -31,6 +31,7 @@ local hs          = hs
 local Logger      = require("infra.logger")
 local ShellRunner = require("adapters.shell_runner")
 local Crypto      = require("adapters.crypto")
+local NumberPolicy = require("number_policy")
 
 local LOG = "adapters.network_info"
 
@@ -52,12 +53,14 @@ local PING_TIMEOUT_SEC = 1
 -- =========================================
 -- =========================================
 
---- Computes the SHA-256 hex digest of a string via macOS openssl.
---- Returns "" on any failure.
+--- Computes the SHA-256 hex digest of a string via the native hash adapter.
+--- Returns nil on failure, as required by the network information contract.
 --- @param s string Input string.
---- @return string
+--- @return string|nil
 local function sha256_hex(s)
-	return Crypto.sha256(s)
+	local digest = Crypto.sha256(s)
+	if digest == "" then return nil end
+	return digest
 end
 
 --- Returns whether an ifconfig snapshot contains an up utun interface carrying
@@ -124,11 +127,14 @@ end
 --- @return number|nil
 function M.getSignalStrength()
 	local ok, result = pcall(function()
+		local ssid = hs.wifi and hs.wifi.currentNetwork and hs.wifi.currentNetwork()
+		-- CoreWLAN can retain interface details after the connection disappears.
+		if type(ssid) ~= "string" or ssid == "" then return nil end
 		local rssi = hs.wifi and hs.wifi.interfaceDetails and (function()
 			local details = hs.wifi.interfaceDetails()
 			return details and details.rssi
 		end)()
-		if type(rssi) ~= "number" then return nil end
+		if not NumberPolicy.is_finite(rssi) then return nil end
 		-- Convert dBm (-100 to 0) to 0-100 percentage
 		local clamped = math.max(-100, math.min(0, rssi))
 		return math.floor((clamped + 100))

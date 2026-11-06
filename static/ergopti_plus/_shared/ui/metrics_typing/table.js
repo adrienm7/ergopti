@@ -2067,7 +2067,9 @@ function render_media_keys() {
 			!object(apps)
 		)
 			return;
-		Object.entries(apps).forEach(([app_name, app]) => {
+		Object.entries(apps).forEach(([app_key, app]) => {
+			if (app_key === '_sys' || app_key === '_system') return;
+			const app_name = metricsManifestLabel(app_key);
 			if (!matches_typing_app_selection(app_name) || !object(app)) return;
 			rows.forEach((row, id) => {
 				if (object(app.media_keys) && Object.hasOwn(app.media_keys, id)) {

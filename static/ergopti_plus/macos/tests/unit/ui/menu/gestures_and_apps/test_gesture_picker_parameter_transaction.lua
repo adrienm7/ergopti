@@ -63,7 +63,10 @@ local function with_picker(options, callback)
 				return confirm, scalar
 			end,
 		}
-		package.loaded["infra.deferred_work"] = { after = function(_, work) work(); return true end }
+		package.loaded["infra.deferred_work"] = { after = function(_, work)
+			if options.reject_chooser then return false end
+			work(); return true
+		end }
 		-- The provider's declared child must use a fresh real renderer. Keep
 		-- only the original fixture's parent-provider capture controlled.
 		local renderer = assert(require("menu.renderer").new({
@@ -93,7 +96,11 @@ local function with_picker(options, callback)
 		})
 		local rows = provider()
 		helpers.assert_eq(#rows, 1)
-		rows[1].items[1].action()
+		local chooser_receipt = rows[1].items[1].action()
+		if options.reject_chooser then
+			callback(fixture, chooser_receipt)
+			return
+		end
 		helpers.assert_type(picker_callback, "function")
 		callback(fixture, function()
 			if options.cancel then return picker_callback(selected) end
@@ -106,6 +113,24 @@ local function with_picker(options, callback)
 end
 
 helpers.describe("gesture picker acknowledged parameter transaction", function()
+	helpers.it("reports refusal to schedule the gesture action chooser", function()
+		with_picker({ reject_chooser = true }, function(fixture, receipt)
+			helpers.assert_eq(receipt, false)
+			helpers.assert_eq(fixture.assigned, "none")
+		end)
+	end)
+	helpers.it("keeps the picker open when its parameter handoff is refused", function()
+		with_picker({}, function(fixture, pick)
+			local deferred = require("infra.deferred_work")
+			local previous = deferred.after
+			deferred.after = function() return false end
+			local ok, result = pcall(pick)
+			deferred.after = previous
+			helpers.assert_true(ok)
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(fixture.assigned, "none")
+		end)
+	end)
 	for _, mode in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("does not assign after " .. mode .. " parameter refusal", function()
 			with_picker({ parameter = mode }, function(fixture, pick)

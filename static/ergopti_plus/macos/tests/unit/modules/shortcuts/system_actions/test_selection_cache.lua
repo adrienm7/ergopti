@@ -22,7 +22,7 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 	-- @param selection string|nil What read_ax_selection returns. nil is the COMMON
 	--   real-world result (nothing selected, or an app hiding AXSelectedText such as
 	--   VS Code/Electron) and was the case the original spy could not express.
-	local function make_sys_with_ax_spy(selection)
+	local function make_sys_with_ax_spy(selection, wrap_action)
 		if selection == nil then selection = "selected text" end
 		if selection == "" then selection = nil end
 		package.loaded["infra.keycodes"] = nil
@@ -44,7 +44,7 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 				ax_call_count = ax_call_count + 1
 				return selection
 			end,
-			wrap_selection = function() return true end,
+			wrap_selection = wrap_action or function() return true end,
 		}
 
 		local captured = { cb = nil }
@@ -71,7 +71,8 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 		local function invoke(event)
 			return captured.cb(event)
 		end
-		return sys, captured, clock, function() return ax_call_count end, invoke, _G.hs
+		return sys, captured, clock, function() return ax_call_count end, invoke, _G.hs,
+			function(value) selection = value end
 	end
 
 	-- A fake keyDown event typing the wrap symbol "(" with no modifiers.
@@ -113,6 +114,25 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 			helpers.assert_eq(get_count(), 2, "a press after the TTL window must trigger a fresh AX call")
 		end)
 	end)
+
+	for _, mode in ipairs({ "refusal", "exception" }) do
+		helpers.it("a " .. mode .. " wrap never reuses a selection changed by its passed-through key", function()
+		with_fixture(function()
+			local attempts = {}
+			local _, _, clock, reads, invoke, _, set_selection = make_sys_with_ax_spy("original", function(text)
+				attempts[#attempts + 1] = text
+				if mode == "exception" then error("clipboard unavailable") end
+				return #attempts > 1
+			end)
+			helpers.assert_eq(invoke(fake_wrap_key_event()), false, "refusal passes the physical key through")
+			set_selection(nil) -- the target replaced its selection with the passed-through symbol
+			clock.now = clock.now + 0.05
+			helpers.assert_eq(invoke(fake_wrap_key_event()), false, "no stale text may be injected")
+			helpers.assert_eq(#attempts, 1, "the old selection must never reach a second wrap")
+			helpers.assert_eq(reads(), 1, "a negative cache still avoids another AX read")
+		end)
+		end)
+	end
 
 	-- Regression: freshness was keyed on the cached VALUE
 	-- (`_wrap_ax_selection_cache ~= nil`), so a nil selection was never cached and
@@ -274,7 +294,7 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 
 	for _, mode in ipairs({ "refused queue", "modified", "unassigned", "closed admission",
 		"owned", "unreadable provenance", "autorepeat" }) do
-		helpers.it(mode .. " tap preserves the existing AX selection cache", function()
+		helpers.it(mode .. " tap preserves the negative AX selection cache", function()
 			local state = observe_tap(mode)
 			helpers.assert_eq(state.accepted, mode == "autorepeat")
 			helpers.assert_eq(state.first_wrap, false)
@@ -284,9 +304,9 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 			helpers.assert_eq(state.runs, 0)
 			helpers.assert_eq(state.pending_before_dispatch, 0)
 			helpers.assert_eq(state.pending_after_dispatch, 0)
-			helpers.assert_eq(state.reads, 1, "unaccepted tap must not retire eligible selection")
+			helpers.assert_eq(state.reads, 1, "unaccepted tap must preserve the negative cache")
 			helpers.assert_eq(table.concat(state.attributes, ","), "AXFocusedUIElement,AXSelectedText")
-			helpers.assert_eq(table.concat(state.attempts, ","), "selected,selected,selected")
+			helpers.assert_eq(table.concat(state.attempts, ","), "selected", "passed-through symbols must not reuse stale selected text")
 			helpers.assert_eq(state.failed_starts, mode == "refused queue" and 2 or 0)
 			helpers.assert_eq(state.failed_zero_delays, mode == "refused queue" and 2 or 0,
 				"native fallback and its deferred refusal diagnostic each attempt one timer")

@@ -213,6 +213,16 @@ helpers.describe("prompt prediction end to end (llm-prompt-prediction)", functio
 	local BUFFER = "Bonjour Marc. ok pr jd 14h"
 	local SPAN = "ok pr jd 14h"
 
+	helpers.it("sends only the typed context for the raw prediction preset", function()
+		local world = build_world(BUFFER)
+		helpers.assert_true(world.actions.execute_single("llm_predict_raw", "tap_3"))
+		helpers.assert_eq(#world.posts, 1)
+		local messages = world.posts[1].body.messages
+		helpers.assert_eq(#messages, 1, "raw must not send a system prompt")
+		helpers.assert_eq(messages[1].role, "user")
+		helpers.assert_eq(messages[1].content, BUFFER)
+	end)
+
 	helpers.it("rewrites the current sentence from llm_prompt_prediction 'rewrite|2' and accepts it", function()
 		local world = build_world(BUFFER)
 		helpers.assert_eq(world.actions.set_action_parameter("tap_3", "llm_prompt_prediction", "rewrite|2"), true)

@@ -63,6 +63,8 @@ local _device_id = nil
 
 --- Open SQLite handle. nil until M.open_db() succeeds.
 local _db = nil
+-- A native backup keeps this exact source handle live across paced steps.
+local _backup_source_lease = nil
 
 --- Unadmitted startup handle whose native SQLite close refused cleanup.
 local _startup_db_debt = nil
@@ -414,7 +416,7 @@ end
 --- Close the SQLite handle cleanly without losing retry ownership.
 --- @return boolean closed True only after SQLite accepted close and no startup file debt remains.
 function M.close_db()
-	if _terminal_db_close_debt ~= nil then return false end
+	if _backup_source_lease ~= nil or _terminal_db_close_debt ~= nil then return false end
 	local db = _startup_db_debt or _db
 	if db == nil then return _schema_close_debt == nil end
 	local closed, retryable = _close_owned_db(db)
@@ -428,6 +430,43 @@ function M.close_db()
 	if _db == db then _db = nil end
 	if _startup_db_debt == db then _startup_db_debt = nil end
 	return _db == nil and _startup_db_debt == nil and _schema_close_debt == nil
+end
+
+--- Retain the exact source while native SQLite backup steps may yield.
+function M.acquire_backup_source(expected)
+	if _db == nil or _db ~= expected or _backup_source_lease ~= nil then return false end
+	_backup_source_lease = expected
+	return true
+end
+
+--- Release only the lease whose backup handle has been consumed.
+function M.release_backup_source(expected)
+	if _backup_source_lease ~= expected or expected == nil then return false end
+	_backup_source_lease = nil
+	if _startup_db_debt == expected then
+		local closed, retryable = _close_owned_db(expected)
+		if closed or not retryable then _startup_db_debt = nil end
+		-- The lease is released; get_db() still refuses the quarantined owner.
+		return true
+	end
+	return true
+end
+
+--- Quarantine the exact writer after an uncertain transaction. No other writer
+--- method may observe it while native cleanup is pending.
+--- @param expected userdata The exact handle whose rollback or detach failed.
+--- @return boolean retired True only when native close confirmed retirement.
+function M.quarantine_db(expected)
+	if _db == nil or _db ~= expected then return false end
+	local db = _db
+	_db = nil
+	_startup_db_debt = db
+	-- Never close a source while a backup retains it. The lease release retires
+	-- this unpublished exact owner as soon as finish consumes the backup.
+	if _backup_source_lease == db then return false end
+	local closed, retryable = _close_owned_db(db)
+	if closed or not retryable then _startup_db_debt = nil end
+	return closed
 end
 
 --- Return the raw SQLite handle. Log manager uses this for ingest transactions.
@@ -474,16 +513,13 @@ end
 -- =================================
 -- =================================
 
---- JSON-encode a Lua value compactly, unquoted: the catalogue slot quotes it, and
---- the typing builder must encrypt the payload first.
---- @param v any
---- @return string The encoded JSON, or "{}" when encoding fails.
-local function _json_text(v)
-	if v == nil then return "{}" end
-	local ok, encoded = pcall(json.encode, v)
-	if not ok then
-		Logger.warn(LOG, "_json_text: json.encode failed (%s) — storing empty object.", tostring(encoded))
-		return "{}"
+--- Raw event JSON is replay source data: an empty fallback would permanently
+--- discard the event's keystrokes or system metadata from reconstruction.
+local function _required_event_json(value, label)
+	if value == nil then return "{}" end
+	local ok, encoded = pcall(json.encode, value)
+	if not ok or type(encoded) ~= "string" or encoded == "" then
+		error(label .. " JSON encoding failed", 0)
 	end
 	return encoded
 end
@@ -518,7 +554,7 @@ function _builders.typing(e, id)
 	-- literally typed, so they are the only ones encrypted. The aggregates the
 	-- dashboard computes over stay in clear, which is what keeps reads fast.
 	local enc_text = TextCipher.encrypt(_device_id, id, e.text or "")
-	local enc_json = TextCipher.encrypt(_device_id, tostring(id) .. "j", _json_text(e.events))
+	local enc_json = TextCipher.encrypt(_device_id, tostring(id) .. "j", _required_event_json(e.events, "typing event"))
 	if enc_text == nil or enc_json == nil then
 		-- Encryption is on but could not run. Storing the plaintext would defeat
 		-- the setting the user turned on, so this row is not written at all.
@@ -597,7 +633,7 @@ function _builders.system(e, id, action_override)
 		-- column is NOT NULL, the exact swallow this function's docstring warns
 		-- about. Fall back to a sentinel so the event survives as an anomaly rather
 		-- than vanishing entirely.
-		action = tostring(action_override or e.action or "unknown"), metadata_json = _json_text(meta),
+		action = tostring(action_override or e.action or "unknown"), metadata_json = _required_event_json(meta, "system event"),
 	})
 end
 
@@ -617,8 +653,8 @@ function _builders.llm(e, id, kind)
 		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
 		app = tostring(e.app or "Unknown"), kind = tostring(kind),
 		context = _opt_text(e.context), prediction = _opt_text(e.prediction),
-		predictions_json = e.predictions and _json_text(e.predictions) or nil,
-		all_predictions_json = e.all_predictions and _json_text(e.all_predictions) or nil,
+		predictions_json = e.predictions ~= nil and _required_event_json(e.predictions, "LLM predictions") or nil,
+		all_predictions_json = e.all_predictions ~= nil and _required_event_json(e.all_predictions, "LLM all predictions") or nil,
 		chosen_index = tonumber(e.chosen_index), deletes = tonumber(e.deletes),
 		deleted_text = _opt_text(e.deleted_text), net_saved_chars = tonumber(e.net_saved_chars),
 		count = tonumber(e.count),

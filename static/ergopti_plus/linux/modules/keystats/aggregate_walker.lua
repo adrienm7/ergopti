@@ -244,10 +244,9 @@ end
 --- Splits a batch's n-gram tables into per-table, per-app-day maps the writer
 --- takes.
 ---
---- The batch keys rows by "date\1app\1token" because the shared accumulator has
---- to hold several applications at once; the writer takes one application at a
---- time. Undoing that here rather than in the writer keeps the writer's shape
---- the same as its five siblings.
+--- The shared accumulator keeps the original tuple in item.identity when an
+--- app contains the legacy key separator. Other rows retain the established
+--- "date\1app\1token" key. The writer takes one application at a time.
 --- @param batch table
 --- @return table Array of { table_name, date, app, ngrams }.
 function M.batches_for_writer(batch)
@@ -257,7 +256,12 @@ function M.batches_for_writer(batch)
 	for table_name, rows in pairs(batch.ngram) do
 		local grouped = {}
 		for key, item in pairs(rows) do
-			local date_str, app, token = key:match("^([^\1]*)\1([^\1]*)\1(.*)$")
+			local date_str, app, token
+			if item.identity then
+				date_str, app, token = item.identity.date, item.identity.app, item.identity.token
+			else
+				date_str, app, token = key:match("^([^\1]*)\1([^\1]*)\1(.*)$")
+			end
 			if date_str and token ~= "" then
 				local bucket = grouped[date_str .. "\1" .. app]
 				if not bucket then

@@ -9,6 +9,8 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.modules.llm.prediction.test_parser_comparisons",
+	"tests.unit.modules.llm.prediction.test_parser_unicode_escapes",
 	"tests.unit.modules.llm.runtime.test_shared_loader_sources",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_semantic_controls",
 	"tests.unit.adapters.layout.test_xkb_capture_semantic_controls",

@@ -310,6 +310,36 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 		package.loaded["adapters.tooltip_renderer"] = old_renderer
 	end)
 
+	for _, failure in ipairs({ "edit", "private-mark" }) do
+		helpers.it("restores both text owners when " .. failure .. " raises before output", function()
+			local E, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
+			local state = make_state("before")
+			state.llm_buffer, state.llm_context_text, state.llm_context_mark = "visible", "secretvisible", "secret"
+			state.llm_private_mark, state.llm_context_generation = "secret", 7
+			local llm = make_llm()
+			llm.mark_private_context = function() error("privacy mark refused") end
+			E.init(state, make_registry({}, {}), llm)
+			SyntheticInput.enter_callback()
+			local replaced = E.perform_text_replacement(0, function()
+				SyntheticInput.emit_key_strokes("new")
+				return 3, "new", "new"
+			end, function()
+				state.buffer, state.llm_buffer = "new", "new"
+				state.llm_context_text, state.llm_context_mark = "new", ""
+				if failure == "edit" then error("context edit refused") end
+			end, false, false, "test", nil, failure == "private-mark")
+			local _, events = SyntheticInput.leave_callback(replaced)
+			helpers.assert_eq(replaced, false)
+			helpers.assert_true(events == nil or #events == 0)
+			helpers.assert_eq(state.buffer, "before")
+			helpers.assert_eq(state.llm_buffer, "visible")
+			helpers.assert_eq(state.llm_context_text, "secretvisible")
+			helpers.assert_eq(state.llm_context_mark, "secret")
+			helpers.assert_eq(state.llm_private_mark, "secret")
+			helpers.assert_true(state.llm_context_generation > 7)
+		end)
+	end
+
 	helpers.it("issues the requested deletes and runs the buffer_action", function()
 		local E, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
 		local s = make_state("hello")

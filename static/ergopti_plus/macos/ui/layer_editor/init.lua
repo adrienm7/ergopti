@@ -42,6 +42,7 @@ local FileSystem  = require("adapters.file_system")
 local ui_builder  = require("ui.ui_builder")
 local Json        = require("json")
 local TomlCodec   = require("toml_codec")
+local TomlWriter  = require("toml_codec.writer")
 local Layers      = require("keymap.layers")
 local LayerEditor = require("keymap.layer_editor")
 local Keycodes    = require("infra.keycodes")
@@ -234,24 +235,84 @@ end
 -- ================================
 -- ================================
 
---- Sends the page the user's layers.toml.
+--- Tests whether the original page and configuration folder still own this draft.
+local function opening_current(session, opening)
+	local function identities_current()
+		return _session == session and not session.retired and session.opening == opening
+			and rawequal(package.loaded["infra.config_paths"], ConfigPaths)
+			and rawequal(package.loaded["adapters.file_system"], FileSystem)
+			and FileSystem.read_with_status == opening.read_with_status
+			and FileSystem.write_if_unchanged_admitted == opening.publish
+			and ConfigPaths.get_config_dir == opening.get_config_dir
+	end
+	if not identities_current() then return false end
+	local ok, dir = pcall(opening.get_config_dir)
+	return ok and dir == opening.config_dir and identities_current()
+end
+--- Sends the original page the original classified source, including on retry.
 --- @param session table
 local function push_init(session)
-	local ok_ctx, ctx = pcall(load_context)
-	if not ok_ctx then
-		Logger.error(LOG, "The layer data could not be read: %s.", tostring(ctx))
-		return
+	if _session ~= session or session.retired or not session.webview then return end
+	local opening = session.opening
+	if not opening then
+		local ok_ctx, ctx = pcall(load_context)
+		if not ok_ctx then
+			Logger.error(LOG, "The layer data could not be read: %s.", tostring(ctx))
+			return
+		end
+		local get_config_dir = ConfigPaths.get_config_dir
+		local dir_ok, config_dir = pcall(get_config_dir)
+		if not dir_ok or type(config_dir) ~= "string" or config_dir == "" then return end
+		local path = Layers.user_file_path(config_dir, ctx)
+		local read_with_status, publish = FileSystem.read_with_status, FileSystem.write_if_unchanged_admitted
+		local content, status, detail = TomlWriter.read_classified(path, FileSystem)
+		opening = { get_config_dir = get_config_dir, config_dir = config_dir, path = path,
+			read_with_status = read_with_status, publish = publish,
+			ctx = ctx, source = { status = status, content = content }, detail = detail }
+		session.opening = opening
+		opening.payload = LayerEditor.init_payload({
+			os = OS, ctx = ctx, config_dir = config_dir,
+			read_file = function()
+				if status == "ok" then return content end
+				if status == "absent" then return nil end
+				error(detail or "the layer file is unreadable", 0)
+			end,
+			toml_decode = TomlCodec.decode, legends = current_legends(ctx),
+			layer_keys = layer_keys(ctx, session.karabiner),
+		})
 	end
-	local payload = LayerEditor.init_payload({
-		os          = OS,
-		ctx         = ctx,
-		config_dir  = ConfigPaths.get_config_dir(),
-		read_file   = LayerEditor.read_file,
-		toml_decode = TomlCodec.decode,
-		legends     = current_legends(ctx),
-		layer_keys  = layer_keys(ctx, session.karabiner),
-	})
-	call_page(session, "init", payload)
+	if not opening_current(session, opening) then return end
+	local offered = call_page(session, "init", opening.payload)
+	opening.offered = offered == true and opening_current(session, opening)
+end
+
+--- Adapts the shared writer to the source retained when the page opened.
+local function opening_files(session, opening)
+	local function publish(path, content, _, _, outer_admission)
+		if path ~= opening.path or not opening_current(session, opening) then
+			return false, "the layer editor source is no longer current"
+		end
+		local written, detail, receipt = TomlWriter.publish_if_unchanged(path, content, FileSystem,
+			opening.source, nil, function()
+				return opening_current(session, opening)
+					and (outer_admission == nil or outer_admission() == true)
+					and opening_current(session, opening)
+			end)
+		if written == true and opening_current(session, opening) then
+			opening.source = { status = "ok", content = content }
+		end
+		return written, detail, receipt
+	end
+	return {
+		read_with_status = function(path)
+			if path ~= opening.path or not opening_current(session, opening) then
+				return nil, "error", "the layer editor source is no longer current"
+			end
+			return FileSystem.read_with_status(path)
+		end,
+		write_if_unchanged = publish,
+		write_if_unchanged_admitted = publish,
+	}
 end
 
 --- Sends the page the legends of the input source in use now.
@@ -270,18 +331,16 @@ end
 --- @param text any The payload's text.
 local function save(session, text)
 	Logger.start(LOG, "Saving the navigation layer…")
-	local ok_ctx, ctx = pcall(load_context)
-	if not ok_ctx then
-		Logger.error(LOG, "The layer data could not be read: %s.", tostring(ctx))
-		call_page(session, "saveResult", { saved = false, errors = { { code = "write_failed", detail = tostring(ctx) } } })
+	local opening = session.opening
+	if not opening or opening.offered ~= true or not opening_current(session, opening)
+		or (opening.source.status ~= "ok" and opening.source.status ~= "absent") then
+		call_page(session, "saveResult", { saved = false,
+			errors = { { code = LayerEditor.WRITE_FAILED, detail = "the layer editor source is no longer current" } } })
 		return
 	end
 	local result = LayerEditor.save({
-		text         = text,
-		ctx          = ctx,
-		config_dir   = ConfigPaths.get_config_dir(),
-		toml_decode  = TomlCodec.decode,
-		file_adapter = FileSystem,
+		text = text, ctx = opening.ctx, config_dir = opening.config_dir,
+		toml_decode = TomlCodec.decode, file_adapter = opening_files(session, opening),
 	})
 	if not result.saved then
 		for _, err in ipairs(result.errors) do
@@ -293,8 +352,21 @@ local function save(session, text)
 		call_page(session, "saveResult", { saved = false, errors = result.errors })
 		return
 	end
+	if not opening_current(session, opening) then
+		Logger.warn(LOG, "The layer was saved, but its editor destination changed before application.")
+		call_page(session, "saveResult", { saved = true, applied = false, errors = {} })
+		return
+	end
 	local applied = request_regeneration(session.karabiner)
+	if not opening_current(session, opening) then
+		call_page(session, "saveResult", { saved = true, applied = false, errors = {} })
+		return
+	end
 	reconcile_wheel()
+	if not opening_current(session, opening) then
+		call_page(session, "saveResult", { saved = true, applied = false, errors = {} })
+		return
+	end
 	if applied then
 		Logger.success(LOG, "Navigation layer saved to '%s'; the Karabiner rules are regenerating.", result.path)
 	else

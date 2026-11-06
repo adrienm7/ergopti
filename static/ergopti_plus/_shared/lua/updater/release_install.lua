@@ -23,6 +23,7 @@
 --- 5. Pure Lua: every effect is a port.
 --- ==============================================================================
 
+local ErrorDescription = require("error_description")
 local M = {}
 
 -- Remains monotonic when a native window creates a new install session.
@@ -37,6 +38,7 @@ M.REASON = {
 	download = "changelog_window.install_error_download",
 	verify = "changelog_window.install_error_verify",
 	install = "changelog_window.install_error_install",
+	previous_backup = "changelog_window.install_error_previous_backup",
 	unknown_release = "changelog_window.install_error_unknown_release",
 	-- A feed-only list: no driver verifies a download without the API's digest
 	-- or checksum asset. The macOS window hands the channel's newest release to
@@ -118,7 +120,7 @@ function M.new(ports)
 		local retained = operation or running or terminal
 		local native_owner = retained and retained.native_owner or nil
 		local ok, err = pcall(ports.report, message, native_owner)
-		if not ok then Logger.error(LOG, "The Versions page could not be told the install phase: %s.", tostring(err)) end
+		if not ok then Logger.error(LOG, "The Versions page could not be told the install phase: %s.", ErrorDescription.describe(err)) end
 	end
 
 	--- Ends the running install with a failure the page shows.
@@ -276,12 +278,17 @@ function M.new(ports)
 		if not execution_current() then return false end
 		if not ok_backup or not backup then
 			Logger.error(LOG, "Install of %s refused: the configuration backup failed (%s).", tag,
-				tostring(ok_backup and backup_err or backup))
+				ErrorDescription.describe(ok_backup and backup_err or backup))
 			fail(tag, M.REASON.backup, nil, nil, current)
 			return false
 		end
-		local asset = ports.resolve_asset(release, current.native_owner)
+		local asset_ok, asset = pcall(ports.resolve_asset, release, current.native_owner)
 		if not execution_current() then return false end
+		if not asset_ok then
+			Logger.error(LOG, "Install of %s refused: the release asset resolver failed.", tag)
+			fail(tag, M.REASON.unexpected, backup, nil, current)
+			return false
+		end
 		if not asset then
 			Logger.error(LOG, "Install of %s refused: the release has no asset for this system.", tag)
 			fail(tag, M.REASON.no_asset, backup, nil, current)
@@ -291,11 +298,11 @@ function M.new(ports)
 		report({ tag = tag, phase = "downloading", backup_path = backup.path }, current)
 		if not execution_current() then return false end
 		local settled = false
-		local function done(path, reason, detail, failure_receipt)
+		local function finish_download(path, reason, detail, failure_receipt)
 			if settled or not execution_current() then return end
 			settled = true
 			if not path then
-				Logger.error(LOG, "Install of %s stopped before installing: %s.", tag, tostring(detail or reason))
+				Logger.error(LOG, "Install of %s stopped before installing: %s.", tag, ErrorDescription.describe(detail or reason))
 				fail(tag, reason == M.REASON.verify and M.REASON.verify or M.REASON.download, backup, failure_receipt, current)
 				return
 			end
@@ -308,7 +315,7 @@ function M.new(ports)
 				if not execution_current() then return end
 				if not ok_install or installed ~= true then
 					Logger.error(LOG, "Install of %s failed: %s.", tag,
-						tostring(ok_install and (install_detail or install_reason) or installed))
+						ErrorDescription.describe(ok_install and (install_detail or install_reason) or installed))
 					fail(tag, ok_install and install_reason or M.REASON.install, backup, failure_receipt, current)
 					return
 				end
@@ -320,7 +327,7 @@ function M.new(ports)
 				if not execution_current() then return end
 				if not ok_restart or restarted ~= true then
 					Logger.error(LOG, "Release %s is installed but the restart failed: %s.", tag,
-						tostring(ok_restart and "refused" or restarted))
+						ErrorDescription.describe(ok_restart and "refused" or restarted))
 					fail(tag, M.REASON.install, backup, nil, current)
 				end
 			end
@@ -351,16 +358,26 @@ function M.new(ports)
 				installed_done(ok_install, installed, install_reason, install_detail)
 			end
 		end
+		local constructing, admitted, seen, early = true, false, false, nil
+		local function done(path, reason, detail, failure_receipt)
+			if seen then return end
+			seen = true
+			if constructing then early = { path = path, reason = reason, detail = detail, receipt = failure_receipt }
+			elseif admitted then finish_download(path, reason, detail, failure_receipt) end
+		end
 		local ok_dispatch, dispatched = pcall(ports.download, asset, release, done, current.native_owner)
-		if not ok_dispatch or dispatched ~= true then
+		admitted = ok_dispatch and dispatched == true
+		constructing = false
+		if not admitted then
 			if not settled then
 				Logger.error(LOG, "Install of %s stopped: the download could not start (%s).", tag,
-					tostring(ok_dispatch and "refused" or dispatched))
+					ErrorDescription.describe(ok_dispatch and "refused" or dispatched))
 				settled = true
 				fail(tag, M.REASON.download, backup, nil, current)
 			end
 			return false
 		end
+		if early then finish_download(early.path, early.reason, early.detail, early.receipt) end
 		return true
 	end
 

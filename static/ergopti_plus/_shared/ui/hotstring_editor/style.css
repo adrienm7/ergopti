@@ -842,6 +842,7 @@ body {
 	transition:
 		border-color 0.15s,
 		box-shadow 0.15s;
+	white-space: pre-wrap;
 	word-break: break-word;
 }
 

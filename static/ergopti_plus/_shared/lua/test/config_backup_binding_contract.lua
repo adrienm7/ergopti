@@ -36,9 +36,20 @@ function M.register(helpers, env)
 	end
 
 	local function io_double()
-		local double = {}
-		for _, name in ipairs({ "list", "read", "make_dir", "create", "replace" }) do
+		local double, directories = {}, {}
+		for _, name in ipairs({ "list", "read", "create", "replace" }) do
 			double[name] = function() return nil, "absent" end
+		end
+		double.make_dir = function(path) directories[path] = true; return true end
+		double.directory_status = function(path) return directories[path] and "present" or "absent" end
+		double.directory_identity = function(path)
+			if directories[path] then return { dev = 1, ino = 1 } end
+			return nil, "absent"
+		end
+		double.make_dir_exclusive = function(path)
+			if directories[path] then return nil, "exists" end
+			directories[path] = true
+			return true
 		end
 		return double
 	end
@@ -74,6 +85,15 @@ function M.register(helpers, env)
 	end
 
 	helpers.describe("configuration backup binding (config-backup-binding-contract)", function()
+		helpers.it("(config-backup-binding-contract) fixture reserves directories exclusively", function()
+			local io = io_double()
+			helpers.assert_true(io.make_dir_exclusive("/claimed"))
+			local again, reason = io.make_dir_exclusive("/claimed")
+			helpers.assert_nil(again)
+			helpers.assert_eq(reason, "exists")
+			helpers.assert_true(io.make_dir("/existing"))
+			helpers.assert_nil(io.make_dir_exclusive("/existing"))
+		end)
 		helpers.it("(config-backup-binding-contract) is built only from complete ports", function()
 			helpers.assert_throws(function() Binding.new({}) end)
 			helpers.assert_throws(function() Binding.new({ logger = logger(), log = "T" }) end)

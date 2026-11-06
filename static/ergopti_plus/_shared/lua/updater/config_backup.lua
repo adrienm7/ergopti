@@ -36,6 +36,7 @@ M.SCHEMA_VERSION = 1
 -- A backup id is a folder name; a release tag inside it keeps only these bytes.
 local TAG_SAFE = "[^%w%._%-]"
 local STAMP_PATTERN = "^%d%d%d%d%d%d%d%d%-%d%d%d%d%d%d$"
+local ISO_PATTERN = "^%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%dZ$"
 local ROOT_ID_PATTERN = "^[a-z][a-z_]*$"
 
 
@@ -139,6 +140,14 @@ local function included(rules, name)
 	return false
 end
 
+--- Only compare identities represented exactly on every supported Lua runtime.
+local function valid_identity(identity)
+	local function component(value)
+		return type(value) == "number" and value >= 0 and value < 9007199254740992 and value % 1 == 0
+	end
+	return type(identity) == "table" and component(identity.dev) and component(identity.ino)
+end
+
 
 
 
@@ -154,6 +163,8 @@ end
 ---   rules = M.rules() result,
 ---   roots = array of { id, dir } (the first holds the backups) or { id, file },
 ---   io = { list(dir) -> entries|nil, err (entries: { name, kind = "file"|"dir"|"other" }),
+---          directory_status(path) -> "present"|"absent"|"error", detail,
+---          directory_identity(path) -> { dev, ino }|nil, err,
 ---          read(path) -> content|nil, status ("absent" or an error),
 ---          make_dir(path) -> true|nil, err, create(path, content) -> true|nil, err
 ---          (create-only), replace(path, content) -> true|nil, err (atomic) },
@@ -166,7 +177,9 @@ function M.new(options)
 	assert(type(options.roots) == "table" and #options.roots > 0, "config_backup needs its roots")
 	local io_port, json, clock = options.io, options.json, options.clock
 	assert(type(io_port) == "table" and type(io_port.list) == "function" and type(io_port.read) == "function"
-		and type(io_port.make_dir) == "function" and type(io_port.create) == "function"
+		and type(io_port.make_dir) == "function" and type(io_port.make_dir_exclusive) == "function" and type(io_port.create) == "function"
+		and type(io_port.directory_status) == "function"
+		and type(io_port.directory_identity) == "function"
 		and type(io_port.replace) == "function", "config_backup needs its file ports")
 	assert(type(json) == "table" and type(json.encode) == "function" and type(json.decode) == "function",
 		"config_backup needs a JSON codec")
@@ -182,7 +195,9 @@ function M.new(options)
 		assert((type(root.dir) == "string" and root.dir:sub(1, 1) == "/")
 			or (type(root.file) == "string" and root.file:sub(1, 1) == "/"), "config_backup roots are absolute")
 		assert(index > 1 or root.dir ~= nil, "the first config_backup root is the configuration folder")
-		local entry = { id = root.id, dir = root.dir and (root.dir:gsub("/+$", "")) or nil, file = root.file }
+		local dir = root.dir and (root.dir:gsub("/+$", "")) or nil
+		if dir == "" then dir = "/" end
+		local entry = { id = root.id, dir = dir, file = root.file }
 		roots[#roots + 1] = entry
 		by_id[root.id] = entry
 	end
@@ -206,6 +221,12 @@ function M.new(options)
 				if relative == "" and err == "absent" then return files, nil, skipped end
 				return nil, "cannot list " .. dir .. ": " .. tostring(err), skipped
 			end
+			local present = {}
+			if relative == "" then
+				for _, entry in ipairs(entries) do
+					if type(entry.name) == "string" then present[entry.name] = true end
+				end
+			end
 			table.sort(entries, function(a, b) return a.name < b.name end)
 			for _, entry in ipairs(entries) do
 				local name = entry.name
@@ -213,7 +234,28 @@ function M.new(options)
 				if type(name) ~= "string" or not contained(name) then
 					return nil, "unexpected entry name in " .. dir, skipped
 				elseif entry.kind == "dir" then
-					if not (relative == "" and rules.excluded[name]) then pending[#pending + 1] = path end
+					local excluded = relative == "" and rules.excluded[name] == true
+					if relative == "" and not excluded then
+						for canonical in pairs(rules.excluded) do
+							if not present[canonical] and name:lower() == canonical:lower() then
+								local status, detail = io_port.directory_status(join(root.dir, canonical))
+								if status == "present" then
+									local actual, actual_err = io_port.directory_identity(join(root.dir, name))
+									local expected, expected_err = io_port.directory_identity(join(root.dir, canonical))
+									if not valid_identity(actual) or not valid_identity(expected) then
+										return nil, "cannot establish excluded folder identity: "
+											.. tostring(actual_err or expected_err), skipped
+									end
+									if actual.dev == expected.dev and actual.ino == expected.ino then excluded = true; break end
+									status = "absent" -- the probed directory is a distinct entry
+								end
+								if status ~= "absent" then
+									return nil, "cannot classify excluded folder " .. canonical .. ": " .. tostring(detail), skipped
+								end
+							end
+						end
+					end
+					if not excluded then pending[#pending + 1] = path end
 				elseif entry.kind == "file" then
 					if included(rules, name) then files[#files + 1] = { root = root.id, path = path } end
 				else
@@ -229,7 +271,7 @@ function M.new(options)
 	--- @param file string
 	--- @return boolean
 	local function inside_config(file)
-		local prefix = roots[1].dir .. "/"
+		local prefix = NativePath.with_trailing_separator(roots[1].dir)
 		return file:sub(1, #prefix) == prefix
 	end
 
@@ -288,7 +330,7 @@ function M.new(options)
 		Logger.start(LOG, "Backing up the configuration (%s)…", kind)
 		local time = clock()
 		if type(time) ~= "table" or type(time.stamp) ~= "string" or not time.stamp:match(STAMP_PATTERN)
-			or type(time.iso) ~= "string" then
+			or type(time.iso) ~= "string" or not time.iso:match(ISO_PATTERN) then
 			Logger.error(LOG, "Configuration backup refused: the clock gave no usable time.")
 			return nil, "clock"
 		end
@@ -308,13 +350,37 @@ function M.new(options)
 			Logger.error(LOG, "Configuration backup refused: cannot create %s: %s.", folder, tostring(make_err))
 			return nil, "cannot create " .. folder
 		end
-		-- Two backups within one second get distinct folders: the manifest's
-		-- create-only write refuses an existing one.
-		local base, suffix, path = id, 1, join(folder, id)
-		while io_port.read(join(path, rules.manifest)) ~= nil or (io_port.list(path)) ~= nil do
-			suffix = suffix + 1
-			id = base .. "-" .. suffix
-			path = join(folder, id)
+		-- Keep collision suffixes monotonic even when an older backup was removed.
+		local base = id
+		local siblings, list_err = io_port.list(folder)
+		if not siblings then
+			Logger.error(LOG, "Configuration backup refused: cannot list its backup folder.")
+			return nil, "cannot list " .. folder .. ": " .. tostring(list_err)
+		end
+		local highest
+		for _, sibling in ipairs(siblings) do
+			local name = sibling.name
+			local suffix = type(name) == "string" and name:sub(1, #base + 1) == base .. "-"
+				and name:sub(#base + 2):match("^[1-9]%d*$") or nil
+			if name == base then suffix = "1" end
+			if suffix and (not highest or #suffix > #highest or (#suffix == #highest and suffix > highest)) then
+				highest = suffix
+			end
+		end
+		if highest then
+			local carry, digits = 1, {}
+			for index = #highest, 1, -1 do
+				local digit = tonumber(highest:sub(index, index)) + carry
+				if digit >= 10 then digit, carry = digit - 10, 1 else carry = 0 end
+				digits[index] = tostring(digit)
+			end
+			id = base .. "-" .. (carry == 1 and "1" or "") .. table.concat(digits)
+		end
+		local path = join(folder, id)
+		local path_ok, path_err = io_port.make_dir_exclusive(path)
+		if not path_ok then
+			Logger.error(LOG, "Configuration backup refused: cannot create %s: %s.", path, tostring(path_err))
+			return nil, "cannot create " .. path
 		end
 		local manifest_files = {}
 		for _, entry in ipairs(entries) do
@@ -347,10 +413,15 @@ function M.new(options)
 			Logger.error(LOG, "Configuration backup failed encoding its manifest: %s.", tostring(encode_err))
 			return nil, "cannot encode the manifest"
 		end
-		local wrote, manifest_err = io_port.create(join(path, rules.manifest), encoded)
+		local manifest_path = join(path, rules.manifest)
+		local wrote, manifest_err = io_port.create(manifest_path, encoded)
 		if not wrote then
 			Logger.error(LOG, "Configuration backup failed writing its manifest: %s.", tostring(manifest_err))
 			return nil, "cannot write the manifest"
+		end
+		if io_port.read(manifest_path) ~= encoded then
+			Logger.error(LOG, "Configuration backup failed: its manifest does not read back as written.")
+			return nil, "verification failed for the manifest"
 		end
 		record.path = path
 		Logger.success(LOG, "Configuration backed up to %s (%d file(s)).", path, #manifest_files)
@@ -369,16 +440,42 @@ function M.new(options)
 		local record, decode_err = json.decode(raw)
 		if type(record) ~= "table" or decode_err then return nil, "unreadable manifest" end
 		if record.schema_version ~= M.SCHEMA_VERSION or record.id ~= id
-			or type(record.files) ~= "table" or rules.kinds[record.kind] == nil then
+			or type(record.files) ~= "table" or rules.kinds[record.kind] == nil
+			or type(record.created_at) ~= "string" or not record.created_at:match(ISO_PATTERN)
+			or type(record.tag) ~= "string" or type(record.from_version) ~= "string" then
 			return nil, "unexpected manifest"
 		end
-		for _, file in ipairs(record.files) do
+		local count = 0
+		for index in pairs(record.files) do
+			if type(index) ~= "number" or index < 1 or index % 1 ~= 0 then return nil, "unexpected manifest" end
+			count = count + 1
+		end
+		local seen = {}
+		for index = 1, count do
+			local file = record.files[index]
 			if type(file) ~= "table" or not target(file.root, file.path) then
 				return nil, "manifest names a file outside the configuration"
 			end
+			local identity = file.root .. "\0" .. file.path
+			if seen[identity] then return nil, "manifest repeats a configuration file" end
+			seen[identity] = true
 		end
 		record.path = path
 		return record, nil
+	end
+
+	--- Compare collision suffixes as decimal strings, without integer overflow.
+	local function newer(left, right)
+		if left.created_at ~= right.created_at then return left.created_at > right.created_at end
+		if left.tag == right.tag then
+			local left_base, left_suffix = left.id:match("^(.*)%-([1-9]%d*)$")
+			local right_base, right_suffix = right.id:match("^(.*)%-([1-9]%d*)$")
+			if left_base and left_base == right_base then
+				if #left_suffix ~= #right_suffix then return #left_suffix > #right_suffix end
+				return left_suffix > right_suffix
+			end
+		end
+		return left.id > right.id
 	end
 
 	--- The newest complete backup of one kind, or nil when there is none.
@@ -389,19 +486,30 @@ function M.new(options)
 		assert(prefix ~= nil, "unknown config_backup kind")
 		local entries = io_port.list(folder)
 		if entries == nil then return nil end
-		local best = nil
+		local candidates = {}
 		for _, entry in ipairs(entries) do
 			local name = entry.name
 			if entry.kind == "dir" and type(name) == "string" and name:sub(1, #prefix + 1) == prefix .. "-" then
 				local record = load(name)
-				if record and record.kind == kind
-					and (best == nil or tostring(record.created_at) > tostring(best.created_at)
-						or (record.created_at == best.created_at and record.id > best.id)) then
-					best = record
-				end
+				if record and record.kind == kind then candidates[#candidates + 1] = record end
 			end
 		end
-		return best
+		while #candidates > 0 do
+			local best = 1
+			for index = 2, #candidates do
+				if newer(candidates[index], candidates[best]) then best = index end
+			end
+			local record = table.remove(candidates, best)
+			local complete = true
+			for _, file in ipairs(record.files) do
+				if io_port.read(join(record.path, file.root .. "/" .. file.path)) == nil then
+					complete = false
+					break
+				end
+			end
+			if complete then return record end
+		end
+		return nil
 	end
 
 	--- Puts a backup back: backs the current configuration up first, checks

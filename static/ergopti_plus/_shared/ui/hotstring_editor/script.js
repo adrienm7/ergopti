@@ -110,14 +110,13 @@ function getCmdGroups() {
 // ====================================
 
 /**
- * Normalizes a raw token name into its canonical PascalCase representation.
+ * Normalizes known token aliases while preserving unknown literal brace text.
  * @param {string} name - The raw token name.
  * @returns {string} The normalized token name.
  */
 function normToken(name) {
-	const canonical = TOKEN_NORM[name.toLowerCase()];
-	if (canonical) return canonical;
-	return name.charAt(0).toUpperCase() + name.slice(1);
+	const key = name.toLowerCase();
+	return Object.hasOwn(TOKEN_NORM, key) ? TOKEN_NORM[key] : name;
 }
 
 /**
@@ -385,6 +384,13 @@ function serializeTrigEditor(el) {
 	return s.trim();
 }
 
+// Distinguish an intentional Enter command from WebKit's empty-editor BR.
+function makeEnterBreak() {
+	const br = document.createElement('br');
+	br.dataset.enter = 'true';
+	return br;
+}
+
 function parseToNodes(text) {
 	if (!text) return [document.createTextNode('')];
 	text = toDisplay(text);
@@ -395,7 +401,7 @@ function parseToNodes(text) {
 	while ((m = re.exec(text)) !== null) {
 		if (m.index > last) nodes.push(document.createTextNode(text.slice(last, m.index)));
 		const tname = normToken(m[1]);
-		if (tname === 'Enter') nodes.push(document.createElement('br'));
+		if (tname === 'Enter') nodes.push(makeEnterBreak());
 		else nodes.push(makeChip(tname));
 		last = re.lastIndex;
 	}
@@ -407,7 +413,12 @@ function serializeEditor(el) {
 	const nodes = Array.from(el.childNodes);
 	while (nodes.length > 0) {
 		const last = nodes[nodes.length - 1];
-		if (last.nodeType === 1 && last.tagName === 'BR' && !last.classList.contains('token-chip')) {
+		if (
+			last.nodeType === 1 &&
+			last.tagName === 'BR' &&
+			!last.dataset.enter &&
+			!last.classList.contains('token-chip')
+		) {
 			nodes.pop();
 		} else {
 			break;
@@ -440,7 +451,7 @@ function insertBrAtCursor() {
 	const ed = document.getElementById('e-out');
 	ed.focus();
 	let sel = window.getSelection();
-	const br = document.createElement('br');
+	const br = makeEnterBreak();
 	if (sel && sel.rangeCount) {
 		const r = sel.getRangeAt(0);
 		if (ed.contains(r.commonAncestorContainer)) {
@@ -549,7 +560,7 @@ function tryConvertToken(editor) {
 
 	if (tokenName === 'Enter') {
 		const anch = sel.getRangeAt(0);
-		const br = document.createElement('br');
+		const br = makeEnterBreak();
 		anch.insertNode(br);
 		if (!br.nextSibling) br.parentNode.appendChild(document.createTextNode(''));
 		const nr = document.createRange();
@@ -664,7 +675,7 @@ function applyAc(name) {
 	if (normToken(name) === 'Enter') {
 		const sel2 = window.getSelection();
 		const anch = sel2.getRangeAt(0);
-		const br = document.createElement('br');
+		const br = makeEnterBreak();
 		anch.insertNode(br);
 		if (!br.nextSibling) br.parentNode.appendChild(document.createTextNode(''));
 		const nr = document.createRange();
@@ -1468,6 +1479,18 @@ window.initData = function (d) {
 	}
 };
 
+// A host preference change must not replace the user's unsaved document.
+window.updatePreferences = function (d) {
+	if (!d) return;
+	TRIGGER_CHAR = d.trigger_char || TRIGGER_CHAR;
+	compactView = !!d.compact_view;
+	autoClose = !!d.auto_close;
+	defaultSec = d.default_section || null;
+	updateHints();
+	updateCompactBtn();
+	render();
+};
+
 window.updateData = function (d) {
 	if (D && D.sections && d && d.sections) {
 		const m = {};
@@ -1521,6 +1544,15 @@ window.addEventListener(
 	true
 );
 
+// Selection and input events may omit isComposing while an IME owns the DOM.
+let imeComposing = false;
+document.addEventListener('compositionstart', () => {
+	imeComposing = true;
+});
+document.addEventListener('compositionend', () => {
+	imeComposing = false;
+});
+
 document.querySelectorAll('.overlay').forEach((el) => {
 	el.addEventListener('click', (e) => {
 		if (e.target === el) closeModal(el.id);
@@ -1528,10 +1560,12 @@ document.querySelectorAll('.overlay').forEach((el) => {
 });
 
 document.getElementById('msg-modal').addEventListener('keydown', (e) => {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (e.key === 'Enter' || e.key === 'Escape') closeModal('msg-modal');
 });
 
 document.getElementById('confirm-modal').addEventListener('keydown', (e) => {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (e.key === 'Escape') {
 		_confirmCb = null;
 		closeModal('confirm-modal');
@@ -1564,6 +1598,7 @@ function runConfirm() {
 }
 
 document.getElementById('sec-modal').addEventListener('keydown', (e) => {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (e.key === 'Enter') {
 		e.preventDefault();
 		saveSec();
@@ -1572,6 +1607,7 @@ document.getElementById('sec-modal').addEventListener('keydown', (e) => {
 });
 
 document.getElementById('entry-modal').addEventListener('keydown', (e) => {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (e.key === 'Escape') closeModal('entry-modal');
 });
 
@@ -1586,6 +1622,7 @@ document.getElementById('sec-id').addEventListener('input', function () {
 });
 
 document.getElementById('sec-id').addEventListener('keydown', function (e) {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (
 		[
 			'Backspace',
@@ -1606,7 +1643,9 @@ document.getElementById('sec-id').addEventListener('keydown', function (e) {
 	if (!/^[a-z0-9_]$/i.test(e.key)) e.preventDefault();
 });
 
-document.addEventListener('selectionchange', ejectFromChip);
+document.addEventListener('selectionchange', function () {
+	if (!imeComposing) ejectFromChip();
+});
 
 // Trigger Editor logic
 (function () {
@@ -1614,6 +1653,7 @@ document.addEventListener('selectionchange', ejectFromChip);
 	te.addEventListener('input', () => clearFieldError('e-trig', 'trig-err'));
 
 	te.addEventListener('keydown', function (e) {
+		if (imeComposing || e.isComposing || e.keyCode === 229) return;
 		if (e.key === 'Enter' || e.key === 'Tab') {
 			e.preventDefault();
 			document.getElementById('e-out').focus();
@@ -1736,6 +1776,7 @@ document.addEventListener('selectionchange', ejectFromChip);
 	ed.addEventListener('input', () => clearFieldError('e-out', 'out-err'));
 
 	ed.addEventListener('keydown', function (e) {
+		if (imeComposing || e.isComposing || e.keyCode === 229) return;
 		if (acItems.length > 0) {
 			if (e.key === 'Tab') {
 				e.preventDefault();
@@ -1849,13 +1890,15 @@ document.addEventListener('selectionchange', ejectFromChip);
 		}
 	});
 
-	ed.addEventListener('input', function () {
+	ed.addEventListener('input', function (e) {
+		if (imeComposing || e.isComposing) return;
 		tryConvertToken(ed);
 		checkAc();
 		checkPh();
 	});
 
 	ed.addEventListener('keyup', function (e) {
+		if (imeComposing || e.isComposing || e.keyCode === 229) return;
 		if (
 			acItems.length > 0 &&
 			['Tab', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Escape', 'Enter'].indexOf(

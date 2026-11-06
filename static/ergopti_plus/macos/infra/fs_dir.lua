@@ -41,16 +41,18 @@ local LOG = "fs_dir"
 --- @return table names Array of entry names.
 --- @return boolean listed Whether the whole directory was enumerated.
 --- @return string|nil error_message
-local function collect_entries(dir)
+local function collect_entries(dir, quiet)
 	local names = {}
-	if type(dir) ~= "string" or dir == "" then return names, false, "invalid directory path" end
+	if type(dir) ~= "string" or dir == "" or dir:find("\0", 1, true) then
+		return names, false, "invalid directory path"
+	end
 	local ok, err = pcall(function()
 		for name in hs.fs.dir(dir) do
 			names[#names + 1] = name
 		end
 	end)
 	if not ok then
-		Logger.error(LOG, "Cannot iterate directory '%s' — %s.", tostring(dir), tostring(err))
+		if not quiet then Logger.error(LOG, "Cannot iterate directory '%s' — %s.", tostring(dir), tostring(err)) end
 		return {}, false, tostring(err)
 	end
 	return names, true
@@ -73,6 +75,13 @@ end
 --- @return string|nil error_message
 function M.try_entries(dir)
 	return collect_entries(dir)
+end
+
+--- Lists without logging when the caller owns a bounded, private diagnostic.
+--- @param dir string Absolute directory path.
+--- @return table names, boolean listed, string|nil error_message
+function M.try_entries_quiet(dir)
+	return collect_entries(dir, true)
 end
 
 --- Collects bounded private names without logging native pathname or error text.

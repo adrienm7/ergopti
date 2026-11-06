@@ -129,12 +129,12 @@ function M.isElementSecure(element, observe)
 		if observe then observe(false) end
 		return false
 	end
-	local ok_role, role, role_error = read_attribute(element, "AXRole")
+	local ok_role, role = read_attribute(element, "AXRole")
 	local ok_sub, subrole, subrole_error = read_attribute(element, "AXSubrole")
 	-- Native AX failures return nil plus an error without raising a Lua exception.
 	-- Optional nil-only subroles remain valid; a transport refusal is unknown.
-	local role_read = ok_role and not (role == nil and role_error ~= nil)
-	local subrole_read = ok_sub and not (subrole == nil and subrole_error ~= nil)
+	local role_read = ok_role and type(role) == "string" and role ~= ""
+	local subrole_read = ok_sub and (type(subrole) == "string" or (subrole == nil and subrole_error == nil))
 	if observe then
 		local confirmed_secure = (role_read and role == SECURE_ROLE) or (subrole_read and subrole == SECURE_ROLE)
 		observe(confirmed_secure or (role_read and subrole_read and type(role) == "string" and role ~= ""
@@ -166,18 +166,19 @@ local function inspect_focused_element(application_or_pid, observe)
 		return nil, "Accessibility element API is unavailable"
 	end
 
-	local ok, result, focus_refused = pcall(function()
+	local ok, result, focus_refused, focused_element = pcall(function()
 		local app_element = hs.axuielement.applicationElementForPID(pid)
 		if not app_element then return nil end
 		local focused, focused_error = app_element:attributeValue("AXFocusedUIElement")
 		if not focused then return nil, focused == nil and focused_error ~= nil end
-		return M.isElementSecure(focused, observe and function(complete) observe(complete, pid) end)
+		local secure = M.isElementSecure(focused, observe and function(complete) observe(complete, pid) end)
+		return secure, nil, focused
 	end)
 	if not ok then return nil, result end
 	if type(result) ~= "boolean" then
 		return nil, "focused Accessibility element is unavailable", focus_refused == true
 	end
-	return result, nil
+	return result, nil, nil, focused_element
 end
 
 --- Classifies the focused element for one exact application.
@@ -191,6 +192,17 @@ end
 function M.inspectFocusedElement(application_or_pid, observe)
 	local secure, detail = inspect_focused_element(application_or_pid, observe)
 	return secure, detail
+end
+
+
+--- Classifies and returns the exact same focused element for a destination receipt.
+--- @param application_or_pid table|userdata|number Application object or PID.
+--- @return boolean|nil secure
+--- @return any error_detail
+--- @return userdata|table|nil element The element that was classified.
+function M.inspectFocusedElementWithReceipt(application_or_pid)
+	local secure, detail, _, element = inspect_focused_element(application_or_pid)
+	return secure, detail, element
 end
 
 

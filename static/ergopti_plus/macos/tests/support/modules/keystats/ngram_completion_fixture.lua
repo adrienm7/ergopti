@@ -134,6 +134,7 @@ function M.run(options, callback)
 		logger.warn = function(_, template, ...) state.warnings[#state.warnings + 1] = string.format(template, ...) end
 		package.loaded["infra.logger"] = logger
 		local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", { sqlite3 = state.sqlite })
+		reader.history_fingerprint_exact = true -- The fixture owns all its rows and mutations.
 		local original_read = reader.read_ngrams
 		reader.read_ngrams = function(path, first, last, apps, pacer)
 			local data, complete = original_read(path, first, last, apps, pacer)

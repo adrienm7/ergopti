@@ -52,6 +52,7 @@ local REQUEST_TIMEOUT_MS = Timings.ms("llm", "request_timeout_ms")
 local _http_options = { timeout_ms = REQUEST_TIMEOUT_MS }
 local _infer_client  = _http_adapter.new(_http_options)   -- used for inference POST requests
 local _check_client  = _http_adapter.new(_http_options)   -- used for explicit availability checks
+local _listing_client = _http_adapter.new(_http_options) -- model selector listings have independent ownership
 local _warmup_client = _http_adapter.new(_http_options)   -- warmup has independent cancellation ownership
 -- Screen reading (modules/llm/screen_answer.lua) names its own provider, which
 -- need not be the active entry: its requests never share the prediction owner
@@ -419,6 +420,8 @@ local _entries = {}
 local _active_id = ""
 local _is_ready = false
 local _identity_generation = 0
+local _listing_state = {}
+local _listing_owner = nil
 local _availability_generation = 0
 local _availability_owner = nil
 local _warmup_generation = 0
@@ -832,6 +835,10 @@ end
 --- selected. The adapter generation is the first fence; this module generation
 --- remains authoritative even when a native completion was already queued.
 local function invalidate_identity()
+	local retired_listing = _listing_owner
+	if retired_listing then retired_listing.retired = true end
+	_listing_owner = nil
+	_listing_state = {}
 	cancel_availability_owner("identity_changed")
 	_identity_generation = _identity_generation + 1
 	_availability_generation = _availability_generation + 1
@@ -850,6 +857,7 @@ local function invalidate_identity()
 	_is_ready = false
 	for label, client in pairs({
 		availability = _check_client,
+		listing = _listing_client,
 		inference = _infer_client,
 		warmup = _warmup_client,
 	}) do
@@ -859,6 +867,14 @@ local function invalidate_identity()
 				tostring(label), tostring(result))
 		end
 	end
+	return retired_listing
+end
+
+local function finish_listing(owner, ok, detail)
+	if not owner or owner.done then return end
+	owner.done = true
+	if _listing_owner == owner then _listing_owner = nil end
+	Logger.callback(LOG, "Remote model listing", owner.callback, ok, detail)
 end
 
 -- Starts the access-token exchange of the active entry once the identity
@@ -870,12 +886,13 @@ local schedule_access_prewarm
 --- @param entries table Array of entry tables. Pass {} to clear.
 function M.set_entries(entries)
 	if type(entries) ~= "table" then return end
-	invalidate_identity()
+	local retired_listing = invalidate_identity()
 	_entries = {}
 	for _, e in ipairs(entries) do
 		if type(e) == "table" then table.insert(_entries, e) end
 	end
 	Logger.debug(LOG, "API entries set (%d entry/entries).", #_entries)
+	finish_listing(retired_listing, false, "stale_identity")
 	schedule_access_prewarm()
 end
 
@@ -900,8 +917,9 @@ function M.set_active_entry_id(id)
 	if type(id) ~= "string" then return end
 	if id == _active_id then return end
 	_active_id = id
-	invalidate_identity()
+	local retired_listing = invalidate_identity()
 	Logger.debug(LOG, "Active API entry id: '%s'.", id)
+	finish_listing(retired_listing, false, "stale_identity")
 	schedule_access_prewarm()
 end
 
@@ -1568,12 +1586,14 @@ local function models_response_is_valid(format, response)
 	if type(response.body) ~= "string" or response.body == "" then
 		return false, "response body is empty"
 	end
-	local decode_ok, decoded, decode_error = pcall(JsonCodec.decode, response.body)
+	-- Native decoding collapses empty arrays and objects, so it cannot prove
+	-- that a successful response actually contains the provider's array.
+	local decode_ok, decoded, decode_error = pcall(Json.decode_lossless, response.body)
 	if not decode_ok or decode_error ~= nil or type(decoded) ~= "table" then
 		return false, "response body is not valid JSON"
 	end
 	local catalogue_key = format == "gemini" and "models" or "data"
-	if type(decoded[catalogue_key]) ~= "table" then
+	if not Json.is_array(decoded[catalogue_key]) then
 		return false, "models catalogue is missing"
 	end
 	return true, "ok"
@@ -1595,7 +1615,7 @@ local function log_models_response_refusal(operation, entry, response, reason)
 end
 
 --- Build the JSON payload for the chosen provider format. We keep the body
---- minimal but correct: one system message + one user message + temperature.
+--- minimal but correct: optional system instructions, one user message and temperature.
 --- Streaming is OFF — the engine-level pacing already protects paid quotas,
 --- and the single-shot path keeps error handling trivial.
 --- @param extras table|nil Per-model body fields from the catalogue
@@ -1614,7 +1634,7 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 	if format == "anthropic" then
 		return {
 			model      = model,
-			system     = system_prompt or "",
+			system     = type(system_prompt) == "string" and system_prompt ~= "" and system_prompt or nil,
 			messages   = { { role = "user", content = user_prompt or "" } },
 			max_tokens = max_tokens,
 			temperature = temperature,
@@ -1622,7 +1642,8 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 	end
 	if format == "gemini" then
 		return {
-			systemInstruction = { parts = { { text = system_prompt or "" } } },
+			systemInstruction = type(system_prompt) == "string" and system_prompt ~= ""
+				and { parts = { { text = system_prompt } } } or nil,
 			contents          = { { role = "user", parts = { { text = user_prompt or "" } } } },
 			generationConfig  = { temperature = temperature, maxOutputTokens = max_tokens },
 		}
@@ -1631,13 +1652,15 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 		return Formats.agent_body({ model = model, system = system_prompt, text = user_prompt or "",
 			max_tokens = max_tokens, temperature = temperature })
 	end
-	-- OpenAI Chat Completions
+	-- OpenAI Chat Completions: an empty system instruction is omitted.
+	local messages = {}
+	if type(system_prompt) == "string" and system_prompt ~= "" then
+		messages[#messages + 1] = { role = "system", content = system_prompt }
+	end
+	messages[#messages + 1] = { role = "user", content = user_prompt or "" }
 	local payload = {
 		model       = model,
-		messages    = {
-			{ role = "system", content = system_prompt or "" },
-			{ role = "user",   content = user_prompt   or "" },
-		},
+		messages    = messages,
 		temperature = temperature,
 		max_tokens  = max_tokens,
 		stream      = false,
@@ -2441,8 +2464,6 @@ end
 -- page shows one row per listed model, or the provider's known models and a
 -- typed-id row while it is pending, refused or unavailable
 -- (_shared/lua/llm/api_model_listing.lua).
-local _listing_state = {}
-
 --- The ids the active entry's provider listed at its last successful listing.
 --- @param entry_id string Entry identifier.
 --- @return table|nil ids Nil before a listing succeeded for this entry.
@@ -2466,27 +2487,39 @@ function M.list_active_models(on_done)
 	if type(on_done) ~= "function" then error("api_remote.list_active_models requires on_done") end
 	local paused, _, pause_state_ok = read_script_pause_state()
 	if pause_state_ok ~= true or paused == true then return false end
+	local previous = _listing_owner
+	local owner = { callback = on_done, done = false }
+	_listing_owner = owner
+	if previous and previous.entry_id then
+		local held = _listing_state[previous.entry_id]
+		if type(held) == "table" and held.state == "pending" then _listing_state[previous.entry_id] = nil end
+	end
+	finish_listing(previous, false, "superseded")
+	if _listing_owner ~= owner then return false end
 	local my_identity = _identity_generation
 	local lease = M.resolve_active_entry(function(resolved, entry)
+		if owner.done or owner.retired then return end
 		if resolved ~= true or not entry then
-			Logger.callback(LOG, "Remote model listing", on_done, false, "no_active_entry")
+			finish_listing(owner, false, "no_active_entry")
 			return
 		end
 		local provider = M.PROVIDERS[entry.provider]
 		local base = provider and resolve_base_url(entry, provider) or nil
 		if not provider or not base or key_missing(entry) or not ApiModelListing.supported(provider.format) then
 			_listing_state[entry.id] = { state = "failed", reason = "unsupported" }
-			Logger.callback(LOG, "Remote model listing", on_done, false, "listing_unsupported")
+			finish_listing(owner, false, "listing_unsupported")
 			return
 		end
 		local format = provider.format
+		owner.entry_id = entry.id
 		_listing_state[entry.id] = { state = "pending" }
-		local dispatched = dispatch_probe(_check_client, base, format, entry.token, function(r)
+		local dispatched = dispatch_probe(_listing_client, base, format, entry.token, function(r)
+			if owner.done or owner.retired then return end
 			if my_identity ~= _identity_generation then
 				-- The entry changed under the listing: it is no longer pending.
 				local held = _listing_state[entry.id]
 				if type(held) == "table" and held.state == "pending" then _listing_state[entry.id] = nil end
-				Logger.callback(LOG, "Remote model listing", on_done, false, "stale_identity")
+				finish_listing(owner, false, "stale_identity")
 				return
 			end
 			local valid, reason = models_response_is_valid(format, r)
@@ -2495,23 +2528,23 @@ function M.list_active_models(on_done)
 				_listing_state[entry.id] = { state = "failed", reason = (status or 0) > 0 and "refused" or "unavailable" }
 				Logger.info(LOG, "Remote model listing unavailable (provider=%s, status=%s, reason=%s).",
 					tostring(entry.provider), tostring(type(r) == "table" and r.status or nil), tostring(reason))
-				Logger.callback(LOG, "Remote model listing", on_done, false, "listing_refused")
+				finish_listing(owner, false, "listing_refused")
 				return
 			end
 			local ok, ids = pcall(function() return ApiModelListing.model_ids(format, JsonCodec.decode(r.body)) end)
 			if not ok or type(ids) ~= "table" then
 				_listing_state[entry.id] = { state = "failed", reason = "unreadable" }
 				Logger.warn(LOG, "Remote model listing could not be read: %s.", tostring(ok and "no model list" or ids))
-				Logger.callback(LOG, "Remote model listing", on_done, false, "listing_unreadable")
+				finish_listing(owner, false, "listing_unreadable")
 				return
 			end
 			_listing_state[entry.id] = { state = "listed", ids = ids }
 			Logger.info(LOG, "Remote model listing: %d model(s) for provider %s.", #ids, tostring(entry.provider))
-			Logger.callback(LOG, "Remote model listing", on_done, true, ids)
+			finish_listing(owner, true, ids)
 		end)
-		if dispatched ~= true then
+		if dispatched ~= true and not owner.done then
 			_listing_state[entry.id] = { state = "failed", reason = "unavailable" }
-			Logger.callback(LOG, "Remote model listing", on_done, false, "dispatch_refused")
+			finish_listing(owner, false, "dispatch_refused")
 		end
 	end)
 	return type(lease) == "table"
@@ -2620,8 +2653,8 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 				if thinking_retry.resend(on_response) then return end
 			end
 			if not r.ok then
-				Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%s body=%s",
-					model, req_id, tostring(status), (body or ""):sub(1, 200))
+				Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%s (response body withheld).",
+					model, req_id, tostring(status))
 				-- Log the failure so the audit trail shows it instead of
 				-- silently dropping. Same envelope as keystats.log_llm
 				-- but routed to log_llm_failed; the engine doesn't need
@@ -2929,12 +2962,19 @@ local function with_provider_key(label, provider_id, use, fail, on_ready)
 	local provider = M.PROVIDERS[provider_id]
 	local entry = find_provider_entry(provider_id)
 	local configured_entries, stored_token = _entries, entry.token
+	local stored_id, stored_base, stored_model = entry.id, entry.base_url, entry.model
+	local function entry_current()
+		local selected = find_provider_entry(provider_id)
+		return _entries == configured_entries and selected ~= nil
+			and selected.id == stored_id and selected.token == stored_token
+			and selected.base_url == stored_base and selected.model == stored_model
+	end
 	--- Hands over the request once its key is known.
 	--- @param token string The cleartext key, "" for a local server given none.
 	local function with_token(token)
 		-- Agent/vision requests are independent of the prediction selection, but
 		-- a late Keychain read cannot retain credentials removed from configuration.
-		if _entries ~= configured_entries or entry.token ~= stored_token then
+		if not entry_current() then
 			fail("stale_identity")
 			return
 		end
@@ -2946,6 +2986,11 @@ local function with_provider_key(label, provider_id, use, fail, on_ready)
 		end
 		-- The stored key is exchanged for the short-lived token the requests carry
 		M.prepare_access(provider_id, token, function(ok, reason, access)
+			-- Token exchange can outlive account removal or an endpoint/key edit.
+			if not entry_current() then
+				fail("stale_identity")
+				return
+			end
 			if not ok then
 				Logger.error(LOG, "%s request for provider '%s' has no access token: %s.", label, provider_id, tostring(reason))
 				fail("access_token_unavailable")

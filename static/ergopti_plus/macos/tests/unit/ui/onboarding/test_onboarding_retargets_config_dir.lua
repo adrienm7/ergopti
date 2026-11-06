@@ -88,46 +88,42 @@ end)
 -- ==============================================
 -- ==============================================
 
-helpers.describe("onboarding retarget falls back rather than losing the answers", function()
-	helpers.it("returns the fallback verbatim when the resolver raises", function()
+helpers.describe("onboarding refuses an unresolved destination", function()
+	helpers.it("refuses when the resolver raises", function()
 		local resolved = Onboarding._resolve_commit_path(
 			menu_paths_double(function() error("resolver exploded") end),
 			OLD_CONFIG_PATH
 		)
-		helpers.assert_eq(resolved, OLD_CONFIG_PATH,
-			"a throwing resolver must not redirect the write — the answers still "
-			.. "need a readable destination")
+		helpers.assert_nil(resolved)
 	end)
 
-	helpers.it("returns the fallback verbatim when the resolver yields an empty string", function()
+	helpers.it("refuses when the resolver yields an empty string", function()
 		local resolved = Onboarding._resolve_commit_path(
 			menu_paths_double(function() return "" end),
 			OLD_CONFIG_PATH
 		)
-		helpers.assert_eq(resolved, OLD_CONFIG_PATH,
-			"an empty target would drop the answers on the floor")
+		helpers.assert_nil(resolved)
 	end)
 
-	helpers.it("returns the fallback verbatim when the resolver yields a non-string", function()
-		for _, bad in ipairs({ 42, true, {} }) do
+	helpers.it("refuses non-string, relative and NUL-bearing paths", function()
+		for _, bad in ipairs({ 42, true, {}, "relative/config.toml", "/bad\0path" }) do
 			local resolved = Onboarding._resolve_commit_path(
 				menu_paths_double(function() return bad end),
 				OLD_CONFIG_PATH
 			)
-			helpers.assert_eq(resolved, OLD_CONFIG_PATH,
-				"a non-string resolution is not a path — keep the fallback")
+			helpers.assert_nil(resolved)
 		end
 		-- nil is the same class of failure and must behave identically.
 		helpers.assert_eq(
 			Onboarding._resolve_commit_path(menu_paths_double(function() return nil end), OLD_CONFIG_PATH),
-			OLD_CONFIG_PATH)
+			nil)
 	end)
 
-	helpers.it("returns the fallback when menu_paths itself is unusable", function()
-		helpers.assert_eq(Onboarding._resolve_commit_path(nil, OLD_CONFIG_PATH), OLD_CONFIG_PATH)
-		helpers.assert_eq(Onboarding._resolve_commit_path({}, OLD_CONFIG_PATH), OLD_CONFIG_PATH)
+	helpers.it("refuses when menu_paths itself is unusable", function()
+		helpers.assert_nil(Onboarding._resolve_commit_path(nil, OLD_CONFIG_PATH))
+		helpers.assert_nil(Onboarding._resolve_commit_path({}, OLD_CONFIG_PATH))
 		helpers.assert_eq(Onboarding._resolve_commit_path({ get = "not callable" }, OLD_CONFIG_PATH),
-			OLD_CONFIG_PATH)
+			nil)
 	end)
 end)
 

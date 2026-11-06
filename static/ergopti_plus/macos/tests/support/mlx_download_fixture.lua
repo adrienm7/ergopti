@@ -10,6 +10,7 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"adapters.json_codec",
+	"adapters.file_system",
 	"hs",
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
@@ -77,6 +78,40 @@ local function with_fixture(plan, callback)
 				exit_code = nil,
 				files = {},
 				tasks = {launcher = {}, tail = {}},
+			}
+
+			package.loaded["adapters.file_system"] = {
+				classify_no_follow = function(path)
+					if plan.session_classify_failure then return nil, "error" end
+					if controls.files[path] == nil then return nil, "absent" end
+					return { mode = "file" }, "ok"
+				end,
+				read_with_status = function(path)
+					local value = controls.files[path]
+					if value == nil then return nil, "absent" end
+					return value, "ok"
+				end,
+				remove_if_unchanged = function(path, expected)
+					if controls.files[path] ~= expected.content then return false end
+					if plan.session_remove_failure then
+						if plan.session_release_failure then
+							return false, "removal and release refused", { removed = false }, function()
+								records.session_at_release_retry = controls.files[path]
+								return not plan.session_release_failure
+							end
+						end
+						return false
+					end
+					records.session_removed_content = controls.files[path]
+					local removed = os.remove(path)
+					if plan.session_release_failure then
+						return false, "release refused", { removed = true }, function()
+							records.session_at_release_retry = controls.files[path]
+							return not plan.session_release_failure
+						end
+					end
+					return removed
+				end,
 			}
 
 			local function reenter_pause(kind, record_key)
@@ -257,6 +292,7 @@ local function with_fixture(plan, callback)
 							exit_path = raw:match('"exit_path":"([^"]+)"'),
 							script_path = raw:match('"script_path":"([^"]+)"'),
 							repo = raw:match('"repo":"([^"]+)"'),
+							pid = tonumber(raw:match('"pid":(%d+)')),
 						}
 					end,
 					encode = function(value)

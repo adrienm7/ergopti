@@ -25,6 +25,7 @@ local text_utils  = require("infra.text_utils")
 local shared_utils = require("keymap.utils")
 local Logger      = require("infra.logger")
 local Timings     = require("infra.timings")
+local Clipboard = require("adapters.clipboard")
 local TimerScheduler = require("adapters.timer_scheduler")
 local SyntheticInput = require("adapters.synthetic_input")
 local SecureFieldDetector = require("adapters.secure_field_detector")
@@ -509,13 +510,13 @@ local function perform_paste(value, handoff)
 			end
 		end
 		-- Preserve all clipboard types (images, RTF, etc.), not just plain text.
-		local ok_snapshot, snapshot_or_error = pcall(function()
-			return hs.pasteboard.readAllData()
-		end)
-		if not ok_snapshot or (snapshot_or_error ~= nil and type(snapshot_or_error) ~= "table") then
+		local ok_snapshot, snapshot_or_error, captured, snapshot_count = pcall(Clipboard.save, true)
+		if not ok_snapshot or captured ~= true then
 			Logger.error(LOG, "Clipboard paste snapshot failed: %s.", tostring(snapshot_or_error))
 			return false
 		end
+		if guarded_count ~= nil and snapshot_count ~= guarded_count then return false end
+		if builtin_snapshot_count ~= nil and snapshot_count ~= builtin_snapshot_count then return false end
 		if guarded_count ~= nil and clipboard_change_count() ~= guarded_count then return false end
 		if builtin_snapshot_count ~= nil and clipboard_change_count() ~= builtin_snapshot_count then
 			Logger.error(LOG, "Clipboard paste snapshot ownership changed during acquisition.")
@@ -1510,22 +1511,24 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	end
 	stage("context_watchers")
 	observe_ignored_win_identity(win, app_name, title)
-	local secure = SecureFieldDetector.isSecureApp(app_name) == true and true
-		or SecureFieldDetector.inspectFocusedElement(app)
+	local secure, detail, element
+	if SecureFieldDetector.isSecureApp(app_name) == true then
+		secure = true
+	else
+		secure, detail, element = SecureFieldDetector.inspectFocusedElementWithReceipt(app)
+	end
 	if type(secure) ~= "boolean" then return stage("secure_field", true) end
 	stage("secure_field")
 	_secure_field_cache_value = secure
-	-- Retain an exact native destination off the HID path. Application names and
-	-- titles alone cannot distinguish two editor controls or a reused window.
-	local captured, destination = pcall(function()
-		local pid = app:pid()
-		local application_element = hs.axuielement.applicationElementForPID(pid)
-		local element = application_element:attributeValue("AXFocusedUIElement")
-		if not element then return nil end
-		return { pid = pid, app = app, window_id = win:id(), element = element,
-			generation = _ignored_win_context_generation }
-	end)
-	if captured then _text_destination = destination end
+	-- Bind the receipt to the exact AX element whose privacy was classified.
+	-- A second focused-element read could select another field between calls.
+	if not secure and element then
+		local captured, destination = pcall(function()
+			return { pid = app:pid(), app = app, window_id = win:id(), element = element,
+				generation = _ignored_win_context_generation }
+		end)
+		if captured then _text_destination = destination end
+	end
 	stage("destination")
 	report_slow_probe(probe_started, stage_ms)
 
@@ -1663,7 +1666,7 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 		return nil, _ignored_win_context_generation
 	end
 
-	if (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
+	if now < _ignored_win_cache_time or (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
 		-- The periodic timer should normally have refreshed first. If the main
 		-- runloop delayed it, never authorize the previous window's answer.
 		invalidate_ignored_win_cache()
@@ -1707,7 +1710,7 @@ function M.is_secure_field(now)
 		schedule_ignored_win_refresh()
 		return nil, _ignored_win_context_generation
 	end
-	if (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
+	if now < _ignored_win_cache_time or (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
 		invalidate_ignored_win_cache()
 		return nil, _ignored_win_context_generation
 	end

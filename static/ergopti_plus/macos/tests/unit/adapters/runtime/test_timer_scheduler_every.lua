@@ -19,6 +19,51 @@ local owned_registry_count = Fixture.owned_registry_count
 
 
 helpers.describe("TimerScheduler adapter — every()", function()
+	helpers.it("keeps zero and negative intervals repeating (timer-zero-repeat)", function()
+		for _, interval in ipairs({ 0, -1 }) do
+			local timer_stub = make_timer_stub()
+			local native_callback, native_interval, running
+			timer_stub.new = function(seconds, callback)
+				native_interval, native_callback = seconds, callback
+				local timer = {}
+				function timer:start() running = true; return self end
+				function timer:stop() running = false; return self end
+				return timer
+			end
+			local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+			local calls = 0
+			local handle, committed = TS.every(interval, function() calls = calls + 1 end)
+			helpers.assert_true(committed)
+			local function fire()
+				if not running then return end
+				-- Hammerspoon creates a one-shot when the native interval is zero.
+				if native_interval == 0 then running = false end
+				native_callback()
+			end
+			fire(); fire()
+			helpers.assert_eq(calls, 2, "every() must remain repeating for a clamped interval")
+			helpers.assert_true(native_interval >= 0.001, "the native repeating interval must be bounded")
+			helpers.assert_true(TS.cancel(handle))
+		end
+	end)
+
+	helpers.it("rejects invalid callbacks without arming either timer type (timer-invalid-callback)", function()
+		local invalid_callbacks = { false, "not a callback", {} }
+		for _, method in ipairs({ "after", "every" }) do
+			for index = 1, 4 do
+				local invalid = invalid_callbacks[index]
+				local timer_stub = make_timer_stub()
+				local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+				local handle, committed = TS[method](1, invalid)
+				helpers.assert_eq(committed, false, method .. " must not claim an unusable callback")
+				helpers.assert_true(handle.fired)
+				helpers.assert_nil(handle.timer)
+				helpers.assert_eq(#timer_stub._pending, 0)
+				helpers.assert_eq(TS.activeCount(), 0)
+			end
+		end
+	end)
+
 	helpers.it("does not register a nil repeating timer as live", function()
 		local timer_stub = make_timer_stub()
 		timer_stub.new = function() return nil end
@@ -170,6 +215,37 @@ helpers.describe("TimerScheduler adapter — every()", function()
 end)
 
 helpers.describe("TimerScheduler adapter — monotonic clock", function()
+	helpers.it("falls back when the native timer namespace is unavailable (timer-missing-namespace)", function()
+		local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = make_timer_stub() })
+		local native_timer = _G.hs.timer
+		_G.hs.timer = nil
+		local ok, err = pcall(function()
+			local before = os.time()
+			local wall = TS.now()
+			local awake = TS.awake_time()
+			local after = os.time()
+			helpers.assert_true(wall >= before and wall <= after)
+			helpers.assert_true(awake >= before and awake <= after)
+		end)
+		_G.hs.timer = native_timer
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("uses the fallback when a native wall-clock sample is invalid (timer-invalid-wall-clock)", function()
+		for _, sample in ipairs({ false, "invalid", 0 / 0, math.huge, -math.huge }) do
+			local timer_stub = make_timer_stub()
+			timer_stub.secondsSinceEpoch = function() return sample end
+			timer_stub.absoluteTime = function() error("absolute clock unavailable") end
+			local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+			local before = os.time()
+			local now = TS.now()
+			local awake = TS.awake_time()
+			local after = os.time()
+			helpers.assert_true(now >= before and now <= after, "invalid wall time must not reach callers")
+			helpers.assert_true(awake >= before and awake <= after, "elapsed-time fallback must be usable")
+		end
+	end)
+
 	helpers.it("reports awake time independently of wall-clock sleep", function()
 		local wall_sec = 100
 		local awake_ns = 5000000000

@@ -394,11 +394,16 @@ local function submit_data(owner, webview, method, data)
 	return executed and owner_is_current(owner)
 end
 
---- Pushes preferences through the exact current native owner.
+--- Pushes only preferences, preserving unsaved edits and the source snapshot.
 local function push_update_to_webview()
 	local owner, webview = _owner, _webview
 	if not owner_is_current(owner) or not webview then return end
-	submit_data(owner, webview, "updateData", load_js_data(_pending_mode))
+	submit_data(owner, webview, "updatePreferences", {
+		trigger_char = _prefs.trigger_char,
+		compact_view = _prefs.compact_view,
+		auto_close = _prefs.auto_close,
+		default_section = _prefs.default_section,
+	})
 end
 
 
@@ -496,10 +501,15 @@ local function handle_message(msg, owner)
 	end
 
 	if action == "save_pref" then
-		if type(data) == "table" and type(data.key) == "string" then
-			if data.key == "compact_view"    then _prefs.compact_view    = (data.value == true) end
-			if data.key == "auto_close"      then _prefs.auto_close      = (data.value == true) end
-			if data.key == "default_section" then _prefs.default_section = data.value end
+		if type(data) ~= "table" then return false end
+		local key, value = data.key, data.value
+		if (key == "compact_view" or key == "auto_close") and type(value) == "boolean" then
+			_prefs[key] = value
+		elseif key == "default_section" and (value == nil or type(value) == "string") then
+			_prefs.default_section = value
+		else
+			Logger.warn(LOG, "Hotstring editor preference message was malformed; no change applied.")
+			return false
 		end
 		invoke_controller("Hotstring preference update", _update_pref, data)
 		return

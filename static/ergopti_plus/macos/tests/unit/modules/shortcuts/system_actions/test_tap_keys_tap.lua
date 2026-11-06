@@ -117,6 +117,42 @@ helpers.describe("shortcuts.actions.system: the tap-key tap (tap-keys)", functio
 		end)
 	end)
 
+	helpers.it("keeps a delayed burst physical when each event crosses several taps", function()
+		with_fixture(function()
+			local sys, spy = make_sys_screenshot_spies()
+			local ran = 0
+			sys.bind_tap_keys(nil, function() return function() ran = ran + 1; return true end end)
+			local properties = spy.hs.eventtap.event.properties
+			local EventClock = require("adapters.event_clock")
+			local Health = require("infra.key_event_health")
+			EventClock.reset(); Health.reset()
+			local host_ns = 3600 * 1000000000
+			local saved = hs.timer.absoluteTime
+			hs.timer.absoluteTime = function() return host_ns end
+			local ok, err = pcall(function()
+				local function stamped(age)
+					local event = key_down(27, {}, false, properties)
+					local stamp = host_ns - age * 1000000
+					event.timestamp = function() return stamp end
+					return event
+				end
+				helpers.assert_eq(spy.captured_cb(stamped(1)), true)
+				for _ = 1, 10 do
+					host_ns = host_ns + 1000000
+					local event = stamped(1200)
+					-- Other real eventtap consumers observe this same Quartz timestamp.
+					for _ = 1, 3 do EventClock.is_stale(event) end
+					helpers.assert_eq(spy.captured_cb(event), false, "delayed key must pass through")
+				end
+				run_screenshot_deferred(spy)
+				helpers.assert_eq(ran, 1, "only the fresh key may run an action")
+			end)
+			hs.timer.absoluteTime = saved
+			EventClock.reset(); Health.reset()
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("refuses a tap without a decision function", function()
 		with_fixture(function()
 			local sys = make_sys_screenshot_spies()

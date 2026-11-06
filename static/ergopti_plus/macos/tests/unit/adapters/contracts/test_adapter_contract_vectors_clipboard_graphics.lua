@@ -48,6 +48,8 @@ helpers.describe("Adapter contract vectors: Clipboard", function()
 		pasteboard = {
 			getContents = function() return pb.text end,
 			setContents = function(t) pb.text = t ; pb.data = { text = t } ; return true end,
+			allContentTypes = function() return { {} } end,
+			changeCount = function() return 0 end,
 			readAllData = function() return pb.data end,
 			clearContents = function() pb.text = nil ; pb.data = nil end,
 			writeAllData = function(d) pb.data = d ; pb.text = d and d.text or nil ; return true end,

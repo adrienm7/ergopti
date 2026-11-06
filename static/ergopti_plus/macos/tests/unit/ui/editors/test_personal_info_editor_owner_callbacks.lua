@@ -19,7 +19,7 @@ local function with_editor(scenario)
 	local records = { windows = {}, bridges = {}, deferred = {}, errors = {} }
 	local ok, err = xpcall(function()
 		_G.hs = {
-			json = { encode = function() return "{}" end },
+			json = { encode = function(payload) records.encoded = payload; return "{}" end },
 			screen = { mainScreen = function() return { frame = function() return { w = 1440, h = 900 } end } end },
 			webview = { windowMasks = { titled = 1, closable = 2 }, usercontent = {
 				new = function() return { setCallback = function(_, callback)
@@ -73,6 +73,26 @@ local function with_editor(scenario)
 end
 
 helpers.describe("personal editor exact callback owners", function()
+	helpers.it("keeps the displayed form bound to its original save owner when reopened", function()
+		with_editor(function(editor, records)
+			local first, second = 0, 0
+			helpers.assert_true(editor.open({ first_name = "original" }, function(values)
+				first = first + 1
+				helpers.assert_eq(values.first_name, "edited")
+				return true
+			end))
+			helpers.assert_true(editor.open({ first_name = "different" }, function()
+				second = second + 1
+				return true
+			end))
+			helpers.assert_eq(#records.windows, 1)
+			records.bridges[1]({ body = { action = "ready" } })
+			helpers.assert_eq(records.encoded.fields[1].value, "original", "late readiness retains the form's source")
+			records.bridges[1]({ body = { action = "save", values = { first_name = "edited" } } })
+			helpers.assert_eq(first, 1, "the displayed form retains its original persistence owner")
+			helpers.assert_eq(second, 0, "reopening must not redirect old form contents to a new callback")
+		end)
+	end)
 	for _, boundary in ipairs({ "public close", "page cancel" }) do
 		helpers.it("honours " .. boundary .. " during creation (personal-editor-construction-close)", function()
 			with_editor(function(editor, records)
@@ -246,6 +266,31 @@ helpers.describe("personal editor save diagnostic privacy", function()
 end)
 
 helpers.describe("personal editor JavaScript failure boundary", function()
+	helpers.it("ignores a JavaScript failure delivered after the editor closes", function()
+		with_editor(function(editor, records)
+			helpers.assert_true(editor.open({}, function() return true end))
+			records.bridges[1]({ body = { action = "ready" } })
+			local completion = records.windows[1].js_callback
+			helpers.assert_true(editor.close())
+			completion(nil, { message = "late error" })
+			helpers.assert_eq(#records.errors, 0, "retired JavaScript cannot report a current failure")
+		end)
+	end)
+	helpers.it("does not let an old context suppress a current JavaScript failure", function()
+		with_editor(function(editor, records)
+			helpers.assert_true(editor.open({}, function() return true end))
+			local bridge, view = records.bridges[1], records.windows[1]
+			bridge({ body = { action = "ready" } })
+			local old_completion = view.js_callback
+			helpers.assert_true(editor.open({}, function() return true end))
+			bridge({ body = { action = "ready" } })
+			local current_completion = view.js_callback
+			old_completion(nil, { message = "old error" })
+			helpers.assert_eq(#records.errors, 0)
+			current_completion(nil, { message = "current error" })
+			helpers.assert_eq(#records.errors, 1)
+		end)
+	end)
 	for _, mode in ipairs({ "throw", "nil", "false", "async" }) do
 		helpers.it("reports " .. mode .. " without personal values (personal-editor-javascript)", function()
 			with_editor(function(editor, records)

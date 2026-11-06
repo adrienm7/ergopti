@@ -21,7 +21,7 @@ local helpers = require("tests.helpers")
 --- Loads the real adapter behind controlled eventtap and dependency boundaries.
 --- @param schedule_ok boolean Result returned by defer_after_callback.
 --- @return table fixture
-local function make_fixture(schedule_ok)
+local function make_fixture(schedule_ok, start_event)
 	local tap_callback = nil
 	local tap_stop_count = 0
 	local deferred = {}
@@ -49,6 +49,7 @@ local function make_fixture(schedule_ok)
 			return {
 				start = function(self)
 					tap_enabled = true
+					if start_event then callback(start_event) end
 					return self
 				end,
 				stop = function(self)
@@ -103,6 +104,17 @@ end
 -- =====================================================
 
 helpers.describe("modifier injector: atomic post-eventtap policy handoff", function()
+	helpers.it("does not modify a key until the native tap has committed", function()
+		local early, observed = physical_key(false)
+		local fixture = make_fixture(true, early)
+		helpers.assert_eq(fixture.injector.arm({ cmd = true }), true)
+		helpers.assert_eq(observed.set_calls, 0)
+		helpers.assert_eq(fixture.injector.is_armed(), true)
+		local later, later_observed = physical_key(false)
+		fixture.fire(later)
+		helpers.assert_eq(later_observed.set_calls, 1)
+	end)
+
 	helpers.it("keeps the key untouched and arm live when callback scheduling fails", function()
 		local fixture = make_fixture(false)
 		local applied = 0

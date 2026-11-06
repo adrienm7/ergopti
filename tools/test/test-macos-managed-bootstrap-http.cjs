@@ -142,7 +142,7 @@ const result = spawnSync(pythonExecutable(), ['tools/test/macos_managed_bootstra
 assert.equal(result.error, undefined, 'the bootstrap receiver must start');
 assert.equal(result.signal, null, 'the bootstrap receiver must close within its bound');
 assert.equal(result.status, 0, result.stderr || result.stdout);
-assert.match(result.stderr, /Ran 25 tests in/);
+assert.match(result.stderr, /Ran 28 tests in/);
 assert.match(result.stderr, /\bOK\b/);
 assert.doesNotMatch(result.stderr, /skipped=/);
 process.stdout.write(result.stdout);
@@ -237,6 +237,17 @@ const actualWorkspaceCases = [
 assert.deepEqual(actualWorkspaceCases, expectedWorkspaceCases);
 process.stdout.write(mlxWorkspaces.stdout);
 process.stdout.write(mlxWorkspaces.stderr);
+
+const networkWorkspace = spawnSync(
+	pythonExecutable(),
+	['tools/test/macos_network_check_workspace_test.py'],
+	{ cwd: path.resolve(__dirname, '../..'), encoding: 'utf8', timeout: 10000 }
+);
+assert.equal(networkWorkspace.error, undefined);
+assert.equal(networkWorkspace.signal, null);
+assert.equal(networkWorkspace.status, 0, networkWorkspace.stderr || networkWorkspace.stdout);
+assert.match(networkWorkspace.stderr, /Ran 2 tests in/);
+assert.match(networkWorkspace.stderr, /\bOK\b/);
 
 // The field run's blob probe against the fake registry, which answers a blob
 // HEAD itself and sends its GET to storage with a 307, as the real registry

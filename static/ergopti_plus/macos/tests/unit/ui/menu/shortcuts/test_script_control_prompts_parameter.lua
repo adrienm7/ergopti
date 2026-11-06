@@ -194,7 +194,7 @@ helpers.describe("the script-control picker configures before it binds", functio
 		helpers.assert_true(src ~= nil, "menu_shortcuts source must be locatable")
 		if not src then return end
 
-		local at = src:find("script_control_shortcuts%[slot_id%] = a")
+		local at = src:find("local function assign()", 1, true)
 		helpers.assert_true(at ~= nil, "the script-control assignment must be locatable")
 		if not at then return end
 

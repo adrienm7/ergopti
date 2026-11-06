@@ -45,6 +45,7 @@ local touchdevice = load_touchdevice_module()
 local Engine    = require("modules.gestures.engine")
 local Actions   = require("modules.gestures.actions")
 local Conflicts = require("modules.gestures.conflicts")
+local Sensitivity = require("modules.gestures.sensitivity")
 local TableUtil = require("table_util")
 local ConfigKeys = require("config_keys")
 
@@ -662,7 +663,7 @@ M.isRightClickHeld   = Actions.is_right_click_held
 M.on_action_changed  = Conflicts.on_action_changed
 
 function M.apply_all_overrides()    return Conflicts.apply_all_overrides(CoreState.ga, function() return CoreState.enabled end) end
-function M.restore_all_overrides()  Conflicts.restore_all_overrides()           end
+function M.restore_all_overrides()  return Conflicts.restore_all_overrides()    end
 function M.refresh_system_gestures(callback) return Conflicts.refresh(callback) end
 function M.system_gesture_conflicts() return Conflicts.active_conflicts(CoreState.enabled and CoreState.ga or {}) end
 function M.open_system_gestures() return Conflicts.open_settings() end
@@ -712,31 +713,38 @@ function M.set_mode(slot, mode)
 	return true
 end
 
-function M.get_sensitivity(slot)    return tonumber(CoreState.sensitivities[slot]) or M.DEFAULT_SENSITIVITY end
+local function default_sensitivity(slot)
+	return Sensitivity.coerce(M.DEFAULT_STATE.sensitivities[slot]) or M.DEFAULT_SENSITIVITY
+end
 
---- Stores a gesture sensitivity, failing closed to DEFAULT_SENSITIVITY when the
---- value is not a positive number. A persisted config.toml / plist value can
+function M.get_sensitivity(slot)
+	return Sensitivity.coerce(CoreState.sensitivities[slot]) or default_sensitivity(slot)
+end
+
+--- Stores a gesture sensitivity, falling back to the slot's manifest default when the
+--- value is outside the menu's supported range. A persisted config.toml / plist value can
 --- arrive as a string (hand edit, AHK migration, half-written plist); the engine
 --- divides by this (Geometry.incrementalSteps(abs(sd), sensitivity)) inside the gesture eventtap
 --- and the menu runs string.format("%.1f", …) on it, so a non-number would crash
 --- the tap (swallowed to Console) and blank the gestures submenu under the
 --- menu-builder pcall. The fallback IS the single-source default (no new literal).
 --- @param slot string Gesture slot id.
---- @param s any Candidate sensitivity (coerced to a positive number).
+--- @param s any Candidate sensitivity (coerced within the supported range).
 --- @return boolean committed
 function M.set_sensitivity(slot, s)
 	if type(slot) ~= "string" or slot == "" then
 		Logger.error(LOG, "set_sensitivity(): slot must be a non-empty string.")
 		return false
 	end
-	local n = tonumber(s)
-	if type(n) == "number" and n > 0 then
+	local n = Sensitivity.coerce(s)
+	if n ~= nil then
 		CoreState.sensitivities[slot] = n
 		Logger.debug(LOG, "Sensitivity['%s'] = %s.", tostring(slot), tostring(n))
 	else
-		CoreState.sensitivities[slot] = M.DEFAULT_SENSITIVITY
-		Logger.warn(LOG, "set_sensitivity('%s'): non-numeric/non-positive value %s — using default %s.",
-			tostring(slot), tostring(s), tostring(M.DEFAULT_SENSITIVITY))
+		local fallback = default_sensitivity(slot)
+		CoreState.sensitivities[slot] = fallback
+		Logger.warn(LOG, "set_sensitivity('%s'): unsupported value %s — using default %s.",
+			tostring(slot), tostring(s), tostring(fallback))
 	end
 	return true
 end
@@ -1550,7 +1558,7 @@ function M.start()
 	local wake_start_ok, wake_start_result = xpcall(function()
 		return sleep_watcher:start()
 	end, debug.traceback)
-	if not wake_start_ok or wake_start_result == false then
+	if not wake_start_ok or wake_start_result ~= wake_or_err then
 		return reject_attempt("wake watcher start failed: " .. tostring(wake_start_result))
 	end
 	if not gesture_start_is_current(start_attempt) then

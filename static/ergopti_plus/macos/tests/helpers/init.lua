@@ -372,6 +372,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 		loaded["modules.shortcuts.actions.system_mouse"] = nil
 		loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	end
+	if module_name == "modules.shortcuts.actions.text" or module_name == "modules.keymap.utils" then
+		loaded["adapters.clipboard"] = nil
+	end
 	-- Every screen-capture owner shares the flow's once-per-process permission
 	-- prompt. A fresh owner must not inherit the previous fixture's prompt.
 	if module_name == "modules.shortcuts.actions.system"

@@ -181,7 +181,7 @@ helpers.describe("common autocorrection interleaved source order", function()
 				local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 				helpers.assert_true(Registry.init(state))
 				for _, section in ipairs(expected.sections) do
-					helpers.assert_true(Storage.set("hotstrings_section_" .. category .. "_" .. section,
+					helpers.assert_true(Storage.set(require("modules.keymap.section_keys").current(category, section),
 						section ~= "unknown" and (not caps_only or section == "caps")))
 				end
 				local sources = bound_mode and { { path = bound_path, sections = { "caps" } } } or nil
@@ -295,7 +295,7 @@ local function shipped_split_registry(only)
 				helpers.assert_eq(observed, baseline, "loading or disabling current families preserves every foreign mapping field")
 			end
 			for _, section in ipairs({ "names", "abbreviations", "technical_terms" }) do
-				helpers.assert_true(Storage.set("hotstrings_section_autocorrection_" .. section, only == nil or section == only))
+				helpers.assert_true(Storage.set(require("modules.keymap.section_keys").current("autocorrection", section), only == nil or section == only))
 			end
 			helpers.assert_true(Registry.load_toml("autocorrection", helpers.shared("modules/hotstrings/autocorrection.toml")))
 			-- Native registration adds NBSP/NNBSP aliases to these three spaced
@@ -366,7 +366,7 @@ local function shipped_split_registry(only)
 				end
 			end
 			for _, section in ipairs({ "names", "abbreviations", "technical_terms" }) do
-				helpers.assert_true(Storage.set("hotstrings_section_autocorrection_" .. section, false))
+				helpers.assert_true(Storage.set(require("modules.keymap.section_keys").current("autocorrection", section), false))
 			end
 			helpers.assert_true(Registry.reload_toml("autocorrection", helpers.shared("modules/hotstrings/autocorrection.toml")))
 			helpers.assert_eq(#state.mappings, baseline_count, "disabled current families remove their canonical rules and native aliases only")

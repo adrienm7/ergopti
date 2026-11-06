@@ -412,8 +412,8 @@ local function prefix_values(personal_data)
 		and personal_data.social_security_number or tostring(personal_data.social_security_number or "")
 	local iban = type(personal_data.iban) == "string"
 		and personal_data.iban or tostring(personal_data.iban or "")
-	return phone, formatted_phone, ssn:gsub("%s+", ""), ssn,
-		iban:gsub("%s+", ""), iban
+	return phone, formatted_phone, SharedEngine.strip_prefix_spacing(ssn), ssn,
+		SharedEngine.strip_prefix_spacing(iban), iban
 end
 
 --- Publishes prefix counts into the exact section descriptors owned by the menu.
@@ -509,26 +509,26 @@ local function register_prefix_entries()
 			local phone_opts  = opts_for("phone_number")
 			local phone_magic_opts = opts_for("phone_number", { is_magic_trigger = true })
 			local fphone_opts = opts_for("phone_number_clean")
-			if #phone >= 2 then
-				add_mapping(phone:sub(1, 2) .. _trigger, phone, phone_magic_opts)
-				add_mapping("+33" .. phone:sub(1, 2), "+33" .. phone, phone_opts)
+			if text_utils.utf8_len(phone) >= 2 then
+				add_mapping(text_utils.utf8_sub(phone, 1, 2) .. _trigger, phone, phone_magic_opts)
+				add_mapping("+33" .. text_utils.utf8_sub(phone, 1, 2), "+33" .. phone, phone_opts)
 			end
-			if #phone >= 4 then
-				add_mapping(phone:sub(1, 4), phone, phone_opts)
-				add_mapping("+33" .. phone:sub(2, 4), "+33" .. phone, phone_opts)
+			if text_utils.utf8_len(phone) >= 4 then
+				add_mapping(text_utils.utf8_sub(phone, 1, 4), phone, phone_opts)
+				add_mapping("+33" .. text_utils.utf8_sub(phone, 2, 4), "+33" .. phone, phone_opts)
 			end
-			if #phone >= 6 then
-				add_mapping(phone:sub(2, 5), phone, phone_opts)
+			if text_utils.utf8_len(phone) >= 6 then
+				add_mapping(text_utils.utf8_sub(phone, 2, 5), phone, phone_opts)
 			end
-			if #fphone >= 5 then
-				add_mapping(fphone:sub(1, 5), fphone, fphone_opts)
+			if text_utils.utf8_len(fphone) >= 5 then
+				add_mapping(text_utils.utf8_sub(fphone, 1, 5), fphone, fphone_opts)
 			end
 		end
 
 		-- Register SSN prefixes: no-space trigger → SSN without spaces; spaced → SSN with spaces
 		if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "ssnprefixes") then
-			if #ssn_raw >= 5 then
-				local ssn_raw_pfx    = ssn_raw:sub(1, 5)
+			if text_utils.utf8_len(ssn_raw) >= 5 then
+				local ssn_raw_pfx    = text_utils.utf8_sub(ssn_raw, 1, 5)
 				local ssn_spaced_pfx = SharedEngine.spaced_prefix(ssn, 5)
 				local ssn_opts       = opts_for("social_security_number")
 				add_mapping(ssn_raw_pfx, ssn_raw, ssn_opts)
@@ -541,13 +541,13 @@ local function register_prefix_entries()
 		-- Register IBAN prefixes: 6 raw chars (case-insensitive) → IBAN without spaces;
 		-- 7-char spaced trigger (e.g. "FR76 XX") → IBAN with spaces.
 		if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "ibanprefixes") then
-			if #iban_raw >= 6 then
-				local iban_raw_pfx    = iban_raw:sub(1, 6)
+			if text_utils.utf8_len(iban_raw) >= 6 then
+				local iban_raw_pfx    = text_utils.utf8_sub(iban_raw, 1, 6)
 				local iban_spaced_pfx = SharedEngine.spaced_prefix(iban, 6)
 				-- is_private for the same reason as `base_opts` above: the IBAN and its
 				-- 6-char prefix trigger are both secret
 				local opts_ci = opts_for("iban", { is_case_sensitive = false })
-				add_mapping(iban_raw_pfx, iban:gsub("%s+", ""), opts_ci)
+				add_mapping(iban_raw_pfx, iban_raw, opts_ci)
 				if iban_spaced_pfx ~= iban_raw_pfx then
 					add_mapping(iban_spaced_pfx, iban, opts_ci)
 				end

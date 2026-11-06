@@ -63,8 +63,11 @@ def owned_path(temporary, candidate):
 
 def run_fixture(lua, temporary, fixture=None):
     """Answer Lua API requests with one real connection and an owned child deadline."""
-    connection = None
-    identity = 0
+    bridge_path = ROOT / "static/ergopti_plus/macos/tests/support/keystats/rebuild_sqlite_bridge.py"
+    spec = importlib.util.spec_from_file_location("physical_rebuild_sqlite_bridge", bridge_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    bridge = module.RebuildSQLiteBridge(temporary)
     digests = {}
     digest_identity = 0
     child = subprocess.Popen(
@@ -136,15 +139,6 @@ def run_fixture(lua, temporary, fixture=None):
                         owned_path(temporary, request["destination"]),
                     )
                     value = True
-                elif operation == "open":
-                    if connection is not None:
-                        raise ValueError("Prior SQLite connection is still owned")
-                    connection = sqlite3.connect(
-                        owned_path(temporary, request["path"]), isolation_level=None
-                    )
-                    connection.row_factory = sqlite3.Row
-                    identity += 1
-                    value = identity
                 elif operation == "sha256_new":
                     digest_identity += 1
                     digests[digest_identity] = hashlib.sha256()
@@ -154,32 +148,15 @@ def run_fixture(lua, temporary, fixture=None):
                     value = True
                 elif operation == "sha256_finish":
                     value = digests.pop(request["digest"]).hexdigest()
+                elif operation == "open" and request["path"] != "":
+                    owned_path(temporary, request["path"])
+                    value = bridge._handle(request)
+                elif operation == "bound":
+                    db = bridge._connection(request["connection"])
+                    db.execute(request["sql"], request["values"])
+                    value = 0
                 else:
-                    if connection is None or request["connection"] != identity:
-                        raise ValueError("SQLite request does not own the live connection")
-                    if operation == "close":
-                        connection.close()
-                        connection = None
-                        value = 0
-                    elif operation == "rows":
-                        value = [dict(row) for row in connection.execute(request["sql"])]
-                    elif operation == "bound":
-                        connection.execute(request["sql"], request["values"])
-                        value = 0
-                    elif operation == "exec":
-                        # executescript implicitly commits; execute complete statements
-                        # separately so the production BEGIN/COMMIT boundary stays real.
-                        pending = ""
-                        for character in request["sql"]:
-                            pending += character
-                            if character == ";" and sqlite3.complete_statement(pending):
-                                connection.execute(pending)
-                                pending = ""
-                        if pending.strip():
-                            connection.execute(pending)
-                        value = 0
-                    else:
-                        raise ValueError("Unknown SQLite bridge operation")
+                    value = bridge._handle(request)
                 response = {"ok": True, "value": value}
             except (KeyError, ValueError, OSError, sqlite3.Error) as error:
                 response = {"ok": False, "error": str(error)}
@@ -191,8 +168,8 @@ def run_fixture(lua, temporary, fixture=None):
             raise AssertionError(
                 child.stderr.read() or "Physical persistence fixture did not finish"
             )
-        if connection is not None:
-            raise AssertionError("Physical persistence fixture retained a live SQLite connection")
+        if bridge.connections or bridge.backups:
+            raise AssertionError("Physical persistence fixture retained a live SQLite capability")
         return receipt
     finally:
         selector.close()
@@ -201,8 +178,7 @@ def run_fixture(lua, temporary, fixture=None):
             child.wait(timeout=5)
         for pipe in (child.stdin, child.stdout, child.stderr):
             pipe.close()
-        if connection is not None:
-            connection.close()
+        bridge.close()
 
 
 class PhysicalReleasePersistenceTests(unittest.TestCase):

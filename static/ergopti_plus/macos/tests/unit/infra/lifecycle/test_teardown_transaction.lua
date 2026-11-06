@@ -25,6 +25,60 @@ local function load_transaction()
 end
 
 helpers.describe("retryable local teardown transaction", function()
+	helpers.it("keeps sibling cleanup and retry state when error formatting fails (teardown-error-object)", function()
+		local transaction, errors = load_transaction()
+		local state = transaction.new_state()
+		local calls, fail = 0, true
+		local hostile = setmetatable({}, { __tostring = function() error("formatting failed") end })
+		local steps = {
+			{ name = "unstable", run = function() if fail then error(hostile) end end },
+			{ name = "sibling", run = function() calls = calls + 1 end },
+		}
+		helpers.assert_eq(transaction.run(state, steps), false)
+		helpers.assert_eq(calls, 1, "a failed diagnostic must not skip sibling cleanup")
+		helpers.assert_eq(state.running, false, "failure must not strand the transaction")
+		helpers.assert_contains(errors[1], "error object (table)")
+		fail = false
+		helpers.assert_true(transaction.run(state, steps), "the failed owner remains retryable")
+		helpers.assert_eq(calls, 1, "the successful sibling must not run twice")
+	end)
+
+	helpers.it("retains validated steps and finalizer across reentrant mutation (teardown-step-mutation)", function()
+		local transaction = load_transaction()
+		local state = transaction.new_state()
+		local calls = {}
+		local second = { name = "second", run = function() calls[#calls + 1] = "second" end }
+		local finalizer = { name = "finalizer", run = function() calls[#calls + 1] = "finalizer" end }
+		local steps = {}
+		steps[1] = { name = "first", run = function()
+			calls[#calls + 1] = "first"
+			steps[2] = nil
+			second.run = function() calls[#calls + 1] = "replacement" end
+			finalizer.run = function() calls[#calls + 1] = "replacement-finalizer" end
+		end }
+		steps[2] = second
+		helpers.assert_true(transaction.run_with_finalizer(state, steps, finalizer))
+		helpers.assert_eq(calls, { "first", "second", "finalizer" },
+			"validation must retain the actual capabilities until their execution")
+		helpers.assert_true(state.completed.second)
+		helpers.assert_true(state.completed.finalizer)
+	end)
+
+	helpers.it("rejects sparse step lists before cleanup or finalization (teardown-sparse-steps)", function()
+		local transaction = load_transaction()
+		local calls = 0
+		local function step(name)
+			return { name = name, run = function() calls = calls + 1 end }
+		end
+		for _, steps in ipairs({ { [2] = step("hidden") }, { step("first"), [3] = step("hidden") },
+			{ step("first"), extra = step("hidden") } }) do
+			local state = transaction.new_state()
+			helpers.assert_eq(transaction.run(state, steps), false)
+			helpers.assert_eq(transaction.run_with_finalizer(state, steps, step("finalizer")), false)
+			helpers.assert_eq(calls, 0, "an incomplete list must not commit any cleanup")
+		end
+	end)
+
 	helpers.it("continues healthy siblings and retries only unproven steps", function()
 		local transaction, errors = load_transaction()
 		local state = transaction.new_state()

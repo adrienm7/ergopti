@@ -18,6 +18,14 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local vectors_file = assert(io.open(helpers.shared("tests/corpus/keystats/manifest_key_vectors.json"), "r"))
+local vectors = require("json").decode(vectors_file:read("*a"))
+vectors_file:close()
+local keys = require("keystats.manifest_keys")
+for _, vector in ipairs(vectors) do
+	helpers.assert_eq(keys.encode(vector.label), vector.key)
+	helpers.assert_eq(keys.decode(vector.key), vector.label)
+end
 
 --- Loads a fresh reader whose database answers one table with given rows.
 --- @param table_name string Table whose SELECT returns `rows`.
@@ -41,6 +49,34 @@ local function reader_answering(table_name, rows)
 end
 
 helpers.describe("macOS manifest: fields under the dashboard's keys", function()
+	helpers.it("keeps reserved application labels separate from system totals", function()
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		local sqlite = {OK = 0, open = function()
+			return {exec = function() return 0 end, close = function() end, nrows = function(_, sql)
+				local rows = {}
+				if sql:find("FROM agg_app_day[^%w_]") then
+					rows = {{date = "2026-10-01", app = "_system", chars = 7},
+						{date = "2026-10-01", app = "_sys", chars = 8},
+						{date = "2026-10-01", app = "~app", chars = 9},
+						{date = "2026-10-01", app = "Editor", chars = 10}}
+				elseif sql:find("FROM agg_system_day[^%w_]") then
+					rows = {{date = "2026-10-01", wifi_changes = 1}}
+				end
+				local index = 0
+				return function() index = index + 1; return rows[index] end
+			end}
+		end}
+		local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", {sqlite3 = sqlite})
+		local manifest, complete = reader.read_manifest("/fake/db")
+		helpers.assert_true(complete)
+		local day = manifest["2026-10-01"]
+		helpers.assert_eq(day["~_system"].chars, 7)
+		helpers.assert_eq(day["~_sys"].chars, 8)
+		helpers.assert_eq(day["~~app"].chars, 9)
+		helpers.assert_eq(day.Editor.chars, 10)
+		helpers.assert_eq(day._system.wifi_changes, 1)
+	end)
+
 	helpers.it("projects key holds as { s, n, m, tap, hold } like Windows and Linux", function()
 		local reader = reader_answering("agg_app_day_kc_hold", {
 			{ date = "2026-10-01", app = "Code", keycode = 56, s = 13000, c = 60, mx = 1200, t = 48, h = 12 },

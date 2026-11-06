@@ -25,6 +25,17 @@ local function dict_of(count)
 end
 
 helpers.describe("n-gram history merge yields to the run loop (ngram-merge-paced)", function()
+	helpers.it("refuses overflowing history merges without corrupting the existing token", function()
+		local Reader = helpers.load_with_stubs("modules.keystats.sqlite_reader")
+		for _, pair in ipairs({{1e308, 1e308}, {math.maxinteger, 1}, {math.mininteger, -1}}) do
+			local into, from = dict_of(1), dict_of(1)
+			into.c.t1.c, from.c.t1.c = pair[1], pair[2]
+			local ok = pcall(Reader.merge_ngrams, into, from)
+			helpers.assert_eq(ok, false, "an overflowing total cannot be published as valid history")
+			helpers.assert_eq(into.c.t1.c, pair[1], "the rejected token remains unchanged")
+		end
+	end)
+
 	helpers.it("pauses at every merged token when given a pacer", function()
 		local Reader = helpers.load_with_stubs("modules.keystats.sqlite_reader")
 		local pauses = 0
@@ -45,6 +56,7 @@ helpers.describe("n-gram history merge yields to the run loop (ngram-merge-paced
 		local reader = {
 			next_day = Real.next_day,
 			split_bounds = Real.split_bounds,
+			history_fingerprint_exact = true, -- Controlled fixture with immutable historical rows.
 			fingerprint = function() return "unchanged" end,
 			read_today_split = function() return {} end,
 			read_ngrams = function() return dict_of(TOKENS), true end,

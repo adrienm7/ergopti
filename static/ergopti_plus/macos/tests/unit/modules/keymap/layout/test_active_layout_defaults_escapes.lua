@@ -69,4 +69,12 @@ helpers.describe("active-layout-defaults-escapes", function()
 		end
 		helpers.assert_eq(#parse('()'), 0)
 	end)
+
+	helpers.it("does not select an ambiguous display name (active-layout-ambiguous-name)", function()
+		local parse = load_parser()
+		local raw = '({ "KeyboardLayout Name" = "Foo_Bar"; }, { "KeyboardLayout Name" = "Foo Bar"; })'
+		local records = parse(raw, "Foo Bar")
+		helpers.assert_eq(records[1].selected, false)
+		helpers.assert_eq(records[2].selected, false)
+	end)
 end)

@@ -49,6 +49,7 @@ local Logger = require("infra.logger")
 local NativePath = require("native_path")
 local LlmLine = require("tooltip.llm_line")
 local KeyNames = require("keycodes.key_names")
+local HexColor = require("color.hex")
 local LOG = "tooltip_config"
 
 -- Populated strictly from _shared/modules/tooltip/constants.toml at require-time (fail fast).
@@ -144,20 +145,16 @@ local TINT_KEY_TO_CATEGORY = {
 	hotstring_personal    = "personal",
 }
 
---- Parse a hex string ("#rrggbb" or "rrggbb") into an RGBA table the canvas
+--- Parse a CSS hex string into an RGBA table the canvas
 --- subsystem accepts. Returns nil for malformed input so callers can fall
 --- back to the static accent_colors table.
 --- @param hex string|nil
 --- @return table|nil
 local function parse_hex_color(hex)
-	if type(hex) ~= "string" or hex == "" then return nil end
-	if hex:sub(1, 1) == "#" then hex = hex:sub(2) end
-	if #hex ~= 6 then return nil end
-	local r = tonumber(hex:sub(1, 2), 16)
-	local g = tonumber(hex:sub(3, 4), 16)
-	local b = tonumber(hex:sub(5, 6), 16)
-	if not (r and g and b) then return nil end
-	return { red = r / 255, green = g / 255, blue = b / 255, alpha = 1.0 }
+	local color = HexColor.parse(hex)
+	if not color then return nil end
+	color.alpha = 1.0
+	return color
 end
 
 --- Returns the accent color for a display context, gated by the colorization setting.

@@ -46,6 +46,7 @@ local LOG = "adapters.field_check_ports"
 --- @param environment table|nil Explicit child environment (the launcher's identity).
 local function exec(executable, args, timeout_s, callback, environment)
 	local settled, timer, handle = false, nil, nil
+	local retiring = false
 	local function settle(code, stdout, stderr)
 		if settled then return end
 		settled = true
@@ -53,18 +54,44 @@ local function exec(executable, args, timeout_s, callback, environment)
 		callback(code, stdout, stderr or "")
 	end
 	handle = ShellRunner.spawn(executable, args, function(code, stdout, stderr)
-		settle(code, stdout, stderr)
+		if not retiring then settle(code, stdout, stderr) end
 	end, nil, environment)
-	if handle.isSettled() or not handle.start() then
+	local function retire(reason)
+		if retiring or settled then return end
+		retiring = true
+		local observer_ok, observed = pcall(handle.onSettled, function() settle(nil, "", reason) end)
+		if not observer_ok or observed ~= true then
+			Logger.error(LOG, "Could not observe the child after %s.", reason)
+		end
+		if settled then return end
+		local terminated, accepted = pcall(handle.terminate)
+		if not terminated or accepted ~= true then Logger.error(LOG, "Could not terminate the child after %s.", reason) end
+	end
+	if handle.isSettled() then
 		Logger.warn(LOG, "Could not start %s.", NativePath.basename(executable) or "a command")
 		settle(nil, "")
 		return
 	end
-	timer = Timer.after(timeout_s, function()
+	if not handle.start() then
+		Logger.warn(LOG, "Could not start %s.", NativePath.basename(executable) or "a command")
+		if handle.isSettled() then settle(nil, "") else retire("start refused") end
+		return
+	end
+	if settled then return end
+	local timer_committed
+	timer, timer_committed = Timer.after(timeout_s, function()
 		timer = nil
-		pcall(handle.terminate)
-		settle(nil, "")
+		retire("deadline expired")
 	end)
+	if settled then
+		if timer then Timer.cancel(timer); timer = nil end
+		return
+	end
+	if timer_committed ~= true then
+		-- The task was already started. A refused deadline is not permission to
+		-- abandon it or report completion before the exact process is retired.
+		retire("deadline unavailable")
+	end
 end
 
 

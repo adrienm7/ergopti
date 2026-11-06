@@ -51,6 +51,7 @@ local function load_coordinator(options)
 			calls.reason = reason
 			calls.lease_callback = callback
 			append("request-lease")
+			if options.request_error_object then error(options.request_error_object) end
 			if options.request_raises then error("synthetic lease request failure") end
 			if options.synchronous_result ~= nil then
 				callback(options.synchronous_result, "synchronous")
@@ -74,6 +75,7 @@ local function load_coordinator(options)
 			calls.teardowns = calls.teardowns + 1
 			calls.teardown_kind = kind
 			append("teardown-" .. kind)
+			if options.teardown_error_object then error(options.teardown_error_object) end
 			if options.teardown_synchronous_ready ~= nil and not calls.teardown_released then
 				calls.teardown_released = true
 				on_ready(options.teardown_synchronous_ready, "synchronous teardown boundary")
@@ -135,6 +137,11 @@ local function load_coordinator(options)
 			-- The reload deadline has its own bound; it never joins the call order
 			if delay == 30 then
 				calls.reload_deadline_callback = callback
+				if options.reload_deadline_inline then callback() end
+				if options.reload_deadline_throw_after then error("schedule failed after callback") end
+				if options.reload_timer_raises then error("timer unavailable") end
+				if options.reload_timer_refused then return false end
+				if options.reload_timer ~= nil then return options.reload_timer end
 				return { stop = function() calls.reload_deadline_stopped = true; return true end }
 			end
 			calls.watchdog_delay = delay
@@ -162,6 +169,20 @@ local function load_coordinator(options)
 end
 
 helpers.describe("controlled termination coordinator", function()
+	helpers.it("contains opaque errors before and after the lease fence (termination-error-object)", function()
+		local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
+		local before, before_calls = load_coordinator({ request_error_object = hostile })
+		helpers.assert_eq(before.request_reload("opaque_request"), false)
+		helpers.assert_eq(before.is_pending(), false, "pre-fence refusal must release the transaction")
+		helpers.assert_eq(before_calls.reloads, 0)
+
+		local after, after_calls = load_coordinator({ teardown_error_object = hostile })
+		helpers.assert_true(after.request_reload("opaque_teardown"))
+		after_calls.lease_callback(true, "stopped")
+		helpers.assert_eq(after_calls.reloads, 1, "post-fence teardown failure must reload natively")
+		helpers.assert_eq(after.is_pending(), false)
+	end)
+
 	helpers.it("refuses publication debt before requesting a fence or arming the user-quit watchdog", function()
 		local captures = 0
 		local coordinator, calls = load_coordinator({ capture_publication_admission = function()
@@ -944,6 +965,72 @@ helpers.describe("controlled termination coordinator", function()
 		helpers.assert_eq(calls.teardowns, 0)
 	end)
 
+	helpers.it("does not fence after an inline reload deadline has already fired (reload-deadline-inline)", function()
+		for _, options in ipairs({
+			{ reload_deadline_inline = true },
+			{ reload_deadline_inline = true, reload_deadline_throw_after = true },
+			{ reload_deadline_inline = true, reload_raises = true },
+		}) do
+			local coordinator, calls = load_coordinator(options)
+			helpers.assert_eq(coordinator.request_reload("inline_deadline"), not options.reload_raises)
+			helpers.assert_eq(calls.reloads, 1)
+			helpers.assert_eq(calls.lease_requests, 0, "the expired transaction cannot request a lease")
+			helpers.assert_eq(coordinator.is_pending(), false)
+			if not options.reload_deadline_throw_after then
+				helpers.assert_true(calls.reload_deadline_stopped, "the late returned handle must be retired")
+			end
+		end
+	end)
+
+	helpers.it("retains an inline deadline whose native stop refuses until retry (reload-deadline-cleanup)", function()
+		for _, failure in ipairs({ "false", "nil", "throw" }) do
+			local stops = 0
+			local timer = { stop = function()
+				stops = stops + 1
+				if stops == 1 then
+					if failure == "throw" then error("stop failed") end
+					if failure == "nil" then return nil end
+					return false
+				end
+				return true
+			end }
+			local coordinator, calls = load_coordinator({ reload_deadline_inline = true, reload_timer = timer })
+			helpers.assert_true(coordinator.request_reload("inline_cleanup"))
+			helpers.assert_eq(stops, 1)
+			helpers.assert_eq(calls.lease_requests, 0)
+			helpers.assert_true(coordinator.request_exit("retry_cleanup"), "a later request retries the retained timer")
+			helpers.assert_eq(stops, 2)
+			helpers.assert_true(coordinator.retry_deadline_cleanup())
+			helpers.assert_eq(stops, 2, "a settled timer must not be stopped twice")
+		end
+	end)
+
+	helpers.it("refuses reload before fencing if its deadline cannot be armed (reload-deadline-unavailable)", function()
+		for _, options in ipairs({ { reload_timer_raises = true }, { reload_timer_refused = true },
+			{ reload_timer = true }, { reload_timer = {} } }) do
+			local aborts = 0
+			options.capture_publication_admission = function()
+				return { current = function() return true end, abort = function() aborts = aborts + 1; return true end }
+			end
+			local coordinator, calls = load_coordinator(options)
+			helpers.assert_eq(coordinator.request_reload("no_deadline"), false)
+			helpers.assert_eq(calls.lease_requests, 0, "a reload without a deadline must not revoke the lease")
+			helpers.assert_eq(aborts, 1, "the acquired publication admission must be released")
+			helpers.assert_eq(coordinator.is_pending(), false)
+		end
+	end)
+
+	helpers.it("stops a userdata reload deadline when its transaction aborts (reload-userdata-timer)", function()
+		local timer = assert(io.tmpfile())
+		timer:close()
+		local stopped = false
+		debug.setmetatable(timer, { __index = { stop = function(self) stopped = true; return self end } })
+		local coordinator, calls = load_coordinator({ reload_timer = timer })
+		helpers.assert_true(coordinator.request_reload_owned("userdata_timer", function() end))
+		calls.lease_callback(false, "refused")
+		helpers.assert_true(stopped, "Hammerspoon's userdata timer must be stopped on abort")
+	end)
+
 	helpers.it("disarms the reload deadline once the reload settles, aborts or becomes an exit (reload-deadline)", function()
 		local settled, settled_calls = load_coordinator()
 		helpers.assert_true(settled.request_reload("menu"))
@@ -998,6 +1085,24 @@ helpers.describe("controlled termination coordinator", function()
 		helpers.assert_true(raising.request_reload("watcher"))
 		raising_calls.lease_callback(false, "refused")
 		helpers.assert_eq(raising_calls.fatal_exits, 1)
+	end)
+
+	helpers.it("rejects nonfinite and oversized termination deadlines (termination-deadline-range)", function()
+		for _, name in ipairs({ "user_exit_deadline_seconds", "reload_deadline_seconds" }) do
+			for _, value in ipairs({ 0 / 0, math.huge, math.maxinteger }) do
+				package.loaded["infra.termination_coordinator"] = nil
+				local coordinator = require("infra.termination_coordinator")
+				local noop = function() return true end
+				local deps = {
+					request_lease = noop, drain_input = noop, teardown = noop, begin_drain = noop,
+					finalize_teardown = noop, reload = noop, exit = noop, fatal_exit = noop,
+					mark_reload = noop, clear_reload = noop, schedule = noop, fatal_exit_code = 70,
+					user_exit_deadline_seconds = 12, reload_deadline_seconds = 30,
+				}
+				deps[name] = value
+				helpers.assert_eq(coordinator.init(deps), false, name .. " must be a bounded positive duration")
+			end
+		end
 	end)
 
 	helpers.it("refuses initialization without a positive reload deadline (reload-deadline)", function()

@@ -139,6 +139,7 @@ local MOUSE_MOVE_THROTTLE_SEC = 0.2
 -- ========================
 
 local _canvas            = nil
+local _canvas_releasing  = false
 local _timer             = nil
 local _mouse_tap         = nil   -- hs.eventtap watching mouse/touchpad events
 local _running           = false -- true between start() and stop(); guards redundant restarts
@@ -454,6 +455,23 @@ local function release_runtime()
 	return generation == _generation and timer_stopped and tap_stopped
 end
 
+--- Retires the exact canvas before allowing another widget generation.
+--- @return boolean settled
+local function release_canvas()
+	if _canvas_releasing then return false end
+	local canvas = _canvas
+	if not canvas then return true end
+	_canvas_releasing = true
+	local ok = pcall(function() canvas:delete() end)
+	_canvas_releasing = false
+	if not ok then
+		Logger.error(LOG, "WPM widget canvas cleanup failed; exact canvas retained.")
+		return false
+	end
+	if _canvas == canvas then _canvas = nil end
+	return true
+end
+
 
 
 
@@ -494,6 +512,8 @@ function M.start(show_graph)
 		Logger.error(LOG, "WPM widget start refused: prior cleanup remains pending.")
 		return false
 	end
+	if before_start ~= _generation then return false end
+	if not release_canvas() then return false end
 	if before_start ~= _generation then return false end
 	_show_graph = want_graph
 	_generation = _generation + 1
@@ -578,7 +598,7 @@ function M.stop()
 	local generation = _generation
 	local runtime_stopped = release_runtime()
 	if generation ~= _generation then return false end
-	if _canvas then _canvas:delete(); _canvas = nil end
+	if not release_canvas() then return false end
 	if generation ~= _generation then return false end
 	Logger.debug(LOG, "Stopping floating WPM widget…")
 	if generation ~= _generation then return false end

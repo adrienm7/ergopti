@@ -91,12 +91,21 @@ local function with_stream(backend, callback)
 			if code == 2 then return nil, "absent" end
 			return nil, "error", detail
 		end
+		filesystem.remove_if_unchanged = function(path, expected, _, admission)
+			local file = assert(open(path, "rb"))
+			local content = assert(file:read("*a"))
+			assert(file:close())
+			if content ~= expected.content or not admission() then return false end
+			return filesystem.remove_exact(path)
+		end
 		filesystem.create_secure_temp_file = function()
 			if h.allocation_refusal then return h.allocation_result, "CONTROLLED_ALLOCATION_FAILURE" end
 			local path = os.tmpname()
 			h.paths[#h.paths] = path
 			h.writable_paths[path] = true
-			return path
+			if h.missing_identity then return path end
+			local identity = assert(require("lfs").symlinkattributes(path))
+			return path, nil, { dev = identity.dev, ino = identity.ino }
 		end
 		io.open = function(path, mode)
 			if not h.writable_paths[path] or mode ~= "w" then return open(path, mode) end

@@ -44,6 +44,51 @@ local function with_browser(scenario)
 end
 
 helpers.describe("model browser exact JavaScript completion owner", function()
+	helpers.it("reports native submission refusal for catalogue and progress updates", function()
+		with_browser(function(host, h, errors)
+			ready(h)
+			h.windows[1].evaluateJavaScript = function() return false end
+			assert(host.refresh() == false)
+			assert(host.inject_progress({ backend = "mlx", name = "model", percent = 20 }) == false)
+			assert(host.inject_install_progress({ backend = "mlx", percent = 20 }) == false)
+			assert(#errors == 1)
+		end)
+	end)
+	helpers.it("refuses updates when a ready view loses its JavaScript method", function()
+		with_browser(function(host, h, errors)
+			ready(h)
+			h.windows[1].evaluateJavaScript = false
+			assert(host.refresh() == false)
+			assert(host.inject_progress({ backend = "mlx", name = "model", percent = 20 }) == false)
+			assert(#errors == 1)
+		end)
+	end)
+	helpers.it("discards a catalogue when its provider closes the browser", function()
+		with_browser(function(host, h, errors)
+			local pending = ready(h)
+			local result = host.open({ build_payload = function()
+				assert(host.close())
+				return { models = {} }
+			end })
+			assert(result == false and #pending == 1 and #errors == 0)
+		end)
+	end)
+	for _, kind in ipairs({ "throws", "nil", "models" }) do
+		helpers.it("rejects a malformed catalogue provider: " .. kind, function()
+			with_browser(function(host, h, errors)
+				local pending = ready(h)
+				local ok, result = pcall(host.open, { build_payload = function()
+					if kind == "throws" then error("private catalogue data") end
+					if kind == "nil" then return nil end
+					return { models = false }
+				end })
+				assert(ok and result == false)
+				assert(#pending == 1 and #errors == 1)
+				assert(not errors[1]:find("private catalogue data", 1, true))
+				assert(host.refresh() == false)
+			end)
+		end)
+	end
 	helpers.it("accepts the native bare code-zero sentinel without an error", function()
 		with_browser(function(_, h, errors)
 			ready(h)[1].complete(true, { code = 0 })

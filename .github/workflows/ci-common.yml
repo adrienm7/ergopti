@@ -329,6 +329,12 @@ jobs:
       - name: Test shared layer editor rendering
         run: npm run test:browser:layer-editor
 
+      - name: Test shared hotstring editor rendering
+        run: npm run test:browser:hotstring-editor
+
+      - name: Test shared model browser draft
+        run: npm run test:browser:model-browser-draft
+
       - name: Test shared physical shortcut rendering
         run: npm run test:browser:physical-shortcuts
 

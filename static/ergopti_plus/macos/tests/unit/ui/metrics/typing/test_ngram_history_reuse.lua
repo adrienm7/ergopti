@@ -40,7 +40,8 @@ local function fixture()
 		next_day = Real.next_day,
 		split_bounds = Real.split_bounds,
 		merge_ngrams = Real.merge_ngrams,
-		fingerprint = function() return "unchanged" end,
+		history_fingerprint_exact = true, -- Controlled fixture with immutable historical rows.
+			fingerprint = function() return "unchanged" end,
 		read_today_split = function() return {}, true end,
 		read_ngrams = function() return dict_of(1), world.complete end,
 	}

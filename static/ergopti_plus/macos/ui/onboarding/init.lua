@@ -65,6 +65,7 @@ local TAP_HOLD_IMPORT_TIMEOUT_SEC = 30
 
 -- Path to config.toml — set by M.run() before the wizard opens
 local _config_path  = nil
+local _config_path_unresolved = false
 
 -- The generated catalogue of this driver, loaded by the first run.
 local _catalogue = nil
@@ -498,18 +499,17 @@ end
 --- MenuPaths so a config-dir change made moments earlier is honoured. Pure apart
 --- from the injected resolver, so the retarget is testable without a webview.
 --- @param menu_paths table The ui.menu.menu_paths module (or a test double).
---- @param fallback string Path to keep when the resolver yields nothing usable.
---- @return string Absolute path to config.toml.
+--- @param fallback string Previously captured path, used only for diagnostics.
+--- @return string|nil Absolute path to config.toml, or nil on resolution failure.
 function M._resolve_commit_path(menu_paths, fallback)
 	if type(menu_paths) ~= "table" or type(menu_paths.get) ~= "function" then
-		return fallback
+		return nil
 	end
 	local ok, resolved = pcall(menu_paths.get, CONFIG_TOML_PATH_KEY)
-	-- A resolver that throws or hands back anything but a usable path must never
-	-- redirect the write: keeping the fallback still lands the answers somewhere
-	-- readable, whereas an empty target would drop them on the floor.
-	if not ok or type(resolved) ~= "string" or resolved == "" then
-		return fallback
+	-- The old capture is no longer authoritative once the folder changed.
+	if not ok or type(resolved) ~= "string" or not NativePath.is_absolute(resolved)
+		or resolved:find("\0", 1, true) then
+		return nil
 	end
 	if resolved ~= fallback then
 		Logger.info(LOG, "Config write retargeted to '%s' (was '%s').", resolved, tostring(fallback))
@@ -635,7 +635,7 @@ local function import_nav_layer(keys)
 		if not NavLayer.recommendation_enters_layer(keys, require("platform.remap.defaults").tap_hold) then
 			return nil, false
 		end
-		local imported = NavLayer.import_recommended({ config_dir = require("infra.config_paths").get_config_dir() })
+		local imported = NavLayer.import_owned({ config_dir = require("infra.config_paths").get_config_dir() })
 		return imported, imported == nil
 	end)
 	if not ok then
@@ -719,6 +719,7 @@ local function commit_owned(answers, publication)
 	-- "drop the override" case internally).
 	local previous_config_path = _config_path
 	if answers.config_dir ~= "" then
+		_config_path_unresolved = true
 		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
 		local persisted, persist_err = M._persist_config_dir(
 			ok_mp and menu_paths or nil,
@@ -733,7 +734,18 @@ local function commit_owned(answers, publication)
 		-- BEFORE the wizard ran; persistence above moved the resolver. Writing
 		-- through the stale path would leave the NEW directory without config.toml,
 		-- so should_run() would reopen the wizard with every answer lost.
-		_config_path = M._resolve_commit_path(menu_paths, _config_path)
+		local resolved_path = M._resolve_commit_path(menu_paths, _config_path)
+		if not resolved_path then
+			Logger.error(LOG, "The selected configuration path could not be resolved; onboarding answers were not written.")
+			fail_commit("paths_editor.save_failed_title", i18n.get("paths_editor.save_failed"))
+			return
+		end
+		_config_path = resolved_path
+		_config_path_unresolved = false
+	elseif _config_path_unresolved then
+		Logger.error(LOG, "The selected configuration folder must be confirmed again; onboarding answers were not written.")
+		fail_commit("paths_editor.save_failed_title", i18n.get("onboarding.error.commit_redirect_render"))
+		return
 	end
 
 	-- Switch to the chosen locale before writing so success messages are translated,
@@ -814,7 +826,7 @@ local function commit_owned(answers, publication)
 	import_tap_holds(tap_hold_keys, _config_path ~= previous_config_path, function(ok, detail)
 		-- Only a refusal takes the layer back: after a timeout the keys may
 		-- still land, and they must not enter an empty layer then.
-		if not ok then require("platform.remap.nav_layer").undo_import(layer) end
+		if not ok then require("platform.remap.nav_layer").undo_owned(layer) end
 		if settled then
 			Logger.warn(LOG, "The tap-hold import answered after the wizard went on without it: %s.",
 				tostring(detail))
@@ -1019,7 +1031,7 @@ function M.run(config_path)
 	-- Retained cleanup authority cannot retarget its captured configuration.
 	-- Same-source reuse keeps the existing singleton acknowledgment and revoked page.
 	if _webview and _focus_owner == nil and config_path ~= _config_path then return false end
-	_config_path = config_path
+	if _webview and not _config_path_unresolved then _config_path = config_path end
 
 	-- Bring the existing window to front if the wizard is already open
 	if _webview then
@@ -1032,6 +1044,8 @@ function M.run(config_path)
 		end
 		return true
 	end
+	_config_path = config_path
+	_config_path_unresolved = false
 	if _usercontent and close_webview() ~= true then
 		Logger.error(LOG, "Cannot open onboarding while bridge cleanup remains pending.")
 		return false

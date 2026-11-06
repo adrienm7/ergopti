@@ -60,4 +60,61 @@ helpers.describe("login startup menu", function()
 		helpers.assert_eq(module.enabled(), false)
 		helpers.assert_eq(calls.errors, 2)
 	end)
+	helpers.it("runs a queued click when refreshing the menu raises", function()
+		local module, deps, calls = fixture()
+		module.request("status", function() error("refresh failed") end, deps)
+		module.request("toggle", nil, deps)
+		calls.callbacks[1](0, "enabled\n")
+		helpers.assert_eq(calls.commands, { "status", "toggle" })
+		calls.callbacks[2](0, "disabled\n")
+		helpers.assert_eq(module.enabled(), false)
+	end)
+	helpers.it("runs a queued click if the previous failure dialog cannot open", function()
+		local module, deps, calls = fixture()
+		deps.dialog.block_alert = function() error("dialog failed") end
+		module.request("toggle", nil, deps)
+		module.request("toggle", nil, deps)
+		calls.callbacks[1](1, "")
+		helpers.assert_eq(calls.commands, { "toggle", "toggle" })
+		calls.callbacks[2](0, "enabled\n")
+		helpers.assert_true(module.enabled())
+	end)
+	for _, boundary in ipairs({ "spawn", "start", "missing" }) do
+		helpers.it("allows retry after native worker " .. boundary .. " failure", function()
+			local module, deps, calls = fixture()
+			local spawn = deps.shell.spawn
+			deps.shell.spawn = function(...)
+				if boundary == "spawn" then error("spawn failed") end
+				if boundary == "start" then return { start = function() error("start failed") end } end
+				return nil
+			end
+			helpers.assert_eq(module.request("toggle", nil, deps), false)
+			helpers.assert_eq(calls.errors, 1)
+			deps.shell.spawn = spawn
+			helpers.assert_true(module.request("toggle", nil, deps))
+			helpers.assert_eq(calls.commands, { "toggle" })
+			calls.callbacks[1](0, "enabled\n")
+			helpers.assert_true(module.enabled())
+		end)
+	end
+	helpers.it("waits for a refused worker to settle before replaying a queued click", function()
+		local module, deps, calls = fixture()
+		local spawn = deps.shell.spawn
+		local settle
+		deps.shell.spawn = function()
+			return {
+				start = function() return false end,
+				isSettled = function() return false end,
+				onSettled = function(callback) settle = callback; return true end,
+			}
+		end
+		helpers.assert_eq(module.request("toggle", nil, deps), false)
+		deps.shell.spawn = spawn
+		helpers.assert_true(module.request("toggle", nil, deps))
+		helpers.assert_eq(#calls.commands, 0)
+		settle()
+		helpers.assert_eq(calls.commands, { "toggle" })
+		calls.callbacks[1](0, "enabled\n")
+		helpers.assert_true(module.enabled())
+	end)
 end)

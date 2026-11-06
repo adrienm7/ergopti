@@ -22,7 +22,7 @@ end
 
 local function load_fixture()
 	for _, name in ipairs({
-		"modules.keymap.utils", "adapters.synthetic_input",
+		"modules.keymap.utils", "adapters.clipboard", "adapters.synthetic_input",
 		"adapters.event_provenance", "adapters.timer_scheduler",
 		"infra.logger", "infra.timings",
 	}) do
@@ -196,6 +196,7 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		local original = { ["public.utf8-plain-text"] = "ORIGINAL" }
 		local current = original
 		local payload_writes = 0
+		fixture.hs.pasteboard.allContentTypes = function() return { { "public.utf8-plain-text" } } end
 		fixture.hs.pasteboard.readAllData = function() return original end
 		fixture.hs.pasteboard.writeAllData = function(saved)
 			fixture.native_write_all_data(saved)
@@ -245,6 +246,7 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		local current = original
 		local restore_attempts = 0
 		local refused_restore_before = nil
+		fixture.hs.pasteboard.allContentTypes = function() return { { "public.utf8-plain-text" } } end
 		fixture.hs.pasteboard.readAllData = function() return original end
 		fixture.hs.pasteboard.setContents = function(value)
 			fixture.native_set_contents(value)
@@ -335,6 +337,7 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		local fixture = load_fixture()
 		local original = { ["public.utf8-plain-text"] = "ORIGINAL" }
 		local current = original
+		fixture.hs.pasteboard.allContentTypes = function() return { { "public.utf8-plain-text" } } end
 		fixture.hs.pasteboard.readAllData = function() return original end
 		fixture.hs.pasteboard.setContents = function(value)
 			fixture.native_set_contents(value)
@@ -389,6 +392,7 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		local restore_attempts = 0
 		local timer_calls = 0
 		local defer_calls = 0
+		fixture.hs.pasteboard.allContentTypes = function() return { { "public.utf8-plain-text" } } end
 		fixture.hs.pasteboard.readAllData = function() return original end
 		fixture.hs.pasteboard.setContents = function(value)
 			fixture.native_set_contents(value)

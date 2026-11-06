@@ -41,7 +41,7 @@ local M = {}
 ---   log           string    Tag passed as the logger's first argument.
 ---   defaults      function  () -> decoded updater defaults | nil, reason.
 ---   json          table     { encode(value) -> string, decode(text) -> value | nil, err }.
----   file_ports    function  () -> the owner's io table (list/read/make_dir/create/replace).
+---   file_ports    function  () -> the owner's classified directory, read and publication ports.
 ---   clock         function  () -> { stamp, iso }, UTC wall-clock time of a backup.
 ---   default_roots function  () -> roots | nil, reason, log_text. The roots of
 ---                           this driver; log_text is the one error line of a refusal.

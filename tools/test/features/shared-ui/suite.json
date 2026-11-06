@@ -292,6 +292,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-encryptor-launch.cjs"],
 			"repro": "npm run test:encryptor-launch"
+		},
+		{
+			"id": "paths-editor-initialization",
+			"ordinal": 586,
+			"name": "paths editor keeps typed and browsed folders across delayed initialization",
+			"cmd": "node",
+			"args": ["tools/test/test-paths-editor-initialization.cjs"],
+			"repro": "npm run test:paths-editor-initialization"
 		}
 	]
 }

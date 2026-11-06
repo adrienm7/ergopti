@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 
 
 helpers.describe("HS-098 remote request timeout wiring", function()
-	helpers.it("passes the shared millisecond value to all three HTTP owners", function()
+	helpers.it("passes the shared millisecond value to all four HTTP owners", function()
 		local module_names = {
 			"modules.llm.api_remote",
 			"adapters.http_client",
@@ -53,9 +53,12 @@ helpers.describe("HS-098 remote request timeout wiring", function()
 			helpers.assert_true(timings_calls > 0,
 				"the remote backend must resolve the shared request timeout")
 			api.set_entries({})
-			helpers.assert_eq(#cancelled, 3,
-				"the active inference, availability, and warmup owners must all cancel")
+			helpers.assert_eq(#cancelled, 4,
+				"the active inference, availability, listing, and warmup owners must all cancel")
+			local seen = {}
 			for index, client in ipairs(cancelled) do
+				helpers.assert_nil(seen[client], "each semantic owner must cancel its own client")
+				seen[client] = true
 				helpers.assert_eq(client.timeout_ms, 60000,
 					"remote client " .. tostring(index) .. " must use the registry value")
 			end

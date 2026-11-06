@@ -59,6 +59,66 @@
 		},
 		{ "id": "ipv6_loopback", "text": "::1", "expect": { "kind": "url", "target": "http://[::1]" } },
 		{
+			"id": "ipv6_unspecified",
+			"text": "::",
+			"expect": { "kind": "url", "target": "http://[::]" }
+		},
+		{
+			"id": "ipv6_ipv4_mapped",
+			"text": "::ffff:192.0.2.1",
+			"expect": { "kind": "url", "target": "http://[::ffff:192.0.2.1]" }
+		},
+		{
+			"id": "ipv6_ipv4_uncompressed",
+			"text": "1:2:3:4:5:6:192.0.2.1",
+			"expect": { "kind": "url", "target": "http://[1:2:3:4:5:6:192.0.2.1]" }
+		},
+		{
+			"id": "ipv6_ipv4_mapped_port",
+			"text": "[::ffff:192.0.2.1]:8080/status",
+			"expect": { "kind": "url", "target": "http://[::ffff:192.0.2.1]:8080/status" }
+		},
+		{
+			"id": "ipv6_ipv4_leading_zero_rejected",
+			"text": "::ffff:192.168.001.1",
+			"expect": { "kind": "search", "target": "::ffff:192.168.001.1" }
+		},
+		{
+			"id": "ipv6_ipv4_double_zero_rejected",
+			"text": "[::ffff:00.0.0.0]:8080",
+			"expect": { "kind": "search", "target": "[::ffff:00.0.0.0]:8080" }
+		},
+		{
+			"id": "ipv6_ipv4_single_zero_accepted",
+			"text": "::ffff:0.0.0.0",
+			"expect": { "kind": "url", "target": "http://[::ffff:0.0.0.0]" }
+		},
+		{
+			"id": "ipv6_ipv4_invalid_octet",
+			"text": "::ffff:192.0.2.256",
+			"expect": { "kind": "search", "target": "::ffff:192.0.2.256" }
+		},
+		{
+			"id": "ipv6_ipv4_too_many_groups",
+			"text": "1:2:3:4:5:6:7:192.0.2.1",
+			"expect": { "kind": "search", "target": "1:2:3:4:5:6:7:192.0.2.1" }
+		},
+		{
+			"id": "ipv6_compressed_trailing_single_group",
+			"text": "1:2:3:4:5:6:7::",
+			"expect": { "kind": "url", "target": "http://[1:2:3:4:5:6:7::]" }
+		},
+		{
+			"id": "ipv6_compressed_leading_single_group",
+			"text": "::1:2:3:4:5:6:7",
+			"expect": { "kind": "url", "target": "http://[::1:2:3:4:5:6:7]" }
+		},
+		{
+			"id": "ipv6_compressed_cannot_have_eight_groups",
+			"text": "1:2:3:4:5:6:7::8",
+			"expect": { "kind": "search", "target": "1:2:3:4:5:6:7::8" }
+		},
+		{
 			"id": "ipv6_full",
 			"text": "2001:0db8:0000:0000:0000:ff00:0042:8329",
 			"expect": { "kind": "url", "target": "http://[2001:0db8:0000:0000:0000:ff00:0042:8329]" }

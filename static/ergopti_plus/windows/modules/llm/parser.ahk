@@ -84,7 +84,7 @@ _LLM_Parser_CleanModelOutput(text) {
 	out := RegExReplace(out, "\*\*", "")
 	out := RegExReplace(out, Chr(96), "")
 	out := RegExReplace(out, '"', "")
-	out := RegExReplace(out, "<[^>]+>", "")
+	out := RegExReplace(out, "i)</?[a-z][a-z0-9:_-]*(?:\s+[^<>]*?)?\s*/?>", "")
 	out := RegExReplace(out, "i)^Voici la suite\s*:?\s*", "")
 	out := RegExReplace(out, "i)^Je propose\s*:?\s*", "")
 	out := RegExReplace(out, "i)^Suite finale\s*[:.\-]*\s*", "")

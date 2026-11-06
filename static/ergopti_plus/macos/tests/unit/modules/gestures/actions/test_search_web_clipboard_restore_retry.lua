@@ -14,6 +14,7 @@ local helpers = require("tests.helpers")
 
 --- Adds only the transaction and clock boundaries used by queued Search.
 local function search_transaction_ports(hs_stub)
+	package.loaded["adapters.clipboard"] = nil
 	local input = package.loaded["adapters.synthetic_input"]
 	local function complete(tx, status)
 		if tx.status then return false end
@@ -65,6 +66,7 @@ helpers.describe("search_web: native clipboard refusal retains ownership", funct
 			["public.utf8-plain-text"] = "ORIGINAL",
 			["public.html"] = "<b>ORIGINAL</b>",
 		}
+		hs_stub.pasteboard.allContentTypes = function() return { { "public.utf8-plain-text", "public.html" } } end
 		hs_stub.pasteboard.readAllData = function() snapshots = snapshots + 1; return original end
 		hs_stub.pasteboard.clearContents = function() return true end
 		hs_stub.pasteboard.getContents = function() return "selected words" end
@@ -127,6 +129,9 @@ helpers.describe("search_web: native clipboard refusal retains ownership", funct
 		package.loaded["hs"] = hs_stub
 		local original = { ["public.png"] = "PNG" }
 		local restored = nil
+		hs_stub.pasteboard.allContentTypes = function()
+			local types = {}; for uti in pairs(original) do types[#types + 1] = uti end; return { types }
+		end
 		hs_stub.pasteboard.readAllData = function() return original end
 		hs_stub.pasteboard.clearContents = function() return true end
 		hs_stub.pasteboard.writeAllData = function(value)
@@ -168,6 +173,9 @@ helpers.describe("search_web: native clipboard refusal retains ownership", funct
 		local original = { ["public.html"] = "<b>ORIGINAL</b>" }
 		local restored = nil
 		local selection_reads = 0
+		hs_stub.pasteboard.allContentTypes = function()
+			local types = {}; for uti in pairs(original) do types[#types + 1] = uti end; return { types }
+		end
 		hs_stub.pasteboard.readAllData = function() return original end
 		hs_stub.pasteboard.clearContents = function() return true end
 		hs_stub.pasteboard.getContents = function()

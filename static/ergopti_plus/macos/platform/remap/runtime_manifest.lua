@@ -52,10 +52,18 @@ M.FIELDS = {
 --- The manifest schema this module understands.
 M.SCHEMA = 1
 
+--- A version is also used as one artifact-directory component.
+--- @param value any
+--- @return boolean
+function M.valid_version(value)
+	return type(value) == "string" and value:match("^%d+%.%d+%.%d+[%w%.%-+]*$") ~= nil
+		and not value:find("..", 1, true)
+end
+
 local SHAPES = {
 	text = function(value) return type(value) == "string" and value:match("^[%w%-_/.]+$") ~= nil end,
 	revision = function(value) return type(value) == "string" and value:match("^%x+$") ~= nil and #value == 40 end,
-	version = function(value) return type(value) == "string" and value:match("^%d+%.%d+%.%d+[%w%.%-+]*$") ~= nil end,
+	version = M.valid_version,
 	file_name = function(value)
 		return type(value) == "string" and value:match("^[%w][%w%._%-]*$") ~= nil
 	end,

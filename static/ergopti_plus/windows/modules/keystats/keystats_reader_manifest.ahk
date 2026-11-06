@@ -186,7 +186,16 @@ KLR_ManifestSql(Name, Where) {
 		return KeystatsQuery(Name, Map("where", Where))
 }
 
+KLR_ManifestAppKey(app) {
+		return (app == "_system" || app == "_sys" || SubStr(app, 1, 1) == "~") ? "~" app : app
+}
+
+KLR_ManifestAppLabel(key) {
+		return SubStr(key, 1, 1) == "~" ? SubStr(key, 2) : key
+}
+
 KLR_GetCell(manifest, date_str, app) {
+		app := KLR_ManifestAppKey(app)
 		if !manifest.Has(date_str)
 				manifest[date_str] := Map()
 		d := manifest[date_str]

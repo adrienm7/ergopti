@@ -95,6 +95,16 @@ class BootstrapDownloadTests(unittest.TestCase):
         parameters.update(overrides)
         return BOOTSTRAP.download(**parameters)
 
+    def test_missing_partial_file_does_not_mask_transfer_failure(self):
+        def request(*_args, **_kwargs):
+            self.output.unlink()
+            raise BOOTSTRAP.BootstrapFailure("connect")
+
+        with self.assertRaises(BOOTSTRAP.BootstrapFailure) as caught:
+            self.receive(request)
+        self.assertEqual(caught.exception.reason, "connect")
+        self.assertFalse(self.output.exists())
+
     def test_full_url_identity_hash_and_physical_terminal_before_publication(self):
         response = Response()
         calls = []
@@ -257,6 +267,22 @@ class BootstrapDownloadTests(unittest.TestCase):
                 self.assertEqual(len(observed), 1)
                 self.assertIsNotNone(observed[0].poll())
                 self.assertTrue(observed[0].stdout.closed)
+
+    def test_uv_output_limit_is_enforced_before_the_child_exits(self):
+        command = "import sys,time; sys.stdout.buffer.write(b'x' * (16 * 1024 * 1024 + 1)); sys.stdout.flush(); time.sleep(30)"
+        with self.assertRaises(BOOTSTRAP.BootstrapFailure) as caught:
+            BOOTSTRAP._run_uv([sys.executable, "-c", command], time.monotonic() + 2)
+        self.assertEqual(caught.exception.reason, "dependency")
+
+    def test_uv_collects_output_and_waits_for_child_after_stdout_eof(self):
+        command = "import sys; sys.stdout.buffer.write(b'hello')"
+        self.assertEqual(
+            BOOTSTRAP._run_uv([sys.executable, "-c", command], time.monotonic() + 2), b"hello"
+        )
+        command = "import os,time; os.close(1); time.sleep(30)"
+        with self.assertRaises(BOOTSTRAP.BootstrapFailure) as caught:
+            BOOTSTRAP._run_uv([sys.executable, "-c", command], time.monotonic() + 0.2)
+        self.assertEqual(caught.exception.reason, "deadline")
 
     def test_managed_interpreter_uses_pinned_cache_and_offline_uv_extraction(self):
         captures = []

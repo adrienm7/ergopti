@@ -48,6 +48,7 @@ local ManifestReader = require("infra.manifest_reader")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 local Timings          = require("infra.timings")
 local ConfigKeys = require("config_keys")
+local LlmContext       = require("modules.keymap.llm_context")
 local ContextBuffer    = require("llm.context_buffer")  -- shared navigation rule of the AI context
 
 local LOG    = "keymap.llm_bridge"
@@ -292,10 +293,14 @@ local function invalidate_cursor_context(clear_llm)
 	local snapshot = {
 		buffer = _state.buffer,
 		llm_buffer = _state.llm_buffer,
+		llm_context_text = _state.llm_context_text,
+		llm_context_mark = _state.llm_context_mark,
 		start_is_word_boundary = _state.start_is_word_boundary,
 	}
 	_state.buffer = ""
-	if clear_llm == true then _state.llm_buffer = "" end
+	if clear_llm == true then
+		LlmContext.reset(_state)
+	end
 	_state.start_is_word_boundary = false
 	return snapshot
 end
@@ -306,6 +311,9 @@ end
 local function restore_cursor_context(snapshot)
 	_state.buffer = snapshot.buffer
 	_state.llm_buffer = snapshot.llm_buffer
+	_state.llm_context_text = snapshot.llm_context_text
+	_state.llm_context_mark = snapshot.llm_context_mark
+	_state.llm_context_generation = (_state.llm_context_generation or 0) + 1
 	_state.start_is_word_boundary = snapshot.start_is_word_boundary
 end
 
@@ -590,7 +598,11 @@ function M.set_llm_configuration_model(name) return engine.set_llm_configuration
 function M.set_llm_model(name)              return engine.set_llm_model(name)              end
 function M.set_llm_display_model_name(name) return engine.set_llm_display_model_name(name) end
 function M.set_llm_backend_name(label)      return engine.set_llm_backend_name(label)      end
-function M.set_llm_context_length(l)        return engine.set_llm_context_length(l)        end
+function M.set_llm_context_length(l)
+	local result = engine.set_llm_context_length(l)
+	if result ~= false and _state then LlmContext.configure(_state, l) end
+	return result
+end
 function M.set_llm_temperature(t)           return engine.set_llm_temperature(t)           end
 function M.set_llm_num_predictions(n)       return engine.set_llm_num_predictions(n)       end
 function M.set_llm_pred_indent(v)           return engine.set_llm_pred_indent(v)           end
@@ -703,21 +715,6 @@ local function arm_llm_timer(label, fn, delay)
 	return true
 end
 
---- The part of a hotstring-buffer text the AI may see, and the mark it keeps.
----
---- The AI context mirrors the hotstring buffer, which holds the replacement of
---- a private (personal-information) expansion like any other text. That text
---- must never reach a prompt, local or remote, so everything up to the last
---- private expansion is withheld (the shared rule, see
---- ContextBuffer.after_private; Linux clears its context object instead).
---- @param text string The hotstring buffer.
---- @return string visible
-local function ai_context_of(text)
-	local visible, mark = ContextBuffer.after_private(text, _state.llm_private_mark or "")
-	_state.llm_private_mark = mark
-	return visible
-end
-
 --- Declares that a private expansion just landed: the AI forgets the buffer.
 ---
 --- Called by the expander once the replacement is committed, with the buffer
@@ -728,17 +725,8 @@ function M.mark_private_context(buffer)
 	if not require_state("mark_private_context") then error("keymap LLM bridge is not initialised", 2) end
 	if type(buffer) ~= "string" then error("private context buffer must be a string", 2) end
 	_state.llm_private_mark = buffer
-	_state.llm_buffer = ""
+	LlmContext.mark_private(_state)
 	Logger.debug(LOG, "Private expansion — AI typing context forgotten.")
-end
-
---- Keeps the private mark aligned with a hotstring buffer whose head was cut.
---- @param buffer string The buffer before the cut.
---- @param removed integer Bytes removed from its head.
-function M.private_context_trimmed(buffer, removed)
-	if not _state or (_state.llm_private_mark or "") == "" then return end
-	local _, mark = ContextBuffer.after_private(buffer, _state.llm_private_mark)
-	_state.llm_private_mark = removed >= #mark and "" or mark:sub(removed + 1)
 end
 
 --- Refreshes the preview tooltip from the current buffer content.
@@ -752,13 +740,10 @@ end
 --- @param buf string The current typed buffer.
 local function update_preview_body(buf)
 	if not require_state("update_preview") then return end
-	-- This is the sole observation seam for physical text. Hotstring matching owns
-	-- `_state.buffer`; LLM prompting owns this separate context so navigation can
-	-- revoke cursor-relative actions without defeating the user's keep-context
-	-- preference.
-	local ai_context = buf
-	if type(buf) == "string" then ai_context = ai_context_of(buf) end
-	_state.llm_buffer = ai_context
+	local context_generation = _state.llm_context_generation
+	-- The keymap applies physical edits to the independent AI context before
+	-- this preview. Hotstring matching continues to use its shorter buffer.
+	local ai_context = _state.llm_buffer
 	-- The agent's automatic mode waits for a pause in the typing: every
 	-- keystroke drops what it had in flight and re-arms its own timer
 	local agent_ok, agent_error = xpcall(AgentRunner.observe_typing, debug.traceback, ai_context)
@@ -811,12 +796,12 @@ local function update_preview_body(buf)
 	-- the tap tests, so the preview and the engine cannot disagree about whether
 	-- a trigger is live. Custom providers above are unaffected: they do not go
 	-- through the trigger engine.
-	local epoch_fn = (hs and hs.timer and hs.timer.secondsSinceEpoch) or os.time
-	local preview_now = epoch_fn()
+	local deadline_now = TimerScheduler.hotstring_time
+	local preview_now = deadline_now()
 	local engine_blocked = preview_now < (_state.no_rescan_until or 0)
 	if engine_blocked then
 		Logger.debug(LOG, "Preview: static mappings skipped — engine suppressed for %.3fs more.",
-			(_state.no_rescan_until or 0) - epoch_fn())
+			(_state.no_rescan_until or 0) - deadline_now())
 	end
 
 	-- Interceptor-backed providers run before the static engine on the real
@@ -996,7 +981,7 @@ local function update_preview_body(buf)
 			-- 0 (always active), not "already expired".
 			local row_timeout = 0
 			if m.type == "literal_auto" and m.expires_at then
-				row_timeout = math.max(0, m.expires_at - epoch_fn())
+				row_timeout = math.max(0, m.expires_at - deadline_now())
 				if row_timeout <= 0 then
 					enabled = false
 					if m.is_winner then winner_expired_during_build = true end
@@ -1034,7 +1019,7 @@ local function update_preview_body(buf)
 					on_expire     = m.type == "literal_auto" and m.is_winner and m.expires_at
 						and function()
 							_visible_magic_lease = nil
-							if _state.buffer == buf then
+							if _state.buffer == buf and _state.llm_context_generation == context_generation then
 								M.update_preview(buf)
 							else
 								M.reset_predictions(false)
@@ -1077,7 +1062,7 @@ local function update_preview_body(buf)
 				return schedule_prediction_deferred("winner-expiry refresh", function()
 					local callback_ok, callback_err = xpcall(function()
 						if refresh_generation ~= _preview_render_generation then return end
-						if _state.buffer == buf then
+						if _state.buffer == buf and _state.llm_context_generation == context_generation then
 							M.update_preview(buf)
 						else
 							M.reset_predictions(false)
@@ -1192,7 +1177,7 @@ local function update_preview_body(buf)
 			local function render_preview()
 				local callback_ok, callback_err = xpcall(function()
 					if my_generation ~= _preview_render_generation then return end
-					local render_now = epoch_fn()
+					local render_now = deadline_now()
 					local live_rows = {}
 					local live_timeout = nil
 					local winner_expired = false
@@ -1209,7 +1194,7 @@ local function update_preview_body(buf)
 					if winner_expired then
 						-- Re-resolve off the HID thread: a lower-priority star/end action may
 						-- have become the winner exactly when the timed literal expired.
-						if _state.buffer == buf then M.update_preview(buf) else M.reset_predictions(false) end
+						if _state.buffer == buf and _state.llm_context_generation == context_generation then M.update_preview(buf) else M.reset_predictions(false) end
 						return
 					end
 					if #live_rows == 0 then M.reset_predictions(false); return end
@@ -1773,7 +1758,7 @@ function M.apply_prediction(idx)
 			-- transaction events already carry their provenance independently of
 			-- whether the text path used direct key pairs or Cmd+V.
 			_state.buffer = next_buffer
-			_state.llm_buffer = ai_context_of(_state.buffer)
+			LlmContext.replace_tail(_state, delete_count, text_to_type)
 		end,
 		true,   -- is_final
 		true,   -- is_ignored
@@ -1920,7 +1905,7 @@ function M.check_escape_reset()
 	if not require_state("check_escape_reset") then return false end
 	if not M.is_runtime_available() then
 		if reset_buffer_on_navigation then _state.buffer = "" end
-		_state.llm_buffer = ContextBuffer.retained_after_navigation(_state.llm_buffer, reset_buffer_on_navigation == true)
+		if reset_buffer_on_navigation then LlmContext.reset(_state) end
 		if type(tooltip.is_hotstring_visible) == "function"
 			and tooltip.is_hotstring_visible() then
 			invalidate_cursor_context(reset_buffer_on_navigation)
@@ -1945,7 +1930,7 @@ function M.check_escape_reset()
 		Logger.debug(LOG, "Escape — buffer cleared.")
 		_state.buffer = ""
 	end
-	_state.llm_buffer = ContextBuffer.retained_after_navigation(_state.llm_buffer, reset_buffer_on_navigation == true)
+	if reset_buffer_on_navigation then LlmContext.reset(_state) end
 	M.reset_predictions()
 	return false
 end
@@ -1956,6 +1941,7 @@ end
 function M.check_nav_reset()
 	if not require_state("check_nav_reset") then return end
 
+	if reset_buffer_on_navigation then LlmContext.reset(_state) end
 	local retained = ContextBuffer.retained_after_navigation(_state.llm_buffer, reset_buffer_on_navigation == true)
 	if retained ~= _state.llm_buffer then
 		Logger.debug(LOG, "LLM context cleared on navigation.")
@@ -2136,6 +2122,11 @@ function M.init(core_state, keymap_defaults)
 		Logger.error(LOG, "M.init(): core_state must be a table (got %s) — bridge non-functional.", type(core_state))
 		return false
 	end
+	if type(core_state.llm_context_text) ~= "string" or type(core_state.llm_context_mark) ~= "string" then
+		Logger.error(LOG, "M.init(): independent AI context is unavailable.")
+		return false
+	end
+
 	if type(keymap_defaults) ~= "table" then
 		Logger.error(LOG, "M.init(): keymap_defaults must be a table (got %s) — bridge non-functional.", type(keymap_defaults))
 		return false
@@ -2155,6 +2146,10 @@ function M.init(core_state, keymap_defaults)
 		return false
 	end
 	_state = core_state
+	if type(engine.get_llm_runtime_setting) == "function" then
+		local ok, found, configured = pcall(engine.get_llm_runtime_setting, "llm_context_length")
+		if ok and found == true then LlmContext.configure(_state, configured) end
+	end
 	_keymap_defaults = keymap_defaults
 	if type(engine.set_runtime_guard) == "function" then
 		engine.set_runtime_guard(M.is_runtime_available)

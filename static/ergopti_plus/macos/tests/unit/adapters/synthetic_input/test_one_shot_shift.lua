@@ -47,6 +47,25 @@ local function fixture()
 end
 
 helpers.describe("one-shot native boundary", function()
+	helpers.it("checks the actual shifted Option combination before native emission (one-shot-option-shift)", function()
+		local emitted, raw, text = {}, 16, "é"
+		local event = {
+			getFlags = function() return { alt = true } end,
+			rawFlags = function(_, value) if value ~= nil then raw = value end; return raw end,
+			getCharacters = function() return text end,
+			setUnicodeString = function(_, value) text = value end,
+		}
+		local adapter = require("adapters.one_shot_shift").new({
+			data = data, magic = function() return "★" end, now = function() return 10 end,
+			event = { rawFlagMasks = { shift = 2 } }, is_repeat = function() return false end,
+			translate = function(_, flags) return ({ [16] = "é", [2] = "É", [18] = "Ω" })[flags] end,
+			emit = function(value) emitted[#emitted + 1] = value; return true end,
+		})
+		adapter.arm(2)
+		helpers.assert_true(adapter.key_down(event, 1), "different Option+Shift output needs Unicode emission")
+		adapter.finish(true)
+		helpers.assert_eq(emitted, { "É" })
+	end)
 	helpers.it("keeps native translation probes private to the synthetic adapter (one-shot-probe)", function()
 		helpers.with_stub_scope({ "adapters.synthetic_input", "adapters.event_provenance", "tests.stubs.hs" }, function()
 			package.loaded["adapters.synthetic_input"] = nil
@@ -149,6 +168,18 @@ helpers.describe("one-shot native boundary", function()
 		helpers.assert_eq(#calls.emitted, 1)
 		helpers.assert_true(adapter.key_up(event(1), 1))
 		helpers.assert_eq(adapter.claim_repeat(event(1, 0, nil, 1)), false)
+	end)
+	helpers.it("releases a transformed key with Shift after disarm (one-shot-disarm-native)", function()
+		local adapter, event = fixture()
+		adapter.arm(2)
+		local pressed = event(0, 128)
+		adapter.key_down(pressed, 0)
+		adapter.finish(true)
+		helpers.assert_eq(pressed:rawFlags(), 130)
+		adapter.disarm()
+		local released = event(0, 128)
+		helpers.assert_eq(adapter.key_up(released, 0), false)
+		helpers.assert_eq(released:rawFlags(), 130, "the release retains the press's Shift and unrelated flags")
 	end)
 	helpers.it("types a fresh press whose earlier release was missed (one-shot-stale-claim)", function()
 		-- A tap outage lets a release pass unseen. The claim used to outlive it

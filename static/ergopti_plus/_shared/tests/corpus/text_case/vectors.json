@@ -142,6 +142,26 @@
 			"toggle_title": "Οδος Και Οσα"
 		},
 		{
+			"id": "greek_sigma_after_cased_without_mapping",
+			"drivers": ["hs", "linux"],
+			"input": "ªΣ ºΣ",
+			"upper": "ªΣ ºΣ",
+			"lower": "ªς ºς",
+			"title": "ªς ºς",
+			"toggle_upper": "ªς ºς",
+			"toggle_title": "ªς ºς"
+		},
+		{
+			"id": "greek_sigma_before_cased_without_mapping",
+			"drivers": ["hs", "linux"],
+			"input": "AΣª",
+			"upper": "AΣª",
+			"lower": "aσª",
+			"title": "Aσª",
+			"toggle_upper": "aσª",
+			"toggle_title": "Aσª"
+		},
+		{
 			"id": "title_case_digraph",
 			"drivers": ["hs", "linux"],
 			"input": "ǆungla",

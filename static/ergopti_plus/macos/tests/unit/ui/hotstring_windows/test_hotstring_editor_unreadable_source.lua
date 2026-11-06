@@ -96,6 +96,44 @@ end
 -- ====================================================
 
 helpers.describe("hotstring editor: unreadable source fails closed", function()
+	helpers.it("keeps the displayed document and its source snapshot during a preference update", function()
+		local disk, seen_source = "original", nil
+		local editor, dispatch, state = load_editor({ write_if_unchanged = function(_, _, expected)
+			seen_source = expected
+			return false, "conflict"
+		end }, {
+			parse = function() return { sections = {}, sections_order = {} }, true end,
+		}, { read_with_status = function() return disk, "ok" end })
+		editor.init("/virtual/personal_hotstrings.toml", { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
+		helpers.assert_true(editor.open("menu"))
+		dispatch({ action = "ready" })
+		disk = "external edit"
+		editor.set_trigger_char("#")
+		helpers.assert_contains(state.javascript[#state.javascript], "updatePreferences")
+		dispatch({ action = "save", data = { sections = {}, sections_order = {} } })
+		helpers.assert_eq(seen_source, { status = "ok", content = "original" },
+			"a preference update must not silently adopt a newer file")
+		package.loaded["ui.hotstring_editor"] = nil
+	end)
+	helpers.it("rejects malformed preference messages without changing or forwarding them", function()
+		local editor, dispatch, state = load_editor({}, {
+			parse = function() return { sections = {}, sections_order = {} }, true end,
+		}, { read_with_status = function() return "", "ok" end })
+		local forwarded = 0
+		editor.init("/virtual/personal_hotstrings.toml", { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
+		editor.set_ui_prefs({ compact_view = true, default_section = "existing" })
+		editor.set_update_pref(function() forwarded = forwarded + 1 end)
+		helpers.assert_true(editor.open("menu"))
+		dispatch({ action = "save_pref", data = { key = "compact_view", value = "true" } })
+		dispatch({ action = "save_pref", data = { key = "default_section", value = {} } })
+		dispatch({ action = "save_pref", data = { key = "unknown", value = true } })
+		helpers.assert_eq(forwarded, 0)
+		dispatch({ action = "ready" })
+		local payload = table.concat(state.javascript, "\n")
+		helpers.assert_contains(payload, '"compact_view":true')
+		helpers.assert_contains(payload, '"default_section":"existing"')
+		package.loaded["ui.hotstring_editor"] = nil
+	end)
 	helpers.it("sends strict-case state to the shared frontend", function()
 		local path = "/virtual/personal_hotstrings.toml"
 		local source = "[[_meta]]\n"

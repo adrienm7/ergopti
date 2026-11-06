@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local Scanner = require("toml_codec.record_scanner")
+local KeyPath = require("toml_codec.key_path")
 local TextUtils = require("text_utils")
 
 local M = {}
@@ -80,13 +81,13 @@ local function local_eol(records, pivot)
 end
 
 local function starts_target_header(trimmed, target_header)
-	if trimmed:sub(1, #target_header) ~= target_header then return false end
-	local suffix = trimmed:sub(#target_header + 1)
-	return suffix == "" or suffix:match("^%s+#") ~= nil
-end
-
-local function escape_pattern(value)
-	return (value:gsub("([^%w])", "%%%1"))
+	local actual, target = KeyPath.header(trimmed), KeyPath.header(target_header)
+	if actual.array or target.array or type(actual.segments) ~= "table"
+		or type(target.segments) ~= "table" or #actual.segments ~= #target.segments then return false end
+	for index, segment in ipairs(target.segments) do
+		if actual.segments[index] ~= segment then return false end
+	end
+	return true
 end
 
 --- Finds complete records for one field inside an exact TOML table.
@@ -101,7 +102,6 @@ local function scan_table(lines, target_header, field)
 	local depth = 0
 	local multiline_quote = nil
 	local open_field_range = nil
-	local field_pattern = "^" .. escape_pattern(field) .. "%s*="
 
 	for index, record in ipairs(lines) do
 		local raw = record.text
@@ -118,7 +118,9 @@ local function scan_table(lines, target_header, field)
 					in_target = false
 				end
 			else
-				if in_target and trimmed:match(field_pattern) then
+				local key_text = in_target and Scanner.split_assignment(trimmed) or nil
+				local key = key_text and KeyPath.parse(key_text) or nil
+				if key and #key == 1 and key[1] == field then
 					open_field_range = { first = index, last = index }
 					scan.field_ranges[#scan.field_ranges + 1] = open_field_range
 				else
@@ -139,6 +141,21 @@ end
 
 local function remove_range(lines, range)
 	for index = range.last, range.first, -1 do table.remove(lines, index) end
+end
+
+--- Preserves a trailing comment outside strings when replacing an assignment.
+local function trailing_comment(lines, range)
+	local depth, quote, comment = 0, nil, nil
+	for index = range.first, range.last do
+		local raw = lines[index].text
+		local offset
+		depth, quote, offset = Scanner.advance(raw, depth, quote)
+		if index == range.last and offset then
+			local before = raw:sub(1, offset - 1)
+			comment = (before:match("[ \t]*$") or "") .. raw:sub(offset)
+		end
+	end
+	return comment or ""
 end
 
 local function section_has_value(lines, header_line)
@@ -183,6 +200,7 @@ function M.patch_table_field(source, target_header, field, encoded_value, option
 		local first = ranges[1]
 		if new_line then
 			local replacement_eol = lines[first.last].eol
+			new_line = new_line .. trailing_comment(lines, first)
 			for index = first.last, first.first + 1, -1 do table.remove(lines, index) end
 			lines[first.first] = { text = new_line, eol = replacement_eol }
 		else
@@ -216,9 +234,12 @@ function M.patch_table_field(source, target_header, field, encoded_value, option
 		}
 	end
 
-	if not new_line and scan.header_line
+	if not new_line and #ranges > 0 and scan.header_line
 		and options and options.remove_empty_section == true
-		and not section_has_value(lines, scan.header_line) then
+		and not section_has_value(lines, scan.header_line)
+		-- A header can carry user-authored context. Retaining a harmless empty
+		-- table preserves that text, including quoted keys containing '#'.
+		and not lines[scan.header_line].text:find("#", 1, true) then
 		table.remove(lines, scan.header_line)
 	end
 

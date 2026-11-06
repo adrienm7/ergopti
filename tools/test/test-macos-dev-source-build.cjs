@@ -69,6 +69,16 @@ try {
 		refuseDeveloperSource(packaged);
 	});
 
+	check('the guard decodes XML key spellings and rejects malformed plists', () => {
+		const encoded = `&#${KEY.charCodeAt(0)};${KEY.slice(1)}`;
+		const variant = bundle('encoded', xml(`<key >${encoded}</key><string>/clone</string>`));
+		assert.throws(() => refuseDeveloperSource(variant), /developer source build/);
+		assert.throws(
+			() => refuseDeveloperSource(bundle('malformed', '<plist><dict>')),
+			/property list/
+		);
+	});
+
 	check('the guard refuses a plist it cannot prove free of the key', () => {
 		assert.throws(() => refuseDeveloperSource(bundle('binary', 'bplist00\u0000')), /not an XML/);
 		assert.throws(() => refuseDeveloperSource(bundle('missing', null)), /ENOENT/);

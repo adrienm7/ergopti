@@ -25,6 +25,7 @@
 --- ==============================================================================
 
 local M = {}
+local ManifestKeys = require("keystats.manifest_keys")
 local TableUtil = require("table_util")
 local ErrorDescription = require("error_description")
 local Calendar = require("modules.keystats.calendar")
@@ -1398,12 +1399,13 @@ local function add_live_manifest_delta(manifest)
 		result[date] = TableUtil.shallow_copy(manifest[date] or {})
 		for app, state in pairs(apps) do
 			local previous = (_flushed_app_totals[date] or {})[app] or {}
-			local entry = TableUtil.shallow_copy(result[date][app] or { category = "Unknown" })
+			local app_key = ManifestKeys.encode(app)
+			local entry = TableUtil.shallow_copy(result[date][app_key] or { category = "Unknown" })
 			for field, value in pairs(state.totals) do
 				local output = field == "time_ms" and "time" or field
 				entry[output] = (entry[output] or 0) + math.max(0, value - (previous[field] or 0))
 			end
-			result[date][app] = entry
+			result[date][app_key] = entry
 		end
 	end
 	return result

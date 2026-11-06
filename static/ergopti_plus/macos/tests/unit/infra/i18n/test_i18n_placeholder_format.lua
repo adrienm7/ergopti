@@ -58,4 +58,18 @@ helpers.describe("i18n.format: {n} placeholders are substituted, not printed", f
 			.. "filesystem paths the user controls")
 	end)
 
+	helpers.it("keeps a calendar title containing another placeholder literal", function()
+		local i18n = load_i18n_with({ ["llm.agent.label.calendar"] = "📅 {1} — {2}" })
+		local Agent = require("llm.agent")
+		local key, args = Agent.label({ type = "calendar", title = "Sprint {2}",
+			start = "2026-11-06T14:00" })
+		helpers.assert_eq(i18n.format(key, table.unpack(args)), "📅 Sprint {2} — 2026-11-06 14:00")
+	end)
+
+	helpers.it("leaves missing and noncanonical placeholders unchanged", function()
+		local i18n = load_i18n_with({ k = "{1} {2} {01} {0}" })
+		helpers.assert_eq(i18n.format("k", "one"), "one {2} {01} {0}")
+		helpers.assert_eq(i18n.format("k", "one", nil), "one nil {01} {0}")
+	end)
+
 end)

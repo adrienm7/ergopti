@@ -17,7 +17,7 @@ local OWNED_MODULES = {
 	"infra.timings", "infra.text_utils", "modules.llm.profiles", "modules.llm.parser",
 	"modules.llm.api_common", "llm.prompt_builder", "modules.llm.api_token_crypto",
 	"modules.llm.progressive_reveal", "modules.llm.remote_response_classifier",
-	"llm.remote_formats", "modules.keystats", "adapters.file_system",
+	"llm.remote_formats", "modules.keystats", "adapters.file_system", "infra.http_header_policy",
 }
 
 --- Reads an existing declared backend seam, without production test hooks.
@@ -32,6 +32,7 @@ end
 
 local function isolated(scenario)
 	helpers.with_stub_scope(OWNED_MODULES, function()
+		package.loaded["infra.http_header_policy"] = require("tests.support.network.header_policy_fixture").load()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		local state = { requests = {}, timers = {}, clients = {} }
 		local function dispatch(url, callback)

@@ -53,9 +53,10 @@ local function with_dialog(body)
 			end,
 			get_centered_frame = function(w, height) return { x = 440, y = 250, w = w, h = height } end,
 			-- The shared present helper: raises and focuses, never sets a level.
-			force_focus = function(wv, is_new)
+			force_focus = function(wv, is_new, lifecycle)
 				h.focuses = (h.focuses or 0) + 1
 				h.focus_is_new = is_new
+				h.focus_owner = lifecycle.is_current
 				return wv ~= nil
 			end,
 			show_webview = function(opts)
@@ -355,6 +356,12 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 			helpers.assert_eq(h.focuses, 1, "presented again like any window")
 			helpers.assert_eq(h.focus_is_new, false)
 			helpers.assert_eq(h.windows[1].raised, 0, "the floating raise is the Accessibility one only")
+			local focus_owner = h.focus_owner
+			helpers.assert_true(focus_owner())
+			h.dialog.close("login_items")
+			helpers.assert_eq(focus_owner(), false, "closed dialog cannot receive a focus retry")
+			h.dialog.show(spec)
+			helpers.assert_eq(focus_owner(), false, "replacement cannot revive the old retry")
 		end)
 	end)
 

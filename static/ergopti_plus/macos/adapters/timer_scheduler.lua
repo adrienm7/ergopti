@@ -34,6 +34,10 @@ local NumberPolicy = require("number_policy")
 
 local LOG = "adapters.timer_scheduler"
 
+-- hs.timer.new(0) creates a one-shot, while every() promises repetition.
+-- Match the Linux adapter's one-millisecond minimum repeating interval.
+local MIN_REPEAT_INTERVAL_SEC = 0.001
+
 
 -- =========================================
 -- =========================================
@@ -184,6 +188,11 @@ function M.after(delaySec, fn)
 		id = _new_id(),
 		settlement_observers = {},
 	}
+	if type(fn) ~= "function" then
+		Logger.error(LOG, "after(): callback must be a function — timer rejected.")
+		settle_handle(handle)
+		return handle, false
+	end
 	if not admit_delay("after", delaySec) then
 		settle_handle(handle)
 		return handle, false
@@ -268,10 +277,16 @@ function M.every(intervalSec, fn)
 		id = _new_id(),
 		settlement_observers = {},
 	}
+	if type(fn) ~= "function" then
+		Logger.error(LOG, "every(): callback must be a function — timer rejected.")
+		settle_handle(handle)
+		return handle, false
+	end
 	if not admit_delay("every", intervalSec) then
 		settle_handle(handle)
 		return handle, false
 	end
+	intervalSec = math.max(intervalSec, MIN_REPEAT_INTERVAL_SEC)
 	local activation_in_progress = true
 	local delivered_before_commit = false
 	M.retryCleanup()
@@ -416,8 +431,9 @@ end
 --- hs.timer.secondsSinceEpoch() so callers have no direct hs.timer dependency.
 --- @return number Seconds since epoch as a floating-point value.
 function M.now()
-	local ok, t = pcall(hs.timer.secondsSinceEpoch)
-	return ok and t or os.time()
+	local ok, t = pcall(function() return hs.timer.secondsSinceEpoch() end)
+	if ok and type(t) == "number" and t == t and t ~= math.huge and t ~= -math.huge then return t end
+	return os.time()
 end
 
 --- Returns a high-resolution monotonic timestamp in nanoseconds. Wraps
@@ -445,6 +461,32 @@ end
 --- @return number Seconds from an arbitrary monotonic origin.
 function M.awake_time()
 	return M.now_ns() / 1e9
+end
+
+-- Hotstring deadlines must also expire during sleep. Compare the civil and
+-- awake advances: a significant positive difference is sleep or a forward
+-- wall-clock correction, either of which safely expires short deadlines. The
+-- tolerance prevents ordinary sampling jitter from accumulating as elapsed time.
+local _hotstring_last_awake, _hotstring_last_wall = nil, nil
+local _hotstring_sleep_offset = 0
+local HOTSTRING_CLOCK_TOLERANCE_SEC = 0.1
+
+--- Monotonic elapsed time including observable sleep and forward clock jumps.
+--- An unavailable civil sample leaves awake-time progress intact.
+--- @return number seconds
+function M.hotstring_time()
+	local awake = M.awake_time()
+	local ok, wall = pcall(function() return hs.timer.secondsSinceEpoch() end)
+	if not ok or type(wall) ~= "number" or wall ~= wall or wall == math.huge or wall == -math.huge then
+		_hotstring_last_awake, _hotstring_last_wall = nil, nil
+		return awake + _hotstring_sleep_offset
+	end
+	if _hotstring_last_awake ~= nil then
+		local gap = (wall - _hotstring_last_wall) - (awake - _hotstring_last_awake)
+		if gap > HOTSTRING_CLOCK_TOLERANCE_SEC then _hotstring_sleep_offset = _hotstring_sleep_offset + gap end
+	end
+	_hotstring_last_awake, _hotstring_last_wall = awake, wall
+	return awake + _hotstring_sleep_offset
 end
 
 --- Suspends execution for the given number of microseconds.

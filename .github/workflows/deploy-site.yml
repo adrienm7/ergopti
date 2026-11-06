@@ -35,6 +35,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
+      # true when a newer push moved the target branch past this source: that push
+      # deploys its own site, so this run receives and publishes nothing.
+      superseded: ${{ steps.admit.outputs.superseded }}
       source_sha: ${{ steps.admit.outputs.source_sha }}
       target: ${{ steps.admit.outputs.target }}
       run_id: ${{ steps.admit.outputs.run_id }}
@@ -57,6 +60,7 @@ jobs:
         run: node tools/ci/site-deploy-admission.cjs admit "$GITHUB_EVENT_PATH" "$RUNNER_TEMP/site-admission.json"
 
       - name: Checkout exact producer source
+        if: steps.admit.outputs.superseded == 'false'
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.admit.outputs.source_sha }}
@@ -64,6 +68,7 @@ jobs:
           persist-credentials: false
 
       - name: Receive selected build artifact
+        if: steps.admit.outputs.superseded == 'false'
         uses: actions/download-artifact@v4
         with:
           artifact-ids: ${{ steps.admit.outputs.build_artifact_id }}
@@ -73,6 +78,7 @@ jobs:
           path: ${{ runner.temp }}/received-site
 
       - name: Receive selected browser proof
+        if: steps.admit.outputs.superseded == 'false'
         uses: actions/download-artifact@v4
         with:
           artifact-ids: ${{ steps.admit.outputs.testbuild_artifact_id }}
@@ -82,11 +88,13 @@ jobs:
           path: ${{ runner.temp }}/received-testbuild
 
       - name: Verify tested bytes and source
+        if: steps.admit.outputs.superseded == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: node tools/ci/site-deploy-admission.cjs verify "$RUNNER_TEMP/site-admission.json" "$RUNNER_TEMP/received-site/site" "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/received-testbuild/site-testbuild.json" "$GITHUB_WORKSPACE/producer-source"
 
       - name: Retain admitted producer identity
+        if: steps.admit.outputs.superseded == 'false'
         uses: actions/upload-artifact@v4
         with:
           name: site-deployment-admission
@@ -97,6 +105,7 @@ jobs:
   deploy:
     name: Publish received site — ${{ needs.preflight.outputs.target }}
     needs: [preflight]
+    if: needs.preflight.outputs.superseded == 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

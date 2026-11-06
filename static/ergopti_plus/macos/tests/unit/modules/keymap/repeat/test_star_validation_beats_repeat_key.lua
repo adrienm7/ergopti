@@ -298,8 +298,19 @@ helpers.describe("magic validation through the real keymap eventtap", function()
 		local restore_normal_window = force_normal_window()
 		local now = 100
 		hs_stub.timer.secondsSinceEpoch = function() return now end
+		hs_stub.timer.absoluteTime = function() return math.floor(now * 1e9) end
 
 		Keymap.add("slow" .. STAR, SLOW_REPLACEMENT, {
+			auto_expand = true,
+			is_case_sensitive = true,
+			is_case_sensitive_strict = true,
+		})
+		Keymap.add("é", "TWO_BYTE_SCALAR", {
+			auto_expand = true,
+			is_case_sensitive = true,
+			is_case_sensitive_strict = true,
+		})
+		Keymap.add("ab", "TWO_ASCII_AUTO", {
 			auto_expand = true,
 			is_case_sensitive = true,
 			is_case_sensitive_strict = true,
@@ -338,6 +349,57 @@ helpers.describe("magic validation through the real keymap eventtap", function()
 		end
 
 		local ok, err = xpcall(function()
+			reset_context()
+			helpers.assert_eq(press("ab"), true, "two ASCII scalars in one event must match the final b bucket")
+			helpers.assert_eq(effects.emitted, { "TWO_ASCII_AUTO" })
+			reset_context()
+			local consumed, events = press("zab")
+			helpers.assert_eq(consumed, true, "a trigger at the end of one composite event must fire")
+			local text = {}
+			for _, event in ipairs(events or {}) do
+				if event.isDown and event.unicode then text[#text + 1] = event.unicode end
+			end
+			helpers.assert_eq(table.concat(text), "zTWO_ASCII_AUTO", "returned Quartz events must preserve the prefix")
+			helpers.assert_eq(effects.emitted, { "zTWO_ASCII_AUTO" }, "the event prefix must not be lost")
+			reset_context()
+			local accented, accented_events = press("éab")
+			helpers.assert_eq(accented, true)
+			local accented_text = {}
+			for _, event in ipairs(accented_events or {}) do
+				if event.isDown and event.unicode then accented_text[#accented_text + 1] = event.unicode end
+			end
+			helpers.assert_eq(table.concat(accented_text), "éTWO_ASCII_AUTO", "UTF-8 prefix must survive verbatim")
+			reset_context()
+			local literal, literal_events = press("{Tab}ab")
+			helpers.assert_eq(literal, true)
+			local literal_text = {}
+			for _, event in ipairs(literal_events or {}) do
+				if event.isDown and event.unicode then literal_text[#literal_text + 1] = event.unicode end
+			end
+			helpers.assert_eq(table.concat(literal_text), "{Tab}TWO_ASCII_AUTO", "event text is never parsed as a token")
+			reset_context()
+			helpers.assert_eq(press("é"), true, "one two-byte Unicode scalar remains one character")
+			helpers.assert_eq(effects.emitted, { "TWO_BYTE_SCALAR" })
+			for _, delimiter in ipairs({ ":", ";" }) do
+				reset_context()
+				for _, character in ipairs({ "p", "l", "a", "i", "n" }) do press(character) end
+				helpers.assert_eq(press(delimiter), true, "bare punctuation must terminate the ordinary mapping")
+				helpers.assert_eq(effects.emitted, { "PLAIN_END" .. delimiter })
+			end
+			for _, carrier in ipairs({ { NBSP, ":" }, { NNBSP, ";" } }) do
+				reset_context()
+				for _, character in ipairs({ "p", "l", "a", "i", "n" }) do press(character) end
+				press(carrier[1])
+				local consumed, events = press(carrier[2])
+				helpers.assert_eq(consumed, true, "a separately typed typographic space must not hide the trigger")
+				local deletes = 0
+				for _, event in ipairs(events or {}) do
+					if event.isDown and event.key == "delete" then deletes = deletes + 1 end
+				end
+				helpers.assert_eq(deletes, 6, "the on-screen trigger and prior space must be erased")
+				helpers.assert_eq(effects.emitted, { "PLAIN_END" .. carrier[2] })
+			end
+			reset_context()
 			for _, character in ipairs({ "s", "l", "o", "w" }) do press(character) end
 			drain_immediate_timers(hs_stub)
 			helpers.assert_true(type(effects.rows) == "table" and effects.rows[1].text == SLOW_REPLACEMENT,
@@ -519,6 +581,27 @@ helpers.describe("magic validation through the real keymap eventtap", function()
 				"an arbitrary multi-codepoint suffix must not acquire terminator or magic identity")
 			helpers.assert_eq(#effects.emitted, 0,
 				"rejecting magic identity must not fall through to a looser terminator tail probe")
+
+			reset_context()
+			Keymap.set_repeat_feature_enabled(false)
+			Keymap.set_trigger_char(":")
+			for _, character in ipairs({ "p", "l", "a", "i", "n" }) do press(character) end
+			press(NBSP)
+			drain_immediate_timers(hs_stub)
+			helpers.assert_true(type(effects.rows) == "table" and effects.rows[1].text == "PLAIN_END",
+				"preview and magic action must resolve the same trigger")
+			helpers.assert_eq(press(":"), true, "magic colon must find the trigger before separately typed spacing")
+			helpers.assert_eq(effects.emitted, { "PLAIN_END" })
+
+			Keymap.add("plain" .. NBSP, "LITERAL_SPACE_END", {
+				auto_expand = false, is_case_sensitive = true, is_case_sensitive_strict = true,
+			})
+			Keymap.sort_mappings()
+			reset_context()
+			for _, character in ipairs({ "p", "l", "a", "i", "n" }) do press(character) end
+			press(NBSP)
+			helpers.assert_eq(press(":"), true, "literal space-ending triggers must remain available")
+			helpers.assert_eq(effects.emitted, { "LITERAL_SPACE_END" }, "the longer literal trigger keeps priority")
 		end, debug.traceback)
 
 		-- The terminator catalogue is process-global; restore both runtime knobs even

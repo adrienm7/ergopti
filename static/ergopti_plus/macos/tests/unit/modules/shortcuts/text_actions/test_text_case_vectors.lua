@@ -15,6 +15,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local previous_destination = package.loaded["modules.keymap.utils"]
+local Destination = require("tests.support.text_destination_receipt")
 local json = require("json")
 
 local CORPUS = helpers.shared("tests/corpus/text_case/vectors.json")
@@ -56,6 +58,7 @@ end
 --- @param selected string What Cmd+C put on the clipboard.
 --- @return string|nil written
 local function transformed_by(action_name, selected)
+	Destination.install()
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
@@ -66,6 +69,7 @@ local function transformed_by(action_name, selected)
 		getContents = function() return selected end,
 		setContents = function(value) change_count = change_count + 1; written = value; return true end,
 		clearContents = function() change_count = change_count + 1 end,
+		allContentTypes = function() return { {} } end,
 		readAllData = function() return { ["public.utf8-plain-text"] = "USER_CLIPBOARD" } end,
 		writeAllData = function() change_count = change_count + 1; return true end,
 	}
@@ -75,9 +79,13 @@ local function transformed_by(action_name, selected)
 	package.loaded["infra.paths"] = nil
 	package.loaded["infra.timings"] = nil
 	package.loaded["adapters.synthetic_input"] = {
-		emit_key_stroke = function() return true end,
+		emit_key_stroke = function(_, _, _, tx)
+			helpers.assert_not_nil(tx.publication, "the copy must retain its destination receipt")
+			helpers.assert_eq(tx.publication.cached(), true)
+			return true
+		end,
 		emit_key_strokes = function() return true end,
-		begin = function() return {} end,
+		begin = function(_, _, publication) return { publication = publication } end,
 		begin_batch = function(tx) return { tx = tx } end,
 		keyStroke = function() return true end,
 		dispatch = function() return true end,
@@ -94,6 +102,7 @@ local function transformed_by(action_name, selected)
 		end,
 	}
 	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["adapters.clipboard"] = nil
 	package.loaded["modules.shortcuts.actions.text"] = nil
 	local Text = require("modules.shortcuts.actions.text")
 	helpers.assert_eq(type(Text[action_name]), "function",
@@ -137,3 +146,5 @@ helpers.describe("selection case actions replay the shared text-case corpus", fu
 		end
 	end
 end)
+
+package.loaded["modules.keymap.utils"] = previous_destination

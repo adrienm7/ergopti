@@ -433,6 +433,8 @@ M.keyboard_source_answer = keyboard_source_answer
 --- RESUME, while its answer is still due.
 M.MACHINES = {
 	standard = { layout = "abc", worker = { ready_after = 0, answer_after = 0 } },
+	gesture_conflict = { layout = "abc", system_gesture_conflict = true,
+		worker = { ready_after = 0, answer_after = 0 } },
 	-- Both sources are enabled, but Hammerspoon declines the localized names:
 	-- the real menu must reach the isolated native selection command.
 	native_layout_selection = { layout = "abc", enabled_layouts = { "abc", "french" },
@@ -457,6 +459,28 @@ M.MACHINES = {
 local _machine = nil
 local _selected_layout = nil
 local _selected_layout_key = nil
+
+--- Models only the four system gesture preference reads the driver uses.
+--- The standard test Mac has its conflicting Trackpad gestures disabled; the
+--- conflicting variant enables Look up so the real conflict policy remains testable.
+--- @param args table defaults arguments.
+--- @param conflicting boolean Whether Look up is enabled.
+--- @return table|nil answer
+function M.gesture_preferences_answer(args, conflicting)
+	local domain = nil
+	if #args == 2 and args[1] == "read" then domain = args[2]
+	elseif #args == 3 and args[1] == "-currentHost" and args[2] == "read" then domain = args[3] end
+	if domain == "com.apple.dock" then
+		return { code = 0, stdout = "{ showMissionControlGestureEnabled = 0; showAppExposeGestureEnabled = 0; }" }
+	end
+	if domain ~= "com.apple.AppleMultitouchTrackpad"
+		and domain ~= "com.apple.driver.AppleBluetoothMultitouch.trackpad"
+		and domain ~= "-globalDomain" then return nil end
+	return { code = 0, stdout = "{ TrackpadThreeFingerTapGesture = " .. (conflicting and "1" or "0")
+		.. "; TrackpadThreeFingerDrag = 0; TrackpadThreeFingerHorizSwipeGesture = 0;"
+		.. " TrackpadThreeFingerVertSwipeGesture = 0; TrackpadFourFingerHorizSwipeGesture = 0;"
+		.. " TrackpadFourFingerVertSwipeGesture = 0; }" }
+end
 M.lease_workers_started = 0
 M.native_reloads = 0
 M.layout_attempts = 0
@@ -638,6 +662,10 @@ local function machine_answer(path, args, helper, environment, launcher_environm
 	end
 	if path == "/usr/bin/defaults" and args[1] == "read" and args[3] == "AppleEnabledInputSources" then
 		return { code = 0, stdout = enabled_input_sources() }
+	end
+	if path == "/usr/bin/defaults" then
+		local answer = M.gesture_preferences_answer(args, _machine.system_gesture_conflict == true)
+		if answer then return answer end
 	end
 	if path:match("/python[%d.]*$") and args[1] == "-c" then
 		local source = tostring(args[2])
@@ -1300,6 +1328,10 @@ function M.install(hs, options)
 	install_natives(hs, env, options.arch, options.machine_root)
 	install_extension_searcher(hs)
 	install_file_system(hs, options)
+	-- This headless world models an empty SQLite database, including the native
+	-- backup/revision protocol used by first-run aggregate recovery.
+	require("tests.e2e.boot.empty_sqlite").install(hs,
+		options.app_root .. "/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/_shared")
 	hs.configdir = env.ERGOPTI_CONFIG_DIR
 	local real_exit = os.exit
 	os.exit = function(code)

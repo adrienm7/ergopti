@@ -382,10 +382,11 @@ helpers.describe("error window retains its captured sharing identity", function(
 			bridge.on_error("synthetic", "Private sentinel", "CANARY-private.invalid/notes")
 			run_deferred(context)
 			local initial = bridge.on_message("ready", {}, page(context))
-			helpers.assert_true(initial.text:find("CANARY", 1, true) ~= nil, "local detail remains visible")
+			helpers.assert_true(initial.message:find("CANARY", 1, true) ~= nil, "local detail remains visible separately")
 			context.version = "9.9.9"
 			helpers.assert_true(bridge.on_message({ action = "copy", text = "forged" }, {}, page(context)).ok)
 			helpers.assert_type(context.copied, "string")
+			helpers.assert_eq(initial.text, context.copied, "the preview must equal the copied report")
 			helpers.assert_true(context.copied:find("CANARY", 1, true) == nil)
 			helpers.assert_true(context.copied:find("2.1.0", 1, true) ~= nil)
 			helpers.assert_true(context.copied:find("9.9.9", 1, true) == nil)

@@ -30,6 +30,7 @@ local Renderer = require("adapters.graphics_renderer")
 local Scheduler = require("adapters.timer_scheduler")
 local Shell = require("adapters.shell_runner")
 local DisplayServer = require("infra.display_server")
+local HexColor = require("color.hex")
 
 local LOG = "ui.tooltip.preview"
 
@@ -310,13 +311,7 @@ local function accent_for(kind, group)
 	if not _config or type(_config.resolve) ~= "function" or not category then return nil end
 	local ok, resolved = pcall(_config.resolve, category, nil)
 	if not ok or type(resolved) ~= "table" or type(resolved.color) ~= "string" then return nil end
-	local r, g, b = resolved.color:match("^#(%x%x)(%x%x)(%x%x)$")
-	if not r then return nil end
-	return {
-		red = tonumber(r, 16) / 255,
-		green = tonumber(g, 16) / 255,
-		blue = tonumber(b, 16) / 255,
-	}
+	return HexColor.parse(resolved.color)
 end
 
 --- Schedules the bubble's own disappearance.

@@ -64,7 +64,9 @@ local CATALOGUE = { { label = "Alibaba", families = { { label = "Qwen", models =
 local function with_page(opts, body)
 	helpers.with_fresh_modules(OWNED, function()
 		local calls = { switch = {}, select = {}, pulls = {}, saves = 0, api = {} }
-		package.loaded["infra.dialog_util"] = { block_alert = function() return "OK" end,
+		package.loaded["infra.dialog_util"] = { block_alert = function()
+			return opts.confirm_remove and require("infra.i18n").get("button.remove") or "OK"
+		end,
 			text_prompt = function() return "OK", opts.typed_model or "" end }
 		package.loaded["infra.deferred_work"] = { after = function(_, fn) fn(); return true end }
 		package.loaded["ui.menu.menu_llm.mlx_repair_offer"] = { set_alternative = function() end }
@@ -101,7 +103,7 @@ local function with_page(opts, body)
 			state = state, keymap = {}, settings_mgr = {}, WarmupCtrl = {},
 			DEFAULT_STATE = { llm_model_ollama = "Qwen-A", llm_model_mlx = "Qwen-A" },
 			models_mgr = {
-				get_all_presets = function() return CATALOGUE end,
+				get_all_presets = function() return opts.catalogue or CATALOGUE end,
 				backend_model_installed = function(backend, name) return installed[backend][name] == true end,
 				backend_actual_model_name = function(_, name) return name:lower() end,
 				pull_ollama_model = function(tag, done) calls.pulls[#calls.pulls + 1] = "ollama:" .. tag; calls.done = done; return true end,
@@ -260,6 +262,28 @@ helpers.describe("model selector page owner", function()
 		end)
 	end)
 
+	for _, mode in ipairs({ "refuses", "throws" }) do
+	helpers.it("retries a runtime recheck after the timer scheduler " .. mode, function()
+		local opts = { ollama = { installed = false, pending = true } }
+		with_page(opts, function(Page, ctx, _, collected, p)
+			local attempts, pending = 0, nil
+			package.loaded["infra.deferred_work"].after = function(_, callback)
+				attempts = attempts + 1
+				if attempts == 1 then
+					if mode == "throws" then error("timer unavailable") end
+					return false
+				end
+				pending = callback
+				return true
+			end
+			Page.build_payload(ctx, p, collected)
+			Page.build_payload(ctx, p, collected)
+			helpers.assert_eq(attempts, 2, "a refused timer must not block a later retry")
+			helpers.assert_type(pending, "function")
+		end)
+	end)
+	end
+
 	helpers.it("(model-selector-install-refusal) a paused driver names the pause on the install button", function()
 		local opts = { paused = true, ollama = { installed = false } }
 		with_page(opts, function(Page, ctx, _, collected, p)
@@ -330,6 +354,21 @@ helpers.describe("model selector page owner", function()
 			calls.done()
 			helpers.assert_nil(row_of(Page.build_payload(ctx, p, collected), "ollama", "Qwen-B").pending)
 			helpers.assert_eq(#calls.switch, 0, "a download never activates the model")
+		end)
+	end)
+
+	helpers.it("ignores a late completion from an earlier download of the same model", function()
+		with_page({}, function(Page, ctx, calls, collected, p)
+			local action = { action = "download_model", backend = "ollama", name = "Qwen-B" }
+			helpers.assert_true(Page.handle_action(ctx, action, p, collected))
+			local old_done = calls.done
+			old_done()
+			helpers.assert_true(Page.handle_action(ctx, action, p, collected))
+			old_done()
+			helpers.assert_eq(row_of(Page.build_payload(ctx, p, collected), "ollama", "Qwen-B").pending, "download")
+			helpers.assert_true(Page.on_download_percent("ollama_model", 42))
+			calls.done()
+			helpers.assert_nil(row_of(Page.build_payload(ctx, p, collected), "ollama", "Qwen-B").pending)
 		end)
 	end)
 
@@ -419,6 +458,23 @@ helpers.describe("model selector page owner", function()
 		with_page({ entries = two, listing = {} }, function(Page, ctx, _, collected, p)
 			local row = row_of(Page.build_payload(ctx, p, collected), "api", "OpenAI/gpt-4o-mini")
 			helpers.assert_eq(row.entry_id, "e2", "an entry's own model wins over another entry's known one")
+		end)
+	end)
+
+	helpers.it("removes a custom entry whose name matches a catalogue row", function()
+		local catalogue = { { label = "Provider", families = { { label = "Family", models = {
+			{ name = "mistral-small:22b", urls = { ollama = "https://ollama.com/library/mistral-small:22b" } },
+		} } } } }
+		with_page({ catalogue = catalogue, confirm_remove = true }, function(Page, ctx, calls, collected, p)
+			ctx.state.llm_user_models = { { backend = "ollama", name = "mistral-small:22b" } }
+			helpers.assert_true(Page.handle_action(ctx, { action = "remove_custom_model", backend = "ollama",
+				name = "mistral-small:22b" }, p, collected))
+			helpers.assert_eq(#ctx.state.llm_user_models, 0)
+			helpers.assert_eq(calls.saves, 1, "the real custom model owner persists the removal")
+			helpers.assert_nil(calls.disabled)
+			helpers.assert_eq(Page.handle_action(ctx, { action = "remove_custom_model", backend = "ollama",
+				name = "mistral-small:22b" }, p, collected), false, "catalogue rows cannot be removed as custom")
+			helpers.assert_eq(calls.saves, 1)
 		end)
 	end)
 

@@ -95,6 +95,17 @@ helpers.describe("notifications.notify", function()
 			"an explicit native refusal must never produce a success diagnostic")
 	end)
 
+	helpers.it("refuses malformed native notification receipts without raising (notification-bad-receipt)", function()
+		local hostile = setmetatable({}, { __index = function() error("native lookup failed") end })
+		for _, receipt in ipairs({ true, hostile }) do
+			_G.hs.notify.new = function() return receipt end
+			local called, dispatched, detail = pcall(notifications.notify, "hello")
+			helpers.assert_true(called, "a malformed native receipt must remain a refusal")
+			helpers.assert_eq(dispatched, false)
+			helpers.assert_contains(detail, "no send capability")
+		end
+	end)
+
 	helpers.it("routes notification-click callback failures into the logger", function()
 		local click_callback = nil
 		local activation_attempts = 0
@@ -157,6 +168,33 @@ helpers.describe("notifications.notify", function()
 		_G.hs.focus = original_focus
 		helpers.assert_eq(acted, 1, "the click action must run")
 		helpers.assert_eq(focused, 0, "the app must not steal focus from the place the notice opens")
+	end)
+
+	helpers.it("does not redeliver an already retired notification click (notification-click-once)", function()
+		local click
+		_G.hs.notify.new = function(callback)
+			click = callback
+			local native = {}
+			native.send = function() return native end
+			return native
+		end
+		local actions = 0
+		helpers.assert_true(notifications.notify("approve", nil, "warning", function() actions = actions + 1 end))
+		click()
+		click()
+		helpers.assert_eq(actions, 1, "a retired notification must not repeat its action")
+		local scheduler = require("adapters.timer_scheduler")
+		local previous_after = scheduler.after
+		local expire
+		scheduler.after = function(_, callback) expire = callback; return {}, true end
+		local ok, err = pcall(function()
+			helpers.assert_true(notifications.notify("late", nil, "warning", function() actions = actions + 1 end))
+			expire()
+			click()
+			helpers.assert_eq(actions, 1, "a queued click must not revive an expired owner")
+		end)
+		scheduler.after = previous_after
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("refuses a click action that is not a function", function()

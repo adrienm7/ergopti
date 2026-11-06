@@ -10,10 +10,28 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local previous_destination = package.loaded["modules.keymap.utils"]
+local Destination = require("tests.support.text_destination_receipt")
 
+
+helpers.describe("text transform destination boundary", function()
+	helpers.it("revokes an issued destination receipt instead of always allowing", function()
+		local boundary = Destination.install()
+		local continuation = require("modules.shortcuts.actions.text_continuation")
+		local receipt = continuation.capture_destination()
+		helpers.assert_not_nil(receipt)
+		helpers.assert_eq(receipt.cached(), true)
+		helpers.assert_eq(receipt.current(), true)
+		boundary.revoke()
+		helpers.assert_eq(receipt.cached(), false)
+		helpers.assert_eq(receipt.current(), false)
+		helpers.assert_nil(continuation.capture_destination())
+	end)
+end)
 
 helpers.describe("text transform: reselection is one synthetic transaction", function()
 	helpers.it("batches every cursor key behind one broker handoff", function()
+		Destination.install()
 		package.loaded["tests.stubs.hs"] = nil
 		local hs_stub = require("tests.stubs.hs")
 		hs_stub.__reset()
@@ -24,6 +42,7 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 			getContents = function() return selected end,
 			setContents = function() change_count = change_count + 1; return true end,
 			clearContents = function() change_count = change_count + 1 end,
+			allContentTypes = function() return { {} } end,
 			readAllData = function()
 				return { ["public.utf8-plain-text"] = "USER_CLIPBOARD" }
 			end,
@@ -125,3 +144,5 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 		end
 	end)
 end)
+
+package.loaded["modules.keymap.utils"] = previous_destination

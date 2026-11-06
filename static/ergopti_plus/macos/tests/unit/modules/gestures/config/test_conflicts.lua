@@ -274,7 +274,7 @@ helpers.describe("Conflicts — slots taken by a macOS gesture", function()
 		local armed, cancelled = 0, 0
 		local scheduler = {
 			every = function(_interval, _fn) armed = armed + 1; return { id = armed }, true end,
-			cancel = function() cancelled = cancelled + 1 end,
+			cancel = function() cancelled = cancelled + 1; return true end,
 		}
 		helpers.assert_true(conflicts.start_watch(scheduler))
 		helpers.assert_true(conflicts.start_watch(scheduler))

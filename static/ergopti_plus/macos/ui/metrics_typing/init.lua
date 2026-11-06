@@ -28,6 +28,7 @@
 --- ==============================================================================
 
 local M = {}
+local ManifestKeys = require("keystats.manifest_keys")
 local WebviewResult = require("adapters.webview_result")
 local RunningApplication = require("adapters.running_application")
 local OwnWindow = require("adapters.own_window")
@@ -483,12 +484,13 @@ local function compute_full(pacer)
 	local all_apps_list  = {}
 	for date_str, day_data in pairs(manifest) do
 		if first_date == nil or date_str < first_date then first_date = date_str end
-		for app_name, _ in pairs(day_data) do
-			if not EXCLUDED_APPS[app_name] and not all_apps_set[app_name] then
+		for app_key, _ in pairs(day_data) do
+			local app_name = ManifestKeys.decode(app_key)
+			if not EXCLUDED_APPS[app_key] and app_name ~= "Unknown" and not all_apps_set[app_name] then
 				all_apps_set[app_name] = true
 				table.insert(all_apps_list, app_name)
 			end
-			if app_name ~= "Unknown" and app_icons[app_name] == nil then
+			if not EXCLUDED_APPS[app_key] and app_name ~= "Unknown" and app_icons[app_name] == nil then
 				local cached = M._app_icon_cache[app_name]
 				if cached ~= nil then
 					if cached then app_icons[app_name] = cached end

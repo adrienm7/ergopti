@@ -83,6 +83,18 @@ local function run_stream_case(case)
 	parser.process_prediction = function(_, _, raw) return { to_type = raw } end
 	json_codec.decode = function(raw)
 		decoded_payloads[#decoded_payloads + 1] = raw
+		if raw == 'false' then return false, nil end
+		if raw == 'null' then return nil, nil end
+		if raw == '{"choices":[null]}' then return { choices = {} }, nil end
+		if raw == '{"error":null,"choices":[]}' then return { choices = {} }, nil end
+		if raw == '{"error":null,"choices":[{"delta":{"content":"world"}}]}' then
+			return { choices = { { delta = { content = "world" } } } }, nil
+		end
+		if raw == '{"choices":[1]}' or raw == '{"choices":[]}' or raw == '{"choices":false}'
+			or raw == '{"choices":1}' or raw == '{"choices":{}}' then return require("json").decode(raw), nil end
+		if raw == '{"error":{"message":"generation failed"}}' then
+			return require("json").decode(raw), nil
+		end
 		if raw ~= (case.expected_payload or JSON_SINGLE) then
 			return nil, "unexpected SSE payload"
 		end
@@ -113,7 +125,9 @@ local function run_stream_case(case)
 		helpers.assert_eq(type(stream_on_done), "function",
 			"the real stream must hand its terminal callback to ShellRunner")
 		for index, chunk in ipairs(case.chunks) do
-			local keep_streaming = stream_on_chunk(nil, chunk, "")
+			local keep_streaming
+			if chunk == false then keep_streaming = stream_on_chunk(nil, nil, "")
+			else keep_streaming = stream_on_chunk(nil, chunk, "") end
 			helpers.assert_eq(keep_streaming, true,
 				"a valid SSE chunk must keep the transport alive")
 			if index == case.observe_before_blank_at then
@@ -125,7 +139,8 @@ local function run_stream_case(case)
 			context.stream.generation = context.stream.generation + 1
 			context.stream.task, context.stream.timeout = successor, successor_timeout
 		end
-		stream_on_done(case.exit_code or 0, case.remaining or "", "")
+		if case.lost_final then stream_on_done(case.exit_code or 0, nil, "")
+		else stream_on_done(case.exit_code or 0, case.remaining or "", "") end
 	end, debug.traceback)
 
 	shell_runner.spawn = original_spawn
@@ -181,6 +196,27 @@ local function run_stream_case(case)
 			"a nil decode error is authoritative even for a false value")
 		return
 	end
+	if case.expect_additional then
+		helpers.assert_eq(#partials, 2)
+		helpers.assert_eq(#successes, 1)
+		helpers.assert_eq(successes[1][1].to_type, "helloworld")
+		helpers.assert_eq(failures, 0)
+		return
+	end
+	if case.expect_usage then
+		helpers.assert_eq(#decoded_payloads, 2)
+		helpers.assert_eq(#successes, 1)
+		helpers.assert_eq(successes[1][1].to_type, "hello")
+		helpers.assert_eq(failures, 0)
+		return
+	end
+	if case.expect_provider_error then
+		helpers.assert_eq(#decoded_payloads, 2)
+		helpers.assert_eq(#partials, 1)
+		helpers.assert_eq(#successes, 0, "provider failure cannot publish a partial answer")
+		helpers.assert_eq(failures, 1, "provider failure is reported once")
+		return
+	end
 	if case.expect_transport_incomplete then
 		helpers.assert_eq(#decoded_payloads, 1, "the truncated stream must contain a valid decoded token")
 		helpers.assert_eq(#partials, 1, "the provider must have started a real partial prediction")
@@ -206,7 +242,76 @@ local function run_stream_case(case)
 end
 
 helpers.describe("MLX SSE event parser", function()
+	helpers.it("rejects native undecodable terminal stdout", function()
+		run_stream_case({ chunks = { "data:" .. JSON_SINGLE .. "\n\n", SSE_DONE },
+			lost_final = true, expect_transport_incomplete = true })
+	end)
+	helpers.it("rejects native undecodable stdout between valid records", function()
+		run_stream_case({ chunks = { "data:" .. JSON_SINGLE .. "\n\n", false, SSE_DONE },
+			expect_transport_incomplete = true })
+	end)
 	for _, case in ipairs({
+		{ name = "rejects boolean choices after partial output",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", 'data:{"choices":false}\n\n', SSE_DONE },
+			expect_provider_error = true },
+		{ name = "rejects numeric choices after partial output",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", 'data:{"choices":1}\n\n', SSE_DONE },
+			expect_provider_error = true },
+		{ name = "rejects object choices after partial output",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", 'data:{"choices":{}}\n\n', SSE_DONE },
+			expect_provider_error = true },
+		{
+			name = "accepts a valid token with a null error",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", 'data:{"error":null,"choices":[{"delta":{"content":"world"}}]}\n\n', SSE_DONE },
+			expect_additional = true,
+		},
+		{
+			name = "rejects a null choice hidden by native decoding",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", 'data:{"choices":[null]}\n\n', SSE_DONE },
+			expect_provider_error = true,
+		},
+		{
+			name = "rejects a null JSON root after partial output",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", 'data:null\n\n', SSE_DONE },
+			expect_provider_error = true,
+		},
+		{
+			name = "rejects malformed JSON after a partial response",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", 'data:{broken\n\n', SSE_DONE },
+			expect_provider_error = true,
+		},
+		{
+			name = "rejects a JSON scalar after a partial response",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", 'data:false\n\n', SSE_DONE },
+			expect_provider_error = true,
+		},
+		{
+			name = "accepts a null error when native decode drops it",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", 'data:{"error":null,"choices":[]}\n\n', SSE_DONE },
+			expect_usage = true,
+		},
+		{
+			name = "accepts a usage-only empty choices event",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", 'data:{"choices":[]}\n\n', SSE_DONE },
+			expect_usage = true,
+		},
+		{
+			name = "rejects a scalar choice following a partial response",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", 'data:{"choices":[1]}\n\n', SSE_DONE },
+			expect_provider_error = true,
+		},
+		{
+			name = "rejects a scalar choice without throwing from the stream callback",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", SSE_DONE },
+			has_decoded_value = true,
+			decoded_value = { choices = { 1 } },
+			expect_schema_rejection = true,
+		},
+		{
+			name = "rejects provider error after partial text even with a DONE marker",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", 'data:{"error":{"message":"generation failed"}}\n\n', SSE_DONE },
+			expect_provider_error = true,
+		},
 		{
 			name = "ignores superseded EOF without clearing its successor (mlx-stream-terminal-receipt)",
 			chunks = { "data:" .. JSON_SINGLE .. "\n\n" },

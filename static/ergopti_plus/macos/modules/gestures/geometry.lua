@@ -52,6 +52,11 @@ M.DIAG_MIN_2  = 5.0    -- 2 fingers: minimum total distance to validate a diagon
 -- step is smaller than this fires its first action after one step, as before.
 M.INCREMENTAL_FIRST_STEP = 4.0
 
+-- Bound synchronous work on a single touch frame. A normal full swipe travels
+-- about 15–45 units, so even at the smallest supported step of 1 it remains
+-- well below this guard. An implausible sensor jump is rejected, not truncated.
+M.MAX_INCREMENTAL_ACTIONS_PER_FRAME = 100
+
 -- Least share of the centroid's travel along the swipe axis that EVERY contact
 -- of a three-or-more-finger gesture must cover itself, in the same direction.
 -- Two scrolling fingers beside a resting thumb move the centroid two thirds of
@@ -66,6 +71,25 @@ M.COHESION_MIN_SHARE = 0.3
 -- ===================================
 -- ======= 2/ Geometry Helpers =======
 -- ===================================
+-- ===================================
+
+--- Rejects a frame whose centroid cannot be computed from every contact.
+--- @param touches table Trackpad touch array.
+--- @return boolean valid
+function M.validPositions(touches)
+	for _, touch in ipairs(touches) do
+		local position = type(touch) == "table" and type(touch.absoluteVector) == "table"
+			and touch.absoluteVector.position or nil
+		if type(position) ~= "table" then return false end
+		for _, axis in ipairs({ "x", "y" }) do
+			local value = position[axis]
+			if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
+				return false
+			end
+		end
+	end
+	return true
+end
 -- ===================================
 
 --- Calculates the central point among all current fingers.
@@ -139,10 +163,17 @@ end
 --- @param step number Distance per action after the first (the sensitivity).
 --- @return integer steps
 function M.incrementalSteps(distance, step)
-	if type(step) ~= "number" or step <= 0 then error("incremental step must be a positive number") end
+	if type(distance) ~= "number" or distance ~= distance or distance < 0 or distance == math.huge then
+		error("incremental distance must be a finite non-negative number")
+	end
+	if type(step) ~= "number" or step ~= step or step <= 0 or step == math.huge then
+		error("incremental step must be a finite positive number")
+	end
 	local first = math.min(M.INCREMENTAL_FIRST_STEP, step)
 	if distance < first then return 0 end
-	return 1 + math.floor((distance - first) / step)
+	local count = (distance - first) / step
+	if count == math.huge then error("incremental action count is not finite") end
+	return 1 + math.floor(count)
 end
 
 --- Distance a swipe must come back from its last action before it counts as a

@@ -23,10 +23,10 @@ local function load_subject(open_url, alert)
 		error = function(_tag, message) errors[#errors + 1] = message end,
 	}
 	package.loaded["infra.dialog_util"] = {
-		block_alert = alert or function(...) dialogs[#dialogs + 1] = { ... } end,
+		block_alert = alert or function(...) dialogs[#dialogs + 1] = { ... }; return "OK" end,
 	}
 	package.loaded["adapters.application_notifier"] = {
-		send = function(...) notifications[#notifications + 1] = { ... } end,
+		send = function(...) notifications[#notifications + 1] = { ... }; return true end,
 	}
 	local subject = helpers.load_with_stubs("adapters.update_launcher", {
 		urlevent = { openURL = open_url },
@@ -78,6 +78,26 @@ helpers.describe("update_launcher: exact native updater command", function()
 		helpers.assert_true(#errors >= 6)
 	end)
 
+	helpers.it("refuses a syntactically valid channel absent from the registry", function()
+		local sent = {}
+		local subject, _, dialogs = load_subject(function(url) sent[#sent + 1] = url; return true end)
+		helpers.assert_eq(subject.select_channel("unknown_channel"), false)
+		helpers.assert_eq(subject.request_check("unknown_channel"), false)
+		helpers.assert_eq(#sent, 0)
+		helpers.assert_eq(#dialogs, 1)
+	end)
+
+	helpers.it("does not send a command when the channel registry is unavailable", function()
+		helpers.with_stub_scope({ "modules.updater" }, function()
+			package.loaded["modules.updater"] = { channels = function() error("registry unavailable") end }
+			local sent = {}
+			local subject, _, dialogs = load_subject(function(url) sent[#sent + 1] = url; return true end)
+			helpers.assert_eq(subject.request_check("dev"), false)
+			helpers.assert_eq(#sent, 0)
+			helpers.assert_eq(#dialogs, 1)
+		end)
+	end)
+
 	helpers.it("fails visibly when Hammerspoon refuses the URL", function()
 		local subject, errors, dialogs = load_subject(function() return false end)
 
@@ -94,6 +114,43 @@ helpers.describe("update_launcher: exact native updater command", function()
 		helpers.assert_eq(result, false)
 		helpers.assert_eq(#errors, 1)
 		helpers.assert_eq(#dialogs, 1)
+	end)
+
+	helpers.it("surfaces an opaque native URL error without formatting it", function()
+		local failure = setmetatable({}, { __tostring = function() error("cannot format") end })
+		local subject, _, dialogs = load_subject(function() error(failure) end)
+		local ok, result = pcall(subject.request_check, "dev")
+		helpers.assert_true(ok)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(#dialogs, 1)
+		local channel_ok, changed = pcall(subject.select_channel, "dev")
+		helpers.assert_true(channel_ok)
+		helpers.assert_eq(changed, false)
+	end)
+
+	helpers.it("falls back when the modal returns no button", function()
+		for _, answer in ipairs({ false, "" }) do
+			local subject, _, _, notifications = load_subject(function() return false end, function() return answer end)
+			helpers.assert_eq(subject.request_check("main"), false)
+			helpers.assert_eq(#notifications, 1, "a refused modal must not hide the check failure")
+		end
+		local subject, _, _, notifications = load_subject(function() return false end, function() return nil end)
+		helpers.assert_eq(subject.request_check("main"), false)
+		helpers.assert_eq(#notifications, 1, "a modal without a result must fall back")
+	end)
+
+	helpers.it("contains a failed fallback notification", function()
+		for _, failure in ipairs({ "throw", "refuse" }) do
+			local subject, errors = load_subject(function() return false end, function() error("dialog unavailable") end)
+			package.loaded["adapters.application_notifier"].send = function()
+				if failure == "throw" then error("notification unavailable") end
+				return false
+			end
+			local ok, sent = pcall(subject.request_check, "main")
+			helpers.assert_true(ok, "notification failure must not escape the adapter")
+			helpers.assert_eq(sent, false)
+			helpers.assert_eq(#errors, 2, "both the failed check and failed notification must be logged")
+		end
 	end)
 
 	helpers.it("falls back to a notification when the modal boundary throws", function()

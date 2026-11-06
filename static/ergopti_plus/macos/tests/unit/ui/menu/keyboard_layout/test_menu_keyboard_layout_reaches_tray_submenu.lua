@@ -216,10 +216,10 @@ end)
 
 
 --- Uses the actual empty-source list, canonical binding and native row renderer.
---- Native effect ports are controlled; successful UI dispatch still returns nil.
+--- Native effect ports are controlled and expose their launch receipt.
 local function with_empty_source_preferences(callback, labels)
 	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "infra.i18n",
-		"modules.keymap.input_sources", "modules.keymap.layout_install"}, function()
+		"modules.keymap.input_sources", "modules.keymap.layout_install", "adapters.shell_runner"}, function()
 		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local installer = require("modules.keymap.layout_install")
 		local state = {records = {}, commands = {}, result = true, effects = 0}
@@ -233,11 +233,11 @@ local function with_empty_source_preferences(callback, labels)
 		installer.install_user = forbid_effect
 		installer.install_system = forbid_effect
 		sources.set_input_source_async = forbid_effect
-		hs.execute = function(command)
-			state.commands[#state.commands + 1] = command
+		package.loaded["adapters.shell_runner"] = { open = function(url)
+			state.commands[#state.commands + 1] = url
 			if state.result == "throw" then error("Native launch refused") end
 			return state.result
-		end
+		end }
 		local translator = require("infra.i18n")
 		if labels then translator.get = function(key) return labels[key] or key end end
 		package.loaded["infra.manifest_menu"] = nil
@@ -264,18 +264,18 @@ helpers.describe("empty native Input Sources consumes the canonical preferences 
 			helpers.assert_true(row.disabled ~= true)
 			helpers.assert_nil(row.checked)
 			helpers.assert_eq(#state.commands, 0, "building the actual provider never launches preferences")
-			helpers.assert_nil(row.fn(), "the unchanged native UI callback does not fabricate a true ACK")
-			helpers.assert_eq(state.commands, {"open 'x-apple.systempreferences:com.apple.preference.keyboard?InputSources'"})
+			helpers.assert_eq(row.fn(), true, "the asynchronous launcher acknowledged the request")
+			helpers.assert_eq(state.commands, {"x-apple.systempreferences:com.apple.preference.keyboard?InputSources"})
 		end)
 	end)
 	for _, result in ipairs({false, "throw"}) do
-		helpers.it("preserves the native nil receipt on launch refusal " .. tostring(result), function()
+		helpers.it("reports asynchronous launch refusal " .. tostring(result), function()
 			with_empty_source_preferences(function(build, state)
 				state.result = result
 				local row = empty_preferences_row(build(), "menu.layout.open_prefs")
 				helpers.assert_not_nil(row)
-				helpers.assert_nil(row.fn(), "a refused native launch must not report a fabricated true ACK")
-				helpers.assert_eq(state.commands, {"open 'x-apple.systempreferences:com.apple.preference.keyboard?InputSources'"})
+				helpers.assert_eq(row.fn(), false, "a refused native launch must not report success")
+				helpers.assert_eq(state.commands, {"x-apple.systempreferences:com.apple.preference.keyboard?InputSources"})
 			end)
 		end)
 	end
@@ -289,7 +289,7 @@ helpers.describe("empty native Input Sources consumes the canonical preferences 
 				helpers.assert_nil(empty_preferences_row(rows, "menu.layout.open_prefs"))
 				local row = empty_preferences_row(rows, "menu.about.check_for_updates")
 				helpers.assert_not_nil(row)
-				helpers.assert_nil(row.fn())
+				helpers.assert_true(row.fn())
 				helpers.assert_eq(#state.commands, 1)
 			end, debug.traceback)
 			item.i18n = old
@@ -361,8 +361,8 @@ helpers.describe("empty native Input Sources consumes the canonical preferences 
 				local row = empty_preferences_row(build(), labels["menu.layout.open_prefs"])
 				helpers.assert_not_nil(row, "actual native preferences caption: " .. locale)
 				helpers.assert_eq(type(row.fn), "function")
-				helpers.assert_nil(row.fn())
-				helpers.assert_eq(state.commands, {"open 'x-apple.systempreferences:com.apple.preference.keyboard?InputSources'"})
+				helpers.assert_true(row.fn())
+				helpers.assert_eq(state.commands, {"x-apple.systempreferences:com.apple.preference.keyboard?InputSources"})
 			end, labels)
 		end
 	end)

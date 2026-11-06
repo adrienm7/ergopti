@@ -107,7 +107,10 @@ function M.new(dependencies)
 			end)
 			if committed ~= true then
 				Logger.error(LOG, "The wait for the official Karabiner to exit could not be scheduled.")
-				callback(false)
+				-- Core unregister already succeeded. Preserve that fact so the
+				-- activation owner records its restoration debt; admission still
+				-- performs its own fresh process probe before starting capture.
+				callback(true)
 			end
 		end)
 	end

@@ -11,6 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Destination = require("tests.support.text_destination_receipt")
 
 
 local function clone(value, seen)
@@ -33,6 +34,7 @@ local function load_fixture(options)
 	options = options or {}
 	local saved = {
 		hs_global = _G.hs,
+		destination = package.loaded["modules.keymap.utils"],
 		hs_module = package.loaded["hs"],
 		logger = package.loaded["infra.logger"],
 		synthetic = package.loaded["adapters.synthetic_input"],
@@ -122,6 +124,7 @@ local function load_fixture(options)
 
 	local pasteboard = {
 		changeCount = function() return change_count end,
+		allContentTypes = function() return { {} } end,
 		readAllData = function()
 			calls.read = calls.read + 1
 			local outcome = next_outcome(read_outcomes, calls.read)
@@ -191,6 +194,7 @@ local function load_fixture(options)
 	}
 
 	package.loaded["adapters.timer_scheduler"] = nil
+	Destination.install()
 	local Text = helpers.load_with_stubs("modules.shortcuts.actions.text", {
 		pasteboard = pasteboard,
 		timer = timer,
@@ -220,6 +224,7 @@ local function load_fixture(options)
 			end
 		end,
 		restore = function()
+			package.loaded["modules.keymap.utils"] = saved.destination
 			package.loaded["modules.shortcuts.actions.text"] = saved.text
 			package.loaded["infra.logger"] = saved.logger
 			package.loaded["adapters.synthetic_input"] = saved.synthetic

@@ -149,6 +149,15 @@ vm.runInContext(
 	appsContext
 );
 vm.runInContext(read('static/ergopti_plus/_shared/ui/metrics_calendar.js'), appsContext);
+vm.runInContext(read('static/ergopti_plus/_shared/ui/metrics_manifest_keys.js'), appsContext);
+const manifestKeyVectors = JSON.parse(
+	read('static/ergopti_plus/_shared/tests/corpus/keystats/manifest_key_vectors.json')
+);
+for (const vector of manifestKeyVectors) {
+	assert.strictEqual(appsContext.metricsManifestKey(vector.label), vector.key);
+	assert.strictEqual(appsContext.metricsManifestLabel(vector.key), vector.label);
+}
+
 require('./support/theme-tokens.cjs').installThemeTokens(appsContext);
 vm.runInContext(read('static/ergopti_plus/_shared/ui/metrics_apps/helpers.js'), appsContext);
 vm.runInContext(appsSource, appsContext);
@@ -219,6 +228,11 @@ const typingContext = {
 	INFO_SVG: '',
 	render_charts: () => {}
 };
+typingContext.metricsManifestLabel = compileFunction(
+	read('static/ergopti_plus/_shared/ui/metrics_manifest_keys.js'),
+	'metricsManifestLabel',
+	typingContext
+);
 // Execute the real selection dependencies alongside the extracted consumer.
 // Loading shared state keeps the selection constants owned by production code.
 typingContext.APP_SELECTION_MODE = vm.runInNewContext(
@@ -269,6 +283,11 @@ const selectionContext = {
 	request_range_data() {},
 	ensure_live_refresh() {}
 };
+selectionContext.metricsManifestLabel = compileFunction(
+	read('static/ergopti_plus/_shared/ui/metrics_manifest_keys.js'),
+	'metricsManifestLabel',
+	selectionContext
+);
 selectionContext.update_manifest_scope = compileFunction(
 	typingSource,
 	'update_manifest_scope',

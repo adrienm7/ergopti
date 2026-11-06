@@ -392,7 +392,7 @@ local function _read_persisted_interval(path)
 	local section = config[CONFIG_SECTION]
 	local raw = type(section) == "table" and section[CONFIG_INTERVAL_KEY] or nil
 	if raw == nil then return DEFAULT_INTERVAL_SEC end
-	if type(raw) ~= "number" or raw < 0 or raw ~= math.floor(raw) then
+	if type(raw) ~= "number" or raw < 0 or raw == math.huge or raw ~= math.floor(raw) then
 		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is not a whole number of seconds; using %ds.",
 			tostring(raw), DEFAULT_INTERVAL_SEC)
 		return DEFAULT_INTERVAL_SEC
@@ -421,7 +421,16 @@ end
 --- @return table state
 local function _load_check_state()
 	if _check_state then return _check_state end
-	local state, dropped = Schedule.sanitize_state(_storage_get(CHECK_STATE_KEY, nil))
+	if not Storage or type(Storage.read_exact) ~= "function" then
+		Logger.error(LOG, "The update-check storage cannot perform an exact read.")
+		return nil
+	end
+	local called, read_ok, stored = pcall(Storage.read_exact, CHECK_STATE_KEY)
+	if not called or read_ok ~= true then
+		Logger.error(LOG, "The update-check record could not be read; retrying without overwriting it.")
+		return nil
+	end
+	local state, dropped = Schedule.sanitize_state(stored)
 	for _, field in ipairs(dropped) do
 		Logger.warn(LOG, "Dropped the invalid '%s' of the stored update-check record.", field)
 	end
@@ -470,6 +479,13 @@ local function _load_list_cache()
 	end
 	for key, raw in pairs(stored) do
 		local copy, reason = ListCache.validate(raw)
+		if copy then
+			local valid, decoded = pcall(Json.decode_lossless, copy.body)
+			local entries = valid and type(decoded) == "table" and Parser.split_releases_array(copy.body) or nil
+			if not entries or #entries ~= #decoded or #entries > RELEASE_PAGE_SIZE then
+				copy, reason = nil, "invalid release page JSON"
+			end
+		end
 		if copy and type(key) == "string" and _list_cache[key] == nil then
 			_list_cache[key] = { body = copy.body, validator = copy.etag, effective_url = copy.url, restored = true }
 		else
@@ -1244,7 +1260,9 @@ end
 --- @param generation number Captured logical schedule owner.
 local function _complete_background_check(ok, available, release, generation)
 	if not _schedule_current(generation) then return end
-	local state = Schedule.record_check(_load_check_state(), M._now(), ok)
+	local previous = _load_check_state()
+	if not previous then return end
+	local state = Schedule.record_check(previous, M._now(), ok)
 	_save_check_state(state)
 	Logger.info(LOG, "Background check recorded: %s (consecutive failures: %d).",
 		ok and "success" or "failure", state.failures)
@@ -1283,6 +1301,10 @@ local function _evaluate_schedule()
 	if _schedule_active ~= true then return end
 	_bg_timer_handle = nil
 	local now = M._now()
+	if _started_at and now < _started_at then
+		Logger.info(LOG, "The wall clock moved behind startup; restarting the update-check boot delay.")
+		_started_at = now
+	end
 	-- A luv timer does not advance during a suspend: a wall-clock gap longer
 	-- than the delay it was armed for is a wake, after which the network needs
 	-- the boot delay before a catch-up check.
@@ -1291,9 +1313,11 @@ local function _evaluate_schedule()
 			now - _armed_at, _armed_for)
 		_started_at = now
 	end
+	local state = _load_check_state()
+	if not state then _arm_schedule(TIMING.reevaluate_sec); return end
 	local due_at, reason = Schedule.next_due({
 		now = now, started_at = _started_at or now, interval = _check_interval,
-		state = _load_check_state(), timing = TIMING,
+		state = state, timing = TIMING,
 	})
 	if due_at == nil then
 		Logger.debug(LOG, "Automatic update checks are off (%s).", reason)
@@ -1392,10 +1416,13 @@ function M.start_background_checks(channel, interval_sec, on_available)
 	_schedule_active = true
 	_started_at = _started_at or M._now()
 	local now = M._now()
-	local due_at, reason = Schedule.next_due({
+	if now < _started_at then _started_at = now end
+	local state = _load_check_state()
+	local due_at, reason
+	if state then due_at, reason = Schedule.next_due({
 		now = now, started_at = _started_at, interval = _check_interval,
-		state = _load_check_state(), timing = TIMING,
-	})
+		state = state, timing = TIMING,
+	}) else reason = "record_unavailable" end
 	local first_delay = due_at and Schedule.delay_until(due_at, now, TIMING) or TIMING.reevaluate_sec
 	Logger.start(LOG, "Background checks every %ds on channel '%s' (next evaluation in %ds, %s).",
 		_check_interval, _channel, first_delay, reason)

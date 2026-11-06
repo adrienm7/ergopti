@@ -406,7 +406,8 @@ helpers.describe("error window (macOS): page and actions (error-dialog-macos)", 
 		helpers.assert_eq(init.log_path, "~/" .. AppDirs.macos.relative .. "/ErgoptiPlus_errors_2026-09-24.log")
 		helpers.assert_true(init.text:find("# ErgoptiPlus diagnostics", 1, true) ~= nil, "the report must be sent")
 		helpers.assert_true(init.text:find(HOME, 1, true) == nil, "the report must be redacted")
-		helpers.assert_true(init.text:find("keystats", 1, true) ~= nil, "the report must name the module")
+		helpers.assert_true(init.text:find("Flush failed: disk full", 1, true) == nil,
+			"the sharing preview must not add the local error message")
 	end)
 
 	helpers.it("copy, report and open act on the report the page showed (error-dialog-macos)", function()
@@ -490,6 +491,23 @@ helpers.describe("error window sharing uses the real report sink", function()
 end)
 
 
+helpers.describe("error window sharing preview", function()
+	helpers.it("shows exactly the text copied from the retained diagnostics snapshot", function()
+		local dialog, context = load_dialog({ real_report = true })
+		dialog.init()
+		dialog.on_error("synthetic", "failure", "private local detail")
+		fire_timers(context)
+		context.page({ body = "ready" })
+		local preview = page_messages(context)[1].text
+		context.page({ body = { action = "copy" } })
+		helpers.assert_type(context.copied, "string")
+		helpers.assert_eq(preview, context.copied, "the preview must describe exactly what is copied")
+		context.page({ body = { action = "report" } })
+		helpers.assert_type(context.saved, "table")
+		helpers.assert_eq(preview, context.saved.text, "the attachment must match the preview")
+	end)
+end)
+
 helpers.describe("error window retains its captured sharing identity", function()
 	helpers.it("keeps local details and shares its own snapshot after another collection (error-sharing-owner)", function()
 		local dialog, context = load_dialog({ real_report = true })
@@ -497,7 +515,7 @@ helpers.describe("error window retains its captured sharing identity", function(
 		dialog.on_error("synthetic", "Private sentinel", "CANARY-private.invalid/notes")
 		fire_timers(context)
 		context.page({ body = "ready" })
-		helpers.assert_true(page_messages(context)[1].text:find("CANARY", 1, true) ~= nil, "local detail remains visible")
+		helpers.assert_true(page_messages(context)[1].message:find("CANARY", 1, true) ~= nil, "local detail remains visible separately")
 		context.version = "9.9.9"
 		context.page({ body = { action = "copy", text = "forged" } })
 		helpers.assert_type(context.copied, "string")

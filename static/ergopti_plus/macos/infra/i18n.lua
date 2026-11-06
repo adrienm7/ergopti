@@ -57,11 +57,16 @@ local SETTINGS_KEY = "i18n_locale"
 
 --- Currently active locale code.
 local _locale = "fr"
+local _locale_write_active = false
+local _locale_rewrite_debt = nil
+local _locale_storage_debt = nil
+local _locale_storage_serial = 0
 
 --- Pending reload timer — cancelled and replaced on every rapid locale switch
 --- so only the last selection triggers a reload.
 local _reload_timer = nil
 local _reload_generation = 0
+local _reload_deferred = nil
 
 --- Delay before reloading after a locale change (seconds).
 local RELOAD_DEBOUNCE_SEC = 0.15
@@ -118,6 +123,8 @@ function M.detect_system_locale()
 	end
 	-- Try exact two-letter prefix first (e.g. "fr" from "fr_FR")
 	local lang = raw:match("^([a-z][a-z])")
+	-- Norwegian catalogues use "no", while the system identifies its two written forms.
+	if lang == "nb" or lang == "nn" then lang = "no" end
 	if lang and is_known(lang) then
 		Logger.debug(LOG, "detect_system_locale: '%s' → '%s'.", raw, lang)
 		return lang
@@ -130,7 +137,7 @@ end
 --- if none is saved, detects the macOS system locale (fallback: "en").
 --- Must be called once at boot before any menu is built.
 function M.init()
-	if not _scope.admit_change() then return false end
+	if _locale_write_active or _locale_rewrite_debt or _locale_storage_debt or not _scope.admit_change() then return false end
 	Logger.trace(LOG, "Initialising i18n…")
 	local saved = Storage.get(SETTINGS_KEY)
 	if type(saved) == "string" and is_known(saved) then
@@ -171,14 +178,13 @@ function M.format(key, ...)
 	local text = M.get(key)
 	if type(text) ~= "string" then return text end
 	local args = table.pack(...)
-	for n = 1, args.n do
-		local value = tostring(args[n])
-		-- The replacement is outside-world data (a filesystem path), and a "%" in
-		-- a gsub replacement raises. Escape it rather than trusting the input.
-		value = value:gsub("%%", "%%%%")
-		text = text:gsub("{" .. n .. "}", value)
-	end
-	return text
+	-- Substitution values are data, not templates: formatting a later argument
+	-- must never rewrite a placeholder that appeared inside an earlier value.
+	return (text:gsub("{([1-9]%d*)}", function(index)
+		local position = tonumber(index)
+		if position and position <= args.n then return tostring(args[position]) end
+		return nil
+	end))
 end
 
 --- @return string
@@ -191,7 +197,180 @@ end
 --- @param code string Locale about to be saved.
 --- @return boolean committed
 local function rewrite_configured(code)
-	return require("infra.script_scope").rewrite_configured(require("config_keys").KEY.SCRIPT_LOCALE, code)
+	local committed, detail, receipt = require("infra.script_scope").rewrite_configured_owned(
+		require("config_keys").KEY.SCRIPT_LOCALE, code)
+	_locale_rewrite_debt = receipt
+	if committed ~= true then
+		Logger.error(LOG, "Configured locale rewrite was refused: %s.", tostring(detail))
+		return false
+	end
+	return true
+end
+
+--- Keeps the exact config inverse until restoration is confirmed by readback.
+local function settle_locale_rewrite()
+	if _locale_rewrite_debt == nil then return true end
+	local ok, restored = pcall(require("infra.script_scope").restore_configured_rewrite, _locale_rewrite_debt)
+	if not ok or restored ~= true then
+		Logger.error(LOG, "Locale config rollback remains pending; another locale change is blocked.")
+		return false
+	end
+	_locale_rewrite_debt = nil
+	return true
+end
+
+--- Finishes the exact native cohort and conditionally removes its backup.
+local function settle_locale_storage_inner(keep)
+	local debt = _locale_storage_debt
+	if debt == nil then return true end
+	if debt.keep == nil then debt.keep = keep == true end
+	if not rawequal(package.loaded["adapters.storage"], Storage) then return false end
+	if debt.receipt and not debt.keep and not debt.restored then
+		if Storage.restore_owned(debt.owner, debt.receipt) ~= true then return false end
+		debt.restored = true
+	end
+	if not debt.released then
+		if Storage.release_owned(debt.owner) ~= true then return false end
+		debt.released = true
+	end
+	if debt.receipt and not debt.forgotten then
+		if Storage.forget_owned(debt.owner, debt.receipt) ~= true then return false end
+		debt.forgotten = true
+	end
+	if debt.backup_cleanup then
+		if debt.backup_cleanup() ~= true then return false end
+		debt.backup_cleanup = nil
+	end
+	if debt.backup_path then
+		local content, status = debt.files.read_with_status(debt.backup_path)
+		if status == "ok" then
+			if content ~= debt.backup_bytes then return false end
+			local removed, _, _, retry = debt.files.remove_if_unchanged(debt.backup_path,
+				{ status = "ok", content = debt.backup_bytes })
+			if removed ~= true then
+				if type(retry) == "function" then debt.backup_cleanup = retry end
+				return false
+			end
+		elseif status ~= "absent" then return false end
+	end
+	_locale_storage_debt = nil
+	return true
+end
+
+local function settle_locale_storage(keep)
+	local ok, settled = pcall(settle_locale_storage_inner, keep)
+	return ok and settled == true
+end
+
+local function persist_selected_locale(code)
+	local debt = _locale_storage_debt
+	if not debt or debt.backup_path then return false end
+	local path = require("infra.config_paths").get("ConfigTomlPath")
+	if type(path) ~= "string" or path == "" then return false end
+	_locale_storage_serial = _locale_storage_serial + 1
+	debt.backup_path = path .. ".locale-" .. tostring(hs.timer.absoluteTime()) .. "-"
+		.. tostring(_locale_storage_serial) .. ".settings"
+	debt.files = require("adapters.file_system")
+	debt.backup_bytes = require("json").encode({ format = "ergopti-owned-settings-v1", cells = debt.cells })
+	if type(debt.backup_bytes) ~= "string" then return false end
+	return Storage.publish_owned(debt.owner, debt.receipt,
+		{ [SETTINGS_KEY] = { present = true, value = code } }, debt.backup_path, debt.files) == true
+end
+
+local function verify_configured_locale()
+	local ok, verified = pcall(require("infra.script_scope").verify_configured_rewrite, _locale_rewrite_debt)
+	return ok and verified == true
+end
+
+--- Arms one reload attempt. A delivered timer never reloads across an owned
+--- locale write or retained storage cleanup; it retries after that work settles.
+local function arm_locale_reload(generation, code)
+	local handle
+	local committed
+	local predecessor = _reload_timer
+	handle, committed = TimerScheduler.after(RELOAD_DEBOUNCE_SEC, function()
+		if generation ~= _reload_generation or _reload_timer ~= handle then return end
+		if _locale_write_active then
+			_reload_deferred = { handle = handle, generation = generation, code = code }
+			return
+		end
+		_locale_write_active = true
+		local ready = settle_locale_storage(true) and _locale_rewrite_debt == nil
+		_locale_write_active = false
+		if handle.timer ~= nil and TimerScheduler.cancel(handle) ~= true then
+			Logger.error(LOG, "Locale reload is blocked by retained timer cleanup.")
+			return
+		end
+		if generation ~= _reload_generation or _reload_timer ~= handle then return end
+		_reload_timer = nil
+		if not ready then
+			if not arm_locale_reload(generation, code) then
+				Logger.error(LOG, "Locale reload retry could not be scheduled; cleanup remains pending.")
+			end
+			return
+		end
+		Logger.success(LOG, "Locale set to '%s' — reloading.", code)
+		Logger.pcall(LOG, hs.reload)
+	end)
+	if generation ~= _reload_generation or _reload_timer ~= predecessor then
+		if handle and handle.timer ~= nil and TimerScheduler.cancel(handle) ~= true then
+			Logger.error(LOG, "Superseded locale reload timer retains native cleanup debt.")
+		end
+		return false
+	end
+	if handle and handle.timer ~= nil then _reload_timer = handle end
+	if committed ~= true then
+		if not handle or handle.timer == nil then _reload_timer = nil end
+		return false
+	end
+	_reload_timer = handle
+	return true
+end
+
+local function resume_deferred_reload()
+	local pending = _reload_deferred
+	_reload_deferred = nil
+	if not pending or pending.generation ~= _reload_generation or _reload_timer ~= pending.handle then return end
+	if pending.handle.timer ~= nil and TimerScheduler.cancel(pending.handle) ~= true then
+		Logger.error(LOG, "Locale reload is blocked by retained timer cleanup.")
+		return
+	end
+	if pending.generation ~= _reload_generation or _reload_timer ~= pending.handle then return end
+	_reload_timer = nil
+	if not arm_locale_reload(pending.generation, pending.code) then
+		Logger.error(LOG, "Deferred locale reload could not be scheduled.")
+	end
+end
+
+local function locale_transaction(action)
+	if _locale_write_active then return false end
+	_locale_write_active = true
+	local ok, result = xpcall(function()
+		if not settle_locale_storage(false) or not settle_locale_rewrite() then return false end
+		local owner = {}
+		if Storage.acquire_owned(owner, { SETTINGS_KEY }) ~= true then return false end
+		_locale_storage_debt = { owner = owner }
+		local receipt, cells = Storage.capture_owned(owner)
+		if receipt == nil then return false end
+		_locale_storage_debt.receipt, _locale_storage_debt.cells = receipt, cells
+		return action()
+	end, debug.traceback)
+	if not ok or result ~= true then
+		local storage_restored = settle_locale_storage(false)
+		settle_locale_rewrite()
+		if not storage_restored then Logger.error(LOG, "Locale settings rollback remains pending.") end
+		if not ok then Logger.error(LOG, "Locale change raised; its config rollback was attempted.") end
+		_locale_write_active = false
+		resume_deferred_reload()
+		return false
+	end
+	_locale_rewrite_debt = nil
+	if not settle_locale_storage(true) then
+		Logger.error(LOG, "Committed locale settings cleanup remains pending.")
+	end
+	_locale_write_active = false
+	resume_deferred_reload()
+	return true
 end
 
 --- Changes the active locale, persists it, and triggers a Hammerspoon reload
@@ -200,7 +379,7 @@ end
 --- so only the last selected locale is applied, preventing stale reloads from
 --- landing on an intermediate language when the user switches quickly.
 --- @param code string A known locale code.
-function M.set_locale(code)
+local function set_locale_transaction(code)
 	if not _scope.admit_change() then return false end
 	if not is_known(code) then
 		Logger.warn(LOG, "Unknown locale '%s' — ignoring.", code)
@@ -220,31 +399,31 @@ function M.set_locale(code)
 
 	_reload_generation = _reload_generation + 1
 	local generation = _reload_generation
-	local reload_timer
-	local committed
-	reload_timer, committed = TimerScheduler.after(RELOAD_DEBOUNCE_SEC, function()
-		if generation ~= _reload_generation or _reload_timer ~= reload_timer then return end
-		if reload_timer.timer == nil then _reload_timer = nil end
-		Logger.success(LOG, "Locale set to '%s' — reloading.", code)
-		Logger.pcall(LOG, hs.reload)
-	end)
-	if reload_timer and reload_timer.timer ~= nil then _reload_timer = reload_timer end
-	if committed ~= true then
-		if not reload_timer or reload_timer.timer == nil then _reload_timer = nil end
+	if not arm_locale_reload(generation, code) then
 		Logger.error(LOG, "Locale switch reload timer was refused; locale remains unchanged.")
 		return false
 	end
-	_reload_timer = reload_timer
+	local reload_timer = _reload_timer
 
-	local persisted = Storage.set(SETTINGS_KEY, code)
+	local persisted = persist_selected_locale(code)
 	if persisted ~= true then
 		_reload_generation = _reload_generation + 1
 		TimerScheduler.cancel(reload_timer)
 		Logger.error(LOG, "Locale persistence failed; locale remains unchanged.")
 		return false
 	end
+	if not verify_configured_locale() then
+		_reload_generation = _reload_generation + 1
+		TimerScheduler.cancel(reload_timer)
+		Logger.error(LOG, "Configured locale changed before publication; locale remains unchanged.")
+		return false
+	end
 	_locale = code
 	return true
+end
+
+function M.set_locale(code)
+	return locale_transaction(function() return set_locale_transaction(code) end)
 end
 
 --- Persists the locale to the settings store WITHOUT changing the in-memory
@@ -255,20 +434,28 @@ end
 --- only touches memory, which the reload discards).
 --- @param code string A known locale code.
 --- @return boolean committed True only when settings accepted the exact locale.
-function M.persist_locale(code)
+local function persist_locale_transaction(code)
 	if not _scope.admit_change() then return false end
 	if not is_known(code) then
 		Logger.warn(LOG, "persist_locale: unknown locale '%s' — ignoring.", code)
 		return false
 	end
 	if not rewrite_configured(code) then return false end
-	local persisted = Storage.set(SETTINGS_KEY, code)
+	local persisted = persist_selected_locale(code)
 	if persisted ~= true then
 		Logger.error(LOG, "Locale persistence without reload was refused; selection remains unsaved.")
 		return false
 	end
+	if not verify_configured_locale() then
+		Logger.error(LOG, "Configured locale changed before publication; selection was refused.")
+		return false
+	end
 	Logger.debug(LOG, "Locale '%s' persisted to settings (no reload).", code)
 	return true
+end
+
+function M.persist_locale(code)
+	return locale_transaction(function() return persist_locale_transaction(code) end)
 end
 
 --- Adopts the saved locale when it changed after init(), without a reload.
@@ -277,7 +464,7 @@ end
 --- configured locale wins at start, so the menu must be built in it.
 --- @return boolean adopted True when the active locale changed.
 function M.adopt_saved_locale()
-	if not _scope.admit_change() then return false end
+	if _locale_write_active or _locale_rewrite_debt or _locale_storage_debt or not _scope.admit_change() then return false end
 	local saved = Storage.get(SETTINGS_KEY)
 	if type(saved) ~= "string" or not is_known(saved) or saved == _locale then return false end
 	_locale = saved
@@ -291,7 +478,7 @@ end
 --- without restarting the script mid-wizard.
 --- @param code string A known locale code.
 function M.set_locale_no_reload(code)
-	if not _scope.admit_change() then return false end
+	if _locale_write_active or _locale_rewrite_debt or _locale_storage_debt or not _scope.admit_change() then return false end
 	if not is_known(code) then
 		Logger.warn(LOG, "Unknown locale '%s' — ignoring.", code)
 		return
@@ -342,7 +529,7 @@ end
 --- wire the locale into infra/locale before any module calls locale.get().
 --- @param fn function A function accepting a locale code string.
 function M.set_locale_injector(fn)
-	if not _scope.admit_change() then return false end
+	if _locale_write_active or _locale_rewrite_debt or _locale_storage_debt or not _scope.admit_change() then return false end
 	_locale_set_fn = fn
 end
 
@@ -377,6 +564,7 @@ local function scope_known(value)
 end
 
 local function scope_ready()
+	if _locale_write_active or _locale_rewrite_debt or _locale_storage_debt then return false end
 	if not rawequal(package.loaded["infra.locale"], locale_mod) then return false end
 	if not (type(_locale_set_fn) == "function" and _reload_timer == nil) or not scope_known(_locale) or locale_mod.current_locale() ~= _locale then return false end
 	local strings = locale_mod.all()

@@ -66,6 +66,39 @@ end
 -- ==========================================
 
 helpers.describe("ConfigPaths on the first launch of a packaged app", function()
+	helpers.it("refuses initialization when the default configuration directory cannot be created", function()
+		local previous_hs, previous_getenv = _G.hs, os.getenv
+		local previous_file_system = package.loaded["adapters.file_system"]
+		local ok, err = xpcall(function()
+			local available = false
+			os.getenv = function(name)
+				if name == "HOME" then return "/fixture/home" end
+				if name == "ERGOPTI_PATHS_FILE" then return nil end
+				return previous_getenv(name)
+			end
+			package.loaded["adapters.file_system"] = {
+				read_with_status = function() return "", "ok" end,
+			}
+			local paths = helpers.load_with_stubs("infra.config_paths", {
+				fs = {
+					attributes = function(path)
+						if path:find("/.config/ergopti_plus", 1, true) and not available then return nil end
+						return { mode = "directory" }
+					end,
+					mkdir = function() return nil, "permission denied" end,
+				},
+				execute = function() return "", false end,
+			})
+			helpers.assert_eq(paths.init("/fixture/driver/"), false)
+			helpers.assert_eq(paths.is_initialized(), false)
+			available = true
+			helpers.assert_true(paths.init("/fixture/driver/"), "initialization can retry after access is restored")
+			helpers.assert_true(paths.is_initialized())
+		end, debug.traceback)
+		_G.hs, os.getenv = previous_hs, previous_getenv
+		package.loaded["adapters.file_system"] = previous_file_system
+		if not ok then error(err, 0) end
+	end)
 	helpers.it("reads a missing managed folder as an absent bootstrap, without an error", function()
 		local ConfigPaths, errors = load_first_launch()
 		local dir = ConfigPaths.get_config_dir()

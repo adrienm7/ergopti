@@ -134,7 +134,7 @@ end
 --- @return function hs.eventtap handler function.
 local function _make_handler(generation)
 	return function(event)
-		if generation ~= _handler_generation then return false end
+		if generation ~= _handler_generation or not _tap_committed then return false end
 		if _on_event then
 			local ok, consume, returned_events = Logger.pcall(LOG, _on_event, event)
 			if not ok then return false end
@@ -154,7 +154,14 @@ local function _make_handler(generation)
 			local ok_len, n = pcall(utf8.len, char)
 			if ok_len then char_codepoints = n end
 		end
-		if char_codepoints == 1 then
+		local codepoint = char_codepoints == 1 and utf8.codepoint(char) or nil
+		-- AppKit uses private scalars for navigation/function keys, but U+F8FF
+		-- is the printable Apple logo (Option-Shift-K on the US layout).
+		-- Control characters such as Tab and Return are not printable either.
+		local printable = codepoint ~= nil and codepoint >= 32
+			and not (codepoint >= 0x7F and codepoint <= 0x9F)
+			and not (codepoint >= 0xF700 and codepoint < 0xF8FF)
+		if printable then
 			-- Printable character path
 			if _on_char then
 				Logger.pcall(LOG, _on_char, {

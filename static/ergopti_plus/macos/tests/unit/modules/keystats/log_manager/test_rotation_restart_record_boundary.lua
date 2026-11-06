@@ -48,6 +48,34 @@ local function replay(prefix, expected)
 end
 
 helpers.describe("rotation restart framing", function()
+	helpers.it("refuses EOF if the journal pathname disappears while its writer is open", function()
+		helpers.with_stub_scope({ "modules.keystats.rotation", "adapters.ledger_append", "infra.logger" }, function()
+			local path = os.tmpname()
+			local seed = assert(io.open(path, "w"))
+			assert(seed:write("previous\n")); assert(seed:close())
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["adapters.ledger_append"] = { rollover = function(_, _, _, _, next_date, reset)
+				return reset(next_date, {})
+			end }
+			local rotation = helpers.load_with_stubs("modules.keystats.rotation")
+			rotation.init({paths = {today_log_path = path}, state = {}, recovery_turn_bytes = 65536})
+			assert(os.remove(path))
+			local ok, err = xpcall(function()
+				for _, offset in ipairs({0, 9}) do
+					rotation.set_offset(offset, "2026-10-26")
+					local entries, actual, status = rotation.read_new_entries()
+					helpers.assert_eq(#entries, 0)
+					helpers.assert_eq(actual, offset)
+					helpers.assert_eq(status, rotation.READ_STATUS_FAILED)
+				end
+				helpers.assert_eq(rotation.append_log({type = "typing", timestamp = TIMESTAMP}), false,
+					"a missing pathname fences writes to the now-unlinked stream")
+			end, debug.traceback)
+			assert(rotation.rollover(path .. ".sql", rotation.READ_STATUS_EOF, function() return true end,
+				function() return true end))
+			if not ok then error(err) end
+		end)
+	end)
 	helpers.it("(journal-restart-boundary) separates a torn JSON tail from the first acknowledged new event", function()
 		replay('{"type":"typing","text":"unfinished', { "after_restart" })
 	end)

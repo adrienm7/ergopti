@@ -313,6 +313,39 @@ local function assert_all_taps_disabled(fixture, message)
 end
 
 helpers.describe("keymap start: exact native commitment", function()
+	helpers.it("stops copy verification and ignores modifier edges during pause (tap-copy-pause)", function()
+		helpers.with_stub_scope({ "modules.keymap.tap_copy" }, function()
+			local watch = { stops = 0, edges = 0, keys = 0 }
+			function watch:stop() self.stops = self.stops + 1 end
+			function watch:modifier_edge() self.edges = self.edges + 1 end
+			function watch:key_down() self.keys = self.keys + 1 end
+			function watch:watching() return true end
+			package.loaded["modules.keymap.tap_copy"] = { new = function() return watch end }
+			local fixture = load_fixture()
+			local admission_open = true
+			package.loaded["adapters.synthetic_input"].admission_open = function() return admission_open end
+			package.loaded["adapters.event_provenance"].classify_with_fence = function() return nil, "foreign" end
+			helpers.assert_true(fixture.keymap.start())
+			local event = { getKeyCode = function() return 56 end, getFlags = function() return { shift = true } end }
+			fixture.taps[3].callback(event)
+			helpers.assert_eq(watch.edges, 1, "the active modifier tap reaches the watch")
+			fixture.taps[1].callback(event)
+			helpers.assert_eq(watch.keys, 1, "the active key tap reaches the watch")
+			admission_open = false
+			fixture.taps[3].callback(event)
+			fixture.taps[1].callback(event)
+			helpers.assert_eq(watch.edges, 1, "the pause admission fence also blocks new watches")
+			helpers.assert_eq(watch.keys, 1, "the pause admission fence blocks key observation")
+			admission_open = true
+			helpers.assert_true(fixture.keymap.pause_processing())
+			helpers.assert_eq(watch.stops, 1, "pause must abandon the pending copy retry")
+			fixture.taps[3].callback(event)
+			helpers.assert_eq(watch.edges, 1, "paused modifier input must not arm another check")
+			fixture.taps[1].callback(event)
+			helpers.assert_eq(watch.keys, 1, "paused key input must not complete another check")
+			fixture.keymap.stop()
+		end)
+	end)
 	helpers.it("acknowledges effective replacement transitions to the existing ordinary owner", function()
 		helpers.with_stub_scope({ "modules.shortcuts.keyboard_shortcuts", "modules.keymap.magic_key_source" }, function()
 			local fixture, selected
@@ -428,6 +461,47 @@ helpers.describe("keymap start: exact native commitment", function()
 		end)
 		helpers.assert_eq(committed, true)
 		helpers.assert_eq(calls, 1)
+	end)
+
+	helpers.it("keeps an already committed keymap live on a duplicate start (keymap-partial-start-fence)", function()
+		local fixture = load_fixture()
+		local synthetic = package.loaded["adapters.synthetic_input"]
+		local provenance = package.loaded["adapters.event_provenance"]
+		local entered = 0
+		synthetic.admission_open = function() return true end
+		synthetic.enter_callback = function() entered = entered + 1 end
+		synthetic.leave_callback = function(value) return value, {} end
+		provenance.classify_with_fence = function() return nil, "foreign" end
+		helpers.assert_true(fixture.keymap.start())
+		helpers.assert_true(fixture.keymap.start())
+		fixture.taps[1].callback({ getKeyCode = function() return 0 end,
+			getFlags = function() return {} end, getCharacters = function() return "a" end,
+			getProperty = function() return 0 end })
+		helpers.assert_eq(entered, 1, "a duplicate start must not close committed input")
+		helpers.assert_true(fixture.keymap.stop(true))
+	end)
+
+	helpers.it("fences the first partial start when replay debt refuses rollback (keymap-partial-start-fence)", function()
+		local fixture = load_fixture()
+		fixture.controls.tap_failure_ordinal = 2
+		fixture.controls.tap_failure_mode = "disabled"
+		fixture.controls.replay_pending = true
+		local synthetic = package.loaded["adapters.synthetic_input"]
+		local provenance = package.loaded["adapters.event_provenance"]
+		local entered = 0
+		synthetic.admission_open = function() return true end
+		synthetic.enter_callback = function() entered = entered + 1 end
+		synthetic.leave_callback = function(value) return value, {} end
+		provenance.classify_with_fence = function() return nil, "foreign" end
+		helpers.assert_eq(fixture.keymap.start(), false)
+		helpers.assert_true(fixture.taps[1].enabled, "rollback refusal retains the first live tap")
+		local consumed = fixture.taps[1].callback({ getKeyCode = function() return 0 end,
+			getFlags = function() return {} end, getCharacters = function() return "a" end,
+			getProperty = function() return 0 end })
+		helpers.assert_eq(consumed, false)
+		helpers.assert_eq(entered, 0, "an uncommitted engine must not receive the key")
+		fixture.controls.replay_pending = false
+		helpers.assert_true(fixture.keymap.stop(true))
 	end)
 
 	for ordinal = 1, 4 do

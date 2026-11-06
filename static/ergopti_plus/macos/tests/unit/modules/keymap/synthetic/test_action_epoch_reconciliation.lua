@@ -319,6 +319,88 @@ end
 
 
 helpers.describe("keymap action epochs", function()
+	helpers.it("keeps a retained keydown tap inert after native stop refusal (keymap-stop-retained-tap)", function()
+		local fixture = load_fixture()
+		local old_stops = {}
+		for _, index in ipairs({ 1, 2, 3, 4 }) do
+			local tap = fixture.taps[index]
+			old_stops[index] = tap.stop
+			tap.stop = function() return false end
+		end
+		helpers.assert_eq(fixture.keymap.stop(), false)
+		helpers.assert_eq(fixture.state.buffer, "")
+		helpers.assert_eq(fixture.physical_letter("x"), false)
+		helpers.assert_eq(fixture.state.buffer, "", "the stopped keymap must not process a retained native tap")
+		local sentinel = fixture.taps[1].callback({ getKeyCode = function() return 90 end,
+			getFlags = function() return {} end, getProperty = function() return 0 end })
+		helpers.assert_true(sentinel, "a retained tap must still swallow the reserved sentinel")
+		local sentinel_up = fixture.taps[2].callback({ getKeyCode = function() return 90 end,
+			getFlags = function() return {} end, getProperty = function() return 0 end })
+		helpers.assert_true(sentinel_up, "the matching reserved release must remain swallowed")
+		fixture.taps[3].callback({ getKeyCode = function() return 56 end,
+			getFlags = function() return { shift = true } end })
+		helpers.assert_nil(fixture.keymap.get_shift_side(), "a retained flags tap cannot mutate stopped state")
+		fixture.state.buffer = "guard"
+		fixture.taps[4].callback({})
+		helpers.assert_eq(fixture.state.buffer, "guard", "a retained mouse tap cannot mutate stopped state")
+		for index, stop in pairs(old_stops) do fixture.taps[index].stop = stop end
+		helpers.assert_true(fixture.keymap.stop())
+	end)
+	helpers.it("drops Shift attribution when the tap stops across an unseen release (shift-side-stop-reset)", function()
+		local fixture = load_fixture()
+		fixture.taps[3].callback({ getKeyCode = function() return 56 end,
+			getFlags = function() return { shift = true } end })
+		helpers.assert_eq(fixture.keymap.get_shift_side(), "left")
+		helpers.assert_true(fixture.keymap.stop())
+		helpers.assert_true(fixture.keymap.start())
+		helpers.assert_nil(fixture.keymap.get_shift_side(), "a release while stopped cannot remain attributed")
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("drops Shift attribution when the flags tap is recovered after an outage (shift-side-tap-outage)", function()
+		local fixture = load_fixture()
+		package.loaded["infra.logger"].pcall = function(_, fn, ...) return pcall(fn, ...) end
+		fixture.taps[3].callback({ getKeyCode = function() return 56 end,
+			getFlags = function() return { shift = true } end })
+		helpers.assert_eq(fixture.keymap.get_shift_side(), "left")
+		fixture.taps[3]:stop()
+		local fired = false
+		for _, timer in ipairs(_G.hs.timer.__timers) do
+			if timer.running and timer.delay == 1 then timer:fire(); fired = true end
+		end
+		helpers.assert_true(fired, "the keymap watchdog must be exercised")
+		helpers.assert_nil(fixture.keymap.get_shift_side(), "events missed during the outage invalidate the side")
+		fixture.keymap.stop()
+	end)
+	helpers.it("reads sided Shift state after a previously unseen held key releases (shift-side-raw-flags)", function()
+		local fixture = load_fixture()
+		local masks = { deviceLeftShift = 2, deviceRightShift = 4 }
+		_G.hs.eventtap.event.rawFlagMasks = masks
+		local function edge(code, raw)
+			fixture.taps[3].callback({ getKeyCode = function() return code end,
+				getFlags = function() return { shift = true } end, rawFlags = function() return raw end })
+		end
+		-- Left was already down before the watcher started. Right is pressed,
+		-- then left releases while right remains down.
+		edge(60, 6)
+		edge(56, 4)
+		helpers.assert_eq(fixture.keymap.get_shift_side(), "right")
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("retains observed Shift transitions when sided raw flags are unavailable (shift-side-raw-flags)", function()
+		local fixture = load_fixture()
+		_G.hs.eventtap.event.rawFlagMasks = nil
+		local function edge(code, down)
+			fixture.taps[3].callback({ getKeyCode = function() return code end,
+				getFlags = function() return { shift = down } end })
+		end
+		edge(56, true); helpers.assert_eq(fixture.keymap.get_shift_side(), "left")
+		edge(60, true); helpers.assert_eq(fixture.keymap.get_shift_side(), "right")
+		edge(60, true); helpers.assert_eq(fixture.keymap.get_shift_side(), "left")
+		edge(56, false); helpers.assert_nil(fixture.keymap.get_shift_side())
+		fixture.keymap.stop()
+	end)
 	helpers.it("passes physical input without engine mutation while pause owns admission", function()
 		local fixture = load_fixture()
 		fixture.set_admission(false)

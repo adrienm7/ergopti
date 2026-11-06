@@ -97,6 +97,33 @@ function M.register(helpers)
 			helpers.assert_eq(last(seen).backup_path, "/cfg/backups/pre-install-x-v0.0.0-dev.139")
 		end)
 
+		helpers.it("does not install an inline completion when download admission fails", function()
+			for _, mode in ipairs({ "refuse", "throw" }) do
+				local ports, seen = recording()
+				ports.download = function(_, _, done)
+					done("/tmp/verified")
+					if mode == "throw" then error("dispatch failed") end
+					return false
+				end
+				local session = Install.new(ports)
+				helpers.assert_eq(session.install("v1", "main"), false)
+				helpers.assert_nil(seen.installed_path, "no installation before admission")
+				helpers.assert_eq(last(seen).phase, "failed")
+				helpers.assert_eq(last(seen).reason_key, Install.REASON.download)
+			end
+		end)
+
+		helpers.it("ignores a late completion after refused download admission", function()
+			local ports, seen = recording()
+			local late
+			ports.download = function(_, _, done) late = done; return false end
+			local session = Install.new(ports)
+			helpers.assert_eq(session.install("v1", "main"), false)
+			late("/tmp/verified")
+			helpers.assert_nil(seen.installed_path)
+			helpers.assert_eq(last(seen).reason_key, Install.REASON.download)
+		end)
+
 		helpers.it("refuses a release without this system's asset and keeps the backup", function()
 			local ports, seen = recording({ asset = false })
 			local session = Install.new(ports)
@@ -106,6 +133,37 @@ function M.register(helpers)
 			helpers.assert_eq(last(seen).reason_key, Install.REASON.no_asset)
 			helpers.assert_eq(last(seen).backup_path, "/cfg/backups/pre-install-x-v0.0.0-dev.139")
 			helpers.assert_eq(session.busy(), false)
+		end)
+
+		helpers.it("releases installation ownership when asset resolution raises", function()
+			for _, failure in ipairs({ "asset resolver unavailable", setmetatable({}, {
+				__tostring = function() error("cannot format") end,
+			}) }) do
+				local ports, seen = recording()
+				ports.resolve_asset = function() error(failure) end
+				local session = Install.new(ports)
+				local ok, started = pcall(session.install, "v1", "main")
+				helpers.assert_true(ok, "the failure must reach the progress owner")
+				helpers.assert_eq(started, false)
+				helpers.assert_eq(session.busy(), false)
+				helpers.assert_eq(last(seen).phase, "failed")
+				helpers.assert_eq(last(seen).reason_key, Install.REASON.unexpected)
+			end
+		end)
+
+		helpers.it("reports opaque callback errors without stranding installation", function()
+			for _, port in ipairs({ "backup", "download", "install", "restart", "report" }) do
+				local ports, seen = recording()
+				local failure = setmetatable({}, { __tostring = function() error("cannot format") end })
+				ports[port] = function() error(failure) end
+				local session = Install.new(ports)
+				local ok = pcall(session.install, "v1", "main")
+				helpers.assert_true(ok, port .. " error must not escape during diagnostics")
+				if port ~= "report" then
+					helpers.assert_eq(last(seen).phase, "failed", port .. " must report its failure")
+					helpers.assert_eq(session.busy(), false, port .. " must release ownership")
+				end
+			end
 		end)
 
 		helpers.it("never installs a download that failed its verification", function()

@@ -119,8 +119,8 @@ _Updater_EpochNow() {
 _Updater_CheckStateRead(Key) {
 	global _UpdaterCheckStateStore
 	if (_UpdaterCheckStateStore is Map)
-		return _UpdaterCheckStateStore["read"].Call(Key)
-	return ST_Get(Key, "")
+		return _UpdaterCheckStateStore["read_exact"].Call(Key)
+	return ST_ReadExact(Key)
 }
 
 _Updater_CheckStateWrite(Key, Value) {
@@ -138,7 +138,12 @@ _Updater_CheckState() {
 	if (_UpdaterCheckState is Map)
 		return _UpdaterCheckState
 	Key := UpdateSchedule_Timing()["state_storage_key"]
-	Result := UpdateSchedule_SanitizeState(_Updater_CheckStateRead(Key))
+	try Read := _Updater_CheckStateRead(Key)
+	catch
+		return 0
+	if !(Read is Object) || !Read.HasOwnProp("Ok") || Read.Ok != true || !Read.HasOwnProp("Value")
+		return 0
+	Result := UpdateSchedule_SanitizeState(Read.Value)
 	for _, Field in Result.Dropped
 		try LoggerWarn("Updater", "Dropped the invalid '{1}' of the stored update-check record.", Field)
 	State := Result.State
@@ -176,7 +181,10 @@ _Updater_SaveCheckState(State) {
 _Updater_RecordBackgroundCheck(Ok, Request) {
 	if !_Updater_RequestMayPublish(Request)
 		return false
-	Next := UpdateSchedule_RecordCheck(_Updater_CheckState(), _Updater_EpochNow(), Ok)
+	State := _Updater_CheckState()
+	if !(State is Map)
+		return false
+	Next := UpdateSchedule_RecordCheck(State, _Updater_EpochNow(), Ok)
 	if !_Updater_RequestMayPublish(Request)
 		return false
 	_Updater_SaveCheckState(Next)
@@ -186,7 +194,10 @@ _Updater_RecordBackgroundCheck(Ok, Request) {
 
 ; Persists the release the user was just told about.
 _Updater_RecordNotifiedTag(Tag) {
-	State := _Updater_CheckState().Clone()
+	State := _Updater_CheckState()
+	if !(State is Map)
+		return false
+	State := State.Clone()
 	State["last_notified_tag"] := Tag
 	_Updater_SaveCheckState(State)
 }
@@ -198,8 +209,13 @@ _Updater_ScheduleDecision() {
 	global UPDATER_CHECK_INTERVAL, _UpdaterStartedAt
 	Timing := UpdateSchedule_Timing()
 	Now := _Updater_EpochNow()
+	if (Now < _UpdaterStartedAt)
+		_UpdaterStartedAt := Now
 	ReevaluateMs := Timing["reevaluate_sec"] * 1000
-	Next := UpdateSchedule_NextDue(Now, _UpdaterStartedAt, UPDATER_CHECK_INTERVAL, _Updater_CheckState())
+	State := _Updater_CheckState()
+	if !(State is Map)
+		return { Due: false, WaitMs: ReevaluateMs, ReevaluateMs: ReevaluateMs, DueAt: "", Reason: "record_unavailable" }
+	Next := UpdateSchedule_NextDue(Now, _UpdaterStartedAt, UPDATER_CHECK_INTERVAL, State)
 	if (Next.DueAt == "")
 		return { Due: false, WaitMs: ReevaluateMs, ReevaluateMs: ReevaluateMs, DueAt: "", Reason: Next.Reason }
 	return {

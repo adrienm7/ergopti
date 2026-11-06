@@ -18,6 +18,13 @@ helpers.describe("HS-037 detached session repository identifiers are untrusted",
 		"org/mo del",
 		"org/model\npayload",
 		"org/model/extra",
+		"org/..",
+		"../model",
+		"org/model..name",
+		"org/-model",
+		"org/model-",
+		"org/model--name",
+		"org/" .. string.rep("a", 97),
 	}
 
 	for _, hostile_repo in ipairs(hostile_repositories) do
@@ -40,6 +47,12 @@ helpers.describe("HS-037 detached session repository identifiers are untrusted",
 			end)
 		end)
 	end
+
+	helpers.it("accepts valid repository names with supported punctuation", function()
+		local repo = require("ui.menu.menu_llm.models_manager_mlx_repo")
+		helpers.assert_true(repo.is_valid("mlx-community/Qwen3.5-4B-Instruct_4bit"))
+		helpers.assert_true(repo.is_valid("org/" .. string.rep("a", 96)))
+	end)
 
 	helpers.it("refuses a planted reattach repository at the retry handoff", function()
 		local hostile_repo = "org/model'$(touch_HS037_PWN)'"

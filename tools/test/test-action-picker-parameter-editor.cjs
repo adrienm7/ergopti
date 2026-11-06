@@ -198,7 +198,7 @@ const HOSTS = {
 	linux: { executableSyntax: 'posix', commandIsPrimary: false }
 };
 
-function loadPage(host, current) {
+function loadPage(host, current, skipInit) {
 	const byId = {};
 	for (const id of IDS) byId[id] = new FakeElement('div', id);
 	const docListeners = {};
@@ -228,8 +228,9 @@ function loadPage(host, current) {
 	context.__vocabulary = JSON.parse(fs.readFileSync(VOCABULARY, 'utf8'));
 	context.__capabilities = HOSTS[host];
 	context.__current = current || 'none';
-	vm.runInContext(
-		`init({
+	if (!skipInit)
+		vm.runInContext(
+			`init({
 			title: 'T', cancelLabel: 'Cancel', current: __current, noneLabel: 'Nothing',
 			executableSyntax: __capabilities.executableSyntax,
 			commandIsPrimary: __capabilities.commandIsPrimary,
@@ -268,8 +269,8 @@ function loadPage(host, current) {
 				{ type: 'action', id: 'enter', label: 'Enter' }
 			]
 		})`,
-		context
-	);
+			context
+		);
 	const keydown = (event) => {
 		const e = Object.assign(
 			{
@@ -322,6 +323,46 @@ function loadPage(host, current) {
 	check(
 		parsed === 'primary+a',
 		`an empty alias list encoded as {} breaks the lookup: ${JSON.stringify(parsed)}`
+	);
+}
+
+// Keyboard activation of an actual focused button must keep its own action.
+for (const id of ['send_text', 'send_key', 'send_shortcut', 'llm_prompt_prediction']) {
+	const page = loadPage('hs');
+	page.context.__buttonAction = id;
+	vm.runInContext('doConfirm(__buttonAction)', page.context);
+	const back = page.byId['param-back'];
+	back.tagName = 'BUTTON';
+	const enter = page.keydown({ key: 'Enter', code: 'Enter', target: back });
+	check(!enter.prevented, `Enter on Back must retain native button activation for ${id}`);
+	check(page.posted.length === 0, `Enter on Back must not save ${id}`);
+	if (!enter.prevented) back.dispatch('click');
+	check(page.byId.param.hidden === true, `Back returns to the action list for ${id}`);
+}
+{
+	const page = loadPage('hs');
+	const cancel = page.byId['btn-cancel'];
+	cancel.tagName = 'BUTTON';
+	const enter = page.keydown({ key: 'Enter', code: 'Enter', target: cancel });
+	check(!enter.prevented, 'Enter on Cancel must retain native button activation');
+	check(page.posted.length === 0, 'Enter on Cancel must not confirm the selected action');
+}
+
+// A delayed native navigation callback must not erase the draft opened after ready.
+{
+	const page = loadPage('hs');
+	vm.runInContext("doConfirm('send_text')", page.context);
+	page.byId['param-input'].value = 'my pending text';
+	vm.runInContext("init({ title: 'T', cancelLabel: 'Cancel', items: [] })", page.context);
+	check(page.byId.param.hidden === false, 'a duplicate init keeps the parameter editor open');
+	check(
+		page.byId['param-input'].value === 'my pending text',
+		'a duplicate init preserves its draft'
+	);
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 && page.posted[0].parameter === 'my pending text',
+		'the preserved draft can be confirmed'
 	);
 }
 
@@ -678,6 +719,83 @@ function loadPage(host, current) {
 	);
 }
 
+// Each vision provider has its own model namespace and an independent draft.
+for (const host of ['ahk', 'hs', 'linux']) {
+	const page = loadPage(host);
+	vm.runInContext("doConfirm('llm_screen_region')", page.context);
+	const provider = page.byId['param-vision-provider'];
+	const model = page.byId['param-vision-model'];
+	check(model.value === 'llama-4-scout', `${host}: source provider starts with its model`);
+	provider.value = 'local';
+	provider.dispatch('change');
+	check(model.value === '', `${host}: switching providers must not copy a remote model to local`);
+	model.value = 'local-custom';
+	provider.value = 'cerebras';
+	provider.dispatch('change');
+	check(model.value === 'llama-4-scout', `${host}: returning restores the original provider draft`);
+	provider.value = 'local';
+	provider.dispatch('change');
+	check(model.value === 'local-custom', `${host}: returning restores the local draft`);
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 && page.posted[0].parameter === 'local|local-custom',
+		`${host}: only the active provider model is saved`
+	);
+}
+
+{
+	const page = loadPage('hs');
+	vm.runInContext("doConfirm('llm_screen_region')", page.context);
+	page.byId['param-vision-provider'].value = 'local';
+	page.byId['param-vision-provider'].dispatch('change');
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 && page.posted[0].parameter === 'local',
+		'the local default is saved instead of a model from the former provider'
+	);
+}
+
+// Editing an existing translate prompt must preserve its per-binding target.
+for (const host of ['ahk', 'hs', 'linux']) {
+	const page = loadPage(host);
+	vm.runInContext(
+		`
+		entries.find((entry) => entry.id === 'llm_prompt_prediction').parameterValue = 'translate|2|Esperanto';
+		doConfirm('llm_prompt_prediction');
+	`,
+		page.context
+	);
+	check(
+		page.byId['param-profile'].value === 'translate',
+		`${host}: existing translation remains selectable`
+	);
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 && page.posted[0].parameter === 'translate|2|Esperanto',
+		`${host}: saving an unchanged translate prompt must retain the target`
+	);
+	page.posted.length = 0;
+	page.byId['param-count'].value = '5';
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 && page.posted[0].parameter === 'translate|5|Esperanto',
+		`${host}: changing the count must retain the target`
+	);
+	page.posted.length = 0;
+	page.byId['param-count'].value = '';
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 0 && page.byId['param-error'].hidden === false,
+		`${host}: the implicit count cannot represent an existing target`
+	);
+	page.byId['param-profile'].value = 'rewrite';
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 && page.posted[0].parameter === 'rewrite',
+		`${host}: switching profiles must not carry the translation target`
+	);
+}
+
 // 10. Free language entry belongs to the host's existing InputBox, on all drivers.
 // The page must not synthesize a locale or overwrite the stored binding value.
 for (const host of ['ahk', 'hs', 'linux']) {
@@ -790,7 +908,7 @@ for (const host of ['ahk', 'hs', 'linux']) {
 // 12b. A host that enables the editor must state its capabilities: the page
 // refuses to guess a path syntax or a primary modifier.
 for (const missing of ['executableSyntax', 'commandIsPrimary']) {
-	const page = loadPage('linux');
+	const page = loadPage('linux', null, true);
 	page.context.__missing = missing;
 	const refused = vm.runInContext(
 		`(() => {
@@ -949,7 +1067,7 @@ for (const host of ['hs', 'linux', 'ahk']) {
 
 // Native assignment availability uses existing host hints and refusal delivery.
 {
-	const page = loadPage('hs');
+	const page = loadPage('hs', null, true);
 	page.context.__stored = JSON.stringify({
 		version: 1,
 		executable: '/usr/bin/shortcuts',

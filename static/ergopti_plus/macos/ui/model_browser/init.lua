@@ -122,12 +122,13 @@ end
 --- Queues catalogue scripts until the native page reports readiness.
 --- @param code string Raw JavaScript to evaluate.
 local function eval(code)
-	if not _wv then return end
-	if _ready and type(_wv.evaluateJavaScript) == "function" then
+	if not _wv then return false end
+	if _ready then
 		return submit_javascript(_wv, code)
 	else
 		table.insert(_queued, { code = code, session = _session })
 		if #_queued > 50 then table.remove(_queued, 1) end
+		return true
 	end
 end
 
@@ -162,7 +163,12 @@ end
 local function inject_catalogue(ctx)
 	local session, view, controller = _session, _wv, _ucc
 	if _ctx ~= ctx or _wv_committed ~= true then return end
-	local payload     = build_catalogue(ctx)
+	local built, payload = pcall(build_catalogue, ctx)
+	if not built or type(payload) ~= "table" or type(payload.models) ~= "table" then
+		Logger.error(LOG, "Model catalogue could not be built; the browser was not updated.")
+		return false
+	end
+	if _ctx ~= ctx or _session ~= session or _wv ~= view or _ucc ~= controller or _wv_committed ~= true then return false end
 	payload.session = session
 	local ok, json    = pcall(hs.json.encode, payload)
 	if not ok or not json then
@@ -171,7 +177,7 @@ local function inject_catalogue(ctx)
 	end
 	Logger.done(LOG, "Injecting %d model(s) (backend=%s).", #payload.models, tostring(payload.backend))
 	if _session ~= session or _wv ~= view or _ucc ~= controller or _wv_committed ~= true then return end
-	eval("injectModels(" .. json .. ")")
+	return eval("injectModels(" .. json .. ")")
 end
 
 
@@ -329,8 +335,7 @@ function M.open(ctx)
 					and _wv == view and _ucc == controller and _session == session and _wv_committed == true
 			end })
 			if _session ~= session or _wv_committed ~= true then return false end
-			inject_catalogue(ctx)
-			return true
+			return inject_catalogue(ctx) == true
 		end
 	end
 
@@ -469,8 +474,7 @@ end
 --- @return boolean refreshed False when no page is open.
 function M.refresh()
 	if not _wv or _wv_committed ~= true or not _ctx then return false end
-	inject_catalogue(_ctx)
-	return true
+	return inject_catalogue(_ctx) == true
 end
 
 --- Shows one row's download percentage on the open page.
@@ -483,8 +487,7 @@ function M.inject_progress(update)
 		Logger.warn(LOG, "Failed to encode a download percentage as JSON.")
 		return false
 	end
-	eval("injectProgress(" .. json .. ")")
-	return true
+	return eval("injectProgress(" .. json .. ")")
 end
 
 --- Shows a local backend's runtime install percentage in its group header.
@@ -497,8 +500,7 @@ function M.inject_install_progress(update)
 		Logger.warn(LOG, "Failed to encode a runtime install percentage as JSON.")
 		return false
 	end
-	eval("injectInstallProgress(" .. json .. ")")
-	return true
+	return eval("injectInstallProgress(" .. json .. ")")
 end
 
 --- Whether the page is open.

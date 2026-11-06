@@ -54,6 +54,7 @@ local function run_scenario()
 		current_action_epoch = function() return action_epoch end,
 	}
 	package.loaded["adapters.timer_scheduler"] = {
+		hotstring_time = function() return _G.hs.timer.secondsSinceEpoch() end,
 		after = function(delay, fn)
 			local handle = { delay = delay, fn = fn }
 			scheduled[#scheduled + 1] = handle
@@ -135,6 +136,7 @@ local function run_scenario()
 			},
 			is_repeat_feature_enabled = function() return false end,
 		}
+		require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
 		Bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
 
 		local delivered = 0

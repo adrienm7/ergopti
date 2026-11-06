@@ -81,6 +81,15 @@ _TUCO_ListCacheVectors() {
 }
 Test("updater check-only: the stored list copy follows the shared vectors (PAR-14)", _TUCO_ListCacheVectors)
 
+_TUCO_RejectMalformedCachedList() {
+	global UPDATER_LIST_CACHE_MAGIC
+	Url := "https://api.github.com/example"
+	; A damaged list can retain both brackets and an ETag.
+	Text := UPDATER_LIST_CACHE_MAGIC . "`n" . Url . "`n" . '"etag"' . "`n" . '[{"tag_name":}]'
+	AssertEqual(0, _Updater_ParseListCache(Text, Url), "malformed JSON must not authorize a conditional request")
+}
+Test("updater check-only: reject malformed stored list before revalidation", _TUCO_RejectMalformedCachedList)
+
 ; Drives the manual check's completion with the window captured.
 _TUCO_ManualCase(Scenario) {
 	global _UC_PresentFn, _UC_RequestId, _UC_State, _UC_Release, UPDATER_LATEST_RELEASE, _UpdaterCheckInProgress

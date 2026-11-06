@@ -224,11 +224,13 @@ end
 --- @param enabled boolean True to lock CapsLock on, false to release it.
 --- @return boolean True when Hammerspoon accepted the change.
 function M.set_capslock(enabled)
-	local ok, err = pcall(hs.hid.capslock.set, enabled and true or false)
-	if not ok then
-		Logger.error(LOG, "set_capslock(%s) failed — %s", tostring(enabled), tostring(err))
+	local requested = enabled and true or false
+	local ok, state = pcall(function() return hs.hid.capslock.set(requested) end)
+	if not ok or state ~= requested then
+		Logger.error(LOG, "set_capslock(%s) failed — %s", tostring(requested), tostring(state))
+		return false
 	end
-	return ok
+	return true
 end
 
 

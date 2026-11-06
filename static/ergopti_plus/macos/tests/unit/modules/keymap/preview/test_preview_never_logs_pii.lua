@@ -89,6 +89,8 @@ local function load_bridge(provider)
 			SECTION_DELAYS            = {},
 		}
 
+		require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
+
 		helpers.assert_eq(Bridge.init(state,
 			{ preview_star_enabled = true, preview_autocorrect_enabled = true }), true)
 		Bridge.set_preview_star_enabled(true)
@@ -194,6 +196,8 @@ helpers.describe("hotstring preview never logs personal-info content", function(
 			helpers.assert_eq(Registry.init(state), true)
 			Registry.add("pub★", PUBLIC_REPL, { auto_expand = true })
 			Registry.sort_mappings()
+
+			require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
 
 			helpers.assert_eq(fresh_bridge.init(state,
 				{ preview_star_enabled = true, preview_autocorrect_enabled = true }), true)

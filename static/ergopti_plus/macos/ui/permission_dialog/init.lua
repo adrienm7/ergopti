@@ -282,7 +282,9 @@ local function raise(session)
 	local ok, err = pcall(function()
 		if M.KINDS[session.kind].floating then
 			session.webview:show()
-		elseif ui_builder.force_focus(session.webview, false) == false then
+		elseif ui_builder.force_focus(session.webview, false, { is_current = function()
+			return _session == session and not session.closed and not session.closing
+		end }) == false then
 			error("the window could not be focused")
 		end
 	end)

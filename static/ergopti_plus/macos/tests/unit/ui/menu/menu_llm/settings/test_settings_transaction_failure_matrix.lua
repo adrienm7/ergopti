@@ -31,6 +31,42 @@ local with_fixture = Fixture.with_fixture
 -- ==============================================
 
 helpers.describe("HS-026 LLM settings transaction", function()
+	helpers.it("rejects an oversized context before any transaction boundary", function()
+		with_fixture({}, function(fixture)
+			local old = fixture.state.llm_context_length
+			helpers.assert_eq(fixture.manager.apply_setting_transaction({
+				key = "llm_context_length", value = 4001,
+				runtime_fn = "set_llm_context_length", publish_setting = true,
+			}), false)
+			helpers.assert_eq(fixture.manager.apply_setting_transaction({
+				key = "llm_context_length", value = 4000.5,
+				runtime_fn = "set_llm_context_length", publish_setting = true,
+			}), false)
+			helpers.assert_eq(fixture.state.llm_context_length, old)
+			helpers.assert_eq(fixture.runtime.llm_context_length, old)
+			helpers.assert_eq(fixture.persisted().llm_context_length, old)
+			helpers.assert_eq(fixture.calls.runtime, 0)
+			helpers.assert_eq(fixture.calls.save, 0)
+			helpers.assert_eq(fixture.calls.settings, 0)
+			helpers.assert_eq(fixture.calls.menu, 0)
+		end)
+	end)
+
+	helpers.it("commits the maximum context through every transaction boundary", function()
+		with_fixture({}, function(fixture)
+			helpers.assert_eq(fixture.manager.apply_setting_transaction({
+				key = "llm_context_length", value = 4000,
+				runtime_fn = "set_llm_context_length", publish_setting = true,
+			}), true)
+			helpers.assert_eq(fixture.state.llm_context_length, 4000)
+			helpers.assert_eq(fixture.runtime.llm_context_length, 4000)
+			helpers.assert_eq(fixture.persisted().llm_context_length, 4000)
+			helpers.assert_eq(fixture.settings_store.llm_context_length, 4000)
+			helpers.assert_eq(fixture.calls.runtime, 1)
+			helpers.assert_eq(fixture.calls.save, 1)
+		end)
+	end)
+
 	for _, entry in ipairs(ENTRY_SPECS) do
 		for _, failure in ipairs(FAILURE_SPECS) do
 			if not failure.settings_only or entry.publishes_setting then

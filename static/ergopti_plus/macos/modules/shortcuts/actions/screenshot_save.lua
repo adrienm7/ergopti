@@ -167,6 +167,21 @@ local function finish_operation(operation)
 	return true
 end
 
+--- Keeps allocation owned until its pathname can be cleaned after a pause.
+local function allocate_capture_file(operation)
+	if not operation_is_authorized(operation) then return nil, nil, true end
+	operation.acquisitions = operation.acquisitions + 1
+	local ok, path, detail = pcall(FileSystem.create_secure_temp_file)
+	if ok and type(path) == "string" and path ~= "" then operation.temp_path = path end
+	operation.acquisitions = operation.acquisitions - 1
+	if not operation_is_authorized(operation) then
+		finish_operation(operation)
+		return nil, nil, true
+	end
+	if not operation.temp_path then return nil, ok and detail or path, false end
+	return operation.temp_path, nil, false
+end
+
 local function create_operation(label, parent)
 	local scope_id = action_parent(parent)
 	if not screenshot_admission_open(scope_id) then return nil end
@@ -519,15 +534,15 @@ function M.capture(flags, parent)
 	local operation = create_operation("clipboard screenshot", scope_id)
 	if not operation then return false end
 
-	local allocated, target, allocation_detail = pcall(FileSystem.create_secure_temp_file)
-	if not allocated or type(target) ~= "string" or target == "" then
+	local target, allocation_detail, cancelled = allocate_capture_file(operation)
+	if cancelled then return false end
+	if not target then
 		report_operation_failure(operation, "temporary file allocation",
-			allocated and allocation_detail or target, "shortcuts.screenshot_clipboard_failed")
+			allocation_detail, "shortcuts.screenshot_clipboard_failed")
 		operation.authorized = false
 		finish_operation(operation)
 		return false
 	end
-	operation.temp_path = target
 
 	local args = {}
 	for _, flag in ipairs(flags) do args[#args + 1] = tostring(flag) end
@@ -544,7 +559,9 @@ function M.capture(flags, parent)
 			stderr = stderr,
 			interactive = CaptureFlow.is_interactive(flags),
 			destination = "clipboard",
+			authorized = function() return operation_is_authorized(operation) end,
 		})
+		if not operation_is_authorized(operation) then return false end
 		return report_capture_outcome(operation, outcome, detail, target,
 			"shortcuts.screenshot_clipboard_failed")
 	end, "capture")
@@ -622,23 +639,26 @@ function M.capture_image(flags, parent, max_edge, on_image)
 	if not operation then return false end
 	operation.quiet = true
 
-	local allocated, target, allocation_detail = pcall(FileSystem.create_secure_temp_file)
-	if not allocated or type(target) ~= "string" or target == "" then
+	local target, allocation_detail, cancelled = allocate_capture_file(operation)
+	if cancelled then return false end
+	if not target then
 		Logger.error(LOG, "Screen reading capture refused: no temporary file (%s).",
-			tostring(allocated and allocation_detail or target))
+			tostring(allocation_detail))
 		operation.authorized = false
 		finish_operation(operation)
 		return false
 	end
-	operation.temp_path = target
 
 	--- Hands the capture to the caller.
 	--- @param data string|nil The file bytes already read, nil to read the file now.
 	local function deliver(data)
+		if not operation_is_authorized(operation) then return false end
 		local detail = nil
 		if data == nil then data, detail = read_capture(target) end
+		if not operation_is_authorized(operation) then return false end
 		local encoded = nil
 		if data ~= nil then encoded, detail = encode_capture(data) end
+		if not operation_is_authorized(operation) then return false end
 		if not encoded then
 			Logger.error(LOG, "Screen reading capture unusable: %s.", tostring(detail))
 			on_image("failed", detail)
@@ -664,6 +684,7 @@ function M.capture_image(flags, parent, max_edge, on_image)
 			interactive = CaptureFlow.is_interactive(flags),
 			destination = "file",
 		})
+		if not operation_is_authorized(operation) then return false end
 		if outcome == CaptureFlow.OUTCOME_CANCELLED then
 			Logger.info(LOG, "Screen reading capture cancelled by the user.")
 			on_image("cancelled")
@@ -675,6 +696,7 @@ function M.capture_image(flags, parent, max_edge, on_image)
 			return false
 		end
 		local data, read_error = read_capture(target)
+		if not operation_is_authorized(operation) then return false end
 		if not data then
 			Logger.error(LOG, "Screen reading capture unusable: %s.", tostring(read_error))
 			on_image("failed", read_error)
@@ -684,19 +706,23 @@ function M.capture_image(flags, parent, max_edge, on_image)
 		if math.max(width, height) <= max_edge then return deliver(data) end
 		local started = start_task(operation, SIPS_BIN, { "-Z", tostring(math.floor(max_edge)), target },
 			function(sips_exit_code, _, sips_stderr)
-				if sips_exit_code ~= 0 and not _downscale_failure_logged then
+				local resized, resize_error
+				if sips_exit_code == 0 then resized, resize_error = read_capture(target) end
+				if not resized and not _downscale_failure_logged then
 					_downscale_failure_logged = true
 					Logger.info(LOG, "The screenshot could not be downscaled (sips exit %s: %s); "
-						.. "the original is sent.", tostring(sips_exit_code), tostring(sips_stderr))
+						.. "the original is sent.", tostring(sips_exit_code), tostring(resize_error or sips_stderr))
 				end
-				return deliver()
+				-- sips edits the file in place, even when its conversion fails.
+				-- The original capture was read before handing that file to it.
+				return deliver(resized or data)
 			end, "downscale")
 		if started then return true end
 		if not _downscale_failure_logged then
 			_downscale_failure_logged = true
 			Logger.info(LOG, "The screenshot downscale could not start; the original is sent.")
 		end
-		return deliver()
+		return deliver(data)
 	end, "capture")
 end
 

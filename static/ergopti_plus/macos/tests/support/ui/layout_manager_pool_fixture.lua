@@ -29,7 +29,11 @@ local function with_layout(scenario)
 				refresh = function(callback) h.refreshes = h.refreshes + 1; callback() end,
 			}
 			hs.webview.windowMasks = { titled = 1, closable = 2, resizable = 8 }
-			builder.force_focus = function() h.focuses = h.focuses + 1; return true end
+			builder.force_focus = function(_, _, lifecycle)
+				h.focuses = h.focuses + 1
+				h.focus_owner = lifecycle.is_current
+				return h.focus_result ~= false
+			end
 			builder.show_webview = function(options)
 				local view = create(options)
 				if view == nil then return nil end

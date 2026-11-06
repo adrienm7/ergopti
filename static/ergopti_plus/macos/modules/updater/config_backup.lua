@@ -48,7 +48,10 @@ M._overrides = nil
 --- @return string|nil error Why the link target cannot be classified
 local function classify(path)
 	local status, attributes = FileSystem.path_status(path)
-	if status ~= "present" or type(attributes) ~= "table" then return "other" end
+	if status == "absent" then return "other" end
+	if status ~= "present" or type(attributes) ~= "table" or type(attributes.mode) ~= "string" then
+		return nil, "cannot classify " .. path
+	end
 	if attributes.mode == "directory" then return "dir" end
 	if attributes.mode == "file" then return "file" end
 	if attributes.mode == "link" then
@@ -91,6 +94,14 @@ end
 local function file_ports()
 	return {
 		list = list,
+		directory_status = FileSystem.directory_status,
+		directory_identity = function(path)
+			local attrs, status, detail = FileSystem.classify_no_follow(path)
+			if status ~= "ok" or type(attrs) ~= "table" or attrs.mode ~= "directory" then
+				return nil, detail or status or "not a directory"
+			end
+			return { dev = attrs.dev, ino = attrs.ino }
+		end,
 		read = function(path)
 			local content, status, detail = FileSystem.read_with_status(path)
 			if status == "ok" then return content end
@@ -100,6 +111,12 @@ local function file_ports()
 		make_dir = function(path)
 			if ConfigPaths.ensure_dir(path) == true then return true end
 			return nil, "cannot create the folder"
+		end,
+		make_dir_exclusive = function(path)
+			if not hs or not hs.fs or type(hs.fs.mkdir) ~= "function" then return nil, "mkdir unavailable" end
+			local ok, created, err = pcall(hs.fs.mkdir, path)
+			if ok and created == true then return true end
+			return nil, tostring(ok and err or created)
 		end,
 		create = function(path, content)
 			local created, status, detail = FileSystem.create_if_absent(path, content)

@@ -730,6 +730,78 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-keystats-token-encoding.cjs"],
 			"repro": "npm run test:keystats-token-encoding"
+		},
+		{
+			"id": "js-hotstring-editor-preference-update",
+			"ordinal": 575,
+			"name": "hotstring editor preference updates preserve unsaved drafts",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstring-editor-preference-update.cjs"],
+			"repro": "node tools/test/test-hotstring-editor-preference-update.cjs"
+		},
+		{
+			"id": "js-personal-editor-initialization",
+			"ordinal": 576,
+			"name": "personal information editor preserves edits across delayed initialization",
+			"cmd": "node",
+			"args": ["tools/test/test-personal-editor-initialization.cjs"],
+			"repro": "node tools/test/test-personal-editor-initialization.cjs"
+		},
+		{
+			"id": "js-token-prompt-focus",
+			"ordinal": 578,
+			"name": "token prompt focus retries preserve typing and user focus",
+			"cmd": "node",
+			"args": ["tools/test/test-token-prompt-focus.cjs"],
+			"repro": "node tools/test/test-token-prompt-focus.cjs"
+		},
+		{
+			"id": "js-hotstring-editor-trailing-enter",
+			"ordinal": 579,
+			"name": "hotstring editor preserves trailing Enter commands when saving",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstring-editor-trailing-enter.cjs"],
+			"repro": "node tools/test/test-hotstring-editor-trailing-enter.cjs"
+		},
+		{
+			"id": "js-hotstring-editor-token-literals",
+			"ordinal": 580,
+			"name": "hotstring editor preserves literal brace groups and prototype names",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstring-editor-token-literals.cjs"],
+			"repro": "node tools/test/test-hotstring-editor-token-literals.cjs"
+		},
+		{
+			"id": "js-editors-ime-keyboard",
+			"ordinal": 581,
+			"name": "editor keyboard shortcuts preserve input method composition",
+			"cmd": "node",
+			"args": ["tools/test/test-editors-ime-keyboard.cjs"],
+			"repro": "node tools/test/test-editors-ime-keyboard.cjs"
+		},
+		{
+			"id": "js-hotstrings-config-zero-delay",
+			"ordinal": 582,
+			"name": "hotstring settings display zero unlimited delay after saving",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstrings-config-zero-delay.cjs"],
+			"repro": "node tools/test/test-hotstrings-config-zero-delay.cjs"
+		},
+		{
+			"id": "js-hotstrings-config-number-input",
+			"ordinal": 583,
+			"name": "hotstring numeric settings retain the entered numeric value",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstrings-config-number-input.cjs"],
+			"repro": "node tools/test/test-hotstrings-config-number-input.cjs"
+		},
+		{
+			"id": "js-personal-editor-multiline",
+			"ordinal": 585,
+			"name": "personal information editor preserves multiline fields",
+			"cmd": "node",
+			"args": ["tools/test/test-personal-editor-multiline.cjs"],
+			"repro": "node tools/test/test-personal-editor-multiline.cjs"
 		}
 	]
 }

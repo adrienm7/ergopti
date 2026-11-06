@@ -79,7 +79,8 @@ function M.new(ports)
 	end
 	assert(type(ports.checker) == "table" and type(ports.checker.start) == "function",
 		"tap_copy.new: checker must be a tap_hold.copy_check checker")
-	return setmetatable({ ports = ports, down = {}, candidate = nil, released = nil, stats = M.empty_stats() }, Owner)
+	return setmetatable({ ports = ports, down = {}, candidate = nil, released = nil,
+		generation = 0, stats = M.empty_stats() }, Owner)
 end
 
 -- How many press durations the statistics keep, the most recent ones.
@@ -130,7 +131,9 @@ end
 --- @param why string What came instead.
 function Owner:report_missing(released, why)
 	local ports = self.ports
+	local generation = self.generation
 	ports.defer("tap copy missing", function()
+		if self.generation ~= generation then return end
 		local tap, threshold_ms = ports.key_config(released.key_id)
 		if tap ~= COPY_ACTION then return end
 		local past = type(released.held_ms) == "number" and type(threshold_ms) == "number"
@@ -157,10 +160,20 @@ end
 function Owner:modifier_edge(keycode, flags, stamp)
 	local flag = KEY_FLAGS[keycode]
 	if flag == nil then
+		self.retry_token = nil
 		-- Caps Lock, Fn: part of a chord, never a watched tap.
 		if self.candidate then self.candidate.clean = false end
+		if self.released then
+			local released = self.released
+			self.released = nil
+			self:report_missing(released, "another modifier came first")
+		end
 		return
 	end
+	-- The Cmd release immediately following Karabiner's copy belongs to that
+	-- copy. Any other modifier edge can change the user's selection or context.
+	if self.retry_token and not (keycode == COPY_COMMAND_KEYCODE and self.down[keycode]
+		and type(flags) == "table" and flags.cmd ~= true) then self.retry_token = nil end
 	if not self.down[keycode] and type(flags) == "table" and flags[flag] == true then
 		if self.released ~= nil then
 			if keycode == COPY_COMMAND_KEYCODE and next(self.down) == nil then
@@ -193,14 +206,20 @@ end
 
 --- Observes a click: whatever modifier is down is used with it.
 function Owner:activity()
+	self.retry_token = nil
 	if self.candidate then self.candidate.clean = false end
+	if self.released then
+		local released = self.released
+		self.released = nil
+		self:report_missing(released, "a click came first")
+	end
 end
 
 --- Whether a key-down matters to the watch: a modifier is down or a watched
 --- release waits for its Cmd+C. Ordinary typing costs this one check.
 --- @return boolean
 function Owner:watching()
-	return self.candidate ~= nil or self.released ~= nil
+	return self.candidate ~= nil or self.released ~= nil or self.retry_token ~= nil
 end
 
 --- Observes one physical key-down read by the keyDown tap. Its flags and
@@ -212,20 +231,29 @@ end
 function Owner:key_down(event, stamp, lateness_ms)
 	if self.candidate then self.candidate.clean = false end
 	local released = self.released
-	if released == nil then return end
+	if released == nil then self.retry_token = nil; return end
 	self.released = nil
 	local ports = self.ports
 	local flags = ports.event_flags(event)
 	local copy = type(flags) == "table" and flags.cmd == true and not flags.ctrl and not flags.alt
 		and not flags.shift and ports.event_chars(event) == "c"
 	local gap_ms = ports.duration_ms(released.stamp, stamp)
-	if not copy or type(gap_ms) ~= "number" or gap_ms > M.ATTRIBUTION_WINDOW_MS then
-		self:report_missing(released, copy and "the Cmd+C came too late to be its own" or "the next key was not Cmd+C")
+	if not copy or type(gap_ms) ~= "number" or gap_ms < 0 or gap_ms > M.ATTRIBUTION_WINDOW_MS then
+		self:report_missing(released, copy and "the Cmd+C timing did not match the tap" or "the next key was not Cmd+C")
 		return
 	end
 	-- Read now: the application has not received this Cmd+C yet.
 	local baseline = ports.change_count()
+	local target = nil
+	if type(ports.capture_destination) == "function" then
+		local captured, value = pcall(ports.capture_destination)
+		if captured then target = value end
+	end
+	local token = {}
+	self.retry_token = token
+	local generation = self.generation
 	ports.defer("tap copy check", function()
+		if self.generation ~= generation then return end
 		local tap, threshold_ms = ports.key_config(released.key_id)
 		if tap ~= COPY_ACTION then return end
 		self.stats.sent = self.stats.sent + 1
@@ -234,13 +262,18 @@ function Owner:key_down(event, stamp, lateness_ms)
 			"Tap-hold copy: %s held %s ms (threshold %s ms); Cmd+C %s ms after its release, reached the tap %s ms late; changeCount %s.",
 			released.key_id, ms_text(released.held_ms), ms_text(threshold_ms), ms_text(gap_ms),
 			ms_text(lateness_ms), tostring(baseline))
-		ports.checker:start(baseline, released.key_id)
+		ports.checker:start(baseline, released.key_id, function()
+			if self.retry_token ~= token or target == nil or type(ports.destination_current) ~= "function" then return false end
+			local current = ports.destination_current(target)
+			return current == true and self.retry_token == token
+		end)
 	end)
 end
 
 --- Forgets every press in flight and abandons a pending check.
 function Owner:stop()
-	self.down, self.candidate, self.released = {}, nil, nil
+	self.generation = self.generation + 1
+	self.down, self.candidate, self.released, self.retry_token = {}, nil, nil, nil
 	self.ports.checker:stop()
 end
 

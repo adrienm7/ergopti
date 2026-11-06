@@ -30,6 +30,8 @@ local LOG        = "i18n"
 local _locale    = "fr"   -- active locale code
 local _storage   = nil    -- storage adapter (lazy-loaded)
 local _available = {}     -- cached list of available locale codes
+local _locale_busy, _locale_config_debt, _locale_storage_debt, _locale_backend_debt = false, nil, nil, nil
+local _locale_backup_serial = 0
 
 
 -- =========================================
@@ -63,9 +65,89 @@ end
 --- @param code string Locale code.
 --- @return boolean True only after durable storage confirms the write.
 local function _save_locale(code)
-	local s = _get_storage()
-	if not s or type(s.set) ~= "function" then return false end
-	return s.set("locale", code) == true
+	local debt = _locale_storage_debt
+	if not debt or debt.backup then return false end
+	if type(debt.storage.path) ~= "function" then return false end
+	local store_path = debt.storage.path()
+	if type(store_path) ~= "string" or store_path == "" then return false end
+	_locale_backup_serial = _locale_backup_serial + 1
+	debt.backup = store_path .. ".locale-" .. tostring(os.time()) .. "-" .. tostring(_locale_backup_serial) .. ".settings"
+	return debt.storage.publish_owned(debt.owner, debt.receipt,
+		{ locale = { present = true, value = code } }, debt.backup, require("adapters.file_system")) == true
+end
+
+--- Settles retained native ownership without deleting the durable backup.
+local function settle_locale_storage(keep)
+	local debt = _locale_storage_debt
+	if not debt then return true end
+	if debt.keep == nil then debt.keep = keep == true end
+	if not rawequal(package.loaded["adapters.storage"], debt.storage) then return false end
+	if debt.receipt and not debt.keep and not debt.restored then
+		if debt.storage.restore_owned(debt.owner, debt.receipt) ~= true then return false end
+		debt.restored = true
+	end
+	if not debt.released then
+		if debt.storage.release_owned(debt.owner) ~= true then return false end
+		debt.released = true
+	end
+	if debt.receipt and not debt.forgotten then
+		if debt.storage.forget_owned(debt.owner, debt.receipt) ~= true then return false end
+		debt.forgotten = true
+	end
+	_locale_storage_debt = nil
+	return true
+end
+
+local function settle_locale_config()
+	if not _locale_config_debt then return true end
+	if require("infra.script_scope").restore_configured_rewrite(_locale_config_debt) ~= true then return false end
+	_locale_config_debt = nil
+	return true
+end
+
+local function settle_locale_backend()
+	local debt = _locale_backend_debt
+	if not debt then return true end
+	local current = locale_mod.current_locale()
+	if current ~= debt.before then
+		if current ~= debt.after then return false end
+		local ok = pcall(locale_mod.set_locale, debt.before)
+		if not ok or locale_mod.current_locale() ~= debt.before then return false end
+	end
+	_locale_backend_debt = nil
+	return true
+end
+
+local function locale_transaction(action)
+	if _locale_busy then return false end
+	_locale_busy = true
+	local ok, committed = xpcall(function()
+		if not settle_locale_backend() or not settle_locale_storage(false) or not settle_locale_config() then return false end
+		local storage = _get_storage()
+		if not storage or type(storage.acquire_owned) ~= "function" then return false end
+		local owner = {}
+		if storage.acquire_owned(owner, { "locale" }) ~= true then return false end
+		_locale_storage_debt = { owner = owner, storage = storage }
+		local receipt = storage.capture_owned(owner)
+		if not receipt then return false end
+		_locale_storage_debt.receipt = receipt
+		_locale_storage_debt.config_path = require("infra.config_paths").config("config.toml")
+		if type(_locale_storage_debt.config_path) ~= "string" then return false end
+		return action()
+	end, debug.traceback)
+	if not ok or committed ~= true then
+		local backend_ok, storage_ok, config_ok = pcall(settle_locale_backend), pcall(settle_locale_storage, false), pcall(settle_locale_config)
+		if not backend_ok or not storage_ok or not config_ok or _locale_backend_debt or _locale_storage_debt or _locale_config_debt then
+			Logger.error(LOG, "Locale rollback remains pending; another change is blocked.")
+		end
+		_locale_busy = false
+		return false
+	end
+	_locale_config_debt, _locale_backend_debt = nil, nil
+	local cleaned, settled = pcall(settle_locale_storage, true)
+	if not cleaned or settled ~= true then Logger.error(LOG, "Committed locale storage cleanup remains pending.") end
+	_locale_busy = false
+	return true
 end
 
 
@@ -161,7 +243,7 @@ end
 --- Initialises the i18n module: loads the persisted locale and applies it.
 --- Must be called once at daemon startup. Idempotent.
 function M.init()
-	if not _scope.admit_change() then return false end
+	if _locale_busy or _locale_config_debt or _locale_storage_debt or _locale_backend_debt or not _scope.admit_change() then return false end
 	if _available and #_available > 0 then
 		-- Already initialised — skip.
 		return
@@ -215,7 +297,7 @@ end
 --- Unlike the ordinary menu setter, a same-locale choice needs a storage ACK.
 --- @param code string Locale code (must be in _available).
 --- @return boolean True only after storage confirms the explicit selection.
-function M.persist_locale(code)
+local function persist_locale_transaction(code)
 	if not _scope.admit_change() then return false end
 	if type(code) ~= "string" or code == "" then return false end
 
@@ -230,15 +312,26 @@ function M.persist_locale(code)
 	end
 
 	-- config.toml's [script] locale wins at start: rewrite it first.
-	if not require("infra.script_scope").rewrite_configured(require("config_keys").KEY.SCRIPT_LOCALE, code)
-		or not _save_locale(code) then
+	local scope = require("infra.script_scope")
+	if require("infra.config_paths").config("config.toml") ~= _locale_storage_debt.config_path then return false end
+	local rewritten, _, receipt = scope.rewrite_configured_owned(require("config_keys").KEY.SCRIPT_LOCALE, code)
+	_locale_config_debt = receipt
+	if rewritten ~= true or not _save_locale(code)
+		or require("infra.config_paths").config("config.toml") ~= _locale_storage_debt.config_path
+		or scope.verify_configured_rewrite(receipt) ~= true then
 		Logger.error(LOG, "Locale '%s' was not persisted — nothing changed.", code)
 		return false
 	end
+	_locale_backend_debt = { before = locale_mod.current_locale(), after = code }
+	local applied, accepted = pcall(locale_mod.set_locale, code)
+	if not applied or accepted == false or locale_mod.current_locale() ~= code then return false end
 	_locale = code
-	locale_mod.set_locale(code)
 	Logger.info(LOG, "Locale set to '%s' (persisted).", code)
 	return true
+end
+
+function M.persist_locale(code)
+	return locale_transaction(function() return persist_locale_transaction(code) end)
 end
 
 --- Switches to the given locale and persists a changed choice.
@@ -246,6 +339,9 @@ end
 --- @param code string Locale code (must be in _available).
 --- @return boolean True when the active locale needs no change or was persisted.
 function M.set_locale(code)
+	if _locale_busy or _locale_config_debt or _locale_storage_debt or _locale_backend_debt then
+		return M.persist_locale(code)
+	end
 	if not _scope.admit_change() then return false end
 	if code == _locale then return true end
 	return M.persist_locale(code)
@@ -293,7 +389,7 @@ end
 --- Passthrough for macOS API parity.
 --- @param fn function|nil
 function M.set_locale_injector(fn)
-	if not _scope.admit_change() then return false end
+	if _locale_busy or _locale_config_debt or _locale_storage_debt or _locale_backend_debt or not _scope.admit_change() then return false end
 	-- On Linux, persistence is handled by storage.lua (see _save_locale).
 	-- Kept for API parity with macOS.
 end
@@ -332,6 +428,7 @@ local function scope_known(value)
 end
 
 local function scope_ready()
+	if _locale_busy or _locale_config_debt or _locale_storage_debt or _locale_backend_debt then return false end
 	if not rawequal(package.loaded["infra.locale"], locale_mod) then return false end
 	if not (type(_available) == "table" and #_available > 0) or not scope_known(_locale) or locale_mod.current_locale() ~= _locale then return false end
 	local strings = locale_mod.all()
