@@ -372,7 +372,7 @@ function M._number_row_live() return require("modules.keymap.number_row_live") e
 --- @return string|nil order
 function M._number_row_order_written(rows)
 	for _, row in ipairs(rows or {}) do
-		if row.section == "layout" and row.key == "direct_access_digits" and type(row.value) == "string" then
+		if row.section == "layout" and row.key == require("config_keys").LEAF.DIRECT_ACCESS_DIGITS and type(row.value) == "string" then
 			return row.value
 		end
 	end
