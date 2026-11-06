@@ -587,7 +587,8 @@ end
 --- @param trigger string The sequence to monitor.
 --- @param replacement string The resulting expansion string.
 --- @param opts table Optional flags: is_word, auto_expand, is_case_sensitive,
----   final_result, is_private (trigger and replacement are secrets — never logged),
+---   final_result, literal_output (the replacement is data typed verbatim, never
+---   interpreted as {Key} directives — personal field values), is_private (trigger and replacement are secrets — never logged),
 ---   field (the personal_info.toml field the replacement came from, so the preview
 ---   can ask the shared declaration how much of it may be shown).
 function M.add(trigger, replacement, opts)
@@ -831,7 +832,14 @@ function M.add(trigger, replacement, opts)
 	end
 	local lower_body       = text_utils.trig_lower(case_body)
 	local lower_trig       = lower_body .. case_suffix
-	local plain_repl_base  = km_utils.plain_text(km_utils.tokens_from_repl(replacement))
+	-- A literal replacement is data, never a Send script: its braces are text, so
+	-- the plain form is the replacement itself and the expander types it as text.
+	local is_literal       = opts.literal_output == true
+	local function plain_form(text)
+		if is_literal then return text end
+		return km_utils.plain_text(km_utils.tokens_from_repl(text))
+	end
+	local plain_repl_base  = plain_form(replacement)
 
 	-- ── Case-conform fast path (mirrors AHK CreateCaseSensitiveHotstrings) ──────
 	-- An auto (immediate), case-insensitive trigger whose replacement is plain
@@ -855,8 +863,8 @@ function M.add(trigger, replacement, opts)
 	if not use_conform then
 		title_repl       = text_utils.repl_title(replacement)
 		upper_repl       = text_utils.repl_upper(replacement)
-		plain_repl_title = km_utils.plain_text(km_utils.tokens_from_repl(title_repl))
-		plain_repl_upper = km_utils.plain_text(km_utils.tokens_from_repl(upper_repl))
+		plain_repl_title = plain_form(title_repl)
+		plain_repl_upper = plain_form(upper_repl)
 	end
 
 	if is_strict then

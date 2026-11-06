@@ -469,7 +469,10 @@ local function register_prefix_entries()
 	-- out: the trigger prefix is itself a fragment of the secret (the first 5
 	-- digits of the SSN, the first 6 chars of the IBAN), so redacting only the
 	-- replacement would still leak
-	local base_opts = { is_word = true, auto_expand = true, is_case_sensitive = true, is_private = true }
+	-- literal_output: a personal value is user data, so a "{Tab}" inside it is typed
+	-- as text and never pressed as a key.
+	local base_opts = { is_word = true, auto_expand = true, is_case_sensitive = true, is_private = true,
+		literal_output = true }
 
 	--- Copies the shared flags and names the personal_info.toml field the value
 	--- came from.
