@@ -865,7 +865,10 @@ function validateAgentPickerTail(actionSource, menuSource, transactionSource) {
 	assert.ok(save, 'Actual application-picker save must exist.');
 	assert.match(save[1], /_LLM_Agent_ApplyCommitted\.Bind\("agent_disabled_apps", Previous\)/);
 	assert.match(save[1], /Previous := LLM_Agent_Setting\("agent_disabled_apps"\)/);
-	assert.match(save[1], /Committed := Commit\.Call/);
+	// The save routes through the injected commit port when one is installed and the
+	// native transaction otherwise; both must feed the same refusal check below.
+	assert.match(save[1], /Committed := _LLM_Agent_CommitFn\.Call\(/);
+	assert.match(save[1], /Committed := LLM_Menu_CommitMutation\(/);
 	assert.match(save[1], /if !\(Committed is Integer\) \|\| Committed != true/);
 	const tail = transactionSource.indexOf('try Applied := ApplyFn.Call(CandidateMenu)');
 	const durable = transactionSource.indexOf('if !ConfigCommitBorrowedUpdates(');
