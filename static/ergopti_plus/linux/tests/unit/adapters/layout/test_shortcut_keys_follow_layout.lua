@@ -44,7 +44,12 @@ helpers.describe("shortcut keys: the live layout decides the key", function()
 		package.loaded["adapters.shell_runner"] = {
 			has_command = function() return true end,
 			exec = function() return clipboard end,
-			exec_checked = function() return true, clipboard, nil end,
+			-- The paste refuses to borrow a clipboard holding formats it could
+			-- not put back, so the TARGETS listing must name text alone.
+			exec_checked = function(command)
+				if command:find("-t TARGETS", 1, true) then return true, "TARGETS\nUTF8_STRING\n", nil end
+				return true, clipboard, nil
+			end,
 			with_exact_stdin = function(command, stdin) return { command = command, stdin = stdin } end,
 			run = function(command) clipboard = command.stdin; return true end,
 		}
