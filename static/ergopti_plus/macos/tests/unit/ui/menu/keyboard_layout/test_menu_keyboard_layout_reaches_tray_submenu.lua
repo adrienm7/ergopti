@@ -256,8 +256,9 @@ end
 helpers.describe("empty native Input Sources consumes the canonical preferences command", function()
 	helpers.it("retains its independently declared caption and exact native launch command", function()
 		with_empty_source_preferences(function(build, state, binding)
+			-- Every driver offers the system keyboard settings for an empty list (8eaa013c).
 			helpers.assert_eq(binding.get_root().layout_active_source_empty_commands, {{type = "command",
-				id = "layout_open_preferences", i18n = "menu.layout.open_prefs", platforms = {"hs"}, unavailable = "hide"}})
+				id = "layout_open_preferences", i18n = "menu.layout.open_prefs"}})
 			local row = empty_preferences_row(build(), "menu.layout.open_prefs")
 			helpers.assert_not_nil(row)
 			helpers.assert_eq(type(row.fn), "function")
