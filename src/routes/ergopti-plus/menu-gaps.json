@@ -657,12 +657,12 @@
 		"platforms": { "windows": false, "macos": true, "linux": false },
 		"reasons": {
 			"windows": {
-				"en": "macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.",
-				"fr": "macOS uniquement : ces lignes installent la disposition .bundle via le mécanisme de sources de saisie du système, avec une portée utilisateur et une portée système, et choisissent l'icône de la barre de menus. Windows installe un .klc par son propre installateur, Linux engendre une disposition XKB, et aucun des deux n'a de barre de menus."
+				"en": "macOS only: this row installs the .bundle layout. On Windows the layout installer is a separate, unsigned download that must run as administrator, which the driver never starts: run Ergopti_windows.exe from the release page. On Linux, install Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "macOS uniquement : cette ligne installe la disposition .bundle. Sous Windows, l'installateur de la disposition est un téléchargement séparé, non signé, qui doit s'exécuter en administrateur, ce que le pilote ne lance jamais : exécutez Ergopti_windows.exe depuis la page des versions. Sous Linux, installez Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
 			},
 			"linux": {
-				"en": "macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.",
-				"fr": "macOS uniquement : ces lignes installent la disposition .bundle via le mécanisme de sources de saisie du système, avec une portée utilisateur et une portée système, et choisissent l'icône de la barre de menus. Windows installe un .klc par son propre installateur, Linux engendre une disposition XKB, et aucun des deux n'a de barre de menus."
+				"en": "macOS only: this row installs the .bundle layout. On Windows the layout installer is a separate, unsigned download that must run as administrator, which the driver never starts: run Ergopti_windows.exe from the release page. On Linux, install Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).",
+				"fr": "macOS uniquement : cette ligne installe la disposition .bundle. Sous Windows, l'installateur de la disposition est un téléchargement séparé, non signé, qui doit s'exécuter en administrateur, ce que le pilote ne lance jamais : exécutez Ergopti_windows.exe depuis la page des versions. Sous Linux, installez Ergopti depuis « Gérer les dispositions… » (Wayland) ou avec install.sh (X11)."
 			}
 		}
 	},
@@ -737,22 +737,6 @@
 		"path": "layout_menu.menubar_icon",
 		"visibility": "hide",
 		"labels": { "fr": "Icône de la barre des menus", "en": "Menu bar icon" },
-		"platforms": { "windows": false, "macos": true, "linux": false },
-		"reasons": {
-			"windows": {
-				"en": "macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.",
-				"fr": "macOS uniquement : ces lignes installent la disposition .bundle via le mécanisme de sources de saisie du système, avec une portée utilisateur et une portée système, et choisissent l'icône de la barre de menus. Windows installe un .klc par son propre installateur, Linux engendre une disposition XKB, et aucun des deux n'a de barre de menus."
-			},
-			"linux": {
-				"en": "macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.",
-				"fr": "macOS uniquement : ces lignes installent la disposition .bundle via le mécanisme de sources de saisie du système, avec une portée utilisateur et une portée système, et choisissent l'icône de la barre de menus. Windows installe un .klc par son propre installateur, Linux engendre une disposition XKB, et aucun des deux n'a de barre de menus."
-			}
-		}
-	},
-	{
-		"path": "layout_menu.active_layouts",
-		"visibility": "hide",
-		"labels": { "fr": "active_layouts", "en": "active_layouts" },
 		"platforms": { "windows": false, "macos": true, "linux": false },
 		"reasons": {
 			"windows": {
@@ -1439,22 +1423,6 @@
 			"linux": {
 				"en": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own.",
 				"fr": "Each driver reads the touchpad through a different stack — Windows through its precision-touchpad API, macOS through Hammerspoon's gesture events, Linux through evdev — so the slots each can offer, and the setup each needs, are its own."
-			}
-		}
-	},
-	{
-		"path": "layout_active_source_empty_commands.layout_open_preferences",
-		"visibility": "hide",
-		"labels": { "fr": "Ouvrir les Réglages Clavier…", "en": "Open Keyboard Settings…" },
-		"platforms": { "windows": false, "macos": true, "linux": false },
-		"reasons": {
-			"windows": {
-				"en": "macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.",
-				"fr": "macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar."
-			},
-			"linux": {
-				"en": "macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.",
-				"fr": "macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar."
 			}
 		}
 	},

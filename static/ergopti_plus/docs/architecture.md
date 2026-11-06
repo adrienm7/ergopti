@@ -86,6 +86,7 @@ graph TD
     end
 
     subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
+        MACOS_accessibility_copies["AccessibilityCopies.lua"]
         MACOS_accessibility_permission["AccessibilityPermission.lua"]
         MACOS_app_launcher["AppLauncher.lua"]
         MACOS_apple_shortcuts["AppleShortcuts.lua"]

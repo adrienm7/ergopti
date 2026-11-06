@@ -21,7 +21,6 @@
 	"tap_hold_key_native_commands": "platform_reason.remap_engine_is_per_driver",
 	"gesture_system_status_controls": "platform_reason.touchpad_stack_is_per_driver",
 	"gesture_swipe_slot_menu": "platform_reason.touchpad_stack_is_per_driver",
-	"layout_active_source_empty_commands": "platform_reason.layout_bundle_and_menubar_are_macos",
 	"llm_custom_profile_controls": "platform_reason.menu_control_rows_are_laid_out_per_driver",
 	"llm_numeric_custom_rows": "platform_reason.llm_lists_are_inline_on_linux",
 	"llm_debounce_never_row": "platform_reason.menu_control_rows_are_laid_out_per_driver",
