@@ -172,6 +172,51 @@ helpers.describe("word reset: the settings", function()
 		end)
 	end)
 
+	for _, publication in ipairs({ "commit", "refuse", "raise" }) do
+		helpers.it("word reset, retains a scope candidate adopted during " .. publication .. " publication (word-reset-reentrant-cache)", function()
+			local source = '[hotstrings]\nidle_reset_seconds = 5\n'
+			with_settings(source, function(subject, _, path, _, sandbox)
+				local Writer = require("toml_codec.writer")
+				local write = Writer.batch_write
+				local before = subject.snapshot()
+				local candidate = { hotstrings = { idle_reset_seconds = 12, click_resets_word = true,
+					arrow_resets_word = false, shortcut_resets_word = false, tap_hold_resets_word = false,
+					cascade_max_arrows = 2 } }
+				local adopted
+				Writer.batch_write = function(...)
+					helpers.assert_true(subject.adopt_configuration(candidate))
+					adopted = subject.snapshot()
+					if publication == "refuse" then return false, "controlled publication refusal" end
+					if publication == "raise" then error("controlled publication exception") end
+					return write(...)
+				end
+				helpers.assert_eq(subject.set_click_resets_word(false), publication == "commit")
+				helpers.assert_eq(subject.snapshot(), adopted, "the setter cannot replace a newer scope candidate")
+				if publication == "commit" then
+					local stored = require("toml_codec").decode(sandbox.read_bytes(path)).hotstrings
+					helpers.assert_eq(stored.click_resets_word, false)
+					helpers.assert_eq(stored.idle_reset_seconds, 5)
+				else
+					helpers.assert_eq(sandbox.read_bytes(path), source)
+				end
+				helpers.assert_true(subject.restore_configuration(before))
+				helpers.assert_eq(subject.snapshot(), before, "the scope still owns its restoration image")
+			end)
+		end)
+	end
+
+	helpers.it("word reset, does not publish fresh neighboring settings when the write refuses", function()
+		with_settings('[hotstrings]\nidle_reset_seconds = 5\n', function(subject, controls, path, _, sandbox)
+			local before = subject.snapshot()
+			local external = '[hotstrings]\nidle_reset_seconds = 9\n'
+			local file = assert(io.open(path, "wb")); assert(file:write(external)); assert(file:close())
+			controls.refuse = true
+			helpers.assert_eq(subject.set_click_resets_word(false), false)
+			helpers.assert_eq(subject.snapshot(), before, "uncommitted neighboring values never enter runtime")
+			helpers.assert_eq(sandbox.read_bytes(path), external)
+		end)
+	end)
+
 	helpers.it("word reset, persists both leaves sparsely, keeping neighbours", function()
 		with_settings('[hotstrings]\nunknown = "keep"\n', function(subject, _, path, reload, sandbox)
 			helpers.assert_true(subject.set_idle_seconds(7.5))
