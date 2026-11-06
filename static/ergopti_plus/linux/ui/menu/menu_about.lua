@@ -134,8 +134,22 @@ local function _about_update_rows(ctx)
 	end
 	local frequency_row = _frequency_picker(ctx, up)
 
+	-- An installed release whose daemon restart was refused waits for one: the
+	-- row completes it rather than checking for another release.
+	local Versions = require("ui.changelog.bridge")
+	if type(ctx.on_menu_changed) == "function" then Versions.set_pending_install_observer(ctx.on_menu_changed) end
+	local pending = not source_run and Versions.pending_install() or nil
+
 	-- A check discovers releases; installation needs the separately named row.
-	if source_run then
+	if pending then
+		out[#out + 1] = {
+			label = _fill(i18n_safe("menu.about.restart_to_finish_install"), "{tag}", pending.tag),
+			action = function()
+				Logger.info(LOG, "User asked to restart on installed release %s.", pending.tag)
+				Versions.complete_pending_install()
+			end,
+		}
+	elseif source_run then
 		local source_row = ManifestMenu.command_row("about_source_menu", require("config_keys").COMMAND.ABOUT_SOURCE_CHECK, {
 			[require("config_keys").COMMAND.ABOUT_SOURCE_CHECK] = function() return false end,
 		}, { ["about_source_release_ready"] = function() return not source_run end })

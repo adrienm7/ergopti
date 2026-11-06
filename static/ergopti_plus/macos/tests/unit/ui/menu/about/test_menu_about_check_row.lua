@@ -14,12 +14,20 @@ local helpers = require("tests.helpers")
 
 --- Builds the About submenu of a packaged build and returns its check row with
 --- the recorded window opens and Sparkle requests.
-local function build(latest)
-	local recorded = { opens = {}, requests = {} }
+local function build(latest, pending)
+	local recorded = { opens = {}, requests = {}, completions = 0 }
 	local saved = {
 		window = package.loaded["ui.update_check"],
 		launcher = package.loaded["adapters.update_launcher"],
+		changelog = package.loaded["ui.changelog"],
 	}
+	if pending then
+		package.loaded["ui.changelog"] = {
+			open = function() error("The completing row must not open the Versions window.") end,
+			pending_install = function() return pending end,
+			complete_pending_install = function() recorded.completions = recorded.completions + 1; return true end,
+		}
+	end
 	package.loaded["ui.update_check"] = {
 		open = function(opts) recorded.opens[#recorded.opens + 1] = opts; return true end,
 	}
@@ -52,13 +60,15 @@ local function build(latest)
 	local function restore()
 		package.loaded["ui.update_check"] = saved.window
 		package.loaded["adapters.update_launcher"] = saved.launcher
+		package.loaded["ui.changelog"] = saved.changelog
 	end
 	if not ok then restore(); error(rows, 0) end
 	recorded.owner, recorded.checks, recorded.refresh, recorded.restore = owner, checks, refresh, restore
 	local i18n = require("infra.i18n")
 	for _, row in ipairs(rows) do
 		if row.title == i18n.get("menu.about.check_for_updates")
-			or (latest and type(row.title) == "string" and row.title:find(latest.tag, 1, true)) then
+			or (latest and type(row.title) == "string" and row.title:find(latest.tag, 1, true))
+			or (pending and type(row.title) == "string" and row.title:find(pending.tag, 1, true)) then
 			recorded.row = row
 		end
 	end
@@ -76,6 +86,25 @@ helpers.describe("menu_about: the check row (macOS)", function()
 			helpers.assert_true(recorded.opens[1].checks == recorded.checks, "the window checks through the Lua owner")
 			helpers.assert_true(recorded.opens[1].channel_owner == recorded.owner, "switches go through the channel owner")
 			helpers.assert_true(recorded.opens[1].on_change == recorded.refresh, "the menu refreshes after an answer")
+		end)
+		recorded.restore()
+		if not ok then error(err, 0) end
+	end)
+
+	-- A release armed by Versions whose quit was refused had no completing
+	-- action anywhere but a retry the native lease refuses (MUR-001).
+	helpers.it("a release waiting for its restart turns the row into its completion (release-restart-pending)", function()
+		local recorded = build({ tag = "v0.0.0-dev.150", channel = "dev" }, { tag = "v0.0.0-dev.139" })
+		local ok, err = pcall(function()
+			helpers.assert_not_nil(recorded.row, "the row names the waiting release")
+			local i18n = require("infra.i18n")
+			local wording = i18n.get("menu.about.restart_to_finish_install"):gsub("{tag}.*$", "")
+			helpers.assert_true(recorded.row.title:find(wording, 1, true) == 1, recorded.row.title)
+			helpers.assert_true(recorded.row.title:find("v0.0.0-dev.139", 1, true) ~= nil, recorded.row.title)
+			recorded.row.fn()
+			helpers.assert_eq(recorded.completions, 1, "the click asks for the completing restart")
+			helpers.assert_eq(#recorded.requests, 0, "Sparkle is not asked to install another release")
+			helpers.assert_eq(#recorded.opens, 0, "no check runs over a waiting release")
 		end)
 		recorded.restore()
 		if not ok then error(err, 0) end

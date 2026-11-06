@@ -141,7 +141,8 @@ helpers.describe("menu_about: one titled submenu for the update channels", funct
 		local owner = fake_owner("dev")
 		local previous = package.loaded["ui.changelog"]
 		local opened = {}
-		package.loaded["ui.changelog"] = { open = function(opts) opened[#opened + 1] = opts return true end }
+		package.loaded["ui.changelog"] = { open = function(opts) opened[#opened + 1] = opts return true end,
+			pending_install = function() return nil end }
 		local ok, err = pcall(function()
 			local rows, catalogue = build(owner)
 			local label = catalogue["menu.about.changelog"]

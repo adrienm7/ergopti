@@ -1681,6 +1681,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	ctx.updateMenu   = updateMenu
 	ctx.refresh_icon = function() pcall(update_icon) end
+	-- About's check row completes a release whose restart was refused.
+	require("ui.changelog").set_pending_install_observer(updateMenu)
 
 	-- Rebuilds and caches the full menubar tree, timing the build so a slow menu
 	-- is visible in the boot/runtime log (the macOS analog of the AHK menu-build

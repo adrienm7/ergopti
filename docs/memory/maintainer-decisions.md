@@ -44,6 +44,22 @@ text writers cannot restore, LCP-001), states the reason in the menu and
 diagnostics, and keeps the full implementation as a TODO follow-up. An item
 that needs real hardware goes under "To confirm on ...".
 
+## An installed release whose restart was refused waits, it never fails (2026-11-06, MUR-001)
+
+When the Versions install has installed a release (Linux) or armed the app swap
+(macOS) and the restart is refused, the shared session
+(`_shared/lua/updater/release_install.lua`) holds it as `restart_pending`: the
+page says it is installed and offers « Redémarrer maintenant »
+(`complete_install_restart`), the About check row becomes « Redémarrer pour
+terminer l'installation de {tag} », a window opened later is seeded with it,
+and a new install is refused meanwhile. It is never reported failed or idle.
+macOS bounds the hold by the swap worker's own wait
+(`release_installer.SWAP_WAIT_SECONDS`, the `SWAP_WAIT_TICKS` the script
+counts) and then reports `install_error_restart_expired`, since the worker
+replaced nothing. Windows has no such state: a refused exit makes the updater
+cancel its swap worker (`_Updater_FailSwapTransaction`), so its failure is
+true and its reason set leaves out the two macOS swap-only reasons.
+
 ## The layout menu keeps layers and rows apart (2026-11-03)
 
 The Windows Keyboard layout menu read as a duplicate: the Base/Shift and AltGr
