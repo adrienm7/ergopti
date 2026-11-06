@@ -164,24 +164,35 @@ local function set_with_reason(name, value, expected_source, admission, on_notic
 			name, tostring(value), expectation)
 		return false, "invalid"
 	end
-	if name == LEAF.MIN_WORDS then
-		local maximum = M.get(LEAF.MAX_WORDS)
-		if maximum and maximum > 0 and value > maximum then
-			Logger.error(LOG, "set(): min_words cannot exceed max_words — refused.")
-			return false, "invalid"
-		end
-	elseif name == LEAF.MAX_WORDS then
-		local minimum = M.get(LEAF.MIN_WORDS)
-		if value > 0 and minimum and value < minimum then
-			Logger.error(LOG, "set(): max_words cannot be lower than min_words — refused.")
-			return false, "invalid"
-		end
-	end
-
 	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage then
 		Logger.error(LOG, "No storage — '%s' was not changed.", name)
 		return false, "persistence"
+	end
+	-- Both bounds belong to one source image. A previously cached opposite
+	-- bound cannot authorize a write against a newer configuration.
+	local relation_source
+	if name == LEAF.MIN_WORDS or name == LEAF.MAX_WORDS then
+		local other = name == LEAF.MIN_WORDS and LEAF.MAX_WORDS or LEAF.MIN_WORDS
+		local read_ok, values, source = pcall(Storage.get_many, { FEATURE_PATH[other] })
+		if not read_ok or type(values) ~= "table" or type(source) ~= "table" then
+			Logger.error(LOG, "Generation bounds could not be read; setting refused.")
+			return false, "persistence"
+		end
+		if expected_source ~= nil and (type(expected_source) ~= "table"
+				or expected_source.status ~= source.status or expected_source.content ~= source.content) then
+			Logger.error(LOG, "Generation bounds changed since the edit began; setting refused.")
+			return false, "persistence"
+		end
+		local bound = values[FEATURE_PATH[other]]
+		if not in_bounds(other, bound) then bound = shipped()[other] end
+		if type(bound) ~= "number" then return false, "persistence" end
+		if (name == LEAF.MIN_WORDS and bound > 0 and value > bound)
+				or (name == LEAF.MAX_WORDS and value > 0 and value < bound) then
+			Logger.error(LOG, "set(): min_words cannot exceed max_words — refused.")
+			return false, "invalid"
+		end
+		relation_source = source
 	end
 	local values_owner, previous_value = _values, _values[name]
 	local persisted
@@ -191,6 +202,12 @@ local function set_with_reason(name, value, expected_source, admission, on_notic
 		if on_notice then
 			persisted = Storage.set_many_with_notice({ [FEATURE_PATH[name]] = value }, expected_source, admission, on_notice)
 		else persisted = Storage.set_many({ [FEATURE_PATH[name]] = value }, expected_source, admission) end
+	elseif relation_source then
+		if on_notice then
+			persisted = Storage.set_many_with_notice({ [FEATURE_PATH[name]] = value }, relation_source, nil, on_notice)
+		else
+			persisted = Storage.set_many({ [FEATURE_PATH[name]] = value }, relation_source)
+		end
 	elseif on_notice then
 		persisted = Storage.set_with_notice(FEATURE_PATH[name], value, on_notice)
 	elseif value == default then
@@ -206,7 +223,9 @@ local function set_with_reason(name, value, expected_source, admission, on_notic
 	end
 	local may_publish = not publication_guard or publication_guard()
 	if _values == values_owner and _values[name] == previous_value then
-		if may_publish then _values[name] = value
+		-- Other settings may have changed in the source used for this write.
+		-- Resolve them again on demand instead of retaining an older image.
+		if may_publish then _values = { [name] = value }
 		else _values[name] = nil end
 	end
 	Logger.info(LOG, "%s: %s.", name, tostring(value))
