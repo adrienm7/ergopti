@@ -426,8 +426,12 @@ end
 
 local _caps_word_active = false
 -- What ends this CapsWord session on its own (modules/shortcuts/caps_word_auto_off),
--- compiled when it was switched on; nil while CapsWord is off.
+-- compiled when it was switched on and replaced by every acknowledged menu change
+-- (M.caps_word_policy_published); nil while CapsWord is off.
 local _caps_word_policy = nil
+-- Bumped whenever the idle check chain is replaced (a new delay mid-session), so
+-- the chain of the old delay never ends the session early or late.
+local _caps_word_idle_chain = 0
 -- Monotonic time of the last keystroke of the session, for the idle delay.
 local _caps_word_last_ms = nil
 -- Bumped by every session start and stop, so a queued idle check of an earlier
@@ -476,8 +480,10 @@ end
 --- @param session integer Session the check belongs to.
 --- @param delay_ms number Milliseconds until the earliest possible expiry.
 local function schedule_idle_check(session, delay_ms)
+	local chain = _caps_word_idle_chain
 	local queued = EventLoop.defer(function()
-		if session ~= _caps_word_session or not _caps_word_active or not _caps_word_policy then return end
+		if session ~= _caps_word_session or chain ~= _caps_word_idle_chain or not _caps_word_active
+			or not _caps_word_policy then return end
 		local now = Monotonic.now_ms()
 		if CapsWordPolicy.idle_expired(_caps_word_policy, _caps_word_last_ms, now - Monotonic.resolution_ms()) then
 			end_caps_word("no keystroke for the configured delay")
@@ -519,6 +525,23 @@ local function start_caps_word()
 	if delay then schedule_idle_check(_caps_word_session, delay) end
 	Logger.info(LOG, "CapsWord: ON (idle delay %s).", delay and (delay .. " ms") or "never")
 	return true
+end
+
+--- Applies an acknowledged CapsWord setting change to the running session from
+--- its next event, as macOS does (decision of 2026-11-06): the delimiters and
+--- pointer kinds are read from the new policy, and the idle check is re-armed
+--- for the new delay counted from the last keystroke (none when it is 0). A hand
+--- edit of config.toml still waits for the next activation, which refreshes.
+--- @param policy table The newly published compiled policy.
+function M.caps_word_policy_published(policy)
+	if not _caps_word_active then return end
+	-- Validates the policy before any session state changes.
+	local delay = CapsWordPolicy.idle_delay_ms(policy)
+	_caps_word_policy = policy
+	_caps_word_idle_chain = _caps_word_idle_chain + 1
+	if delay then schedule_idle_check(_caps_word_session, delay - (Monotonic.now_ms() - _caps_word_last_ms)) end
+	Logger.info(LOG, "CapsWord: running session follows the new settings (idle delay %s).",
+		delay and (delay .. " ms") or "never")
 end
 
 --- Toggles CapsWord on/off via the menu.

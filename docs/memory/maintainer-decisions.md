@@ -554,3 +554,12 @@ Aligned on macOS: `sticky_timeout_ms` (2000 ms registry default) is editable on
 Windows (`config.toml` `[tap_holds]`, `_TH_CommitOneShotTimeoutMs`) and Linux
 (`tap_hold.toml` `[tap_hold]`, `set_one_shot_timeout_ms`), each with a tray row;
 only a positive whole number of milliseconds is admitted, no zero or unlimited.
+
+## CapsWord setting changes reach the running session (6 November 2026)
+
+Aligned on macOS: a delimiter, pointer or idle-delay change acknowledged by the
+CapsWord menu applies to the session already running from its next event; a
+new delay counts from the last keystroke and 0 stops the idle check. A hand
+edit of `config.toml` still waits for the next activation. Linux owner:
+`modules/shortcuts/manager.caps_word_policy_published`, called by
+`caps_word_auto_off` after each acknowledged write.
