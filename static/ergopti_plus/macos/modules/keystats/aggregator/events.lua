@@ -199,7 +199,16 @@ function M.walk_system_event(entry)
 	})
 	if action == "wifi_change" then s.wifi_changes = s.wifi_changes + 1
 	elseif action == "space_change"    then s.space_switches = s.space_switches + 1
-	elseif action == "passive_period"  then s.passive_count  = s.passive_count  + 1
+	elseif action == "passive_period"  then
+		s.passive_count = s.passive_count + 1
+		-- The caffeinate watcher measures the interval here; its wake/unlock edge
+		-- carries no duration, so this row is the only owner of the measurement.
+		local duration = tonumber(entry.duration_ms) or 0
+		if entry.kind == "sleep" then s.sleep_ms = s.sleep_ms + duration
+		elseif entry.kind == "lock" then s.locked_ms = s.locked_ms + duration
+		end
+	-- Legacy edges recorded before measured passive rows still carry their own
+	-- interval; a current edge has no duration and adds nothing.
 	elseif action == "unlock" then s.locked_ms = s.locked_ms + (entry.duration_ms or 0)
 	elseif action == "wake"   then s.sleep_ms  = s.sleep_ms  + (entry.duration_ms or 0)
 	end
