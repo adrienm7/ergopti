@@ -178,7 +178,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 - [x] **[CODE] MRT-001:** Approval-watch deadline counts polling intervals rather than elapsed time. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md). Done: the watch takes a monotonic `now` port and checks one absolute deadline before each look and each result.
 - [ ] **[CODE] MRT-002:** Refused command watchdog leaves pending installation without its local deadline. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md).
-- [ ] **[CODE] MRT-003:** Malformed cached receipt is accepted by Lua but permanently refused by the Swift install source. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md).
+- [x] **[CODE] MRT-003:** Malformed cached receipt is accepted by Lua but permanently refused by the Swift install source. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md). Done: the Lua cache requires the exact `digest\n` bytes the Swift source requires, so a damaged receipt is refetched.
 - [ ] **[CODE] MRT-004:** Advertised reinstall route always refuses an already published runtime needing service recovery. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md).
 - [x] **[CODE] MRT-006:** False native System Settings opener result is accepted without failure diagnostics. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md). Done: the watch keeps the native boolean and logs a false/nil opening as a refusal.
 

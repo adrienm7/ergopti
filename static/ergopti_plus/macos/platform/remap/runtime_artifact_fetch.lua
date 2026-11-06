@@ -173,8 +173,10 @@ function M.new(ports)
 		-- A first start has no folder yet: reading through a missing parent is an
 		-- ERROR of the file system adapter, while an absent receipt is the normal case.
 		if ports.exists(home .. "/receipt") ~= true then return false end
-		local receipt = ports.read(home .. "/receipt")
-		if type(receipt) ~= "string" or receipt:match("^(%x+)") ~= pin.sha256 then return false end
+		-- The exact bytes the writer below produces, as the launcher's helper source
+		-- requires (OwnedRuntimeDownloadedHelper.swift): a looser match would call
+		-- the artifact ready while every install keeps refusing it.
+		if ports.read(home .. "/receipt") ~= pin.sha256 .. "\n" then return false end
 		for _, product in ipairs(M.PRODUCTS) do
 			if ports.exists(home .. "/payload/" .. product) ~= true then return false end
 		end
