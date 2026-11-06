@@ -1,0 +1,83 @@
+{
+	"$description": "Shared Encryptor vectors. `containers`: OpenSSL 3 produced each container (`openssl enc -e -aes-256-cbc -pbkdf2 -iter 600000` with the salt fixed, the `Salted__` header written as a random-salt run writes it) and decrypted it back; every driver must decrypt each one to its plaintext and, given the same salt, produce the same bytes. `names`: the destination each source path gets (encryptor `.enc` suffix added, decryption strips it, a bare `.enc` name gains `_decrypted`; the `.enc` test ignores case, as AppleScript's `ends with` does), as Encryptor.app/Contents/Resources/Scripts/main.applescript computes it. `wrong_password` must fail to decrypt `containers[0]`.",
+	"containers": [
+		{
+			"id": "empty-plaintext",
+			"password": "correct horse",
+			"plaintext_hex": "",
+			"salt_hex": "0001020304050607",
+			"container_hex": "53616c7465645f5f00010203040506071c0dc11fbd81cc3e70e121e6071ede99"
+		},
+		{
+			"id": "one-block",
+			"password": "correct horse",
+			"plaintext_hex": "30313233343536373839616263646566",
+			"salt_hex": "a1b2c3d4e5f60718",
+			"container_hex": "53616c7465645f5fa1b2c3d4e5f607182524c00ee5793f6edeacbbad689b3f2f3ede3fb3f749c673e03173006defe569"
+		},
+		{
+			"id": "binary-tail",
+			"password": "s3cr3t",
+			"plaintext_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+			"salt_hex": "ffeeddccbbaa9988",
+			"container_hex": "53616c7465645f5fffeeddccbbaa9988097420dcf7e58e762215df06ab04ab1d5bad4b254f5bcfbc874ef4349e7528310ff26d8ee9a5bc510e4ccd60b8fc3ac8"
+		},
+		{
+			"id": "utf8-password",
+			"password": "pässwörd ✓ é",
+			"plaintext_hex": "426f6e6a6f75722c20636869666672c3a920e29c930a",
+			"salt_hex": "1122334455667788",
+			"container_hex": "53616c7465645f5f1122334455667788250700fe3f9a918c952d271eb0cc7ebee4220304163cfe3a28f94265c88be6d9"
+		},
+		{
+			"id": "shell-metacharacters",
+			"password": "'pw $HOME `x` \\ \"q\"",
+			"plaintext_hex": "6c696e65310d0a6c696e65320a",
+			"salt_hex": "8899aabbccddeeff",
+			"container_hex": "53616c7465645f5f8899aabbccddeeff416fe4e0673b3853e5bcba40dc3662f8"
+		}
+	],
+	"wrong_password": "correct horsf",
+	"names": [
+		{
+			"source": "/home/me/report.pdf",
+			"mode": "encrypt",
+			"destination": "/home/me/report.pdf.enc"
+		},
+		{
+			"source": "/home/me/report.pdf.enc",
+			"mode": "decrypt",
+			"destination": "/home/me/report.pdf"
+		},
+		{
+			"source": "/home/me/archive.tar.gz",
+			"mode": "encrypt",
+			"destination": "/home/me/archive.tar.gz.enc"
+		},
+		{
+			"source": "/home/me/.enc",
+			"mode": "decrypt",
+			"destination": "/home/me/.enc_decrypted"
+		},
+		{
+			"source": "/home/me/notes.ENC",
+			"mode": "decrypt",
+			"destination": "/home/me/notes"
+		},
+		{
+			"source": "/home/me/data.enc.enc",
+			"mode": "decrypt",
+			"destination": "/home/me/data.enc"
+		},
+		{
+			"source": "C:\\Users\\me\\report.pdf.enc",
+			"mode": "decrypt",
+			"destination": "C:\\Users\\me\\report.pdf"
+		},
+		{
+			"source": "C:\\Users\\me\\.enc",
+			"mode": "decrypt",
+			"destination": "C:\\Users\\me\\.enc_decrypted"
+		}
+	]
+}
