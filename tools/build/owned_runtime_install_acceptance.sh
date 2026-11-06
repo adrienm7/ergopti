@@ -80,7 +80,7 @@ sudo /bin/sh -c '
 	set -eu
 	[ -d "$1" ] || /bin/mkdir -m 0755 "$1"
 	/bin/mkdir -m 0700 "$2"
-	/usr/bin/ditto --noqtn --noacl "$3" "$4"
+	/usr/bin/ditto --noqtn --noacl --noextattr --norsrc "$3" "$4"
 	/usr/sbin/chown -R root:wheel "$2"; /bin/chmod -RN "$2"; /bin/chmod -R go-w "$2"
 	/usr/bin/codesign --verify --strict --all-architectures --deep "$4"
 ' sh "$PARENT" "$stage_dir" "$helper" "$stage"
