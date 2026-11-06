@@ -691,10 +691,17 @@ helpers.describe("sqlite_writer — encryption is not optional once enabled", fu
 
 	helpers.it("routes the typed-text columns through the cipher", function()
 		local code = writer_code()
-		helpers.assert_contains(code, "TextCipher.encrypt(device_id, event_id",
+		-- The shared migration plan owns each column's IV id, so the writer and
+		-- the at-rest migration derive the same one.
+		helpers.assert_contains(code, 'local text_id = MigrationPlan.iv_event_id(event_id, "text")')
+		helpers.assert_contains(code, "TextCipher.encrypt(device_id, text_id, raw_text)",
 			"events_typing.text must be encrypted before it is stored")
-		helpers.assert_contains(code, 'TextCipher.encrypt(device_id, tostring(event_id) .. "j"',
+		helpers.assert_contains(code, 'local json_id = MigrationPlan.iv_event_id(event_id, "events_json")')
+		helpers.assert_contains(code, "TextCipher.encrypt(device_id, json_id, raw_json)",
 			"events_json holds the same characters and must be encrypted too")
+		local Plan = require("keystats.text_migration")
+		helpers.assert_eq(Plan.iv_event_id(7, "text"), "7", "the text column keeps its historical IV id")
+		helpers.assert_eq(Plan.iv_event_id(7, "events_json"), "7j", "the JSON column keeps a distinct IV id")
 	end)
 
 	helpers.it("drops the batch rather than storing plaintext on failure", function()
