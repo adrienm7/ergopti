@@ -136,9 +136,14 @@ _LFM_RewriteKeepsTheBackup() {
 			"the backup holds the previous text")
 		AssertEqual('ConfigDirPath = "C:/new/"`n', FileRead(Path, "UTF-8"), "the file names the new folder")
 		FileDelete(Path)
+		FileAppend('ConfigDirPath = "C:/old/" # other`n', Path, "UTF-8-RAW")
+		AssertEqual("backup_taken", LegacyFolderRewritePathsFile(Path, Rewrites),
+			"a backup holding other text is never replaced")
+		AssertEqual('ConfigDirPath = "C:/old/" # other`n', FileRead(Path, "UTF-8"), "nothing rewritten without a backup")
+		FileDelete(Path)
 		FileAppend('ConfigDirPath = "C:/old/"`n', Path, "UTF-8-RAW")
-		AssertEqual("backup_refused", LegacyFolderRewritePathsFile(Path, Rewrites), "an existing backup is never replaced")
-		AssertEqual('ConfigDirPath = "C:/old/"`n', FileRead(Path, "UTF-8"), "nothing rewritten without a backup")
+		AssertEqual("rewritten", LegacyFolderRewritePathsFile(Path, Rewrites),
+			"a backup an interrupted boot left with the same text is reused")
 		AssertEqual("absent", LegacyFolderRewritePathsFile(Root . "\none.toml", Rewrites))
 	} finally {
 		DirDelete(Root, true)
@@ -236,3 +241,75 @@ _LFM_WindowsPlanMovesEveryOldFolderOnAPrivateProfile() {
 }
 Test("legacy folder migration: the Windows plan moves both old Ollama folders on a private profile (legacy-folder-migration-windows-plan)",
 	_LFM_WindowsPlanMovesEveryOldFolderOnAPrivateProfile)
+
+; Runs Body(Home) with LOCALAPPDATA, APPDATA and USERPROFILE pointing at a
+; private profile holding an old paths.toml that names the old configuration
+; folder, so the real AppData is never read or moved.
+_LFM_WithOldConfigProfile(Body) {
+	Profile := A_Temp . "\ergopti_test_legacy_folder_locator_" . A_TickCount
+	Saved := Map()
+	for Name in ["LOCALAPPDATA", "APPDATA", "USERPROFILE"]
+		Saved[Name] := EnvGet(Name)
+	try {
+		Local_ := Profile . "\Local", Roaming := Profile . "\Roaming", Home := Profile . "\Home"
+		OldConfig := Home . "\" . AppDirsMigrationWindowsLegacyConfigRelative()
+		OldPaths := Roaming . "\" . AppDirsMigrationWindowsLegacyPathsFileRelative()
+		SplitPath(OldPaths, , &OldPathsDir)
+		for Path in [Local_, OldPathsDir, OldConfig]
+			DirCreate(Path)
+		FileAppend('ConfigDirPath = "' . StrReplace(OldConfig, "\", "/") . '/"`n', OldPaths, "UTF-8-RAW")
+		FileAppend("PERSONAL", OldConfig . "\config.toml")
+		EnvSet("LOCALAPPDATA", Local_), EnvSet("APPDATA", Roaming), EnvSet("USERPROFILE", Home)
+		Body(OldConfig)
+	} finally {
+		for Name, Value in Saved
+			EnvSet(Name, Value)
+		if DirExist(Profile)
+			DirDelete(Profile, true)
+	}
+}
+
+; A refused configuration move keeps the data in the old folder: paths.toml
+; must keep naming it instead of an empty new folder (WFM-001). An open file
+; with no sharing makes Windows refuse the folder rename.
+_LFM_RefusedConfigMoveKeepsTheLocator() {
+	_LFM_WithOldConfigProfile(Body)
+	Body(OldConfig) {
+		Lock := FileOpen(OldConfig . "\config.toml", "r -rwd")
+		try {
+			Report := LegacyFolderMigrationRun(AppFoldersPathsFile())
+			Assert(FileExist(OldConfig . "\config.toml"), "the configuration stayed in the old folder")
+			AssertEqual('ConfigDirPath = "' . StrReplace(OldConfig, "\", "/") . '/"`n', FileRead(AppFoldersPathsFile(), "UTF-8"),
+				"paths.toml still names the folder that holds the data")
+			AssertEqual("unchanged", Report["paths_file"], "not reported as rewritten")
+		} finally {
+			Lock.Close()
+		}
+	}
+}
+Test("legacy folder migration: a refused configuration move keeps paths.toml naming it (legacy-folder-migration-refused)",
+	_LFM_RefusedConfigMoveKeepsTheLocator)
+
+; When paths.toml cannot be rewritten after the configuration moved, the
+; configuration moves back to the folder it still names, and the next boot
+; completes (WFM-001). A folder at the private stage name refuses the write.
+_LFM_UnpublishedLocatorMovesTheConfigBack() {
+	_LFM_WithOldConfigProfile(Body)
+	Body(OldConfig) {
+		Text := 'ConfigDirPath = "' . StrReplace(OldConfig, "\", "/") . '/"`n'
+		Stage := AppFoldersPathsFile() . LEGACY_FOLDER_STAGE_SUFFIX
+		DirCreate(Stage)
+		FileAppend("x", Stage . "\blocker")
+		Report := LegacyFolderMigrationRun(AppFoldersPathsFile())
+		AssertEqual("write_refused", Report["paths_file"], "the refused write is reported as such")
+		AssertEqual(Text, FileRead(AppFoldersPathsFile(), "UTF-8"), "a refused write leaves paths.toml as it was")
+		Assert(FileExist(OldConfig . "\config.toml"), "the configuration is back in the folder paths.toml names")
+		AssertEqual(1, Report["restored"].Length, "the move back is reported")
+		DirDelete(Stage, true)
+		Again := LegacyFolderMigrationRun(AppFoldersPathsFile())
+		AssertEqual("rewritten", Again["paths_file"], "the next boot completes, reusing the same backup")
+		Assert(FileExist(RTrim(AppFoldersDefaultConfigDir(), "\") . "\config.toml"), "and the configuration follows")
+	}
+}
+Test("legacy folder migration: the configuration moves back when paths.toml cannot follow (legacy-folder-migration-unpublished)",
+	_LFM_UnpublishedLocatorMovesTheConfigBack)

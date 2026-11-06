@@ -49,6 +49,12 @@ local function ports_with_files(tree, files)
 	end
 	local exists = ports.exists
 	ports.exists = function(path) return files[path] ~= nil or exists(path) end
+	ports.replace = function(from, to)
+		if files[from] == nil then return false end
+		files[to], files[from] = files[from], nil
+		return true
+	end
+	ports.remove = function(path) local had = files[path] ~= nil; files[path] = nil; return had end
 	return ports, snapshot
 end
 
@@ -128,6 +134,47 @@ helpers.describe("macOS legacy folder migration", function()
 		helpers.assert_eq(files[NEW .. "/paths.toml" .. AppDirs.migration.backup_suffix],
 			'ConfigDirPath = "' .. OLD_CONFIG .. '/"\nLogsDirPath = ""\n', "the previous text is kept")
 		helpers.assert_true(#logged >= 4, "every move and the rewrite are logged")
+	end)
+
+	helpers.it("keeps paths.toml naming a configuration folder whose move was refused (legacy-folder-migration-macos-refused)",
+		function()
+		local text = 'ConfigDirPath = "' .. OLD_CONFIG .. '/"\nLogsDirPath = ""\n'
+		local files = { [OLD .. "/paths.toml"] = text }
+		local ports = ports_with_files({ OLD .. "/paths.toml", OLD_CONFIG .. "/hammerspoon/config.toml" }, files)
+		local rename = ports.rename
+		ports.rename = function(from, to)
+			if from == OLD_CONFIG then return nil, "Operation not permitted" end
+			return rename(from, to)
+		end
+		local logger = { info = function() end, warn = function() end }
+		local report = Migration.run(logger, { home = HOME, ports = ports })
+		helpers.assert_eq(files[NEW .. "/paths.toml"], text, "paths.toml still names the folder that holds the data")
+		helpers.assert_eq(report.paths_file, "unchanged", "and is not reported as rewritten")
+	end)
+
+	helpers.it("moves the configuration back when paths.toml cannot follow it (legacy-folder-migration-macos-unpublished)",
+		function()
+		local text = 'ConfigDirPath = "' .. OLD_CONFIG .. '/"\nLogsDirPath = ""\n'
+		local files = { [OLD .. "/paths.toml"] = text }
+		local ports, snapshot = ports_with_files({ OLD .. "/paths.toml", OLD_CONFIG .. "/hammerspoon/config.toml" }, files)
+		local write = ports.write
+		local refused = true
+		ports.write = function(path, content)
+			if refused and path == NEW .. "/paths.toml.migration-stage" then return false end
+			return write(path, content)
+		end
+		local logger = { info = function() end, warn = function() end }
+		local report = Migration.run(logger, { home = HOME, ports = ports })
+		helpers.assert_eq(files[NEW .. "/paths.toml"], text, "a refused write leaves paths.toml as it was")
+		helpers.assert_true(table.concat(snapshot(), " "):find(OLD_CONFIG .. "/hammerspoon/config.toml", 1, true) ~= nil,
+			"the configuration is back in the folder paths.toml names")
+		helpers.assert_eq(report.paths_file, "write_refused")
+		helpers.assert_eq(#report.restored, 1, "the move back is reported")
+		refused = false
+		local again = Migration.run(logger, { home = HOME, ports = ports })
+		helpers.assert_eq(again.paths_file, "rewritten", "the next boot completes, reusing the same backup")
+		helpers.assert_true(table.concat(snapshot(), " "):find(HOME .. "/" .. AppDirs.config.macos_relative
+			.. "/hammerspoon/config.toml", 1, true) ~= nil, "and the configuration follows")
 	end)
 
 	helpers.it("merges the old logs, cache and control folders, backing up what clashes (legacy-folder-migration-macos-merge)",
