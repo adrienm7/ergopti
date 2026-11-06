@@ -536,6 +536,17 @@ _ResolveFireHType(Spec) {
 	return (Spec.HasOwnProp("Star") and Spec.Star) ? "star" : "endchar"
 }
 
+; The category a fired Spec is logged and WPM-coloured with. A repeat fallback
+; Spec carries the magic-key category of the registry it was built beside, so it
+; is normalised here, once, for the atomic caller and every deferred owner
+; (Notepad, terminal): a doubling is a neutral ``repeat_key`` source, never a
+; coloured magic-key correction.
+_ResolveFireCategory(Spec) {
+	if (Spec.HasOwnProp("IsRepeat") and Spec.IsRepeat)
+		return MenuCommand.REPEAT_KEY
+	return Spec.HasOwnProp("Category") ? Spec.Category : ""
+}
+
 ; Toggle the render/depth guard around an output transaction.  Synthetic
 ; provenance is enforced by the InputHook's I1 input level, so this guard must
 ; never suppress a physical character merely because it arrives near a send.
@@ -1650,11 +1661,9 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 				; _MIN_PREFIX_LEN) still carry meaningful metadata.
 				HotstringHType := _ResolveFireHType(HSEMatch)
 				HotstringRepl := HSEMatch.HasOwnProp("Replacement") ? HSEMatch.Replacement : HSEMatch.Trigger
-				; IsRepeat matches have no Category property — pass "repeat_key" explicitly
-				; so the WPM widget knows to stay at the default color.
-				HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
-					? MenuCommand.REPEAT_KEY
-					: (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
+				; A repeat is classified "repeat_key" so the WPM widget stays at the
+				; default colour, the same value every deferred owner logs.
+				HotstringCategory := _ResolveFireCategory(HSEMatch)
 				HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
 				; Metrics logging is analytics — enqueue it and return; the heavy
 				; KL_LogHotstring work runs off the keystroke path (see
