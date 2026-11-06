@@ -171,6 +171,24 @@ on ask_password(prompt_text, dialog_title, btn_cancel_label)
 end ask_password
 
 
+-- Write the password into an existing private file, without a newline.
+-- OpenSSL "-pass file:" reads its first line, so the bytes match what the
+-- former "-pass pass:" argument carried. Throws when the file cannot be written.
+on write_private_password(pw_file, secret_text)
+	set fh to open for access (POSIX file pw_file) with write permission
+	try
+		set eof of fh to 0
+		write secret_text to fh as «class utf8»
+		close access fh
+	on error err_msg number err_num
+		try
+			close access fh
+		end try
+		error err_msg number err_num
+	end try
+end write_private_password
+
+
 -- ====================================================
 -- ====================================================
 -- ======= 3/ Main entry point (open handler) ==========
@@ -296,34 +314,35 @@ on process_file(file_path, is_encrypt, s)
 		end if
 	end repeat
 
-	-- Run openssl.
+	-- Run openssl through encryptor_convert.sh.
 	-- AES-256-CBC with PBKDF2 key derivation (-pbkdf2 -iter 600000).
 	-- -pbkdf2 is supported by the LibreSSL shipped with macOS 10.15+ and
 	-- by any OpenSSL 1.1.1+; it eliminates the legacy MD5 key derivation
 	-- warning and dramatically increases brute-force cost.
-	set openssl_cmd to ""
-	if is_encrypt then
-		set openssl_cmd to "openssl enc -aes-256-cbc -pbkdf2 -iter 600000" ¬
-			& " -in " & quoted form of file_path ¬
-			& " -out " & quoted form of dest_path ¬
-			& " -pass pass:" & quoted form of the_password
-	else
-		set openssl_cmd to "openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000" ¬
-			& " -in " & quoted form of file_path ¬
-			& " -out " & quoted form of dest_path ¬
-			& " -pass pass:" & quoted form of the_password
-	end if
-
+	-- The password never enters a shell command: every argument is visible to
+	-- local processes through the process table. It is written into a private
+	-- folder and OpenSSL reads it from that file.
+	set convert_mode to "decrypt"
+	if is_encrypt then set convert_mode to "encrypt"
 	set openssl_ok to false
+	set pw_dir to ""
 	try
-		do shell script openssl_cmd
+		set pw_dir to do shell script "umask 077; d=$(mktemp -d) && : > \"$d/password\" && printf %s \"$d\""
+		set pw_file to pw_dir & "/password"
+		my write_private_password(pw_file, the_password)
+		set helper_path to POSIX path of (path to resource "encryptor_convert.sh")
+		do shell script "/bin/sh " & quoted form of helper_path ¬
+			& " " & convert_mode ¬
+			& " " & quoted form of file_path ¬
+			& " " & quoted form of dest_path ¬
+			& " " & quoted form of pw_file
 		set openssl_ok to true
-	on error
-		-- Remove partial output file on failure.
-		try
-			do shell script "rm -f " & quoted form of dest_path
-		end try
 	end try
+	if pw_dir is not "" then
+		try
+			do shell script "rm -rf " & quoted form of pw_dir
+		end try
+	end if
 
 	if not openssl_ok then
 		if is_encrypt then

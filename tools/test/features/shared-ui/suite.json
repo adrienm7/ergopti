@@ -300,6 +300,15 @@
 			"cmd": "node",
 			"args": ["tools/test/test-paths-editor-initialization.cjs"],
 			"repro": "npm run test:paths-editor-initialization"
+		},
+		{
+			"id": "encryptor-conversion-receipts",
+			"ordinal": 587,
+			"name": "Encryptor conversion reads the password from a private file and never from a command argument",
+			"cmd": "node",
+			"args": ["tools/test/test-encryptor-convert.cjs"],
+			"repro": "npm run test:encryptor-convert",
+			"platforms": ["linux", "darwin"]
 		}
 	]
 }
