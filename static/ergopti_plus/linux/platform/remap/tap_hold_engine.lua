@@ -237,6 +237,9 @@ local SWALLOWED_ON_LAYER = { left_alt = { tap = "backspace", layer = "nav" } }
 ---   held_shortcut_modifier_codes = function() -> { code }, the same for Ctrl,
 ---     Alt and Super; without it, the usual Ctrl, Alt and Super keys the hand
 ---     or a hold has down,
+---   caps_locked = function() -> boolean, whether Caps Lock is locked now (the
+---     XKB state); plan_text plans with it off, so typed text releases it
+---     around its keystrokes; without it, a caller with no layout, never,
 --- }
 --- @return table engine
 function M.new(opts)
@@ -257,6 +260,7 @@ function M.new(opts)
 		held_modifiers = options.held_modifiers,
 		held_text_modifier_codes = options.held_text_modifier_codes,
 		held_shortcut_modifier_codes = options.held_shortcut_modifier_codes,
+		caps_locked = options.caps_locked,
 		held = {},          -- code -> { down_at, cancelled, emitted = {codes}, layer = bool }
 		layer_depth = 0,     -- how many layer keys are down
 		layer_keys = {},     -- code -> chord emitted for a key pressed on the layer
@@ -615,6 +619,18 @@ local function spend_one_shot_shift(self, out)
 	return spent
 end
 
+--- Whether Caps Lock is locked now, as the live XKB state says.
+--- @return boolean
+local function caps_locked(self)
+	return self.caps_locked ~= nil and self.caps_locked() == true
+end
+
+--- Toggles the Caps Lock state with one keystroke of its own.
+local function toggle_caps_lock(out)
+	out[#out + 1] = { code = EvdevCodes.KEY_CAPSLOCK, value = DOWN }
+	out[#out + 1] = { code = EvdevCodes.KEY_CAPSLOCK, value = UP }
+end
+
 local function take_one_shot(self, code, now_ms)
 	if not self.one_shot_until then return nil end
 	local arm = input_arms[self]
@@ -633,8 +649,12 @@ local function take_one_shot(self, code, now_ms)
 	self.one_shot_until = nil
 	if not armed then input_arms[self] = nil; return nil end
 	-- The capital on the same key's Shift level is that key under Shift: a real
-	-- keystroke that repeats. Anywhere else ("É" on AZERTY), it is typed.
+	-- keystroke that repeats. Anywhere else ("É" on AZERTY), it is typed. The
+	-- plan assumes Caps Lock off: locked, that Shift gives the lowercase (OSL-001),
+	-- so the capital is typed with the lock released, as Windows types it.
+	local locked = caps_locked(self)
 	local verdict, result = OneShotShift.resolve(text, self.one_shot_result, function(title)
+		if locked then return false end
 		local steps = self.plan_text(title)
 		local step = steps and #steps == 1 and steps[1]
 		return step and step.keycode == code and #step.mods == 1 and step.mods[1] == "shift"
@@ -686,6 +706,10 @@ local function type_text(self, out, text)
 	local lifted = held_level_keys(self)
 	if not input_arm_current(self, arm) then return nil end
 	for _, code in ipairs(lifted) do out[#out + 1] = { code = code, value = UP, handoff = "suspended" } end
+	-- The steps are planned with Caps Lock off; locked, every letter would
+	-- invert, so the lock is released around them as the injector does.
+	local locked = caps_locked(self)
+	if locked then toggle_caps_lock(out) end
 	for _, step in ipairs(steps) do
 		local mods = {}
 		for _, name in ipairs(step.mods or {}) do
@@ -696,6 +720,7 @@ local function type_text(self, out, text)
 		tap_key(self, out, step.keycode)
 		for index = #mods, 1, -1 do out[#out + 1] = { code = mods[index], value = UP } end
 	end
+	if locked then toggle_caps_lock(out) end
 	for index = #lifted, 1, -1 do out[#out + 1] = { code = lifted[index], value = DOWN, handoff = "restored" } end
 	return nil
 end

@@ -678,6 +678,7 @@ local function _build(loaded, boot)
 		held_modifiers = function() return _hook.held_modifiers() end,
 		held_text_modifier_codes = function() return _hook.held_text_modifier_codes() end,
 		held_shortcut_modifier_codes = function() return _hook.held_shortcut_modifier_codes() end,
+		caps_locked = function() return require("adapters.xkb_capture").caps_locked() end,
 	})
 	local nav_base, nav_wrapped = engine, false
 	assert(rawget(Combinations,"new")==original_combination_constructor and rawget(Engine,"new")==original_engine_constructor
