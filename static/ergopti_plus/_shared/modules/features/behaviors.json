@@ -15,7 +15,14 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
 			"symbol": "_OnPrefixKeyDown",
-			"sha256": "efd2e20c6ede64d5c9a16320f660799629680d1718d00541b6a2d09fc04a633b"
+			"sha256": "1b8b1ecd86352debd1fdd6c92636bafaead2324ff3ea8d6ba390254b08582780"
+		},
+		{
+			"id": "windows-undo",
+			"platform": "windows",
+			"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
+			"symbol": "HSE_UndoExpansion(Undo",
+			"sha256": "c2a09369b02df0382c2adda33397ab92cbcfa763339ad84160ec344d22729f57"
 		},
 		{
 			"id": "macos-repeat",
@@ -129,9 +136,9 @@
 			"label_key": "inventory.behavior.backspace_restore",
 			"platforms": {
 				"windows": {
-					"declared": false,
-					"note_key": "inventory.behavior.backspace_other",
-					"owners": ["windows-control"]
+					"declared": true,
+					"note_key": "inventory.behavior.backspace_linux",
+					"owners": ["windows-control", "windows-undo"]
 				},
 				"macos": {
 					"declared": false,

@@ -206,7 +206,7 @@ assert.ok(behaviorRows.length >= 2);
 assert.deepStrictEqual(
 	behaviorRows.find((row) => row.path === 'hotstrings.backspace_restore').platforms,
 	{
-		windows: false,
+		windows: true,
 		macos: false,
 		linux: true
 	}

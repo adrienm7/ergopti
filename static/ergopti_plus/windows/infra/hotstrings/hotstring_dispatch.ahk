@@ -45,6 +45,9 @@ global _HSE_TerminalOwner := 0
 global _HSE_TerminalOwnerSerial := 0
 global _HSE_TerminalReplayPending := 0
 global _HSE_TerminalReplaying := false
+; The literal expansion an immediate Backspace may still undo (HSE_UndoExpansion),
+; "" when none: set by the atomic fire, taken by the very next key.
+global HSE_Undoable := ""
 
 /** Known terminal executables need no cross-process caption to select pacing. */
 _HSE_OutputHostNeedsTitle(Exe) {
@@ -1334,8 +1337,10 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		EndCharOnScreen := true) {
 		global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook, HSE_TypoNbspStripped, HSE_Buffer
 		global _HSE_TerminalOwnerSerial, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
-		global _PrefixInputContextGeneration, _PrefixDeferredGeneration
+		global _PrefixInputContextGeneration, _PrefixDeferredGeneration, HSE_Undoable
 		CommittedEffect := 0
+		; A new fire attempt ends the previous expansion's undo, whatever it does.
+		HSE_Undoable := ""
 		if (Spec == "") {
 				return false
 		}
@@ -1643,10 +1648,12 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 					; a physical OnChar cannot land between the two buffers.
 					_BufferCrit := Critical("On")
 					try {
+							BufferBeforeFire := HSE_Buffer
 							ExpansionEffect := HSE_ApplyExpansion(
 									Spec, Replacement, EndChar, ForceConsumeEndChar, CascadeUnits, OutputIsFinal)
 							_HSE_MirrorCanonicalEffectToLlm(ExpansionEffect)
 							CommittedEffect := ExpansionEffect
+							_HSE_RememberUndo(Spec, BufferBeforeFire, ExpansionEffect, CascadeUnits, OutputHost)
 					} finally {
 							Critical(_BufferCrit)
 					}
@@ -1686,5 +1693,107 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						KL_ClearSynthetic(SyntheticOwner)
 		}
 		; Reached only when the replacement was actually emitted.
+		return true
+}
+
+; Keeps an atomic literal expansion for an immediate Backspace, as Linux and macOS
+; do (decision of 2026-11-06): that Backspace means « not what I wanted » and
+; brings the trigger back. Only literal text is kept: a Send-key payload, a
+; dynamic or user-code replacement does not say what it typed, and a raw callback
+; never reaches this path. The Notepad and terminal owners emit later, outside
+; this keystroke, and keep no record. The typed trigger is read from the buffer
+; the fire erased, so a case-conformed or cascaded trigger comes back as typed.
+; @param Spec {Object} The matched Spec.
+; @param BufferBefore {String} HSE_Buffer before the expansion was applied.
+; @param Effect {Object} The committed canonical effect of HSE_ApplyExpansion.
+; @param CascadeUnits {Integer} Typed units a cascade erased beyond the trigger.
+; @param OutputHost {Map} The receipt of the window the burst went to.
+_HSE_RememberUndo(Spec, BufferBefore, Effect, CascadeUnits, OutputHost) {
+		global HSE_Undoable, HSE_Buffer, _PrefixInputContextGeneration, _PrefixFocusedControlToken
+		HSE_Undoable := ""
+		if Effect.ClearAll or Effect.InsertedText == "" or HasMethod(Spec.Replacement)
+				or Spec.HasOwnProp("UserCodeGeneration")
+				or !IsSet(_PrefixInputContextGeneration) or !IsSet(_PrefixFocusedControlToken)
+				return
+		TriggerUnits := Spec.Length + CascadeUnits
+		Start := StrLen(BufferBefore) - Effect.DeleteFromEnd + 1
+		if (Start < 1 or TriggerUnits < 1 or TriggerUnits > Effect.DeleteFromEnd)
+				return
+		HSE_Undoable := {
+				Trigger: SubStr(BufferBefore, Start, TriggerUnits),
+				Typed: Effect.InsertedText,
+				IsPrivate: Effect.IsPrivate,
+				BufferAfter: HSE_Buffer,
+				InputGeneration: _PrefixInputContextGeneration,
+				FocusToken: _PrefixFocusedControlToken,
+				Hwnd: OutputHost["Hwnd"]
+		}
+}
+
+; Puts the trigger back for a Backspace pressed right after an expansion. The
+; physical Backspace has already reached the application and removed the last
+; character the expansion typed, so the burst erases what is left of it and types
+; the trigger, outside the buffers so it cannot fire again at once (Linux's undo).
+; Any edit, click, focus change or other window in between voids the record.
+; @param Undo {Object} The record _HSE_RememberUndo kept, already taken.
+; @param FocusToken {Integer} The focused control, probed live when unset.
+; @returns {Boolean} True when this function owns the Backspace's buffer effect:
+;   the trigger went out, or a failed send left the context reset.
+HSE_UndoExpansion(Undo, FocusToken := unset) {
+		global HSE_Buffer, HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook
+		global _PrefixInputContextGeneration, _PrefixFocusedControlToken
+		if !IsObject(Undo) or A_IsSuspended or !IsSet(_PrefixInputContextGeneration)
+				return false
+		if !_PrefixEnsureInputContext(FocusToken?)
+				return false
+		if (HSE_Buffer !== Undo.BufferAfter or _PrefixInputContextGeneration != Undo.InputGeneration
+				or _PrefixFocusedControlToken != Undo.FocusToken)
+				return false
+		Host := OutputHostResolve(_HSE_OutputHostNeedsTitle)
+		if !Host["Valid"] or Host["Hwnd"] != Undo.Hwnd or OutputHostTakesTextByPaste(Host)
+				or _HSE_IsTerminalInputHost(Host["Exe"], Host["Title"])
+				return false
+		Remaining := _TextCodepointLength(Undo.Typed)
+		if (Remaining < 1)
+				return false
+		Burst := (Remaining > 1 ? "{BackSpace " . (Remaining - 1) . "}" : "") . "{Text}" . Undo.Trigger
+		PrefixWatcherSuppress(true)
+		SyntheticOwner := 0
+		try SyntheticOwner := KL_MarkSynthetic("hotstring", Undo.IsPrivate)
+		Sent := false
+		SendError := ""
+		try {
+				AtCritical := Critical("On")
+				try {
+						if _SendHook {
+								Hook := _SendHook
+								Sent := _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))
+						} else {
+								_TextSenderAtSendLevel(_AHK_SendInput.Bind(Burst))
+								Sent := true
+						}
+				} finally Critical(AtCritical)
+		} catch as Err {
+				SendError := Err.Message
+		} finally {
+				SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+		}
+		; The restored trigger is not in the buffers and the caret follows it: the
+		; next key starts no known word, so a word-start rule cannot fire inside it.
+		; A failed or partial send leaves the line unknown, which the same reset says.
+		_PrefixInvalidateInputContext(_PrefixFocusedControlToken, false)
+		_LSCResetFrom([])
+		if IsSet(LLM_Bridge_OnUnknownEdit)
+				try LLM_Bridge_OnUnknownEdit("Backspace undo")
+		if !Sent {
+				LoggerError("HSE", "Undo: restoring the trigger failed ({1}); the context is reset.",
+						SendError != "" ? SendError : "send refused")
+				return true
+		}
+		if Undo.IsPrivate
+				LoggerInfo("HSE", "Undo: restored a private trigger (content withheld).")
+		else
+				LoggerInfo("HSE", "Undo: restored the trigger ({1} char(s)).", _TextCodepointLength(Undo.Trigger))
 		return true
 }
