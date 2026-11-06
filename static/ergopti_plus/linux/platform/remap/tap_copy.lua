@@ -12,8 +12,9 @@
 --- 1. The counter is the X11 CLIPBOARD owner's TIMESTAMP (adapters/clipboard
 ---    change_counter), never the content: copying the same text again moves
 ---    the counter and leaves the content as it was.
---- 2. A Wayland session has no counter a client can read, so its copies go
----    unchecked; that is said once in the log, not at every copy.
+--- 2. A session with no counter (Wayland without data-control, or no
+---    display) leaves its copies unchecked; that is said once in the log, not
+---    at every copy.
 --- 3. Pure over its ports, so the suite drives it with a fake counter and
 ---    clock; platform/remap/tap_hold_manager.lua owns the live instance.
 --- ==============================================================================
@@ -100,7 +101,7 @@ function Owner:run(source, send, source_current)
 		if not self.unsupported_reported then
 			self.unsupported_reported = true
 			self.ports.log("info",
-				"Tap-hold copies are not checked: this session exposes no clipboard change counter (Wayland, or X11 without xclip).")
+				"Tap-hold copies are not checked: this session exposes no clipboard change counter (Wayland without a clipboard watch, or no display).")
 		end
 		return true
 	end

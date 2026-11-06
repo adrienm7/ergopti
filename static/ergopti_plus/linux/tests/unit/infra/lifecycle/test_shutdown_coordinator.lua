@@ -531,6 +531,7 @@ helpers.describe("shutdown coordinator: daemon integration", function()
 			"LLM prediction request",
 			"screen capture cleanup",
 			"file watchers",
+			"Wayland clipboard watch",
 			"process lifecycle",
 			"tooltip preview",
 			"gesture reader",

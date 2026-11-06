@@ -543,6 +543,14 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			-- Started by the tap-hold manager on Wayland only; absent elsewhere.
+			name = "Wayland clipboard watch",
+			stop = function()
+				local counter = package.loaded["adapters.wayland_selection_counter"]
+				if counter then counter.stop() end
+			end,
+		},
+		{
 			name = "process lifecycle",
 			stop = function()
 				if process_lifecycle and type(process_lifecycle.stop) == "function" then process_lifecycle.stop() end

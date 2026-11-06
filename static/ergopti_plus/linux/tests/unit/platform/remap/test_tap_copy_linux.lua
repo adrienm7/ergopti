@@ -332,12 +332,91 @@ helpers.describe("X11 clipboard change counter (tap-copy-verified)", function()
 		end)
 	end)
 
-	helpers.it("Wayland has no counter (tap-copy-verified)", function()
-		with_adapter("wayland", { ok = true, output = "1" }, function(Clipboard, shell)
-			local counter, reason = Clipboard.change_counter()
-			helpers.assert_eq(counter, nil)
-			helpers.assert_eq(reason, "unsupported")
-			helpers.assert_eq(#shell.commands, 0, "no command is run where none could answer")
+	--- Runs body with a fresh Wayland counter module, restored afterwards.
+	local function with_counter(body)
+		local name = "adapters.wayland_selection_counter"
+		local previous = package.loaded[name]
+		package.loaded[name] = nil
+		local Counter = require(name)
+		local ok, err = pcall(body, Counter)
+		Counter.stop()
+		package.loaded[name] = previous
+		helpers.assert_true(ok, tostring(err))
+	end
+
+	--- A fake owned process whose output and exit the test drives.
+	local function fake_process()
+		local fake = { started = 0 }
+		function fake.start(executable, args, options, callback)
+			fake.started = fake.started + 1
+			fake.executable, fake.args, fake.options, fake.callback = executable, args, options, callback
+			fake.running = true
+			return { started = true, is_running = function() return fake.running end,
+				cancel = function() fake.cancelled = true fake.running = false end }
+		end
+		return fake
+	end
+
+	helpers.it("Wayland without a clipboard watch has no counter (tap-copy-verified)", function()
+		with_counter(function()
+			with_adapter("wayland", { ok = true, output = "1" }, function(Clipboard, shell)
+				local counter, reason = Clipboard.change_counter()
+				helpers.assert_eq(counter, nil)
+				helpers.assert_eq(reason, "unsupported")
+				helpers.assert_eq(#shell.commands, 0, "no command is run where none could answer")
+			end)
 		end)
+	end)
+
+	helpers.it("Wayland counts the selection changes wl-paste --watch reports (wayland-copy-counter)", function()
+		with_counter(function(Counter)
+			local fake = fake_process()
+			helpers.assert_eq(Counter.start({ start_process = fake.start, has_command = function() return true end }), true)
+			helpers.assert_eq(fake.executable, "wl-paste")
+			helpers.assert_eq(fake.args[1], "--watch")
+			helpers.assert_true(fake.args[#fake.args]:find("cat >/dev/null", 1, true) ~= nil,
+				"the offered content is drained to /dev/null, never kept")
+			with_adapter("wayland", { ok = true }, function(Clipboard, shell)
+				fake.options.on_output("\n", "stdout")
+				local before = Clipboard.change_counter()
+				fake.options.on_output("\n", "stdout")
+				fake.options.on_output("ignored\n", "stderr")
+				helpers.assert_eq(Clipboard.change_counter(), before + 1, "a copy moves the counter by one")
+				helpers.assert_eq(#shell.commands, 0)
+				fake.running = false
+				fake.callback()
+				local counter, reason = Clipboard.change_counter()
+				helpers.assert_eq(counter, nil, "a watcher the compositor refused gives no counter")
+				helpers.assert_eq(reason, "unsupported")
+			end)
+			helpers.assert_true(not pcall(Counter.start, { start_process = fake.start, has_command = function() return true end }),
+				"a second start is refused")
+			Counter.stop()
+			helpers.assert_eq(fake.cancelled, true, "stop ends the watcher")
+		end)
+	end)
+
+	helpers.it("Wayland without wl-paste starts no watcher (wayland-copy-counter)", function()
+		with_counter(function(Counter)
+			local fake = fake_process()
+			helpers.assert_eq(Counter.start({ start_process = fake.start, has_command = function() return false end }), false)
+			helpers.assert_eq(fake.started, 0)
+			helpers.assert_eq(select(2, Counter.read()), "unsupported")
+		end)
+	end)
+
+	helpers.it("X11 without xclip reads the owner's TIMESTAMP through libX11 (x11-native-copy-counter)", function()
+		local name = "adapters.x11_selection_stamp"
+		local previous = package.loaded[name]
+		local asked = nil
+		package.loaded[name] = { read = function(timeout_s) asked = timeout_s return 4242 end }
+		local ok, err = pcall(with_adapter, "x11", { ok = true, output = "1" }, function(Clipboard, shell)
+			shell.has_command = function(binary) return binary ~= "xclip" end
+			helpers.assert_eq(Clipboard.change_counter(), 4242)
+			helpers.assert_eq(#shell.commands, 0, "no xclip command without xclip")
+			helpers.assert_true(type(asked) == "number" and asked > 0, "the read is bounded")
+		end)
+		package.loaded[name] = previous
+		helpers.assert_true(ok, tostring(err))
 	end)
 end)

@@ -1060,6 +1060,23 @@ jobs:
           fi
         timeout-minutes: 1
 
+      - name: Read the X11 clipboard owner's timestamp through libX11 under Xvfb
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_x11_selection_stamp.lua
+          else
+              exit 1
+          fi
+        timeout-minutes: 1
+
       - name: Delete files using native permission and symlink receipts
         if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
