@@ -8,14 +8,14 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
 			"symbol": "HSE_TryRepeatKey(MagicKey)",
-			"sha256": "54b6d880f365bf58bf4e245ea24b523693a99464c5db2e3aa79202cdcbcbffab"
+			"sha256": "4d09b8735fbc38a046f31ca25abef5a7d287bf66ee6d46111d0b0bdba2c75d45"
 		},
 		{
 			"id": "windows-control",
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
 			"symbol": "_OnPrefixKeyDown",
-			"sha256": "4cd2d7f8218564f39c55161a008e29301bb2563a1ed1e8c05ba3a85f4e6f97d6"
+			"sha256": "a62494bbaa6e6cb4f74b4c58c8476eb29c4c72b5d762c08b5736cd4fbd5b0fd5"
 		},
 		{
 			"id": "macos-repeat",

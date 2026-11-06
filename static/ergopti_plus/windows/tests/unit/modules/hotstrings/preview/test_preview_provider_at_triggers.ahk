@@ -396,9 +396,10 @@ Test("hotstrings: the live-rebuild fence hides personal decisions",
 	_PIPP_RebuildFenceHidesPersonalDecisions)
 
 
-; @dt spells two valid letter aliases (d, t) AND is the short-date trigger. Only
-; the engine's Spec knows which one it will fire, which is why the rendering
-; branch is chosen from the Spec's replacement and never from the tag.
+; The bare dt trigger is the short-date trigger while "d" and "t" are also valid
+; personal-info letter aliases. Only the engine's Spec knows which one it will
+; fire, which is why the rendering branch is chosen from the Spec's replacement
+; and never from the tag.
 _PIPP_DateTriggerPreviewsItsDate() {
 	global HSE_Buffer, HSE_StartIsWordBoundary, ScriptInformation, PersonalInformationLetters
 	Saved := _PIPP_Setup()
@@ -406,19 +407,19 @@ _PIPP_DateTriggerPreviewsItsDate() {
 		MK := ScriptInformation["MagicKey"]
 		PersonalInformationLetters["d"] := "first_name"
 		_PIPP_RegisterAtTriggers()
-		CreateHotstring("*?", "@dt" . MK, _DateShortFr, Map("FinalResult", True))
-		HSE_Buffer := "@dt"
+		CreateHotstring("*", "dt" . MK, _DateShortFr, Map("FinalResult", True))
+		HSE_Buffer := "dt"
 		HSE_StartIsWordBoundary := true
 
-		Row := _PIPP_CandidateFor(_PrefixCollectCandidates(), "@dt" . MK)
-		Assert(IsObject(Row), "@dt must produce a candidate — it is an @ trigger like the others")
+		Row := _PIPP_CandidateFor(_PrefixCollectCandidates(), "dt" . MK)
+		Assert(IsObject(Row), "dt must produce a candidate — a bare date trigger previews like the others")
 		AssertEqual(FormatTime(, "dd/MM/yyyy"), Row.Output,
-			"@dt is the short-date trigger, and its letters ALSO resolve as personal-info aliases. Reading the tag instead of the engine's Spec would preview a first name and a phone number for a trigger that types today's date")
+			"dt is the short-date trigger, and its letters ALSO resolve as personal-info aliases. Reading the tag instead of the engine's Spec would preview a first name and a phone number for a trigger that types today's date")
 	} finally {
 		_PIPP_Teardown(Saved)
 	}
 }
-Test("hotstrings: an @ date trigger previews the date the engine will type (at-triggers-have-no-preview-candidate-source)",
+Test("hotstrings: a bare date trigger previews the date the engine will type (at-triggers-have-no-preview-candidate-source)",
 	_PIPP_DateTriggerPreviewsItsDate)
 
 

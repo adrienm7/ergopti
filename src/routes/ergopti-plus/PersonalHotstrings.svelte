@@ -64,8 +64,8 @@ FEATURES & RATIONALE:
 	]);
 
 	let dynamicExamples = $derived([
-		{ trig: '@dt', out: dateShort, desc: 'Date du jour' },
-		{ trig: '@dtL', out: dateLong, desc: 'Date en lettres' },
+		{ trig: 'dt★', out: dateShort, desc: 'Date du jour' },
+		{ trig: 'date★', out: dateLong, desc: 'Date en lettres' },
 		{ trig: '@ph', out: info.phone || '…', desc: 'Téléphone configuré' },
 		{
 			trig: '@np★',

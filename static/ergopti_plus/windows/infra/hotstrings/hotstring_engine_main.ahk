@@ -1308,9 +1308,9 @@ HSE_TryRepeatKey(MagicKey) {
 ; letters in different sequence and concatenate their fields in that sequence.
 ;
 ; PRIORITY: this is a fallback, reached only when no registered trigger claimed
-; the sequence, so the literal tags (@iban★, @tel★) and the dates (@dt★) still
-; win — @dt spells two valid alias letters AND is the short-date trigger, and the
-; registration is what decides. It runs BEFORE HSE_TryRepeatKey because it is the
+; the sequence, so the literal tags (@iban★, @tel★) and the dates (dt★) still
+; win — dt is the short-date trigger while "d" and "t" are also alias letters, and
+; the registration is what decides. It runs BEFORE HSE_TryRepeatKey because it is the
 ; more specific of the two: @nn★ must expand two fields, not double an "n".
 ;
 ; SINGLE SOURCE: the engine owns the tag walk and letters-to-fields resolution;

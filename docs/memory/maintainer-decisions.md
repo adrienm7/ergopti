@@ -456,3 +456,12 @@ keyDown taps) and the keymap utils app/window watchers; Windows
 `LLM_Bridge_OnUserActivity` from the pointer watcher, `_OnPrefixKeyDown` and
 the AltGr foreground WinEvent hook; Linux `prediction_engine.note_user_activity`
 from `on_pointer_event`, `on_consume` and the existing focus poll.
+
+## Date hotstrings are bare on every OS (6 November 2026)
+
+The dynamic date hotstrings are `td★`, `dt★` and `date★`, without an `@`, on
+Windows, macOS and Linux. Windows registers them without the AHK `?` flag, so
+the shared word-start rule (`HSE_IsWordChar`, as `word_boundary_allows` in the
+Lua engine) applies: they never fire inside a larger word. The `@td★` / `@dt★` /
+`@date★` spelling is retired; `@` stays the prefix of personal-information
+tags only.
