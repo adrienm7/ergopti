@@ -193,7 +193,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 ### linux-webview
 
-- [ ] **[CODE] LVB-001:** Shortcut hotstring auto-close is admitted but never closes its Linux page. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-webview/report.md).
+- [x] **[CODE] LVB-001:** Shortcut hotstring auto-close is admitted but never closes its Linux page. [Reproduction and limits](docs/audits/platform-parity/2026-11-05-native-ui/linux-webview/report.md). Done: `close` calls the manager's epoch-bound `close_owned_window` and, like macOS (MVB-002), refuses after a refused save.
 
 ### linux-diagnostics
 

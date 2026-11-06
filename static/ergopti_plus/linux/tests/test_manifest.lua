@@ -536,6 +536,7 @@ return {
 	"tests.unit.ui.editors.test_ui_bridge_handlers_locale_routing_i18n",
 	"tests.unit.ui.editors.test_ui_bridge_handlers_paths_editor",
 	"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture",
+	"tests.unit.ui.editors.test_hotstring_editor_autoclose",
 	"tests.unit.ui.personal_info_editor.test_personal_info_editor_close",
 	"tests.unit.ui.personal_info_editor.test_personal_info_editor_payload",
 	"tests.unit.infra.test_personal_info_fields",
