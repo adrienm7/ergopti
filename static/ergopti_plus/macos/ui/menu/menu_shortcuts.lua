@@ -29,6 +29,7 @@ local ManifestMenu  = require("infra.manifest_menu")
 local WrapMutation  = require("menu.wrap_mutation")
 local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KeyboardSlots = require("ui.menu.menu_keyboard_slots")
+local ActionPicker  = require("ui.action_picker")
 local TapKeysMenu   = require("ui.menu.menu_tap_keys")
 local ManifestReader = require("infra.manifest_reader")
 local TextUtils = require("text_utils")
@@ -614,7 +615,6 @@ function M.build(ctx)
 			Logger.warn(LOG, "Script control absent from the menu context — its submenu is skipped.")
 			return nil
 		end
-		local actions = type(script_control.ACTIONS) == "table" and script_control.ACTIONS or {}
 		local prefix = script_control.SCRIPT_BINDING_PREFIX
 
 		local function get_label(act, slot_id)
@@ -629,76 +629,83 @@ function M.build(ctx)
 			return act
 		end
 
-		-- Row DATA: the renderer draws all three levels, and this only answers
-		-- what the rows are.
-		local function slot_submenu_rows(slot_id)
-			local current = state.script_control_shortcuts[slot_id] or "none"
-			local sub = {}
-			for _, act in ipairs(actions) do
-				local label = get_label(act, slot_id)
-				if act:match("^#") then
-					table.insert(sub, { label = i18n.decorate_section(label), disabled = true })
-				else
-					table.insert(sub, {
-						label    = label,
-						checked  = (current == act) or nil,
-						disabled = paused or nil,
-						action   = (not paused) and (function(a) return function()
-							local function assign()
-								if a == "run_program" then ctx.updateMenu(); return true end
-								if type(ctx.commit_script_action) ~= "function"
-									or ctx.commit_script_action(slot_id, a) ~= true then return false end
-								ctx.updateMenu()
-								return true
-							end
-
-							-- open_url / search_web do nothing without their parameter:
-							-- prompting under the PREFIXED binding dispatch reads
-							-- (script__<slot>) keeps the configured key from staying
-							-- silently inert. Deferred so the modal opens after the
-							-- menu has closed.
-							local gestures = ctx.gestures
-							local spec = gestures and type(gestures.get_action_parameter_spec) == "function"
-								and gestures.get_action_parameter_spec(a) or nil
-							if spec then
-								if type(prefix) ~= "string" then
-									Logger.error(LOG, "The script binding prefix is missing — refusing to "
-										.. "store '%s' under a binding key dispatch will not read.", tostring(a))
-									return false
-								end
-								return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
-									local mutation = {
-										section = require("config_keys").KEY.SHORTCUTS_SCRIPT_CONTROL, key = slot_id,
-										read = function()
-											if type(script_control.get_shortcut_actions) ~= "function" then return nil end
-											local actions = script_control.get_shortcut_actions()
-											return type(actions) == "table" and (actions[slot_id] or "none") or nil
-										end,
-										read_menu = function() return state.script_control_shortcuts[slot_id] or "none" end,
-										apply = function()
-											if type(script_control.set_shortcut_action) ~= "function"
-												or script_control.set_shortcut_action(slot_id, a) ~= true then return false end
-											state.script_control_shortcuts[slot_id] = a
-											return true
-										end,
-										restore = function(previous)
-											state.script_control_shortcuts[slot_id] = previous
-											return script_control.set_shortcut_action(slot_id, previous) == true
-										end,
-									}
-									local transaction = ctx.commit_program_parameter
-									if ShortcutUtils.prompt_action_parameter(gestures, prefix .. slot_id, a, spec, nil, mutation, transaction) then
-										ctx.updateMenu()
-									end
-								end, "menu_shortcuts.action_parameter")
-							end
-
-							return assign()
-						end end)(act) or nil,
-					})
+		--- Opens the shared action picker for one slot, as Windows does and as
+		--- this driver's keyboard slots and tap keys do. The slot row used to
+		--- open a submenu holding the whole action catalogue, 840 rows for each
+		--- of the four slots: 3,368 of the Shortcuts submenu's 3,537 rows, about
+		--- 30 ms and 4.5 MB of every tray rebuild and as many NSMenu items in
+		--- every push (2026-11-06 field report, menu_item.shortcuts up to 342 ms).
+		--- @param slot_id string Script chord slot id.
+		--- @param slot_label string Localized slot name, the picker's title.
+		local function choose_script_action(slot_id, slot_label)
+			local gestures = ctx.gestures
+			local items = KeyboardSlots.build_action_items(gestures)
+			local binding = type(prefix) == "string" and prefix .. slot_id or nil
+			local editor = ShortcutUtils.picker_parameter_fields(gestures, items, binding)
+			ActionPicker.open({
+				title   = slot_label,
+				current = state.script_control_shortcuts[slot_id] or "none",
+				items   = items,
+				send_vocabulary   = editor.send_vocabulary,
+				parameter_strings = editor.parameter_strings,
+				prompt_choices    = editor.prompt_choices,
+				default_count     = editor.default_count,
+				vision_choices    = editor.vision_choices,
+				language_choices  = editor.language_choices,
+				edit_current_label = editor.edit_current_label,
+			}, function(a, picked)
+				if type(a) ~= "string" then return end
+				local function assign()
+					if a == "run_program" then ctx.updateMenu(); return true end
+					if type(ctx.commit_script_action) ~= "function"
+						or ctx.commit_script_action(slot_id, a) ~= true then return false end
+					ctx.updateMenu()
+					return true
 				end
-			end
-			return sub
+
+				-- open_url / search_web do nothing without their parameter:
+				-- prompting under the PREFIXED binding dispatch reads
+				-- (script__<slot>) keeps the configured key from staying
+				-- silently inert. Deferred so the modal opens after the
+				-- picker has closed; a value its editor collected is stored
+				-- without asking.
+				local spec = gestures and type(gestures.get_action_parameter_spec) == "function"
+					and gestures.get_action_parameter_spec(a) or nil
+				if spec then
+					if type(prefix) ~= "string" then
+						Logger.error(LOG, "The script binding prefix is missing — refusing to "
+							.. "store '%s' under a binding key dispatch will not read.", tostring(a))
+						return false
+					end
+					return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+						local mutation = {
+							section = require("config_keys").KEY.SHORTCUTS_SCRIPT_CONTROL, key = slot_id,
+							read = function()
+								if type(script_control.get_shortcut_actions) ~= "function" then return nil end
+								local actions = script_control.get_shortcut_actions()
+								return type(actions) == "table" and (actions[slot_id] or "none") or nil
+							end,
+							read_menu = function() return state.script_control_shortcuts[slot_id] or "none" end,
+							apply = function()
+								if type(script_control.set_shortcut_action) ~= "function"
+									or script_control.set_shortcut_action(slot_id, a) ~= true then return false end
+								state.script_control_shortcuts[slot_id] = a
+								return true
+							end,
+							restore = function(previous)
+								state.script_control_shortcuts[slot_id] = previous
+								return script_control.set_shortcut_action(slot_id, previous) == true
+							end,
+						}
+						local transaction = ctx.commit_program_parameter
+						if ShortcutUtils.prompt_action_parameter(gestures, prefix .. slot_id, a, spec, picked, mutation, transaction) then
+							ctx.updateMenu()
+						end
+					end, "menu_shortcuts.action_parameter")
+				end
+
+				return assign()
+			end)
 		end
 
 		local providers = {
@@ -706,11 +713,11 @@ function M.build(ctx)
 				local rows = {}
 				for _, slot in ipairs(script_control.script_chord_slots()) do
 					local current = state.script_control_shortcuts[slot.id] or "none"
+					local slot_label = i18n.get(SCRIPT_CHORD_LABELS[slot.id])
 					rows[#rows + 1] = {
-						label    = string.format("%s → %s", i18n.get(SCRIPT_CHORD_LABELS[slot.id]),
-							get_label(current, slot.id)),
+						label    = string.format("%s → %s", slot_label, get_label(current, slot.id)),
 						disabled = paused or nil,
-						items    = slot_submenu_rows(slot.id),
+						action   = (not paused) and function() choose_script_action(slot.id, slot_label) end or nil,
 					}
 				end
 				return rows
