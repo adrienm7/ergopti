@@ -108,9 +108,7 @@ global ERGOPTI_KEY_DEVIATIONS := Map(
 global ERGOPTI_DEAD_KEY_DEVIATIONS := Map(
 	"Circumflex", Map(
 		; Characters the KbdEdit-made .keylayout cannot encode yet.
-		"0", Chr(0x1F10B),
-		; The magic key composes like the j it stands for.
-		Chr(0x2605), "j"
+		"0", Chr(0x1F10B)
 	),
 	"Diaresis", Map(
 		"0", Chr(0x1F10C)
@@ -288,6 +286,10 @@ ErgoptiLayout_BuildSpec(ErgoptiModel, PlusModel, KeyCodes, WrapPairs, KeyDeviati
 	Tables := KeylayoutTables_Build(ErgoptiModel, KeyCodes)
 	Levels := Tables["Levels"]
 	PlusLevels := KeylayoutTables_Levels(PlusModel, KeyCodes)
+	; Ergopti+ types characters Ergopti lacks on a base key (the magic key ★
+	; where Ergopti has j): inside a dead key they compose as the Ergopti+
+	; .keylayout says, which is what macOS and the Linux Compose table type.
+	PlusDeadKeys := KeylayoutTables_DeadKeys(PlusModel, KeyCodes)
 
 	DeadKeys := Map()
 	TerminatorMap := Map()
@@ -303,6 +305,10 @@ ErgoptiLayout_BuildSpec(ErgoptiModel, PlusModel, KeyCodes, WrapPairs, KeyDeviati
 				throw ValueError("The Ergopti emulation cannot chain dead keys.", -1, State . " + " . Input)
 			Table[Input] := Result["Output"]
 		}
+		if PlusDeadKeys.Has(State)
+			for Input, Result in PlusDeadKeys[State]["Inputs"]
+				if !Table.Has(Input) && Result["Next"] == ""
+					Table[Input] := Result["Output"]
 		if DeadKeyDeviations.Has(Name)
 			for Input, Output in DeadKeyDeviations[Name]
 				Table[Input] := Output
