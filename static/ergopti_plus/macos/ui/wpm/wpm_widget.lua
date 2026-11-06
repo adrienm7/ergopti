@@ -288,8 +288,12 @@ update_widget_body = function(generation)
 		_canvas_geom.compact_h     = compact_h
 
 		-- The pill's top-left is the anchor; the graph keeps its bottom-right.
-		if not _pos_x or not _pos_y then _pos_x, _pos_y = WPMModel.default_anchor(canon, full_frame) end
-		local target_x, target_y = WPMModel.frame_origin(canon, frame, _pos_x, _pos_y)
+		-- The default anchor is recomputed from the current display each cycle and
+		-- never cached: a cached default would stay outside the desktop after a
+		-- display shrink. Only a user-chosen (dragged) position is retained.
+		local anchor_x, anchor_y = _pos_x, _pos_y
+		if not anchor_x or not anchor_y then anchor_x, anchor_y = WPMModel.default_anchor(canon, full_frame) end
+		local target_x, target_y = WPMModel.frame_origin(canon, frame, anchor_x, anchor_y)
 
 		if not _canvas then
 			local candidate = GraphicsRenderer.createWindow({
