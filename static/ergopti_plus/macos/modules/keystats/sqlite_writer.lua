@@ -286,6 +286,14 @@ local function _initialize_db(db, existed)
 		return false
 	end
 
+	-- The purge tombstone triggers run on every open, so a cache built before
+	-- them still applies a tombstone, from this writer or a replayed ledger.
+	local purge_schema = _read_schema_file(Paths.shared("data/db/purge_schema.sql"), "metrics purge schema")
+	if purge_schema == nil then
+		return false
+	end
+	_exec_startup_sql(db, purge_schema, "metrics purge triggers")
+
 	-- schema.sql applies only to fresh caches. An index it gained later is
 	-- created on an existing cache from the schema's own statement (L19).
 	local index_schema = nil

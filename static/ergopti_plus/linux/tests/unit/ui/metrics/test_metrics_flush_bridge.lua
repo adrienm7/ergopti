@@ -509,3 +509,47 @@ H.describe("metrics flush bridge", function()
 end)
 
 require("ui.metrics_apps.bridge")._reset()
+
+H.describe("dashboard export and purge bridge", function()
+	local function harness(accepts)
+		local Bridge = require("ui.metrics_typing.bridge")
+		local evaluated, requests = {}, {}
+		local state = {
+			webview_manager = {
+				page_current = function(app, epoch) return app == "metrics_typing" and epoch == 4 end,
+				eval_js = function(app, code) evaluated[#evaluated + 1] = { app, code }; return true end,
+			},
+			keystats = {
+				request_metrics_maintenance = function(kind, complete)
+					requests[#requests + 1] = { kind = kind, complete = complete }
+					return accepts
+				end,
+			},
+		}
+		return Bridge, state, { app_name = "metrics_typing", epoch = 4 }, evaluated, requests
+	end
+
+	H.it("metrics-maintenance-bridge: the writer owns the request and the page gets its exact answer", function()
+		local Bridge, state, context, evaluated, requests = harness(true)
+		H.assert_nil(Bridge.on_message({ action = "metrics_purge", maintenance_id = 7 }, state, context))
+		H.assert_eq(#requests, 1)
+		H.assert_eq(requests[1].kind, "purge")
+		H.assert_eq(#evaluated, 0, "no answer before the writer completes")
+		requests[1].complete(true, nil)
+		H.assert_eq(#evaluated, 1)
+		H.assert_contains(evaluated[1][2], "window.complete_metrics_maintenance.apply(null,[7,true")
+		Bridge.on_message({ action = "metrics_export", maintenance_id = 8 }, state, context)
+		H.assert_eq(requests[2].kind, "export")
+		requests[2].complete(true, "/h/Downloads/x.sqlite")
+		H.assert_contains(evaluated[2][2], '[8,true,"/h/Downloads/x.sqlite"]')
+	end)
+
+	H.it("metrics-maintenance-bridge-refusal: a refused request answers false, a bad id asks nothing", function()
+		local Bridge, state, context, evaluated, requests = harness(false)
+		Bridge.on_message({ action = "metrics_purge", maintenance_id = 3 }, state, context)
+		H.assert_eq(#requests, 1)
+		H.assert_contains(evaluated[1][2], "[3,false]")
+		Bridge.on_message({ action = "metrics_purge", maintenance_id = 1.5 }, state, context)
+		H.assert_eq(#requests, 1, "a request without an integer owner id reaches no writer")
+	end)
+end)

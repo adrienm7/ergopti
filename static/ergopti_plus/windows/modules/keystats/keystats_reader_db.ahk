@@ -92,7 +92,21 @@ KLR_LoadMediaSchema(db) {
 				try LoggerError("KLReader", "Semantic media schema read failed: {1}.", err.Message)
 				return false
 		}
-		return SQLite_Exec(db, media_schema)
+		if !SQLite_Exec(db, media_schema)
+				return false
+		return KLR_LoadPurgeSchema(db)
+}
+
+; Install the purge tombstone triggers after the media tables exist, so every
+; replayed ledger applies a tombstone and never re-imports a purged row.
+KLR_LoadPurgeSchema(db) {
+		global _SharedDir
+		try purge_schema := FSReadStrict(_SharedDir . "\data\db\purge_schema.sql")
+		catch as err {
+				try LoggerError("KLReader", "Metrics purge schema read failed: {1}.", err.Message)
+				return false
+		}
+		return SQLite_Exec(db, purge_schema)
 }
 
 
@@ -1123,6 +1137,12 @@ KLR_PrepareIncremental(md, logPath) {
 ; open SQLite transaction is an interrupted append, not a successful refresh.
 ; The caller discards the candidate and retains bounded path-specific metadata.
 KLR_ApplyIncremental(db, tails, logPath) {
+		; An image restored from an earlier worker may predate the purge triggers;
+		; they must exist before a tail can carry a tombstone or a purged row.
+		if !KLR_LoadPurgeSchema(db) {
+				try LoggerError("KLReader", "Metrics purge triggers could not be installed; retaining the last-good dashboard projection.")
+				return Map("ok", false, "incomplete", false, "retry", false)
+		}
 		total_new := 0
 		for sql_path, tail in tails {
 				result := SQLite_ExecReturnCarry(db, tail["sql"])

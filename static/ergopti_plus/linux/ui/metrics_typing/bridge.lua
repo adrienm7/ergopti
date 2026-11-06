@@ -198,6 +198,31 @@ local function handle(payload, state, context, request)
 	return nil
 end
 
+--- The dashboard's Export and Purge: the keystats writer owns both, and the
+--- page learns the outcome through complete_metrics_maintenance.
+local MAINTENANCE = { metrics_export = "export", metrics_purge = "purge" }
+
+--- Hands one Export or Purge to the writer and answers the page once.
+--- @param payload table { action, maintenance_id }
+--- @param state table
+--- @param context table|nil
+local function request_maintenance(payload, state, context)
+	local id = payload.maintenance_id
+	if type(id) ~= "number" or id <= 0 or id % 1 ~= 0 then
+		Logger.error(LOG, "Dashboard maintenance request without a valid owner id; ignored.")
+		return
+	end
+	local function answer(success, path)
+		Flush.call(APP_NAME, "complete_metrics_maintenance", { id, success == true, path }, state, context)
+	end
+	local k = state.keystats
+	if not k or type(k.request_metrics_maintenance) ~= "function" then
+		Logger.error(LOG, "The keystats exposes no request_metrics_maintenance; the dashboard is told it failed.")
+		return answer(false)
+	end
+	if k.request_metrics_maintenance(MAINTENANCE[payload.action], answer) ~= true then answer(false) end
+end
+
 --- Defers requests until the database/RAM view and native page are both current.
 --- @param payload any
 --- @param state table
@@ -211,9 +236,10 @@ function M.on_message(payload, state, context)
 			for key, value in pairs(payload.apps) do apps[key] = value end
 		end
 		payload = { action = payload.action, start_date = payload.start_date, end_date = payload.end_date,
-			request_id = payload.request_id, apps = apps }
+			request_id = payload.request_id, apps = apps, maintenance_id = payload.maintenance_id }
 	end
 	local action = type(payload) == "table" and payload.action or payload
+	if MAINTENANCE[action] then return request_maintenance(payload, state, context) end
 	if action ~= "ready" and action ~= "refresh" and action ~= "clear_cache" and action ~= "range" then return nil end
 	return Requests.run(state, context, function(request)
 		return handle(payload, state, request.context, request)

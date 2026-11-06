@@ -32,6 +32,13 @@ local function temp_dir()
 	return assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-import-XXXXXX"))
 end
 
+local function shared_sql(name)
+	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/data/db/" .. name, "rb"))
+	local text = handle:read("*a")
+	handle:close()
+	return text
+end
+
 local function schema_sql()
 	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/data/db/schema.sql", "rb"))
 	local text = handle:read("*a")
@@ -71,6 +78,9 @@ local function fixture(options)
 	local db = dir .. "/metrics.sqlite"
 	local schema = schema_sql()
 	assert(sqlite(db, ".output /dev/null\n" .. schema))
+	if options.purge then
+		assert(sqlite(db, shared_sql("media_schema.sql") .. "\n" .. shared_sql("purge_schema.sql")))
+	end
 	local folder = dir .. "/metrics/by_device/" .. FOREIGN
 	assert(os.execute("mkdir -p " .. quote(folder)))
 	write(folder .. "/device.json", string.format(
@@ -270,5 +280,52 @@ helpers.describe("Linux foreign metrics ledger import", function()
 		write(f.dir .. "/metrics/by_device/" .. FOREIGN .. "/device.json", '{"device_id":"not-this-folder"}')
 		drain(f)
 		helpers.assert_eq(scalar(f.db, "SELECT count(*) FROM events_typing;"), "0")
+	end)
+
+	-- A Purge is a tombstone row in the owning writer's ledger. A sibling's
+	-- ledger replayed afterwards must not bring the purged rows back, and a
+	-- sibling's tombstone purges this device too, Linux rows compared in UTC.
+	local function system_row(device, id, ts, date, action, metadata)
+		return string.format("INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) "
+			.. "VALUES ('%s', %d, '%s', '%s', '%s', %s);", device, id, ts, date, action,
+			metadata and ("'" .. metadata .. "'") or "NULL")
+	end
+	local LINUX_DEVICE = "INSERT INTO devices (device_id, name, os, os_version, host_signature, created_at, updated_at) "
+		.. "VALUES ('" .. LOCAL .. "', 'host', 'linux', '', '', '', '');"
+	local TOMBSTONE_UTC = '{"utc":"2026-11-06 09:00:00"}'
+
+	it("linux-import-purge-no-resurrection: a sibling ledger replayed after a local purge stays purged", function()
+		if not HAS_SQLITE then return end
+		local f = fixture({ purge = true })
+		assert(sqlite(f.db, LINUX_DEVICE .. "\n"
+			.. system_row(LOCAL, 1, "2026-11-05 08:00:00", "2026-11-05", "wake")
+			.. "\n" .. system_row(LOCAL, 2, "2026-11-06 10:00:00.000", "2026-11-06", "metrics_purge", TOMBSTONE_UTC)))
+		helpers.assert_eq(scalar(f.db, "SELECT count(*) FROM events_system WHERE action='wake';"), "0")
+		write(f.ledger, HEADER .. batch(typing(1, EVENTS),
+			"INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms) VALUES ('"
+				.. FOREIGN .. "', 2, '2026-11-06 11:00:00.000', '2026-11-06', 'Safari', 'Mail', 60000);"))
+		drain(f)
+		helpers.assert_eq(scalar(f.db, "SELECT count(*) FROM events_typing;"), "0", "the purged sibling row came back")
+		helpers.assert_eq(scalar(f.db, "SELECT count(*) FROM agg_app_day WHERE date='2026-11-05';"), "0")
+		helpers.assert_eq(scalar(f.db, "SELECT count(*) FROM events_app_switch WHERE device_id='" .. FOREIGN .. "';"), "1",
+			"a row after the tombstone must survive")
+	end)
+
+	it("linux-import-purge-from-sibling: a sibling's tombstone purges every device, Linux rows in UTC", function()
+		if not HAS_SQLITE then return end
+		local f = fixture({ purge = true })
+		assert(sqlite(f.db, LINUX_DEVICE .. "\n"
+			.. system_row(LOCAL, 1, "2026-11-06 08:59:59", "2026-11-06", "wake")
+			.. "\n" .. system_row(LOCAL, 2, "2026-11-06 09:00:01", "2026-11-06", "sleep")))
+		write(f.ledger, HEADER .. batch(typing(1, EVENTS)))
+		drain(f)
+		helpers.assert_eq(scalar(f.db, "SELECT count(*) FROM agg_app_day WHERE device_id='" .. FOREIGN .. "';"), "1")
+		write(f.ledger, batch(system_row(FOREIGN, 7, "2026-11-06 10:00:00.000", "2026-11-06", "metrics_purge",
+			TOMBSTONE_UTC)), "ab")
+		drain(f)
+		helpers.assert_eq(scalar(f.db, "SELECT count(*) FROM events_typing;"), "0")
+		helpers.assert_eq(scalar(f.db, "SELECT count(*) FROM agg_app_day;"), "0")
+		helpers.assert_eq(scalar(f.db, "SELECT group_concat(action) FROM events_system WHERE device_id='" .. LOCAL .. "';"),
+			"sleep", "a Linux row is compared with the tombstone's UTC instant")
 	end)
 end)

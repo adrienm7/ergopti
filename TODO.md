@@ -1137,12 +1137,14 @@ Each closes on a named green hosted or native run, recorded here.
       last good projection. Reads wait the writer's COMMIT (`keystats.sqlite_read_busy_timeout_ms`) on both. Windows
       replays the append-only `data.sql` into a private image and keeps the last good one on an open transaction.
       Done: the wait, the named refusal, tests on Linux and macOS.
-- [ ] Dashboard export and purge on the three drivers (reset exists as `metrics_reset_session`). Decided 2026-11-06:
+- [x] Dashboard export and purge on the three drivers (reset exists as `metrics_reset_session`). Decided 2026-11-06:
       both go through the single owning writer after its flush settles, with a confirmation, same behaviour on every
       OS, text through the `i18n` skill in all locales. Purge decided 2026-11-06: purge everywhere. The owning writer appends a dated tombstone row to its ledger; every
       device applies it when replaying, so purged data never comes back from a sibling device. Export has no such question (a copy taken
-      after the flush settles). Not built yet: needs the writer-side request/receipt protocol
-      per driver (Linux `request_session_reset`, macOS `log_manager`, Windows `KL_*` journal owner) and a Windows run.
+      after the flush settles). Built: the tombstone is an `events_system` `metrics_purge` row applied by the triggers of
+      `_shared/data/db/purge_schema.sql`; writers `request_metrics_maintenance` (Linux keystats, macOS `log_manager`) and
+      `KL_RunMetricsMaintenance` (Windows); the Windows path is checked by source contracts only and still wants a live
+      Windows run.
 
 - **PAC list walk on macOS.** Linux probes a `PROXY a; DIRECT` list before the Ollama start
   (`llm.managed_proxy_probe_timeout_ms`). Decided 2026-11-06 (align on the most complete OS, Linux): Windows walks

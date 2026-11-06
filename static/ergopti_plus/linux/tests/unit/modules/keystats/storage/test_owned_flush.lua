@@ -1423,3 +1423,113 @@ helpers.describe("native sampled reset acknowledgement", function()
 		helpers.assert_true(status == true or status == 0, "actual sampled reset must finish once after COMMIT and cleanup")
 	end)
 end)
+
+helpers.describe("dashboard export and purge through the owning writer", function()
+	local function tombstones(op)
+		local found = {}
+		for _, event in ipairs(op.payload.raw.system or {}) do
+			if event.action == "metrics_purge" then found[#found + 1] = event end
+		end
+		return found
+	end
+
+	it("metrics-purge-after-settle: the tombstone waits for the pending flush and completes after its own COMMIT", function()
+		with_collector(function(k, operations)
+			k.on_keydown("a", 1000, "owned")
+			k.flush()
+			helpers.assert_eq(#operations, 1)
+			local replies = {}
+			helpers.assert_true(k.request_metrics_maintenance("purge", function(success, path)
+				replies[#replies + 1] = { success, path }
+			end))
+			assert_false(k.request_metrics_maintenance("export", function() error("duplicate owner") end))
+			helpers.assert_eq(#tombstones(operations[1]), 0, "the tombstone must not ride the unsettled flush")
+			operations[1].outcome, operations[1].physical = "commit", true
+			k.pump_flush()
+			helpers.assert_eq(#operations, 2, "the settled flush hands over to the tombstone's flush")
+			local tombstone = tombstones(operations[2])
+			helpers.assert_eq(#tombstone, 1)
+			helpers.assert_true(tombstone[1].ts:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d%.%d%d%d$") ~= nil)
+			helpers.assert_true(tombstone[1].metadata.utc:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d$") ~= nil)
+			helpers.assert_eq(#replies, 0, "no answer before the tombstone commits")
+			operations[2].outcome, operations[2].physical = "commit", true
+			k.pump_flush()
+			helpers.assert_eq(replies, { { true, nil } })
+		end)
+	end)
+
+	it("metrics-purge-refused: a stopping writer answers false once", function()
+		with_collector(function(k, operations)
+			k.on_keydown("a", 1000, "owned")
+			k.flush()
+			local replies = {}
+			helpers.assert_true(k.request_metrics_maintenance("purge", function(success) replies[#replies + 1] = success end))
+			operations[1].outcome, operations[1].physical = "abort", true
+			k.stop()
+			helpers.assert_eq(replies, { false })
+		end)
+	end)
+
+	it("metrics-export-after-settle: the copy is taken by VACUUM INTO once the flush settles", function()
+		with_collector(function(k, operations, writer)
+			local home = os.tmpname()
+			os.remove(home)
+			assert(os.execute("mkdir -p '" .. home .. "/Downloads'"))
+			local getenv = os.getenv
+			os.getenv = function(name)
+				if name == "HOME" then return home end
+				if name == "XDG_DOWNLOAD_DIR" then return nil end
+				return getenv(name)
+			end
+			local ok, err = pcall(function()
+				k.on_keydown("a", 1000, "owned")
+				k.flush()
+				writer.executed = {}
+				local replies = {}
+				helpers.assert_true(k.request_metrics_maintenance("export", function(success, path)
+					replies[#replies + 1] = { success, path }
+				end))
+				helpers.assert_eq(#writer.executed, 0, "no copy of an unsettled store")
+				operations[1].outcome, operations[1].physical = "commit", true
+				k.pump_flush()
+				helpers.assert_eq(#replies, 1)
+				helpers.assert_eq(replies[1][1], true)
+				helpers.assert_true(replies[1][2]:match("^" .. home:gsub("%p", "%%%0")
+					.. "/Downloads/ergopti%-metrics%-%d%d%d%d%-%d%d%-%d%d_%d%d%-%d%d%-%d%d%.sqlite$") ~= nil)
+				helpers.assert_eq(writer.executed[#writer.executed], "VACUUM INTO '" .. replies[1][2] .. "';")
+			end)
+			os.getenv = getenv
+			os.execute("rm -rf '" .. home .. "'")
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	it("metrics-maintenance-vectors: the shared helper renders the shared tombstone and export name", function()
+		local Maintenance = require("keystats.metrics_maintenance")
+		local handle = assert(io.open(require("infra.paths").shared(
+			"tests/corpus/keystats/metrics_maintenance_vectors.json"), "rb"))
+		local vectors = require("json").decode(handle:read("*a"))
+		handle:close()
+		local tombstone = Maintenance.tombstone(vectors.tombstone.epoch)
+		helpers.assert_eq(tombstone.action, vectors.tombstone.action)
+		helpers.assert_eq(tombstone.metadata.utc, vectors.tombstone.utc)
+		helpers.assert_eq(tombstone.ts:sub(-4), vectors.tombstone.millis)
+		helpers.assert_eq(tombstone.ts:sub(1, 10), tombstone.date)
+		local name = Maintenance.export_file_name(vectors.tombstone.epoch)
+		helpers.assert_eq(name:sub(1, #vectors.export.prefix), vectors.export.prefix)
+		helpers.assert_eq(name:sub(-#vectors.export.extension), vectors.export.extension)
+		helpers.assert_true(name:match("^ergopti%-metrics%-%d%d%d%d%-%d%d%-%d%d_%d%d%-%d%d%-%d%d%.sqlite$") ~= nil)
+		helpers.assert_eq(Maintenance.downloads_dir(function(key) return ({ HOME = "/h" })[key] end), "/h/Downloads")
+		helpers.assert_eq(Maintenance.downloads_dir(function(key)
+			return ({ HOME = "/h", XDG_DOWNLOAD_DIR = "/d" })[key]
+		end), "/d")
+		helpers.assert_nil(Maintenance.downloads_dir(function() return nil end))
+	end)
+
+	it("metrics-maintenance-kind: an unknown kind or a missing callback is refused", function()
+		with_collector(function(k)
+			assert_false(k.request_metrics_maintenance("drop", function() end))
+			assert_false(k.request_metrics_maintenance("purge"))
+		end)
+	end)
+end)

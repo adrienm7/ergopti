@@ -2,6 +2,22 @@
 	"_description": "Rendered SQL of the typed-slot and keyed catalogue statements. The JS reference renderer (tools/codegen/codegen-keystats-queries.cjs) and the Lua renderer of both drivers must produce exactly these texts; the values hold what the slot encoder must protect: quotes, a carriage return, a NUL, a line feed. A missing or null value is a missing slot.",
 	"vectors": [
 		{
+			"name": "export.vacuum_into",
+			"dialect": "native",
+			"values": {
+				"path": "/home/it's/Downloads/ergopti-metrics-2026-11-06_10-00-00.sqlite"
+			},
+			"sql": "VACUUM INTO '/home/it''s/Downloads/ergopti-metrics-2026-11-06_10-00-00.sqlite';"
+		},
+		{
+			"name": "export.vacuum_into",
+			"dialect": "cli_json",
+			"values": {
+				"path": "C:\\Users\\Me\\Downloads\\ergopti-metrics-2026-11-06_10-00-00.sqlite"
+			},
+			"sql": "VACUUM INTO 'C:\\Users\\Me\\Downloads\\ergopti-metrics-2026-11-06_10-00-00.sqlite';"
+		},
+		{
 			"name": "meta.get",
 			"dialect": "native",
 			"values": {

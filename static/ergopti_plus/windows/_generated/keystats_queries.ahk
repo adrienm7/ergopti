@@ -143,6 +143,11 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "value", "s"],
 			["literal", ")`;"]
 		],
+		"export.vacuum_into", [
+			["literal", "VACUUM INTO "],
+			["slot", "path", "s"],
+			["literal", "`;"]
+		],
 		"meta.rev_bump", [
 			["literal", "UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev'`;"]
 		],

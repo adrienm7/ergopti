@@ -58,6 +58,21 @@ function M.push(app, bridge, payload, state, context)
 	return manager_for(state).eval_js(app, code) == true
 end
 
+--- Calls one page function of the current document with JSON arguments.
+--- @param app string
+--- @param name string Global function the page defines.
+--- @param args table Array of JSON-encodable arguments.
+--- @param state table
+--- @param context table|nil
+--- @return boolean called
+function M.call(app, name, args, state, context)
+	assert(type(name) == "string" and name:match("^[%a_][%w_]*$"), "a page function needs a plain name")
+	if not context or type(context.epoch) ~= "number" or not page_current(app, state, context) then return false end
+	local encoded = require("json").encode(args)
+	local code = string.format("if(typeof window.%s==='function')window.%s.apply(null,%s)", name, name, encoded)
+	return manager_for(state).eval_js(app, code) == true
+end
+
 --- Creates one request owner for a dashboard bridge.
 --- @param app string
 --- @param push function

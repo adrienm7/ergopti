@@ -43,6 +43,12 @@ window.toggle_hs_source = toggle_hs_source;
 window.toggle_llm_source = toggle_llm_source;
 window.reset_filters = reset_filters;
 
+// Export and Purge (maintenance.js)
+window.ask_metrics_maintenance = ask_metrics_maintenance;
+window.cancel_metrics_maintenance = cancel_metrics_maintenance;
+window.confirm_metrics_maintenance = confirm_metrics_maintenance;
+window.complete_metrics_maintenance = complete_metrics_maintenance;
+
 // Table interactions
 window.switch_tab = switch_tab;
 window.handle_search = handle_search;
