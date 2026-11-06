@@ -594,6 +594,24 @@ _PTIOCR_AllEditorsUseTheDurableLiveGateway() {
 Test("personal-toml-live-transaction: native and WebView saves share one gateway",
 	_PTIOCR_AllEditorsUseTheDurableLiveGateway)
 
+; The refusal toast script must splice the complete JSON literal bare: a second
+; pair of quotes turned it into `e.textContent=""..."";`, a SyntaxError that left
+; the optimistic "Saved" toast visible after a refused save (audit WVB-001).
+_PTIOCR_SaveFailureScriptIsValidJs() {
+	Message := 'Écriture "refusée"\n'
+	Script := _HsEdWeb_SaveFailureJs(Message)
+	Assert(InStr(Script, "e.textContent=" . JsonStringLiteral(Message) . ";", true) > 0,
+		"the refusal toast must assign the exact message as one string literal: " . Script)
+	Assert(InStr(Script, '=""', true) == 0 && InStr(Script, '"";', true) == 0,
+		"the refusal toast must not wrap the literal in a second pair of quotes: " . Script)
+	ShowBody := _DriverFuncBody("_HsEdWeb_ShowSaveFailure")
+	Assert(ShowBody != "", "_HsEdWeb_ShowSaveFailure must exist")
+	Assert(InStr(ShowBody, "_HsEdWeb_SaveFailureJs(") > 0,
+		"the displayed refusal must use the tested script builder")
+}
+Test("personal-toml-live-transaction: refused-save toast script is valid JavaScript (wvb-001)",
+	_PTIOCR_SaveFailureScriptIsValidJs)
+
 _PTIO_PriorityDomainRejectsInvalidCandidate() {
 	global ScriptInformation, _ReadPersonalTomlCache
 	OldPath := ScriptInformation["PersonalTomlPath"]
