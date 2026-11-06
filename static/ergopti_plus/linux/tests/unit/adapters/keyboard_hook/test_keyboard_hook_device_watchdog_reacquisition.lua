@@ -25,7 +25,10 @@
 --- ==============================================================================
 
 -- The cases replace these entries; the module end puts them back.
-local restore_loaded = require("tests.helpers").keep_loaded({ "modules.hotstrings.device_finder" })
+local prior_writer, prior_broker = package.loaded["adapters.uinput_writer"], package.loaded["adapters.modifier_broker"]
+local restore_loaded = require("tests.helpers").keep_loaded({
+	"modules.hotstrings.device_finder", "adapters.uinput_writer", "adapters.modifier_broker",
+})
 package.loaded["tests.support.adapters.keyboard_hook.keyboard_hook_device_watchdog_fixture"] = nil
 local Fixture = require("tests.support.adapters.keyboard_hook.keyboard_hook_device_watchdog_fixture")
 local helpers, load_hook, fake_node, stub_device_finder, recorder, multi_recorder, tick_until_check =
@@ -243,6 +246,35 @@ helpers.describe("keyboard_hook: re-acquires when the preferred device changes",
 		kh.stop()
 		reader._reset_backend()
 		os.remove(node_a) ; os.remove(node_b)
+		if not ok then error(failure, 0) end
+	end)
+
+	helpers.it("closes newly opened keyboards when a later keyboard cannot open", function()
+		local node_a, node_b, node_c = fake_node("partial-a"), fake_node("partial-b"), fake_node("partial-c")
+		local devices, closed = { { node_a }, {} }, {}
+		package.loaded["modules.hotstrings.device_finder"] = {
+			find_devices = function() return devices[1], devices[2] end,
+			is_key_device = function() return true end,
+			is_interceptable_key_device = function() return true end,
+			is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
+		}
+		local reader = helpers.load_module("adapters.evdev_reader")
+		reader._set_backend({
+			open = function(path) if path == node_c then return nil, "permission denied" end; return path end,
+			ioctl = function() return true end,
+			read = function() return nil end, poll = function() return false end,
+			close = function(fd) closed[#closed + 1] = fd end,
+		})
+		local hook = load_hook()
+		local ok, failure = xpcall(function()
+			helpers.assert_true(hook.start({ intercept = false }))
+			devices = { { node_a, node_b, node_c }, {} }
+			tick_until_check(hook, 1)
+			helpers.assert_true(hook.isRunning())
+			helpers.assert_eq(closed, { node_b }, "only the newly opened descriptor must be retired")
+		end, debug.traceback)
+		hook.stop(); reader._reset_backend()
+		os.remove(node_a); os.remove(node_b); os.remove(node_c)
 		if not ok then error(failure, 0) end
 	end)
 
@@ -638,32 +670,43 @@ helpers.describe("keyboard_hook: ordinary overlapping physical-source release", 
 		reader._set_backend(backend)
 		local writer = helpers.load_module("adapters.uinput_writer")
 		local rows = {}
-		writer._set_backend({
-			open = function() return 9 end,
-			ioctl = function() return true end,
-			write = function(_, bytes) rows[#rows + 1] = bytes; return true end,
-			close = function() return true end,
-		})
-		assert(writer.open())
-		local output = assert(writer.capture_output())
-		local hook = load_hook()
-		hook.start({ intercept = true, onEmitRaw = writer.emit })
-		hook.pump()
-		local held = hook.held_text_modifier_codes()
-		local output_after_first_release = writer.output_view(output)
-		queues[b][1] = InputEvent.encode(1, 42, 0, nil, 4)
-		hook.pump()
-		local final = writer.output_view(output)
-		hook.stop()
+		local hook, output
+		local ok, failure = xpcall(function()
+			writer._set_backend({
+				open = function() return 9 end,
+				ioctl = function() return true end,
+				write = function(_, bytes) rows[#rows + 1] = bytes; return true end,
+				close = function() return true end,
+			})
+			assert(writer.open())
+			output = assert(writer.capture_output())
+			hook = load_hook()
+			hook.start({ intercept = true, onEmitRaw = writer.emit })
+			hook.pump()
+			local held = hook.held_text_modifier_codes()
+			local output_after_first_release = writer.output_view(output)
+			queues[b][1] = InputEvent.encode(1, 42, 0, nil, 4)
+			hook.pump()
+			local final = writer.output_view(output)
+			helpers.assert_eq(held, { 42 }, "the second source still physically owns Shift")
+			helpers.assert_eq(output_after_first_release.down, { 42 },
+				"a first-source up must not lift the shared virtual modifier bit")
+			helpers.assert_eq(final.down, {}, "the final-source up must release the virtual bit")
+		end, debug.traceback)
+		if hook then hook.stop() end
 		reader._reset_backend()
-		writer.close_owned(output)
+		if output then writer.close_owned(output) end
+		writer._reset_backend()
 		os.remove(a); os.remove(b)
-		helpers.assert_eq(held, { 42 }, "the second source still physically owns Shift")
-		helpers.assert_eq(output_after_first_release.down, { 42 },
-			"a first-source up must not lift the shared virtual modifier bit")
-		helpers.assert_eq(final.down, {}, "the final-source up must release the virtual bit")
+		if not ok then error(failure, 0) end
 	end)
 
 end)
 
 restore_loaded()
+helpers.describe("keyboard watchdog fixture isolation", function()
+	helpers.it("restores the writer and broker identities before the next module", function()
+		helpers.assert_true(rawequal(package.loaded["adapters.uinput_writer"], prior_writer))
+		helpers.assert_true(rawequal(package.loaded["adapters.modifier_broker"], prior_broker))
+	end)
+end)

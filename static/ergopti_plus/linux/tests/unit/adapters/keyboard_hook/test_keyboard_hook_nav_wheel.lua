@@ -517,6 +517,16 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		helpers.assert_true(InputEvent.wheel_layer_code("vertical", 1) > 0x2ff, "above every evdev key code")
 	end)
 
+	helpers.it("passes unbound horizontal high-resolution and classic wheel reports once each", function()
+		local emitted = drive("mouse", HOLD, {
+			{ EV_REL, 0x0c, -120, 3000 }, { EV_REL, REL_HWHEEL, -1, 3001 }, { EV_SYN, 0, 0, 3002 },
+		})
+		helpers.assert_eq(count(emitted, "rel:12:-120"), 1)
+		helpers.assert_eq(count(emitted, "rel:" .. REL_HWHEEL .. ":-1"), 1)
+		helpers.assert_eq(count(emitted, "key:" .. VOLUME_UP .. ":1"), 0)
+		helpers.assert_eq(count(emitted, "key:" .. VOLUME_DOWN .. ":1"), 0)
+	end)
+
 	helpers.it("turns each bound notch into the volume key and never scrolls", function()
 		local emitted, grabs = drive("mouse", HOLD, {
 			{ EV_REL, REL_WHEEL_HI_RES, 240, 3000 }, { EV_REL, REL_WHEEL, 2, 3000 }, { EV_SYN, 0, 0, 3000 },
