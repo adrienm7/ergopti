@@ -1,4 +1,4 @@
---- tests/unit/apps/test_encryptor_core.lua
+--- tests/unit/ui/bundled_apps/test_encryptor_core.lua
 
 --- ==============================================================================
 --- MODULE: Linux Encryptor Tests
