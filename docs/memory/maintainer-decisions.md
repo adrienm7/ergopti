@@ -5,6 +5,26 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Layout emulation on the three OS (2026-11-06)
+
+Every feature about the user's keyboard layout is the same on Windows, macOS
+and Linux. The emulation is the first part: the user keeps any installed
+system layout and Ergopti types the selected layout over it, with the same
+options and menu rows as Windows (layers, rows, number-row ordering and edge
+keys, dead keys, AltGr, the shortcut chords' Command level, the magic key).
+macOS and Linux run one shared engine, `_shared/lua/layouts/keylayout_emulation.lua`,
+the twin of `windows/modules/keymap/keylayout/keylayout_emulation.ahk`; the
+three replay `_shared/tests/corpus/layouts/keylayout_vectors.json` (the
+cross-OS oracle) and the Lua drivers `emulation_vectors.json` for the options.
+The built-in Ergopti variants are emulated from their registry `.keylayout`
+(`ergopti`, `ergopti_plus`) on macOS and Linux. Mechanisms: macOS rewrites the
+keymap tap's key-down (`setUnicodeString`, the magic key's route; a Cmd/Ctrl
+chord takes the input source's key code of the Command-level character),
+Linux consumes the grabbed press and types in its place (the magic key's
+route). Installing or switching the OS layout is a separate feature with its
+own owner. The decisions of 2026-11-03 below that say macOS and Linux emulate
+no layout, and « the layout row switches stay Windows-only », are superseded.
+
 ## Every commit carries the maintainer's identity (2026-11-06)
 
 Every commit an agent creates, in this checkout or in a cloud session it
@@ -104,8 +124,8 @@ types, and on which keyboard rows). The layer rows sit under the header
 the submenu « Rangées émulées (apprentissage progressif) »
 (`menu.layout.emulated_rows`, `layout_emulated_rows_group` in `menu.toml`),
 since switching rows on one by one is how a user learns the layout gradually.
-macOS and Linux emulate no layout: they draw that submenu's row greyed with
-`platform_reason.layout_emulation_is_windows_only`.
+macOS and Linux emulate the layout too since 2026-11-06 (see « Layout
+emulation on the three OS ») and draw the same rows.
 
 ## Windows boot: keyboard before tray, early tray click queued (2026-11-03)
 
@@ -333,7 +353,8 @@ shared (`Catalogue.registry_source` and `registry_changes_args` in
   key and takes a workspace slug as the model; Msty documents no port or
   dialect. Foundry Local (Windows) and `mlx_lm.server` (macOS) belong to those
   drivers, not to the shared list.
-- **The layout row switches stay Windows-only.** `layout.emulate_*_row` mixes
+- **Superseded 2026-11-06 (layout emulation on the three OS):** the layout row
+  switches stay Windows-only. `layout.emulate_*_row` mixes
   Ergopti rows with the OS layout, which has no `.keylayout` source on macOS or
   Linux; an Ergopti bundle source types digits on both levels, so its rows stay
   greyed on macOS. The number-row options work everywhere by rebuilding the one

@@ -2,6 +2,13 @@
 
 # Layout options on macOS and Linux, live, through one generated `.keylayout`
 
+Update 2026-11-06: the maintainer asked for full layout emulation on the three
+OS (docs/memory/maintainer-decisions.md, « Layout emulation on the three OS »).
+macOS and Linux now also emulate the chosen layout over the system one through
+`_shared/lua/layouts/keylayout_emulation.lua`, which applies the number-row
+options itself; the live rebuild below stays the route for a user who installs
+the layout as a system input source.
+
 Status: Linux implemented (X11, GNOME and KDE Wayland, scope acknowledgement;
 section 3.2); macOS implemented, waiting for the field run's `field_layout_rows`
 answer on a real Mac (section 3.1, "Implemented"). It answers the TODO item « Number-row

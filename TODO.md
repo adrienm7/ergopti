@@ -721,6 +721,12 @@ Field run, no person needed (read the next report):
 
 Hands needed:
 
+- [ ] Layout emulation (2026-11-06): with French (or ABC) selected as the input source, choose Keyboard layout >
+      Layout to emulate > Ergopti➕ and type in TextEdit: letters, Shift, CapsLock, Option levels and the
+      circumflex dead key (`^` then `e` gives ê) follow Ergopti➕; Cmd+Z undoes where Ergopti has z; a row switched
+      off types French; a hotstring fires on emulated text. Check that a key the French layout makes dead (`^`)
+      types its emulated character, that the cleared Option flag does not break an Option chord in Terminal, and
+      note the password-field limit (Secure Event Input: the system layout types).
 - [ ] Hotstrings (axa): `axa` + Space fast twenty times, also holding `a`: always `AXA`, with
       `Synthetic text moved off a held key` in the day log; ordinary hotstrings in Edge, VS Code and a terminal.
 - [ ] oMLX on port 8181 is found in API mode with no `ps` deadlock (`field_local_servers` names it).
@@ -806,6 +812,9 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
 4. The checks below and the [standing checks](docs/tooling/windows-maintainer-checks.md#standing-checks) 1 to 15
    (`node tools/maintainer/windows-live-checks.cjs` runs the automatable ones).
 
+- [ ] Layout emulation parity (2026-11-06): replay `_shared/tests/corpus/layouts/emulation_vectors.json` in
+      `test_keylayout_emulation.ahk` (the Lua drivers' options oracle; only `keylayout_vectors.json` is replayed by
+      AHK today) and fix any difference in the Windows emulation or the corpus.
 - [ ] Tray > Gestures: one « Infos… » row that opens the dialog.
 - [ ] Ollama or oMLX on a non-default port with the process scan failing: still found.
 - [ ] `axa` then Space fast, 20 times: always `AXA`.
@@ -890,6 +899,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       (relay); `…update-watch.log` beside the settings reads « reported a healthy start ». With a new tree whose
       `bin/` launcher exits at once, the tree moves to `<root>.failed-<pid>` within 60 s, `<root>.old` is back and the
       previous daemon runs; a Quit during the wait leaves the update installed and nothing restarted.
+- [ ] Layout emulation (2026-11-06): with an AZERTY (fr) XKB layout, choose Keyboard layout > Layout to emulate >
 - [ ] AI inline auto-type: with the trigger menu switch on, a finished prediction is typed into a real editor through
       uinput without Tab, and nothing is typed into a password field.
 - [ ] Navigation layer mouse buttons and repeat counts: with `MouseMiddle = "escape"` and the recommended number row,
