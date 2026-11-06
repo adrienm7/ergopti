@@ -158,8 +158,13 @@ helpers.describe("system_proxy: exact native process ownership", function()
 			helpers.assert_true(operation.is_settled())
 			helpers.assert_eq(delivered, 1)
 			helpers.assert_eq(adapter.is_owned("private-owner"), false)
-			local late = pcall(operation.on_settled, function() error("controlled late listener failure") end)
+			local late_deliveries = 0
+			local late = pcall(operation.on_settled, function()
+				late_deliveries = late_deliveries + 1
+				error("controlled late listener failure")
+			end)
 			helpers.assert_true(late, "a late listener and failing diagnostic must be isolated too")
+			helpers.assert_eq(late_deliveries, 1, "a listener added after settlement is still delivered once")
 		end)
 	end
 	helpers.it("uses private stdin and publishes only after exit and every close acknowledgement", function()

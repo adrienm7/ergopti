@@ -276,26 +276,27 @@ helpers.describe("application lookup owns its bounded native worker", function()
 		local driver, user = root .. "/driver;?literal", root .. "/user"
 		assert(Shell.run("mkdir -p " .. Shell.quote(driver .. "/ui") .. " " .. Shell.quote(driver .. "/_generated")
 			.. " " .. Shell.quote(user .. "/applications")))
-		local function copy(source, target)
-			local input = assert(io.open(source, "rb")); local bytes = input:read("*a"); assert(input:close())
-			local output = assert(io.open(target, "wb")); assert(output:write(bytes)); assert(output:close())
+		-- The sources are resolved by module name, never by a path pinned to the tree.
+		local modules = { "ui.desktop_application_resolution", "ui.desktop_application_resolution_worker",
+			"_generated.native_runtime" }
+		local function relative(module_name) return (module_name:gsub("%.", "/")) .. ".lua" end
+		for _, module_name in ipairs(modules) do
+			local bytes = assert(helpers.read_module_source(module_name))
+			local output = assert(io.open(driver .. "/" .. relative(module_name), "wb"))
+			assert(output:write(bytes)); assert(output:close())
 		end
-		local original = helpers.driver_root()
-		for _, file in ipairs({ "ui/desktop_application_resolution.lua", "ui/desktop_application_resolution_worker.lua",
-			"_generated/native_runtime.lua" }) do copy(original .. "/" .. file, driver .. "/" .. file) end
 		local desktop = user .. "/applications/ergopti-literal-choice.desktop"
 		local entry = assert(io.open(desktop, "wb")); assert(entry:write("[Desktop Entry]\nType=Application\nName=Literal\nExec=/bin/true\n")); assert(entry:close())
 		local parent = root .. "/parent.lua"
 		local file = assert(io.open(parent, "wb"))
 		assert(file:write("package.path=" .. string.format("%q", package.path) .. "\n"
 			.. "package.loaded['ui.modal']={run=function(fn)return fn()end}\n"
-			.. "local resolver=assert(loadfile(" .. string.format("%q", driver .. "/ui/desktop_application_resolution.lua") .. "))()\n"
+			.. "local resolver=assert(loadfile(" .. string.format("%q", driver .. "/" .. relative(modules[1])) .. "))()\n"
 			.. "local path,status=resolver.resolve('ergopti-literal-choice'); io.write(tostring(path),'|',status)\n")); assert(file:close())
 		local command = "env XDG_DATA_HOME=" .. Shell.quote(user) .. " XDG_DATA_DIRS=" .. Shell.quote(root .. "/empty")
 			.. " " .. Shell.quote(arg[-1] or "luajit") .. " " .. Shell.quote(parent)
 		local ran, output = Shell.exec_checked(command)
-		for _, file_name in ipairs({ "ui/desktop_application_resolution.lua", "ui/desktop_application_resolution_worker.lua",
-			"_generated/native_runtime.lua" }) do os.remove(driver .. "/" .. file_name) end
+		for _, module_name in ipairs(modules) do os.remove(driver .. "/" .. relative(module_name)) end
 		os.remove(parent); os.remove(desktop)
 		Shell.run("rmdir " .. Shell.quote(driver .. "/ui") .. " " .. Shell.quote(driver .. "/_generated")
 			.. " " .. Shell.quote(user .. "/applications") .. " " .. Shell.quote(driver) .. " " .. Shell.quote(user) .. " " .. Shell.quote(root))
