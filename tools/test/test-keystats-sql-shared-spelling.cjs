@@ -30,7 +30,8 @@ const Census = require('../audit/keystats-sql-census.cjs');
 const Codegen = require('../codegen/codegen-keystats-queries.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const TRANSACTION_VERBS = new Set(['begin', 'commit', 'rollback']);
+// Transaction control is the SQLite dialect itself, not a statement worth a catalogue name.
+const TRANSACTION_VERBS = new Set(['begin', 'begin immediate', 'commit', 'rollback']);
 
 let failures = 0;
 function check(name, fn) {

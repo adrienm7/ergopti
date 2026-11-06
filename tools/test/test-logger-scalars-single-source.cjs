@@ -250,7 +250,14 @@ check(
 				'what this gate exists to prevent, or it does not purge at all.'
 		);
 	}
-	if (!/-mtime/.test(sink)) {
+	// The purge lists the folder natively, ages each rolled or topical file against a
+	// cutoff built from the retention window, and removes the expired ones.
+	const agePurge =
+		/NativeDirectory\.entries\(?[^\n]*|NativeDirectory\.entries/.test(sink) &&
+		/local cutoff = now - \(math\.floor\(days\) \+ 1\) \* DAY_SECONDS/.test(sink) &&
+		/stat\.modified < cutoff/.test(sink) &&
+		/pcall\(os\.remove, path\)/.test(sink);
+	if (!agePurge) {
 		errors.push(
 			'linux/infra/logger_sink.lua: no age-based purge found. ' +
 				'Rolling a file per day and deleting none grows the log directory without ' +
