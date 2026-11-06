@@ -226,8 +226,8 @@ function Get-ErgoptiOwnedProxyEnvironment {
 		for ($At = 0; $At -lt $Routes.Count - 1; $At++) {
 			$Candidate = $Routes[$At]
 			# DIRECT, an override and a relay the user exported are kept as named.
-			if ($Candidate.Kind -cne 'proxy' -or $Candidate.Endpoint -isnot [string] -or $Candidate.Source -ceq 'override'
-					-or $script:ErgoptiOwnedInheritedSources -ccontains $Candidate.Source) {
+			if ($Candidate.Kind -cne 'proxy' -or $Candidate.Endpoint -isnot [string] -or $Candidate.Source -ceq 'override' -or
+					$script:ErgoptiOwnedInheritedSources -ccontains $Candidate.Source) {
 				$First = $Candidate
 				break
 			}
