@@ -532,6 +532,33 @@ function reportFolder(paths) {
 			);
 		});
 
+		// Field report 2026-11-05: a recommended slot macOS still took could not
+		// be read against the Mac's own gesture settings.
+		await check('the collector reads the Trackpad and Dock gesture keys, read only', () => {
+			const start = collector.indexOf('step trackpad_gestures ');
+			assert(start >= 0, 'the collector has no trackpad_gestures step');
+			const end = collector.indexOf("'\n", collector.indexOf("sh -c '", start) + 7);
+			const body = collector.slice(start, end);
+			for (const domain of [
+				'com.apple.AppleMultitouchTrackpad',
+				'com.apple.driver.AppleBluetoothMultitouch.trackpad',
+				'showMissionControlGestureEnabled',
+				'showAppExposeGestureEnabled'
+			]) {
+				assert(body.includes(domain), `the trackpad_gestures step does not read ${domain}`);
+			}
+			assert.doesNotMatch(
+				body,
+				/defaults (-currentHost )?(write|delete|import)/,
+				'the step must stay read only'
+			);
+			assert.doesNotMatch(
+				body,
+				/defaults read com\.apple\.dock 2>/,
+				"the whole Dock domain lists the user's applications"
+			);
+		});
+
 		await check('a managed Mac installs the dev prerelease with one administrator password', () => {
 			const installer = fs.readFileSync(
 				path.join(ROOT, 'tools/dev/install-macos-dev-prerelease.sh'),

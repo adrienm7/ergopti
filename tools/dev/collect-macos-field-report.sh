@@ -309,6 +309,20 @@ step launchd sh -c 'launchctl list | grep -iE "ergopti|pqrs" || true'
 step listeners sh -c 'lsof -nP -iTCP -sTCP:LISTEN || true'
 step input_sources sh -c 'defaults read com.apple.HIToolbox AppleEnabledInputSources; defaults read com.apple.HIToolbox AppleSelectedInputSources'
 step user_layouts sh -c 'ls -la "${HOME}/Library/Keyboard Layouts" 2>&1'
+# The Trackpad and Dock gesture keys the gesture conflict read uses
+# (modules/gestures/conflicts.lua), read only: a slot macOS still takes after
+# "Restore recommended" reads against them. The Dock domain also lists the
+# user's applications, so only its gesture switches are read.
+step trackpad_gestures sh -c '
+	for domain in com.apple.AppleMultitouchTrackpad com.apple.driver.AppleBluetoothMultitouch.trackpad; do
+		echo "== $domain"; defaults read "$domain" 2>&1
+	done
+	echo "== -currentHost -globalDomain (gesture keys)"
+	defaults -currentHost read -globalDomain 2>&1 | grep -iE "trackpad|gesture" || echo "no gesture key"
+	echo "== com.apple.dock (gesture switches)"
+	for key in showMissionControlGestureEnabled showAppExposeGestureEnabled showDesktopGestureEnabled showLaunchpadGestureEnabled; do
+		printf "%s: " "$key"; defaults read com.apple.dock "$key" 2>&1
+	done'
 # The day's sleeps and wakes: a key stuck across a sleep or a lease lost at
 # wake reads against them.
 step power sh -c 'uptime; pmset -g batt | head -2; pmset -g log | grep -E " (Sleep|Wake|DarkWake) " | grep "$(date +%Y-%m-%d)" | tail -40'
