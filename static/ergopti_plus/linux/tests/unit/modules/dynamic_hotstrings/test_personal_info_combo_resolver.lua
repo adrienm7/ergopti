@@ -329,6 +329,32 @@ helpers.describe("dynamic expansion events carry the privacy verdict", function(
 			"every multi-field personal combo must be private before injection")
 	end)
 
+	helpers.it("hands the retained text destination to the combo output boundary (PIL-001)", function()
+		local single_publication, combo_publication
+		local observing_injector = {
+			inject = function(_count, _text, _private, _terminator, publication)
+				single_publication = publication
+				return { ok = true }
+			end,
+			inject_fields = function(_count, _values, _private, publication)
+				combo_publication = publication
+				return { ok = true }
+			end,
+		}
+		local refused_without_destination
+		with_fixture(function()
+			local Fixture = require("tests.support.dynamic_hotstrings_fixture")
+			helpers.assert_true(Fixture.trigger(dh, "@p\\", "\\"))
+			helpers.assert_true(Fixture.trigger(dh, "@np\\", "\\"))
+			refused_without_destination = dh.on_trigger("@np\\", "\\", true, nil)
+		end, observing_injector)
+		helpers.assert_not_nil(single_publication, "the single-field output keeps its destination")
+		helpers.assert_not_nil(combo_publication,
+			"the multi-field output must keep the destination captured with the trigger")
+		helpers.assert_eq(refused_without_destination, false,
+			"a combo without a retained destination must not write into whatever is focused")
+	end)
+
 	helpers.it("the daemon forwards the flag it is given", function()
 		local path = helpers.driver_root() .. "/ergopti_hotstrings.lua"
 		local fh = assert(io.open(path, "r"), "cannot open ergopti_hotstrings.lua")
