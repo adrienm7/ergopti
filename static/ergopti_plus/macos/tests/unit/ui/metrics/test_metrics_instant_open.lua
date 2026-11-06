@@ -29,6 +29,7 @@ local SNAPSHOT = "ERGOPTI_TYPING_METRICS_SNAPSHOT 3 " .. GENERATED_AT .. " " .. 
 
 --- Runs a dashboard scenario over a fake store whose statements are counted.
 local function with_store(callback)
+	helpers.provide_timings() -- the reader resolves its busy-wait from the registry
 	with_delivery(function(dashboard, context, timers, errors, successes, evaluations, filesystem)
 		local sqlite = FakeSqlite.new({
 			ngram_chars = { { date = "2026-09-01", app = "Code", token = "a", c = 3, td = 300, e = 0, esrc_json = "{}" } },
