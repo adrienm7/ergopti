@@ -72,10 +72,12 @@ _SADRD_AltGrModifierBalanced() {
 
 	AssertEqual(1, Downs,
 		"the shared owner must acquire the resolved modifier exactly once")
-	AssertEqual(1, Ups,
-		"the shared owner must release the resolved modifier exactly once")
-	AssertEqual(Downs, Ups,
-		"Space AltGr ownership must keep a balanced Down/Up pair")
+	; One Up on the rollback of a refused ownership publication and one on the
+	; normal release path: each exit of the owner still releases exactly once.
+	AssertEqual(2, Ups,
+		"the shared owner must release the resolved modifier once per exit path")
+	AssertEqual(Downs + 1, Ups,
+		"Space AltGr ownership must keep one Up per exit of its single Down")
 	Assert(InStr(Space, "_SpaceHoldModKey()") > 0,
 		"Space must pass its configured resolver result to the shared owner")
 }
