@@ -514,6 +514,95 @@ _KLT_IndependentLayersCase() {
 	}
 }
 
+Test("keylayout emulation: a pending dead key completes with the OS character on a row switched off (layout-row-pending-dead-key)",
+	() => _KLT_WithEmulation(_KLT_PendingDisabledRowCase))
+
+; DKW-001. Ergopti+'s home-row SC02B is the circumflex dead key and its top-row
+; SC012 types o. With the global base on and only the top row switched off, the
+; pending accent must compose the OS layout's character on SC012 (e -> ê), not
+; the selected layout's (o -> ô). The original registered callbacks are driven.
+_KLT_PendingDisabledRowCase() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Registered, KLE_State, KLE_Compositions
+	global KEYLAYOUT_NEUTRAL_STATE, _Stub_RecordedSends
+	global _KLE_ResetObserverRegistering, _KLE_ResetObserverCohort, _KLE_ResetObserverCapture, _KLE_ResetObserverGeneration
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone(),
+		_KLE_ResetObserverRegistering, _KLE_ResetObserverCohort, _KLE_ResetObserverCapture,
+		_KLE_ResetObserverGeneration]
+	try {
+		Features := Map("layout", Map("emulated_layout", "ergopti_plus", "ergopti_base", true,
+			"ergopti_alt_gr", true, "ergopti_variant", "none", "direct_access_digits", "native",
+			"emulate_number_row", true, "emulate_top_row", false, "emulate_home_row", true,
+			"emulate_bottom_row", true))
+		CategoryEnabled := Map("Layout", true)
+		LayerEnabled := false
+		State["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
+		_KLT_Load("ergopti_plus")
+		KLE_Registered := false
+		Callbacks := Map()
+		Criteria := Map()
+		Current := {Criterion: 0}
+		KeylayoutEmulation_Register(LayoutRegistry_Keycodes(),
+			(Name, Callback, *) => (Callbacks[Name] := Callback, Criteria[Name] := Current.Criterion),
+			(Args*) => Current.Criterion := Args.Length ? Args[1] : 0, 0,
+			(Scan, Callback, Criterion) => 0)
+		AssertTrue(KeylayoutEmulation_LayerIsActive("ergopti_base"), "the global base layer stays on")
+		AssertFalse(LayoutRowIsEmulated("SC012"), "the top row is switched off")
+		AssertTrue(LayoutRowIsEmulated("SC02B"), "the home row stays emulated")
+		Hkl := GetForegroundKeyboardLayout()
+		Plain := KS_KeyTextNoStateChange(KS_ScancodeToVk(0x12, Hkl), 0x12, Hkl, false, false)
+		Shifted := KS_KeyTextNoStateChange(KS_ScancodeToVk(0x12, Hkl), 0x12, Hkl, true, false)
+		Assert(Plain.Count == 1 && Plain.Text != "o", "the proof needs an OS layout whose SC012 is not o")
+		Circumflex := KLE_Compositions["s1_circumflex"]
+		Assert(Circumflex.Has(Plain.Text) && Circumflex.Has(Shifted.Text),
+			"Ergopti+ composes the circumflex over the OS character " . Plain.Text)
+		if Plain.Text == "e"
+			AssertEqual(Chr(0xEA), Circumflex["e"]["Output"], "the installed US letter e composes to ê")
+		AssertFalse(Criteria["SC012"].Call(), "neutral: the switched-off top row stays with the OS")
+		InstallHotstringHooks()
+		; Plain continuation on the switched-off row.
+		_Stub_RecordedSends := []
+		Callbacks["SC02B"].Call("SC02B")
+		AssertEqual("s1_circumflex", KLE_State, "the home-row dead key arms its accent")
+		AssertTrue(Criteria["SC012"].Call(), "the pending accent owns the native continuation")
+		Callbacks["SC012"].Call("SC012")
+		AssertEqual(1, _Stub_RecordedSends.Length, "the continuation sends one result")
+		AssertEqual(Circumflex[Plain.Text]["Output"], _Stub_RecordedSends[1].args[1],
+			"the OS character completes the accent, not the selected layout's o")
+		AssertEqual(KEYLAYOUT_NEUTRAL_STATE, KLE_State, "the accent is settled")
+		; Shift continuation on the same row.
+		_Stub_RecordedSends := []
+		Callbacks["SC02B"].Call("SC02B")
+		AssertTrue(Criteria["+SC012"].Call(), "the pending accent owns the Shift continuation")
+		Callbacks["+SC012"].Call("+SC012")
+		AssertEqual(1, _Stub_RecordedSends.Length)
+		AssertEqual(Circumflex[Shifted.Text]["Output"], _Stub_RecordedSends[1].args[1],
+			"Shift composes the OS uppercase character")
+		; Enabled-row control: a home-row continuation keeps the selected layout.
+		KLE_State := "s1_circumflex"
+		Selected := KeylayoutEmulation_Press("SC01E", false, KS_CapsLockToggleState(), false)
+		_Stub_RecordedSends := []
+		Callbacks["SC02B"].Call("SC02B")
+		Callbacks["SC01E"].Call("SC01E")
+		AssertEqual(1, _Stub_RecordedSends.Length)
+		AssertEqual(Selected, _Stub_RecordedSends[1].args[1], "an emulated row composes the selected layout's key")
+	} finally {
+		UninstallHotstringHooks()
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		KLE_Registered := Saved[4]
+		State.Clear()
+		for Key, Value in Saved[5]
+			State[Key] := Value
+		_KLE_ResetObserverRegistering := Saved[6]
+		_KLE_ResetObserverCohort := Saved[7]
+		_KLE_ResetObserverCapture := Saved[8]
+		_KLE_ResetObserverGeneration := Saved[9]
+	}
+}
+
 Test("magic key: the configured key wins over the layout's declaration and the OS layout (layout-magic-key)",
 	_KLT_MagicKeySourceOrderCase)
 
