@@ -1767,12 +1767,12 @@ LLM_Bridge_OnChar(ch) {
 			return false
 		}
 		Generation := _LLM_Bridge_ContentGeneration
-		Buffer := _LLM_Bridge_Buffer
+		BridgeBuffer := _LLM_Bridge_Buffer
 	} finally {
 		Critical(PreviousCritical)
 	}
 	Current := _LLM_Bridge_TypingSourceCurrent.Bind(Source, true, Generation)
-	return _LLM_Bridge_NotifyChar(ch, Buffer, Current, Source, Receipt)
+	return _LLM_Bridge_NotifyChar(ch, BridgeBuffer, Current, Source, Receipt)
 }
 
 _LLM_Bridge_NotifyChar(ch, Buffer, PublishGuard := unset, Source := unset, Receipt := unset) {
@@ -2014,15 +2014,15 @@ _LLM_Bridge_ObserveAgentTyping(DeleteFromEnd, InsertedText) {
 		_LLM_Bridge_PrepareInput(InsertedText)
 		LLM_Bridge_MirrorAgentEdit(DeleteFromEnd, InsertedText)
 		Generation := _LLM_Bridge_AgentContentGeneration
-		Buffer := _LLM_Bridge_AgentBuffer
-		if Buffer != "" && _TextCompleteTailScalar(Buffer) == "" {
+		BridgeBuffer := _LLM_Bridge_AgentBuffer
+		if BridgeBuffer != "" && _TextCompleteTailScalar(BridgeBuffer) == "" {
 			_LLM_Bridge_InvalidateIncompleteTyping(false)
 			return false
 		}
 	} finally Critical(EditCritical)
 	try {
 		Current := _LLM_Bridge_TypingStateCurrent.Bind(Source, false, Generation)
-		LLM_Agent_OnTyping(Buffer, _LLM_Bridge_AdmittedTypingCurrent.Bind(Current, Receipt, true),
+		LLM_Agent_OnTyping(BridgeBuffer, _LLM_Bridge_AdmittedTypingCurrent.Bind(Current, Receipt, true),
 			_LLM_Bridge_TypingSourceCurrent.Bind(Source, false, Generation))
 	} catch as Err {
 		Now := A_TickCount

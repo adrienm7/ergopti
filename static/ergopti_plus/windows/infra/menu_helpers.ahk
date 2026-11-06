@@ -254,13 +254,13 @@ _HS_BuildDisambiguatedSectionLabels(TomlData) {
 				if (SecName == "-" or !TomlData["sections"].Has(SecName))
 						continue
 				Desc := TomlData["sections"][SecName]["description"]
-				Number := (Seen.Has(Desc) ? Seen[Desc] : 0) + 1
-				Candidate := Number > 1 ? Desc . " #" . Number : Desc
+				Ordinal := (Seen.Has(Desc) ? Seen[Desc] : 0) + 1
+				Candidate := Ordinal > 1 ? Desc . " #" . Ordinal : Desc
 				while Used.Has(Candidate) {
-						Number := Max(2, Number + 1)
-						Candidate := Desc . " #" . Number
+						Ordinal := Max(2, Ordinal + 1)
+						Candidate := Desc . " #" . Ordinal
 				}
-				Seen[Desc] := Number
+				Seen[Desc] := Ordinal
 				Used[Candidate] := true
 				Out[SecName] := Candidate
 		}

@@ -487,8 +487,8 @@ class SystemControl {
 				Failed += 1
 				continue
 			}
-			Search := DllCall("Kernel32\FindFirstFileW", "Str", RTrim(Current, "\/") . "\*", "Ptr", Data, "Ptr")
-			if Search == -1 {
+			FindHandle := DllCall("Kernel32\FindFirstFileW", "Str", RTrim(Current, "\/") . "\*", "Ptr", Data, "Ptr")
+			if FindHandle == -1 {
 				; No matches is a valid empty directory; all other failures are incomplete.
 				if A_LastError != 2
 					Failed += 1
@@ -513,14 +513,14 @@ class SystemControl {
 						else
 							Files.Push(Path)
 					}
-					if !DllCall("Kernel32\FindNextFileW", "Ptr", Search, "Ptr", Data, "Int") {
+					if !DllCall("Kernel32\FindNextFileW", "Ptr", FindHandle, "Ptr", Data, "Int") {
 						if A_LastError != 18 ; ERROR_NO_MORE_FILES
 							Failed += 1
 						break
 					}
 				}
 			} finally {
-				if !DllCall("Kernel32\FindClose", "Ptr", Search, "Int")
+				if !DllCall("Kernel32\FindClose", "Ptr", FindHandle, "Int")
 					Failed += 1
 			}
 		}
