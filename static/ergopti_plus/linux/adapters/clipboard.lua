@@ -109,6 +109,9 @@ local function backend()
 				-- (RFC 2483); the plain read gets its text form, if any.
 				read_uri_list = string.format(
 					"timeout %d wl-paste --no-newline --type text/uri-list 2>/dev/null", IO_TIMEOUT_S),
+				-- Every MIME type the owner offers, one per line: a borrower
+				-- checks it before replacing formats it could not put back.
+				list_types = string.format("timeout %d wl-paste --list-types 2>/dev/null", IO_TIMEOUT_S),
 			}
 		end
 		return nil
@@ -122,6 +125,9 @@ local function backend()
 				write = "xclip -selection clipboard -in",
 				read_uri_list = string.format(
 					"timeout %d xclip -selection clipboard -t text/uri-list -o 2>/dev/null", IO_TIMEOUT_S),
+				-- The ICCCM TARGETS answer: every target the owner can convert to.
+				list_types = string.format(
+					"timeout %d xclip -selection clipboard -t TARGETS -o 2>/dev/null", IO_TIMEOUT_S),
 			}
 		end
 		if Shell.has_command("xsel") then
@@ -180,14 +186,67 @@ local function write_backend_checked(selected_backend, text)
 	return ran and result == true
 end
 
---- Accepts a saved snapshot only when the text writer can restore its bytes.
+-- Targets that carry the text the writer restores, or ICCCM bookkeeping
+-- with no payload of its own. Anything else (text/html, image/png, a file
+-- manager's copied files...) is a format the single-type writers cannot
+-- offer back alongside the text.
+local TEXT_EQUIVALENT_TARGETS = {
+	["TARGETS"] = true, ["TIMESTAMP"] = true, ["MULTIPLE"] = true,
+	["SAVE_TARGETS"] = true, ["DELETE"] = true, ["INSERT_SELECTION"] = true,
+	["INSERT_PROPERTY"] = true, ["UTF8_STRING"] = true, ["STRING"] = true,
+	["TEXT"] = true, ["COMPOUND_TEXT"] = true, ["text/plain"] = true,
+}
+
+--- Whether one advertised target is the restored text or bookkeeping.
+--- @param target string One line of the type listing.
+--- @return boolean
+local function is_text_equivalent_target(target)
+	if TEXT_EQUIVALENT_TARGETS[target] then return true end
+	-- text/plain;charset=utf-8 and its spelling variants name the same text.
+	local charset = target:lower():match("^text/plain%s*;%s*charset%s*=%s*\"?([%w%-_]+)\"?$")
+	return charset == "utf-8" or charset == "utf8"
+end
+
+--- Lists the clipboard formats a restore of the text alone would destroy.
+--- @param selected_backend table
+--- @return boolean ok False when the formats could not be enumerated.
+--- @return table lost Advertised formats other than the text.
+local function formats_lost_by_text_restore(selected_backend)
+	if not selected_backend.list_types then return false, {} end
+	local ok, listing = Shell.exec_checked(selected_backend.list_types)
+	if not ok then return false, {} end
+	local lost = {}
+	for line in listing:gmatch("[^\r\n]+") do
+		local target = line:match("^%s*(.-)%s*$")
+		if target ~= "" and not is_text_equivalent_target(target) then lost[#lost + 1] = target end
+	end
+	return true, lost
+end
+
+--- Accepts a saved snapshot only when the writer can restore it whole.
 --- Raw readers may return NUL, but the literal sh -c writer cannot carry it.
---- Refuse before an owner acquires restoration debt or mutates the clipboard.
+--- The writers also offer a single text type: a clipboard holding HTML, an
+--- image or copied files next to its text would come back as text alone,
+--- which Windows (ClipboardAll) and macOS (readAllData) never do. Refuse
+--- before an owner acquires restoration debt or mutates the clipboard.
 local function read_restorable_snapshot(selected_backend)
 	local ok, contents, reason = read_backend_checked(selected_backend)
 	if not ok then return false, "", reason end
 	if contents:find("\0", 1, true) then
 		Logger.warn(LOG, "Clipboard snapshot cannot be restored through the text writer.")
+		return false, "", "clipboard_snapshot_not_restorable"
+	end
+	local listed, lost = formats_lost_by_text_restore(selected_backend)
+	if not listed then
+		-- xsel cannot ask for TARGETS: nothing proves the text is all there is.
+		Logger.warn(LOG, "Clipboard formats cannot be listed via %s; borrowing refused (install %s).",
+			selected_backend.name, DisplayServer.is_wayland() and "wl-clipboard" or "xclip")
+		return false, "", "clipboard_formats_unknown"
+	end
+	if #lost > 0 then
+		-- Format names only: they describe the clipboard, not its content.
+		Logger.warn(LOG, "Clipboard also holds %s, which the text writer cannot restore; borrowing refused.",
+			table.concat(lost, ", "))
 		return false, "", "clipboard_snapshot_not_restorable"
 	end
 	return true, contents, nil

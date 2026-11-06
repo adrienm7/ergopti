@@ -5,7 +5,7 @@ local REPLACEMENT = "EP79_PRIVATE_REPLACEMENT_CANARY"
 local SELECTED = "EP79_PRIVATE_SELECTED_CANARY"
 local URI = "file:///owned/EP79_PRIVATE_URI_CANARY\n"
 
-local function with_snapshot(saved, body)
+local function with_snapshot(saved, body, targets)
 	local loaded, globals = {}, {}
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local old_cpath, old_ffi_preload = package.cpath, package.preload.ffi
@@ -41,7 +41,8 @@ local function with_snapshot(saved, body)
 		display._set_for_test(display.X11, "private-memory")
 		shell = require("adapters.shell_runner")
 		local validate, run, checked, exact = shell.validate_spawn_args, shell.run, shell.exec_checked, shell.with_exact_stdin
-		local s = { value = saved, writes = {}, reads = {}, settles = {}, emits = {}, transforms = 0, layout_calls = 0 }
+		local s = { value = saved, writes = {}, reads = {}, settles = {}, emits = {}, transforms = 0, layout_calls = 0,
+			listings = 0, targets = targets or "TARGETS\nTIMESTAMP\nUTF8_STRING\ntext/plain;charset=utf-8\n" }
 		package.loaded["adapters.keyboard_layout"] = {
 			shortcut_keycode = function(char, fallback)
 				s.layout_calls = s.layout_calls + 1
@@ -55,6 +56,10 @@ local function with_snapshot(saved, body)
 			local clipboard = "timeout 1 xclip -selection clipboard -o 2>/dev/null"
 			local primary = "timeout 1 xclip -selection primary -o 2>/dev/null"
 			local uri = "timeout 1 xclip -selection clipboard -t text/uri-list -o 2>/dev/null"
+			if command == "timeout 1 xclip -selection clipboard -t TARGETS -o 2>/dev/null" then
+				s.listings = s.listings + 1
+				return { ok = true, output = s.targets }
+			end
 			if command == clipboard or command == primary or command == uri then
 				s.reads[#s.reads + 1] = command
 				return { ok = true, output = s.value }
@@ -160,6 +165,21 @@ helpers.describe("clipboard snapshot restorability", function()
 					elseif owner == "read_selection" then helpers.assert_eq(text, SELECTED)
 					elseif owner == "read_selection_uri_list" then helpers.assert_eq(text, URI) end
 				end)
+			end)
+		end
+		-- LCP-001: the text writer offers one type, so a clipboard that also holds
+		-- HTML, an image or copied files would come back as text alone.
+		for _, extra in ipairs({ "text/html", "image/png", "x-special/gnome-copied-files", "text/uri-list" }) do
+			helpers.it("snapshot preflight: " .. owner .. " refuses a clipboard that also holds " .. extra, function()
+				local targets = "TARGETS\nTIMESTAMP\nUTF8_STRING\n" .. extra .. "\ntext/plain\n"
+				with_snapshot("EP79_PRIVATE_RICH_TEXT", function(_, s)
+					local accepted = s.invoke(owner)
+					helpers.assert_eq(#s.writes, 0, "a format the writer cannot restore must refuse before borrowing")
+					helpers.assert_eq(s.value, "EP79_PRIVATE_RICH_TEXT")
+					helpers.assert_eq(accepted, false)
+					helpers.assert_eq(s.listings, 1)
+					helpers.assert_eq({ #s.settles, #s.emits, s.transforms }, { 0, 0, 0 })
+				end, targets)
 			end)
 		end
 	end

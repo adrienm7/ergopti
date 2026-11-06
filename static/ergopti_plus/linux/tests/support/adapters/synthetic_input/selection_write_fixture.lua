@@ -8,6 +8,7 @@
 --- ==============================================================================
 local M = {}
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local text_owner = require("tests.support.text_owner_fixture")
 
 --- Runs an isolated selected write with controlled native settlement boundaries.
@@ -52,7 +53,10 @@ function M.with(body)
 		local pending
 		package.loaded["adapters.shell_runner"] = {
 			has_command = function() return true end,
-			exec_checked = function() boundary("read"); return true, state.clipboard end,
+			exec_checked = function(command)
+				if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
+				boundary("read"); return true, state.clipboard
+			end,
 			with_exact_stdin = function(_, text) pending = text; return "controlled clipboard write" end,
 			run = function()
 				local text = pending

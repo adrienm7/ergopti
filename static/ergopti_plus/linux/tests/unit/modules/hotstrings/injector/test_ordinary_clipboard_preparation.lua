@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local names = { "modules.hotstrings.injector", "adapters.clipboard", "modules.hotstrings.output_transaction",
 	"adapters.keyboard_layout", "adapters.xkb_capture", "adapters.shell_runner", "infra.display_server",
 	"logger.shim", "adapters.keyboard_hook", "adapters.modifier_broker", "input.modifier_custody", "adapters.uinput_writer" }
@@ -37,7 +38,8 @@ local function fixture(options, callback)
 		end,
 	}
 	local Shell = { has_command = function(name) return name == "xclip" end }
-	function Shell.exec_checked()
+	function Shell.exec_checked(command)
+		if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY, nil end
 		record("read")
 		if options.read_refuses then return false, "", "native pipe read failed" end
 		if options.retire_on_read then retire() end

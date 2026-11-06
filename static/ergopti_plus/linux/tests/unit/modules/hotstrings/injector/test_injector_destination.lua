@@ -7,6 +7,7 @@
 --- command/output ports. No native input qualification is claimed by these units.
 --- ==============================================================================
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local fixture = require("tests.support.text_owner_fixture")
 
 --- Runs the complete injection with controlled clipboard I/O and focus changes.
@@ -41,7 +42,10 @@ local function injection(boundary, body)
 		package.loaded["adapters.shell_runner"] = {
 			has_command = function() return true end,
 			-- A completed write is what the next read sees, as on a real clipboard.
-			exec_checked = function() transition("read"); return true, clipboard end,
+			exec_checked = function(command)
+				if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
+				transition("read"); return true, clipboard
+			end,
 			with_exact_stdin = function(_, text)
 				local command = "controlled-clipboard-" .. tostring(#commands + 1)
 				commands[#commands + 1] = { command = command, text = text }

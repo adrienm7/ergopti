@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local fixture = require("tests.support.text_owner_fixture")
 
 --- Executes Main's actual initialization call while isolating configuration I/O.
@@ -63,7 +64,8 @@ local function with_action(session, action, change, body)
 			package.loaded["adapters.shell_runner"] = {
 				quote = function(value) return "'" .. value .. "'" end,
 				has_command = function() return true end,
-				exec_checked = function()
+				exec_checked = function(command)
+					if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
 					world.reads = world.reads + 1
 					local snapshot = world.clipboard
 					if world.reads == 1 then
@@ -398,7 +400,8 @@ local function observe_configured_insertion(session, action, route, change)
 			package.loaded["adapters.shell_runner"] = {
 				quote = function(value) return "'" .. value .. "'" end,
 				has_command = function() return true end,
-				exec_checked = function()
+				exec_checked = function(command)
+					if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
 					world.reads = world.reads + 1
 					retire("snapshot")
 					return true, world.clipboard

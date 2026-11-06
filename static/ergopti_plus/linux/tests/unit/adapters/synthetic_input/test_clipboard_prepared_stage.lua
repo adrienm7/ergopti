@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 
 local function with_stage(body, options)
 	options = options or {}
@@ -26,7 +27,8 @@ local function with_stage(body, options)
 		s.backend_calls = s.backend_calls + 1; boundary("backend")
 		return not options.unavailable
 	end
-	function shell.exec_checked()
+	function shell.exec_checked(command)
+		if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
 		s.reads = s.reads + 1; boundary("read")
 		if options.read_refused then return false, "", "controlled refusal" end
 		return true, s.value
