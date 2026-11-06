@@ -593,12 +593,18 @@ function Converter:compose()
 		end
 	end
 
+	local explicit = self:explicit_state_keysyms()
+	local chain_heads = {}
+	for _, seqs in pairs(sequences) do
+		for _, seq in ipairs(seqs) do chain_heads[table.concat(seq, " ")] = true end
+	end
 	local first = true
 	local emitted = {}
 	local conflicts = {}
 	for _, state in ipairs(TableUtil.sorted_keys(outputs)) do
 		if sequences[state] ~= nil then
 			sort_pairs(outputs[state])
+			local terminator = self.layout.terminators[state] or ""
 			for _, prefix in ipairs(sequences[state]) do
 				if not first then lines[#lines + 1] = "" end
 				first = false
@@ -619,11 +625,60 @@ function Converter:compose()
 						end
 					end
 				end
+				if is_printable(terminator) then
+					local explicit_here = explicit[state] or {}
+					local prefix_key = table.concat(prefix, " ")
+					for _, pair in ipairs(self:typed_texts()) do
+						local keysym, text = pair[1], pair[2]
+						local sequence = head .. " <" .. keysym .. ">"
+						if emitted[sequence] == nil and not explicit_here[keysym]
+							and not chain_heads[prefix_key .. " " .. keysym] then
+							emitted[sequence] = terminator .. text
+							lines[#lines + 1] = sequence .. "\t: " .. compose_string(terminator .. text)
+						end
+					end
+				end
 			end
 		end
 	end
 	self.conflicts = conflicts
 	return 'include "%L"\n\n' .. table.concat(lines, "\n") .. "\n"
+end
+
+--- { keysym, text } of every key/level typing text, in keyboard order. Inside a dead
+--- state macOS types the dead key's terminator then what a key with no composition
+--- there types; compose() writes that fallback explicitly, since native Compose would
+--- cancel the sequence instead. Twin of _typed_texts in keylayout_to_xkb.py.
+function Converter:typed_texts()
+	local found, seen = {}, {}
+	for _, key in ipairs(self.keycodes) do
+		for _, cell in ipairs(self.grid[key[1]]) do
+			if cell.kind == "text" then
+				local keysym = self:text_keysym(cell.text)
+				if not seen[keysym] then
+					seen[keysym] = true
+					found[#found + 1] = { keysym, cell.text }
+				end
+			end
+		end
+	end
+	return found
+end
+
+--- State -> set of keysyms whose action the .keylayout defines in that state: an
+--- explicit <when>, even one typing nothing or chaining, never gets the terminator
+--- fallback. Twin of _explicit_state_keysyms in keylayout_to_xkb.py.
+function Converter:explicit_state_keysyms()
+	local explicit = {}
+	for _, action_id in ipairs(self.layout.action_ids) do
+		for _, when in ipairs(self.layout.actions[action_id].list) do
+			if when.state ~= "none" then
+				explicit[when.state] = explicit[when.state] or {}
+				for _, keysym in ipairs(self:state_keysyms(action_id)) do explicit[when.state][keysym] = true end
+			end
+		end
+	end
+	return explicit
 end
 
 --- The policy descriptor of a grid cell, as layout/number_row_policy.lua reads it.

@@ -44,13 +44,20 @@ EXPECTED_SEQUENCES = {
     ("infinity", "asciicircum"): "⃗",
     ("infinity", "dead_circumflex"): "→",
     ("infinity", "U26A0"): "⃕",
+    # A key with no composition in the state: macOS types the terminator,
+    # then what the key types (the plain "^" key, then a).
+    ("dead_circumflex", "asciicircum"): "^^",
+    ("dead_diaeresis", "a"): "¨a",
 }
-# The sequences the old converter wrote instead: nobody can type them.
-UNTYPABLE_SEQUENCES = {
-    ("dead_circumflex", "asciicircum"),
-    ("dead_circumflex", "diaeresis"),
-    ("dead_diaeresis", "diaeresis"),
-    ("infinity", "U262D"),
+# What the old converter wrote for a dead key pressed inside a dead state,
+# naming the character the key types instead of the keysym it sends. The plain
+# "^" key does send asciicircum, so that sequence now exists, but only with its
+# terminator fallback, never the chained output.
+OLD_CHAINED_SEQUENCES = {
+    ("dead_circumflex", "asciicircum"): "^",
+    ("dead_circumflex", "diaeresis"): "/",
+    ("dead_diaeresis", "diaeresis"): "¨",
+    ("infinity", "U262D"): "⃕",
 }
 
 
@@ -95,8 +102,10 @@ class ChainedDeadKeyTests(unittest.TestCase):
             with self.subTest(sequence=sequence):
                 self.assertEqual(self.compose.get(sequence), output)
 
-    def test_no_sequence_names_a_keysym_no_key_sends(self):
-        self.assertEqual(UNTYPABLE_SEQUENCES & set(self.compose), set())
+    def test_no_chained_output_names_the_character_a_dead_key_types(self):
+        for sequence, chained in OLD_CHAINED_SEQUENCES.items():
+            with self.subTest(sequence=sequence):
+                self.assertNotEqual(self.compose.get(sequence), chained)
 
     def test_a_plain_key_and_a_dead_key_with_one_base_keysym_do_not_collide(self):
         self.assertEqual(self.result.conflicts, [])

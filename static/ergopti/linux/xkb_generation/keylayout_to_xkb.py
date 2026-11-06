@@ -857,11 +857,14 @@ class _Converter:
                 if state != "none" and output:
                     outputs.setdefault(state, []).append((action_id, output))
 
+        explicit = self._explicit_state_keysyms()
+        chain_heads = {tuple(seq) for seqs in sequences.values() for seq in seqs}
         first = True
         emitted: Dict[str, str] = {}
         for state in sorted(outputs):
             if state not in sequences:
                 continue
+            terminator = self.layout.terminators.get(state, "")
             for prefix in sequences[state]:
                 if not first:
                     lines.append("")
@@ -879,7 +882,51 @@ class _Converter:
                             continue
                         emitted[sequence] = output
                         lines.append("%s\t: %s" % (sequence, compose_string(output)))
+                if not is_printable(terminator):
+                    continue
+                for keysym, text in self._typed_texts():
+                    sequence = "%s <%s>" % (head, keysym)
+                    if (
+                        sequence in emitted
+                        or keysym in explicit.get(state, ())
+                        or tuple(prefix) + (keysym,) in chain_heads
+                    ):
+                        continue
+                    emitted[sequence] = terminator + text
+                    lines.append("%s\t: %s" % (sequence, compose_string(terminator + text)))
         return 'include "%L"\n\n' + "\n".join(lines) + "\n"
+
+    def _typed_texts(self) -> List[Tuple[str, str]]:
+        """(keysym, text) of every key/level typing text, in keyboard order.
+
+        Inside a dead state macOS types the dead key's terminator then what a
+        key with no composition there types; compose() writes that fallback
+        explicitly, since native Compose would cancel the sequence instead.
+        """
+        found: List[Tuple[str, str]] = []
+        seen = set()
+        for xkb, _code in self.keycodes:
+            for cell in self.grid[xkb]:
+                if cell.kind != "text":
+                    continue
+                keysym = self.text_keysym(cell.text)
+                if keysym not in seen:
+                    seen.add(keysym)
+                    found.append((keysym, cell.text))
+        return found
+
+    def _explicit_state_keysyms(self) -> Dict[str, set]:
+        """State -> keysyms whose action the .keylayout defines in that state.
+
+        An explicit <when>, even one typing nothing or chaining, is the
+        layout's answer and never gets the terminator fallback.
+        """
+        explicit: Dict[str, set] = {}
+        for action_id, action in self.layout.actions.items():
+            for state in action.whens:
+                if state != "none":
+                    explicit.setdefault(state, set()).update(self.state_keysyms(action_id))
+        return explicit
 
 
 def compose_string(text: str) -> str:
