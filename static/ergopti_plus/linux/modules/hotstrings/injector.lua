@@ -580,7 +580,12 @@ end
 --- @return table fields Exact retained route for each original value.
 local function prepare_fields(values, owner, publication)
 	local fields = {}
-	for index, value in ipairs(values) do fields[index] = prepare_replacement(value, publication, owner) end
+	-- Only the FIRST field is bound to the destination captured when the trigger
+	-- was typed: the intended Tabs move focus to the following fields, so holding
+	-- those to the original destination would refuse the feature itself.
+	for index, value in ipairs(values) do
+		fields[index] = prepare_replacement(value, index == 1 and publication or nil, owner)
+	end
 	local active = 1
 	local batch = { channel = owner.channel }
 	function batch.current()
@@ -1021,7 +1026,8 @@ end
 --- @param backspace_count integer Characters to erase before typing.
 --- @param values table Array of strings, in the order they are typed.
 --- @param is_private boolean|nil True when the values are PII and must not be logged.
-function M.inject_fields(backspace_count, values, is_private)
+--- @param publication table|nil Retained text destination captured when the trigger was typed.
+function M.inject_fields(backspace_count, values, is_private, publication)
 	if type(backspace_count) ~= "number" or type(values) ~= "table" then
 		Logger.error(LOG, "inject_fields(): invalid arguments — bc is %s, values is %s.",
 			type(backspace_count), type(values))
@@ -1042,7 +1048,7 @@ function M.inject_fields(backspace_count, values, is_private)
 	-- inject() keeps a single implementation of the modifier neutralisation, the
 	-- two-phase timing and the clipboard fallback.
 	if #values == 1 then
-		return M.inject(backspace_count, values[1], is_private)
+		return M.inject(backspace_count, values[1], is_private, nil, publication)
 	end
 	local owner = capture_replacement_owner()
 	if not retire_clipboard() then
@@ -1055,17 +1061,21 @@ function M.inject_fields(backspace_count, values, is_private)
 	else
 		Logger.trace(LOG, "inject_fields(): bc=%d, %d field(s)…", backspace_count, #values)
 	end
-	local checked, prepared, fields = pcall(prepare_fields, values, owner)
+	local checked, prepared, fields = pcall(prepare_fields, values, owner, publication)
 	if not checked then
 		Logger.error(LOG, "Cannot prepare %d replacement field(s) before erasure (content withheld).", #values)
 		return { ok = false, error = private_failure(prepared, is_private), failed_phase = "replacement preflight", cleanup_ok = true }
 	end
 
 	local result = run_transaction("inject_fields()", function(tx)
+		-- The first erase and the first value must still belong to the field the
+		-- trigger was typed in; later fields are reached through the Tabs below.
+		require_publication(publication, false)
 		if backspace_count > 0 then
 			send_backspaces(tx, backspace_count)
 			sleep_ms(INTER_PHASE_DELAY_MS)
 		end
+		require_publication(publication, false)
 
 		for index, value in ipairs(values) do
 			if not send_text(tx, value, is_private, fields[index]) then error(tx.error(), 0) end

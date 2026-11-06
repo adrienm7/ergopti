@@ -417,13 +417,19 @@ end
 --- remove when it flips.
 --- @param prefix string The buffer without the trigger character.
 --- @param trigger string The trigger character that fired.
+--- @param publication table|nil Retained text destination captured with the trigger.
 --- @return boolean fired
 --- @return table|nil event Canonical event details when it fired.
-local function _fire_combo(prefix, trigger)
+local function _fire_combo(prefix, trigger, publication)
 	if not M.is_rule_enabled(DYNAMIC_GROUP, PERSONAL_SECTION) then return false end
 
 	local tag = M.trailing_tag(prefix)
 	if tag == "" then return false end
+	if type(publication) ~= "table" or getmetatable(publication) ~= nil
+		or type(publication.current) ~= "function" or type(publication.cached) ~= "function" then
+		Logger.warn(LOG, "Dynamic @-combo expansion refused: no retained text destination.")
+		return false
+	end
 
 	local values = M.resolve_combo_values(tag)
 	-- A single-letter tag that resolves here is one the registered rule already
@@ -452,7 +458,7 @@ local function _fire_combo(prefix, trigger)
 	local backspace_count = tag_length + 2
 	-- is_private is not optional: every value here comes out of personal_info.toml,
 	-- so the payload is the user's own data by construction.
-	local delivery = injector.inject_fields(backspace_count, values, true)
+	local delivery = injector.inject_fields(backspace_count, values, true, publication)
 	if type(delivery) ~= "table" or delivery.ok ~= true then
 		Logger.error(LOG,
 			"@-combo output did not commit for '@%s' (%d field(s), %d-byte content withheld).",
@@ -510,7 +516,7 @@ function M.on_trigger(buffer, trigger, start_is_boundary, publication)
 		-- Nothing registered claimed the sequence. Only now try the multi-letter
 		-- @-combo, so a registered tag always wins: "@dt" spells two valid alias
 		-- letters AND is the short-date rule, and the registration is what decides.
-		local expanded, event = _fire_combo(prefix, t)
+		local expanded, event = _fire_combo(prefix, t, publication)
 		if expanded then return expanded, event end
 		if UserCode.request(prefix) then return true, { pending_user = true } end
 		return false
