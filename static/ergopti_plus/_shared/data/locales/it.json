@@ -1808,6 +1808,8 @@
 	"menu.layout.pause_layout_enabled": "Cambia layout in pausa / ripresa",
 	"menu.layout.pause_layout_section": "Layout in pausa / ripresa",
 	"menu.layout.pause_layout_unsupported_desktop": "Layout in pausa / ripresa: non disponibile su questo desktop (solo GNOME, KDE o X11)",
+	"menu.layout.select_failed": "Impossibile cambiare il layout di tastiera. Consulta i log per i dettagli.",
+	"menu.layout.active_layouts_unsupported_desktop": "Non disponibile su questo desktop (solo GNOME, KDE o X11)",
 	"menu.layout.replace": "Trasformare un tasto nel tasto ★",
 	"menu.layout.magic_key_source": "Tasto magico fisico",
 	"menu.layout.magic_key_source.auto": "Automatico (il tasto del layout)",

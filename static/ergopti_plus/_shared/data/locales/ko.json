@@ -1808,6 +1808,8 @@
 	"menu.layout.pause_layout_enabled": "일시정지/재개 시 레이아웃 전환",
 	"menu.layout.pause_layout_section": "일시정지/재개 시 레이아웃",
 	"menu.layout.pause_layout_unsupported_desktop": "일시 정지 / 재개 시 레이아웃: 이 데스크톱에서는 사용할 수 없음 (GNOME, KDE 또는 X11만)",
+	"menu.layout.select_failed": "키보드 레이아웃을 전환할 수 없습니다. 자세한 내용은 로그를 확인하세요.",
+	"menu.layout.active_layouts_unsupported_desktop": "이 데스크톱에서는 사용할 수 없음 (GNOME, KDE 또는 X11만)",
 	"menu.layout.replace": "키를 ★ 키로 변환",
 	"menu.layout.magic_key_source": "물리 매직 키",
 	"menu.layout.magic_key_source.auto": "자동 (레이아웃의 키)",

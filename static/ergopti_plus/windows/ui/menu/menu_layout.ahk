@@ -47,6 +47,57 @@ _LAY_CustomLayoutRows(FeaturesSource := unset, Enabled := unset, Index := unset)
 	return [Map("label", Label, "disabled", true)]
 }
 
+/**
+ * Layout > « Input sources »: the layouts installed for the user, the active
+ * one ticked, choosing another switching the foreground window to it, as macOS
+ * lists and selects its input sources.
+ * @param {Func} ChoicesFn Optional port with KLS_Choices' contract.
+ * @param {Func} ActiveFn Optional port with KLS_ActiveId's contract.
+ * @param {Func} SelectFn Optional port with KLS_Select's contract.
+ * @param {Func} ErrorFn Optional port: ErrorFn(Message) tells a refused switch.
+ * @param {Func} OpenFn Optional port with KLS_OpenSettings' contract.
+ * @returns {Array} Provider rows.
+ */
+_LAY_ActiveLayoutRows(ChoicesFn := 0, ActiveFn := 0, SelectFn := 0, ErrorFn := 0, OpenFn := 0) {
+	if !HasMethod(ChoicesFn, "Call")
+		ChoicesFn := KLS_Choices
+	if !HasMethod(ActiveFn, "Call")
+		ActiveFn := KLS_ActiveId
+	if !HasMethod(SelectFn, "Call")
+		SelectFn := KLS_Select
+	if !HasMethod(ErrorFn, "Call")
+		ErrorFn := (Message) => Ui_MsgBox(Message, t("common.error_title"), "Icon!")
+	if !HasMethod(OpenFn, "Call")
+		OpenFn := KLS_OpenSettings
+	Choices := ChoicesFn.Call()
+	if (Choices.Length == 0) {
+		Rows := MenuRenderer_TemplateRows("layout_active_source_empty_commands",
+			Map(MenuCommand.LAYOUT_OPEN_PREFERENCES, (*) => OpenFn.Call()), Map(), Map())
+		return Rows is Array ? Rows : []
+	}
+	Active := ActiveFn.Call()
+	; One call per choice owns its id: a closure over the loop variable would
+	; see its last value.
+	SelectAction(Klid) {
+		return (*) => _LAY_SelectActiveLayout(Klid, SelectFn, ErrorFn)
+	}
+	Rows := []
+	for Choice in Choices
+		Rows.Push(Map("label", Choice["label"], "checked", Choice["id"] == Active,
+			"disabled", Choice["id"] == Active, "action", SelectAction(Choice["id"])))
+	return Rows
+}
+
+; Switches to one installed layout from the menu and tells a refusal.
+_LAY_SelectActiveLayout(Klid, SelectFn, ErrorFn) {
+	try LoggerInfo("Layout", "Switching the keyboard layout to {1} from the menu.", Klid)
+	Result := SelectFn.Call(Klid)
+	if (Result is Integer) && Result == 1
+		return 1
+	ErrorFn.Call(t("menu.layout.select_failed"))
+	return false
+}
+
 ; List provider: Ergopti base-layer feature only (ergopti_base).
 ;
 ; A `list` since 2026-08-07, where both blocks were `dynamic` handlers handed the

@@ -2436,27 +2436,23 @@
 			]
 		},
 		{
-			"type": "---",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
+			"type": "---"
 		},
 		{
 			"type": "section_header",
-			"i18n": "menu.layout.active_layouts",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos"
+			"i18n": "menu.layout.active_layouts"
 		},
 		{
 			"type": "list",
 			"id": "active_layouts",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos"
+			"status_rows": {
+				"unsupported_desktop": [
+					{
+						"type": "label",
+						"i18n": "menu.layout.active_layouts_unsupported_desktop"
+					}
+				]
+			}
 		},
 		{
 			"type": "---"
@@ -3855,11 +3851,7 @@
 		{
 			"type": "command",
 			"id": "layout_open_preferences",
-			"i18n": "menu.layout.open_prefs",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
+			"i18n": "menu.layout.open_prefs"
 		}
 	],
 	"llm_custom_profile_controls": [

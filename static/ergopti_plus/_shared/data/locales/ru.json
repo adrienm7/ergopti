@@ -1808,6 +1808,8 @@
 	"menu.layout.pause_layout_enabled": "Переключать раскладку при паузе / возобновлении",
 	"menu.layout.pause_layout_section": "Раскладка при паузе / возобновлении",
 	"menu.layout.pause_layout_unsupported_desktop": "Раскладка при паузе / возобновлении: недоступно в этой среде (только GNOME, KDE или X11)",
+	"menu.layout.select_failed": "Не удалось переключить раскладку клавиатуры. Подробности — в журналах.",
+	"menu.layout.active_layouts_unsupported_desktop": "Недоступно в этой среде (только GNOME, KDE или X11)",
 	"menu.layout.replace": "Превратить клавишу в клавишу ★",
 	"menu.layout.magic_key_source": "Физическая волшебная клавиша",
 	"menu.layout.magic_key_source.auto": "Автоматически (клавиша раскладки)",
