@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "Solo Windows: Microsoft Office in francese mette in grassetto con Ctrl+G dove le altre app usano Ctrl+B, quindi questa azione sceglie il tasto in base all'app. Su macOS (Cmd+B) e Linux (Ctrl+B) una sola combinazione va bene ovunque: assegnala da «Scorciatoie».",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Questo sistema registra lo schermo dal proprio strumento di cattura (la barra Istantanea schermo di macOS, lo strumento di GNOME o KDE), che l'azione equivalente apre.",
 	"platform_reason.action_same_action_under_another_name": "Questo sistema offre la stessa azione con un altro nome: usa l'azione equivalente.",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "Non su Linux: disegnare sopra tutte le finestre richiede una superficie sovrapposta che i compositori Wayland non concedono a nessuna app.",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "Non è un'azione a sé su questo sistema: è una delle sue combinazioni modificatore + tasto (Cmd su macOS, Ctrl su Windows e Linux), elencate in «Scorciatoie».",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "Gli Spaces di macOS e i desktop di Windows e Linux sono gli stessi desktop virtuali con due nomi: usa l'azione equivalente.",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "Non su macOS: gli Spaces si aggiungono e si rimuovono in Mission Control, che macOS non lascia controllare a nessun'altra app.",

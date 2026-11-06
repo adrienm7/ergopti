@@ -139,7 +139,7 @@ end
 --- @return table|nil monitors
 --- @return number|nil x
 --- @return number|nil y
-local function read_state(action)
+function M.read_state(action)
 	if require("infra.display_server").is_wayland() then
 		Logger.error(LOG, "%s: a Wayland session lets no program move the pointer.", action)
 		return nil
@@ -166,7 +166,7 @@ end
 --- center_mouse: the centre of the monitor under the pointer.
 --- @param deps table The executor's { run_background }.
 function M.center_mouse(deps)
-	local monitors, x, y = read_state("center_mouse")
+	local monitors, x, y = M.read_state("center_mouse")
 	if not monitors then return end
 	local cx, cy = M.center_target(monitors, x, y)
 	if not cx then
@@ -180,7 +180,7 @@ end
 --- teleport_mouse: the centre of the next monitor, wrapping to the first.
 --- @param deps table The executor's { run_background, notify }.
 function M.teleport_mouse(deps)
-	local monitors, x, y = read_state("teleport_mouse")
+	local monitors, x, y = M.read_state("teleport_mouse")
 	if not monitors then return end
 	local tx, ty = M.teleport_target(monitors, x, y)
 	if tx == "single" then

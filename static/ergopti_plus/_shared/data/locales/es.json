@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "Solo Windows: Microsoft Office en francés pone negrita con Ctrl+G donde las demás aplicaciones usan Ctrl+B, por eso esta acción elige la tecla según la aplicación. En macOS (Cmd+B) y Linux (Ctrl+B) una sola combinación sirve en todas partes: asígnela desde «Atajos».",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Este sistema graba la pantalla desde su propia herramienta de captura (la barra Captura de pantalla de macOS, la herramienta de GNOME o KDE), que la acción equivalente abre.",
 	"platform_reason.action_same_action_under_another_name": "Este sistema ofrece la misma acción con otro nombre: use la acción equivalente.",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "No en Linux: dibujar sobre todas las ventanas requiere una superficie superpuesta que los compositores Wayland no conceden a ninguna aplicación.",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "No es una acción aparte en este sistema: es una de sus combinaciones modificador + tecla (Cmd en macOS, Ctrl en Windows y Linux), listadas en «Atajos».",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "Los Spaces de macOS y los escritorios de Windows y Linux son los mismos escritorios virtuales con dos nombres: use la acción equivalente.",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "No en macOS: los Spaces se añaden y se quitan en Mission Control, que macOS no deja controlar a ninguna otra aplicación.",

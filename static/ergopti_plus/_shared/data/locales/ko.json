@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "Windows 전용: 프랑스어 Microsoft Office는 다른 앱이 Ctrl+B를 쓰는 곳에서 Ctrl+G로 굵게 하므로, 이 동작은 앱에 따라 키를 고릅니다. macOS(Cmd+B)와 Linux(Ctrl+B)에서는 한 조합이 어디서나 통합니다: \"단축키\"에서 지정하세요.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "이 시스템은 자체 캡처 도구(macOS 스크린샷 막대, GNOME 또는 KDE 도구)에서 화면을 녹화하며, 대응하는 동작이 그 도구를 엽니다.",
 	"platform_reason.action_same_action_under_another_name": "이 시스템은 같은 동작을 다른 이름으로 제공합니다: 대응하는 동작을 사용하세요.",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "Linux에는 없음: 모든 창 위에 그리려면 오버레이 표면이 필요한데, Wayland 컴포지터는 이를 어떤 앱에도 주지 않습니다.",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "이 시스템에서는 별도 동작이 아닙니다: \"단축키\" 아래에 나열된 수정 키 + 키 조합 중 하나입니다(macOS는 Cmd, Windows와 Linux는 Ctrl).",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "macOS의 Spaces와 Windows·Linux의 데스크톱은 두 이름을 가진 같은 가상 데스크톱입니다: 대응하는 동작을 사용하세요.",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "macOS에는 없음: Spaces는 Mission Control에서 추가·제거되며, macOS는 다른 앱이 이를 조작하도록 허용하지 않습니다.",

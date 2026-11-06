@@ -261,6 +261,8 @@ M.HANDLERS = {
 	teleport_mouse = function(deps)
 		require("modules.gestures.pointer_warp").teleport_mouse({ run_background = deps.run_background, notify = notify })
 	end,
+	-- X11 overlay (modules/gestures/pointer_spotlight.lua); Wayland refuses.
+	spotlight_mouse = function() require("modules.gestures.pointer_spotlight").spotlight_mouse() end,
 	-- Backgrounded, the command's failure is invisible: with none of the
 	-- clients installed nothing could ever be cleared, which is said here.
 	clear_notifications = function(deps)

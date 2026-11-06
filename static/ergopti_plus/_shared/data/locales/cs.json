@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "Pouze Windows: francouzský Microsoft Office dává tučné písmo zkratkou Ctrl+G, kde jiné aplikace používají Ctrl+B, proto tato akce volí klávesu podle aplikace. V macOS (Cmd+B) a Linuxu (Ctrl+B) funguje jedna kombinace všude: přiřaďte ji v části „Klávesové zkratky“.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Tento systém nahrává obrazovku ze svého nástroje pro zachycení (lišta Snímek obrazovky v macOS, nástroj GNOME nebo KDE), který otevře odpovídající akce.",
 	"platform_reason.action_same_action_under_another_name": "Tento systém nabízí stejnou akci pod jiným názvem: použijte odpovídající akci.",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "Ne v Linuxu: kreslení přes všechna okna vyžaduje překryvnou plochu, kterou kompozitory Waylandu žádné aplikaci neposkytnou.",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "Na tomto systému to není samostatná akce: je to jedna z jeho kombinací modifikátor + klávesa (Cmd v macOS, Ctrl ve Windows a Linuxu), uvedených v části „Klávesové zkratky“.",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "Spaces v macOS a plochy ve Windows a Linuxu jsou tytéž virtuální plochy pod dvěma názvy: použijte odpovídající akci.",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "Ne v macOS: Spaces se přidávají a odebírají v Mission Control, které macOS nedovolí ovládat žádné jiné aplikaci.",

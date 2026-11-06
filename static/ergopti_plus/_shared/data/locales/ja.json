@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "Windows のみ：フランス語版 Microsoft Office は他のアプリが Ctrl+B を使うところで Ctrl+G で太字にするため、この操作はアプリに応じてキーを選びます。macOS（Cmd+B）と Linux（Ctrl+B）では 1 つの組み合わせがどこでも使えます：「ショートカット」から割り当ててください。",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "このシステムは独自のキャプチャツール（macOS のスクリーンショットバー、GNOME や KDE のツール）から画面を収録します。同等の操作がそのツールを開きます。",
 	"platform_reason.action_same_action_under_another_name": "このシステムは同じ操作を別の名前で提供しています：同等の操作を使ってください。",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "Linux にはありません：すべてのウインドウの上に描くにはオーバーレイ面が必要ですが、Wayland のコンポジターはそれをどのアプリにも与えません。",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "このシステムでは独立した操作ではありません：「ショートカット」に並ぶ修飾キー + キーの組み合わせの 1 つです（macOS では Cmd、Windows と Linux では Ctrl）。",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "macOS の Spaces と Windows・Linux のデスクトップは、2 つの名前を持つ同じ仮想デスクトップです：同等の操作を使ってください。",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "macOS にはありません：Spaces は Mission Control で追加・削除され、macOS は他のアプリにその操作を許しません。",

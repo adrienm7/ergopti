@@ -319,33 +319,33 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `search_web` | 🔍 Web search [configurable] | yes | yes | yes (tool:xclip, tool:xdg-open) |
 | `copy_selected_path` | 📋 Copy the path, or open / search the selection | yes | yes | yes (tool:xclip, tool:xdg-open) |
 | `teleport_mouse` | 🖱 Teleport mouse | yes | yes | yes (session:x11, tool:xdotool, tool:xrandr) |
-| `spotlight_mouse` | 🔦 Mouse spotlight | yes | yes | no, R24 |
+| `spotlight_mouse` | 🔦 Mouse spotlight | yes | yes | yes (session:x11, tool:xdotool, tool:xrandr) |
 | `toggle_capslock` | ⇪ Toggle CapsLock | yes | yes | yes |
-| `microsoft_bold` | 𝐁 Ctrl+B Microsoft (→ Ctrl+G) | yes | no, R25 | no, R25 |
+| `microsoft_bold` | 𝐁 Ctrl+B Microsoft (→ Ctrl+G) | yes | no, R24 | no, R24 |
 | `one_shot_shift` | ⇧ OneShotShift | yes | no, R4; use `sticky_shift` | yes |
 | `caps_word` | ⇪★ CapsWord | yes | no, R4; use `capsword` | yes |
 | `ctrl_backspace` | ⌫ Ctrl+BackSpace | yes | no, R6; use `opt_backspace` | yes |
 | `ctrl_delete` | ⌦ Ctrl+Delete | yes | no, R6; use `opt_delete_fwd` | yes |
 | `space` | ␣ Space | yes | yes | yes |
 | `caps_lock` | ⇪ CapsLock | yes | no, R4; use `toggle_capslock` | yes |
-| `layer_on` | 🗂 Nav layer ON | no, R26 | yes | no, R26 |
-| `layer_off` | 🗂 Nav layer OFF | no, R26 | yes | no, R26 |
+| `layer_on` | 🗂 Nav layer ON | no, R25 | yes | no, R25 |
+| `layer_off` | 🗂 Nav layer OFF | no, R25 | yes | no, R25 |
 | `capsword` | ⇪★ CapsWord | no, R4; use `caps_word` | yes | no, R4; use `caps_word` |
 | `sticky_shift` | 📌 Sticky Shift | no, R4; use `one_shot_shift` | yes | no, R4; use `one_shot_shift` |
-| `sticky_ctrl` | 📌 Sticky Ctrl | yes | yes | no, R27 |
-| `sticky_cmd` | 📌 Sticky Cmd | yes | yes | no, R27 |
-| `sticky_option` | 📌 Sticky Option | yes | yes | no, R27 |
-| `sticky_cmd_shift` | 📌 Sticky Cmd + Shift | yes | yes | no, R27 |
-| `sticky_cmd_option` | 📌 Sticky Cmd + Option | yes | yes | no, R27 |
-| `sticky_cmd_ctrl` | 📌 Sticky Cmd + Ctrl | yes | yes | no, R27 |
-| `sticky_option_shift` | 📌 Sticky Option + Shift | yes | yes | no, R27 |
-| `sticky_option_ctrl` | 📌 Sticky Option + Ctrl | yes | yes | no, R27 |
-| `sticky_ctrl_shift` | 📌 Sticky Ctrl + Shift | yes | yes | no, R27 |
-| `sticky_cmd_option_shift` | 📌 Sticky Cmd + Option + Shift | yes | yes | no, R27 |
-| `sticky_cmd_option_ctrl` | 📌 Sticky Cmd + Option + Ctrl | yes | yes | no, R27 |
-| `sticky_cmd_shift_ctrl` | 📌 Sticky Cmd + Shift + Ctrl | yes | yes | no, R27 |
-| `sticky_option_shift_ctrl` | 📌 Sticky Option + Shift + Ctrl | yes | yes | no, R27 |
-| `sticky_hyper` | 📌 Sticky Hyper | yes | yes | no, R27 |
+| `sticky_ctrl` | 📌 Sticky Ctrl | yes | yes | no, R26 |
+| `sticky_cmd` | 📌 Sticky Cmd | yes | yes | no, R26 |
+| `sticky_option` | 📌 Sticky Option | yes | yes | no, R26 |
+| `sticky_cmd_shift` | 📌 Sticky Cmd + Shift | yes | yes | no, R26 |
+| `sticky_cmd_option` | 📌 Sticky Cmd + Option | yes | yes | no, R26 |
+| `sticky_cmd_ctrl` | 📌 Sticky Cmd + Ctrl | yes | yes | no, R26 |
+| `sticky_option_shift` | 📌 Sticky Option + Shift | yes | yes | no, R26 |
+| `sticky_option_ctrl` | 📌 Sticky Option + Ctrl | yes | yes | no, R26 |
+| `sticky_ctrl_shift` | 📌 Sticky Ctrl + Shift | yes | yes | no, R26 |
+| `sticky_cmd_option_shift` | 📌 Sticky Cmd + Option + Shift | yes | yes | no, R26 |
+| `sticky_cmd_option_ctrl` | 📌 Sticky Cmd + Option + Ctrl | yes | yes | no, R26 |
+| `sticky_cmd_shift_ctrl` | 📌 Sticky Cmd + Shift + Ctrl | yes | yes | no, R26 |
+| `sticky_option_shift_ctrl` | 📌 Sticky Option + Shift + Ctrl | yes | yes | no, R26 |
+| `sticky_hyper` | 📌 Sticky Hyper | yes | yes | no, R26 |
 | `open_metrics_typing` | 📊 Typing stats | yes | yes | yes |
 | `open_metrics_apps` | 📊 App stats | yes | yes | yes |
 | `open_hotstrings_editor` | ⌨ Hotstrings editor | yes | yes | yes |
@@ -368,31 +368,31 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `script_reload` | ↻ Reload | yes | yes | yes |
 | `script_save_reload` | ↻ Save and reload | yes | yes | yes |
 | `script_quit` | ✕ Quit | yes | yes | yes |
-| `open_console` | ▤ Console | no, R28 | yes | no, R28 |
-| `open_window_spy` | Window Spy | yes | no, R28 | no, R28 |
-| `open_list_vars` | Variable state | yes | no, R28 | no, R28 |
-| `open_key_history` | Key history | yes | no, R28 | no, R28 |
+| `open_console` | ▤ Console | no, R27 | yes | no, R27 |
+| `open_window_spy` | Window Spy | yes | no, R27 | no, R27 |
+| `open_list_vars` | Variable state | yes | no, R27 | no, R27 |
+| `open_key_history` | Key history | yes | no, R27 | no, R27 |
 
 ### Continuous swipes (axis actions)
 
 | Action | Label | Windows | macOS | Linux |
 | --- | --- | --- | --- | --- |
-| `tabs` | ⧉ Tabs | no, R29; use `tab_prev`, `tab_next` | yes | no, R29; use `tab_prev`, `tab_next` |
-| `char` | A Characters | no, R29; use `arrow_left`, `arrow_right` | yes | no, R29; use `arrow_left`, `arrow_right` |
-| `char_sel` | ✎ A Sel. Characters | no, R29; use `sel_left`, `sel_right` | yes | no, R29; use `sel_left`, `sel_right` |
-| `line_arrow` | ↕ Lines (Arrows) | no, R29; use `arrow_up`, `arrow_down` | yes | no, R29; use `arrow_up`, `arrow_down` |
-| `line_sel` | ✎ ↕ Sel. Lines | no, R29; use `sel_up`, `sel_down` | yes | no, R29; use `sel_up`, `sel_down` |
-| `words` | W Words | no, R29; use `word_prev`, `word_next` | yes | no, R29; use `word_prev`, `word_next` |
-| `words_sel` | ✎ W Sel. Words | no, R29; use `sel_word_prev`, `sel_word_next` | yes | no, R29; use `sel_word_prev`, `sel_word_next` |
-| `windows` | ◱ Windows | no, R29; use `win_prev`, `win_next` | yes | no, R29; use `win_prev`, `win_next` |
-| `spaces` | ▢ Spaces | no, R29; use `desktop_prev`, `desktop_next` | yes | no, R29; use `desktop_prev`, `desktop_next` |
-| `volume` | 🔊 Volume | no, R29; use `vol_down`, `vol_up` | yes | no, R29; use `vol_down`, `vol_up` |
-| `brightness` | ☀ Brightness | no, R29; use `brightness_down`, `brightness_up` | yes | no, R29; use `brightness_down`, `brightness_up` |
-| `tracks` | ♫ Tracks | no, R29; use `track_prev`, `track_next` | yes | no, R29; use `track_prev`, `track_next` |
-| `lines` | ↕ Lines (Alt) | no, R29; use `line_up`, `line_down` | yes | no, R29; use `line_up`, `line_down` |
-| `line_bounds` | ↔ Line (start/end) | no, R29; use `line_start`, `line_end` | yes | no, R29; use `line_start`, `line_end` |
-| `paragraphs` | ¶ Paragraphs | no, R29; use `para_prev`, `para_next` | yes | no, R29; use `para_prev`, `para_next` |
-| `document` | 📄 Document (start/end) | no, R29; use `doc_start`, `doc_end` | yes | no, R29; use `doc_start`, `doc_end` |
+| `tabs` | ⧉ Tabs | no, R28; use `tab_prev`, `tab_next` | yes | no, R28; use `tab_prev`, `tab_next` |
+| `char` | A Characters | no, R28; use `arrow_left`, `arrow_right` | yes | no, R28; use `arrow_left`, `arrow_right` |
+| `char_sel` | ✎ A Sel. Characters | no, R28; use `sel_left`, `sel_right` | yes | no, R28; use `sel_left`, `sel_right` |
+| `line_arrow` | ↕ Lines (Arrows) | no, R28; use `arrow_up`, `arrow_down` | yes | no, R28; use `arrow_up`, `arrow_down` |
+| `line_sel` | ✎ ↕ Sel. Lines | no, R28; use `sel_up`, `sel_down` | yes | no, R28; use `sel_up`, `sel_down` |
+| `words` | W Words | no, R28; use `word_prev`, `word_next` | yes | no, R28; use `word_prev`, `word_next` |
+| `words_sel` | ✎ W Sel. Words | no, R28; use `sel_word_prev`, `sel_word_next` | yes | no, R28; use `sel_word_prev`, `sel_word_next` |
+| `windows` | ◱ Windows | no, R28; use `win_prev`, `win_next` | yes | no, R28; use `win_prev`, `win_next` |
+| `spaces` | ▢ Spaces | no, R28; use `desktop_prev`, `desktop_next` | yes | no, R28; use `desktop_prev`, `desktop_next` |
+| `volume` | 🔊 Volume | no, R28; use `vol_down`, `vol_up` | yes | no, R28; use `vol_down`, `vol_up` |
+| `brightness` | ☀ Brightness | no, R28; use `brightness_down`, `brightness_up` | yes | no, R28; use `brightness_down`, `brightness_up` |
+| `tracks` | ♫ Tracks | no, R28; use `track_prev`, `track_next` | yes | no, R28; use `track_prev`, `track_next` |
+| `lines` | ↕ Lines (Alt) | no, R28; use `line_up`, `line_down` | yes | no, R28; use `line_up`, `line_down` |
+| `line_bounds` | ↔ Line (start/end) | no, R28; use `line_start`, `line_end` | yes | no, R28; use `line_start`, `line_end` |
+| `paragraphs` | ¶ Paragraphs | no, R28; use `para_prev`, `para_next` | yes | no, R28; use `para_prev`, `para_next` |
+| `document` | 📄 Document (start/end) | no, R28; use `doc_start`, `doc_end` | yes | no, R28; use `doc_start`, `doc_end` |
 
 ### Reasons
 
@@ -421,12 +421,11 @@ actions that do the same on that OS. The modifier + key shortcuts
 | R21 | `platform_reason.action_take_note_uses_notepad` | Windows only: this opens the day's notes file in Notepad, the editor every Windows ships. macOS has its own Quick Note (Fn+Q), and Linux has no editor every desktop ships. |
 | R22 | `platform_reason.action_keep_awake_is_the_desktops_inhibitor` | Not on Linux: each Linux desktop keeps a session awake through its own idle inhibitor (the presentation mode of KDE and Xfce, a Caffeine extension on GNOME); turn it on there. |
 | R23 | `platform_reason.action_mirroring_is_the_systems_projection_menu` | No toggle on Linux: GNOME and KDE choose Duplicate in their own Super+P display switcher; bind that key as a keystroke. |
-| R24 | `platform_reason.action_screen_overlay_is_not_on_linux` | Not on Linux: drawing over every window needs an overlay surface that Wayland compositors give no application. |
-| R25 | `platform_reason.action_office_bold_key_is_windows` | Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”. |
-| R26 | `platform_reason.action_navigation_layer_switch_is_karabiner` | macOS only: these switch the navigation layer kept inside Karabiner-Elements. On Windows and Linux the layer follows the key held down and has no switch to set. |
-| R27 | `platform_reason.action_sticky_keys_are_the_systems` | This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there. |
-| R28 | `platform_reason.debug_surface_is_each_drivers_own` | Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open. |
-| R29 | `platform_reason.action_continuous_swipe_is_macos` | macOS only: a continuous swipe follows the fingers while they move, which only the macOS driver reads. Windows gets finished gestures from its touchpad settings and Linux acts once a swipe ends: use the equivalent single-step actions. |
+| R24 | `platform_reason.action_office_bold_key_is_windows` | Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”. |
+| R25 | `platform_reason.action_navigation_layer_switch_is_karabiner` | macOS only: these switch the navigation layer kept inside Karabiner-Elements. On Windows and Linux the layer follows the key held down and has no switch to set. |
+| R26 | `platform_reason.action_sticky_keys_are_the_systems` | This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there. |
+| R27 | `platform_reason.debug_surface_is_each_drivers_own` | Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open. |
+| R28 | `platform_reason.action_continuous_swipe_is_macos` | macOS only: a continuous swipe follows the fingers while they move, which only the macOS driver reads. Windows gets finished gestures from its touchpad settings and Linux acts once a swipe ends: use the equivalent single-step actions. |
 
 <!-- END GENERATED availability -->
 

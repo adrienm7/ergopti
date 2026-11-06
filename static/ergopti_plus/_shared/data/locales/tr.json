@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "Yalnızca Windows: Fransızca Microsoft Office, diğer uygulamaların Ctrl+B kullandığı yerde kalın yazıyı Ctrl+G ile yapar; bu yüzden bu eylem tuşu uygulamaya göre seçer. macOS'te (Cmd+B) ve Linux'ta (Ctrl+B) tek bir birleşim her yerde çalışır: onu “Kısayollar” bölümünden atayın.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Bu sistem ekranı kendi yakalama aracından kaydeder (macOS'in Ekran Görüntüsü çubuğu, GNOME veya KDE aracı); eşdeğer eylem bu aracı açar.",
 	"platform_reason.action_same_action_under_another_name": "Bu sistem aynı eylemi başka bir adla sunar: eşdeğer eylemi kullanın.",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "Linux'ta yok: tüm pencerelerin üzerine çizmek, Wayland birleştiricilerinin hiçbir uygulamaya vermediği bir kaplama yüzeyi gerektirir.",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "Bu sistemde ayrı bir eylem değil: “Kısayollar” altında listelenen değiştirici + tuş birleşimlerinden biridir (macOS'te Cmd, Windows ve Linux'ta Ctrl).",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "macOS'teki Spaces ile Windows ve Linux'taki masaüstleri iki ad altındaki aynı sanal masaüstleridir: eşdeğer eylemi kullanın.",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "macOS'te yok: Spaces, macOS'in başka hiçbir uygulamanın yönetmesine izin vermediği Mission Control'de eklenir ve kaldırılır.",

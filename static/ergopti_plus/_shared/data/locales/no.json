@@ -4118,7 +4118,6 @@
 	"platform_reason.action_office_bold_key_is_windows": "Bare Windows: fransk Microsoft Office gjør tekst fet med Ctrl+G der andre apper bruker Ctrl+B, så denne handlingen velger tasten etter app. På macOS (Cmd+B) og Linux (Ctrl+B) virker én kombinasjon overalt: tilordne den fra «Snarveier».",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Dette systemet tar opp skjermen fra sitt eget opptaksverktøy (Skjermbilde-linjen på macOS, verktøyet i GNOME eller KDE), som den tilsvarende handlingen åpner.",
 	"platform_reason.action_same_action_under_another_name": "Dette systemet tilbyr samme handling under et annet navn: bruk den tilsvarende handlingen.",
-	"platform_reason.action_screen_overlay_is_not_on_linux": "Ikke på Linux: å tegne over alle vinduer krever en overleggsflate som Wayland-kompositorer ikke gir noen app.",
 	"platform_reason.action_shortcut_is_a_modifier_chord_here": "Ikke en egen handling på dette systemet: det er en av kombinasjonene av modifikator + tast (Cmd på macOS, Ctrl på Windows og Linux), oppført under «Snarveier».",
 	"platform_reason.action_spaces_and_desktops_are_one_thing": "Spaces på macOS og skrivebord på Windows og Linux er de samme virtuelle skrivebordene under to navn: bruk den tilsvarende handlingen.",
 	"platform_reason.action_spaces_are_edited_in_mission_control": "Ikke på macOS: Spaces legges til og fjernes i Mission Control, som macOS ikke lar noen annen app styre.",
