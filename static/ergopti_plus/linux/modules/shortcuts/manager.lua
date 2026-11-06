@@ -567,7 +567,8 @@ end
 --- Ends CapsWord on a native pointer event of a checked kind, named here so
 --- the daemon's main() captures no pointer-kind table of its own (it sits at
 --- LuaJIT's 60-upvalue limit).
---- @param kind_of_event string "press" (a button) or "motion" (an EV_REL report).
+--- @param kind_of_event string "press" (a button), "motion" (an EV_REL report) or
+--- "absolute_motion" (a changed EV_ABS coordinate).
 --- @param code integer The button's evdev code for a press.
 --- @return boolean ended
 function M.caps_word_observe_pointer_event(kind_of_event, code)

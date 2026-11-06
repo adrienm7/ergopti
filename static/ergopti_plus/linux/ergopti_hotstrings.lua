@@ -2272,7 +2272,8 @@ local function main()
 	-- The manager names the event's pointer kind: main() is at LuaJIT's
 	-- 60-upvalue limit.
 	local function on_pointer_event(kind_of_event, code, value, source)
-		keystats.record_pointer(kind_of_event, code, value, source)
+		-- An absolute coordinate is no distance in the relative units the metrics count.
+		if kind_of_event ~= "absolute_motion" then keystats.record_pointer(kind_of_event, code, value, source) end
 		if kind_of_event == "frame" or kind_of_event == "reset" or kind_of_event == "dropped" then return end
 		if not (shortcuts and shortcuts.is_caps_word_active()) then return end
 		shortcuts.caps_word_observe_pointer_event(kind_of_event, code)
