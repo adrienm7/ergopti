@@ -75,6 +75,7 @@ local function bind()
 			cairo = lgi.cairo,
 			Pango = lgi.require("Pango"),
 			PangoCairo = lgi.require("PangoCairo"),
+			GLib = lgi.GLib,
 		}
 	end)
 	if not ok or type(bound) ~= "table" then
@@ -359,6 +360,33 @@ function M.pointer_position()
 	if not ok then return nil end
 	return x, y
 end
+
+--- Drains pending GTK events for the widget's window without blocking.
+---
+--- The widget owns its window and so its event delivery: a draw, a hide and a
+--- drag only reach the screen when the default GLib context is iterated, and
+--- the tray adapter (which also iterates it) exists only under --tray. Without
+--- this the floating widget stayed queued whenever the daemon ran without a
+--- tray, though Windows and macOS draw it independently of any tray.
+--- @param budget integer|nil Maximum iterations, default 32.
+--- @return integer Iterations performed (0 while no window exists).
+function M.pump(budget)
+	if not _window then return 0 end
+	local g = bind()
+	if not g then return 0 end
+	local context = g.GLib.MainContext.default()
+	local done = 0
+	for _ = 1, budget or 32 do
+		if not context:pending() then break end
+		context:iteration(false)
+		done = done + 1
+	end
+	return done
+end
+
+-- GTK can enter a Lua callback during any iteration, which LuaJIT forbids from
+-- compiled code (the tray's pump carries the same guard).
+if jit then jit.off(M.pump) end
 
 --- Destroys the window.
 function M.destroy()
