@@ -4,8 +4,8 @@
 --- MODULE: Typed-Text Cipher Core (Shared)
 --- DESCRIPTION:
 --- The policy of the at-rest encryption of typed text on macOS and Linux
---- (modules/keystats/text_cipher.lua): when a value is encrypted, which stored
---- values are already envelopes, the cached key, and what a failure means. The
+--- (modules/keystats/text_cipher.lua): when a value is encrypted, the cached
+--- key, and what a failure means. The
 --- AES primitive, the machine identity and the key derivation are platform
 --- code, so each driver supplies them as ports; the envelope format is the
 --- shared codec (text_crypto.lua), so a database written on one machine reads
@@ -21,6 +21,10 @@
 ---    a second, so a failed one is latched instead of retried on every flush.
 --- 3. Disabled is genuinely disabled: with the toggle off, encrypt() returns the
 ---    plaintext untouched and starts nothing.
+--- 4. encrypt() receives raw input, so it seals every nonempty value, even one
+---    whose bytes look like an envelope: a content prefix proves nothing about
+---    where a value came from. Not double-wrapping a STORED envelope belongs to
+---    the migration, the one caller that reads stored values.
 --- ==============================================================================
 
 local TextCrypto = require("keystats.text_crypto")
@@ -112,16 +116,17 @@ function M.new(ports)
 	--- Encrypts one value for storage.
 	--- @param device_id string Owning device.
 	--- @param event_id number|string Row identifier, unique per device.
-	--- @param plaintext string Value to protect.
+	--- @param plaintext string Raw value to protect, never an already stored value.
 	--- @return string|nil The envelope, the untouched plaintext when disabled, or
 	---   nil when encryption is enabled but impossible: the caller must NOT store
 	---   the plaintext in that case.
 	function cipher.encrypt(device_id, event_id, plaintext)
 		if not enabled then return plaintext end
 		if type(plaintext) ~= "string" or plaintext == "" then return plaintext end
-		-- Already an envelope: re-encrypting would double-wrap and make the value
-		-- undecryptable in one pass.
-		if TextCrypto.is_encrypted(plaintext) then return plaintext end
+		-- No envelope-prefix shortcut here: this is the raw-input API, and typed
+		-- text may legitimately begin with the marker or copy a whole envelope.
+		-- Only the migration, which reads stored values, skips stored envelopes
+		-- (text_migration.needs_conversion) before it calls this.
 		if not ports.ready("encrypt") then return nil end
 
 		local key = ensure_key()

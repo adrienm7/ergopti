@@ -5,8 +5,9 @@
 --- DESCRIPTION:
 --- Pins the policy both drivers' text ciphers share
 --- (_shared/lua/keystats/text_cipher.lua) with a scripted primitive: disabled
---- encryption spawns nothing, an envelope is never wrapped twice, an
---- encryption that cannot happen answers nil instead of plaintext, a failed
+--- encryption spawns nothing, raw text is sealed even when it already looks
+--- like an envelope, an encryption that cannot happen answers nil instead of
+--- plaintext, a failed
 --- derivation is latched and not retried, an unreadable envelope reads as the
 --- empty string, and a value that is not an envelope reads as itself.
 --- ==============================================================================
@@ -49,14 +50,16 @@ helpers.describe("shared typed-text cipher policy (macOS)", function()
 		helpers.assert_eq(calls.derive, 1, "the key is derived once")
 	end)
 
-	helpers.it("does not wrap an envelope twice and leaves empty or non-string values alone", function()
+	helpers.it("seals raw text that copies an envelope and leaves empty or non-string values alone", function()
 		local cipher, calls = build()
 		cipher.set_enabled(true)
 		local envelope = cipher.encrypt("dev", 1, "secret")
-		helpers.assert_eq(cipher.encrypt("dev", 2, envelope), envelope)
+		local sealed = cipher.encrypt("dev", 2, envelope)
+		helpers.assert_true(sealed ~= envelope, "raw input is never trusted as a stored envelope")
+		helpers.assert_eq(cipher.decrypt(sealed), envelope)
 		helpers.assert_eq(cipher.encrypt("dev", 3, ""), "")
 		helpers.assert_eq(cipher.encrypt("dev", 4, 7), 7)
-		helpers.assert_eq(calls.encrypt, 1)
+		helpers.assert_eq(calls.encrypt, 2)
 	end)
 
 	helpers.it("fails closed: no key means nil, never the plaintext, and the failure is latched", function()

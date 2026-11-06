@@ -394,14 +394,15 @@ helpers.describe("text_cipher — enabled changes what is stored", function()
 		helpers.assert_true(a ~= b, "identical text in two rows must not produce identical envelopes")
 	end)
 
-	helpers.it("does not double-wrap a value that is already encrypted", function()
+	helpers.it("seals raw text that copies an envelope instead of trusting it", function()
 		local cipher = fresh_cipher()
 		capture_shell()
 		cipher.set_enabled(true)
 		local once  = cipher.encrypt("dev", 1, "text")
-		local twice = cipher.encrypt("dev", 1, once)
+		local twice = cipher.encrypt("dev", 2, once)
 		Shell()._reset_runner()
-		helpers.assert_eq(twice, once, "re-encrypting would make the value undecryptable in one pass")
+		helpers.assert_true(TextCrypto.is_encrypted(twice) and twice ~= once,
+			"a raw value is sealed; only the migration skips stored envelopes")
 	end)
 
 	helpers.it("leaves an empty value alone", function()
