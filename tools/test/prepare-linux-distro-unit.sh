@@ -37,6 +37,12 @@ test -x "$sqlite"
 "$sqlite" --version
 # The GNOME proxy check decodes gsettings output with the native GLib.
 "$interpreter" -e 'require("ffi").load("libglib-2.0.so.0")'
+# Every installed system has a machine id (systemd or D-Bus writes it); the
+# metrics ledger names the host by it. Container images ship none, so give this
+# one its own, as first boot would, instead of testing a host that cannot exist.
+if [ ! -s /etc/machine-id ] && [ ! -s /var/lib/dbus/machine-id ]; then
+	python3 -c 'import uuid; print(uuid.uuid4().hex)' > /etc/machine-id
+fi
 
 # Root bypasses the suite's real unreadable-file permission premise, so the
 # suite runs as the same ordinary user the archive installation lot creates.
