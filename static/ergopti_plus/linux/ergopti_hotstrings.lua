@@ -2173,6 +2173,7 @@ local function main()
 	-- paused daemon can always be resumed from the keyboard.
 	local script_chords = require("modules.shortcuts.script_chords")
 	script_chords.init({
+		pause_epoch = script_actions.pause_epoch,
 		is_paused = function() return opts.dry_run or script_actions.is_paused() end,
 		defer = function(fn) return event_loop.defer(fn) end,
 	})
@@ -2182,6 +2183,7 @@ local function main()
 	-- the consumption callback below, before wrap-on-type sees the key.
 	local tap_keys = require("modules.shortcuts.tap_keys")
 	tap_keys.init({
+		pause_epoch = script_actions.pause_epoch,
 		is_active = function(action)
 			return shortcuts ~= nil and shortcuts.is_enabled() and not script_actions.is_paused()
 				and (action == nil or not opts.dry_run or require("modules.shortcuts.script_actions").is_script_action(action))
@@ -2398,6 +2400,7 @@ local function main()
 	local function consume_bound_chord(detail)
 		local shortcuts_on = shortcuts ~= nil and shortcuts.is_enabled()
 		local consumed = keyboard_shortcuts.consume(detail, {
+			pause_epoch = script_actions.pause_epoch,
 			only_script = opts.dry_run or script_actions.is_paused() or not shortcuts_on,
 			defer = function(fn) return event_loop.defer(fn) end,
 			admission = function()

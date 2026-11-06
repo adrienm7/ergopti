@@ -858,9 +858,24 @@ function M.consume(detail, opts)
 	if not hit or hit.held_back or _configuration_owner ~= nil or entry_generation ~= _dispatch_generation then return false, nil end
 	local generation = _dispatch_generation
 	local admission_reader, decision_reader = opts.admission, M.magic_editor_decision
+	local pause_reader, pause_epoch = opts.pause_epoch, nil
+	local script_action = ScriptActions.is_script_action(hit.action)
+	if not script_action and pause_reader ~= nil then
+		if type(pause_reader) ~= "function" then return false, nil end
+		local called, epoch = pcall(pause_reader)
+		if not called or type(epoch) ~= "number" then return false, nil end
+		pause_epoch = epoch
+	end
+	local function pause_current()
+		if script_action or pause_reader == nil then return true end
+		if opts.pause_epoch ~= pause_reader then return false end
+		local called, epoch = pcall(pause_reader)
+		return called and epoch == pause_epoch and opts.pause_epoch == pause_reader
+	end
 	-- Ordinary chords have the same live gates as contextual bindings. A pause
 	-- or a modal capture can begin after the key was claimed but before delivery.
 	local function delivery_current()
+		if not pause_current() then return false end
 		if hit.physical or hit.decision then
 			return _configuration_owner == nil and generation == _dispatch_generation
 		end
@@ -876,8 +891,8 @@ function M.consume(detail, opts)
 		if not called or type(admission) ~= "table" or not owner_current() then return false end
 		if type(admission.master) ~= "boolean" or type(admission.paused) ~= "boolean"
 			or admission.inhibited ~= false then return false end
-		return ScriptActions.is_script_action(hit.action)
-			or (admission.master == true and admission.paused == false)
+		return pause_current() and (script_action
+			or (admission.master == true and admission.paused == false))
 	end
 	if not delivery_current() then return false, nil end
 	-- A scheduled callback has no delivery rights until its original queue ACK.

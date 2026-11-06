@@ -78,6 +78,7 @@ local _is_active = NEVER_ACTIVE
 
 -- Injected by init(): queues a function for the next loop tick.
 local _defer = nil
+local _pause_epoch = nil
 local _configuration_owner = nil
 local _dispatch_generation = 0
 
@@ -272,13 +273,18 @@ end
 
 --- Wires the daemon's state in.
 --- @param opts table { is_active = fn(action|nil) -> boolean, defer = fn(fn) -> boolean }
+---   Optional pause_epoch = fn() -> number identifies the active pause lifetime.
 function M.init(opts)
 	if _configuration_owner ~= nil then return false end
 	if type(opts) ~= "table" or type(opts.is_active) ~= "function" or type(opts.defer) ~= "function" then
 		error("tap_keys.init() needs is_active and defer functions")
 	end
+	if opts.pause_epoch ~= nil and type(opts.pause_epoch) ~= "function" then
+		error("tap_keys.init() pause_epoch must be a function")
+	end
 	_is_active = opts.is_active
 	_defer = opts.defer
+	_pause_epoch = opts.pause_epoch
 end
 
 --- Decides one key press from the keyboard hook's consumption callback.
@@ -298,14 +304,28 @@ function M.on_key(detail)
 		if mods[name] then return false end
 	end
 	-- Initial admission is itself a foreign callback and can revoke this source.
-	local generation, active = _dispatch_generation, _is_active
+	local generation, active, epoch_reader = _dispatch_generation, _is_active, _pause_epoch
+	local epoch
+	if epoch_reader then
+		local called, value = pcall(epoch_reader)
+		if not called or type(value) ~= "number" then return false end
+		epoch = value
+	end
+	local function epoch_current()
+		if _pause_epoch ~= epoch_reader then return false end
+		if not epoch_reader then return true end
+		local called, value = pcall(epoch_reader)
+		return called and value == epoch and _pause_epoch == epoch_reader
+	end
 	local action = M.get_action(id)
 	local function current()
-		if _configuration_owner ~= nil or generation ~= _dispatch_generation or _is_active ~= active then return false end
+		if _configuration_owner ~= nil or generation ~= _dispatch_generation or _is_active ~= active
+			or not epoch_current() then return false end
 		-- Re-read at delivery: the AI may be switched off between press and run.
 		if AiActions.blocked(action) then return false end
 		local admitted = active(action)
 		return admitted == true and _configuration_owner == nil and generation == _dispatch_generation and _is_active == active
+			and epoch_current()
 	end
 	if action == "none" or not current() then return false end
 	if not _defer then
@@ -370,6 +390,7 @@ function M._reset()
 	_assignments = nil
 	_is_active = NEVER_ACTIVE
 	_defer = nil
+	_pause_epoch = nil
 end
 
 

@@ -787,3 +787,30 @@ for _, case in ipairs({
 		else helpers.assert_eq(ok, false, "special catalogue must be refused") end
 	end)
 end
+
+helpers.describe('keyboard shortcut after a pause cycle', function()
+  for _, action in ipairs({'select_line', 'script_reload'}) do
+    helpers.it('respects pause generation for '..action, function()
+      local shortcuts = load_over_config({['shortcuts.keyboard.primary_j']=action})
+      local gestures = require('modules.gestures.manager')
+      local original = gestures.execute_action
+      local queue, fired = {}, {}
+      gestures.execute_action = function(value) fired[#fired+1]=value end
+      local script = require('modules.shortcuts.script_actions').new({reset=function() end,reload=function() end,quit=function() end})
+      local opts = { defer=function(fn) queue[#queue+1]=fn; return true end,
+        pause_epoch=script.pause_epoch,
+        admission=function() return {master=true,paused=script.is_paused(),inhibited=false} end }
+      local ok, err = pcall(function()
+        assert(shortcuts.consume(chord('j',{ctrl=true}), opts))
+        assert(script.toggle_pause()); assert(script.toggle_pause())
+        queue[1]()
+        helpers.assert_eq(fired, action == 'script_reload' and {'script_reload'} or {})
+        assert(shortcuts.consume(chord('j',{ctrl=true}),opts)); queue[2]()
+        helpers.assert_eq(fired, action == 'script_reload' and {'script_reload','script_reload'} or {'select_line'})
+      end)
+      gestures.execute_action = original
+      drop_config()
+      if not ok then error(err,0) end
+    end)
+  end
+end)
