@@ -128,7 +128,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 ### wrap-symbols
 
-- [ ] **[CODE] WSW-001:** Saved custom wrap pair is ignored by remapped symbol keys. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/windows/report.md).
+- [x] **[CODE] WSW-001:** Saved custom wrap pair is ignored by remapped symbol keys. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/windows/report.md). Done: WrapTextIfSelected resolves the saved custom pair of the typed symbol (WrapSymbols_CustomPairFor) before building the output, so remapped keys wrap like the prefix route.
 - [ ] **[CODE] WSW-002:** UIA selection prefix is wrapped as though it were the complete selection. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/windows/report.md).
 - [x] **[CODE] WSM-001:** Checked guillemet pair does not match native layout trigger strings. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/macos/report.md). Done: typed guillemets, bare or with a non-breaking space, now trigger the spaced pair through the shared wrap_pair trigger keys while the output keeps its spacing.
 - [x] **[CODE] WSM-002:** Wrap clipboard restoration discards later pasteboard items. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/macos/report.md). Done: already fixed by 68bd4b064d (Clipboard.save refuses a multi-item pasteboard before any mutation); regression test added for the wrap path.

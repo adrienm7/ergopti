@@ -659,6 +659,13 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 		and Features["shortcuts"].Has(ConfigLeaf.WRAP_TEXT_IF_SELECTED)
 		and Features["shortcuts"][ConfigLeaf.WRAP_TEXT_IF_SELECTED]
 	if (WrapEnabled and WrapSymbols_IsEnabled(LeftSymbol)) {
+		; A saved custom pair owns its key: the layout descriptor's delimiters are
+		; the built-in ones, and the prefix route already wraps with the custom pair.
+		CustomPair := WrapSymbols_CustomPairFor(Symbol)
+		if (CustomPair is Map) {
+			LeftSymbol := CustomPair["left"]
+			RightSymbol := CustomPair["right"]
+		}
 		; Critical is RELEASED across the selection probe and the clipboard
 		; round-trip, then restored.
 		;
