@@ -848,6 +848,19 @@ GestureSendInput(ActionName, BindingId := "") {
 		return true
 }
 
+; The paste chord of GesturePastePlain, sent only while its target is current.
+; Critical keeps the check and the injection one step.
+_GesturePastePlainSend(Target, Keys) {
+		PreviousCritical := Critical("On")
+		try {
+				if !_SendInstantTargetCurrent(Target) {
+						try LoggerInfo("gestures", "Plain paste refused: the target or the input changed before the paste.")
+						return false
+				}
+				return SendFinalResult(Keys)
+		} finally Critical(PreviousCritical)
+}
+
 ; Deferred clipboard restore for GesturePastePlain. Runs on a negative-delay
 ; SetTimer so the synthetic ^v has already consumed the coerced text before the
 ; user's original (possibly non-text) clipboard is put back.
@@ -857,6 +870,13 @@ _GesturePastePlainRestore(OldClip, OwnedSequence, OwnerToken) {
 }
 
 GesturePastePlain() {
+		; Every read, snapshot and write below can yield. The paste belongs only to
+		; the window, control and physical action that asked for it (WCP-002).
+		Target := _SendInstantCaptureAdmittedTarget()
+		if !(Target is Map) {
+				try LoggerInfo("gestures", "Plain paste refused: no input target or the driver is paused.")
+				return
+		}
 		OwnerToken := CB_TryBeginPasteTransaction("gesture_paste_plain")
 		if !OwnerToken {
 				try LoggerWarn("gestures", "Plain paste refused while another clipboard transaction is active.")
@@ -865,12 +885,12 @@ GesturePastePlain() {
 		RestoreTimerArmed := false
 		try {
 				if WinActive("ahk_exe EXCEL.EXE") {
-						SendFinalResult("^+v")
+						_GesturePastePlainSend(Target, "^+v")
 						return
 				}
 				; Keep non-text formats intact and use the application's native paste.
 				if CB_Read() == "" {
-						SendFinalResult("^v")
+						_GesturePastePlainSend(Target, "^v")
 						return
 				}
 				; Admission precedes every read, including an empty temporary clear owned
@@ -878,14 +898,19 @@ GesturePastePlain() {
 				Captured := 0
 				if !CB_SavePlainSnapshot(OwnerToken, &Captured) {
 						try LoggerWarn("gestures", "GesturePastePlain: clipboard snapshot is unavailable or changed; using native paste.")
-						SendFinalResult("^v")
+						_GesturePastePlainSend(Target, "^v")
 						return
 				}
 				OldClip := Captured["saved"]
 				PlainText := CB_Read()
 				; Saving all formats can yield to a new non-text copy. Paste it intact.
 				if PlainText == "" {
-						SendFinalResult("^v")
+						_GesturePastePlainSend(Target, "^v")
+						return
+				}
+				; Never replace the clipboard for a paste that can no longer happen.
+				if !_SendInstantTargetCurrent(Target) {
+						try LoggerInfo("gestures", "Plain paste refused: the target or the input changed during clipboard preparation.")
 						return
 				}
 				OwnedSequence := 0
@@ -894,7 +919,12 @@ GesturePastePlain() {
 								throw Error("clipboard write failed")
 						if !OwnedSequence
 								throw Error("clipboard sequence unavailable")
-						SendFinalResult("^v")
+						; A refused or failed paste puts the user's clipboard back at once.
+						if !_GesturePastePlainSend(Target, "^v") {
+								CB_RestorePlainSnapshotEventually(OldClip, OwnedSequence, OwnerToken,
+										"gesture_paste_plain_refused")
+								return
+						}
 						SetTimer(_GesturePastePlainRestore.Bind(OldClip, OwnedSequence, OwnerToken), -SEND_INSTANT_PASTE_DELAY_MS)
 						RestoreTimerArmed := true
 				} catch as Err {

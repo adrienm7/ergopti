@@ -25,7 +25,11 @@ _PPSNT_ChildSource(Client) {
 	Code := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 	Code .= "LoggerWarn(*) => 0`nLoggerError(*) => 0`nLoggerDebug(*) => 0`nLoggerInfo(*) => 0`n"
 	Code .= "global _SendHook := 0`nglobal SEND_INSTANT_PASTE_DELAY_MS := Integer(A_Args[4])`n"
-	Names := ["TickElapsed", "TickElapsed64", "_TextSenderNativeFocus", "_SendVerdictSucceeded", "SendFinalResult"]
+	; Native focus is outside this clipboard-custody child: its private Edit
+	; stays the target, so the target observers are passive and always current.
+	Code .= "_SendInstantCaptureAdmittedTarget() => Map()`n_SendInstantTargetCurrent(Target) => Target is Map`n"
+	Names := ["TickElapsed", "TickElapsed64", "_TextSenderNativeFocus", "_SendVerdictSucceeded", "SendFinalResult",
+		"_GesturePastePlainSend"]
 	Names.Push(Client == "gesture" ? "_GesturePastePlainRestore" : "_GesturePastePlainRestore")
 	Names.Push(Client == "gesture" ? "GesturePastePlain" : "GesturePastePlain")
 	for Name in Names {

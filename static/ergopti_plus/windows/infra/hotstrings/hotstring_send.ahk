@@ -498,6 +498,18 @@ _SendInstantCaptureTarget() {
 	} finally Critical(PreviousCritical)
 }
 
+; The target of output that prepares the clipboard before its own paste. The
+; preparation can yield, so the paste also refuses a pause or a newer physical
+; action that happened meanwhile, not only a changed window or control (WCP-002).
+_SendInstantCaptureAdmittedTarget() {
+	Generation := KS_GetPhysicalInputGeneration()
+	Target := _SendInstantCaptureTarget()
+	if !(Target is Map) || A_IsSuspended
+		return 0
+	Target["admission"] := () => !A_IsSuspended && KS_GetPhysicalInputGeneration() == Generation
+	return Target
+}
+
 _SendInstantTargetCurrent(Target) {
 	if !(Target is Map)
 		return false
