@@ -83,3 +83,13 @@ _LDEK_DeadKeyReplaysControlModifiers() {
 		"DeadKey must not rebuild the chord from the live modifier state at replay time (OSW-001)")
 }
 Test("layout: DeadKey replays a named control with its captured modifiers (OSW-001)", _LDEK_DeadKeyReplaysControlModifiers)
+
+; Expiry cancels the pending dead key like a pause does: the timeout branch
+; returns without typing the accent (maintainer decision, dead-key lifecycle).
+_LDEK_DeadKeyExpiryCancels() {
+	Body := _LDEK_StripComments(_DriverFuncBody("DeadKey"))
+	Assert(Body != "", "DeadKey(Mapping) must exist in modules/keymap/layout.ahk")
+	Assert(RegExMatch(Body, 'if Capture\.Kind == "timeout"\s*\n\s*return\b'),
+		"DeadKey must cancel the pending dead key on expiry, typing nothing (dead-key lifecycle)")
+}
+Test("layout: DeadKey expiry cancels the pending dead key (dead-key lifecycle)", _LDEK_DeadKeyExpiryCancels)
