@@ -174,18 +174,21 @@ function functionBody(source, name) {
 		configure.includes('TouchpadRegistryApply(') && !configure.includes('Reg_WriteDword'),
 		'the in-process writer must write through the owner, never on its own'
 	);
+	// WG-003: HKCU in an elevated worker is the hive of the account that
+	// answered UAC, so the wizard writes in process and elevates only the restart.
 	const wizard = read(path.join(WIN, 'ui', 'onboarding', 'gesture_registration.ahk'));
-	const script = functionBody(wizard, '_Onboarding_BuildGesturePsScript');
-	check(
-		script.includes('TouchpadRegistryPowerShellKey()') &&
-			script.includes('TouchpadRegistryPowerShellValues()'),
-		"the wizard's elevated script must write the owner's table"
-	);
 	const launch = functionBody(wizard, '_Onboarding_StartGestureAuto');
-	const backupAt = launch.indexOf('TouchpadRegistryEnsureBackup()');
+	const applyAt = launch.indexOf('TouchpadRegistryApply()');
 	check(
-		backupAt > 0 && backupAt < launch.indexOf('Run('),
-		'the wizard must back up the values before launching its elevated script'
+		applyAt > 0 && applyAt < launch.indexOf('Run('),
+		'the wizard must write the values in process, through the owner, before elevating'
+	);
+	const restart = functionBody(config, '_GestureRestartBuildPsScript');
+	check(
+		launch.includes('_GestureRestartBuildPsScript(') &&
+			restart !== '' &&
+			!/HKCU|HKEY_|ItemProperty/.test(restart),
+		'the elevated wizard worker must be the registry-free touchpad restart'
 	);
 
 	// ==================================

@@ -10,31 +10,6 @@
 
 #Requires AutoHotkey v2.0
 
-; Generated data is resolved from the real runner's includes, outside the
-; authored-code census, with the canonical lexical/definition helpers.
-_GPSE_DataOwner(Name) {
-	global _DriverDir
-	Runner := FSReadStrict(A_ScriptFullPath)
-	Code := _DriverMaskNonCode(&Runner)
-	Owners := Map()
-	Owners.CaseSense := "Off"
-	for Line in StrSplit(Code, "`n", "`r") {
-		if !RegExMatch(Line, "i)^\s*#Include\s+(\.\.[\\/]_generated[\\/][A-Za-z0-9_.-]+\.ahk)\s*$", &Include)
-			continue
-		Owner := _DriverDir . "\" . SubStr(StrReplace(Include[1], "/", "\"), 4)
-		Text := FSReadStrict(Owner)
-		Masked := _DriverMaskNonCode(&Text)
-		Count := _DriverTopLevelDefinitionCount(&Masked, Name)
-		if Count {
-			AssertEqual(1, Count)
-			Owners[Owner] := true
-		}
-	}
-	AssertEqual(1, Owners.Count, "one actual included data owner is required")
-	for Owner in Owners
-		return Owner
-}
-
 ; Rewrite only one external boundary identifier in code, never strings or the
 ; writer/builder. Future changes on either real caller or builder remain tested.
 _GPSE_Port(Body, Name, Port) {
@@ -50,12 +25,11 @@ _GPSE_Source() {
 	Source := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 	Owner := _DriverProductionFileForSymbol("FSWrite", _DriverDir)
 	AssertTrue(Owner != "")
-	Source .= "#Include " . Owner . "`n#Include " . _GPSE_DataOwner("TouchpadRegistryData") . "`n"
+	Source .= "#Include " . Owner . "`n"
 	for Name in ["_Onboarding_StartGestureAuto", "_Onboarding_ReserveGestureAuto", "_Onboarding_AbortGestureAutoReservation",
-		"_Onboarding_PollGestureAuto", "_Onboarding_ReadGestureAutoResult", "_Onboarding_BuildGesturePsScript",
+		"_Onboarding_PollGestureAuto", "_Onboarding_ReadGestureAutoResult",
 		"GestureRestartTouchpadDevice", "_GestureRestartReserve", "_GestureRestartAbortReservation",
-		"_GestureRestartPoll", "_GestureRestartReadResult", "_GestureRestartBuildPsScript",
-		"TouchpadRegistryPowerShellKey", "TouchpadRegistryPowerShellValues"] {
+		"_GestureRestartPoll", "_GestureRestartReadResult", "_GestureRestartBuildPsScript"] {
 		Body := _DriverFuncBody(Name)
 		AssertTrue(Body != "", "the child needs the entire actual function: " . Name)
 		if Name == "_Onboarding_StartGestureAuto" || Name == "GestureRestartTouchpadDevice"

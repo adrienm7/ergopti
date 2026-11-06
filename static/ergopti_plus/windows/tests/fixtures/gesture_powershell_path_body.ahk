@@ -3,8 +3,8 @@
 ; ==============================================================================
 ; MODULE: Gesture PowerShell Artifact Producer Child
 ; DESCRIPTION:
-; Real public callers build and write their worker. Elevated Run and registry
-; backup are passive boundaries. A native reservation timer is retained and
+; Real public callers build and write their worker. Elevated Run and the
+; in-process registry write are passive boundaries. A native reservation timer is retained and
 ; cancelled while this private child remains Critical; no worker is executed.
 ; ==============================================================================
 
@@ -16,8 +16,9 @@ LoggerInfo(*) => 0
 LoggerWarn(*) => 0
 LoggerError(*) => 0
 
-TouchpadRegistryEnsureBackup(*) {
-	global _GPSE_Backups
+TouchpadRegistryApply(*) {
+	global _GPSE_Backups, _GPSE_Runs
+	_GPSE_Require(_GPSE_Runs == 0, "The values are written in process before any elevated launch.")
 	_GPSE_Backups += 1
 	return true
 }
@@ -73,9 +74,12 @@ _GPSE_Main() {
 		_GPSE_Require(Accepted && _GPSE_Runs == 1 && _GPSE_Timers.Length == 1,
 			"The whole caller must reach its real writer and controlled launch once.")
 		_GPSE_Require(_GPSE_Backups == (A_Args[1] == "onboarding" ? 1 : 0),
-			"Only the explicit registry backup boundary may be bypassed.")
+			"Only the explicit in-process registry write boundary may be bypassed.")
 		_GPSE_Require(FileExist(Job["script"]) && !FileExist(Job["result"]),
 			"The actual caller must publish a script without executing it.")
+		; WG-003: elevated HKCU is the UAC account's hive, so no worker writes it.
+		_GPSE_Require(!InStr(FileRead(Job["script"], "UTF-8"), "HKCU"),
+			"The elevated worker must not write a per-user registry value.")
 		_GPSE_Require(InStr(_GPSE_Command, '*RunAs powershell.exe ')
 			&& InStr(_GPSE_Command, '-File "' . Job["script"] . '"'),
 			"The observed real launch must reference its own written artifact.")

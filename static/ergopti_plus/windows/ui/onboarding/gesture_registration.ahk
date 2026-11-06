@@ -4,11 +4,12 @@
 ; MODULE: Onboarding / Touchpad Gesture Registration
 ; DESCRIPTION:
 ; Registers the Precision Touchpad gesture shortcuts from the wizard's gestures
-; page. One elevated PowerShell worker writes the registry values and cycles the
-; touchpad device; it runs asynchronously and publishes its own result file, so
-; the wizard never blocks on the UAC prompt and never mistakes a vanished
-; process for a success. Definitions only: the test harness includes it to
-; exercise the reservation without building the wizard.
+; page. The registry values are written in this resident process, then one
+; elevated PowerShell worker cycles the touchpad device; it runs asynchronously
+; and publishes its own result file, so the wizard never blocks on the UAC
+; prompt and never mistakes a vanished process for a success. Definitions only:
+; the test harness includes it to exercise the reservation without building the
+; wizard.
 ; ==============================================================================
 
 ; Success token the elevated PowerShell worker writes to its result file
@@ -85,10 +86,14 @@ _Onboarding_StartGestureAuto(OnDone) {
 		if _OnboardingGestureJob["pid"]
 			return false
 	}
-	; The elevated script overwrites the touchpad values: the one registry owner
-	; backs up the user's own first, or nothing is written at all.
-	if !TouchpadRegistryEnsureBackup() {
-		try LoggerError("Onboarding", "Gesture auto-config refused: the touchpad values could not be backed up.")
+	; Write the values here, as the signed-in user, exactly like the tray action.
+	; HKCU in an elevated worker is the hive of whichever account answered the UAC
+	; prompt: a standard user typing an administrator's credentials configured
+	; that administrator's touchpad while the backup held their own (WG-003). Only
+	; the device restart needs elevation, and it touches no per-user state. The
+	; owner backs up the user's values first, or writes nothing at all.
+	if !TouchpadRegistryApply() {
+		try LoggerError("Onboarding", "Gesture auto-config refused: the touchpad values were not backed up and written.")
 		return false
 	}
 	Epoch := _OnboardingGestureJob["epoch"] + 1
@@ -107,7 +112,7 @@ _Onboarding_StartGestureAuto(OnDone) {
 	FSDelete(ResultPath)
 	FSDelete(ResultPath . ".stage")
 	; Windows PowerShell 5.1 otherwise decodes a BOMless source with the ANSI code page.
-	if !FSWrite(ScriptPath, Chr(0xFEFF) . _Onboarding_BuildGesturePsScript(ResultPath)) {
+	if !FSWrite(ScriptPath, Chr(0xFEFF) . _GestureRestartBuildPsScript(ResultPath)) {
 		_Onboarding_AbortGestureAutoReservation(Epoch)
 		try LoggerError("Onboarding", "Could not write gesture PS script.")
 		return false
@@ -188,84 +193,3 @@ _Onboarding_ReadGestureAutoResult(ResultPath) {
 	return true
 }
 
-
-
-
-
-; ================================
-; ================================
-; ======= 2/ Worker script =======
-; ================================
-; ================================
-
-; Builds a self-contained PowerShell script that writes every PrecisionTouchPad
-; registry value AND restarts the touchpad PnP device so the new gesture map
-; takes effect without a logout. The key and the values come from the generated
-; touchpad table through its one owner (modules/gestures/touchpad_registry.ahk),
-; the same table the in-process writer uses; the caller has already backed up
-; the values it replaces. Functions, not globals, so the wizard can build it
-; before modules/gestures/init.ahk runs.
-;
-; The returned text is a full .ps1 script (multi-line, comments allowed)
-; written to a temp file by the caller — running it via ``-File`` avoids the
-; argv-quoting issues that plagued the previous ``-Command`` inline variant.
-_Onboarding_BuildGesturePsScript(ResultPath) {
-	; The script is assembled line-by-line instead of via a multi-line
-	; continuation section because the latter — combined with embedded
-	; ``foreach (...)`` lines — triggers a fail-fast crash
-	; (STATUS_STACK_BUFFER_OVERRUN, 0xC0000409) during AHK v2's continuation-
-	; section parser. Concatenating with explicit ``\`r\`n`` separators keeps
-	; the parser happy AND yields identical .ps1 content on disk.
-	CRLF := "`r`n"
-	ResultLiteral := StrReplace(ResultPath, "'", "''")
-	S := ""
-	S .= "$ErrorActionPreference = 'Stop'" . CRLF
-	S .= "$ResultPath = '" . ResultLiteral . "'" . CRLF
-	S .= "$ResultStage = $ResultPath + '.stage'" . CRLF
-	S .= "$ErgoptiExitCode = 1" . CRLF
-	S .= "$Reg = '" . TouchpadRegistryPowerShellKey() . "'" . CRLF
-	; Create the PrecisionTouchPad key if missing (machines that never had a
-	; precision touchpad driver loaded won't have it). Without this guard,
-	; Set-ItemProperty -Force still fails with "Cannot find path" and the
-	; whole script bails out before any value is written. -Force on New-Item
-	; makes the call idempotent so it's safe when the key already exists.
-	S .= "if (-not (Test-Path $Reg)) { New-Item -Path $Reg -Force | Out-Null }" . CRLF
-	S .= "$disabled = @()" . CRLF
-	S .= "$V = [ordered]@{" . CRLF
-	S .= TouchpadRegistryPowerShellValues()
-	S .= "}" . CRLF
-	S .= "try {" . CRLF
-	S .= "  foreach ($n in $V.Keys) {" . CRLF
-	; New-ItemProperty -Force creates the property OR updates it in place.
-	; Set-ItemProperty raises "Property X does not exist" on a first-time
-	; PrecisionTouchPad key (one we may have just created above), which
-	; aborts the whole script under $ErrorActionPreference='Stop'.
-	S .= "    New-ItemProperty -Path $Reg -Name $n -Value $V[$n] -PropertyType DWord -Force | Out-Null" . CRLF
-	S .= "  }" . CRLF
-	; Same outcome contract as the tray restart worker (config.ahk
-	; _GestureRestartBuildPsScript): no device or any refused PnP operation is a
-	; failure, and a device this script disabled is always re-enabled.
-	S .= "  $devs = @(Get-PnpDevice -PresentOnly | Where-Object {" . CRLF
-	S .= "    $_.Class -eq 'HIDClass' -and $_.FriendlyName -match 'Input Configuration|I2C HID'" . CRLF
-	S .= "  })" . CRLF
-	S .= "  if ($devs.Count -eq 0) { throw 'No Precision Touchpad HID device found.' }" . CRLF
-	S .= "  foreach ($d in $devs) {" . CRLF
-	S .= "    Disable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop" . CRLF
-	S .= "    $disabled += $d" . CRLF
-	S .= "  }" . CRLF
-	S .= "  Start-Sleep -Milliseconds 500" . CRLF
-	S .= "  foreach ($d in $devs) {" . CRLF
-	S .= "    Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop" . CRLF
-	S .= "  }" . CRLF
-	S .= "  $ErgoptiExitCode = 0" . CRLF
-	S .= "} catch {" . CRLF
-	S .= "} finally {" . CRLF
-	S .= "  foreach ($d in $disabled) { try { Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop } catch {} }" . CRLF
-	S .= "}" . CRLF
-	S .= "try {" . CRLF
-	S .= "  [System.IO.File]::WriteAllText($ResultStage, [string]$ErgoptiExitCode, [System.Text.Encoding]::ASCII)" . CRLF
-	S .= "  [System.IO.File]::Move($ResultStage, $ResultPath)" . CRLF
-	S .= "} catch { Remove-Item -LiteralPath $ResultStage -Force -ErrorAction SilentlyContinue; exit 1 }" . CRLF
-	S .= "exit $ErgoptiExitCode" . CRLF
-	return S
-}
