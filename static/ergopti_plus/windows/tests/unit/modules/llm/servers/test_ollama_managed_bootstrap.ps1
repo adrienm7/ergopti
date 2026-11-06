@@ -11,7 +11,10 @@ $fixture = [IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, '..\..\..\..
 $receipt = ([IO.File]::ReadAllText([IO.Path]::Combine($fixture, 'receipts.json')) | ConvertFrom-Json).portable
 $ticket = [Guid]::NewGuid().ToString('N')
 $runtime = [Guid]::NewGuid().ToString('N')
-$rootPath = [IO.Path]::Combine([Environment]::GetFolderPath('LocalApplicationData'), 'ergopti-bootstrap-test-' + $ticket)
+# The evidence folder stands for the Ergopti root, a direct LocalApplicationData
+# child; Open-OllamaManagedRoot admits only the managed folder one level below it.
+$evidencePath = [IO.Path]::Combine([Environment]::GetFolderPath('LocalApplicationData'), 'ergopti-bootstrap-test-' + $ticket)
+$rootPath = [IO.Path]::Combine($evidencePath, 'ollama')
 $catalogue = [IO.Path]::Combine([IO.Path]::GetTempPath(), 'ergopti-bootstrap-source-' + $ticket + '.json')
 Write-OllamaOwnedJson $catalogue ([ordered]@{ schema_version = 1; version = '0.24.0'; assets = [ordered]@{
 	'windows-amd64' = [ordered]@{ filename = 'ollama-windows-amd64.zip'; bytes = $receipt.bytes; sha256 = $receipt.sha256 }
@@ -99,7 +102,7 @@ try {
 	if ($null -ne $stage) { Close-OllamaPreparedStage $stage }
 	if ($null -ne $archive) { Close-OllamaPinnedArchive $archive }
 	if ($null -ne $root) { Close-OllamaManagedRoot $root }
-	Write-Output ('Evidence root: ' + $rootPath)
+	Write-Output ('Evidence root: ' + $evidencePath)
 	Write-Output ('Source receipt: ' + $catalogue)
 	Write-Output ('RESULT passed=' + $script:passed + ' failed=' + $script:failed + ' skipped=0')
 }

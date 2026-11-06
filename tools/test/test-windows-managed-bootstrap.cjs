@@ -537,6 +537,22 @@ for (const withdrawn of [1, 2]) {
 	assert.notEqual(changed, originHttp);
 	assert.throws(() => assertFinalAuxCurrency(changed));
 }
+// The native bootstrap fixture must hand Open-OllamaManagedRoot the same nested
+// root as the registered file component: the helper refuses a direct
+// LocalApplicationData child, so a flat fixture root could never pass.
+const bootstrapFixture = fs.readFileSync(
+	path.join(root, 'tests/unit/modules/llm/servers/test_ollama_managed_bootstrap.ps1'),
+	'utf8'
+);
+assert.match(
+	bootstrapFixture,
+	/^\$evidencePath = \[IO\.Path\]::Combine\(\[Environment\]::GetFolderPath\('LocalApplicationData'\), 'ergopti-bootstrap-test-' \+ \$ticket\)\r?$/m
+);
+assert.match(
+	bootstrapFixture,
+	/^\$rootPath = \[IO\.Path\]::Combine\(\$evidencePath, 'ollama'\)\r?$/m
+);
+assert.match(bootstrapFixture, /^\t\$root = Open-OllamaManagedRoot \$rootPath\r?$/m);
 process.stdout.write(
 	'Windows exact auxiliary result: PASS (5 causal source inverses; authored AHK UNRUN).\n'
 );

@@ -205,7 +205,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 - [ ] **[NATIVE]** Exercise the retained runtime/editor/diagnostics receiving boundaries on Windows and macOS, and the Linux live GTK/session flows. Replay refused writes, native timer admission, stale epochs and physical cleanup; the private models do not certify these boundaries.
 - [ ] **[POLICY] macOS local crash reports:** clarify raw local error/stack retention versus the existing no-PII comment; Windows explicitly keeps full local crash detail and Linux redacts before persistence. Shared exported diagnostics and day logs pass the canary control. No network disclosure or mandatory identical local retention policy is established.
-- [ ] **[COVERAGE] Windows managed-runtime fixture:** update or retire the unregistered legacy direct-child bootstrap fixture; the registered current fixture correctly uses the nested managed path. Do not treat the old fixture as a product install failure.
+- [ ] **[COVERAGE] Windows managed-runtime fixture:** update or retire the unregistered legacy direct-child bootstrap fixture; the registered current fixture correctly uses the nested managed path. Do not treat the old fixture as a product install failure. Partly done: the fixture now nests its root like the registered one (source guard in `test-windows-managed-bootstrap.cjs`); it holds the only reuse and runtime-receipt retirement cases, so registering it in `ci-windows.yml` remains, after a first native Windows run.
 
 ## Migration and update parity follow-up
 
