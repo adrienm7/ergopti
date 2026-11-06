@@ -149,3 +149,50 @@ helpers.describe("wrap-symbols shared catalogue", function()
 		helpers.assert_nil(active[utf8.char(0x3009)], "its closer must also be absent")
 	end)
 end)
+
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 4/ Trigger collisions =======
+-- =====================================
+-- =====================================
+
+helpers.describe("build_active_wrap_pairs: shared trigger keys (WSM-001, WSM-003)", function()
+	local NBSP = "\194\160"
+
+	helpers.it("keeps the still-enabled curly opener when the lower-quote pair is disabled (WSM-003)", function()
+		local active = text_acts.build_active_wrap_pairs({ ["„"] = false }, {})
+		helpers.assert_true(active["“"] ~= nil, "typing the opening curly quote must still wrap")
+		helpers.assert_eq(active["“"].left, "“")
+		helpers.assert_eq(active["“"].right, "”")
+	end)
+
+	helpers.it("keeps the lower-quote pair when the curly pair is disabled (WSM-003)", function()
+		local active = text_acts.build_active_wrap_pairs({ ["“"] = false }, {})
+		helpers.assert_eq(active["“"].left, "„")
+		helpers.assert_nil(active["”"], "the disabled pair's closing key must be absent")
+	end)
+
+	helpers.it("matches the typed guillemets, bare or with a non-breaking space, to the spaced pair (WSM-001)", function()
+		local active = text_acts.build_active_wrap_pairs(nil, {})
+		for _, typed in ipairs({ "«", "«" .. NBSP }) do
+			helpers.assert_true(active[typed] ~= nil, "opening guillemet must be a trigger: " .. typed)
+			helpers.assert_eq(active[typed].left, "« ", "the output keeps the catalogue spacing")
+			helpers.assert_eq(active[typed].right, " »")
+		end
+		for _, typed in ipairs({ "»", NBSP .. "»" }) do
+			helpers.assert_true(active[typed] ~= nil, "closing guillemet must be a trigger: " .. typed)
+			helpers.assert_eq(active[typed].left, "« ")
+		end
+	end)
+
+	helpers.it("a disabled guillemet pair loses every one of its trigger forms (WSM-001)", function()
+		local active = text_acts.build_active_wrap_pairs({ ["« "] = false }, {})
+		helpers.assert_nil(active["«"])
+		helpers.assert_nil(active["»"])
+		helpers.assert_nil(active["«" .. NBSP])
+	end)
+end)

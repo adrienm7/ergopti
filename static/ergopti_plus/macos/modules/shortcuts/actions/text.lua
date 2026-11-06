@@ -29,6 +29,7 @@ local TextContinuation = require("modules.shortcuts.actions.text_continuation")
 local TextDispatch = require("modules.shortcuts.actions.text_dispatch")
 local TransformGrace = require("modules.shortcuts.actions.text_transform_grace")
 local TableUtil = require("table_util")
+local WrapPair = require("wrap_pair")
 
 local LOG = "shortcuts.actions.text"
 
@@ -662,16 +663,18 @@ if #WRAP_GROUPS == 0 then
 	WRAP_GROUPS = FALLBACK_GROUPS
 end
 
+--- Whether a catalogue entry is a usable pair.
+--- @param pair any Catalogue entry.
+--- @return boolean
+local function is_catalogue_pair(pair)
+	return type(pair) == "table" and type(pair.left) == "string" and pair.left ~= ""
+		and type(pair.right) == "string" and pair.right ~= ""
+end
+
 local WRAP_PAIRS = {}
 for _, group in ipairs(WRAP_GROUPS) do
 	for _, pair in ipairs(group.pairs or {}) do
-		if type(pair) == "table" and type(pair.left) == "string" and pair.left ~= ""
-				and type(pair.right) == "string" and pair.right ~= "" then
-			WRAP_PAIRS[pair.left] = { left = pair.left, right = pair.right }
-			if pair.right ~= pair.left then
-				WRAP_PAIRS[pair.right] = { left = pair.left, right = pair.right }
-			end
-		end
+		if is_catalogue_pair(pair) then WrapPair.register(WRAP_PAIRS, pair) end
 	end
 end
 
@@ -1924,12 +1927,16 @@ end
 --- @return table {[char]={left,right}} ready for the eventtap filter.
 function M.build_active_wrap_pairs(symbol_states, custom_symbols)
 	local result = {}
-	for char, pair in pairs(WRAP_PAIRS) do
-		-- Use the opening symbol as the canonical key for state lookup
-		local state_key = pair.left
-		local enabled = (type(symbol_states) ~= "table") or (symbol_states[state_key] ~= false)
-		if enabled then
-			result[char] = pair
+	-- Filter by the user's choice BEFORE resolving shared trigger keys, so a
+	-- disabled pair can never take away a key a still-enabled pair owns. Later
+	-- catalogue pairs win a key shared by two enabled pairs.
+	for _, group in ipairs(WRAP_GROUPS) do
+		for _, pair in ipairs(group.pairs or {}) do
+			if is_catalogue_pair(pair) then
+				-- The opening symbol is the canonical key for state lookup.
+				local enabled = (type(symbol_states) ~= "table") or (symbol_states[pair.left] ~= false)
+				if enabled then WrapPair.register(result, pair) end
+			end
 		end
 	end
 	if type(custom_symbols) == "table" then
