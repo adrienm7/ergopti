@@ -92,11 +92,10 @@ DeadKey(Mapping) {
 			LoggerWarn("DeadKey", "Discarded invalid scalar capture ({1}).", Capture.Reason)
 		if Capture.Kind == "invalid"
 			return
-		if Capture.Kind == "timeout" {
-			if Mapping.Has(" ")
-				SendNewResult(Mapping[" "])
+		; Expiry cancels the pending dead key, like a pause: nothing is typed
+		; and nothing composes later (maintainer decision, dead-key lifecycle).
+		if Capture.Kind == "timeout"
 			return
-		}
 		PressedKey := Capture.Text
 		if Mapping.Has(PressedKey) {
 			SendNewResult(Mapping[PressedKey])

@@ -593,6 +593,11 @@ Ergopti_OnSuspendEnter() {
 			() => _SpaceHoldInputHook.Stop())
 	_LifecycleRunRequiredStep(Transition, "suppressive-input-hooks",
 		() => SIHO_StopAll())
+	; A registry layout's pending dead key is plain state, untouched by the
+	; hooks stopped above: pausing cancels it, so nothing composes after resume.
+	if IsSet(KeylayoutEmulation_ResetDeadKey)
+		_LifecycleRunRequiredStep(Transition, "keylayout-dead-key",
+			() => KeylayoutEmulation_ResetDeadKey())
 	if IsSet(_MagicKeyEditorInputHook) and IsObject(_MagicKeyEditorInputHook)
 		_LifecycleRunRequiredStep(Transition, "magic-key-editor-input-hook",
 			() => _MagicKeyEditorStopOwned(_MagicKeyEditorInputHook), true)
