@@ -60,6 +60,21 @@ context.init({
 	mode: 'parallel',
 	prompt
 });
+elements['p-name'].value = 'Edited name';
+elements['e-out'].childNodes = [{ nodeType: 3, textContent: 'Edited prompt' }];
+context.init({
+	edit_id: 'p',
+	epoch: 7,
+	title: 'Prompt',
+	name: 'My profile',
+	mode: 'parallel',
+	prompt
+});
+assert.equal(elements['p-name'].value, 'Edited name', 'duplicate initialization keeps the draft');
+assert.equal(elements['e-out'].childNodes[0].textContent, 'Edited prompt');
+// Restore the original draft to exercise exact whitespace separately.
+elements['p-name'].value = 'My profile';
+elements['e-out'].childNodes = [{ nodeType: 3, textContent: prompt }];
 context.doSave();
 const saved = messages.find((message) => message.action === 'save');
 assert.equal(
