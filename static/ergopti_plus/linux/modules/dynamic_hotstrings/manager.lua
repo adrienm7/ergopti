@@ -428,7 +428,7 @@ local function _fire_combo(prefix, trigger, publication)
 	if tag == "" then return false end
 	if type(publication) ~= "table" or getmetatable(publication) ~= nil
 		or type(publication.current) ~= "function" or type(publication.cached) ~= "function" then
-		Logger.warn(LOG, "Dynamic @-combo expansion refused: no retained text destination.")
+		Logger.warn(LOG, "Dynamic @-combo expansion refused: no retained text destination (content withheld).")
 		return false
 	end
 
