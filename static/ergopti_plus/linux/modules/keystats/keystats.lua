@@ -116,6 +116,8 @@ local TextCipher = require("modules.keystats.text_cipher")
 local TextMigration = require("modules.keystats.text_migration")
 -- The per-device data.sql the macOS and Windows drivers import.
 local MetricsLedger = require("modules.keystats.metrics_ledger")
+local LedgerImport = require("modules.keystats.ledger_import")
+local LedgerRebuild = require("modules.keystats.ledger_rebuild")
 local MigrationPlan = require("keystats.text_migration")
 -- Battery, network, lock and suspend. Optional: a machine with none of the
 -- tools it reads simply reports nothing, and the typing path must not care.
@@ -463,7 +465,10 @@ local _device_id = "linux-unknown"
 -- The per-device ledger: `exporter` (nil when refused, with `refusal`),
 -- `saw_migration` (the at-rest migration ran at the previous pump) and
 -- `pending` (committed rows may await export; no query is spawned otherwise).
-local _ledger = { exporter = nil, refusal = nil, saw_migration = false, pending = false }
+-- `importer` replays the other devices' ledgers once this one is exported;
+-- `import_after` is the monotonic instant of the next scan while all are caught up.
+local _ledger = { exporter = nil, refusal = nil, saw_migration = false, pending = false,
+	importer = nil, import_after = 0 }
 
 -- Session start timestamp for export.
 local _session_started_at = nil
@@ -717,6 +722,37 @@ LedgerSetup.start = function(identity, metrics_dir)
 	end
 	_ledger.exporter, _ledger.pending = ledger, true
 	Logger.info(LOG, "Metrics ledger ready: %s.", ledger.path)
+	LedgerSetup.start_import(identity, metrics_dir)
+end
+
+--- Creates the importer of the other devices' ledgers (ledger_import).
+--- @param identity table This device's identity.
+--- @param metrics_dir string|nil Override of <config>/metrics (tests).
+LedgerSetup.start_import = function(identity, metrics_dir)
+	local Paths = require("infra.paths")
+	local schema_path = Paths.shared("data/db/schema.sql")
+	local schema = schema_path and require("adapters.file_system").read(schema_path)
+	local Digest = require("infra.openssl_digest")
+	if type(schema) ~= "string" or not Digest.streaming then
+		Logger.error(LOG, "Foreign metrics import refused (%s); other devices' metrics are not shown.",
+			type(schema) ~= "string" and "schema.sql is unreadable" or "no streaming SHA-256")
+		return
+	end
+	local store = { query_rows = SqliteWriter.query_rows, exec_sql = SqliteWriter.exec_sql }
+	_ledger.importer = LedgerImport.new({
+		metrics_dir = metrics_dir or require("infra.config_paths").config("metrics"),
+		local_device_id = identity.device_id, schema = schema, store = store,
+		fs = LedgerImport.native_ports(), digest_stream = Digest.stream,
+		rebuild = function(device_id)
+			return LedgerRebuild.render({ store = store, device_id = device_id, schema = schema,
+				decrypt = TextCipher.decrypt,
+				statement = SqliteWriter.derived_statement })
+		end,
+		now_ts = function() return os.date("%Y-%m-%d %H:%M:%S") .. ".000" end,
+		logger = Logger,
+	})
+	_ledger.import_after = 0
+	Logger.info(LOG, "Foreign metrics import ready.")
 end
 
 --- Initialises the keystats.
@@ -2233,7 +2269,10 @@ function M.pump_ledger()
 		_ledger.exporter:request_rebuild()
 		_ledger.pending = true
 	end
-	if not _ledger.pending then return end
+	if not _ledger.pending then
+		M.pump_import()
+		return
+	end
 	local status, reason = _ledger.exporter:step()
 	if status == "idle" then _ledger.pending = false end
 	if status == "failed" and reason ~= _ledger.refusal then
@@ -2242,6 +2281,18 @@ function M.pump_ledger()
 	elseif status ~= "failed" and _ledger.refusal ~= nil then
 		_ledger.refusal = nil
 	end
+end
+
+--- Imports the next bounded slice of the other devices' ledgers. Runs only
+--- once this device's own export is idle; while every device is caught up it
+--- rescans at the ingest cadence, the one macOS syncs foreign ledgers at.
+function M.pump_import()
+	if not _ledger.importer or M.has_flush_debt() or _flush_stopping or not sqlite_available() then return end
+	if TextMigration.is_running() then return end
+	local now = Monotonic.now_ms()
+	if now < _ledger.import_after then return end
+	local status = _ledger.importer:step()
+	_ledger.import_after = status == "more" and 0 or now + Timings.ms("keystats", "ingest_tick_ms")
 end
 
 --- The ledger's state, for diagnostics.

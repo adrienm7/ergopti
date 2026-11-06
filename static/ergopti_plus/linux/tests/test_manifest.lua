@@ -10,6 +10,7 @@
 
 return {
 	"tests.unit.modules.keystats.storage.test_metrics_ledger",
+	"tests.unit.modules.keystats.storage.test_ledger_import",
 	"tests.unit.modules.llm.prediction.test_parser_comparisons",
 	"tests.unit.modules.llm.prediction.test_parser_unicode_escapes",
 	"tests.unit.ui.test_shared_catalogue_sources",

@@ -927,6 +927,8 @@ function M.sqlite_writer(opts)
 	end
 
 	function fake.exec_sql(sql) fake.executed[#fake.executed + 1] = sql ; return true end
+	-- Renders nothing: the fake keeps no derived formatter of its own.
+	function fake.derived_statement() return nil end
 	-- The ledger identity asks whether the store already knows its pre-ledger
 	-- "linux-<hostname>" id. A fake store is an existing one unless the test
 	-- says it is new (opts.fresh_store), so the historical id stays in force.

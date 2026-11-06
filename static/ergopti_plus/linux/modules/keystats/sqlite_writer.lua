@@ -12,7 +12,8 @@
 --- This module is the Linux counterpart to macOS's modules/keystats/sqlite_writer.lua
 --- (which uses hs.sqlite3). Both write to the same canonical schema; the raw
 --- rows reach the other devices through metrics_ledger.lua, which projects them
---- to this device's by_device/<id>/data.sql.
+--- to this device's by_device/<id>/data.sql, and the other devices' ledgers
+--- come back through ledger_import.lua.
 ---
 --- FEATURES & RATIONALE:
 --- 1. CLI-based: every SQL statement is executed through `sqlite3 <db> "<sql>"`
@@ -1904,6 +1905,18 @@ function M.start_flush(device_id, payload)
 	_flush_owner = operation
 	dispatch("reservation", _reservation_sql(count))
 	return operation
+end
+
+--- Renders one derived upsert without running it, so a caller composing its
+--- own transaction (the foreign ledger rebuild) writes exactly the rows a
+--- local flush would.
+--- @param kind string Derived family, such as "chars_class" or "ngrams".
+--- @param device_id string Device the row belongs to.
+--- @return string|nil sql Nil when the row writes nothing (an all-zero app day).
+function M.derived_statement(kind, device_id, ...)
+	local formatter = _derived_sql[kind]
+	assert(type(formatter) == "function", "unknown derived family " .. tostring(kind))
+	return formatter(device_id, ...)
 end
 
 --- Runs an arbitrary SQL script through the same stdin path as every write.
