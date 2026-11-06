@@ -407,6 +407,7 @@ end
 --- timer allocation fails without performing file/canvas work on the HID path.
 local function invalidate_observed_context()
 	if _one_shot_shift then _one_shot_shift.disarm() end
+	CoreState.undoable = nil
 	CoreState.buffer = ""
 	LlmContext.reset(CoreState)
 	CoreState.llm_private_mark = ""
@@ -441,6 +442,7 @@ end
 --- terminator into the new app. Reconciliation stays closed until AX says the
 --- destination is known-normal; ignored/unknown destinations never reopen LLM.
 local function invalidate_window_context()
+	CoreState.undoable = nil
 	CoreState.buffer = ""
 	LlmContext.reset(CoreState)
 	CoreState.llm_private_mark = ""
@@ -1718,6 +1720,9 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	if is_ignored ~= false then
 		return internal_loopback == true
 	end
+	-- An expansion is undoable by the very next keystroke only (Expander.undo_on_backspace).
+	local undo = CoreState.undoable
+	CoreState.undoable = nil
 	local is_secure = km_utils.is_secure_field(context_now)
 	if is_secure ~= false then
 		return internal_loopback == true
@@ -1856,6 +1861,8 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 
 	-- 6. Handle Backspace.
 	if keyCode == Keycodes.BACKSPACE then
+		-- Right after an expansion, a Backspace brings the trigger back (as on Linux).
+		if undo and not flags.alt and Expander.undo_on_backspace(undo) then return true end
 		-- Option+Backspace deletes the previous word: the caret now sits where
 		-- that word began, so the next character starts a word. (Cmd and Ctrl
 		-- with Backspace were handled above, at an unknown position.)
@@ -2501,6 +2508,7 @@ mouse_tap = eventtap.new(
 		-- Close the runtime in O(1) before returning the focus-changing click.
 		-- Canvas, AX, task cancellation and logging run only after Quartz receives
 		-- the older fence payload and the original mouse event.
+		CoreState.undoable = nil
 		CoreState.buffer = ""
 		-- hotstrings.click_resets_word: the caret moved somewhere unobservable;
 		-- by default the next run is a new word, as on the other drivers.
