@@ -25,6 +25,7 @@ local FileSystem    = require("adapters.file_system")
 local KeyState      = require("adapters.key_state")
 local SyntheticInput = require("adapters.synthetic_input")
 local Clipboard     = require("adapters.clipboard")
+local ClipboardBorrowers = require("infra.clipboard_borrowers")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local Click         = require("modules.gestures.actions_click")
 local Sticky        = require("modules.gestures.sticky_modifiers")
@@ -1598,6 +1599,7 @@ end)
 -- it: a local declared below one binds a nil global instead, and the failure
 -- surfaces only inside a timer callback where the file logger never sees it.
 local _search_capture_in_flight = false
+ClipboardBorrowers.register("search", function() return _search_capture_in_flight == true end)
 local _search_parent = nil
 local _search_saved_clipboard = nil
 local _search_result_receipt = nil
@@ -1967,6 +1969,12 @@ sg("search_web", function(binding)
 	-- the FIRST had just copied — the selection, not the user's clipboard — and
 	-- then dutifully "restored" it, so the real clipboard was gone for good. The
 	-- same stale-snapshot class the text-transform path was hardened against.
+	-- Another family's temporary payload is not the user's clipboard
+	local holder = ClipboardBorrowers.foreign_holder("search")
+	if holder then
+		Logger.info(LOG, "search_web ignored while %s borrows the clipboard.", holder)
+		return false
+	end
 	local ok_snapshot, snapshot, captured, snapshot_count = pcall(Clipboard.save)
 	if not ok_snapshot or captured ~= true then
 		Logger.error(LOG, "search_web clipboard snapshot failed.")

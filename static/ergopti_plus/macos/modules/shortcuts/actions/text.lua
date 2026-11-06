@@ -19,6 +19,7 @@ local M = {}
 local hs         = hs
 local pasteboard = hs.pasteboard
 local Clipboard  = require("adapters.clipboard")
+local ClipboardBorrowers = require("infra.clipboard_borrowers")
 local JsonCodec  = require("adapters.json_codec")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
@@ -425,12 +426,35 @@ settle_text_owner = function(owner)
 		and synthetic_settled == true and released == true
 end
 
+-- Only "surround" emits keys without borrowing the clipboard
+local CLIPBOARD_FREE_KINDS = { surround = true }
+
+--- Whether any parent's text owner holds (or settles) a borrowed clipboard.
+--- @return boolean borrowed
+local function text_clipboard_borrowed()
+	for _, scope in pairs(_text_scopes) do
+		for kind, owner in pairs(scope.slots) do
+			if owner ~= nil and CLIPBOARD_FREE_KINDS[kind] ~= true then return true end
+		end
+	end
+	return false
+end
+ClipboardBorrowers.register("text", text_clipboard_borrowed)
+
 --- Acquires one named slot after retrying prior fenced debt.
 --- @param kind string transform|plain|wrap|surround.
 --- @return table|nil owner
 local function acquire_text_owner(kind, parent)
 	local scope = text_scope(parent)
 	if scope.paused == true then return nil end
+	if CLIPBOARD_FREE_KINDS[kind] ~= true then
+		-- Another family's temporary payload is not the user's clipboard
+		local holder = ClipboardBorrowers.foreign_holder("text")
+		if holder then
+			Logger.info(LOG, "Text %s ignored while %s borrows the clipboard.", kind, holder)
+			return nil
+		end
+	end
 	for _, existing in pairs(scope.slots) do
 		if existing and existing.business_open ~= true then settle_text_owner(existing) end
 	end

@@ -42,6 +42,7 @@ local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
 local FileSystem    = require("adapters.file_system")
 local Clipboard     = require("adapters.clipboard")
+local ClipboardBorrowers = require("infra.clipboard_borrowers")
 local OpenTarget    = require("open_target")
 
 local LOG = "shortcuts.actions.apps"
@@ -97,6 +98,7 @@ local _copy_dispatch = nil
 -- From then on the snapshot may only be restored over that same generation: a
 -- later user or application copy owns the clipboard and revokes the snapshot.
 local _copy_result_receipt = nil
+ClipboardBorrowers.register("apps", function() return _copy_capture_in_flight == true end)
 
 -- App navigation owns two kinds of asynchronous native capabilities: deferred
 -- timers and ShellRunner processes.  Each parent scope has one admission
@@ -430,6 +432,12 @@ end
 local function begin_copy_capture(scope)
 	if not apps_admission_open(scope) or _copy_capture_in_flight then
 		Logger.debug(LOG, "copy_or_open_path ignored while another capture owns the clipboard.")
+		return nil, nil
+	end
+	-- Another family's temporary payload is not the user's clipboard
+	local holder = ClipboardBorrowers.foreign_holder("apps")
+	if holder then
+		Logger.info(LOG, "copy_or_open_path ignored while %s borrows the clipboard.", holder)
 		return nil, nil
 	end
 	-- Publish the acquisition before crossing into the native pasteboard. A
