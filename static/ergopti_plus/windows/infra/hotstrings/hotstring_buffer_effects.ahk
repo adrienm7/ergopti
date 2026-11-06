@@ -91,6 +91,22 @@ HS_SyntheticPayloadKind(Payload) {
 	return "edit"
 }
 
+; Whether a synthetic payload is a Backspace the physical counterpart refuses to
+; promise a word start for: under Alt, Win or AltGr it undoes or deletes an
+; amount the driver cannot know, exactly as _PrefixWordDeleteChordHeld treats the
+; physical chord. Ctrl (alone or with Shift) deletes the previous word, so it
+; still starts one.
+; @param Payload {String} The exact Send/SendInput payload.
+; @returns {Boolean}
+HS_SyntheticBackspaceLeavesBoundaryUnknown(Payload) {
+	global HS_BUFFER_KEYSTROKE_PAYLOAD
+	if !RegExMatch(Payload, HS_BUFFER_KEYSTROKE_PAYLOAD, &Stroke)
+		return false
+	if !RegExMatch(Stroke[3], "i)^(?:BackSpace|BS)$")
+		return false
+	return Stroke[1] != "" or RegExMatch(Stroke[2], "[!#]")
+}
+
 ; The setting a shortcut made now answers to: the tap-hold one when the
 ; shortcut is a tap-hold key's own output (TapHoldOwnsShortcut), else the
 ; shortcut one.
@@ -204,7 +220,10 @@ HS_CommitSyntheticEffect(Payload, SendFailed := false) {
 	; fresh — the same verdict the watcher reaches for a physical arrow key.
 	; A completed caret move permits a new word start. A rejected or partially
 	; emitted edit does not establish a boundary or a precise deletion count.
+	; An Alt/Win/AltGr Backspace is the exception: like its physical twin it forgets
+	; the word without promising where the next one begins.
 	KnownBoundary := !SendFailed && !IncompleteContext
+		&& !HS_SyntheticBackspaceLeavesBoundaryUnknown(Payload)
 	if IsSet(_PrefixCommitInputContext) {
 		PrefixCommit := _PrefixCommitInputContext(0, KnownBoundary)
 		NeedsLegacyPrefixReset := false
