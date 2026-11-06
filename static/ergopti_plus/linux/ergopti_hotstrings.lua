@@ -3412,6 +3412,9 @@ local function main()
 					tray_menu = nil
 				end)
 			end
+			-- The floating WPM widget owns its window's event delivery; it must not
+			-- depend on the tray having been started.
+			RuntimeGuard.call("WPM surface pump", require("adapters.wpm_surface").pump)
 			privacy_owners.watch.pump()
 			RuntimeGuard.call("metrics SQLite flush acknowledgement", keystats.pump_flush)
 			-- Consume owned results promptly; fresh dispatch/retry stays periodic.

@@ -500,3 +500,11 @@ detail.
 Windows runs an accepted agent connector on a fresh timer thread; it is refused
 when the script is paused or the AI is off by the time it starts, like ordinary
 accepted text. macOS and Linux run the connector on the acceptance itself.
+
+## The Linux WPM widget does not need the tray (2026-11-06)
+
+The floating WPM widget is drawn without --tray, as on Windows and macOS: the
+daemon pumps the widget's own GLib context instead of leaving it to the tray's
+pump. WPM pointer-hide and colour precedence align on Windows (mouse after the
+last keystroke hides unless a preview is up; AI, then hotstring, then
+autocorrection); the Lua trackers still owe that change.
