@@ -305,16 +305,21 @@ end
 
 --- The clipboard's change counter, for the tap-hold copy check: the X11
 --- CLIPBOARD owner's TIMESTAMP (ICCCM), which a toolkit renews each time it
---- takes the selection, so copying the same text again still moves it.
---- Wayland gives clients no such counter (only a data-control watcher would
---- see each new selection, and GNOME offers none), so there it is nil with
---- its reason and the copy goes unchecked.
+--- takes the selection, so copying the same text again still moves it; xclip
+--- reads it, and libX11 directly when xclip is absent
+--- (adapters/x11_selection_stamp.lua). Wayland gives clients no timestamp:
+--- there the count of selection changes a `wl-paste --watch` child saw
+--- (adapters/wayland_selection_counter.lua) stands in, and a compositor with
+--- no data-control (GNOME) leaves it nil with its reason, the copy unchecked.
 --- @return number|nil counter
 --- @return string|nil reason Why there is none: "unsupported" when the session
 ---   can never have one, "unreadable" when this read failed.
 function M.change_counter()
+	if DisplayServer.is_wayland() then return require("adapters.wayland_selection_counter").read() end
 	if not DisplayServer.is_x11() then return nil, "unsupported" end
-	if not Shell.has_command("xclip") then return nil, "unsupported" end
+	if not Shell.has_command("xclip") then
+		return require("adapters.x11_selection_stamp").read(tonumber(COUNTER_TIMEOUT_S))
+	end
 	local ok, output = Shell.exec_checked(string.format(
 		"timeout %s xclip -selection clipboard -t TIMESTAMP -o 2>/dev/null", COUNTER_TIMEOUT_S))
 	if not ok then return nil, "unreadable" end

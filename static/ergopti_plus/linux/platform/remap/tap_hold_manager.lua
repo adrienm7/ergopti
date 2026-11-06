@@ -787,6 +787,11 @@ function M.init(opts)
 	_action_names = opts.action_names
 	_on_text_injected = opts.on_text_injected
 	_tap_copy = build_tap_copy(opts.execute_action, opts.capture_copy_owner)
+	-- Wayland's copy check counts the selection changes a watcher sees; it
+	-- lives as long as the copy owner (adapters/wayland_selection_counter.lua).
+	if not _dry_run and require("infra.display_server").is_wayland() then
+		require("adapters.wayland_selection_counter").start()
+	end
 	_defaults_path = opts.defaults_path
 	_user_path = opts.user_path
 	_enabled, _paused = true, false
@@ -1185,6 +1190,8 @@ function M._reset_for_test()
 	_on_text_injected = nil
 	if _tap_copy then _tap_copy:stop() end
 	_tap_copy = nil
+	local counter = package.loaded["adapters.wayland_selection_counter"]
+	if counter then counter.stop() end
 	cached_roll_proof = nil
 	_combinations, _installed_engine = nil, nil
 	_enabled, _paused = true, false

@@ -371,6 +371,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Read the X11 clipboard owner's timestamp through libX11 under Xvfb",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Delete files using native permission and symlink receipts",
 			"protocol": 10
 		},

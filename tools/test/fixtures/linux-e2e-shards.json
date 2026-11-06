@@ -165,6 +165,7 @@
 			"Keep native shell capture failures free of caller text",
 			"Refuse truncated native process names and arguments",
 			"Check native path existence without opening readable streams",
+			"Read the X11 clipboard owner's timestamp through libX11 under Xvfb",
 			"Delete files using native permission and symlink receipts",
 			"Refuse truncated native paths and retain literal filenames",
 			"Retain native timer ownership across garbage collection",
