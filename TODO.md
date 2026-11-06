@@ -843,6 +843,7 @@ Account and tester actions (maintainer, from the PC):
       « WPM in menu bar », type: a second icon shows the number (source colour after a hotstring, neutral otherwise),
       hides when typing stops and on pause; restart Explorer: it comes back; quit: it leaves; at 125 % and 200 % the
       number stays legible.
+- [ ] Branch `layout/system-switch-parity` (2026-11-06, AHK unrun on Linux): run the AHK suite
 
 ## To confirm on Linux
 
@@ -864,6 +865,12 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 - [ ] Gestures: a three-finger pad and one `libinput record` from a real touchpad (d627f511fc, 1870e62e1a,
       `linux/HARDWARE.md` section 13); a two-finger scroll with a thumb resting reports two fingers, a brisk
       three-finger tap still reports `tap_3`.
+- [ ] Layout switching (branch `layout/system-switch-parity`, 2026-11-06): on GNOME Wayland, KDE Plasma 6 Wayland,
+      KDE Plasma X11 and another X11 desktop with two layouts, Layout > « Input sources » lists them (GNOME and KDE
+      tick the active one, X11 ticks none) and picking one switches the desktop. On KDE, the keyboard daemon's
+      `org.kde.KeyboardLayouts.getLayoutsList` (through `gdbus call`) answers the `a(sss)` shape the adapter parses
+      (Plasma 5.21+). With the pause switch on, the daemon start selects the resume layout and a start after a paused
+      reload keeps the pause layout; on Sway the rows show the unsupported-desktop reason.
 - [ ] Gesture axis slots (312bb581): on a real touchpad, with only `swipe_3_horiz` bound, a three-finger swipe
       left and right each run it once; binding `swipe_3_left` too makes the left swipe run that one instead.
 - [ ] Navigation layer wheel bindings with a real mouse (ea4b3fa600).

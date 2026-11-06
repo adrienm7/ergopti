@@ -15,6 +15,27 @@ and `user.email` to that identity before the first commit, pass the rule to
 every child session, and keep tool attribution out of messages (the strict
 convention lint already rejects attribution trailers).
 
+## System keyboard layout features are the same on every OS (2026-11-06)
+
+Every feature about the user's system keyboard layout follows macOS on all
+three OS. A driver start applies the layout of the live pause state (resume
+layout running, pause layout paused; `PauseSwitchPolicy.startup_event` and its
+AHK twin, pinned by the `startup` vectors of `pause_switch_vectors.json`), a
+pause, a resume and a user quit switch as before, and a pause transition that
+already ran since init (a restored pause) keeps its choice over the start.
+Layout > « Input sources » (`active_layouts`) is declared for every driver: the
+active layout ticked, a pick switching the system (macOS TIS, Windows
+`KLS_Select` on the user's installed layouts, Linux GNOME gsettings, the KDE
+Plasma keyboard daemon over D-Bus, or setxkbmap; other Wayland compositors show
+`menu.layout.active_layouts_unsupported_desktop`). The Ergopti install rows
+(`layout_bundle`) stay macOS-only with
+`platform_reason.layout_install_is_the_macos_bundle`: the Windows installer is
+the unsigned `Ergopti_windows.exe` release asset that must run elevated, which
+the driver never starts (macOS refuses its unverified system scope likewise),
+and Linux installs Ergopti for the user from the layout manager. Action: a new
+layout feature lands on the three drivers or names its blocker in the row's
+reason; installing on Windows from the menu needs a signed layout asset first.
+
 ## Dead keys: one lifecycle contract, macOS output for the magic key (2026-11-06)
 
 Every OS follows the native macOS dead-key behaviour. A continuation with no
