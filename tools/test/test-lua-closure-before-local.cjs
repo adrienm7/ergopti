@@ -83,9 +83,10 @@ function collectLua(dir, acc) {
  * @returns {string} The line with comments and quoted spans blanked out.
  */
 function codeOnly(line) {
+	// One left-to-right pass: either quote kind may hold the other (`['"'] = '"'`),
+	// so blanking one kind first would pair quotes across two different strings.
 	return line
-		.replace(/"(?:[^"\\]|\\.)*"/g, '""')
-		.replace(/'(?:[^'\\]|\\.)*'/g, "''")
+		.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, (span) => span[0] + span[0])
 		.replace(/--.*$/, '');
 }
 
