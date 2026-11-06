@@ -7,6 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local lfs = require("lfs")
 
 local OWNED_MODULES = {
 	"platform.remap.defaults",
@@ -59,7 +60,8 @@ local OWNED_MODULES = {
 --- Runs native construction and every retained callback before restoring state.
 --- @param run function Receives the scoped fixture constructors and observers.
 return function(run, dependencies)
-	return helpers.with_stub_scope(OWNED_MODULES, function()
+	local config_dir = os.tmpname(); assert(os.remove(config_dir)); assert(lfs.mkdir(config_dir))
+	local results = table.pack(xpcall(helpers.with_stub_scope, debug.traceback, OWNED_MODULES, function()
 		if dependencies ~= nil then
 			assert(type(dependencies) == "table" and type(dependencies.files) == "table", "fixture file port is required")
 			package.loaded["adapters.file_system"] = dependencies.files
@@ -485,10 +487,12 @@ return function(run, dependencies)
 			end
 			function timer_scheduler.every() return { committed = false, fired = true }, false end
 			package.loaded["adapters.timer_scheduler"] = timer_scheduler
-			-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
+			-- layers.toml, read at every regeneration, lives in get_config_dir(); none
+			-- at start. The folder exists, as the product's does, so choosing the
+			-- layer hold imports the recommended layer the way a Mac would.
 			package.loaded["infra.config_paths"] = {
 				get = function() return "missing-config.toml" end,
-				get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
+				get_config_dir = function() return config_dir end,
 			}
 			package.loaded["modules.keystats.kc_bridge"] = {
 				refresh_managed_set = function()
@@ -872,5 +876,9 @@ return function(run, dependencies)
 			clone_payload = clone_payload,
 			count_notifications = count_notifications,
 		})
-	end)
+	end))
+	os.remove(config_dir .. "/layers.toml")
+	assert(lfs.rmdir(config_dir), "the fixture configuration folder holds only layers.toml")
+	if not results[1] then error(results[2], 0) end
+	return table.unpack(results, 2, results.n)
 end

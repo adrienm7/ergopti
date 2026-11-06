@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local lfs = require("lfs")
 
 local TOKENS = {
 	"00112233445566778899aabbccddeeff",
@@ -86,6 +87,7 @@ end
 --- @param body function Test body receiving (remap, calls).
 local function with_remap(options, body)
 	options = options or {}
+	local config_dir = os.tmpname(); assert(os.remove(config_dir)); assert(lfs.mkdir(config_dir))
 	local previous_getenv = os.getenv
 	local previous_execute = os.execute
 	local previous_popen = io.popen
@@ -187,21 +189,35 @@ local function with_remap(options, body)
 		end
 	end
 	package.loaded["infra.logger"] = logger
-	-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
+	-- layers.toml, read at every regeneration, lives in get_config_dir(); none
+	-- at start. The folder exists, as the product's does, so choosing the
+	-- layer hold imports the recommended layer the way a Mac would.
 	package.loaded["infra.config_paths"] = {
 		get = function() return "tests/unit/platform/remap/guardian-recovery.toml" end,
-		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
+		get_config_dir = function() return config_dir end,
 	}
-	-- The two timings platform/remap/init.lua reads; any other read is a new
-	-- dependency this fixture must learn about, so it fails loudly.
+	-- The two timings platform/remap/init.lua reads, and the input source limits
+	-- the navigation layer reader loads; any other read is a new dependency this
+	-- fixture must learn about, so it fails loudly. Those limits are the registry's.
 	local timings_sec = {
 		["debounce.layout_tis_settle_ms"] = 0.5,
 		["ui.onboarding_startup_delay_ms"] = 2,
+	}
+	package.loaded["infra.timings"] = nil
+	local RegistryTimings = require("infra.timings")
+	timings_sec["ui.input_source_operation_timeout_ms"] = RegistryTimings.sec("ui", "input_source_operation_timeout_ms")
+	local timings_count = {
+		["limits.input_source_id_bytes"] = RegistryTimings.count("limits", "input_source_id_bytes"),
 	}
 	package.loaded["infra.timings"] = {
 		sec = function(category, key)
 			local value = timings_sec[category .. "." .. key]
 			helpers.assert_true(value ~= nil, "unexpected timing read: " .. category .. "." .. key)
+			return value
+		end,
+		count = function(category, key)
+			local value = timings_count[category .. "." .. key]
+			helpers.assert_true(value ~= nil, "unexpected count read: " .. category .. "." .. key)
 			return value
 		end,
 	}
@@ -868,6 +884,8 @@ local function with_remap(options, body)
 	end
 	for name, value in pairs(previous_hs_modules) do package.loaded[name] = value end
 	for _, name in ipairs(STUB_MODULES) do package.loaded[name] = previous_modules[name] end
+	os.remove(config_dir .. "/layers.toml")
+	assert(lfs.rmdir(config_dir), "the fixture configuration folder holds only layers.toml")
 	if not ok then error(err, 0) end
 end
 
