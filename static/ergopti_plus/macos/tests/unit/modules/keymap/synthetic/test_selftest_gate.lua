@@ -138,7 +138,7 @@ helpers.describe("keymap selftest gate", function()
 
 	helpers.it("retries the refusal diagnostic when deferral is refused (selftest-gate-defer-retry)", function()
 		for _, refusal in ipairs({ true, "raise" }) do
-			local world = { dev = true, focused = 7, refuse_defer = refusal }
+			local world = { running = true, focused = 7, refuse_defer = refusal }
 			with_gate(world, function(Gate, Publisher, log)
 				Publisher.publish(SCRATCH_WINDOW)
 				helpers.assert_eq(select(2, Gate.admits(selftest_key())), "other_window")
