@@ -360,18 +360,18 @@ two disagree in either direction.
 | `gestures.sensitivities.swipe_3_horiz`                        | —               | n/a                                    | n/a                  |
 | `gestures.sensitivities.swipe_4_horiz`                        | —               | n/a                                    | n/a                  |
 | `gestures.sensitivities.swipe_5_horiz`                        | —               | n/a                                    | n/a                  |
-| `layout.ergopti_base`                                         | n/a             | n/a                                    | —                    |
+| `layout.ergopti_base`                                         | —               | `evdev`, `uinput`                      | —                    |
 | `layout.direct_access_digits`                                 | —               | —                                      | —                    |
 | `layout.virtual_keyboard`                                     | `karabiner`     | n/a                                    | n/a                  |
 | `layout.number_row_reorder_edges`                             | —               | —                                      | —                    |
-| `layout.ergopti_alt_gr`                                       | n/a             | n/a                                    | —                    |
-| `layout.ergopti_variant`                                      | n/a             | n/a                                    | —                    |
-| `layout.emulate_number_row`                                   | n/a             | n/a                                    | —                    |
-| `layout.emulate_top_row`                                      | n/a             | n/a                                    | —                    |
-| `layout.emulate_home_row`                                     | n/a             | n/a                                    | —                    |
-| `layout.emulate_bottom_row`                                   | n/a             | n/a                                    | —                    |
+| `layout.ergopti_alt_gr`                                       | —               | `evdev`, `uinput`                      | —                    |
+| `layout.ergopti_variant`                                      | —               | `evdev`, `uinput`                      | —                    |
+| `layout.emulate_number_row`                                   | —               | `evdev`, `uinput`                      | —                    |
+| `layout.emulate_top_row`                                      | —               | `evdev`, `uinput`                      | —                    |
+| `layout.emulate_home_row`                                     | —               | `evdev`, `uinput`                      | —                    |
+| `layout.emulate_bottom_row`                                   | —               | `evdev`, `uinput`                      | —                    |
 | `layout.ctrl_magic_save`                                      | n/a             | n/a                                    | —                    |
-| `layout.emulated_layout`                                      | n/a             | n/a                                    | —                    |
+| `layout.emulated_layout`                                      | —               | `evdev`, `uinput`                      | —                    |
 | `category_enabled.hotstrings`                                 | n/a             | n/a                                    | —                    |
 | `category_enabled.layout`                                     | n/a             | n/a                                    | —                    |
 | `category_enabled.shortcuts`                                  | n/a             | n/a                                    | —                    |

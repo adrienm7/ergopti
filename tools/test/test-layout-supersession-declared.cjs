@@ -109,44 +109,47 @@ check('number-row modes are independently source-scoped rather than boolean supe
 	assert.ok(!declared.some((d) => d.section === 'layout' && d.id === 'direct_access_digits'));
 });
 
-check('the Ergopti emulation declares two Windows booleans and one closed internal variant', () => {
-	assert.ok(declared.length >= EXPECTED.length, `only ${declared.length} declaration(s) found`);
-	for (const id of EXPECTED) {
-		assert.ok(
-			declared.some((d) => d.section === 'layout' && d.id === id),
-			`layout.${id} is not declared`
-		);
-	}
-	for (const d of declared) {
-		assert.strictEqual(
-			d.platforms,
-			'["ahk"]',
-			`${d.section}.${d.id}: only the Windows driver emulates layouts`
-		);
-		if (d.section === 'layout' && d.id === 'ergopti_variant') {
-			const row = blocks.find((b) => b.section === 'layout' && JSON.parse(b.fields.id) === d.id);
-			assert.strictEqual(d.type, '"enum"');
-			assert.deepStrictEqual(JSON.parse(row.fields.enum_values), [
-				'none',
-				'ergopti',
-				'ergopti_plus'
-			]);
-			assert.strictEqual(row.fields.default, '"none"');
-			assert.strictEqual(row.fields.recommended, '"ergopti_plus"');
-			assert.strictEqual(
-				row.fields.choice,
-				undefined,
-				'internal source intent cannot add a public chooser'
-			);
-		} else {
-			assert.strictEqual(
-				d.type,
-				'"boolean"',
-				`${d.section}.${d.id}: the gate can only turn a boolean off`
+check(
+	'the Ergopti emulation declares two booleans and one closed internal variant on every driver',
+	() => {
+		assert.ok(declared.length >= EXPECTED.length, `only ${declared.length} declaration(s) found`);
+		for (const id of EXPECTED) {
+			assert.ok(
+				declared.some((d) => d.section === 'layout' && d.id === id),
+				`layout.${id} is not declared`
 			);
 		}
+		for (const d of declared) {
+			assert.strictEqual(
+				d.platforms,
+				'["ahk", "hs", "linux"]',
+				`${d.section}.${d.id}: the three drivers emulate layouts`
+			);
+			if (d.section === 'layout' && d.id === 'ergopti_variant') {
+				const row = blocks.find((b) => b.section === 'layout' && JSON.parse(b.fields.id) === d.id);
+				assert.strictEqual(d.type, '"enum"');
+				assert.deepStrictEqual(JSON.parse(row.fields.enum_values), [
+					'none',
+					'ergopti',
+					'ergopti_plus'
+				]);
+				assert.strictEqual(row.fields.default, '"none"');
+				assert.strictEqual(row.fields.recommended, '"ergopti_plus"');
+				assert.strictEqual(
+					row.fields.choice,
+					undefined,
+					'internal source intent cannot add a public chooser'
+				);
+			} else {
+				assert.strictEqual(
+					d.type,
+					'"boolean"',
+					`${d.section}.${d.id}: the gate can only turn a boolean off`
+				);
+			}
+		}
 	}
-});
+);
 
 check('every reason resolves in all 21 locales', () => {
 	const files = fs.readdirSync(LOCALES).filter((f) => f.endsWith('.json'));

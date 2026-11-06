@@ -52,10 +52,8 @@ const SINGLE_DRIVER_KEYS = [
 	// stops being where they are recorded. The manifest pins their platforms.
 	// hotstrings.expansion_delay left this list when the three drivers started
 	// reading the base delay from its one manifest declaration.
-	// The Windows layout is installed by the AHK driver's own remapper.
-	['layout.ergopti_base', 'ahk'],
-	['layout.ergopti_alt_gr', 'ahk'],
-	['layout.ergopti_variant', 'ahk'],
+	// layout.ergopti_base, ergopti_alt_gr and ergopti_variant left this list when
+	// macOS and Linux started emulating the Ergopti layout through the shared engine.
 	// Per-category master switches exist only in the AHK tray menu.
 	['category_enabled.hotstrings', 'ahk'],
 	['category_enabled.layout', 'ahk'],

@@ -167,6 +167,15 @@ content = [
 	"category_enabled.key_combinations",
 	"llm.**",
 	"metrics.**",
+	# The layout emulation runs behind the keyboard grab.
+	"layout.emulated_layout",
+	"layout.ergopti_base",
+	"layout.ergopti_alt_gr",
+	"layout.ergopti_variant",
+	"layout.emulate_number_row",
+	"layout.emulate_top_row",
+	"layout.emulate_home_row",
+	"layout.emulate_bottom_row",
 ]
 "modules/hotstrings/injector.lua" = ["hotstrings.**", "llm.**"]
 "modules/shortcuts/manager.lua" = ["shortcuts.**"]
@@ -187,7 +196,8 @@ content = [
 content = ['/dev/uinput', 'UI_DEV_CREATE', '"adapters\.uinput_writer"', '"modules\.hotstrings\.injector"']
 
 [detection.linux.uinput.owners]
-"modules/hotstrings/injector.lua" = ["hotstrings.**", "llm.**"]
+# The layout emulation types its characters through the injector.
+"modules/hotstrings/injector.lua" = ["hotstrings.**", "llm.**", "layout.emulated_layout", "layout.ergopti_base", "layout.ergopti_alt_gr", "layout.ergopti_variant", "layout.emulate_number_row", "layout.emulate_top_row", "layout.emulate_home_row", "layout.emulate_bottom_row"]
 "modules/dynamic_hotstrings/" = ["hotstrings.dynamic.*"]
 "modules/shortcuts/manager.lua" = ["shortcuts.**"]
 "platform/remap/tap_hold_manager.lua" = ["tap_holds.*", "mod_combos.*", "shortcuts.key_combination_taps.*", "category_enabled.key_combinations"]

@@ -139,7 +139,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.keys.wrap_text_if_selected` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keys.cmd_star` (feature; declared: macos; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 
-## macos — 63 paths not declared
+## macos — 55 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `hotstrings.magic_key_source_char` (setting; declared: windows; reason: `platform_reason.magic_key_detection_is_windows`)
@@ -184,15 +184,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `shortcuts.keyboard.meta_quote` (feature; declared: windows; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.primary_g` (feature; declared: linux; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
 - [ ] `shortcuts.keyboard.meta_space` (feature; declared: windows, linux; reason: `platform_reason.shortcut_settings_are_stored_per_driver`)
-- [ ] `layout.ergopti_base` (feature; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
-- [ ] `layout.ergopti_alt_gr` (feature; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
-- [ ] `layout.ergopti_variant` (feature; declared: windows; reason: `platform_reason.legacy_helpers_use_windows_scan_code_hotkeys`)
-- [ ] `layout.emulate_number_row` (setting; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
-- [ ] `layout.emulate_top_row` (setting; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
-- [ ] `layout.emulate_home_row` (setting; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
-- [ ] `layout.emulate_bottom_row` (setting; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
 - [ ] `layout.ctrl_magic_save` (feature; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
-- [ ] `layout.emulated_layout` (feature; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
 - [ ] `category_enabled.hotstrings` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.layout` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.shortcuts` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
@@ -205,7 +197,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `category_enabled.rolls` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.magic_key` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 
-## linux — 153 paths not declared
+## linux — 145 paths not declared
 
 - [ ] `script.alt_gr_is_kana_remap` (setting; declared: windows; reason: `platform_reason.alt_gr_is_kana_remap`)
 - [ ] `hotstrings.enabled` (feature; declared: macos; reason: `platform_reason.hotstrings_master_is_macos_engine`)
@@ -337,16 +329,8 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `gestures.sensitivities.swipe_3_horiz` (setting; declared: macos; reason: `platform_reason.gesture_modes_and_steps_are_macos`)
 - [ ] `gestures.sensitivities.swipe_4_horiz` (setting; declared: macos; reason: `platform_reason.gesture_modes_and_steps_are_macos`)
 - [ ] `gestures.sensitivities.swipe_5_horiz` (setting; declared: macos; reason: `platform_reason.gesture_modes_and_steps_are_macos`)
-- [ ] `layout.ergopti_base` (feature; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
 - [ ] `layout.virtual_keyboard` (setting; declared: macos; reason: `platform_reason.virtual_keyboard_is_karabiner`)
-- [ ] `layout.ergopti_alt_gr` (feature; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
-- [ ] `layout.ergopti_variant` (feature; declared: windows; reason: `platform_reason.legacy_helpers_use_windows_scan_code_hotkeys`)
-- [ ] `layout.emulate_number_row` (setting; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
-- [ ] `layout.emulate_top_row` (setting; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
-- [ ] `layout.emulate_home_row` (setting; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
-- [ ] `layout.emulate_bottom_row` (setting; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
 - [ ] `layout.ctrl_magic_save` (feature; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
-- [ ] `layout.emulated_layout` (feature; declared: windows; reason: `platform_reason.layout_emulation_is_windows_only`)
 - [ ] `category_enabled.hotstrings` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.layout` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
 - [ ] `category_enabled.shortcuts` (feature; declared: windows; reason: `platform_reason.category_gates_are_windows`)
@@ -551,6 +535,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `metrics_menu.metrics_availability` (hide): Linux only: under Wayland an application gets neither the cursor position nor the current desktop, so this list names the metrics that session cannot measure, each with its reason. Windows and macOS measure both on every session and have nothing to list.
 - [ ] `metrics_menu.metrics_migration` (hide): Linux only: this driver converts the stored metrics to encrypted form in the background and shows the progress here, with a way to stop. Windows and macOS convert on the next launch, so they have no progress to show.
 - [ ] `layout_menu.layout_bundle` (hide): macOS only: this row installs the .bundle layout. On Windows the layout installer is a separate, unsigned download that must run as administrator, which the driver never starts: run Ergopti_windows.exe from the release page. On Linux, install Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).
+- [ ] `layout_menu.layout_emulation` (hide): The other drivers carry this control as a row of their own: each driver lays out the value, reset or variants of a setting through its own row, because the native menu toolkits differ. This is a presentation difference, not a missing control.
 - [ ] `layout_menu.virtual_keyboard` (hide): macOS only: Karabiner-Elements, which Ergopti uses on macOS to remap keys, has a virtual keyboard whose type decides which keycodes the two ISO-only keys reach. Windows and Linux name these keys by position and have no virtual keyboard.
 - [ ] `layout_menu.menubar_icon` (hide): macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.
 - [ ] `layout_menu.base_layouts` (hide): Linux only: this driver reads raw keycodes from the kernel and needs to know which physical layout produced them, so it picks the table it decodes with. macOS asks the system for its input sources and Windows installs a keyboard layout; neither has a decode table to choose.
@@ -685,16 +670,9 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `metrics_menu.metrics_availability` (hide): Linux only: under Wayland an application gets neither the cursor position nor the current desktop, so this list names the metrics that session cannot measure, each with its reason. Windows and macOS measure both on every session and have nothing to list.
 - [ ] `metrics_menu.metrics_migration` (hide): Linux only: this driver converts the stored metrics to encrypted form in the background and shows the progress here, with a way to stop. Windows and macOS convert on the next launch, so they have no progress to show.
 - [ ] `layout_menu.layout_toggle` (hide): Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.
-- [ ] `layout_menu.layout_features_base` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.
-- [ ] `layout_menu.layout_features_altgr` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.
-- [ ] `layout_menu.layout_emulated_rows` (grey): Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.
 - [ ] `layout_menu.base_layouts` (hide): Linux only: this driver reads raw keycodes from the kernel and needs to know which physical layout produced them, so it picks the table it decodes with. macOS asks the system for its input sources and Windows installs a keyboard layout; neither has a decode table to choose.
 - [ ] `layout_menu.accented_letters` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.
 - [ ] `layout_menu.layout.ctrl_magic_save` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.
-- [ ] `layout_emulated_rows_group.layout.emulate_number_row` (grey): Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.
-- [ ] `layout_emulated_rows_group.layout.emulate_top_row` (grey): Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.
-- [ ] `layout_emulated_rows_group.layout.emulate_home_row` (grey): Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.
-- [ ] `layout_emulated_rows_group.layout.emulate_bottom_row` (grey): Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.
 - [ ] `accented_letters_group.e_grave` (hide): Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.
 - [ ] `accented_letters_group.e_circ` (hide): Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.
 - [ ] `accented_letters_group.e_acute` (hide): Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.
@@ -792,17 +770,10 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `tap_hold_owned_install_rows.tap_hold_owned_install` (hide): Each driver remaps the keyboard with a different engine — Windows with its own tap-hold layer, macOS with Karabiner-Elements, Linux with the tap-hold engine in its own daemon — so each carries the menu for the engine it runs, and none of them can configure another's.
 - [ ] `layout_menu.layout_toggle` (hide): Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.
 - [ ] `layout_menu.layout_bundle` (hide): macOS only: this row installs the .bundle layout. On Windows the layout installer is a separate, unsigned download that must run as administrator, which the driver never starts: run Ergopti_windows.exe from the release page. On Linux, install Ergopti from « Manage layouts… » (Wayland) or with install.sh (X11).
-- [ ] `layout_menu.layout_features_base` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.
-- [ ] `layout_menu.layout_features_altgr` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.
-- [ ] `layout_menu.layout_emulated_rows` (grey): Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.
 - [ ] `layout_menu.virtual_keyboard` (hide): macOS only: Karabiner-Elements, which Ergopti uses on macOS to remap keys, has a virtual keyboard whose type decides which keycodes the two ISO-only keys reach. Windows and Linux name these keys by position and have no virtual keyboard.
 - [ ] `layout_menu.menubar_icon` (hide): macOS only: these rows install the .bundle keyboard layout through the system's own input-source mechanism, with a user scope and a system scope, and choose the menubar icon. Windows installs a .klc through its own installer, Linux generates an XKB layout, and neither has a menubar.
 - [ ] `layout_menu.accented_letters` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.
 - [ ] `layout_menu.layout.ctrl_magic_save` (hide): Windows only: everything this row would list is itself Windows-only, so on macOS and Linux it draws an empty list.
-- [ ] `layout_emulated_rows_group.layout.emulate_number_row` (grey): Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.
-- [ ] `layout_emulated_rows_group.layout.emulate_top_row` (grey): Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.
-- [ ] `layout_emulated_rows_group.layout.emulate_home_row` (grey): Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.
-- [ ] `layout_emulated_rows_group.layout.emulate_bottom_row` (grey): Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.
 - [ ] `accented_letters_group.e_grave` (hide): Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.
 - [ ] `accented_letters_group.e_circ` (hide): Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.
 - [ ] `accented_letters_group.e_acute` (hide): Windows only: on layouts whose accented keys are not shortcut letters (AZERTY, BÉPO, an installed Ergopti layout), Ctrl+é would reach the application as a chord nothing is bound to. This remaps Ctrl, Alt and Win chords on those keys to the letter’s usual shortcut, so Ctrl+é acts as Ctrl+C. A macOS layout file carries its own Command and Control layer, and the Linux driver has no equivalent.
