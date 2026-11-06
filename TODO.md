@@ -567,6 +567,8 @@ three-OS CI is green on the final source. See the handoff above for the current 
 
 ## To confirm on the Mac
 
+- [ ] **MRT-004 « Réparer le service »:** decided 2026-11-06, not built: a new authenticated helper role that adopts an existing exact Core/VirtualHIDDevice plist and settles the first-start `core.json` fence; needs a Swift build and native macOS qualification, then i18n in the 21 locales.
+
 Check out `dev` (or the branch to test), set Debug > Log level > DEBUG, then run
 `bash tools/dev/collect-macos-field-report.sh`: it creates `field/mac-<today>-<branch>`, runs the field checks in
 the developer app, writes the report under `docs/field-reports/`, commits and pushes. Needs Go, the Xcode Command
@@ -694,6 +696,8 @@ Hands needed:
       (Debug log `User activity (mouseMoved)` appears once per cancellation, not per event).
 
 ## To confirm on the Windows PC
+
+- [ ] **Windows personal-info eager pre-generation:** measure boot cost at the highest accepted pattern length; cover the accepted-agent policy test, the wrap-scalar test and the 2026-11-06 AHK changes with a native run.
 
 Run by the PC agent from a fresh `dev` on a `fix/windows-pc-<date>` branch; push the branch, the coordinator
 integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater source and passes the Windows lane
