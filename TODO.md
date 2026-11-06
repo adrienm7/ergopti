@@ -475,10 +475,14 @@ Resume from this branch alone; it is based on dev 6d6b743c4f and not yet integra
 Release as 1.0.9 on `main` by fast-forward from `dev`, with `Release-As: 1.0.9` if the computed version differs, once the
 three-OS CI is green on the final source. See the handoff above for the current state.
 
-- [ ] **Macos field report 2026-11-02.** Rotation warnings at midnight during the recovery; `event_taps` run loop late:
+- [x] **Macos field report 2026-11-02.** Rotation warnings at midnight during the recovery; `event_taps` run loop late:
       main thread held 1.5 s, `menu.rebuild` 1.3 s (`menu_item.shortcuts` about 1 s); `diagnostics` phase A over 5 ms;
       `idle_cost` 8.35 %; Ollama `digest_mismatch` on `granite4:350m-h` twice, after the retry. Then rerun the report
       without touching the Mac.
+      Moved (wave 3): the code parts already landed (Shortcuts submenu 3,537 → 177 rows, phase A reads cached
+      answers, the layout menu lists its folders once, managed Ollama on 0.40.6 with Range alignment). The report's
+      logs are not in the repository, so the midnight rotation warnings, the 1.5 s main-thread hold and the
+      `idle_cost` share cannot be reproduced here: the rerun is under « To confirm on the Mac ».
 - [ ] **Slowness, every driver.** Windows boot 7 s, `menu.rebuild` 1.7 s: lazy submenus, single-toggle update, one
       registry proof, full save after ready, disk caches; a toggle must not rebuild 1000 rows.
       Resume here (branch `wip/windows-boot-time`): parse fixes, the smoke operation caps, keyboard before tray root
@@ -610,6 +614,11 @@ red step with its `proves` line in `static/ergopti_plus/macos/data/field_run.jso
 
 Field run, no person needed (read the next report):
 
+- [ ] Rerun of the 2026-11-02 report, without touching the Mac: no keystats rotation warning around midnight, no
+      `event_taps` run-loop lateness with the main thread held over 1 s, `menu.rebuild` and its
+      `menu_item.shortcuts` / `menu_keyboard_layout.sources` phases, `diagnostics` phase A under 5 ms, `idle_cost`
+      below 8 %, and `granite4:350m-h` pulled with no `digest_mismatch`. A remaining one is a code entry with its
+      report lines.
 - [ ] Release swap boot-ready: install a chosen release from the Versions window; `swap.log` ends with « reported a
       healthy start ». Then a chosen build that cannot boot (rename its `init.lua` in the staged app before the quit)
       is moved to `ErgoptiPlus.app.failed-<pid>` within 60 s and the previous app opens (exit 9).
