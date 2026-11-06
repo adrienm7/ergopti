@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "केवल macOS: ये क्रियाएँ Karabiner-Elements में रखी नेविगेशन परत को बदलती हैं। Windows और Linux पर परत दबाकर रखी कुंजी का अनुसरण करती है और उसका कोई स्विच नहीं है।",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "यह सिस्टम किसी भी ऐप को सूचनाएँ हटाने नहीं देता: उन्हें सूचना केंद्र में साफ़ करें, जिसे समकक्ष क्रिया खोलती है।",
 	"platform_reason.action_office_bold_key_is_windows": "केवल Windows: फ़्रेंच Microsoft Office बोल्ड के लिए Ctrl+G का उपयोग करता है जहाँ अन्य ऐप Ctrl+B का, इसलिए यह क्रिया ऐप के अनुसार कुंजी चुनती है। macOS (Cmd+B) और Linux (Ctrl+B) पर एक ही संयोजन हर जगह काम करता है: इसे “शॉर्टकट” से बाँधें।",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Linux पर नहीं: Wayland किसी भी ऐप को पॉइंटर हिलाने नहीं देता, और इस क्रिया का केवल X11 सत्रों वाला कोई संस्करण नहीं है।",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "यह सिस्टम स्क्रीन को अपने कैप्चर टूल से रिकॉर्ड करता है (macOS का स्क्रीनशॉट टूलबार, GNOME या KDE का टूल), जिसे समकक्ष क्रिया खोलती है।",
 	"platform_reason.action_same_action_under_another_name": "यह सिस्टम वही क्रिया दूसरे नाम से देता है: समकक्ष क्रिया का उपयोग करें।",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "Linux पर नहीं: सभी विंडो के ऊपर चित्र बनाने के लिए एक ओवरले सतह चाहिए, जो Wayland कंपोज़िटर किसी ऐप को नहीं देते।",

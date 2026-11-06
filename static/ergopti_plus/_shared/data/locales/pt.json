@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Apenas macOS: estas ações alternam a camada de navegação mantida no Karabiner-Elements. No Windows e no Linux a camada segue a tecla mantida e não tem interruptor a ajustar.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "Este sistema não deixa nenhum aplicativo dispensar notificações: apague-as na central de notificações, que a ação equivalente abre.",
 	"platform_reason.action_office_bold_key_is_windows": "Apenas Windows: o Microsoft Office em francês aplica negrito com Ctrl+G onde os outros aplicativos usam Ctrl+B, por isso esta ação escolhe a tecla conforme o aplicativo. No macOS (Cmd+B) e no Linux (Ctrl+B) uma única combinação serve em toda parte: atribua-a em «Atalhos».",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Não no Linux: o Wayland não deixa nenhum aplicativo mover o ponteiro, e esta ação não tem uma versão limitada às sessões X11.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Este sistema grava a tela a partir da sua própria ferramenta de captura (a barra Captura de Tela do macOS, a ferramenta do GNOME ou do KDE), que a ação equivalente abre.",
 	"platform_reason.action_same_action_under_another_name": "Este sistema oferece a mesma ação com outro nome: use a ação equivalente.",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "Não no Linux: desenhar sobre todas as janelas exige uma superfície sobreposta que os compositores Wayland não concedem a nenhum aplicativo.",

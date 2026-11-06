@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Yalnızca macOS: bu eylemler Karabiner-Elements içinde tutulan gezinme katmanını açıp kapatır. Windows ve Linux'ta katman basılı tutulan tuşu izler ve ayarlanacak bir anahtarı yoktur.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "Bu sistem hiçbir uygulamanın bildirimleri kapatmasına izin vermez: onları eşdeğer eylemin açtığı bildirim merkezinde temizleyin.",
 	"platform_reason.action_office_bold_key_is_windows": "Yalnızca Windows: Fransızca Microsoft Office, diğer uygulamaların Ctrl+B kullandığı yerde kalın yazıyı Ctrl+G ile yapar; bu yüzden bu eylem tuşu uygulamaya göre seçer. macOS'te (Cmd+B) ve Linux'ta (Ctrl+B) tek bir birleşim her yerde çalışır: onu “Kısayollar” bölümünden atayın.",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Linux'ta yok: Wayland hiçbir uygulamanın işaretçiyi taşımasına izin vermez ve bu eylemin yalnızca X11 oturumlarıyla sınırlı bir sürümü yoktur.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Bu sistem ekranı kendi yakalama aracından kaydeder (macOS'in Ekran Görüntüsü çubuğu, GNOME veya KDE aracı); eşdeğer eylem bu aracı açar.",
 	"platform_reason.action_same_action_under_another_name": "Bu sistem aynı eylemi başka bir adla sunar: eşdeğer eylemi kullanın.",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "Linux'ta yok: tüm pencerelerin üzerine çizmek, Wayland birleştiricilerinin hiçbir uygulamaya vermediği bir kaplama yüzeyi gerektirir.",

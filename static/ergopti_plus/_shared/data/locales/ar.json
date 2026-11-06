@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "macOS فقط: تبدّل هذه الإجراءات طبقة التنقل المحفوظة داخل Karabiner-Elements. في Windows وLinux تتبع الطبقة المفتاح المضغوط ولا يوجد مفتاح تبديل لضبطه.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "لا يسمح هذا النظام لأي تطبيق بإغلاق الإشعارات: امسحها في مركز الإشعارات الذي يفتحه الإجراء المكافئ.",
 	"platform_reason.action_office_bold_key_is_windows": "Windows فقط: يجعل Microsoft Office الفرنسي النص عريضاً بـ Ctrl+G حيث تستخدم التطبيقات الأخرى Ctrl+B، لذا يختار هذا الإجراء المفتاح حسب التطبيق. في macOS ‏(Cmd+B) وLinux ‏(Ctrl+B) تعمل تركيبة واحدة في كل مكان: عيّنها من «اختصارات».",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "ليس في Linux: لا يسمح Wayland لأي تطبيق بتحريك المؤشر، وليس لهذا الإجراء إصدار مقصور على جلسات X11.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "يسجّل هذا النظام الشاشة من أداة الالتقاط الخاصة به (شريط لقطة الشاشة في macOS، أو أداة GNOME أو KDE)، والتي يفتحها الإجراء المكافئ.",
 	"platform_reason.action_same_action_under_another_name": "يقدّم هذا النظام الإجراء نفسه باسم آخر: استخدم الإجراء المكافئ.",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "ليس في Linux: الرسم فوق كل النوافذ يتطلب سطح تراكب لا تمنحه مركِّبات Wayland لأي تطبيق.",

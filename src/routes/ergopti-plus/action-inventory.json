@@ -855,14 +855,8 @@
 			"fr": "🖱 Centrer la souris sur l’écran",
 			"en": "🖱 Center the mouse on the screen"
 		},
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "Not on Linux: Wayland lets no application move the pointer, and this action has no version limited to X11 sessions.",
-				"fr": "Pas sous Linux : Wayland ne laisse aucune application déplacer le pointeur, et cette action n’a pas de version limitée aux sessions X11.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.run_program",
@@ -1333,14 +1327,8 @@
 	{
 		"path": "sg_actions.teleport_mouse",
 		"labels": { "fr": "🖱 Téléporter la souris", "en": "🖱 Teleport mouse" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "Not on Linux: Wayland lets no application move the pointer, and this action has no version limited to X11 sessions.",
-				"fr": "Pas sous Linux : Wayland ne laisse aucune application déplacer le pointeur, et cette action n’a pas de version limitée aux sessions X11.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.uppercase_selection",

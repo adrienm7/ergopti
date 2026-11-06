@@ -554,6 +554,7 @@ return {
 	"tests.unit.ui.personal_info_editor.test_personal_info_editor_payload",
 	"tests.unit.infra.test_personal_info_fields",
 	"tests.unit.infra.test_personal_shortcuts",
+	"tests.unit.modules.gestures.actions.test_pointer_warp",
 	"tests.unit.infra.test_features_manifest_projection",
 	"tests.unit.modules.updater.vectors.test_update_channels_vectors",
 	"tests.unit.modules.updater.check.test_update_check_feedback",

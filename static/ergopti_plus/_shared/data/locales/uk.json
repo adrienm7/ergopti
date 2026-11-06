@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Лише macOS: ці дії перемикають навігаційний шар, що зберігається в Karabiner-Elements. У Windows і Linux шар іде за утримуваною клавішею й не має перемикача.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "Ця система не дозволяє жодному застосунку закривати сповіщення: очистьте їх у центрі сповіщень, який відкриває рівноцінна дія.",
 	"platform_reason.action_office_bold_key_is_windows": "Лише Windows: французький Microsoft Office виділяє жирним сполученням Ctrl+G там, де інші застосунки використовують Ctrl+B, тому ця дія вибирає клавішу за застосунком. У macOS (Cmd+B) і Linux (Ctrl+B) одне сполучення працює всюди: призначте його в розділі «Сполучення клавіш».",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "Не в Linux: Wayland не дозволяє жодному застосунку переміщати вказівник, а ця дія не має версії лише для сеансів X11.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "Ця система записує екран зі свого інструмента знімків (панелі «Знімок екрана» в macOS, інструмента GNOME або KDE), який відкриває рівноцінна дія.",
 	"platform_reason.action_same_action_under_another_name": "Ця система пропонує ту саму дію під іншою назвою: скористайтеся рівноцінною дією.",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "Не в Linux: малювання поверх усіх вікон потребує поверхні накладання, якої композитори Wayland не дають жодному застосунку.",

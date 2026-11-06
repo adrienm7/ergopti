@@ -4088,7 +4088,6 @@
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "macOS בלבד: פעולות אלה מחליפות את שכבת הניווט שנשמרת בתוך Karabiner-Elements. ב-Windows וב-Linux השכבה עוקבת אחרי המקש המוחזק ואין לה מתג להגדרה.",
 	"platform_reason.action_notifications_are_cleared_from_their_centre": "מערכת זו אינה מאפשרת לשום יישום לסגור התראות: נקו אותן במרכז ההתראות, שהפעולה המקבילה פותחת.",
 	"platform_reason.action_office_bold_key_is_windows": "Windows בלבד: ‏Microsoft Office בצרפתית מדגיש טקסט עם Ctrl+G במקום שבו יישומים אחרים משתמשים ב-Ctrl+B, ולכן פעולה זו בוחרת את המקש לפי היישום. ב-macOS ‏(Cmd+B) וב-Linux ‏(Ctrl+B) צירוף אחד עובד בכל מקום: הקצו אותו מתוך „קיצורי מקלדת”.",
-	"platform_reason.action_pointer_cannot_be_moved_on_linux": "לא ב-Linux: ‏Wayland אינו מאפשר לשום יישום להזיז את הסמן, ולפעולה זו אין גרסה המוגבלת להפעלות X11.",
 	"platform_reason.action_recording_starts_from_the_capture_tool": "מערכת זו מקליטה את המסך מכלי הלכידה שלה (סרגל צילום המסך של macOS, הכלי של GNOME או KDE), שהפעולה המקבילה פותחת.",
 	"platform_reason.action_same_action_under_another_name": "מערכת זו מציעה את אותה פעולה בשם אחר: השתמשו בפעולה המקבילה.",
 	"platform_reason.action_screen_overlay_is_not_on_linux": "לא ב-Linux: ציור מעל כל החלונות דורש משטח שכבת-על שמרכיבי Wayland אינם נותנים לשום יישום.",
