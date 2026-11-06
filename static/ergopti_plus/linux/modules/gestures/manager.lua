@@ -309,6 +309,26 @@ for _, slot in ipairs(M.AXIS_SLOTS) do
 	M.RECOMMENDED_GESTURES[slot] = Manifest.recommended_for("gestures." .. slot)
 end
 
+--- Incremental mode per swipe slot and its step in millimetres, from the
+--- shared manifest, as on macOS; config.toml `[gestures.modes]` and
+--- `[gestures.sensitivities]` override them. An incremental slot acts while
+--- the fingers move (modules/gestures/incremental_tracker.lua).
+M.MODE_SINGLE, M.MODE_INCREMENTAL = "x1", "incremental"
+local MODES_SECTION = "gestures.modes"
+local SENSITIVITIES_SECTION = "gestures.sensitivities"
+M.DEFAULT_MODES, M.DEFAULT_SENSITIVITIES = {}, {}
+-- The manifest declares a mode and a step for every swipe direction; taps and
+-- the axis slots have none.
+for _, slot in ipairs(M.SINGLE_SLOTS) do
+	if not slot:match("^swipe_") then goto continue end
+	M.DEFAULT_MODES[slot] = Manifest.default_for(MODES_SECTION .. "." .. slot)
+	M.DEFAULT_SENSITIVITIES[slot] = Manifest.default_for(SENSITIVITIES_SECTION .. "." .. slot)
+	::continue::
+end
+local _modes, _sensitivities = {}, {}
+-- The live tracker of the touch in progress; nil while the pad has no scale.
+local _incremental = nil
+
 -- =========================================
 -- =========================================
 -- ======= 2/ Action Registry ==============
@@ -2150,6 +2170,81 @@ function M.execute_action(action_name, binding)
 	return true
 end
 
+--- The mode of a swipe slot: "x1" fires once per swipe, "incremental" once per
+--- step of travel while the fingers move.
+--- @param slot string
+--- @return string|nil mode nil for a slot with no mode (a tap).
+function M.get_mode(slot)
+	return _modes[slot] or M.DEFAULT_MODES[slot]
+end
+
+--- The step of an incremental slot, in millimetres of travel.
+--- @param slot string
+--- @return number|nil step
+function M.get_sensitivity(slot)
+	return _sensitivities[slot] or M.DEFAULT_SENSITIVITIES[slot]
+end
+
+--- The live tracker for a touchpad of a given scale, or nil without one.
+--- @param units_x number|nil Device units per millimetre along x.
+--- @param units_y number|nil Device units per millimetre along y.
+--- @return table|nil tracker
+local function new_incremental(units_x, units_y)
+	if not (units_x and units_y) then return nil end
+	return require("modules.gestures.incremental_tracker").new({
+		units_x = units_x, units_y = units_y,
+		mode_of = M.get_mode, step_of = M.get_sensitivity,
+		-- Each step runs the slot exactly as a completed swipe would, through
+		-- the same pause, click-fence and axis-slot rules.
+		fire = function(_, fingers, direction, count)
+			local fired = 0
+			for _ = 1, count do
+				if not M.dispatch_gesture({ fingers = fingers, direction = direction, tap = false }) then break end
+				fired = fired + 1
+			end
+			return fired
+		end,
+	})
+end
+
+--- Persists one mode or step and applies it.
+--- @return boolean committed
+local function set_slot_setting(store, section, slot, value)
+	if not admit_mutation() then return false end
+	if not M._persist_updates({ { section = section, key = slot, value = value } }) then
+		Logger.error(LOG, "Gesture %s for %s was not persisted — nothing changed.", section, slot)
+		return false
+	end
+	store[slot] = value
+	Logger.info(LOG, "Gesture %s.%s → %s.", section, slot, tostring(value))
+	return true
+end
+
+--- Sets a swipe slot's mode.
+--- @param slot string
+--- @param mode string "x1" or "incremental".
+--- @return boolean committed
+function M.set_mode(slot, mode)
+	if M.DEFAULT_MODES[slot] == nil or (mode ~= M.MODE_SINGLE and mode ~= M.MODE_INCREMENTAL) then
+		Logger.warn(LOG, "Refusing gesture mode '%s' for '%s'.", tostring(mode), tostring(slot))
+		return false
+	end
+	return set_slot_setting(_modes, MODES_SECTION, slot, mode)
+end
+
+--- Sets an incremental slot's step.
+--- @param slot string
+--- @param value number Millimetres, within the shared range.
+--- @return boolean committed
+function M.set_sensitivity(slot, value)
+	local step = require("gestures.sensitivity").coerce(value)
+	if M.DEFAULT_SENSITIVITIES[slot] == nil or step == nil then
+		Logger.warn(LOG, "Refusing gesture step '%s' for '%s'.", tostring(value), tostring(slot))
+		return false
+	end
+	return set_slot_setting(_sensitivities, SENSITIVITIES_SECTION, slot, step)
+end
+
 --- Runs the action bound to a gesture the decoder has already classified.
 ---
 --- Separate from process_frame, which does its own classification from a list of
@@ -2174,9 +2269,9 @@ function M.dispatch_gesture(gesture)
 	-- A straight horizontal swipe whose direction slot is unbound runs the axis
 	-- slot of its finger count. The direction slot wins when both are bound, so
 	-- an explicit left/right choice is never overridden. Diagonals and taps have
-	-- no axis slot. The decoder already applied the shared direction thresholds,
-	-- and the Linux recognizer fires once per completed gesture, as for every
-	-- other slot: there is no incremental repeat to apply.
+	-- no axis slot. The decoder already applied the shared direction thresholds;
+	-- an incremental slot reaches here once per step of travel
+	-- (modules/gestures/incremental_tracker.lua), each step through this rule.
 	if (not action or action == "none") and not gesture.tap
 		and (gesture.direction == "left" or gesture.direction == "right") then
 		local axis_slot = AXIS_SLOT_FOR_FINGERS[math.min(gesture.fingers, 5)]
@@ -2283,6 +2378,14 @@ function M.start_reading()
 	_decoder = Decoder.new()
 	_touchpad = touchpad
 	_reading = true
+	local units_x, units_y = Finder.read_resolution(touchpad.path)
+	_incremental = new_incremental(units_x, units_y)
+	if _incremental then
+		Logger.info(LOG, "%s: %d x %d units per mm; incremental swipes count millimetres.", touchpad.path, units_x, units_y)
+	else
+		-- No scale, no millimetres: an incremental slot cannot measure its step.
+		Logger.warn(LOG, "%s reports no resolution: incremental swipes fire once, like x1 ones.", touchpad.path)
+	end
 	Logger.success(LOG, "Reading %s (%s), up to %d finger(s)%s.",
 		touchpad.path, touchpad.name, touchpad.max_fingers,
 		touchpad.semi_mt and ", semi-MT" or "")
@@ -2305,6 +2408,19 @@ function M.pump()
 
 	local drained, status = Reader.drain(function(event)
 		local gesture = _decoder:feed(event)
+		if _incremental then
+			-- A swipe that already stepped while the fingers moved is done.
+			if gesture then
+				if not _incremental:finish() then M.dispatch_gesture(gesture) end
+				return
+			end
+			if event.type == 0 and event.code == 0 then -- EV_SYN / SYN_REPORT
+				local live = _decoder:live()
+				-- A touch that ended without a completed swipe ends the tracking too.
+				if live then _incremental:update(live) elseif not _decoder:touching() then _incremental:finish() end
+			end
+			return
+		end
 		if gesture then M.dispatch_gesture(gesture) end
 	end, Reader.TOUCHPAD)
 	if status == "fatal" or status == "closed" then
@@ -2344,6 +2460,7 @@ local function stop_reading(preserve_clicks)
 	_reading = false
 	_reader_stop_error = nil
 	_decoder = nil
+	_incremental = nil
 	_touchpad = nil
 	Logger.info(LOG, "Touchpad reader stopped.")
 	return clicks_retired
@@ -2366,9 +2483,12 @@ end
 --- opens that seam and nothing else: the pump, the decoder and the dispatch are
 --- all the real ones, and only the device underneath is faked.
 --- @param decoder table An mt_decoder instance.
-function M._test_begin_reading(decoder)
+--- @param units_x number|nil Device units per millimetre along x, for incremental slots.
+--- @param units_y number|nil Device units per millimetre along y.
+function M._test_begin_reading(decoder, units_x, units_y)
 	_decoder = decoder
 	_reading = true
+	_incremental = new_incremental(units_x, units_y)
 end
 
 --- Returns true if the touch reader is active.
@@ -2444,6 +2564,9 @@ local function walk_user_config(config, visit)
 			-- being skipped in silence. `enabled` is the master switch.
 			if slot == "enabled" and section_name == CONFIG_SECTION then
 				-- Read by the enabled visitor below.
+			elseif (slot == "modes" or slot == "sensitivities") and section_name == CONFIG_SECTION
+				and type(action) == "table" then
+				-- [gestures.modes] and [gestures.sensitivities], read by load_slot_settings.
 			elseif not M.DEFAULT_GESTURES[slot] then
 				ConfigOutdated.report(entry_path(section_name, slot), "no gesture slot of this build has this name", Logger)
 			elseif type(action) ~= "string" then
@@ -2536,6 +2659,29 @@ function M.mark_config_reads(config, mark)
 	})
 end
 
+--- Reads [gestures.modes] and [gestures.sensitivities]; an invalid entry is
+--- outdated configuration, reported and left out.
+--- @param config table Decoded config.toml.
+local function load_slot_settings(config)
+	local section = type(config.gestures) == "table" and config.gestures or {}
+	local Sensitivity = require("gestures.sensitivity")
+	for slot, mode in pairs(type(section.modes) == "table" and section.modes or {}) do
+		if M.DEFAULT_MODES[slot] ~= nil and (mode == M.MODE_SINGLE or mode == M.MODE_INCREMENTAL) then
+			_modes[slot] = mode
+		else
+			ConfigOutdated.report({ "gestures", "modes", tostring(slot) }, "not a swipe slot mode (x1 or incremental)", Logger)
+		end
+	end
+	for slot, value in pairs(type(section.sensitivities) == "table" and section.sensitivities or {}) do
+		local step = Sensitivity.coerce(value)
+		if M.DEFAULT_SENSITIVITIES[slot] ~= nil and step ~= nil then
+			_sensitivities[slot] = step
+		else
+			ConfigOutdated.report({ "gestures", "sensitivities", tostring(slot) }, "not a swipe slot step in range", Logger)
+		end
+	end
+end
+
 local function load_user_config(path)
 	if type(path) ~= "string" or path == "" then return nil end
 	if type(TomlWriter) ~= "table" or type(TomlWriter.read_classified) ~= "function" then
@@ -2568,6 +2714,7 @@ local function load_user_config(path)
 		end,
 		enabled = function(value) configured = value end,
 	})
+	load_slot_settings(config)
 	local legacy = type(config.linux) == "table" and config.linux or nil
 	if legacy and type(legacy.gestures) == "table" and next(legacy.gestures) ~= nil then
 		Logger.info(LOG,

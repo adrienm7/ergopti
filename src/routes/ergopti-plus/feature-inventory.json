@@ -4200,12 +4200,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4218,12 +4218,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4236,12 +4236,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4254,12 +4254,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4272,12 +4272,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4290,12 +4290,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4308,12 +4308,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4326,12 +4326,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4344,12 +4344,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4362,12 +4362,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4380,12 +4380,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4398,12 +4398,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4416,12 +4416,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4434,12 +4434,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4452,12 +4452,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4470,12 +4470,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4488,12 +4488,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4506,12 +4506,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4524,12 +4524,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4542,12 +4542,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4560,12 +4560,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4578,12 +4578,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4596,12 +4596,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4614,12 +4614,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4632,12 +4632,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4650,12 +4650,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4668,12 +4668,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4686,12 +4686,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4704,12 +4704,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4722,12 +4722,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4740,12 +4740,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4758,12 +4758,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4776,12 +4776,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4794,12 +4794,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4812,12 +4812,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4830,12 +4830,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4848,12 +4848,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4866,12 +4866,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4884,12 +4884,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4902,12 +4902,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4920,12 +4920,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4938,12 +4938,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4956,12 +4956,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4974,12 +4974,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -4992,12 +4992,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5010,12 +5010,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5028,12 +5028,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5046,12 +5046,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5064,12 +5064,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5082,12 +5082,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5100,12 +5100,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5118,12 +5118,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5136,12 +5136,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5154,12 +5154,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5172,12 +5172,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5190,12 +5190,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5208,12 +5208,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5226,12 +5226,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5244,12 +5244,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5262,12 +5262,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5280,12 +5280,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5298,12 +5298,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5316,12 +5316,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5334,12 +5334,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5352,12 +5352,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5370,12 +5370,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5388,12 +5388,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5406,12 +5406,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5424,12 +5424,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{
@@ -5442,12 +5442,12 @@
 		"platforms": {
 			"windows": false,
 			"macos": true,
-			"linux": false
+			"linux": true
 		},
-		"reason_key": "platform_reason.gesture_modes_and_steps_are_macos",
+		"reason_key": "platform_reason.gesture_modes_and_steps_need_finger_travel",
 		"reason": {
-			"fr": "macOS uniquement : ce pilote suit lui-même les doigts, donc un balayage peut se répéter pas à pas tant qu’ils bougent, et la taille du pas se règle. Windows reçoit chaque geste tout fait depuis ses réglages du pavé tactile, et le pilote Linux agit une seule fois, quand le geste est terminé.",
-			"en": "macOS only: this driver follows the fingers itself, so a swipe can repeat step by step while they keep moving, and the step size can be tuned. Windows gets each gesture ready-made from its touchpad settings, and the Linux driver acts once, when the gesture is complete."
+			"fr": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
+			"en": "Not on Windows: Windows hands the driver each gesture ready-made, once it is complete, from its touchpad settings, so a swipe cannot repeat step by step while the fingers keep moving. macOS and Linux follow the fingers themselves."
 		}
 	},
 	{

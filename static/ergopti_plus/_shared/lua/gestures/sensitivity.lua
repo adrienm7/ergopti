@@ -1,9 +1,10 @@
---- modules/gestures/sensitivity.lua
+--- _shared/lua/gestures/sensitivity.lua
 
 --- ==============================================================================
 --- MODULE: Gesture Sensitivity Range
 --- DESCRIPTION:
---- Owns the menu choices and the safe range for incremental swipe distances.
+--- Owns the menu choices and the safe range for incremental swipe distances,
+--- in millimetres, for the macOS engine and the Linux gesture manager alike.
 --- ==============================================================================
 
 local M = {}

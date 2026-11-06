@@ -290,76 +290,76 @@ two disagree in either direction.
 | `gestures.swipe_5_horiz`                                      | `karabiner`     | `evdev`, `uinput`, `wmctrl`, `xdotool` | n/a                  |
 | `gestures.tap_2`                                              | `karabiner`     | `evdev`, `uinput`, `wmctrl`, `xdotool` | n/a                  |
 | `gestures.tap_5`                                              | `karabiner`     | `evdev`, `uinput`, `wmctrl`, `xdotool` | n/a                  |
-| `gestures.modes.swipe_2_left`                                 | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_2_right`                                | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_2_up`                                   | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_2_down`                                 | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_2_left_down`                            | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_2_left_up`                              | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_2_right_down`                           | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_2_right_up`                             | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_3_left`                                 | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_3_right`                                | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_3_up`                                   | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_3_down`                                 | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_3_left_down`                            | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_3_left_up`                              | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_3_right_down`                           | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_3_right_up`                             | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_4_left`                                 | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_4_right`                                | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_4_up`                                   | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_4_down`                                 | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_4_left_down`                            | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_4_left_up`                              | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_4_right_down`                           | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_4_right_up`                             | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_5_left`                                 | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_5_right`                                | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_5_up`                                   | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_5_down`                                 | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_5_left_down`                            | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_5_left_up`                              | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_5_right_down`                           | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_5_right_up`                             | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_2_left`                         | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_2_right`                        | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_2_up`                           | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_2_down`                         | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_2_left_down`                    | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_2_left_up`                      | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_2_right_down`                   | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_2_right_up`                     | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_3_left`                         | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_3_right`                        | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_3_up`                           | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_3_down`                         | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_3_left_down`                    | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_3_left_up`                      | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_3_right_down`                   | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_3_right_up`                     | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_4_left`                         | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_4_right`                        | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_4_up`                           | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_4_down`                         | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_4_left_down`                    | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_4_left_up`                      | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_4_right_down`                   | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_4_right_up`                     | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_5_left`                         | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_5_right`                        | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_5_up`                           | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_5_down`                         | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_5_left_down`                    | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_5_left_up`                      | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_5_right_down`                   | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_5_right_up`                     | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_3_horiz`                                | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_4_horiz`                                | —               | n/a                                    | n/a                  |
-| `gestures.modes.swipe_5_horiz`                                | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_3_horiz`                        | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_4_horiz`                        | —               | n/a                                    | n/a                  |
-| `gestures.sensitivities.swipe_5_horiz`                        | —               | n/a                                    | n/a                  |
+| `gestures.modes.swipe_2_left`                                 | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_2_right`                                | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_2_up`                                   | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_2_down`                                 | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_2_left_down`                            | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_2_left_up`                              | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_2_right_down`                           | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_2_right_up`                             | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_3_left`                                 | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_3_right`                                | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_3_up`                                   | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_3_down`                                 | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_3_left_down`                            | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_3_left_up`                              | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_3_right_down`                           | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_3_right_up`                             | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_4_left`                                 | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_4_right`                                | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_4_up`                                   | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_4_down`                                 | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_4_left_down`                            | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_4_left_up`                              | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_4_right_down`                           | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_4_right_up`                             | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_5_left`                                 | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_5_right`                                | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_5_up`                                   | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_5_down`                                 | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_5_left_down`                            | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_5_left_up`                              | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_5_right_down`                           | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_5_right_up`                             | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_2_left`                         | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_2_right`                        | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_2_up`                           | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_2_down`                         | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_2_left_down`                    | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_2_left_up`                      | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_2_right_down`                   | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_2_right_up`                     | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_3_left`                         | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_3_right`                        | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_3_up`                           | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_3_down`                         | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_3_left_down`                    | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_3_left_up`                      | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_3_right_down`                   | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_3_right_up`                     | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_4_left`                         | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_4_right`                        | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_4_up`                           | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_4_down`                         | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_4_left_down`                    | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_4_left_up`                      | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_4_right_down`                   | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_4_right_up`                     | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_5_left`                         | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_5_right`                        | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_5_up`                           | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_5_down`                         | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_5_left_down`                    | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_5_left_up`                      | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_5_right_down`                   | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_5_right_up`                     | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_3_horiz`                                | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_4_horiz`                                | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.modes.swipe_5_horiz`                                | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_3_horiz`                        | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_4_horiz`                        | —               | `evdev`, `uinput`                      | n/a                  |
+| `gestures.sensitivities.swipe_5_horiz`                        | —               | `evdev`, `uinput`                      | n/a                  |
 | `layout.ergopti_base`                                         | —               | `evdev`, `uinput`                      | —                    |
 | `layout.direct_access_digits`                                 | —               | —                                      | —                    |
 | `layout.virtual_keyboard`                                     | `karabiner`     | n/a                                    | n/a                  |

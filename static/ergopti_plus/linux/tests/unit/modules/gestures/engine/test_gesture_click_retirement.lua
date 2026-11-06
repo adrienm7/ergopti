@@ -234,7 +234,7 @@ helpers.describe("gesture click retirement", function()
 					return accepted
 				end
 				if not accepted then
-					package.loaded["modules.gestures.touchpad_finder"] = { find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
+					package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
 					local reader = package.loaded["adapters.evdev_reader"]
 					reader.open = function() return true end
 				end
@@ -254,7 +254,7 @@ helpers.describe("gesture click retirement", function()
 				helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
 				package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", open = function() return true end,
 					close = function() return true end, drain = function() return 0, "would_block" end }
-				package.loaded["modules.gestures.touchpad_finder"] = { find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
+				package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
 				local persist, observed = manager._persist_updates, nil
 				manager._persist_updates = function()
 					observed = manager.dispatch_gesture({ fingers = 3, direction = "left" })
@@ -320,7 +320,7 @@ helpers.describe("gesture click retirement", function()
 				manager._test_begin_reading({ feed = function() end })
 				package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end,
 					open = function() return true end, drain = function() return 0, "would_block" end }
-				package.loaded["modules.gestures.touchpad_finder"] = { find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
+				package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
 				helpers.assert_true(manager.enable())
 				manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
 				local writer, write = require("toml_codec.writer"), require("toml_codec.writer").batch_write
@@ -352,7 +352,7 @@ helpers.describe("gesture click retirement", function()
 				manager._test_begin_reading({ feed = function() end })
 				package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end,
 					open = function() return true end, drain = function() return 0, "would_block" end }
-				package.loaded["modules.gestures.touchpad_finder"] = { find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
+				package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
 				helpers.assert_true(manager.enable())
 				manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
 				local writer = require("toml_codec.writer"); local write, read = writer.batch_write, writer.read_classified
@@ -445,7 +445,7 @@ helpers.describe("gesture click retirement", function()
 			manager._test_begin_reading({ feed = function() end })
 			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end,
 				open = function() return true end, drain = function() return 0, "would_block" end }
-			package.loaded["modules.gestures.touchpad_finder"] = { find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
+			package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
 			helpers.assert_true(manager.enable()); helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
 			manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
 			local scope = require("infra.gesture_scope").new({ path = path, backup_path = backup, gestures = manager })
@@ -481,7 +481,7 @@ helpers.describe("gesture click retirement", function()
 				manager._test_begin_reading({ feed = function() end })
 				package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end,
 					open = function() return true end, drain = function() return 0, "would_block" end }
-				package.loaded["modules.gestures.touchpad_finder"] = { find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
+				package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
 				helpers.assert_true(manager.enable())
 				helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
 				manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()

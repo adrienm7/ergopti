@@ -379,7 +379,7 @@ end
 --- the catalogue still offers.
 local OWNER_VALUE_RULES = {
 	gesture_sensitivities = function(value)
-		if require("modules.gestures.sensitivity").coerce(value) ~= nil then return true end
+		if require("gestures.sensitivity").coerce(value) ~= nil then return true end
 		return false, "the value is outside the supported sensitivity range"
 	end,
 	script_control_shortcuts = function(value)

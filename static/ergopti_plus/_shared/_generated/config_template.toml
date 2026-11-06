@@ -1160,6 +1160,8 @@ sections = [
 	"shortcuts.caps_word",
 	"shortcuts.caps_word.pointer",
 	"gestures",
+	"gestures.modes",
+	"gestures.sensitivities",
 	"layout",
 	"category_enabled",
 	"tap_holds",

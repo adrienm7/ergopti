@@ -810,6 +810,7 @@ return {
 	"tests.unit.modules.gestures.config.test_gesture_enable_transaction",
 	"tests.unit.modules.gestures.engine.test_gesture_pump_chain",
 	"tests.unit.modules.gestures.engine.test_gesture_axis_slots",
+	"tests.unit.modules.gestures.engine.test_gesture_incremental",
 	"tests.unit.modules.gestures.engine.test_gesture_close_ack",
 	"tests.unit.modules.gestures.engine.test_gesture_click_retirement",
 	"tests.unit.modules.gestures.engine.test_gesture_under_load",
