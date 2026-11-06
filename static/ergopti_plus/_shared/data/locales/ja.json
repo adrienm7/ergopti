@@ -4046,7 +4046,7 @@
 	"platform_reason.category_gates_are_windows": "Windows のみ：Windows はカテゴリごとに、そのカテゴリ自身のスイッチの手前にマスターゲートを一つ持ちます。macOS は hotstrings のマスターを hotstrings.enabled に持ち、Linux は hotstring グループを一つずつ切り替えます。",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "このショートカットはそれを割り当てるシステムのものです。各ドライバーは、そのシステムが空けている組み合わせ（Windows では Windows キーの組み合わせ、macOS では Ctrl と Cmd、Linux ではキーボードスロット）に操作を割り当て、選択を独自の名前で保存します。",
 	"platform_reason.personal_shortcut_switches_are_windows": "Windows のみ：この 5 つのスイッチは Windows 上の個人的な環境を指します（壊れたノートPCのキー、マウスでのウィンドウ移動とタブ切り替え、プログラム可能なキーボード、業務環境）。macOS と Linux には対応するものがありません。",
-	"platform_reason.wrap_symbols_store_is_macos": "この名前では macOS のみ：macOS は囲み記号の選択をこのセクションに保存します。Windows は wrap_symbols.toml に保存し、Linux はこのセクションを読みません。",
+	"platform_reason.wrap_symbols_store_is_not_windows": "この名前では macOS と Linux のみ：囲み記号の選択をこのセクションに保存します。Windows は wrap_symbols.toml に保存します。",
 	"platform_reason.ai_menu_bookkeeping_is_windows": "Windows のみ：Windows の AI メニューの内部管理フラグで、選択する設定ではありません。macOS と Linux の AI メニューにはこのような記録はありません。",
 	"platform_reason.inline_autotype_is_windows": "Windows のみ：このモードでは、予測が届くそばから文書に直接入力されます。macOS と Linux では予測を吹き出しに表示し、承認したときに挿入します。",
 	"platform_reason.arrow_navigation_is_macos": "macOS のみ：矢印キーで予測の間を移動するための macOS の AI メニューの設定です。Windows と Linux は、ナビゲーション修飾キーの設定でナビゲーションキーを選びます。",

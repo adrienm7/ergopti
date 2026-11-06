@@ -33,7 +33,7 @@ global FEATURES_MANIFEST := Map(
         "shortcuts.keyboard", Map("description_key", "menu.shortcuts.keyboard", "platforms", ["ahk"], "subsections", []),
         "shortcuts.personal", Map("description_key", "menu.shortcuts.personal", "platforms", ["ahk"], "subsections", []),
         "shortcuts.script_control", Map("description_key", "menu.shortcuts.script_control", "platforms", ["ahk", "hs", "linux"], "subsections", []),
-        "shortcuts.wrap_symbols", Map("description_key", "menu.shortcuts.wrap_symbols", "platforms", ["hs"], "subsections", []),
+        "shortcuts.wrap_symbols", Map("description_key", "menu.shortcuts.wrap_symbols", "platforms", ["hs", "linux"], "subsections", []),
         "shortcuts.tap_keys", Map("description_key", "menu.shortcuts.header_tap_keys", "platforms", ["ahk", "hs", "linux"], "subsections", []),
         "shortcuts.caps_word", Map("description_key", "menu.caps_word.auto_off", "platforms", ["ahk", "hs", "linux"], "subsections", ["pointer"]),
         "shortcuts.caps_word.pointer", Map("description_key", "menu.caps_word.pointer_header", "platforms", ["ahk", "hs", "linux"], "subsections", []),

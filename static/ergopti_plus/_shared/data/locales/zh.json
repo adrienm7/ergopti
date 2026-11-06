@@ -4046,7 +4046,7 @@
 	"platform_reason.category_gates_are_windows": "仅限 Windows：Windows 在每个类别自身的开关之前为每个类别保留一个总开关。macOS 将 hotstrings 总开关保存为 hotstrings.enabled，Linux 则逐个启用其 hotstring 组。",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "此快捷键属于绑定它的系统：每个驱动把自己的操作放在其系统留空的组合上（Windows 上是 Windows 键组合，macOS 上是 Ctrl 和 Cmd，Linux 上是键盘槽位），并以自己的名称保存选择。",
 	"platform_reason.personal_shortcut_switches_are_windows": "仅限 Windows：这五个开关对应个人的 Windows 配置（损坏的笔记本按键、用鼠标拖动窗口和切换标签页、可编程键盘、专业工作环境）。macOS 和 Linux 没有对应项。",
-	"platform_reason.wrap_symbols_store_is_macos": "以此名称仅限 macOS：macOS 在此部分保存其包裹符号的选择。Windows 将自己的选择保存在 wrap_symbols.toml 中，Linux 不读取此部分。",
+	"platform_reason.wrap_symbols_store_is_not_windows": "以此名称仅限 macOS 和 Linux：它们在此部分保存包裹符号的选择。Windows 将自己的选择保存在 wrap_symbols.toml 中。",
 	"platform_reason.ai_menu_bookkeeping_is_windows": "仅限 Windows：Windows AI 菜单的内部记录标志，不是需要你选择的设置。macOS 和 Linux 的 AI 菜单没有这样的记录。",
 	"platform_reason.inline_autotype_is_windows": "仅限 Windows：在此模式下，预测一到就直接键入文档。macOS 和 Linux 在气泡中显示预测，并在你接受后才插入。",
 	"platform_reason.arrow_navigation_is_macos": "仅限 macOS：macOS AI 菜单中用方向键在预测之间移动的偏好设置。Windows 和 Linux 通过导航修饰键设置来选择导航键。",

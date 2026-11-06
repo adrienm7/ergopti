@@ -299,7 +299,8 @@ function checkWrapBulkHead(rows, errors) {
 		// Its trailing separator separates the subsequent native catalogue;
 		// projection must retain that boundary within this composed fragment.
 		const shown = rows.filter((row) => shownOn(row, platform));
-		const expected = WRAP_CONTROLS.platforms.includes(platform) ? WRAP_GLOBAL : [];
+		const expected =
+			!WRAP_CONTROLS.platforms || WRAP_CONTROLS.platforms.includes(platform) ? WRAP_GLOBAL : [];
 		if (shown.length !== expected.length)
 			errors.push(`wrap_symbols_global_controls (${platform}) lost its complete bulk head.`);
 		for (const [index, wanted] of expected.entries()) {
@@ -315,11 +316,11 @@ function checkWrapBulkHead(rows, errors) {
 				errors.push(`wrap_symbols_global_controls (${platform}) changed bulk row ${index + 1}.`);
 		}
 		for (const row of rows) {
-			if (
-				row.unavailable !== 'hide' ||
-				!Array.isArray(row.platforms) ||
-				JSON.stringify(row.platforms) !== JSON.stringify(WRAP_CONTROLS.platforms)
-			)
+			const boundary = WRAP_CONTROLS.platforms
+				? row.unavailable === 'hide' &&
+					JSON.stringify(row.platforms) === JSON.stringify(WRAP_CONTROLS.platforms)
+				: row.unavailable === undefined && row.platforms === undefined;
+			if (!boundary)
 				errors.push('Wrapping controls must keep their declared native capability boundary.');
 		}
 	}
@@ -460,11 +461,10 @@ function describe(row) {
 // The bulk-management fragment cannot be treated as an arbitrary scope exception.
 {
 	assert.equal(WRAP_GLOBAL.length, 4);
-	const valid = WRAP_GLOBAL.map((row) => ({
-		...(row.separator ? { type: '---' } : { type: 'command', ...row }),
-		platforms: ['ahk', 'hs'],
-		unavailable: 'hide'
-	}));
+	// Declared for every driver: no platform list, nothing hidden.
+	const valid = WRAP_GLOBAL.map((row) =>
+		row.separator ? { type: '---' } : { type: 'command', ...row }
+	);
 	const run = (rows) => {
 		const errors = [];
 		checkMenu('wrap_symbols_global_controls', rows, errors);
@@ -479,8 +479,8 @@ function describe(row) {
 		(rows) => (rows[0].type = 'toggle'),
 		(rows) => delete rows[0].disabled_when,
 		(rows) => (rows[0].platforms = ['ahk']),
-		(rows) => rows[0].platforms.push('linux'),
-		(rows) => delete rows[3].unavailable,
+		(rows) => (rows[1].platforms = ['ahk', 'hs']),
+		(rows) => (rows[3].unavailable = 'hide'),
 		(rows) => (rows[3].type = 'command'),
 		(rows) => rows.push({ type: 'command', ...CLEAR })
 	]) {

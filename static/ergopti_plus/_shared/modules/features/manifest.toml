@@ -305,11 +305,12 @@ reason_key = "platform_reason.personal_shortcut_switches_are_windows"
 description_key = "menu.shortcuts.script_control"
 platforms = ["ahk", "hs", "linux"]
 
-# macOS persists its native wrap choices in this optional canonical namespace.
+# macOS and Linux persist their wrap choices in this optional canonical
+# namespace (_shared/lua/menu/wrap_preferences); Windows keeps wrap_symbols.toml.
 [sections.shortcuts.wrap_symbols]
 description_key = "menu.shortcuts.wrap_symbols"
-platforms = ["hs"]
-reason_key = "platform_reason.wrap_symbols_store_is_macos"
+platforms = ["hs", "linux"]
+reason_key = "platform_reason.wrap_symbols_store_is_not_windows"
 
 [sections.shortcuts.tap_keys]
 description_key = "menu.shortcuts.header_tap_keys"

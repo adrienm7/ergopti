@@ -478,55 +478,6 @@
 		"reasons": { "windows": { "en": "", "fr": "" }, "linux": { "en": "", "fr": "" } }
 	},
 	{
-		"path": "wrap_symbols_global_controls.wrap_symbols_enable_all",
-		"visibility": "hide",
-		"labels": { "fr": "Tout cocher", "en": "Check all" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": { "linux": { "en": "", "fr": "" } }
-	},
-	{
-		"path": "wrap_symbols_global_controls.wrap_symbols_disable_all",
-		"visibility": "hide",
-		"labels": { "fr": "Tout décocher", "en": "Uncheck all" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": { "linux": { "en": "", "fr": "" } }
-	},
-	{
-		"path": "wrap_symbols_global_controls.wrap_symbols_restore",
-		"visibility": "hide",
-		"labels": { "fr": "↺ Restaurer les valeurs conseillées", "en": "↺ Restore recommended values" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": { "linux": { "en": "", "fr": "" } }
-	},
-	{
-		"path": "wrap_symbols_group_controls.wrap_symbols_enable_group",
-		"visibility": "hide",
-		"labels": { "fr": "Tout cocher", "en": "Check all" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": { "linux": { "en": "", "fr": "" } }
-	},
-	{
-		"path": "wrap_symbols_group_controls.wrap_symbols_disable_group",
-		"visibility": "hide",
-		"labels": { "fr": "Tout décocher", "en": "Uncheck all" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": { "linux": { "en": "", "fr": "" } }
-	},
-	{
-		"path": "wrap_symbols_custom_controls.wrap_symbols_delete_custom",
-		"visibility": "hide",
-		"labels": { "fr": "Supprimer", "en": "Delete" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": { "linux": { "en": "", "fr": "" } }
-	},
-	{
-		"path": "wrap_symbols_add_controls.wrap_symbols_add_custom",
-		"visibility": "hide",
-		"labels": { "fr": "[+ Ajouter un symbole…]", "en": "[+ Add a symbol…]" },
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": { "linux": { "en": "", "fr": "" } }
-	},
-	{
 		"path": "key_combinations_group.copy_tap_to_combo",
 		"visibility": "hide",
 		"labels": {

@@ -1,5 +1,5 @@
 {
-	"_comment": "Independent handwritten fixed wrap-control expectations. Shared caption/order ownership; native mutation and dynamic pair payload ownership. Linux has no management controls in its wrap-selection picker.",
+	"_comment": "Independent handwritten fixed wrap-control expectations. Shared caption/order ownership; native mutation and dynamic pair payload ownership. All three drivers draw these controls (Linux since 2026-11-06).",
 	"sections": [
 		{
 			"section": "wrap_symbols_global_controls",
@@ -73,7 +73,6 @@
 			]
 		}
 	],
-	"platforms": ["ahk", "hs"],
 	"hidden_platform": "linux",
 	"catalogue_groups": [
 		{

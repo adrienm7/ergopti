@@ -3115,7 +3115,10 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			const declared = { type: row.separator ? '---' : 'command' };
 			if (row.id) Object.assign(declared, { id: row.id, i18n: row.i18n });
 			if (row.disabled_when) declared.disabled_when = row.disabled_when;
-			return { ...declared, platforms: corpus.platforms, unavailable: 'hide' };
+			// Every driver manages its wrap pairs: the rows are declared for all.
+			return corpus.platforms
+				? { ...declared, platforms: corpus.platforms, unavailable: 'hide' }
+				: declared;
 		});
 		assert.deepEqual(
 			menu[section.section],
@@ -3279,6 +3282,41 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			assertWrapMutation(mutationSource);
 		}
 	}
+	// Linux draws the same sections from its own provider and binds every
+	// command through the generated constants.
+	function assertLinuxWrapProvider(source) {
+		const begin = source.indexOf('local function wrap_symbol_rows(');
+		const end = source.indexOf('\n\treturn rows\nend', begin);
+		assert.ok(begin >= 0 && end > begin, 'actual Linux wrap provider body is bounded');
+		const body = source.slice(begin, end);
+		for (const section of corpus.sections)
+			assert.ok(
+				hasCode(body, 'ManifestMenu.template_rows("' + section.section + '"'),
+				'Linux provider consumes each shared section: ' + section.section
+			);
+		for (const section of corpus.sections)
+			for (const row of section.rows)
+				if (row.id)
+					assert.ok(
+						body.includes('[Keys.' + row.id.toUpperCase() + ']'),
+						'Linux command binding: ' + row.id
+					);
+		assert.ok(
+			hasCode(body, 'local committed = sc.commit_wrap_choices(change)'),
+			'Linux shared store owner'
+		);
+	}
+	const linuxWrap = readSourceFile(
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/menu_shortcuts.lua')
+	);
+	assertLinuxWrapProvider(linuxWrap);
+	assert.throws(
+		() =>
+			assertLinuxWrapProvider(
+				linuxWrap.replace('"wrap_symbols_global_controls"', '"wrap_symbols_x"')
+			),
+		/consumes each shared section/
+	);
 	for (const [platform, source] of Object.entries(sources)) {
 		assertWrapProvider(source, platform);
 		assert.throws(

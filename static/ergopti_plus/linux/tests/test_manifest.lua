@@ -665,6 +665,7 @@ return {
 	"tests.unit.modules.keymap.test_xkb_converter",
 	"tests.unit.modules.keymap.test_layout_registry_store",
 	"tests.unit.modules.shortcuts.test_shortcut_catalogue",
+	"tests.unit.modules.shortcuts.text_actions.test_wrap_symbol_settings",
 	"tests.unit.ui.composer_check.test_composer_check_window",
 	"tests.unit.adapters.network.test_network_check",
 	"tests.unit.adapters.network.test_policy_read_admission",
