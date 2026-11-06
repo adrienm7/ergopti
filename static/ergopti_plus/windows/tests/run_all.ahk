@@ -1775,6 +1775,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/keystats/reader/test_klr_builddatabase_failure_logged.ahk
 #Include meta/modules/keystats/ergonomics/test_klw_ctx_unbounded_hist_growth.ahk
 #Include meta/platform/remap/keys/test_lalt_capslock_tap_min_duration.ahk
+#Include meta/platform/remap/keys/test_lalt_tab_requires_hold_layer.ahk
 #Include meta/modules/llm/navigation/test_llm_accept_cleanup_in_finally.ahk
 #Include meta/modules/llm/prediction/test_llm_failure_callback_arity.ahk
 #Include meta/modules/llm/navigation/test_llm_inline_autotype_suspend_guard.ahk
