@@ -965,14 +965,41 @@ local function arm_sticky(modifiers)
 	return Sticky.toggle(modifiers, secs, current_action_parent())
 end
 
-sg("layer_on", function()
+-- Newest layer write; an older settlement must not undo a newer intent.
+local _layer_request = 0
+
+--- Writes the navigation-layer variable and, once that exact write settles,
+--- moves the wheel bindings with it. Karabiner taps the F20/F19 sentinels only
+--- around its own generated actions, so this direct write would otherwise
+--- leave the wheel scrolling after layer_on, or consuming after layer_off.
+--- @param active boolean True to enter the layer, false to leave it.
+local function set_nav_layer(active)
 	local ke = ke_variables()
-	if ke then ke.set(KE_LAYER_VARIABLE, KE_LAYER_ON) end
-end)
-sg("layer_off", function()
-	local ke = ke_variables()
-	if ke then ke.set(KE_LAYER_VARIABLE, KE_LAYER_OFF) end
-end)
+	if not ke then return end
+	_layer_request = _layer_request + 1
+	local request = _layer_request
+	local function finish(ok, reason)
+		if ok ~= true or reason ~= "written" then
+			Logger.debug(LOG, "Navigation layer write did not settle: %s.", tostring(reason))
+			return
+		end
+		if request ~= _layer_request then
+			Logger.debug(LOG, "Navigation layer write was superseded.")
+			return
+		end
+		local sentinels_ok, Sentinels = pcall(require, "modules.keymap.control_sentinels")
+		if not sentinels_ok or type(Sentinels) ~= "table"
+			or type(Sentinels.publish_nav_layer) ~= "function" then
+			Logger.error(LOG, "Navigation layer wheel cannot follow the layer: %s.", tostring(Sentinels))
+			return
+		end
+		Sentinels.publish_nav_layer(active)
+	end
+	ke.set(KE_LAYER_VARIABLE, active and KE_LAYER_ON or KE_LAYER_OFF, finish)
+end
+
+sg("layer_on", function() set_nav_layer(true) end)
+sg("layer_off", function() set_nav_layer(false) end)
 sg("capsword", function()
 	local ke = ke_variables()
 	if not ke then return end
