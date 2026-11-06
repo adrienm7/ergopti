@@ -67,6 +67,7 @@ local function load_fixture()
 		get_llm_enabled = function() return false end,
 		reset = function() effects.visible = false; return true end,
 		handle_chain_signal = function() return false end,
+		has_pending_work    = function() return false end,
 		is_visible = function() return false end,
 	}, {
 		__index = function() return function() end end,
@@ -172,7 +173,10 @@ helpers.describe("navigation invalidates hotstring buffer", function()
 				else
 					local mouse_tap = find_tap(hs_stub, hs_stub.eventtap.event.types.leftMouseDown)
 					helpers.assert_not_nil(mouse_tap)
-					mouse_tap.fn({ getProperty = function() return 0 end })
+					mouse_tap.fn({
+						getType = function() return hs_stub.eventtap.event.types.leftMouseDown end,
+						getProperty = function() return 0 end,
+					})
 				end
 
 				helpers.assert_eq(state.buffer, "",

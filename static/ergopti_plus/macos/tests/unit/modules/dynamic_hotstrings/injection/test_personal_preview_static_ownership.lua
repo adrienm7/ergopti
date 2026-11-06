@@ -44,6 +44,7 @@ local function install_collaborators(effects)
 		get_llm_enabled = function() return false end,
 		reset = function() return true end,
 		handle_chain_signal = function() return false end,
+		has_pending_work    = function() return false end,
 		is_visible = function() return false end,
 	}
 	package.loaded["modules.keystats"] = {

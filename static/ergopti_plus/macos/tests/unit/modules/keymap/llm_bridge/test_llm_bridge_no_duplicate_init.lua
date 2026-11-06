@@ -157,6 +157,7 @@ local engine_stub = {
 	navigate                      = function() end,
 	consume                       = function() return nil, {} end,
 	handle_chain_signal           = function() return false end,
+	has_pending_work              = function() return false end,
 	arm_chain                     = function() end,
 	stop_timer                    = function() return true end,
 	start_timer                   = function() end,

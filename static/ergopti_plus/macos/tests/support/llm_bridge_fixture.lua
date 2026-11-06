@@ -125,6 +125,7 @@ local function make_prediction_engine(fixture)
 		start_timer_word_end = return_true,
 		stop_timer = return_true,
 		handle_chain_signal = return_false,
+		has_pending_work = return_false,
 		is_visible = function() return fixture.engine_visible == true end,
 		is_chain_pending = return_false,
 		get_predictions = function() return fixture.predictions or {} end,

@@ -366,6 +366,64 @@ function M.set_runtime_quarantined(value)
 end
 
 
+--- Cancels every pending prediction because the user did something: moved or
+--- clicked the pointer, scrolled, made a gesture, switched application or
+--- window, or pressed a key the shown tooltip does not own. Predictions run only
+--- while the user does nothing (maintainer decision 2026-11-06).
+---
+--- Safe inside an eventtap: when nothing is pending this is one flag read; the
+--- revocation itself is O(1) and the native cleanup (curl, timers, canvas)
+--- runs once the callback has returned.
+--- @param reason string Diagnostic label of the activity.
+--- @return boolean cancelled True when pending prediction work was revoked.
+function M.note_user_activity(reason)
+	if not engine.has_pending_work() then return false end
+	local token = engine.revoke_for_activity()
+	if token == nil then return false end
+	local scheduled = SyntheticInput.defer_after_callback("prediction activity cancel",
+		function()
+			Logger.debug(LOG, "User activity (%s) — pending prediction cancelled.", tostring(reason))
+			local ok, result = xpcall(engine.settle_activity_cancel, debug.traceback, token)
+			if not ok or result ~= true then
+				Logger.error(LOG, "Activity cancellation did not commit (result: %s).", tostring(result))
+			end
+		end)
+	if not scheduled then
+		-- The revocation already discards every late answer; the next activity
+		-- or reset retries the native cleanup.
+		Logger.error(LOG, "Activity cancellation cleanup could not be scheduled (%s).", tostring(reason))
+	end
+	return true
+end
+
+
+--- Reports whether user activity would cancel prediction work. O(1).
+--- @return boolean pending True while a prediction is pending or shown.
+function M.has_pending_prediction() return engine.has_pending_work() end
+
+
+-- Internal sentinels the keymap tap sees as keys though no user pressed them
+-- as such: Karabiner's remap carriers, the layer signals and the chain edge.
+local ACTIVITY_NEUTRAL_KEYCODES = {}
+for _, name in ipairs({ "F13_KARABINER_RETURN", "F14_KARABINER_BACKSPACE",
+	"F15_KARABINER_ESCAPE", "F18_KARABINER_DELETE", "F16_LLM_CHAIN_SIGNAL",
+	"F17_CYCLE_WINDOWS", "F20_LAYER_NAV_ENTERED", "F19_LAYER_NAV_EXITED",
+	"LAYER_SYN_1", "LAYER_SYN_2", "LAYER_SYN_3" }) do
+	local code = Keycodes[name]
+	if code ~= nil then ACTIVITY_NEUTRAL_KEYCODES[code] = true end
+end
+
+--- Cancels a pending prediction for a physical key the tooltip did not own.
+--- Modifier presses arrive as flagsChanged and never reach this function, so
+--- the validation and navigation chords stay usable.
+--- @param keyCode number The macOS key code.
+--- @return boolean cancelled True when pending prediction work was revoked.
+function M.note_key_activity(keyCode)
+	if not engine.has_pending_work() or ACTIVITY_NEUTRAL_KEYCODES[keyCode] then return false end
+	return M.note_user_activity("keystroke")
+end
+
+
 --- Reports whether prediction/preview interactions are currently safe.
 --- @return boolean True when runtime calls may reach the prediction engine.
 function M.is_runtime_available()

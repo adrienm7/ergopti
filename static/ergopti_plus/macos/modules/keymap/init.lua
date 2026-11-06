@@ -178,6 +178,10 @@ end
 if Expander.init(CoreState, Registry, LLMBridge) ~= true then
 	error("Keymap expander initialization did not commit.", 0)
 end
+-- Switching application or window is user activity: a pending prediction stops.
+km_utils.set_context_change_listener(function()
+	LLMBridge.note_user_activity("application or window switch")
+end)
 
 local tap       = nil
 local shift_tap = nil
@@ -1741,6 +1745,9 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- delayed loopback that owns that edge.
 	if not internal_loopback and keyCode ~= Keycodes.F16_LLM_CHAIN_SIGNAL
 		and LLMBridge.handle_llm_keys(keyCode, flags, false) then return true end
+	-- Any other key is user activity: a pending prediction is cancelled before
+	-- the typing path below can arm the next debounce.
+	if not internal_loopback then LLMBridge.note_key_activity(keyCode) end
 
 	-- Wipe the buffer after the user pauses for hotstrings.idle_reset_seconds:
 	-- the pause itself stands in for a word terminator, so the post-wipe
@@ -2422,17 +2429,54 @@ shift_tap = eventtap.new(
 	end
 )
 
--- scrollWheel is intentionally excluded: scroll events are high-frequency
--- (60 Hz+) and firing check_nav_reset()/reset_predictions() on every frame
--- causes severe lag when the LLM menu is active (ObjC dispatch per frame).
--- Scroll does not move the text cursor, so no buffer reset is needed here.
+-- Pointer activity that never moves the text cursor: motion, drags, scroll and
+-- trackpad gestures. They reach this tap only to cancel a pending prediction
+-- (maintainer decision 2026-11-06: predictions run only while the user does
+-- nothing). These types fire at 60-200 Hz, so their branch is one type lookup
+-- and one engine flag read while no prediction is pending, and never touches
+-- the hotstring buffer: scroll and motion leave the caret where it was.
+local POINTER_ACTIVITY_TYPES = {}
+for _, type_name in ipairs({ "mouseMoved", "leftMouseDragged", "rightMouseDragged",
+	"otherMouseDragged", "scrollWheel", "gesture", "magnify", "swipe", "rotate",
+	"smartMagnify" }) do
+	local type_code = eventtap.event.types[type_name]
+	if type_code ~= nil then POINTER_ACTIVITY_TYPES[type_code] = type_name end
+end
+local MOUSE_TAP_TYPES = {
+	eventtap.event.types.leftMouseDown,
+	eventtap.event.types.rightMouseDown,
+	eventtap.event.types.middleMouseDown,
+}
+for type_code in pairs(POINTER_ACTIVITY_TYPES) do MOUSE_TAP_TYPES[#MOUSE_TAP_TYPES + 1] = type_code end
+local MOUSE_DELTA_X = eventtap.event.properties.mouseEventDeltaX
+local MOUSE_DELTA_Y = eventtap.event.properties.mouseEventDeltaY
+
+--- Cancels a pending prediction on cursor-neutral pointer activity.
+--- @param e userdata The pointer event.
+--- @param type_name string Its POINTER_ACTIVITY_TYPES name.
+--- @return boolean false Never consumes the event.
+local function observe_pointer_activity(e, type_name)
+	if _callbacks_retired or CoreState.processing_paused == true then return false end
+	if not LLMBridge.has_pending_prediction() then return false end
+	-- Ergopti's own pointer output (mouse keys, gestures) is not user activity.
+	if EventProvenance.is_owned(e) then return false end
+	if type_name == "mouseMoved" and MOUSE_DELTA_X and MOUSE_DELTA_Y then
+		local ok, dx, dy = pcall(function()
+			return e:getProperty(MOUSE_DELTA_X), e:getProperty(MOUSE_DELTA_Y)
+		end)
+		if ok and dx == 0 and dy == 0 then return false end
+	end
+	LLMBridge.note_user_activity(type_name)
+	return false
+end
+
+-- Clicks reset the word: the caret moved somewhere unobservable. The other
+-- pointer types only cancel a pending prediction (observe_pointer_activity).
 mouse_tap = eventtap.new(
-	{
-		eventtap.event.types.leftMouseDown,
-		eventtap.event.types.rightMouseDown,
-		eventtap.event.types.middleMouseDown,
-	},
+	MOUSE_TAP_TYPES,
 	function(e)
+		local activity_type = POINTER_ACTIVITY_TYPES[e:getType()]
+		if activity_type then return observe_pointer_activity(e, activity_type) end
 		-- A click can move focus to another app before the deferred broker runs.
 		-- Claim older output here and return it ahead of the original mouseDown, even
 		-- when the optional keystats tap is disabled. Otherwise an Ergopti shortcut

@@ -1159,6 +1159,29 @@ local function stop_application_watcher(label)
 	return true
 end
 
+-- Told when the frontmost application or its focused window changes, so a
+-- pending prediction stops with the context it was asked for. Title and
+-- focused-field edges are left out: an editor retitles its window while the
+-- user types.
+local _context_change_listener = nil
+
+--- Registers the single listener of application and window switches.
+--- @param fn function|nil Zero-argument callback; nil unregisters it.
+function M.set_context_change_listener(fn)
+	if fn ~= nil and type(fn) ~= "function" then
+		error("context change listener must be a function or nil", 2)
+	end
+	_context_change_listener = fn
+end
+
+--- Tells the registered listener that the user switched application or window.
+local function notify_context_change()
+	local listener = _context_change_listener
+	if listener == nil then return end
+	local ok, err = xpcall(listener, debug.traceback)
+	if not ok then Logger.error(LOG, "Context change listener raised: %s.", tostring(err)) end
+end
+
 --- Invalidates the ignored-window cache. Called from focus-change watchers;
 --- also safe to call from anywhere else (tests, manual overrides).
 local function invalidate_ignored_win_cache()
@@ -1196,6 +1219,7 @@ local function ensure_ignored_win_watchers()
 				if event == hs.application.watcher.activated
 					or event == hs.application.watcher.deactivated then
 					invalidate_ignored_win_cache()
+					notify_context_change()
 				end
 			end)
 			if not candidate then error("application watcher construction returned nil", 0) end
@@ -1299,6 +1323,7 @@ local function ensure_ignored_win_context_watchers(app, win, watch_title)
 				if _ignored_win_focus_watcher ~= candidate
 					or _ignored_win_focus_watcher_committed ~= true then return end
 				invalidate_ignored_win_cache()
+				notify_context_change()
 			end)
 			if not candidate then error("focused-window watcher construction returned nil", 0) end
 			_ignored_win_focus_watcher = candidate

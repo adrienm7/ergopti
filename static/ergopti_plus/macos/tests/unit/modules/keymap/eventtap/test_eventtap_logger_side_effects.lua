@@ -131,6 +131,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 			get_llm_enabled = function() return false end,
 			reset = function() return true end,
 			handle_chain_signal = function() return false end,
+			has_pending_work    = function() return false end,
 			is_visible = function() return false end,
 		}
 		package.loaded["modules.keystats"] = setmetatable({

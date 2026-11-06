@@ -154,6 +154,12 @@ local _live = nil
 -- True while predictions are on screen and waiting for user interaction
 local predictions_visible = false
 
+-- True from the moment a typing pause arms the debounce, a prediction request
+-- leaves or a chain is pending, until a reset or a user-activity revocation.
+-- The pointer path reads it on every mouse event, so it stays a plain upvalue;
+-- a stale true costs one extra revocation, never a missed one.
+local _work_pending = false
+
 -- Incremented each time a new LLM request is triggered; stale async callbacks
 -- capture this value at request time and discard themselves when it changes
 local llm_request_counter = 0
@@ -1241,6 +1247,7 @@ local function start_inactivity_timer(delay_override, ends_word)
 		token = arm.token,
 	}
 	_inactivity_timer = descriptor
+	_work_pending = true
 
 	--- Releases this descriptor only after both native and business settlement.
 	--- @return boolean released True when this exact owner left the live slot.
@@ -1952,6 +1959,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	fetch_request_counter = fetch_request_counter + 1
 	local my_fetch_id     = fetch_request_counter
 	_activity = { kind = (force_trigger or live) and "explicit" or "automatic", fetch = my_fetch_id }
+	_work_pending = true
 	local superseded_log_id = retire_request_log(_request_log_id)
 	-- A mashed hotkey: the previous press's request is cancelled, not left running.
 	if force_trigger then explicit_supersedes("Prediction", superseded_log_id ~= nil) end
@@ -2781,6 +2789,7 @@ function M.reset(options)
 	-- Every later cleanup step belongs to this exact generation, not its successor
 	pending_predictions = {}
 	predictions_visible = false
+	_work_pending = false
 	last_buffer_signature = nil
 	llm_request_counter = llm_request_counter + 1
 	fetch_request_counter = fetch_request_counter + 1
@@ -2983,6 +2992,7 @@ function M.arm_chain()
 	-- unpublished intent and leave chain_pending=true without a fallback.
 	descriptor.authorized = false
 	chain_pending = true
+	_work_pending = true
 
 	--- Rolls back only this arm attempt; a re-entrant successor owns the globals.
 	--- @param label string Cleanup label.
@@ -3193,6 +3203,52 @@ function M.handle_chain_signal(keyCode)
 		end
 	end
 	Logger.debug(LOG, "F16 received — chained LLM dispatch committed.")
+	return true
+end
+
+--- Reports whether a prediction is pending: debounce armed, request in
+--- flight, chain pending or predictions shown. O(1), eventtap-safe.
+--- @return boolean pending True while user activity must cancel prediction work.
+function M.has_pending_work() return _work_pending end
+
+--- Revokes every pending prediction on user activity, in O(1) and without any
+--- native call, so it runs inside the eventtap that saw the activity. Late
+--- answers fail the request-counter check from now on; the debounce callback
+--- loses its authority. The native cleanup (timer, curl, canvas) belongs to
+--- settle_activity_cancel(), called once the eventtap has returned.
+--- @return number|nil token Debounce generation seen, nil when nothing was pending.
+function M.revoke_for_activity()
+	if not _work_pending then return nil end
+	_work_pending = false
+	llm_request_counter = llm_request_counter + 1
+	fetch_request_counter = fetch_request_counter + 1
+	chain_pending = false
+	_chain_generation = _chain_generation + 1
+	if _inactivity_timer then _inactivity_timer.authorized = false end
+	return _inactivity_generation
+end
+
+--- Finishes a revocation off the eventtap: cancels the streams, hides the
+--- surface and stops the debounce. When the typing path already stopped or
+--- re-armed the debounce, it owns the surface (a hotstring preview may be on
+--- screen) and the next pause: only the revoked request's streams remain.
+--- @param token number Debounce generation returned by revoke_for_activity().
+--- @return boolean committed True when the cleanup committed.
+function M.settle_activity_cancel(token)
+	if type(token) ~= "number" then error("activity cancel token must be a number", 2) end
+	if token ~= _inactivity_generation then return M.stop_streams_for_activity() end
+	return M.reset() == true
+end
+
+--- Stops the backend streams of a revoked request without touching a debounce
+--- armed after it.
+--- @return boolean committed True when the backend cancellation committed.
+function M.stop_streams_for_activity()
+	local ok, result = xpcall(core_llm.cancel_streaming, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "Activity stream cancellation did not commit (result: %s).", tostring(result))
+		return false
+	end
 	return true
 end
 
