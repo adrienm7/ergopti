@@ -875,6 +875,18 @@ but not as a typed character, ngram source labels other than hotstring, llm and
 none fall into "other", and the dashboard's NONE app selection excludes all
 input on every driver.
 
+### project-metrics-purge-tombstone
+
+A dashboard Purge is one `events_system` row (`action = 'metrics_purge'`) the
+owning writer appends to its ledger; `_shared/data/db/purge_schema.sql` (run
+after `schema.sql` and `media_schema.sql` on every open, and before each
+Windows incremental tail) deletes older raw and derived rows and ignores any
+older raw row inserted later, so every replay order converges. Linux stamps raw
+`ts` in UTC while macOS and Windows stamp local time with milliseconds, so the
+tombstone carries `metadata_json.utc` and the triggers compare a `linux`
+device's rows with it. A new raw `events_*` table needs its guard trigger
+regenerated in that file.
+
 ## Logging and observability
 
 ### errors-only-log-sink

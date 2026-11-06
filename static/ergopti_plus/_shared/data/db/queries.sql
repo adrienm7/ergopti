@@ -234,6 +234,11 @@ INSERT INTO meta(key,value) VALUES ({{s key}},{{s value}}) ON CONFLICT(key) DO U
 -- doc: Creates a metadata key with its first value when it does not exist yet.
 INSERT OR IGNORE INTO meta (key, value) VALUES ({{s key}}, {{s value}});
 
+-- name: export.vacuum_into
+-- doc: The dashboard's Export: a consistent copy of the whole store, taken by the
+-- doc: owning writer once its flush has settled. Runs outside any transaction.
+VACUUM INTO {{s path}};
+
 -- name: meta.rev_bump
 -- doc: Advances the revision counter. The value is stored as text, which is the
 -- doc: column's own affinity, so every driver reads back the same string.

@@ -457,6 +457,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-key-names.cjs"],
 			"repro": "node tools/test/test-metrics-key-names.cjs"
+		},
+		{
+			"id": "js-metrics-maintenance",
+			"ordinal": 601,
+			"name": "dashboard export and purge: a tombstone purges every device in any replay order and the page answers only its own request",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-maintenance.cjs"],
+			"repro": "node tools/test/test-metrics-maintenance.cjs"
 		}
 	]
 }

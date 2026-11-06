@@ -28,6 +28,7 @@
 #Requires Autohotkey v2.0+
 #Include keystats_webview_range_script.ahk
 #Include keystats_webview_range_mount.ahk
+#Include keystats_maintenance.ahk
 #Include keystats_apps_editor.ahk
 
 
@@ -660,6 +661,13 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 				KLWV_QueueAppsEditor(entry, Epoch, msg)
 		case "range_consumed":
 			KLWV_ConsumeRangeStage(which, Epoch, entry, msg)
+		case "metrics_export", "metrics_purge":
+			; The writer drains the journal first; run it after this callback
+			; returns so no ingest work nests inside the WebView message loop.
+			if !RegExMatch(msg, '"maintenance_id"\s*:\s*(\d{1,15})\b', &mid)
+				return
+			SetTimer(KLWV_RunMaintenance.Bind(which, Epoch, SubStr(action, StrLen("metrics_") + 1),
+				Integer(mid[1]), entry["metrics_dir"]), -1)
 				case "ready":
 						; Page just finished loading and signals it's ready to
 						; receive pushes. Inject i18n strings first (fetch() is
@@ -909,6 +917,24 @@ KLWV_QueueRangeTerminal(which, Epoch, request_id, status) {
 				return false
 		entry["pending_range_terminal"] := Map(
 				"epoch", Epoch, "request_id", request_id, "status", status)
+		return true
+}
+
+; Runs one dashboard Export or Purge and answers the page that asked for it.
+KLWV_RunMaintenance(which, Epoch, Kind, MaintenanceId, MetricsDir) {
+		Result := KL_RunMetricsMaintenance(Kind, MetricsDir)
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		entry := KLWV.windows[which]
+		; Built by hand: the page requires a JSON boolean, which AHK has no type for.
+		msg := '{"type":"metrics_maintenance","maintenance_id":' . MaintenanceId
+				. ',"ok":' . (Result["ok"] ? "true" : "false")
+				. ',"path":' . JsonStringLiteral(Result["path"]) . '}'
+		try entry["webview"].PostWebMessageAsString(KLWV_PageMessage(entry, msg))
+		catch as err {
+				try LoggerError("Keystats", "KLWV_RunMaintenance: the outcome could not reach '{1}': {2}", which, err.Message)
+				return false
+		}
 		return true
 }
 

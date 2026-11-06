@@ -303,12 +303,15 @@ local function _read_media_resource(relative)
 end
 
 --- Admits only the committed five-key policy and additive schema before writes.
+--- The purge tombstone triggers (purge_schema.sql) join the same startup
+--- transaction, so a store bootstrapped before them applies a tombstone too.
 local function _ensure_media_schema()
 	local schema = _read_media_resource("data/db/media_schema.sql")
+	local purge = _read_media_resource("data/db/purge_schema.sql")
 	local catalogue = _read_media_resource("data/keycodes/metrics_media_keys.json")
-	if schema == nil or catalogue == nil then return false end
+	if schema == nil or purge == nil or catalogue == nil then return false end
 	local ok, policy, transaction = pcall(function()
-		return MediaStore.policy(Json.decode(catalogue)), MediaStore.schema_transaction(schema)
+		return MediaStore.policy(Json.decode(catalogue)), MediaStore.schema_transaction(schema .. "\n" .. purge)
 	end)
 	if not ok then
 		Logger.error(LOG, "Semantic media schema or catalogue admission refused.")

@@ -96,6 +96,35 @@
 					onclick="reset_filters()"
 					data-i18n="ui_typing.btn_reset"
 				></button>
+				<button
+					class="filter-btn"
+					id="btn_metrics_export"
+					onclick="ask_metrics_maintenance('export')"
+					data-i18n="ui_typing.maintenance_export"
+					data-i18n-title="ui_typing.maintenance_export_title"
+				></button>
+				<button
+					class="filter-btn filter-reset"
+					id="btn_metrics_purge"
+					onclick="ask_metrics_maintenance('purge')"
+					data-i18n="ui_typing.maintenance_purge"
+					data-i18n-title="ui_typing.maintenance_purge_title"
+				></button>
+				<div class="maintenance-bar" id="metrics_maintenance_bar" role="status" hidden>
+					<span id="metrics_maintenance_text"></span>
+					<button
+						class="filter-btn filter-reset"
+						id="btn_maintenance_confirm"
+						onclick="confirm_metrics_maintenance()"
+						data-i18n="ui_typing.maintenance_confirm"
+					></button>
+					<button
+						class="filter-btn"
+						id="btn_maintenance_cancel"
+						onclick="cancel_metrics_maintenance()"
+						data-i18n="ui_typing.maintenance_cancel"
+					></button>
+				</div>
 			</div>
 		</div>
 
@@ -1267,6 +1296,7 @@
 		<script src="charts.js"></script>
 		<script src="table.js"></script>
 		<script src="heatmap_win.js"></script>
+		<script src="maintenance.js"></script>
 		<script src="main.js"></script>
 
 		<!--
@@ -1492,6 +1522,16 @@
 						if (payload.type === 'range_terminal') {
 							if (typeof window.complete_range_request === 'function') {
 								window.complete_range_request(payload.request_id, payload.status);
+							}
+							return;
+						}
+						if (payload.type === 'metrics_maintenance') {
+							if (typeof window.complete_metrics_maintenance === 'function') {
+								window.complete_metrics_maintenance(
+									payload.maintenance_id,
+									payload.ok,
+									payload.path
+								);
 							}
 							return;
 						}

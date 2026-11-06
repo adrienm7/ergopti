@@ -434,6 +434,23 @@ local QUERIES = {
 			},
 		},
 	},
+	["export.vacuum_into"] = {
+		params = { "path" },
+		slots = { { "path", "s", false } },
+		texts = {  },
+		templates = {
+			native = {
+				"VACUUM INTO ",
+				{ slot = "path", kind = "s", nullable = false },
+				";",
+			},
+			cli_json = {
+				"VACUUM INTO ",
+				{ slot = "path", kind = "s", nullable = false },
+				";",
+			},
+		},
+	},
 	["meta.rev_bump"] = {
 		params = {  },
 		slots = {  },

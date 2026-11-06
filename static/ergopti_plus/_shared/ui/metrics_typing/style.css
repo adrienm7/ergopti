@@ -282,6 +282,19 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	color: var(--theme-red);
 }
 
+/* The Export / Purge confirmation and outcome line. */
+.maintenance-bar {
+	align-items: center;
+	color: var(--text-muted);
+	display: flex;
+	flex-wrap: wrap;
+	font-size: 12px;
+	gap: 8px;
+}
+.maintenance-bar[hidden] {
+	display: none;
+}
+
 /* ============================= */
 /* ============================= */
 /* ======= 4/ Stats Grid ======= */

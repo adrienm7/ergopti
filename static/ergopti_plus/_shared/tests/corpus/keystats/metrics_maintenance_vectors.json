@@ -1,0 +1,93 @@
+{
+	"_description": "Dashboard Export and Purge (maintainer decision 2026-11-06). The tombstone is the events_system row a Purge appends to the owning writer's ledger; _shared/data/db/purge_schema.sql applies it while any ledger replays. The macOS/Linux helper (_shared/lua/keystats/metrics_maintenance.lua) and the Windows module (modules/keystats/keystats_maintenance.ahk) render these values; the replay cases run against the shared schema in every order a sync can deliver the ledgers.",
+	"tombstone": {
+		"action": "metrics_purge",
+		"epoch": 1793959200.25,
+		"utc": "2026-11-06 10:00:00",
+		"millis": ".250",
+		"ts_pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3}$",
+		"date_pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+	},
+	"export": {
+		"prefix": "ergopti-metrics-",
+		"extension": ".sqlite",
+		"name_pattern": "^ergopti-metrics-\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}\\.sqlite$",
+		"query": "export.vacuum_into"
+	},
+	"replay": {
+		"devices": [
+			{ "device_id": "mac-device", "os": "darwin" },
+			{ "device_id": "linux-device", "os": "linux" },
+			{ "device_id": "pc-device", "os": "windows" }
+		],
+		"ledgers": {
+			"mac-device": [
+				{
+					"table": "events_system",
+					"id": 1,
+					"ts": "2026-11-06 10:59:00.000",
+					"date": "2026-11-06",
+					"action": "wake"
+				},
+				{
+					"table": "events_system",
+					"id": 2,
+					"ts": "2026-11-06 11:00:00.000",
+					"date": "2026-11-06",
+					"action": "metrics_purge",
+					"metadata_json": "{\"utc\":\"2026-11-06 10:00:00\"}"
+				},
+				{
+					"table": "events_system",
+					"id": 3,
+					"ts": "2026-11-06 11:00:01.000",
+					"date": "2026-11-06",
+					"action": "sleep"
+				}
+			],
+			"linux-device": [
+				{
+					"table": "events_system",
+					"id": 1,
+					"ts": "2026-11-06 09:59:59",
+					"date": "2026-11-06",
+					"action": "wake"
+				},
+				{
+					"table": "events_system",
+					"id": 2,
+					"ts": "2026-11-06 10:00:01",
+					"date": "2026-11-06",
+					"action": "sleep"
+				}
+			],
+			"pc-device": [
+				{
+					"table": "events_system",
+					"id": 1,
+					"ts": "2026-11-05 18:00:00.000",
+					"date": "2026-11-05",
+					"action": "lock"
+				},
+				{
+					"table": "events_system",
+					"id": 2,
+					"ts": "2026-11-06 12:00:00.000",
+					"date": "2026-11-06",
+					"action": "unlock"
+				}
+			]
+		},
+		"derived": [
+			{ "table": "agg_system_day", "device_id": "pc-device", "date": "2026-11-05" },
+			{ "table": "agg_system_day", "device_id": "pc-device", "date": "2026-11-07" }
+		],
+		"surviving": [
+			"linux-device:2:sleep",
+			"mac-device:2:metrics_purge",
+			"mac-device:3:sleep",
+			"pc-device:2:unlock"
+		],
+		"surviving_derived": ["pc-device:2026-11-07"]
+	}
+}

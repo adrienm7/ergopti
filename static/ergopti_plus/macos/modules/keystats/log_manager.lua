@@ -224,6 +224,7 @@ end
 -- Single-sourced in modules/keystats/timestamp.lua so the seconds and the .mmm
 -- fraction share one wall clock (F-L1).
 local Timestamp = require("modules.keystats.timestamp")
+local Maintenance = require("keystats.metrics_maintenance")
 local _now_ts = Timestamp.now_ts
 
 --- Returns today's "YYYY-MM-DD" string.
@@ -1132,6 +1133,8 @@ M._local_ledger_replay_cursor = _local_ledger_replay_cursor
 -- Forward-declared: the replay below and the paced deletes call it; it is
 -- defined with the recovery coroutine it yields.
 local _recovery_pace
+-- Assigned beside M.request_metrics_maintenance; the ingest settles it.
+local _advance_maintenance
 
 --- Meta key holding the resumable state of a pending local-ledger replay. It
 --- is written when a fresh cache is created and removed once the replayed
@@ -2276,6 +2279,78 @@ end
 
 --- Run one ingest cycle: pull new today.log entries, append SQL batch to
 --- data.sql, apply it to db.sqlite, update aggregate tables.
+--- The dashboard's one Export or Purge, owned until the writer settles.
+local _maintenance_request = nil
+
+--- Completes the dashboard request once, with its receipt.
+--- @param request table The owned request.
+--- @param success boolean Whether the operation committed.
+--- @param path string|nil The Export copy.
+local function _finish_maintenance(request, success, path)
+	if _maintenance_request ~= request then return end
+	_maintenance_request = nil
+	if success then
+		Logger.success(LOG, "Metrics %s done.", request.kind)
+	else
+		Logger.error(LOG, "Metrics %s refused; the store is unchanged.", request.kind)
+	end
+	Logger.callback(LOG, "Metrics " .. request.kind .. " completion", function() request.complete(success, path) end)
+end
+
+--- Acts on the store after an ingest: a Purge completes once its tombstone
+--- committed (or fails once the ingest settled without it); an Export copies
+--- the store only once the ingest has settled.
+--- @param db userdata The writer's SQLite handle.
+--- @param settled boolean Whether today.log was read to its end.
+_advance_maintenance = function(db, settled)
+	local request = _maintenance_request
+	if not request then return end
+	if request.kind == "purge" then
+		local found = false
+		for _ in db:nrows("SELECT 1 FROM events_system WHERE action=" .. _sq(Maintenance.TOMBSTONE_ACTION)
+			.. " AND ts=" .. _sq(request.tombstone.ts) .. " LIMIT 1") do found = true end
+		if found or settled then _finish_maintenance(request, found) end
+		return
+	end
+	if not settled then return end
+	local folder, reason = Maintenance.downloads_dir(os.getenv)
+	if not folder or not FileSystem.exists(folder) then
+		Logger.error(LOG, "Metrics export has no destination folder (%s).", tostring(reason or folder))
+		return _finish_maintenance(request, false)
+	end
+	local path = folder .. "/" .. Maintenance.export_file_name(os.time())
+	local copied = pcall(_exec_sqlite_or_error, db, Queries.render("export.vacuum_into", "native", { path = path }),
+		"Metrics export")
+	_finish_maintenance(request, copied, copied and path or nil)
+end
+
+--- Owns one dashboard Export or Purge through this single writer. Both wait
+--- until the ingest has settled; a Purge first queues its tombstone, which the
+--- ingest commits to SQLite and data.sql, and which every device applies while
+--- replaying (purge_schema.sql).
+--- @param kind string "export" or "purge".
+--- @param complete function Receives success and, for an Export, its path.
+--- @return boolean accepted Whether this request owns its completion.
+function M.request_metrics_maintenance(kind, complete)
+	if not Maintenance.KINDS[kind] or type(complete) ~= "function" then
+		Logger.error(LOG, "Metrics maintenance needs a known kind and a completion callback.")
+		return false
+	end
+	if not _require_state("request_metrics_maintenance") or _maintenance_request
+		or not SqliteWriter.get_db() then return false end
+	local request = { kind = kind, complete = complete }
+	_maintenance_request = request
+	Logger.start(LOG, "Metrics %s requested; waiting for the ingest to settle.", kind)
+	M.flush_buffer()
+	if kind == "purge" then
+		request.tombstone = Maintenance.tombstone(Timestamp.now_epoch())
+		M.append_log({ type = "system_event", action = request.tombstone.action,
+			timestamp = request.tombstone.ts, utc = request.tombstone.metadata.utc })
+	end
+	M.ingest_once()
+	return true
+end
+
 function M.ingest_once()
 	-- Settle an already-owned rollover before starting a newly required replay;
 	-- no ingest may pass the durable replay fence after its reset commits.
@@ -2330,6 +2405,9 @@ function M.ingest_once()
 	if #entries == 0 then
 		if #foreign_devices > 0 then _notify_ingest_listeners() end
 		trace.finish()
+		-- Nothing deferred, the data.sql outbox empty and today.log read to its
+		-- end: the writer's flush has settled for a dashboard Export or Purge.
+		_advance_maintenance(db, true)
 		return
 	end
 
@@ -2482,6 +2560,7 @@ function M.ingest_once()
 	-- Notify live-update listeners — dashboard UIs use this to invalidate
 	-- their caches immediately rather than waiting for the next JS poll.
 	_notify_ingest_listeners()
+	_advance_maintenance(db, false)
 	trace.finish()
 end
 

@@ -225,6 +225,9 @@ local _session_reset_flush = nil
 local _reset_request, _reset_request_running = nil, false
 local _reset_receipts = setmetatable({}, { __mode = "k" })
 local reset_session_step, has_reset_input
+-- The dashboard's one Export or Purge, owned until its flush settles. One
+-- table: the main chunk sits at LuaJIT's limit of 200 locals.
+local _maintenance = { request = nil, running = false }
 local _flush_generation, _stop_final_dispatched, _stop_fallback_attempted = 0, false, false
 local _flush_listeners = {}
 local _last_flush_committed = false
@@ -2959,7 +2962,10 @@ end
 function M.pump_flush()
 	if _flush_pumping then return _flush_state == nil end
 	local state = _flush_state
-	if not state then advance_reset_request(); publish_flush_observation(); return _flush_state == nil end
+	if not state then
+		advance_reset_request(); _maintenance.advance(); publish_flush_observation()
+		return _flush_state == nil
+	end
 	if not state.operation then return false end
 	_flush_pumping = true
 	local called, settled = pcall(state.operation.pump, state.operation)
@@ -2994,6 +3000,7 @@ function M.pump_flush()
 	end
 	_flush_pumping = false
 	advance_reset_request()
+	_maintenance.advance()
 	publish_flush_observation()
 	return _flush_state == nil
 end
@@ -3193,6 +3200,7 @@ function M.stop()
 		if may_record() then queue_session_events(forward_session(clock, "stop"), clock) end
 		_flush_stopping = true
 		if _reset_request then finish_reset_request(_reset_request, false) end
+		_maintenance.advance()
 		_flush_generation = _flush_generation + 1
 		_flush_listeners = {}
 	end
@@ -3368,6 +3376,97 @@ function M.request_session_reset(complete)
 	if _reset_request or _session_reset_attempt or _flush_state or _flush_stopping then return false end
 	_reset_request = { complete = complete, origin = _flush_generation }
 	advance_reset_request(true)
+	return true
+end
+
+--- Completes the dashboard request once, with its receipt.
+--- @param request table The owned request.
+--- @param success boolean Whether the operation committed.
+--- @param path string|nil The Export copy.
+function _maintenance.finish(request, success, path)
+	if _maintenance.request ~= request then return end
+	_maintenance.request = nil
+	if success then
+		Logger.success(LOG, "Metrics %s done.", request.kind)
+	else
+		Logger.error(LOG, "Metrics %s refused; the store is unchanged.", request.kind)
+	end
+	local called, err = pcall(request.complete, success, path)
+	if not called then
+		Logger.error(LOG, "Metrics %s completion callback raised: %s.", request.kind, ErrorDescription.describe(err))
+	end
+end
+
+--- Takes the Export copy of the settled store.
+--- @param request table The owned request.
+function _maintenance.export(request)
+	local Maintenance = require("keystats.metrics_maintenance")
+	local folder, reason = Maintenance.downloads_dir(os.getenv)
+	if not folder then
+		Logger.error(LOG, "Metrics export has no destination: %s.", reason)
+		return _maintenance.finish(request, false)
+	end
+	if not require("adapters.file_system").exists(folder) then
+		Logger.error(LOG, "Metrics export destination %s does not exist.", folder)
+		return _maintenance.finish(request, false)
+	end
+	local path = folder .. "/" .. Maintenance.export_file_name(os.time())
+	local sql = require("keystats.queries").render("export.vacuum_into", "cli_json", { path = path })
+	local copied = SqliteWriter.exec_sql(sql) == true
+	_maintenance.finish(request, copied, copied and path or nil)
+end
+
+--- Drives the dashboard request: it waits for the flush to settle, then the
+--- Export copies the store, or the Purge flushes its tombstone and completes
+--- once that flush commits.
+function _maintenance.advance()
+	local request = _maintenance.request
+	if not request or _maintenance.running then return end
+	if _flush_stopping or not sqlite_available() then return _maintenance.finish(request, false) end
+	if _flush_state then return end
+	_maintenance.running = true
+	local called, err = pcall(function()
+		if request.kind == "export" then return _maintenance.export(request) end
+		if request.tombstone then
+			-- A failed COMMIT retains its snapshot in _flush_state, so a settled
+			-- store after the tombstone's dispatch is that tombstone committed.
+			_manifest_cache = { revision = nil, manifest = nil }
+			if _last_flush_committed ~= true then
+				-- Never let a refused purge commit later with a later flush.
+				for index, event in ipairs(_pending_system_events) do
+					if event == request.tombstone then table.remove(_pending_system_events, index); break end
+				end
+			end
+			return _maintenance.finish(request, _last_flush_committed == true)
+		end
+		local Maintenance = require("keystats.metrics_maintenance")
+		request.tombstone = Maintenance.tombstone(Calendar.capture().wall_ms / 1000)
+		_pending_system_events[#_pending_system_events + 1] = request.tombstone
+		flush_dispatch()
+	end)
+	_maintenance.running = false
+	if not called then
+		Logger.error(LOG, "Metrics %s raised: %s.", request.kind, ErrorDescription.describe(err))
+		return _maintenance.finish(request, false)
+	end
+	if request.tombstone and _maintenance.request == request and not _flush_state then _maintenance.advance() end
+end
+
+--- Owns one dashboard Export or Purge through this single writer. Both wait
+--- for the flush to settle; a Purge appends a tombstone to the ledger that
+--- every device applies while replaying (purge_schema.sql).
+--- @param kind string "export" or "purge".
+--- @param complete function Receives success and, for an Export, its path.
+--- @return boolean accepted Whether this request owns its completion.
+function M.request_metrics_maintenance(kind, complete)
+	if not require("keystats.metrics_maintenance").KINDS[kind] or type(complete) ~= "function" then
+		Logger.error(LOG, "Metrics maintenance needs a known kind and a completion callback.")
+		return false
+	end
+	if _maintenance.request or _reset_request or _flush_stopping or not sqlite_available() then return false end
+	_maintenance.request = { kind = kind, complete = complete }
+	Logger.start(LOG, "Metrics %s requested; waiting for the flush to settle.", kind)
+	if _flush_state then flush_dispatch() else _maintenance.advance() end
 	return true
 end
 

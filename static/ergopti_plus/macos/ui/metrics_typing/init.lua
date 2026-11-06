@@ -225,6 +225,26 @@ local function reset_caches(generation, webview)
 	return false
 end
 
+--- The dashboard's Export and Purge: log_manager, the single writer, owns
+--- both, and the page learns the outcome through complete_metrics_maintenance.
+local MAINTENANCE = { metrics_export = "export", metrics_purge = "purge" }
+
+local function request_maintenance(generation, webview, action, maintenance_id)
+	if type(maintenance_id) ~= "number" or maintenance_id <= 0 or maintenance_id % 1 ~= 0
+		or maintenance_id > JS_MAX_SAFE_INTEGER then
+		delivery_failure(generation, webview, "metrics maintenance", "invalid owner")
+		return
+	end
+	local function answer(success, path)
+		local encoded_path = type(path) == "string" and encode_delivery(generation, webview, "metrics maintenance", path)
+		submit_javascript(generation, webview, "metrics maintenance completion", string.format(
+			"window.complete_metrics_maintenance&&window.complete_metrics_maintenance(%d,%s,%s);",
+			maintenance_id, tostring(success == true), encoded_path or "null"))
+	end
+	local accepted = _get_log_manager().request_metrics_maintenance(MAINTENANCE[action], answer)
+	if accepted ~= true then answer(false) end
+end
+
 local function clear_cache(generation, webview, reset_id)
 	if not delivery_is_current(generation, webview) then return end
 	if type(reset_id) ~= "number" or reset_id <= 0 or reset_id % 1 ~= 0 or reset_id > JS_MAX_SAFE_INTEGER then
@@ -959,6 +979,8 @@ function M.show()
 						if ok and query then
 							if query.action == "clear_cache" then
 								clear_cache(generation, webview, query.reset_id)
+							elseif MAINTENANCE[query.action] then
+								request_maintenance(generation, webview, query.action, query.maintenance_id)
 							else
 								local request_id = tonumber(query.request_id)
 								if not (request_id and request_id > 0 and request_id % 1 == 0) then
