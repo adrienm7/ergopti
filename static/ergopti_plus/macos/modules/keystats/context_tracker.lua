@@ -84,6 +84,14 @@ local function require_state(func_name)
 	return true
 end
 
+--- Reports whether the user paused metrics collection from the Metrics menu.
+--- Unlike the global script pause, the context keeps tracking (so privacy is
+--- current on resume); only the activity rows are withheld.
+--- @return boolean suspended True while collection is suspended.
+local function collection_suspended()
+	return _state ~= nil and _state.collection_suspended == true
+end
+
 
 
 
@@ -584,12 +592,14 @@ local function handle_ax_value_changed(element)
 	then
 		Logger.debug(LOG, "Native autocorrect detected in '%s' — flushing buffer.", _state.session_app_name)
 		_log_manager.flush_buffer()
-		_log_manager.append_log({
-			type  = "sys_autocorrect",
-			tag   = "<sys_autocorrect_detected>",
-			app   = _state.session_app_name,
-			title = _state.session_win_title,
-		})
+		if not collection_suspended() then
+			_log_manager.append_log({
+				type  = "sys_autocorrect",
+				tag   = "<sys_autocorrect_detected>",
+				app   = _state.session_app_name,
+				title = _state.session_win_title,
+			})
+		end
 	end
 
 	_last_ax_value = val
@@ -927,7 +937,9 @@ function M.close_active_app()
 		return false
 	end
 	local now = hs.timer.absoluteTime() / 1000000
-	local duration_ms = math.max(0, math.floor(now - _state.active_app_start))
+	-- The interval was already closed at the metrics pause boundary.
+	local duration_ms = collection_suspended() and 0
+		or math.max(0, math.floor(now - _state.active_app_start))
 	if duration_ms > 0 and type(_log_manager.log_app_switch) == "function" then
 		-- `next_app=nil` persists as SQL NULL, so aggregate switches_to is not
 		-- polluted with a fictitious "engine stopped" application.
@@ -955,6 +967,11 @@ function M.split_active_app_at_midnight(previous_date)
 		return false
 	end
 	local now = hs.timer.absoluteTime() / 1000000
+	-- Paused time is never credited; resume reseeds the interval.
+	if collection_suspended() then
+		_state.active_app_start = now
+		return false
+	end
 	local wall = os.date("*t")
 	-- Midnight can have a different DST offset from the current local instant.
 	local midnight = { year = wall.year, month = wall.month, day = wall.day, hour = 0, min = 0, sec = 0 }
@@ -1049,8 +1066,11 @@ function M.update_private_status()
 	_state.is_fullscreen = win:isFullScreen() == true
 	local now = hs.timer.absoluteTime() / 1000000
 
-	-- Log intra-app window switches (tab changes, new windows in the same app)
-	if _last_win_title and _last_win_title ~= title and _state.active_app_name then
+	-- Log intra-app window switches (tab changes, new windows in the same app).
+	-- The user's metrics pause withholds the row and the title it would retain:
+	-- a paused title must not become the prev_title of the first switch after resume.
+	local suspended = collection_suspended()
+	if not suspended and _last_win_title and _last_win_title ~= title and _state.active_app_name then
 		local duration_ms = math.floor(now - _last_win_time)
 		if duration_ms > 1000 then
 			_log_manager.append_log({
@@ -1063,7 +1083,7 @@ function M.update_private_status()
 			Logger.debug(LOG, "Window switch logged in '%s' (%d ms).", _state.active_app_name, duration_ms)
 		end
 	end
-	_last_win_title = title
+	_last_win_title = not suspended and title or nil
 	_last_win_time  = now
 	-- Published into the shared state so the keystroke path can read the focused
 	-- window title instead of making its own cross-process AX call for it. This
@@ -1161,8 +1181,11 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 		and type(_state.active_app_start) == "number"
 	local interval_start = continues_interval and _state.active_app_start or now
 
-	-- Log time spent in the previous app before switching context
-	if _state.active_app_name and _state.active_app_name ~= app_name then
+	-- Log time spent in the previous app before switching context. During the
+	-- user's metrics pause the interval was closed at the pause boundary.
+	if collection_suspended() then
+		interval_start = now
+	elseif _state.active_app_name and _state.active_app_name ~= app_name then
 		-- A typing run captures its app/title when its first key arrives. Detach
 		-- that immutable owner before any row for the new foreground context is
 		-- queued; otherwise separator-free typing in the next app is appended to
@@ -1361,6 +1384,40 @@ function M.init(core_state, log_manager_mod, is_paused_fn, settle_modifiers_fn)
 	_is_paused   = is_paused_fn
 	_settle_modifiers = settle_modifiers_fn
 	Logger.success(LOG, "Context tracker initialized.")
+	return true
+end
+
+--- Closes the foreground interval owned before the user's metrics pause.
+--- Called by keystats just before it suspends collection; the app stays tracked
+--- so the context remains current, but no paused time is credited to it.
+--- @return boolean closed True when a non-empty interval was persisted.
+function M.suspend_collection_context()
+	if not require_state("suspend_collection_context") then return false end
+	local now = hs.timer.absoluteTime() / 1000000
+	local closed = false
+	if type(_state.active_app_name) == "string" and _state.active_app_name ~= ""
+		and type(_state.active_app_start) == "number"
+	then
+		local duration_ms = math.max(0, math.floor(now - _state.active_app_start))
+		if duration_ms > 0 and type(_log_manager.log_app_switch) == "function" then
+			-- `next_app=nil` persists as SQL NULL: the pause is no destination app.
+			_log_manager.log_app_switch(_state.active_app_name, nil, duration_ms)
+			closed = true
+		end
+	end
+	_state.active_app_start = now
+	_last_win_title, _last_win_time = nil, now
+	return closed
+end
+
+--- Starts fresh foreground and window intervals when the metrics pause ends.
+--- Called by keystats just after it resumes collection.
+--- @return boolean True once the timing owners were reseeded.
+function M.resume_collection_context()
+	if not require_state("resume_collection_context") then return false end
+	local now = hs.timer.absoluteTime() / 1000000
+	_state.active_app_start = now
+	_last_win_title, _last_win_time = nil, now
 	return true
 end
 

@@ -96,6 +96,7 @@ local function start_real_keystats()
 	local captured_core_state = nil
 	local appended_entries    = {}
 	local context_capture_count = 0
+	local pause_boundaries      = {}
 
 	package.loaded["modules.keystats.rotation"] = {
 		init             = function() return true end,
@@ -153,6 +154,14 @@ local function start_real_keystats()
 			return true
 		end,
 		update_private_status  = function() end,
+		suspend_collection_context = function()
+			pause_boundaries[#pause_boundaries + 1] = { "suspend", captured_core_state.collection_suspended }
+			return true
+		end,
+		resume_collection_context = function()
+			pause_boundaries[#pause_boundaries + 1] = { "resume", captured_core_state.collection_suspended }
+			return true
+		end,
 		app_watcher_cb         = function() end,
 		update_ax_observer     = function() end,
 		capture_frontmost_app  = function()
@@ -331,6 +340,7 @@ package.loaded["adapters.file_system"] = {
 		suspend         = function() return km.suspend_collection() end,
 		resume          = function() return km.resume_collection() end,
 		is_suspended    = function() return km.is_collection_suspended() end,
+		pause_boundaries = pause_boundaries,
 		reset_session   = function() return km.reset_session() end,
 		stop            = km.stop,
 		-- The two SYNTHETIC routes into the same sink. handle_key was the only
@@ -1047,4 +1057,16 @@ helpers.describe("metrics session reset: the session is closed cleanly", functio
 		helpers.assert_true(typed > 0, "the text typed before the reset is stored, not discarded")
 	end)
 
+	helpers.it("the metrics pause closes and reopens the foreground context intervals (HS-004)", function()
+		local session = start_real_keystats()
+		session.suspend()
+		session.resume()
+		session.stop()
+		local seen = session.pause_boundaries
+		helpers.assert_eq(#seen, 2)
+		helpers.assert_eq(seen[1][1], "suspend")
+		helpers.assert_eq(seen[1][2], false, "the interval closes before the pause flag is published")
+		helpers.assert_eq(seen[2][1], "resume")
+		helpers.assert_eq(seen[2][2], false, "the interval reopens once collection resumed")
+	end)
 end)
