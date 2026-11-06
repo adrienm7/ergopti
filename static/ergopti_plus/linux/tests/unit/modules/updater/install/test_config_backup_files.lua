@@ -44,6 +44,54 @@ local function scratch()
 	return dir
 end
 
+helpers.describe("config_backup (Linux): the remote API entries (backup-api-entries)", function()
+	local function with_entries(text, callback)
+		local dir = scratch()
+		local Entries = require("modules.llm.api_entries")
+		local path = dir .. "/state/api_keys.json"
+		if text then write(path, text) end
+		Entries._set_path_for_test(path)
+		local Backup = helpers.load_module("modules.updater.config_backup")
+		local ok, err = pcall(callback, Backup, path)
+		Entries._set_path_for_test(nil)
+		os.execute("rm -rf " .. quote(dir))
+		if not ok then error(err, 0) end
+	end
+	local function root_of(roots, id)
+		for _, root in ipairs(roots) do if root.id == id then return root end end
+		return nil
+	end
+
+	helpers.it("(backup-api-entries) backs up the entries file of secret-service references, as Windows does", function()
+		with_entries('{"version":1,"entries":[{"id":"a","provider":"openai",'
+			.. '"token":"secret-service:a#1"}],"active_id":"a"}', function(Backup, path)
+			local roots = assert(Backup._default_roots())
+			helpers.assert_eq(root_of(roots, "api_entries"), { id = "api_entries", file = path })
+			helpers.assert_true(root_of(roots, "settings_store") ~= nil, "the settings store stays backed up")
+		end)
+	end)
+
+	helpers.it("(backup-api-entries) leaves out a file that still holds a plaintext key", function()
+		for _, text in ipairs({
+			'{"version":1,"entries":[{"id":"a","provider":"openai","token":"sk-live-123"}]}',
+			"not json",
+		}) do
+			with_entries(text, function(Backup)
+				helpers.assert_eq(Backup._plaintext_api_keys(require("modules.llm.api_entries").path()), 1)
+				helpers.assert_nil(root_of(assert(Backup._default_roots()), "api_entries"),
+					"a plaintext key never reaches a backup folder")
+			end)
+		end
+	end)
+
+	helpers.it("(backup-api-entries) an absent entries file holds no key to protect", function()
+		with_entries(nil, function(Backup, path)
+			helpers.assert_eq(Backup._plaintext_api_keys(path), 0)
+			helpers.assert_true(root_of(assert(Backup._default_roots()), "api_entries") ~= nil)
+		end)
+	end)
+end)
+
 helpers.describe("config_backup (Linux): real files", function()
 	helpers.it("compares actual directory identities and refuses symlinks", function()
 		local dir = scratch()

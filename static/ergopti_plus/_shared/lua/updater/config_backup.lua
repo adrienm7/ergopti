@@ -173,7 +173,10 @@ end
 --- Creates the backup owner of one driver.
 --- @param options table {
 ---   rules = M.rules() result,
----   roots = array of { id, dir } (the first holds the backups) or { id, file },
+---   roots = array of { id, dir } (the first holds the backups), { id, file }, or
+---           { id, name, port = { read() -> content|nil, status ("absent" or an
+---           error), replace(content) -> true|nil, err } } for settings a driver
+---           keeps in a native store rather than a file (the macOS API entries),
 ---   io = { list(dir) -> entries|nil, err (entries: { name, kind = "file"|"dir"|"other" }),
 ---          directory_status(path) -> "present"|"absent"|"error", detail,
 ---          directory_identity(path) -> { dev, ino }|nil, err,
@@ -204,12 +207,17 @@ function M.new(options)
 	for index, root in ipairs(options.roots) do
 		assert(type(root) == "table" and type(root.id) == "string" and root.id:match(ROOT_ID_PATTERN)
 			and not by_id[root.id], "config_backup roots need distinct ids")
+		local is_port = type(root.port) == "table"
 		assert((type(root.dir) == "string" and root.dir:sub(1, 1) == "/")
-			or (type(root.file) == "string" and root.file:sub(1, 1) == "/"), "config_backup roots are absolute")
+			or (type(root.file) == "string" and root.file:sub(1, 1) == "/")
+			or (is_port and type(root.port.read) == "function" and type(root.port.replace) == "function"
+				and type(root.name) == "string" and contained(root.name) and not root.name:find("/", 1, true)),
+			"config_backup roots are absolute folders or files, or named native ports")
 		assert(index > 1 or root.dir ~= nil, "the first config_backup root is the configuration folder")
 		local dir = root.dir and (root.dir:gsub("/+$", "")) or nil
 		if dir == "" then dir = "/" end
-		local entry = { id = root.id, dir = dir, file = root.file }
+		local entry = { id = root.id, dir = dir, file = root.file,
+			name = is_port and root.name or nil, port = is_port and root.port or nil }
 		roots[#roots + 1] = entry
 		by_id[root.id] = entry
 	end
@@ -306,6 +314,13 @@ function M.new(options)
 					end
 					entries[#entries + 1] = { root = root.id, path = file.path, source = source, content = content }
 				end
+			elseif root.port then
+				local content, status = root.port.read()
+				if type(content) == "string" then
+					entries[#entries + 1] = { root = root.id, path = root.name, source = root.id, content = content }
+				elseif status ~= "absent" then
+					return nil, "cannot read " .. root.id .. ": " .. tostring(status), skipped
+				end
 			elseif not inside_config(root.file) then
 				local content, status = io_port.read(root.file)
 				if content ~= nil then
@@ -327,6 +342,7 @@ function M.new(options)
 		local root = by_id[root_id]
 		if not root or not contained(path) then return nil end
 		if root.dir then return join(root.dir, path) end
+		if root.port then return root.name == path and root or nil end
 		return NativePath.basename(root.file) == path and root.file or nil
 	end
 
@@ -554,14 +570,24 @@ function M.new(options)
 		end
 		for index, file in ipairs(record.files) do
 			local destination = target(file.root, file.path)
-			local dir_ok, dir_err = io_port.make_dir(parent(destination))
-			local written, write_err = false, dir_err
-			if dir_ok then written, write_err = io_port.replace(destination, copies[index]) end
-			-- POSIX renames by name and neither OS denies a same-user process the
-			-- staging name, so a swap before the rename cannot be refused. Reading
-			-- the file back is what keeps a substituted file from reporting success.
-			if written and io_port.read(destination) ~= copies[index] then
-				written, write_err = false, "the published file does not hold the restored bytes"
+			local written, write_err = false, nil
+			if type(destination) == "table" then
+				-- A native port: written back, and read back, through its owner.
+				written, write_err = destination.port.replace(copies[index])
+				if written and destination.port.read() ~= copies[index] then
+					written, write_err = false, "the native store does not hold the restored value"
+				end
+				destination = destination.id
+			else
+				local dir_ok, dir_err = io_port.make_dir(parent(destination))
+				write_err = dir_err
+				if dir_ok then written, write_err = io_port.replace(destination, copies[index]) end
+				-- POSIX renames by name and neither OS denies a same-user process the
+				-- staging name, so a swap before the rename cannot be refused. Reading
+				-- the file back is what keeps a substituted file from reporting success.
+				if written and io_port.read(destination) ~= copies[index] then
+					written, write_err = false, "the published file does not hold the restored bytes"
+				end
 			end
 			if not written then
 				Logger.error(LOG, "Restore failed writing %s: %s; the replaced configuration is in %s.",
