@@ -108,6 +108,7 @@ $script:ProxyRelayDialMs = 10000
 $script:ProxyRelayHandshakeMs = 15000
 $script:ProxyRelayIdleMs = 300000
 $script:ProxyRelayProbeMs = 30000
+$script:ProxyListProbeMs = 1000
 $script:ProxyRelayPath = ''
 $script:ProxyRelaySha256 = ''
 $script:ProbeAnswer = $null

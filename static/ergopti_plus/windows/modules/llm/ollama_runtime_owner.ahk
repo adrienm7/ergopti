@@ -46,7 +46,7 @@ class OllamaRuntimeOwner {
 		for Name in ["VendorSha256", "ProxyPolicySha256", "UpdaterDefaultsSha256", "RouteOriginsSha256", "ProxyRelayContractSha256"]
 			if !RegExMatch(Proxy.Get(Name, ""), "^[0-9a-f]{64}$")
 				throw TypeError("Runtime proxy capture requires its digest.", -1, Name)
-		for Name in ["ProxyRelayDialMs", "ProxyRelayHandshakeMs", "ProxyRelayIdleMs", "ProxyRelayProbeMs"]
+		for Name in ["ProxyRelayDialMs", "ProxyRelayHandshakeMs", "ProxyRelayIdleMs", "ProxyRelayProbeMs", "ProxyListProbeMs"]
 			if !(Proxy.Get(Name, 0) is Integer) || Proxy.Get(Name, 0) <= 0
 				throw TypeError("Runtime proxy capture requires its relay deadlines.", -1, Name)
 		if Proxy.Has("ProxyRelayPath") && (!this._LocalPath(Proxy["ProxyRelayPath"])
@@ -131,7 +131,7 @@ class OllamaRuntimeOwner {
 			for Name in ["VendorDirectory", "VendorSha256", "ProxyPolicyPath", "ProxyPolicySha256",
 					"UpdaterDefaultsPath", "UpdaterDefaultsSha256", "RouteOriginsPath", "RouteOriginsSha256",
 					"ProxyRelayContractPath", "ProxyRelayContractSha256", "ProxyRelayDialMs",
-					"ProxyRelayHandshakeMs", "ProxyRelayIdleMs", "ProxyRelayProbeMs"]
+					"ProxyRelayHandshakeMs", "ProxyRelayIdleMs", "ProxyRelayProbeMs", "ProxyListProbeMs"]
 				Arguments.Push("-" . Name, String(this.Options["proxy"][Name]))
 			; No relay installed: the launcher reads the empty default.
 			if this.Options["proxy"].Has("ProxyRelayPath")

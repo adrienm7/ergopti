@@ -113,7 +113,9 @@ corpus.redirects.targets.forEach((vector, index) => {
 });
 
 // The owned daemon's environment over stub lookups: Lookups maps an origin to
-// its first route ("direct", a relay URI, "env" for an exported relay, "fail").
+// its route ("direct", a relay URI followed by DIRECT, "env" for an exported
+// relay, "fail", or "list:" then PAC entries joined by "|"). Reachable names the
+// relays the stub probe reaches ("*": every one); Probed records each probe.
 const DAEMON = `
 $ErrorActionPreference = 'Stop'
 . $env:ERGOPTI_ROUTE_PLAN_MODULE
@@ -122,18 +124,29 @@ $Answers = New-Object System.Collections.ArrayList
 foreach ($Case in $Cases) {
 	$Lookups = $Case.lookups
 	$Bypass = $Case.no_proxy
+	$Reachable = @($Case.reachable)
+	$Probed = New-Object System.Collections.ArrayList
 	$Resolve = {
 		param($Origin)
 		$Route = $Lookups.$Origin
 		if ($Route -ceq 'fail') { return @{ Ok = $false; Routes = @() } }
+		if ($Route.StartsWith('list:')) {
+			$Entries = @()
+			foreach ($Entry in $Route.Substring(5).Split('|')) {
+				if ($Entry -ceq 'direct') { $Entries += @{ Kind = 'direct'; Endpoint = ''; Source = 'pac' } }
+				else { $Entries += @{ Kind = 'proxy'; Endpoint = $Entry; Source = 'pac' } }
+			}
+			return @{ Ok = $true; Routes = $Entries }
+		}
 		if ($Route -ceq 'env') { return @{ Ok = $true; Routes = @(@{ Kind = 'proxy'; Endpoint = 'http://user.corp:8080/'; Source = 'environment' }) } }
 		if ($Route -ceq 'direct') { return @{ Ok = $true; Routes = @(@{ Kind = 'direct'; Endpoint = ''; Source = 'pac' }) } }
 		return @{ Ok = $true; Routes = @(@{ Kind = 'proxy'; Endpoint = $Route; Source = 'pac' }, @{ Kind = 'direct'; Endpoint = ''; Source = 'pac' }) }
 	}.GetNewClosure()
 	$Read = { param($Name) if ($Name -ceq 'NO_PROXY') { return $Bypass } return '' }.GetNewClosure()
-	$Answer = Get-ErgoptiOwnedProxyEnvironment -Origins @($Case.origins) -Resolve $Resolve -ReadEnvironment $Read
-	if ($Answer.Ok) { [void]$Answers.Add(@{ mode = $Answer.Mode; environment = $Answer.Environment }) }
-	else { [void]$Answers.Add(@{ reason = $Answer.Reason }) }
+	$Probe = { param($Relay) [void]$Probed.Add($Relay); return ($Reachable -ccontains '*' -or $Reachable -ccontains $Relay) }.GetNewClosure()
+	$Answer = Get-ErgoptiOwnedProxyEnvironment -Origins @($Case.origins) -Resolve $Resolve -ReadEnvironment $Read -Probe $Probe
+	if ($Answer.Ok) { [void]$Answers.Add(@{ mode = $Answer.Mode; environment = $Answer.Environment; probed = @($Probed) }) }
+	else { [void]$Answers.Add(@{ reason = $Answer.Reason; probed = @($Probed) }) }
 }
 ConvertTo-Json -InputObject @($Answers) -Depth 4 -Compress
 `;
@@ -176,6 +189,44 @@ const DAEMON_CASES = [
 		origins: [REGISTRY, BLOBS],
 		lookups: { [REGISTRY]: 'http://a.corp:3128/', [BLOBS]: 'http://b.corp:3128/' },
 		expect: { reason: 'route-plan-conflict' }
+	},
+	// The PAC list walk, as on Linux (decision of 2026-11-06): a relay followed
+	// by another entry is kept only when the probe reaches it.
+	{
+		name: 'an unreachable PAC relay falls through to DIRECT',
+		origins: [REGISTRY, BLOBS],
+		reachable: [],
+		lookups: { [REGISTRY]: 'http://dead.corp:3128/', [BLOBS]: 'direct' },
+		expect: { mode: 'direct', environment: {} },
+		probed: ['http://dead.corp:3128/']
+	},
+	{
+		name: 'an unreachable PAC relay falls through to the next relay',
+		origins: [REGISTRY, BLOBS],
+		reachable: ['http://live.corp:3128/'],
+		lookups: {
+			[REGISTRY]: 'list:http://dead.corp:3128/|http://live.corp:3128/|direct',
+			[BLOBS]: 'direct'
+		},
+		expect: {
+			mode: 'relay',
+			environment: { HTTPS_PROXY: 'http://live.corp:3128', NO_PROXY: 'blobs.example' }
+		},
+		probed: ['http://dead.corp:3128/', 'http://live.corp:3128/']
+	},
+	{
+		name: 'the last PAC entry is kept unprobed',
+		origins: [REGISTRY, BLOBS],
+		reachable: [],
+		lookups: {
+			[REGISTRY]: 'list:http://dead.corp:3128/|http://last.corp:3128/',
+			[BLOBS]: 'direct'
+		},
+		expect: {
+			mode: 'relay',
+			environment: { HTTPS_PROXY: 'http://last.corp:3128', NO_PROXY: 'blobs.example' }
+		},
+		probed: ['http://dead.corp:3128/']
 	},
 	{
 		name: 'a refused lookup refuses the environment',
@@ -266,12 +317,18 @@ assert.deepEqual([...ownerFields].sort(), [...launcherFields].sort(), 'one recei
 async function main() {
 	const daemon = runPowerShell(DAEMON, {
 		ERGOPTI_DAEMON_CASES: JSON.stringify(
-			DAEMON_CASES.map(({ expect, ...input }) => ({ no_proxy: '', ...input }))
+			DAEMON_CASES.map(({ expect, probed, ...input }) => ({
+				no_proxy: '',
+				reachable: ['*'],
+				...input
+			}))
 		)
 	});
 	assert.equal(daemon.length, DAEMON_CASES.length, 'every daemon case has an answer');
 	DAEMON_CASES.forEach((vector, index) => {
-		assert.deepEqual(daemon[index], vector.expect, `daemon: ${vector.name}`);
+		const { probed, ...answer } = daemon[index];
+		assert.deepEqual(answer, vector.expect, `daemon: ${vector.name}`);
+		if (vector.probed) assert.deepEqual(probed, vector.probed, `daemon probes: ${vector.name}`);
 	});
 
 	const relayPolicy = runPowerShell(RELAY_POLICY, {

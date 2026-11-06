@@ -880,6 +880,7 @@ Each closes on a named green hosted or native run, recorded here.
       which journal is hot: a rollback `-journal` left by an interrupted keystats write, or a WAL?) so a program can
       check it.
 
-- **PAC list walk on macOS and Windows.** Linux probes a `PROXY a; DIRECT` list before the Ollama start
-  (`llm.managed_proxy_probe_timeout_ms`); the decision named Linux only, so macOS
-  (`resolve_system_route_for_probe`) and Windows still export the first entry. Default meanwhile: first entry.
+- **PAC list walk on macOS.** Linux probes a `PROXY a; DIRECT` list before the Ollama start
+  (`llm.managed_proxy_probe_timeout_ms`). Decided 2026-11-06 (align on the most complete OS, Linux): Windows walks
+  it too (`Get-ErgoptiOwnedProxyEnvironment -Probe`, `test-windows-route-plan.cjs`); macOS
+  (`resolve_system_route_for_probe`) still exports the first entry and follows next.

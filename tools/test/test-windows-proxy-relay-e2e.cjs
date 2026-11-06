@@ -69,7 +69,8 @@ const TIMINGS = {
 	dialMs: 2000,
 	handshakeMs: 3000,
 	idleMs: 30000,
-	probeMs: 8000
+	probeMs: 8000,
+	listProbeMs: 1000
 };
 const READY_TIMEOUT_MS = 60000;
 // Far longer than the same launcher takes to publish when the listener is admitted.
@@ -393,6 +394,7 @@ async function runOwnerRegression(context, ahk) {
 			ProxyRelayHandshakeMs: TIMINGS.handshakeMs,
 			ProxyRelayIdleMs: TIMINGS.idleMs,
 			ProxyRelayProbeMs: TIMINGS.probeMs,
+			ProxyListProbeMs: TIMINGS.listProbeMs,
 			ProxyRelayPath: relayPath,
 			ProxyRelaySha256: relaySha256
 		},
