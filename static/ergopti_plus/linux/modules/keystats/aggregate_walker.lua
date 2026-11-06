@@ -169,6 +169,10 @@ end
 --- @param batch table|nil An existing batch to add to; a fresh one when absent.
 --- @param clock table Captured physical_layout and optional reported layout,
 ---        times, wall_times or wall_offset_ms. Missing time ports skip histograms.
+---        A replayed row of another device carries `slot` (the hour of its
+---        timestamp, as macOS bins a replayed row) and `foreign = true`: its
+---        physical keyboard is not one of this host's, so a family this host
+---        does not register walks without a finger port instead of refusing.
 --- @param ctx table|nil The application's walk context (see M.settle), carried
 ---        from the previous flush and updated in place. Without it, everything
 ---        still open is credited when the stream ends.
@@ -178,7 +182,15 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 	if type(events) ~= "table" then return batch end
 	assert(type(clock) == "table", "Metrics walk requires captured input context")
 	assert(clock.layout == nil or type(clock.layout) == "string", "Invalid captured metrics layout label")
-	local typing_walk = captured_walk(clock.physical_layout)
+	local typing_walk
+	if clock.foreign == true then
+		local known = require("modules.hotstrings.input_reader").get_layouts()
+		local family = clock.physical_layout
+		typing_walk = (type(family) == "string" and type(known) == "table" and known[family])
+			and captured_walk(family) or Walk
+	else
+		typing_walk = captured_walk(clock.physical_layout)
+	end
 	-- Nothing continues across midnight: what the context still holds belongs
 	-- to the day it was typed on.
 	if ctx and ctx.date and ctx.date ~= date_str then M.settle(ctx, nil, batch, true) end
@@ -190,6 +202,7 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 
 	--- The hour and five-minute slot of one keystroke, from its stamp.
 	local function slot_of(index)
+		if type(clock.slot) == "table" then return clock.slot end
 		local captured = wall_times and tonumber(wall_times[index])
 		local monotonic = times and tonumber(times[index])
 		if not captured and not monotonic then return nil end

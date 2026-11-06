@@ -387,6 +387,17 @@ context holds once its own gap has passed (all of it at a new day or at
 shutdown). Action: a new cross-keystroke metric keeps its state in that
 context, never in walk locals, or every flush cuts it.
 
+### project-linux-foreign-ledger-import
+
+`ledger_import.lua` never executes a foreign data.sql: it re-renders only
+`INSERT OR IGNORE INTO events_*` rows of literals carrying the folder's own
+device_id, with columns from the shared schema. The `devices` table CHECKs
+`os IN ('darwin','windows','linux')`, and `INSERT OR IGNORE` drops a row that
+fails a CHECK without an error, so the following watermark UPDATE then
+changes nothing and the device re-imports forever. Action: validate every
+value a CHECK guards before an `OR IGNORE` insert whose row a later statement
+depends on.
+
 ### project-linux-json-store-publication
 
 The Linux JSON store requires an object root, creates `storage.json.tmp`
