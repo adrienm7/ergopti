@@ -16,6 +16,19 @@ sqlite = shutil.which("sqlite3")
 assert luajit and sqlite, "Linux integration requires luajit and sqlite3"
 
 
+def host_glibc():
+    """The C library glibc reports, or None on another one (musl on Alpine)."""
+    try:
+        return os.confstr("CS_GNU_LIBC_VERSION")
+    except (ValueError, OSError):
+        return None
+
+
+# The AppImage runs on the recipient's glibc; its AppRun preflight refuses any
+# other C library with EX_UNAVAILABLE before the bundled loader would fail.
+APPIMAGE_REFUSAL_EXIT = 69
+
+
 def run(argv, *, env=None, input=None, cwd=None, timeout=8):
     p = subprocess.run(
         [str(x) for x in argv],
@@ -164,7 +177,24 @@ test -z "${ERGOPTI_LITERAL_NATIVE_MODULES:-}"
             "ERGOPTI_LITERAL_NATIVE_MODULES",
         ):
             env.pop(name, None)
-        assert "Usage:" in run([app / "AppRun", "--help"], env=env)
+        if host_glibc() is None:
+            # musl cannot load glibc programs: the literal AppDir still has to
+            # reach the preflight and refuse there, naming the cause.
+            refused = subprocess.run(
+                [str(app / "AppRun"), "--help"],
+                env=env,
+                text=True,
+                capture_output=True,
+                timeout=8,
+            )
+            assert refused.returncode == APPIMAGE_REFUSAL_EXIT, (
+                refused.returncode,
+                refused.stdout,
+                refused.stderr,
+            )
+            assert "musl" in refused.stderr, refused.stderr
+        else:
+            assert "Usage:" in run([app / "AppRun", "--help"], env=env)
         direct = env.copy()
         for name in (
             "ERGOPTI_LITERAL_DRIVER_ROOT",
