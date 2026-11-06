@@ -17,11 +17,13 @@ local function request(message)
 	return assert(json.decode(line))
 end
 local sqlite = { OK = 0, DONE = 101 }
+-- The aggregate rebuild publishes through a private backup snapshot.
+sqlite.backup_init = require("tests.support.keystats.rebuild_sqlite_bridge").backup_init(request)
 function sqlite.open(path)
 	local opened = request({ op = "open", path = path })
 	assert(opened.ok, opened.error)
 	local identity, detail = opened.value, ""
-	local database = {}
+	local database = { _bridge_id = identity }
 	local function call(operation, sql, values)
 		local result = request({ op = operation, connection = identity, sql = sql, values = values })
 		if not result.ok then detail = result.error; return nil end
@@ -362,11 +364,13 @@ local function request(message)
 	return assert(json.decode(line))
 end
 local sqlite = { OK = 0, DONE = 101 }
+-- The aggregate rebuild publishes through a private backup snapshot.
+sqlite.backup_init = require("tests.support.keystats.rebuild_sqlite_bridge").backup_init(request)
 function sqlite.open(path)
 	local opened = request({ op = "open", path = path })
 	assert(opened.ok, opened.error)
 	local identity, detail = opened.value, ""
-	local database = {}
+	local database = { _bridge_id = identity }
 	local function call(operation, sql, values)
 		local result = request({ op = operation, connection = identity, sql = sql, values = values })
 		if not result.ok then detail = result.error; return nil end
