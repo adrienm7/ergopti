@@ -548,7 +548,7 @@
 				"ahk",
 				"hs"
 			],
-			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
+			"reason_key": "platform_reason.llm_generation_settings_are_inline_on_linux"
 		},
 		{
 			"type": "list",

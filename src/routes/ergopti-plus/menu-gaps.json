@@ -57,8 +57,8 @@
 		"platforms": { "windows": true, "macos": true, "linux": false },
 		"reasons": {
 			"linux": {
-				"en": "Not on Linux: these rows configure the inference backend, the profile, the trigger and how predictions are displayed and navigated. The Linux driver talks to one local backend and offers none of those surfaces, so each row would open an empty submenu.",
-				"fr": "Pas sous Linux : ces lignes règlent le moteur d'inférence, le profil, le déclencheur et la façon dont les prédictions s'affichent et se parcourent. Le pilote Linux dialogue avec un seul moteur local et n'offre aucune de ces surfaces ; chaque ligne ouvrirait donc un sous-menu vide."
+				"en": "Not a submenu on Linux: the Linux driver lists the models and the two generation settings straight in this menu, through its own row below.",
+				"fr": "Pas un sous-menu sous Linux : le pilote Linux affiche les modèles et les deux réglages de génération directement dans ce menu, par sa propre ligne ci-dessous."
 			}
 		}
 	},
