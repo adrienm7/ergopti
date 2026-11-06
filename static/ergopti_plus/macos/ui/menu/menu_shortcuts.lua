@@ -17,6 +17,7 @@ local Errors = require("adapter_errors")
 local ParameterLabel = require("action_parameter_label")
 local hs = hs
 local Logger        = require("infra.logger")
+local PhaseStats    = require("infra.phase_stats")
 local DeferredWork  = require("infra.deferred_work")
 local dialog        = require("infra.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
@@ -921,6 +922,25 @@ function M.build(ctx)
 		return type(karabiner) == "table" and type(karabiner.get_mod_combos_enabled) == "function"
 			and karabiner.get_mod_combos_enabled() == true
 	end
+
+	-- Each stage is a named phase, as the keyboard layout row's are: one rebuild
+	-- after a layout switch spent 341.9 ms here against 30 to 47 ms in every
+	-- other (2026-11-06 field report), and only a phase inside the hold report
+	-- can say which stage. A raising stage is timed too, then re-raised.
+	local function timed_stages(stages)
+		for name, stage in pairs(stages) do
+			local stage_stat = "menu_shortcuts." .. tostring(name)
+			stages[name] = function(...)
+				local started = PhaseStats.now()
+				local results = table.pack(pcall(stage, ...))
+				PhaseStats.stop(stage_stat, started)
+				if not results[1] then error(results[2], 0) end
+				return table.unpack(results, 2, results.n)
+			end
+		end
+	end
+	timed_stages(group_builders)
+	timed_stages(list_providers)
 
 	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, sc_ctx, list_providers)
 
