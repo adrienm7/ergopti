@@ -832,7 +832,10 @@ local function update_preview_body(buf)
 			end
 			winner_match = {
 				repl       = provider_text,
-				plain_repl = provider_plain(provider_text),
+				-- A literal result (programmable preview metadata) is shown
+				-- byte for byte; other providers speak the TOML token grammar.
+				plain_repl = (type(res) == "table" and res.literal == true)
+					and provider_text or provider_plain(provider_text),
 				input      = nil,
 				type       = "provider",
 				group      = nil,
