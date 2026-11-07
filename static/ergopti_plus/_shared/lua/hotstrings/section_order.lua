@@ -1,4 +1,4 @@
---- hotstrings/section_order.lua
+--- _shared/lua/hotstrings/section_order.lua
 
 --- ==============================================================================
 --- MODULE: Hotstring Section Menu Order
