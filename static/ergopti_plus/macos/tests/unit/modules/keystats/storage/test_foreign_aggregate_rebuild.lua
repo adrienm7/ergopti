@@ -48,7 +48,7 @@ helpers.describe("keystats: foreign sync rebuilds UI aggregate partitions", func
 	helpers.it("defers the foreign watermark until the derived callback succeeds", function()
 		local source = read_source("function M._last_complete_batch_offset") -- modules/keystats/export.lua
 		local callback_pos = assert(source:find("pcall(on_applied, entry)", 1, true))
-		local watermark_pos = assert(source:find("UPDATE devices SET imported_data_sql_size", callback_pos, true))
+		local watermark_pos = assert(source:find("Queries.render(\"devices.import_watermark\"", callback_pos, true))
 		helpers.assert_true(callback_pos < watermark_pos,
 			"a failed aggregate rebuild must leave the raw import retryable")
 		helpers.assert_true(source:find("return synced_devices", 1, true) ~= nil,

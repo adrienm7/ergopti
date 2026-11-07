@@ -259,6 +259,11 @@ ON CONFLICT(device_id) DO UPDATE SET
   name = excluded.name, os = excluded.os, os_version = excluded.os_version,
   host_signature = excluded.host_signature, updated_at = excluded.updated_at;
 
+-- name: devices.import_watermark
+-- doc: Advances a device's imported data.sql watermark once its statements are
+-- doc: applied: the bytes read so far and the SHA-256 of that prefix.
+UPDATE devices SET imported_data_sql_size={{i size}}, imported_data_sql_sha256={{s digest}}, updated_at={{s updated_at}} WHERE device_id={{s device_id}};
+
 
 -- ============================================================================
 -- 5. AGGREGATE UPSERTS (one row per application and day, per device)

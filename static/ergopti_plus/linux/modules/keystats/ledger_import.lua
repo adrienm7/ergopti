@@ -357,15 +357,16 @@ function M.new(opts)
 		if not digest then return "failed" end
 		local applied = offset + boundary
 		local q = SqliteCommand.escape_literal
-		local now = q(opts.now_ts())
+		local now_ts = opts.now_ts()
+		local now = q(now_ts)
 		local script = {
 			"BEGIN IMMEDIATE;",
 			string.format("INSERT OR IGNORE INTO devices (device_id, name, os, os_version, host_signature, created_at, updated_at) "
 				.. "VALUES ('%s','%s','%s','%s','%s','%s','%s');", q(device_id), q(descriptor.name), q(descriptor.os),
 				q(descriptor.os_version), q(descriptor.host_signature), q(descriptor.created_at), now),
 			table.concat(statements, "\n"),
-			string.format("UPDATE devices SET imported_data_sql_size=%.0f, imported_data_sql_sha256='%s', updated_at='%s' WHERE device_id='%s';",
-				applied, digest, now, q(device_id)),
+			Queries.render("devices.import_watermark", "cli_json", {
+				size = applied, digest = digest, updated_at = now_ts, device_id = device_id }),
 			Queries.render("meta.set", "cli_json", { key = M.PENDING_PREFIX .. device_id, value = "1" }),
 			"COMMIT;",
 		}

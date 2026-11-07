@@ -688,9 +688,8 @@ function M.sync_foreign_data_sql(on_applied)
 								end
 							end
 							if derived_ok then
-								local watermark_rc = db:exec(string.format(
-									"UPDATE devices SET imported_data_sql_size=%d, imported_data_sql_sha256='%s', updated_at='%s' WHERE device_id='%s'",
-									applied_to, Literal.escape(receipt.digest), Literal.escape(_now_ts()), Literal.escape(entry)))
+								local watermark_rc = db:exec(Queries.render("devices.import_watermark", "native", {
+									size = applied_to, digest = receipt.digest, updated_at = _now_ts(), device_id = entry }))
 								if watermark_rc == sqlite3.OK then
 									table.insert(synced_devices, entry)
 									Logger.debug(LOG, "Foreign sync: applied %d byte(s).", applied_to - watermark)
