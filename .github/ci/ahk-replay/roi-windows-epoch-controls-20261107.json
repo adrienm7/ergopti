@@ -1,0 +1,12 @@
+{
+	"expected_count": 6,
+	"native_http_client_e2e": false,
+	"native_hotstring_e2e": false,
+	"native_proxy_relay_owner_e2e": false,
+	"filters": [
+		{
+			"contains": "ROI encryption: interrupted",
+			"expected_count": 6
+		}
+	]
+}
