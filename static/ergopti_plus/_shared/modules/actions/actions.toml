@@ -1257,12 +1257,10 @@ reason_hs = "platform_reason.action_take_note_uses_notepad"
 requires_linux = ["tool:xdg-open", "tool:xdg-mime"]
 
 [sg_actions.activity_simulation]
-# One keep-awake session per machine, stopped by the first physical input on
-# both drivers. Linux is not implemented, not impossible: the driver's own
-# uinput device could nudge the pointer the same way (an idle inhibitor would
-# be a different feature).
-platform = "ahk,hs"
-reason_linux = "platform_reason.action_keep_awake_is_the_desktops_inhibitor"
+# Windows and macOS simulate activity until physical input. Linux holds the
+# session idle inhibitor until toggled off or the driver exits (2026-11-06).
+platform = "all"
+requires_linux = ["tool:systemd-inhibit"]
 
 [sg_actions.display_mirror_toggle]
 # macOS mirrors through the CoreGraphics display-configuration API, Windows

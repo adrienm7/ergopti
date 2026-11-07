@@ -1672,27 +1672,33 @@ end
 function M.set_program_paused(paused)
 	-- The hidden run_command children follow the same pause as user programs
 	local commands_settled = UserActions.set_paused(paused)
+	local inhibitor = package.loaded["modules.keep_awake"]
+	if paused == true and inhibitor and inhibitor.stop() ~= true then commands_settled = false end
 	if _program_owner == nil then return type(paused) == "boolean" and commands_settled end
 	return _program_owner.set_paused(paused) and commands_settled
 end
 
 function M.stop_programs()
 	local commands_settled = UserActions.stop()
+	local inhibitor = package.loaded["modules.keep_awake"]
+	if inhibitor and inhibitor.stop() ~= true then commands_settled = false end
 	if _program_owner == nil then return commands_settled end
 	return _program_owner.stop() and commands_settled
 end
 
 function M.when_programs_settled(callback)
 	if type(callback) ~= "function" then return false end
-	local commands_done, programs_done, delivered = false, _program_owner == nil, false
+	local inhibitor = package.loaded["modules.keep_awake"]
+	local commands_done, programs_done, inhibitor_done, delivered = false, _program_owner == nil, inhibitor == nil, false
 	local function notify()
-		if commands_done and programs_done and not delivered then
+		if commands_done and programs_done and inhibitor_done and not delivered then
 			delivered = true
 			local ok = pcall(callback)
 			if not ok then Logger.error(LOG, "Program settlement listener failed.") end
 		end
 	end
 	if UserActions.when_settled(function() commands_done = true; notify() end) ~= true then return false end
+	if inhibitor and inhibitor.when_settled(function() inhibitor_done = true; notify() end) ~= true then return false end
 	if _program_owner ~= nil then
 		if _program_owner.when_settled(function() programs_done = true; notify() end) ~= true then return false end
 	end
