@@ -269,7 +269,12 @@ local function assert_guards(source, helper_source, native_source, programmable_
 	-- menu_llm/profiles_manager restores the previous value on a refused save,
 	-- both from its check row and when a manual profile choice turns it off:
 	-- two calls more.
-	helpers.assert_eq(calls, 59 + 3 - 1 + 1 + 1 + 1 + 1 + 2,
+	-- The layout emulation rows (emulated layout, Ergopti base and AltGr, the
+	-- four emulated rows) share one publisher in infra/layout_emulation_preferences
+	-- that restores every leaf it changed on a refused save: one call more.
+	-- The ChatGPT URL and script action rows left menu_shortcuts for their own
+	-- protected transactions: two calls moved, none added.
+	helpers.assert_eq(calls, 59 + 3 - 1 + 1 + 1 + 1 + 1 + 2 + 1,
 		"the reviewed post-retirement census must enumerate every remaining save call")
 	helpers.assert_eq(guarded, calls,
 		"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "
