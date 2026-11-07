@@ -1843,6 +1843,16 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 			return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
 				? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
 		}
+		; A retry that finds another configuration write in flight waits for it.
+		; Its admission would read config.toml while that writer replaces it and
+		; report a refusal for the very request the writer is settling: the boot
+		; arms two tail retries, and the second fired inside the first one's write.
+		if !RegisterRequest && !(ExistingOwner is Object) && !PublicationDebt
+				&& _ConfigWriteLeaseTryAcquire("", "", 0) {
+			PerfCount("config_io.save_retry_deferred_active_write")
+			return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+				? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
+		}
 		if !PublicationDebt && !ConfigFullStateCanPersist() {
 			return CONFIG_SAVE_FAILED
 		}

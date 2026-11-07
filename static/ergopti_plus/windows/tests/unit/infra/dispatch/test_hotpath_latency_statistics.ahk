@@ -381,3 +381,37 @@ _HPLS_PreReadyRetryDoesNotPayAdmission() {
 }
 Test("config: a full-save retry before the driver is ready does not pay write admission (full-save-retry-admission)",
 	_HPLS_PreReadyRetryDoesNotPayAdmission)
+
+_HPLS_RetryWaitsForAnActiveWrite() {
+	global _DriverReady, _DriverBootTailPending, CONFIG_SAVE_DEFERRED
+	Counts := _PerfCountersOwner().Counts
+	Admissions := Counts.Get("config_io.full_state_can_persist", 0)
+	Deferred := Counts.Get("config_io.save_retry_deferred_active_write", 0)
+	Coordinator := _ConfigFullSaveCoordinator()
+	SavedReady := IsSet(_DriverReady) ? _DriverReady : false
+	SavedTail := IsSet(_DriverBootTailPending) ? _DriverBootTailPending : false
+	Lease := 0
+	try {
+		_DriverReady := true, _DriverBootTailPending := false
+		Lease := _ConfigWriteLeaseTryAcquire(A_Temp . "\ergopti_active_write_probe.toml", "full")
+		AssertTrue(Lease is Object, "the probe owns one genuine configuration write lease")
+		AssertEqual(CONFIG_SAVE_DEFERRED, SaveFullConfig(0, (*) => true, false),
+			"a retry that meets a write in flight waits for it")
+		AssertEqual(Admissions, Counts.Get("config_io.full_state_can_persist", 0),
+			"and does not read config.toml for admission while that write replaces it")
+		AssertEqual(Deferred + 1, Counts.Get("config_io.save_retry_deferred_active_write", 0))
+		AssertTrue(_ConfigWriteLeaseRelease(Lease), "the probe releases its lease")
+		Lease := 0
+		SaveFullConfig(0, (*) => true, false)
+		AssertEqual(Deferred + 1, Counts.Get("config_io.save_retry_deferred_active_write", 0),
+			"once the write released its lease the retry proceeds")
+		Assert(Counts.Get("config_io.full_state_can_persist", 0) > Admissions, "and reaches its admission")
+	} finally {
+		if Lease is Object
+			_ConfigWriteLeaseRelease(Lease)
+		_DriverReady := SavedReady, _DriverBootTailPending := SavedTail
+		_ConfigFullSaveCoordinator(Coordinator)
+	}
+}
+Test("config: a full-save retry waits for a configuration write in flight (full-save-retry-active-write)",
+	_HPLS_RetryWaitsForAnActiveWrite)
