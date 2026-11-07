@@ -166,9 +166,18 @@ _MAD_PageAssets() {
 _MAD_CopyShared() {
 	global _MAD, _MAD_Root, _MAD_SourceShared, _SharedDir
 	Files := _MAD_PageAssets()
-	for Relative in ["data\locales\fr.json", "data\locales\en.json", "data\db\schema.sql", "data\db\media_schema.sql",
+	for Relative in ["data\locales\fr.json", "data\locales\en.json",
 		"modules\diagnostics\redaction.json", "modules\timings\constants.toml"]
 		Files.Push(Relative)
+	; Every schema the reader chains (schema, media, purge) comes from the
+	; shared folder itself: a hand-kept list missed purge_schema.sql, so the
+	; detached worker's KLR_LoadSchema failed and no projection was ever built.
+	SchemaCount := 0
+	Loop Files, _MAD_SourceShared . "\data\db\*.sql" {
+		Files.Push("data\db\" . A_LoopFileName)
+		SchemaCount += 1
+	}
+	_MVSP_Require(SchemaCount >= 3, "The reader's schema, media and purge schemas must all reach the private store")
 	for Relative in Files {
 		Source := _MAD_SourceShared . "\" . Relative, Destination := _SharedDir . "\" . Relative
 		SplitPath(Destination, , &Directory)
