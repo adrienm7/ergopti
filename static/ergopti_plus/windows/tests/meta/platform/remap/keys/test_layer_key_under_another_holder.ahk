@@ -112,8 +112,10 @@ _LKAH_EveryVariantStandsDownOnTheLayer() {
 			continue ; called below
 		if (InStr(C, "CapsWordEnabled and CapsWordAutoOffEndsOnNativeKey(") == 1)
 			continue ; CapsWord's own Space and Enter, a separate mode
-		if (C == "KeyCombinationOwnsHotkey()")
-			continue ; a key combination the user bound, held first key and all
+		; A key combination the user bound, held first key and all. The parse-time
+		; IsSet guard only keeps the criterion boot-safe (hotif-globals-boot-safe).
+		if (C == "IsSet(Features) && KeyCombinationOwnsHotkey()")
+			continue
 		if RegExMatch(C, "^\(?\s*LayerEnabled\b") {
 			LayerMapped[Keys[Hotkey.Key]] := true
 			continue
