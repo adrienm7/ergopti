@@ -36,11 +36,10 @@
 ; The generated menu-command constants; #Include skips a file the entry script
 ; already loaded.
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
-
-
-
-
-global SLI_LAYOUTS_KEY := "HKLM\SYSTEM\CurrentControlSet\Control\Keyboard Layouts"
+; KLS_LAYOUTS_KEY: the registry root of installed layouts, owned by the adapter
+; the entry script loads before its boot. This file is included after the boot
+; tail, so a global initialized here would still be unset for a boot menu read.
+#Include %A_LineFile%\..\..\..\adapters\keyboard_layout_switch.ahk
 
 /**
  * The shared description of the layout Windows installs.
@@ -71,8 +70,8 @@ _SystemLayout_System32() => A_WinDir . ((A_Is64bitOS && A_PtrSize == 4) ? "\Sysn
 
 ; The KLID whose Layout File is DllFile, "" when none.
 _SystemLayout_RegistryKlid(DllFile) {
-	global SLI_LAYOUTS_KEY
-	Loop Reg, SLI_LAYOUTS_KEY, "K" {
+	global KLS_LAYOUTS_KEY
+	Loop Reg, KLS_LAYOUTS_KEY, "K" {
 		; Not every layout key names a file (an IME may not): absence is ordinary.
 		LayoutFile := RegRead(A_LoopRegKey . "\" . A_LoopRegName, "Layout File", "")
 		if (StrLower(LayoutFile) == StrLower(DllFile))

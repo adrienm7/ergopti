@@ -46,18 +46,17 @@ _PLS_Apply() {
 
 /** A start applies the layout of the live pause state, once. */
 _PLS_Startup() {
-	global _PauseLayoutSwitchEventApplied
 	Selected := []
 	Select(Id) {
 		Selected.Push(Id)
 		return 1
 	}
-	Saved := _PauseLayoutSwitchEventApplied
+	Saved := PauseLayoutSwitchState.event_applied
 	try {
-		_PauseLayoutSwitchEventApplied := false
+		PauseLayoutSwitchState.event_applied := false
 		_PLS_WithSettings(true, "0000040C", "A000040C", () => (
 			AssertEqual(1, PauseLayoutSwitch_ApplyStartup(0, Select))))
-		_PauseLayoutSwitchEventApplied := false
+		PauseLayoutSwitchState.event_applied := false
 		_PLS_WithSettings(true, "0000040C", "A000040C", () => (
 			AssertEqual(1, PauseLayoutSwitch_ApplyStartup(1, Select))))
 		AssertEqual("A000040C,0000040C", Selected[1] . "," . Selected[2], "running then paused start")
@@ -67,7 +66,7 @@ _PLS_Startup() {
 		AssertEqual(2, Selected.Length, "a pause transition keeps its choice")
 		_PLS_WithSettings(true, "0000040C", "A000040C", () => (
 			AssertThrows(() => PauseLayoutSwitch_ApplyStartup("paused", Select), "a start state is a boolean")))
-	} finally _PauseLayoutSwitchEventApplied := Saved
+	} finally PauseLayoutSwitchState.event_applied := Saved
 	Entry := FSReadUtf8Exact(A_ScriptDir . "\..\ErgoptiPlus.ahk")
 	Ready := InStr(Entry, '`n_DriverBootPhase := "ready"`n')
 	Start := InStr(Entry, "PauseLayoutSwitch_ApplyStartup(A_IsSuspended ? 1 : 0)")
