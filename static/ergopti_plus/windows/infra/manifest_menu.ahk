@@ -471,6 +471,9 @@ _MR_ApplyCategoryOff(Result, OffRule) {
 ; cannot bound a filesystem. This driver's own scan stops at _HS_SCAN_MAX_DEPTH
 ; (16) for the same tree
 global MR_MAX_LIST_DEPTH := 8
+; How many native menus _MR_UniqueNativeName remembers before it forgets the
+; destroyed ones; a tray rebuild creates a few dozen.
+global MR_NATIVE_NAME_PRUNE_AT := 256
 
 ; Report a row written in the OTHER drivers' dialect, field by field.
 ;
@@ -549,6 +552,7 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth, PopulationOwner := unset, Requir
 			Label := Label . " — " . _MR_ReasonHead(t(Row["disabled_reason_key"]))
 		; Rows carry literal text; only the native menu syntax treats & as a mnemonic.
 		Label := StrReplace(Label, "&", "&&")
+		Label := _MR_UniqueNativeName(TargetMenu, Label)
 
 		if (Row.Has("items") and Row["items"] is Array) {
 			if PopulationOwner is MenuPopulation && MenuPopulation_IsLeaf(Row["items"]) {
@@ -695,29 +699,49 @@ _MR_ReplayIdentity(ManifestKey, RowId, Kind := "command", Value := unset) {
 
 ; AHK names a menu item by its caption: Menu.Add with a caption the menu already
 ; holds updates that item instead of adding one, and Check or Disable reach the
-; first match. Two rows of one declaration may share a caption (the notification
-; area and widget « colour by source » checks), so a later twin gets one
-; zero-width space per earlier row with the same i18n key: it reads the same and
-; is its own native item.
-; @param ManifestKey {String} The declaration the row belongs to.
-; @param Id {String} The row's id.
-; @param I18nKey {String} The row's caption key.
-; @returns {String} "" for the first row with that caption.
-_MR_CaptionTwinSuffix(ManifestKey, Id, I18nKey) {
-	static ZeroWidthSpace := Chr(0x200B)
-	if I18nKey == ""
-		return ""
-	Suffix := ""
-	for Entry in _MR_GetMenuDef(ManifestKey) {
-		if !(Entry is Map) || !_MR_IsForAhk(Entry)
-			continue
-		if _MR_Get(Entry, "id") == Id
-			return Suffix
-		if _MR_Get(Entry, "i18n") == I18nKey
-			Suffix .= ZeroWidthSpace
+; first match. Two rows drawn into one menu may share a caption (the
+; notification area and widget « colour by source » checks), so the later one
+; gets a zero-width space per twin already drawn there: it reads the same and is
+; its own native item. Row data keeps the declared caption; only the native name
+; differs, and only when the menu really holds the caption.
+; @param TargetMenu {Menu} The menu the row is drawn into.
+; @param Label {String} The escaped caption the row would be added under.
+; @returns {String} The name to add the row under.
+_MR_UniqueNativeName(TargetMenu, Label) {
+	global MR_NATIVE_NAME_PRUNE_AT
+	static ZeroWidthSpace := Chr(0x200B), Drawn := Map()
+	; The names this renderer drew, per native menu, keep the common case free of
+	; native reads; a remembered name is confirmed natively, so a menu that was
+	; emptied or a recycled handle never earns a suffix it does not need.
+	Handle := TargetMenu.Handle
+	if !Drawn.Has(Handle) {
+		if Drawn.Count >= MR_NATIVE_NAME_PRUNE_AT {
+			Gone := []
+			for Known in Drawn
+				if TrayMenuHandleItemCount(Known) < 0
+					Gone.Push(Known)
+			for Known in Gone
+				Drawn.Delete(Known)
+		}
+		Names := Map()
+		Names.CaseSense := "Off"
+		Drawn[Handle] := Names
 	}
-	; A row nested below this declaration's top level has no twin here.
-	return ""
+	Names := Drawn[Handle]
+	while Names.Has(Label) && _MR_MenuHoldsCaption(TargetMenu, Label)
+		Label .= ZeroWidthSpace
+	Names[Label] := true
+	return Label
+}
+
+; Whether a native row of TargetMenu already carries Caption, compared as AHK
+; compares item names (case-insensitively).
+_MR_MenuHoldsCaption(TargetMenu, Caption) {
+	Loop TrayMenuItemCount(TargetMenu) {
+		if TrayMenuItemCaption(TargetMenu, A_Index - 1) = Caption
+			return true
+	}
+	return false
 }
 
 ; Renders the same declared command/check in full and native-built menus.
@@ -751,9 +775,6 @@ _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters) {
 	}
 	if Item.Has("label_prefix")
 		Label := Prefix . (IsSet(Label) ? Label : t(I18nKey))
-	Twin := _MR_CaptionTwinSuffix(ManifestKey, Id, I18nKey)
-	if Twin != ""
-		Label := (IsSet(Label) ? Label : t(I18nKey)) . Twin
 	Disabled := MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters)
 	ReasonKey := _MR_Get(Item, "disabled_reason_key")
 	if Disabled && ReasonKey != "" && !_MR_DisabledReason(Item, ManifestKey, StateGetters, &ReasonKey)
