@@ -191,11 +191,10 @@ platforms = ["ahk", "hs", "linux"]
 description_key = "menu.hotstrings.personal"
 platforms = ["ahk", "hs", "linux"]
 
-# macOS alone persists optional per-category menu orders; this data has no toggle.
+# Per-category menu orders are presentation preferences, with no expansion toggle.
 [sections.hotstrings.order_overrides]
 description_key = "menu.hotstrings"
-platforms = ["hs"]
-reason_key = "platform_reason.hotstring_menu_order_is_macos"
+platforms = ["ahk", "hs", "linux"]
 
 
 

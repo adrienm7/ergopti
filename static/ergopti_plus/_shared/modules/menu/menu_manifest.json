@@ -1973,6 +1973,44 @@
 			"id": "hotstring_category_sections"
 		}
 	],
+	"hotstring_order_parent": [
+		{
+			"type": "group",
+			"id": "hotstring_order_children",
+			"i18n": "menu.hotstrings.section_order"
+		}
+	],
+	"hotstring_order_moves": [
+		{
+			"type": "command",
+			"id": "hotstring_order_up",
+			"i18n": "menu.hotstrings.move_up",
+			"disabled_when": [
+				"hotstring_order_up_ready"
+			]
+		},
+		{
+			"type": "command",
+			"id": "hotstring_order_down",
+			"i18n": "menu.hotstrings.move_down",
+			"disabled_when": [
+				"hotstring_order_down_ready"
+			]
+		}
+	],
+	"hotstring_order_footer": [
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "hotstring_order_reset",
+			"i18n": "hs_config.btn_reset_default",
+			"disabled_when": [
+				"hotstring_order_ready"
+			]
+		}
+	],
 	"key_combination_pair_menu": [
 		{
 			"type": "command",

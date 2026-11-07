@@ -31,8 +31,10 @@ local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Terminators = require("keymap.terminators")
-local KEY = require("config_keys").KEY
+local ConfigKeys = require("config_keys")
+local KEY = ConfigKeys.KEY
 local NativePath = require("native_path")
+local SectionOrder = require("hotstrings.section_order")
 
 local LOG = "infra.hotstring_preferences"
 
@@ -263,6 +265,61 @@ function M.mark_config_reads(document, mark)
 			mark((table.unpack or unpack)(segments(path)))
 		end
 	end
+	local hotstrings = type(document.hotstrings) == "table" and document.hotstrings or {}
+	local orders = hotstrings.order_overrides
+	if type(orders) == "table" then
+		for category, order in pairs(orders) do
+			if type(category) == "string" and SectionOrder.valid(order) then
+				mark("hotstrings", ConfigKeys.LEAF.ORDER_OVERRIDES, category)
+			end
+		end
+	end
+end
+
+--- Captures the exact source behind a category's menu-order controls.
+--- @param category string Loaded category identity.
+--- @return table|nil snapshot A refused source never offers writable controls.
+function M.section_order_snapshot(category)
+	local called, snapshot = pcall(function()
+		assert(type(category) == "string" and category ~= "", "section order requires a category")
+		local document, source = read()
+		document = LeafRows.decode_source(source.content or "")
+		local hotstrings = document.hotstrings
+		assert(hotstrings == nil or type(hotstrings) == "table", "hotstrings is not a settings table")
+		local orders = hotstrings and hotstrings.order_overrides
+		local origin = orders ~= nil and LeafRows.source_origin(orders)
+		assert(orders == nil or type(orders) == "table" and not (origin and origin.array), "section orders are not a settings table")
+		local order = orders and orders[category]
+		origin = order ~= nil and type(order) == "table" and LeafRows.source_origin(order)
+		assert(order == nil or SectionOrder.valid(order) and not (origin and not origin.array), "section order is not a text list")
+		return { category = category, order = clone(order), source = source, path = file() }
+	end)
+	if called then return snapshot end
+	Logger.error(LOG, "Section order could not be read: %s.", tostring(snapshot))
+	return nil
+end
+
+--- Publishes only the captured category order, preserving concurrent user edits.
+--- @param snapshot table Exact source captured when the menu was built.
+--- @param order table|nil nil restores the catalogue's own order.
+--- @return boolean committed
+function M.set_section_order(snapshot, order)
+	if _scope_owner ~= nil then return false end
+	local called, committed, detail = pcall(function()
+		assert(type(snapshot) == "table" and snapshot.path == file(), "section order source changed")
+		assert(order == nil or SectionOrder.valid(order), "section order is not a text list")
+		local operation = { path = { "hotstrings", ConfigKeys.LEAF.ORDER_OVERRIDES, snapshot.category }, value = order, delete = order == nil and true or nil }
+		local rows = LeafRows.prepare(snapshot.source.content or "", { operation })
+		if snapshot.source.status == "absent" and not Shell.run("mkdir -p " .. Shell.quote(NativePath.dirname(file())) .. " 2>/dev/null") then return false end
+		local written, reason, content = Writer.batch_write(file(), rows, nil, snapshot.source)
+		if written ~= true then return false, reason end
+		publish(decode(content))
+		return true
+	end)
+	if called and committed == true then return true end
+	local reason = tostring(called and detail or committed)
+	Logger.error(LOG, "Section order was not persisted; the menu remains unchanged: %s.", reason)
+	return false, reason
 end
 
 

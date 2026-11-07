@@ -4090,7 +4090,6 @@
 	"menu.caps_word.pointer.other_buttons": "Інші кнопки миші",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Не в Windows: система залишає жести тачпада собі й не передає Ergopti жодного дотику. Прокручування двома пальцями й далі вважається прокручуванням.",
 	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Не у Windows: Windows передає драйверу кожен жест готовим, лише після його завершення, з налаштувань тачпада, тому свайп не може повторюватися крок за кроком, поки пальці рухаються. macOS і Linux самі відстежують пальці.",
-	"platform_reason.hotstring_menu_order_is_macos": "Лише macOS: меню Hotstrings дає змогу змінювати порядок елементів у кожній категорії та запам’ятовує його. У Windows і Linux немає елемента для зміни порядку.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Лише macOS під цією назвою: це головний перемикач рушія набору macOS, який драйвер запускає й зупиняє. У Windows головний перемикач зберігається як шлюз hotstrings у category_enabled, а Linux вмикає групи hotstrings по одній.",
 	"platform_reason.category_gates_are_windows": "Лише Windows: Windows має по одному головному шлюзу на категорію перед власними перемикачами категорії. macOS зберігає головний перемикач hotstrings як hotstrings.enabled, а Linux вмикає групи hotstrings по одній.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "Це скорочення належить системі, яка його призначає: кожен драйвер пропонує свої дії на тих поєднаннях, які залишає вільними його система (поєднання з клавішею Windows у Windows, Ctrl і Cmd у macOS, слоти клавіатури в Linux), і зберігає вибір під власною назвою.",
@@ -4160,5 +4159,8 @@
 	"apps.encryptor.drop_hint": "Перетягніть сюди файли, щоб зашифрувати їх, або файли .enc, щоб розшифрувати.",
 	"apps.cloner.msg_no_isolation": "Ця програма не має параметра окремого профілю: у Windows її клон — другий ярлик, що запускає ту саму програму з тими самими налаштуваннями.",
 	"inventory.behavior.layout_emulation": "Друкує вибраний .keylayout поверх системної розкладки; три драйвери відтворюють один корпус натискань.",
-	"platform_reason.profile_shortcut_uses_prompt_action": "У Windows і Linux призначте «Прогноз ШІ з вибраним промптом» сполученню клавіш і виберіть власний профіль у списку дій. Профіль діє лише для цього запиту; якщо профіль видалено або ШІ вимкнено, дію відхилено."
+	"platform_reason.profile_shortcut_uses_prompt_action": "У Windows і Linux призначте «Прогноз ШІ з вибраним промптом» сполученню клавіш і виберіть власний профіль у списку дій. Профіль діє лише для цього запиту; якщо профіль видалено або ШІ вимкнено, дію відхилено.",
+	"menu.hotstrings.section_order": "Порядок розділів",
+	"menu.hotstrings.move_up": "Перемістити вгору",
+	"menu.hotstrings.move_down": "Перемістити вниз"
 }

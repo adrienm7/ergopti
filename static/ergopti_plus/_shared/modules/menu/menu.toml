@@ -1725,6 +1725,33 @@ type = "---"
 type = "list"
 id = "hotstring_category_sections"
 
+# Section order is a menu preference, independent of expansion priority.
+[[menu.hotstring_order_parent]]
+type = "group"
+id = "hotstring_order_children"
+i18n = "menu.hotstrings.section_order"
+
+[[menu.hotstring_order_moves]]
+type = "command"
+id = "hotstring_order_up"
+i18n = "menu.hotstrings.move_up"
+disabled_when = ["hotstring_order_up_ready"]
+
+[[menu.hotstring_order_moves]]
+type = "command"
+id = "hotstring_order_down"
+i18n = "menu.hotstrings.move_down"
+disabled_when = ["hotstring_order_down_ready"]
+
+[[menu.hotstring_order_footer]]
+type = "---"
+
+[[menu.hotstring_order_footer]]
+type = "command"
+id = "hotstring_order_reset"
+i18n = "hs_config.btn_reset_default"
+disabled_when = ["hotstring_order_ready"]
+
 # The menu one pair of « Combinaisons de touches » opens on Windows, shown at
 # the pointer when its row is clicked: 182 pairs each carrying their slots and
 # a copy of the hold picker as submenus would be thousands of menu rows built

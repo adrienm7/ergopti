@@ -4090,7 +4090,6 @@
 	"menu.caps_word.pointer.other_buttons": "Andere Maustasten",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Nicht unter Windows: Das System behält Touchpad-Gesten für sich und gibt keine Berührung an Ergopti weiter. Scrollen mit zwei Fingern zählt weiterhin als Scrollen.",
 	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Nicht unter Windows: Windows übergibt dem Treiber jede Geste fertig, erst wenn sie abgeschlossen ist, aus seinen Touchpad-Einstellungen, daher kann sich ein Wischen nicht Schritt für Schritt wiederholen, solange sich die Finger bewegen. macOS und Linux verfolgen die Finger selbst.",
-	"platform_reason.hotstring_menu_order_is_macos": "Nur macOS: Das Hotstrings-Menü erlaubt es, die Einträge jeder Kategorie umzusortieren, und merkt sich diese Reihenfolge. Windows und Linux haben keine Bedienung zum Umsortieren.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Nur macOS unter diesem Namen: Es ist der Hauptschalter der macOS-Tippengine, die der Treiber startet und stoppt. Windows führt seinen Hauptschalter als Hotstrings-Gate in category_enabled, und Linux schaltet seine Hotstring-Gruppen einzeln ein.",
 	"platform_reason.category_gates_are_windows": "Nur Windows: Windows führt pro Kategorie ein Haupt-Gate vor den eigenen Schaltern der Kategorie. macOS führt seinen Hotstrings-Hauptschalter als hotstrings.enabled, und Linux schaltet seine Hotstring-Gruppen einzeln ein.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "Dieses Kürzel gehört zu dem System, das es belegt: Jeder Treiber bietet seine Aktionen auf den Kombinationen an, die sein System frei lässt (Windows-Tastenkombinationen unter Windows, Strg und Cmd unter macOS, Tastaturplätze unter Linux), und speichert die Wahl unter eigenem Namen.",
@@ -4160,5 +4159,8 @@
 	"apps.encryptor.drop_hint": "Legen Sie hier Dateien ab, um sie zu verschlüsseln, oder .enc-Dateien, um sie zu entschlüsseln.",
 	"apps.cloner.msg_no_isolation": "Dieses Programm hat keine Option für ein eigenes Profil: Unter Windows ist sein Klon eine zweite Verknüpfung, die dasselbe Programm mit denselben Einstellungen startet.",
 	"inventory.behavior.layout_emulation": "Tippt das gewählte .keylayout über dem Systemlayout; die drei Treiber spielen ein gemeinsames Tastenanschlag-Korpus ab.",
-	"platform_reason.profile_shortcut_uses_prompt_action": "Weisen Sie unter Windows und Linux „KI-Vorhersage mit gewähltem Prompt“ einem Tastenkürzel zu und wählen Sie Ihr eigenes Profil in der Aktionsauswahl. Das Profil gilt nur für diese Anfrage; bei gelöschtem Profil oder deaktivierter KI wird die Aktion abgelehnt."
+	"platform_reason.profile_shortcut_uses_prompt_action": "Weisen Sie unter Windows und Linux „KI-Vorhersage mit gewähltem Prompt“ einem Tastenkürzel zu und wählen Sie Ihr eigenes Profil in der Aktionsauswahl. Das Profil gilt nur für diese Anfrage; bei gelöschtem Profil oder deaktivierter KI wird die Aktion abgelehnt.",
+	"menu.hotstrings.section_order": "Reihenfolge der Abschnitte",
+	"menu.hotstrings.move_up": "Nach oben",
+	"menu.hotstrings.move_down": "Nach unten"
 }

@@ -4090,7 +4090,6 @@
 	"menu.caps_word.pointer.other_buttons": "أزرار الفأرة الأخرى",
 	"platform_reason.caps_word_gestures_stay_with_windows": "ليس على Windows: يحتفظ النظام بإيماءات لوحة اللمس لنفسه ولا يمرر أي لمسة إلى Ergopti. يظل التمرير بإصبعين محسوبًا تمريرًا.",
 	"platform_reason.gesture_modes_and_steps_need_finger_travel": "ليس على Windows: يسلّم Windows إلى برنامج التشغيل كل إيماءة جاهزة، بعد اكتمالها فقط، من إعدادات لوحة اللمس، لذا لا يمكن أن يتكرر السحب خطوة بخطوة ما دامت الأصابع تتحرك. أما macOS وLinux فيتتبعان الأصابع بنفسيهما.",
-	"platform_reason.hotstring_menu_order_is_macos": "macOS فقط: تتيح قائمة Hotstrings فيه إعادة ترتيب عناصر كل فئة وتتذكر هذا الترتيب. لا يوجد في Windows وLinux عنصر تحكم لإعادة الترتيب.",
 	"platform_reason.hotstrings_master_is_macos_engine": "macOS فقط بهذا الاسم: هو المفتاح الرئيسي لمحرك الكتابة في macOS الذي يشغّله البرنامج ويوقفه. يحتفظ Windows بمفتاحه الرئيسي كبوابة hotstrings في category_enabled، ويفعّل Linux مجموعات hotstrings واحدة تلو الأخرى.",
 	"platform_reason.category_gates_are_windows": "Windows فقط: يحتفظ Windows ببوابة رئيسية لكل فئة أمام مفاتيح الفئة نفسها. يحتفظ macOS بمفتاح hotstrings الرئيسي في hotstrings.enabled، ويفعّل Linux مجموعات hotstrings واحدة تلو الأخرى.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "هذا الاختصار يخص النظام الذي يربطه: يعرض كل برنامج إجراءاته على التركيبات التي يتركها نظامه حرة (تركيبات مفتاح Windows في Windows، وCtrl وCmd في macOS، وخانات لوحة المفاتيح في Linux) ويحفظ الاختيار باسمه الخاص.",
@@ -4160,5 +4159,8 @@
 	"apps.encryptor.drop_hint": "أفلت الملفات هنا لتشفيرها، أو ملفات ‎.enc لفك تشفيرها.",
 	"apps.cloner.msg_no_isolation": "لا يوفّر هذا البرنامج خيارًا لملف تعريف منفصل: على Windows، النسخة اختصار ثانٍ يشغّل البرنامج نفسه بالإعدادات نفسها.",
 	"inventory.behavior.layout_emulation": "يكتب ملف .keylayout المختار فوق تخطيط النظام؛ تعيد المشغّلات الثلاثة تشغيل مجموعة ضغطات واحدة.",
-	"platform_reason.profile_shortcut_uses_prompt_action": "في Windows وLinux، عيّن «تنبؤ الذكاء الاصطناعي بموجّه مختار» لاختصار لوحة مفاتيح، ثم اختر ملفك الشخصي المخصص في منتقي الإجراءات. ينطبق الملف على هذا الطلب فقط؛ يُرفض الإجراء إذا حُذف الملف أو عُطّل الذكاء الاصطناعي."
+	"platform_reason.profile_shortcut_uses_prompt_action": "في Windows وLinux، عيّن «تنبؤ الذكاء الاصطناعي بموجّه مختار» لاختصار لوحة مفاتيح، ثم اختر ملفك الشخصي المخصص في منتقي الإجراءات. ينطبق الملف على هذا الطلب فقط؛ يُرفض الإجراء إذا حُذف الملف أو عُطّل الذكاء الاصطناعي.",
+	"menu.hotstrings.section_order": "ترتيب الأقسام",
+	"menu.hotstrings.move_up": "نقل لأعلى",
+	"menu.hotstrings.move_down": "نقل لأسفل"
 }

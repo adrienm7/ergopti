@@ -4090,7 +4090,6 @@
 	"menu.caps_word.pointer.other_buttons": "Autres boutons de la souris",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Pas sous Windows : le système garde les gestes du pavé tactile pour lui et ne transmet aucun contact à Ergopti. Le défilement à deux doigts compte toujours comme un défilement.",
 	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Pas sous Windows : Windows remet au pilote chaque geste tout fait, une fois terminé, depuis ses réglages du pavé tactile, donc un balayage ne peut pas se répéter pas à pas tant que les doigts bougent. macOS et Linux suivent eux-mêmes les doigts.",
-	"platform_reason.hotstring_menu_order_is_macos": "macOS uniquement : son menu Hotstrings permet de réordonner les éléments de chaque catégorie et mémorise cet ordre. Windows et Linux n’ont aucune commande de réordonnancement.",
 	"platform_reason.hotstrings_master_is_macos_engine": "macOS uniquement sous ce nom : c’est l’interrupteur général du moteur de saisie de macOS, que le pilote démarre et arrête. Windows garde son interrupteur général comme porte hotstrings de category_enabled, et Linux active ses groupes de hotstrings un par un.",
 	"platform_reason.category_gates_are_windows": "Windows uniquement : Windows garde une porte générale par catégorie, devant les interrupteurs propres de la catégorie. macOS garde son interrupteur général des hotstrings sous hotstrings.enabled, et Linux active ses groupes de hotstrings un par un.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "Ce raccourci appartient au système qui le lie : chaque pilote propose ses actions sur les combinaisons que son système laisse libres (touche Windows sous Windows, Ctrl et Cmd sous macOS, emplacements du clavier sous Linux) et enregistre le choix sous son propre nom.",
@@ -4160,5 +4159,8 @@
 	"apps.encryptor.drop_hint": "Déposez des fichiers ici pour les chiffrer, ou des fichiers .enc pour les déchiffrer.",
 	"apps.cloner.msg_no_isolation": "Ce programme n'a pas d'option de profil séparé : sous Windows, son clone est un second raccourci qui démarre le même programme avec les mêmes réglages.",
 	"inventory.behavior.layout_emulation": "Tape le .keylayout choisi par-dessus la disposition du système ; les trois pilotes rejouent un même corpus de frappes.",
-	"platform_reason.profile_shortcut_uses_prompt_action": "Sur Windows et Linux, affectez « Prédiction IA avec un prompt choisi » à un raccourci clavier, puis choisissez votre profil personnalisé dans le sélecteur d’actions. Le profil ne s’applique qu’à cette requête ; l’action est refusée si le profil a été supprimé ou si l’IA est désactivée."
+	"platform_reason.profile_shortcut_uses_prompt_action": "Sur Windows et Linux, affectez « Prédiction IA avec un prompt choisi » à un raccourci clavier, puis choisissez votre profil personnalisé dans le sélecteur d’actions. Le profil ne s’applique qu’à cette requête ; l’action est refusée si le profil a été supprimé ou si l’IA est désactivée.",
+	"menu.hotstrings.section_order": "Ordre des sections",
+	"menu.hotstrings.move_up": "Monter",
+	"menu.hotstrings.move_down": "Descendre"
 }

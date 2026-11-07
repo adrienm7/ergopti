@@ -4090,7 +4090,6 @@
 	"menu.caps_word.pointer.other_buttons": "Ostatní tlačítka myši",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Ne na Windows: systém si gesta touchpadu ponechává a Ergopti nepředává žádný dotyk. Posouvání dvěma prsty se stále počítá jako posouvání.",
 	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Ne ve Windows: Windows předává ovladači každé gesto hotové, až když skončí, ze svého nastavení touchpadu, takže tah se nemůže opakovat krok za krokem, dokud se prsty pohybují. macOS a Linux sledují prsty samy.",
-	"platform_reason.hotstring_menu_order_is_macos": "Jen macOS: jeho nabídka Hotstrings umožňuje měnit pořadí položek každé kategorie a toto pořadí si pamatuje. Windows a Linux nemají žádný ovladač pro změnu pořadí.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Jen macOS pod tímto názvem: je to hlavní vypínač psacího jádra macOS, které ovladač spouští a zastavuje. Windows má svůj hlavní vypínač jako bránu hotstrings v category_enabled a Linux zapíná své skupiny hotstringů jednu po druhé.",
 	"platform_reason.category_gates_are_windows": "Jen Windows: Windows má pro každou kategorii jednu hlavní bránu před vlastními vypínači kategorie. macOS drží hlavní vypínač hotstringů jako hotstrings.enabled a Linux zapíná své skupiny hotstringů jednu po druhé.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "Tato zkratka patří systému, který ji váže: každý ovladač nabízí své akce na kombinacích, které jeho systém nechává volné (kombinace s klávesou Windows ve Windows, Ctrl a Cmd v macOS, sloty klávesnice v Linuxu), a volbu ukládá pod vlastním názvem.",
@@ -4160,5 +4159,8 @@
 	"apps.encryptor.drop_hint": "Přetáhněte sem soubory k zašifrování nebo soubory .enc k dešifrování.",
 	"apps.cloner.msg_no_isolation": "Tento program nemá volbu samostatného profilu: ve Windows je jeho klon druhý zástupce, který spouští stejný program se stejným nastavením.",
 	"inventory.behavior.layout_emulation": "Píše zvolený .keylayout přes rozložení systému; všechny tři ovladače přehrávají jeden korpus stisků.",
-	"platform_reason.profile_shortcut_uses_prompt_action": "Ve Windows a Linuxu přiřaďte klávesové zkratce „Predikce AI se zvoleným promptem“ a ve výběru akcí zvolte vlastní profil. Profil platí pouze pro tento požadavek; smazaný profil nebo vypnutá AI akci odmítne."
+	"platform_reason.profile_shortcut_uses_prompt_action": "Ve Windows a Linuxu přiřaďte klávesové zkratce „Predikce AI se zvoleným promptem“ a ve výběru akcí zvolte vlastní profil. Profil platí pouze pro tento požadavek; smazaný profil nebo vypnutá AI akci odmítne.",
+	"menu.hotstrings.section_order": "Pořadí sekcí",
+	"menu.hotstrings.move_up": "Posunout nahoru",
+	"menu.hotstrings.move_down": "Posunout dolů"
 }

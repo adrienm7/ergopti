@@ -4090,7 +4090,6 @@
 	"menu.caps_word.pointer.other_buttons": "Другие кнопки мыши",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Не в Windows: система оставляет жесты тачпада себе и не передаёт Ergopti ни одного касания. Прокрутка двумя пальцами по-прежнему считается прокруткой.",
 	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Не в Windows: Windows передаёт драйверу каждый жест готовым, только после его завершения, из настроек тачпада, поэтому свайп не может повторяться шаг за шагом, пока пальцы двигаются. macOS и Linux сами отслеживают пальцы.",
-	"platform_reason.hotstring_menu_order_is_macos": "Только macOS: меню Hotstrings позволяет менять порядок элементов в каждой категории и запоминает его. В Windows и Linux нет элемента для изменения порядка.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Только macOS под этим именем: это главный выключатель движка набора macOS, который драйвер запускает и останавливает. В Windows главный выключатель хранится как шлюз hotstrings в category_enabled, а Linux включает группы hotstrings по одной.",
 	"platform_reason.category_gates_are_windows": "Только Windows: Windows хранит по одному главному шлюзу на категорию перед собственными переключателями категории. macOS хранит главный переключатель hotstrings как hotstrings.enabled, а Linux включает группы hotstrings по одной.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "Это сочетание принадлежит системе, которая его назначает: каждый драйвер предлагает свои действия на тех сочетаниях, которые оставляет свободными его система (сочетания с клавишей Windows в Windows, Ctrl и Cmd в macOS, слоты клавиатуры в Linux), и хранит выбор под своим именем.",
@@ -4160,5 +4159,8 @@
 	"apps.encryptor.drop_hint": "Перетащите сюда файлы, чтобы зашифровать их, или файлы .enc, чтобы расшифровать.",
 	"apps.cloner.msg_no_isolation": "У этой программы нет параметра отдельного профиля: в Windows её клон — второй ярлык, запускающий ту же программу с теми же настройками.",
 	"inventory.behavior.layout_emulation": "Печатает выбранный .keylayout поверх системной раскладки; три драйвера воспроизводят один корпус нажатий.",
-	"platform_reason.profile_shortcut_uses_prompt_action": "В Windows и Linux назначьте «Прогноз ИИ с выбранным промптом» сочетанию клавиш и выберите свой профиль в списке действий. Профиль действует только для этого запроса; если профиль удалён или ИИ выключен, действие отклоняется."
+	"platform_reason.profile_shortcut_uses_prompt_action": "В Windows и Linux назначьте «Прогноз ИИ с выбранным промптом» сочетанию клавиш и выберите свой профиль в списке действий. Профиль действует только для этого запроса; если профиль удалён или ИИ выключен, действие отклоняется.",
+	"menu.hotstrings.section_order": "Порядок разделов",
+	"menu.hotstrings.move_up": "Переместить вверх",
+	"menu.hotstrings.move_down": "Переместить вниз"
 }

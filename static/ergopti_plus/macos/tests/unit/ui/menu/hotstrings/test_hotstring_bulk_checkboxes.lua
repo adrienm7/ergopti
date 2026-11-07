@@ -409,7 +409,8 @@ helpers.describe("common hotstring sections consume the genuine shared boundary"
 			local rows = f.build()
 			helpers.assert_eq(#rows, 1)
 			local children = assert(rows[1].submenu)
-			helpers.assert_eq(#children, 6)
+			helpers.assert_eq(#children, 7)
+			helpers.assert_eq(children[7].title, "menu.hotstrings.section_order")
 			helpers.assert_eq(children[4].title, "Independent One (1)")
 			helpers.assert_eq(children[5].title, "-")
 			helpers.assert_eq(children[6].title, "Independent Two (2)")
@@ -603,4 +604,43 @@ helpers.describe("personal-info editor original declared leaf (Mac)", function()
 			end)
 		end)
 	end
+end)
+
+
+helpers.describe("hotstring section order native menu", function()
+	helpers.it("hotstring-section-order: original menu moves, rolls back and rejects a stale click", function()
+		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local ctx = context(true, true)
+		ctx.keymap.get_sections = function() return { { name = "one" }, { name = "two" } } end
+		ctx.is_paused = function() return false end
+		local saved, refreshed, accepted = 0, 0, false
+		ctx.save_prefs = function() saved = saved + 1; return accepted end
+		ctx.updateMenu = function() refreshed = refreshed + 1 end
+		local function find(rows, title)
+			for _, row in ipairs(rows or {}) do
+				if row.title == title or row.label == title then return row end
+				local child = find(row.menu or row.submenu or row.items, title)
+				if child then return child end
+			end
+		end
+		local rows = hotstrings.build_groups(ctx, nil, { group_counts = {} })
+		local parent = assert(find(rows, "menu.hotstrings.section_order"))
+		local entries = parent.menu or parent.submenu or parent.items
+		local up = assert(find(entries[2].menu or entries[2].submenu or entries[2].items, "menu.hotstrings.move_up"))
+		local click = up.fn or up.action
+		local before = ctx.state.sections_order_overrides
+		helpers.assert_eq(click(), false)
+		helpers.assert_true(rawequal(before, ctx.state.sections_order_overrides))
+		helpers.assert_eq(refreshed, 0)
+		accepted = true
+		helpers.assert_eq(click(), true)
+		helpers.assert_eq(ctx.state.sections_order_overrides.alpha, { "two", "one" })
+		helpers.assert_eq({ saved, refreshed }, { 2, 1 })
+		helpers.assert_eq(click(), false, "the retained old menu no longer owns this order")
+		helpers.assert_eq(saved, 2)
+		local next_rows = hotstrings.build_groups(ctx, nil, { group_counts = {} })
+		local next_parent = assert(find(next_rows, "menu.hotstrings.section_order"))
+		local next_entries = next_parent.menu or next_parent.submenu or next_parent.items
+		helpers.assert_eq(next_entries[1].title or next_entries[1].label, "two")
+	end)
 end)

@@ -16,6 +16,8 @@ local LabelValue = require("locale.label_value")
 local Logger = require("logger.shim")
 local Extensions = require("hotstrings.extensions")
 local PersonalFiles = require("hotstrings.personal_files")
+local SectionOrder = require("hotstrings.section_order")
+local HotstringPreferences = require("infra.hotstring_preferences")
 local PersonalFileMenu = require("menu.personal_files")
 local Languages = require("hotstrings.languages")
 local LocaleTable = require("_generated.locale_table")
@@ -300,51 +302,75 @@ local function _manifest_hotstring_rows(ctx, config)
 
 		local sub = {}
 
-		local sections = category and category.sections_order or {}
+		local discovered, order_labels = {}, {}
+		for _, name in ipairs(category and category.sections_order or {}) do
+			local section = (category.sections or {})[name]
+			if name == "-" or section and not section.extension then discovered[#discovered + 1] = name end
+		end
+		local order_snapshot = HotstringPreferences.section_order_snapshot(id)
+		local sections = assert(SectionOrder.resolve(discovered, order_snapshot and order_snapshot.order))
 		if #sections > 0 then
 
 			for _, name in ipairs(sections) do
-				local section = (category.sections or {})[name]
-				-- A section an extension binds is drawn in that extension's submenu.
-				if section and section.extension then goto continue_section end
-				-- CHECKED, not ENABLED. The two are different questions and answering
-				-- both with the effective state made a switched-off category untick
-				-- every section it holds — so the information "here is what comes back
-				-- when you switch it on" disappeared, and it looked as though the
-				-- per-section choices had been reset. They never were; only the screen
-				-- said so.
-				local section_checked = config.is_section_checked
-					and config.is_section_checked(id, name)
-					or (config.is_section_enabled and config.is_section_enabled(id, name))
-				sub[#sub + 1] = {
-					-- The count is the point of the row: a section with three entries
-					-- and one with nine hundred are the same line without it.
-					label    = string.format("%s (%d)", name, section and section.count or 0),
-					checked  = section_checked and true or false,
-					-- Greyed rather than hidden while the category is off: a row that
-					-- disappears reads as a bug, and the user still needs to see what
-					-- they will get back when they switch the category on.
-					disabled = not on,
-					action = function()
-						local called, committed = pcall(function()
-							if not current_source() then return false end
-							if type(config.toggle_section) ~= "function" then return false end
-							return config.toggle_section(id, name)
-						end)
-						if called and committed == true then
-							require("ui.menu.feature_notice").feature(name, config.is_section_checked and config.is_section_checked(id, name)
-								or (config.is_section_enabled and config.is_section_enabled(id, name)) or false)
-							return true
-						end
-						Logger.error(LOG, "Hotstring section toggle refused for '%s.%s' (%s).", id, name,
-							called and "owner-not-committed" or "owner-error")
-						SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
-						return false
-					end,
-				}
+				if name == "-" then
+					sub[#sub + 1] = { separator = true }
+				else
+					local section = (category.sections or {})[name]
+					-- A section an extension binds is drawn in that extension's submenu.
+					if section and section.extension then goto continue_section end
+					-- CHECKED, not ENABLED. The two are different questions and answering
+					-- both with the effective state made a switched-off category untick
+					-- every section it holds — so the information "here is what comes back
+					-- when you switch it on" disappeared, and it looked as though the
+					-- per-section choices had been reset. They never were; only the screen
+					-- said so.
+					local section_checked = config.is_section_checked
+						and config.is_section_checked(id, name)
+						or (config.is_section_enabled and config.is_section_enabled(id, name))
+					sub[#sub + 1] = {
+						-- The count is the point of the row: a section with three entries
+						-- and one with nine hundred are the same line without it.
+						label    = string.format("%s (%d)", name, section and section.count or 0),
+						checked  = section_checked and true or false,
+						-- Greyed rather than hidden while the category is off: a row that
+						-- disappears reads as a bug, and the user still needs to see what
+						-- they will get back when they switch the category on.
+						disabled = not on,
+						action = function()
+							local called, committed = pcall(function()
+								if not current_source() then return false end
+								if type(config.toggle_section) ~= "function" then return false end
+								return config.toggle_section(id, name)
+							end)
+							if called and committed == true then
+								require("ui.menu.feature_notice").feature(name, config.is_section_checked and config.is_section_checked(id, name)
+									or (config.is_section_enabled and config.is_section_enabled(id, name)) or false)
+								return true
+							end
+							Logger.error(LOG, "Hotstring section toggle refused for '%s.%s' (%s).", id, name,
+								called and "owner-not-committed" or "owner-error")
+							SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
+							return false
+						end,
+					}
+					order_labels[name] = sub[#sub].label
+				end
 				::continue_section::
 			end
 		end
+		local order_rows = SectionOrder.menu(ManifestMenu.template_rows, sections, order_labels, function(order)
+			if not current_source() then return false end
+			if HotstringPreferences.set_section_order(order_snapshot, order) ~= true then
+				SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
+				return false
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
+		end, function()
+			return order_snapshot ~= nil and current_source() and ctx.paused ~= true
+				and (type(ctx.is_paused) ~= "function" or ctx.is_paused() == false)
+		end)
+		for _, row in ipairs(order_rows) do sub[#sub + 1] = row end
 
 		local function commit_scope(enabled)
 			local called, committed = pcall(function()
@@ -996,6 +1022,19 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- a section, and match_buffer has always taken a predicate to filter on
 			-- it. This driver simply passed nil for it.
 			local families = type(dyn.rule_families) == "function" and dyn.rule_families() or {}
+			local family_ids, family_names, family_rows, order_labels = {}, {}, {}, {}
+			for _, family in ipairs(ManifestMenu.get_dynamic_hotstring_families()) do
+				if family.id then family_ids[family.id] = family.section end
+			end
+			for _, family in ipairs(families) do
+				local name = family.separator and "-" or family_ids[family.id] or family.section
+				family_names[#family_names + 1] = name
+				family_rows[name] = family
+			end
+			local order_snapshot = HotstringPreferences.section_order_snapshot("dynamichotstrings")
+			local family_order = assert(SectionOrder.resolve(family_names, order_snapshot and order_snapshot.order))
+			families = {}
+			for _, name in ipairs(family_order) do families[#families + 1] = family_rows[name] end
 			if #families > 0 then
 				-- The existing shared boundary is the only admitted inert entry.
 				if type(boundaries) ~= "table" or getmetatable(boundaries) ~= nil or #boundaries ~= 1
@@ -1020,6 +1059,7 @@ local function _manifest_hotstring_rows(ctx, config)
 						local family_label = family.count
 							and string.format("%s (%d)", family.label, family.count)
 							or family.label
+						order_labels[family_ids[family.id] or family.section] = family_label
 						sub[#sub + 1] = {
 							-- Resolved by the manager, which owns both the locale key
 							-- and the engine that answers what "{date}" is today.
@@ -1079,6 +1119,19 @@ local function _manifest_hotstring_rows(ctx, config)
 					end
 				end
 			end
+
+			local order_rows = SectionOrder.menu(ManifestMenu.template_rows, family_order, order_labels, function(order)
+				if HotstringPreferences.set_section_order(order_snapshot, order) ~= true then
+					SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
+					return false
+				end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return true
+			end, function()
+				return order_snapshot ~= nil and ctx.paused ~= true
+					and (type(ctx.is_paused) ~= "function" or ctx.is_paused() == false)
+			end)
+			for _, row in ipairs(order_rows) do sub[#sub + 1] = row end
 
 			local programmable = ProgrammableMenuPolicy.build_entry_rows(ManifestMenu,
 				function() return ProgrammableHotstrings.build(ctx) end)

@@ -9,6 +9,8 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.ui.menu.hotstrings.test_section_order",
+	"tests.unit.ui.menu.hotstrings.test_section_order_persistence",
 	"tests.unit.ui.bundled_apps.test_bundled_apps_launcher",
 	"tests.unit.ui.bundled_apps.test_app_cloner_core",
 	"tests.unit.ui.bundled_apps.test_encryptor_core",
