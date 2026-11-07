@@ -119,7 +119,11 @@ helpers.describe("active layout rows", function()
 		helpers.assert_eq(#system.platforms, 1, "the Windows install row is Windows-only")
 		local english = Json.decode(read(helpers.driver_root() .. "/../_shared/data/locales/en.json"))
 		local reason = english[bundle.reason_key]
-		helpers.assert_true(type(reason) == "string" and reason:find("Install the Ergopti system layout", 1, true) ~= nil
+		-- The Windows row's label without its parenthetical and ellipsis.
+		local windows_row = english["menu.layout.system_layout_install"]:match("^(.-) %(")
+		helpers.assert_true(type(windows_row) == "string" and windows_row:find("Download", 1, true) == 1,
+			"the Windows row downloads the layout installer")
+		helpers.assert_true(type(reason) == "string" and reason:find("« " .. windows_row .. " »", 1, true) ~= nil
 			and reason:find(english["menu.layout.manage"], 1, true) ~= nil, "the reason names both install routes")
 		helpers.assert_true(english[system.reason_key]:find(english["menu.layout.manage"], 1, true) ~= nil,
 			"the Windows row tells Linux where to install from")

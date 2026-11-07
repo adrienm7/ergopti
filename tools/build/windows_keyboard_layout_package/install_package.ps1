@@ -5,12 +5,14 @@ MODULE: Ergopti Layout Package Installer (Windows)
 DESCRIPTION:
 The entry point of the Ergopti_windows_layout.zip release package (install.cmd
 starts it). Runs the elevated installer through UAC, then adds the installed
-layout to the current user's language list, the two steps the Ergopti Plus
-tray menu runs from « Install the Ergopti system layout ».
+layout to the current user's language list. The Ergopti Plus tray row
+« Download the Ergopti system layout installer » opens this package's download;
+the exe itself never runs these steps.
 
 FEATURES & RATIONALE:
-1. The same scripts as the driver: install_keyboard_layout.ps1 (elevated) and
-	add_user_keyboard_layout.ps1 (as the user), with windows_system_layout.json.
+1. The scripts of windows/vendor/keyboard_layout: install_keyboard_layout.ps1
+	(elevated) and add_user_keyboard_layout.ps1 (as the user), with
+	windows_system_layout.json.
 2. Fail fast: a refused elevation or a failed step exits 1 with its reason.
 ==============================================================================
 #>

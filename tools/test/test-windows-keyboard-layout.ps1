@@ -4,7 +4,7 @@
 MODULE: Windows Keyboard Layout Install Probe (CI)
 DESCRIPTION:
 Installs the built Ergopti keyboard layout DLL on an ephemeral GitHub Actions
-runner through the installer the driver starts
+runner through the installer the release package starts
 (windows/vendor/keyboard_layout/install_keyboard_layout.ps1), loads it, and
 asks Windows itself what keys type (ToUnicodeEx): letters, Shift, AltGr, a
 ligature and a dead key. Then removes it and checks nothing is left.
@@ -54,7 +54,7 @@ Runs the installer and returns its outcome.
 function Invoke-Installer {
 	param([string]$Action)
 	Remove-Item -LiteralPath $ResultPath -Force -ErrorAction Ignore
-	# The Windows PowerShell the driver starts the installer with.
+	# The Windows PowerShell the package starts the installer with.
 	& (Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe") -NoProfile -ExecutionPolicy Bypass -File $Installer `
 		-Action $Action -SpecPath $SpecPath -SourceDirectory $VendorDirectory -ResultPath $ResultPath
 	$code = $LASTEXITCODE
@@ -123,7 +123,7 @@ try {
 	[void][ErgoptiProbe.Keyboard]::UnloadKeyboardLayout($hkl)
 }
 
-# The user step the driver runs next, as the runner's own user.
+# The user step the package runs next, as the runner's own user.
 $addResult = Join-Path $env:RUNNER_TEMP "ergopti-layout-add.json"
 $tip = "{0}:{1}" -f ([string]$spec.language_id).ToUpperInvariant(), $klid.ToUpperInvariant()
 & (Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe") -NoProfile -ExecutionPolicy Bypass `

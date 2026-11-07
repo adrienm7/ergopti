@@ -38,23 +38,30 @@ or KbdEdit, is a build output: `node tools/codegen/codegen-windows-keyboard-layo
 x64/x86 and ARM64 C++ tools and a Windows SDK) compiles `amd64`, `arm64`, `x86` and
 `wow64` (x86 with 64-bit table pointers, `BUILD_WOW6432`, for SysWOW64) into
 `static/ergopti_plus/windows/vendor/keyboard_layout/<build>/kbdergop.dll` with a
-`build_receipt.json`. `-PackagePath <zip>` also writes the stand-alone package. CI
-runs it in the Windows package job before the static bundle, so the compiled
-`ErgoptiPlus.exe` ships the DLLs; a source run without them shows
-« not built into this copy » in the menu.
+`build_receipt.json`. `-PackagePath <zip>` also writes the stand-alone package,
+`Ergopti_windows_layout.zip` (`release_asset` of `windows_system_layout.json`). CI
+builds it in the Windows package job and uploads it with `assets-windows`, so every
+release publishes it (`.github/workflows/ci-release.yml`, pinned by
+`tools/test/test-release-notes-assets-are-uploaded.cjs`).
 
-## Install: unsigned, through UAC
+## Install: unsigned, through UAC, outside the exe
 
 The installer is unsigned by maintainer decision (2026-11-06).
 `vendor/keyboard_layout/install_keyboard_layout.ps1` runs elevated: it copies the
 builds into System32 and SysWOW64 and registers the layout under the first free
 `A0nn040C` KLID. `add_user_keyboard_layout.ps1` then adds it to the user's
-languages, as the user. The driver runs both from Layout > « Install the Ergopti
-system layout » and switches to the layout; `Ergopti_windows_layout.zip` (CI
-artifact `ergopti-keyboard-layout-windows`, `install.cmd`) runs the same two
-scripts without the driver. `tools/test/test-windows-keyboard-layout.ps1` installs
-the build on the CI runner, asks `ToUnicodeEx` what keys type and removes it.
+languages, as the user. The package's `install.cmd` runs both.
 
-The release still publishes the KbdEdit-made `Ergopti_windows.exe` as the
-stand-alone layout asset; replacing it with the generated package is a release
-decision left to the maintainer.
+`ErgoptiPlus.exe` carries neither these scripts nor the DLLs (provisional
+coordinator decision of 2026-11-07, `docs/memory/maintainer-decisions.md`): the
+exclude group `system-layout-installer` of `tools/build/windows_bundle_manifest.json`
+keeps `vendor/keyboard_layout` out of the bundle, whose UAC wording and P/Invoke
+counts `tools/test/test-windows-exe-av-surface.cjs` holds. Layout > « Download the
+Ergopti system layout installer » says whether the layout is installed and opens
+the package of the running release (`/releases/download/<tag>/`), or in a source
+run the stable channel's latest one or the releases page.
+`tools/test/test-windows-keyboard-layout.ps1` installs the build on the CI runner,
+asks `ToUnicodeEx` what keys type and removes it.
+
+The release also still publishes the KbdEdit-made `Ergopti_windows.exe`; dropping it
+for the generated package is a release decision left to the maintainer.

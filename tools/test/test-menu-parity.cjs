@@ -1249,8 +1249,9 @@ OPENS_SUBMENU.layout_variant_choices = [
 	'layout_bundle_variant_add'
 ].map(layoutOwner);
 
-// Windows draws « Install the Ergopti system layout » from the install state:
-// the install command when absent, the update command for another build.
+// Windows draws « Download the Ergopti system layout installer » from the
+// install state: the download command when absent, the update download under
+// an installed one.
 OPENS_SUBMENU.layout_system_install = [
 	'layout_system_install_commands',
 	'layout_system_update_commands'

@@ -207,6 +207,7 @@ jobs:
           for asset in \
               ErgoptiPlus.exe \
               Ergopti_windows.exe \
+              Ergopti_windows_layout.zip \
               ErgoptiPlus.app.zip \
               Ergopti_macOS.zip \
               _ErgoptiPlus.app.zip.sig \
@@ -577,6 +578,7 @@ jobs:
           | Platform | Download | Installation |
           |---|---|---|
           | Windows | [Ergopti_windows.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_windows.exe) | Run as Administrator, log out and back in, then select the layout in Settings → Time & Language → Language & region. |
+          | Windows (generated from the .keylayout) | [Ergopti_windows_layout.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_windows_layout.zip) | Unzip, run \`install.cmd\` and accept the administrator prompt (the installer is not signed); the layout is added to your languages. Ergopti Plus opens this download from Layout. |
           | macOS | [Ergopti_macOS.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_macOS.zip) | Unzip, copy the \`.bundle\` folder to \`/Library/Keyboard Layouts/\`, log out and back in, then add it in System Settings → Keyboard → Input Sources. |
           | Linux | [Ergopti_xkb.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_xkb.zip) | Follow the [XKB installation guide](https://github.com/${GITHUB_REPOSITORY}/tree/main/static/ergopti/linux/xkb_installation). Includes standard, ANSI, plus and plus-ANSI variants. |
 
