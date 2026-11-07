@@ -341,6 +341,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-prompt-editor-raw-whitespace.cjs"],
 			"repro": "npm run test:prompt-editor-raw-whitespace"
+		},
+		{
+			"id": "layout-source",
+			"ordinal": 604,
+			"name": "versioned layout source preserves imported keylayout and refuses unimplemented exports",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-source.cjs"],
+			"repro": "npm run test:layout-source"
 		}
 	]
 }
