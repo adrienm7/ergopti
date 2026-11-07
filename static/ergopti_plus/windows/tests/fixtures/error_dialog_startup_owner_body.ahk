@@ -258,6 +258,10 @@ _EDOS_Check() {
 		"The genuine source error must reach the actual private errors file.")
 	if InStr(_EDOS.Mode, "current") == 1 {
 		_EDOS_Require(_EDOS.Pages.Length == 1 && _EDOS_Ready(A), "The current positive must retain its complete open session.")
+		FileAppend("REPORT error-dialog-startup schema_version=" . _ED_Session["snapshot"]["schema_version"]
+			. " recent_source=" . _ED_Session["snapshot"]["sections"]["issues"]["recent_source"]
+			. " source_text=" . (InStr(_ED_Session["report"]["text"], "Controlled source error A") > 0)
+			. " log_path_match=" . (_ED_Session["log_path"] == LoggerTodayErrorsPath()) . "`n", "*", "UTF-8")
 		_EDOS_Require(_ED_Session["snapshot"]["schema_version"] == 2
 			&& _ED_Session["snapshot"]["sections"]["issues"]["recent_source"] == "errors_file"
 			&& InStr(_ED_Session["report"]["text"], "Controlled source error A") > 0
