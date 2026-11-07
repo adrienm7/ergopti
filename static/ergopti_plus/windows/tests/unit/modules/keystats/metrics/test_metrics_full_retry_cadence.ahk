@@ -64,7 +64,7 @@ _MFR_DrainAll() {
 
 _MFR_ManifestDrainKeepsRetryOwner() {
 	global _KLPFW_FakeArgs, _KLPFW_FullBuildTimers, _KLPFW_IngestDrainTimers
-	AssertTrue(KLWV_DelayedFullBuild("typing", 501, 0))
+	AssertTrue(KLWV_DelayedFullBuild("typing", 501, 0), "the delayed full build must start; build refusal: " . KLPF_LastBuildRefusal())
 	KLWV_NotifyIngest("manifest")
 	AssertEqual("manifest", KLWV.windows["typing"]["pending_ingest_mode"])
 	_MFR_FailActive()
@@ -84,7 +84,7 @@ Test("metrics retries: coalesced manifest cannot bypass historical backoff (metr
 
 _MFR_ExhaustionRecoversAfterCommit() {
 	global _KLPFW_FakeArgs, _KLPFW_FullBuildTimers
-	AssertTrue(KLWV_DelayedFullBuild("typing", 501))
+	AssertTrue(KLWV_DelayedFullBuild("typing", 501), "the delayed full build must start; build refusal: " . KLPF_LastBuildRefusal())
 	Loop KLWV.FULL_BUILD_MAX_RETRIES + 1 {
 		KLWV_NotifyIngest("manifest")
 		_MFR_FailActive()
@@ -110,7 +110,7 @@ Test("metrics retries: exhaustion retains deferred committed input (metrics-full
 
 _MFR_CommitDuringWorker() {
 	global _KLPFW_FakeArgs, _KLPFW_FullBuildTimers
-	AssertTrue(KLWV_DelayedFullBuild("typing", 501))
+	AssertTrue(KLWV_DelayedFullBuild("typing", 501), "the delayed full build must start; build refusal: " . KLPF_LastBuildRefusal())
 	KLWV_RecordCommittedIngest()
 	_MFR_FailActive()
 	AssertEqual(0, _KLPFW_FullBuildTimers.Length, "new committed input supersedes retrying the old input")
@@ -123,7 +123,7 @@ Test("metrics retries: a commit during the failed worker owns immediate recovery
 
 _MFR_StaleTimerCannotBorrowSuccessor() {
 	global _KLPFW_FakeArgs, _KLPFW_FullBuildTimers
-	AssertTrue(KLWV_DelayedFullBuild("typing", 501))
+	AssertTrue(KLWV_DelayedFullBuild("typing", 501), "the delayed full build must start; build refusal: " . KLPF_LastBuildRefusal())
 	_MFR_FailActive()
 	Old := _KLPFW_FullBuildTimers.RemoveAt(1)["callback"]
 	KLWV_NotifyIngest("live")
@@ -141,7 +141,7 @@ Test("metrics retries: stale timer cannot borrow a successor revision (metrics-f
 
 _MFR_TimerRefusalKeepsRecovery() {
 	KLWV.full_build_timer_fn := (*) => false
-	AssertTrue(KLWV_DelayedFullBuild("typing", 501))
+	AssertTrue(KLWV_DelayedFullBuild("typing", 501), "the delayed full build must start; build refusal: " . KLPF_LastBuildRefusal())
 	_MFR_FailActive()
 	AssertFalse(KLWV.windows["typing"].Has("full_build_retry_owner"), "a refused timer cannot retain phantom ownership")
 	KLWV_NotifyIngest("manifest")
@@ -154,7 +154,7 @@ Test("metrics retries: scheduler refusal releases ownership and admits new input
 
 _MFR_PausedRetryWithNewInput() {
 	global _KLPFW_FullBuildTimers, _KLPFW_FakeArgs
-	AssertTrue(KLWV_DelayedFullBuild("typing", 501))
+	AssertTrue(KLWV_DelayedFullBuild("typing", 501), "the delayed full build must start; build refusal: " . KLPF_LastBuildRefusal())
 	_MFR_FailActive()
 	Suspend(true)
 	_KLPFW_FullBuildTimers.RemoveAt(1)["callback"].Call()

@@ -97,6 +97,9 @@ class KLPFWorker {
 		static owner_id := KLPF_NewOwnerId()
 		static process_id := DllCall("Kernel32\GetCurrentProcessId", "UInt")
 		static jobs := Map()
+		; Why the last KLPF_RequestBuild returned false, "" after one that started:
+		; the caller only sees false, and the reason names the refusing step.
+		static last_build_refusal := ""
 		; Test seam: production leaves this at 0 and always uses ShellRunner.
 		static spawn_fn := 0
 		; Test seam for atomic-publication failure; production uses KLPF_MoveAtomic.
@@ -465,18 +468,32 @@ KLPF_ForegroundProjectionSourceCurrent(Receipt) {
 	return Compatible && KLPF_ForegroundProjectionCurrent(Receipt)
 }
 
+; Records why KLPF_RequestBuild refuses, so its false names the refusing step.
+; @param Reason {String} The closed reason, or an exception's message and origin.
+; @returns {Boolean} false, the request's result.
+_KLPF_RefuseBuild(Reason) {
+		KLPFWorker.last_build_refusal := Reason
+		return false
+}
+
+; @returns {String} Why the last KLPF_RequestBuild refused, "" when it started.
+KLPF_LastBuildRefusal() {
+		return KLPFWorker.last_build_refusal
+}
+
 KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal := unset, replace_active := true,
 		HistorySeed := unset) {
 		global _ConfigDir
+		KLPFWorker.last_build_refusal := ""
 		terminal := IsSet(on_terminal) ? on_terminal : 0
 		if A_IsSuspended || (which != "typing" && which != "apps") || (metrics_dir = "")
 				|| (mode != "full" && mode != "live" && mode != "manifest") {
 				KLPF_InvokeTerminal(terminal, A_IsSuspended ? "canceled" : "failed")
-				return false
+				return _KLPF_RefuseBuild(A_IsSuspended ? "the driver is paused" : "an unknown dashboard, an empty store or an unknown mode")
 		}
 		if KLPF_ReloadKeepsWorkersOut() {
 				KLPF_InvokeTerminal(terminal, "canceled")
-				return false
+				return _KLPF_RefuseBuild("reload handoff keeps workers out")
 		}
 
 		Destination := KLPF_PrefetchPath(which, metrics_dir)
@@ -485,13 +502,13 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 		; one dirty bit and coalesces every intervening ingest behind that owner.
 		if KLPFWorker.jobs.Has(which) {
 				if !replace_active
-						return false
+						return _KLPF_RefuseBuild("an active projection owns the dashboard (no replacement)")
 				KLPF_CancelBuild(which)
 				; A terminal callback is allowed to install a newer owner. Never let the
 				; older request which triggered cancellation overwrite that re-entrant job.
 				if KLPFWorker.jobs.Has(which) {
 						KLPF_InvokeTerminal(terminal, "canceled")
-						return false
+						return _KLPF_RefuseBuild("a re-entrant owner replaced the canceled projection")
 				}
 		}
 
@@ -523,10 +540,10 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 				try LoggerError("KLReader", "Could not capture the foreground projection for '{1}': {2} ({3}:{4})",
 						which, Err.Message, Err.File, Err.Line)
 				KLPF_CompleteJob(which, generation, "failed")
-				return false
+				return _KLPF_RefuseBuild("foreground capture threw: " . Err.Message . " (" . Err.File . ":" . Err.Line . ")")
 		}
 		if !KLPFWorker.jobs.Has(which) || KLPFWorker.jobs[which] != job
-				return false
+				return _KLPF_RefuseBuild("the reservation changed during the foreground capture")
 		job["foreground"] := Foreground
 		try FileDelete(stage)
 		if IsSet(HistorySeed) {
@@ -540,11 +557,11 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 				} catch as Err {
 						try LoggerError("KLReader", "Could not prepare metrics history request: {1}", Err.Message)
 						KLPF_CompleteJob(which, generation, "failed")
-						return false
+						return _KLPF_RefuseBuild("the history request could not be prepared")
 				}
 				if !KLPFWorker.jobs.Has(which) || KLPFWorker.jobs[which] != job {
 						KLPF_DeletePrivateStage(job["request"])
-						return false
+						return _KLPF_RefuseBuild("the reservation changed while the history request was written")
 				}
 		}
 		executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
@@ -559,7 +576,7 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 				try args.Push(KL_JsonEncode(Foreground.Wire))
 				catch {
 						KLPF_CompleteJob(which, generation, "failed")
-						return false
+						return _KLPF_RefuseBuild("the foreground receipt could not be encoded")
 				}
 		}
 		done := KLPF_OnWorkerDone.Bind(which, generation)
@@ -569,7 +586,7 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 		catch as err {
 				try LoggerError("KLReader", "Could not spawn background metrics projection for '{1}': {2}", which, err.Message)
 				KLPF_CompleteJob(which, generation, "failed")
-				return false
+				return _KLPF_RefuseBuild("the worker could not be spawned")
 		}
 		; Cancellation may have won while ShellRunner_Spawn yielded. Validate the
 		; reservation and publish its process handle without an interruptible gap:
@@ -579,7 +596,7 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 			if !KLPFWorker.jobs.Has(which)
 					|| KLPFWorker.jobs[which]["generation"] != generation {
 				try handle.terminate()
-				return false
+				return _KLPF_RefuseBuild("cancellation won before the worker handle was published")
 			}
 			job["handle"] := handle
 		} finally {
@@ -589,13 +606,13 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 		catch as err {
 				try LoggerError("KLReader", "Could not start background metrics projection for '{1}': {2}", which, err.Message)
 				KLPF_CompleteJob(which, generation, "failed")
-				return false
+				return _KLPF_RefuseBuild("the worker could not be started")
 		}
 		if !KLPFWorker.jobs.Has(which)
 				return true
 		if !started {
 				KLPF_CompleteJob(which, generation, "failed")
-				return false
+				return _KLPF_RefuseBuild("the worker refused to start")
 		}
 		return true
 }
