@@ -877,9 +877,9 @@
 		},
 		{
 			"os": "linux",
-			"tool": "`xdg-open`, `xdg-screensaver`, `loginctl`",
-			"programs": ["xdg-open", "xdg-screensaver", "loginctl"],
-			"used_for": "Open a URL, lock the screen (`linux/modules/shortcuts/chatgpt.lua:124`, `linux/modules/gestures/manager.lua:516`)",
+			"tool": "`xdg-open`, `xdg-mime`, `xdg-screensaver`, `loginctl`, `systemd-inhibit`",
+			"programs": ["xdg-open", "xdg-mime", "xdg-screensaver", "loginctl", "systemd-inhibit"],
+			"used_for": "Open a URL or daily note, query the default text editor, lock the screen, inhibit session idle (`linux/modules/shortcuts/chatgpt.lua`, `linux/modules/take_note.lua`, `linux/modules/gestures/system_actions.lua`, `linux/modules/keep_awake.lua`)",
 			"today": "Host",
 			"current_class": "SYS",
 			"version_needed": "any",
