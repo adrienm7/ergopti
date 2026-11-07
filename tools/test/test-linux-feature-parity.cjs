@@ -103,6 +103,28 @@ const beforeInventory = inventory.render(
 	inventoryActions,
 	inventoryMenu
 );
+// Hidden rows resolve their translation key through the registry, not reason_key.
+const hiddenProfileRow = JSON.parse(beforeInventory['src/routes/ergopti-plus/menu-gaps.json']).find(
+	(row) => row.path === 'llm_custom_profile_controls.llm_profile_shortcut'
+);
+assert.ok(hiddenProfileRow, 'the restricted profile shortcut row must be inventoried');
+const hiddenProfileReasons = JSON.parse(
+	fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/_shared/modules/menu/hidden_row_reasons.json'),
+		'utf8'
+	)
+);
+const hiddenProfileReason =
+	hiddenProfileReasons[hiddenProfileRow.path] || hiddenProfileReasons.llm_custom_profile_controls;
+assert.notStrictEqual(
+	inventoryLocales.fr[hiddenProfileReason],
+	inventoryLocales.en[hiddenProfileReason]
+);
+assert.strictEqual(
+	hiddenProfileRow.reasons.linux.fr,
+	inventoryLocales.fr[hiddenProfileReason],
+	'the French inventory must use the translated hidden-row reason'
+);
 const unexplainedModel = structuredClone(inventoryModel);
 const unexplained = unexplainedModel.find((row) => row.platforms.length < 3);
 delete unexplained.reason_key;
