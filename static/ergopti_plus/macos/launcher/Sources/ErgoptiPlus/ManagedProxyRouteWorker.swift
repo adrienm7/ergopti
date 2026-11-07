@@ -3,11 +3,14 @@
 
 import CFNetwork
 import Foundation
+import Network
 
 /// An Ollama daemon Ergopti starts cannot evaluate a PAC: it reads only
 /// HTTPS_PROXY. This role resolves the origin through the same native lookup
-/// the managed downloader uses and prints the first route, so the shell that
-/// starts the daemon can hand it that one variable.
+/// the managed downloader uses and prints the first reachable route, so the
+/// shell that starts the daemon can hand it that one variable. A relay with
+/// another PAC entry after it is probed within the shared deadline; the last
+/// entry is kept unprobed, as on Linux and Windows.
 ///
 /// Protocol: `--managed-proxy-route <https-url> <budget-seconds>`.
 /// stdout, exit 0: one line, `ROUTE direct` or `ROUTE <scheme>://<host>:<port>`.
@@ -52,16 +55,60 @@ enum ManagedProxyRouteWorker {
 		return scheme + "://" + authority + ":" + String(port.intValue)
 	}
 
-	/// The two output lines a lookup result maps to.
-	/// - Returns: (stdout, stderr), exactly one of them non-nil.
-	static func outcome(_ result: Result<[[String: Any]], ManagedLookupFailure>) -> (route: String?, stage: String?) {
+	/// A TCP connection probe, including asynchronous DNS, bounded by the caller.
+	/// Network.framework owns address iteration. Cancellation is requested before
+	/// returning; the headless role bounds any remaining asynchronous retirement.
+	static func tcpReachable(host: String, port: Int, budget: TimeInterval) -> Bool {
+		guard budget.isFinite, budget > 0, let number = UInt16(exactly: port),
+			number > 0, let endpoint = NWEndpoint.Port(rawValue: number) else { return false }
+		let connection = NWConnection(host: NWEndpoint.Host(host), port: endpoint, using: .tcp)
+		let queue = DispatchQueue(label: "com.ergopti.managed-route-probe")
+		let completed = DispatchSemaphore(value: 0)
+		let lock = NSLock()
+		var reachable = false
+		connection.stateUpdateHandler = { state in
+			switch state {
+			case .ready:
+				lock.lock(); reachable = true; lock.unlock()
+				completed.signal()
+			case .failed, .waiting, .cancelled: completed.signal()
+			default: break
+			}
+		}
+		connection.start(queue: queue)
+		let settled = completed.wait(timeout: .now() + budget) == .success
+		connection.cancel()
+		lock.lock()
+		defer { lock.unlock() }
+		return settled && reachable
+	}
+
+	/// Walks the ordered PAC selections, keeping the last relay unprobed.
+	/// - Returns: (stdout, stderr), exactly one of them non-nil. A spent probe
+	///   deadline is a dispatch refusal, never evidence of an unavailable PAC.
+	static func outcome(_ result: Result<[[String: Any]], ManagedLookupFailure>, deadline: TimeInterval,
+		probe: (String, Int, TimeInterval) -> Bool = tcpReachable,
+		now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) -> (route: String?, stage: String?) {
 		switch result {
 		case .failure(let failure): return (nil, failure.stage.rawValue)
 		case .success(let routes):
-			// Ollama has no failover: only the first selection is used.
-			guard let first = routes.first else { return (nil, ManagedHTTPFailureStage.routeEmpty.rawValue) }
-			guard let text = text(for: first) else { return (nil, ManagedHTTPFailureStage.proxyDictionary.rawValue) }
-			return (text, nil)
+			guard !routes.isEmpty else { return (nil, ManagedHTTPFailureStage.routeEmpty.rawValue) }
+			let texts = routes.compactMap { text(for: $0) }
+			guard texts.count == routes.count else { return (nil, ManagedHTTPFailureStage.proxyDictionary.rawValue) }
+			for (index, route) in routes.enumerated() {
+				let remaining = deadline - now()
+				guard remaining > 0 else { return (nil, ManagedHTTPFailureStage.dispatchDeadline.rawValue) }
+				let selected = texts[index]
+				if selected == "direct" || index == routes.count - 1 { return (selected, nil) }
+				guard let host = route[kCFProxyHostNameKey as String] as? String,
+					let port = route[kCFProxyPortNumberKey as String] as? NSNumber else {
+					return (nil, ManagedHTTPFailureStage.proxyDictionary.rawValue)
+				}
+				let reachable = probe(host, port.intValue, min(LauncherTimings.managedProxyProbeTimeout.seconds, remaining))
+				guard now() < deadline else { return (nil, ManagedHTTPFailureStage.dispatchDeadline.rawValue) }
+				if reachable { return (selected, nil) }
+			}
+			return (nil, ManagedHTTPFailureStage.routeEmpty.rawValue)
 		}
 	}
 
@@ -77,9 +124,10 @@ enum ManagedProxyRouteWorker {
 		settingsProvider: () -> CFDictionary? = { CFNetworkCopySystemProxySettings()?.takeRetainedValue() }) -> Int32 {
 		guard arguments.count == 4, let url = origin(arguments[2]), let budget = Double(arguments[3]),
 			budget.isFinite, budget > 0, budget <= maximumBudgetSeconds else { return usageExit }
+		let deadline = ProcessInfo.processInfo.systemUptime + budget
 		let result = ManagedProxyLookup.resolve(url: url, budget: budget, maximumSelections: maximumSelections,
 			settingsProvider: settingsProvider)
-		let decided = outcome(result)
+		let decided = outcome(result, deadline: deadline)
 		if let route = decided.route {
 			print("ROUTE " + route)
 			return 0

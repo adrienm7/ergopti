@@ -8,7 +8,7 @@
  * Mac whose only proxy source is a company PAC could never pull a model. The
  * launcher role `--managed-proxy-route` resolves the registry through the
  * system (CFNetwork, PAC and WPAD included) and network-retry.sh exports the
- * first route it names. The Swift cannot be compiled on this host: this gate
+ * first reachable route it names. The Swift cannot be compiled on this host: this gate
  * pins its source contract, then runs the REAL shell policy under bash against
  * a fake launcher to prove the admission and the exported variables.
  * ==============================================================================
@@ -131,6 +131,19 @@ check('the Go transport replays every shared failure stage with an allowed reaso
 	assert.equal(rows.length, stages.length, 'the Go replay names only shared stages, once each');
 });
 
+check('the TCP list-walk deadline comes from the shared LLM timing', () => {
+	const timing = require('smol-toml').parse(
+		read(path.join(root, 'static/ergopti_plus/_shared/modules/timings/constants.toml'))
+	).llm.managed_proxy_probe_timeout_ms;
+	const generated = read(path.join(sources, 'LauncherTimings.generated.swift'));
+	assert.ok(
+		generated.includes(
+			`static let managedProxyProbeTimeout = RegistryDuration(section: "llm", key: "managed_proxy_probe_timeout_ms", milliseconds: ${timing})`
+		)
+	);
+	assert.ok(worker.includes('LauncherTimings.managedProxyProbeTimeout.seconds'));
+});
+
 check('the refusal exit code is the one the shell policy treats as a refusal', () => {
 	const shell = /OPAQUE_NETWORK_REFUSAL_EXIT_CODE=(\d+)/.exec(policyText);
 	const swift = /static let unusableExit: Int32 = (\d+)/.exec(worker);
@@ -165,8 +178,18 @@ check('the XCTest file covers the exportable and the refused shapes', () => {
 		'testOriginMustBeAnHttpsUrlWithoutCredentials',
 		'testArgumentsOutsideTheContractAreAUsageError',
 		'testUnreadableSettingsExitWithTheLookupStage',
-		'testAStaticPacScriptSelectsTheFirstRoute',
-		'testAPacThatSaysDirectIsExportedAsDirect'
+		'testAStaticPacScriptSelectsTheFirstReachableRoute',
+		'testAPacThatSaysDirectIsExportedAsDirect',
+		'testPacListWalkSkipsUnreachableRelayBeforeDirect',
+		'testPacListWalkKeepsReachableRelayAndStopsBeforeDirect',
+		'testPacListWalkKeepsLastRelayUnprobed',
+		'testPacListWalkDirectNeverProbesLaterRelays',
+		'testPacListWalkRefusesMalformedLaterRouteBeforeProbing',
+		'testPacListWalkBudgetExpiryNeverInventsDirect',
+		'testPacListWalkBudgetExpiryRejectsLateSuccess',
+		'testPacListWalkExhaustedLookupBudgetNeverStartsProbe',
+		'testNativeTcpProbeRejectsInvalidBudgetAndPort',
+		'testNativeTcpProbeReachesListenerAndRetiresConnection'
 	]) {
 		assert.ok(swiftTests.includes(`func ${name}()`), name);
 	}

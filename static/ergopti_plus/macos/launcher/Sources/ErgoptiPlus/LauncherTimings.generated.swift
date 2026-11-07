@@ -6,7 +6,8 @@
 // MODULE: Launcher Timings
 // DESCRIPTION:
 // The [launcher] section of the timing registry: every sleep and poll interval
-// of the launcher, its fixtures and its tests, in the units the sleep APIs take.
+// of the launcher, its fixtures and its tests, plus the shared LLM route-probe
+// budget, in the units the sleep APIs take.
 // ==============================================================================
 
 import Foundation
@@ -59,4 +60,5 @@ enum LauncherTimings {
 	static let testLeaseLineInterval = RegistryDuration(section: "launcher", key: "test_lease_line_interval_ms", milliseconds: 50)
 	static let testLateRelaunchSettle = RegistryDuration(section: "launcher", key: "test_late_relaunch_settle_ms", milliseconds: 250)
 	static let testSlowSettingsRead = RegistryDuration(section: "launcher", key: "test_slow_settings_read_ms", milliseconds: 20)
+	static let managedProxyProbeTimeout = RegistryDuration(section: "llm", key: "managed_proxy_probe_timeout_ms", milliseconds: 1000)
 }
