@@ -527,6 +527,10 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth, PopulationOwner := unset, Requir
 		try LoggerWarn("MenuRenderer", "List '{1}' produced no row array — skipped.", ListId)
 		return 0
 	}
+	; A tracked call renders a batch of a leaf whose complete list
+	; MenuPopulation.Fill already made distinct; the batch alone cannot see it.
+	if !RequireTracking
+		Rows := _MR_NativeDistinctRows(Rows)
 
 	Added := 0
 	for Row in Rows {
@@ -735,6 +739,60 @@ _MR_DeclaredTwinLabel(TargetMenu, RowKey, Label) {
 		Label .= ZeroWidthSpace
 	Names[Label] := RowKey
 	return Label
+}
+
+; Keep every row of one list its own native item.
+;
+; AHK names menu items with the user locale's comparison, which gives some
+; symbols no weight: « Ergopti » and « Ergopti➕ » (U+2795) name ONE item, so the
+; later Menu.Add updates the earlier row in place and its command is never
+; registered. A later row whose different caption the native match merges with an
+; earlier one gets a zero-width space per collision, as declared twins do. The
+; same caption drawn again keeps Menu.Add's in-place update. Only the native name
+; differs: the provider's row Maps are left untouched.
+; @param Rows {Array} The complete row list of one native menu.
+; @returns {Array} Rows, with a relabelled copy in place of each colliding row.
+_MR_NativeDistinctRows(Rows) {
+	static ZeroWidthSpace := Chr(0x200B), MaxSuffixes := 8
+	if !(Rows is Array)
+		return Rows
+	; Locale-equal captions share their letters and digits, so only captions with
+	; the same skeleton need the comparison.
+	Buckets := Map()
+	Distinct := []
+	for Row in Rows {
+		if !(Row is Map) || !Row.Has("label") || !(Row["label"] is String) || Row["label"] == "" {
+			Distinct.Push(Row)
+			continue
+		}
+		Label := Row["label"]
+		Skeleton := StrLower(RegExReplace(Label, "[^\p{L}\p{N}]"))
+		if !Buckets.Has(Skeleton)
+			Buckets[Skeleton] := []
+		Bucket := Buckets[Skeleton]
+		Suffixes := 0
+		loop {
+			Merged := false
+			for Earlier in Bucket {
+				if StrCompare(Earlier, Label, "Locale") == 0 && StrCompare(Earlier, Label) != 0 {
+					Merged := true
+					break
+				}
+			}
+			if !Merged
+				break
+			if ++Suffixes > MaxSuffixes
+				throw Error("Menu caption '" . Row["label"] . "' cannot be made a distinct native item")
+			Label .= ZeroWidthSpace
+		}
+		if Label !== Row["label"] {
+			Row := Row.Clone()
+			Row["label"] := Label
+		}
+		Bucket.Push(Label)
+		Distinct.Push(Row)
+	}
+	return Distinct
 }
 
 ; Whether a native row of TargetMenu already carries Caption, compared as AHK

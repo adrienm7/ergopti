@@ -538,3 +538,45 @@ _MPA_RearmAdmission() {
 }
 Test("menu population: actual one-shot rearm refusal retains a retryable native menu cursor (menu-population-admission-transaction)",
 	_MPA_RearmAdmission)
+
+; AHK names native items with the user locale's comparison, which gives U+2795
+; no weight. The layout-to-emulate leaf lists « Ergopti » before « Ergopti➕ »:
+; without distinct native names the second Add updated the first row in place,
+; the leaf refused its registration, and the full-driver startup smoke failed.
+_MP_LocaleTwinChoices() {
+	global _MenuPopulationBuilding, _MenuPopulationPublished, _MenuDispatchTokens
+	SavedBuild := _MenuPopulationBuilding
+	SavedPublished := _MenuPopulationPublished
+	Plus := "Ergopti" . Chr(0x2795)
+	Rows := [Map("label", "None", "action", (*) => 0),
+		Map("label", "Ergopti", "action", (*) => 0),
+		Map("label", Plus, "action", (*) => 0)]
+	Owner := MenuPopulation()
+	Root := Menu()
+	try {
+		_MenuPopulationBuilding := Owner
+		_MR_RenderRows(Root, [Map("label", "Emulation", "items", Rows)], "test_locale_twins", 1)
+		LeafHandle := DllCall("GetSubMenu", "ptr", Root.Handle, "int", 0, "ptr")
+		Leaf := Owner.Pending[LeafHandle].MenuObj
+		MenuPopulation_Publish(Root)
+		_MenuPopulationBuilding := false
+		AssertTrue(Owner.Complete(LeafHandle), "the leaf registers every distinct choice")
+		AssertEqual(3, _MenuItemCount(Leaf), "each choice is its own native item")
+		AssertEqual("Ergopti", _MP_ReadLabel(Leaf, 1), "the earlier caption is drawn as declared")
+		AssertEqual(1, InStr(_MP_ReadLabel(Leaf, 2), Plus), "the later caption reads as declared")
+		Ids := Map()
+		Loop 3 {
+			Id := _MenuItemIdAtPosition(Leaf, A_Index - 1)
+			AssertTrue(Id && _MenuDispatchTokens.Has(Id), "every choice owns a tracked command")
+			Ids[Id] := true
+		}
+		AssertEqual(3, Ids.Count, "no choice shares another one's command")
+		AssertEqual(Plus, Rows[3]["label"], "the provider's row keeps its declared caption")
+	} finally {
+		Owner.Stop()
+		_MenuPopulationBuilding := SavedBuild
+		_MenuPopulationPublished := SavedPublished
+	}
+}
+Test("menu population: captions the native name match merges stay distinct choices (menu-native-distinct-captions)",
+	_MP_LocaleTwinChoices)
