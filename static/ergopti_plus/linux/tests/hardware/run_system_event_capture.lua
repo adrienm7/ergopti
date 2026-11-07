@@ -30,8 +30,10 @@ Shell.has_command = function(name, ...)
 	if name == "nmcli" or name == "loginctl" or name == "pactl" then return true end
 	return original_has(name, ...)
 end
+-- The network read is matched by program and fields, not its whole spelling:
+-- the sampler's flags (--colors no) once moved and left every wifi change unseen.
 Shell.exec_line = function(command)
-	if command:find("nmcli -t -f active,ssid", 1, true) then calls.network = calls.network + 1; return "yes:" .. network end
+	if command:find("nmcli", 1, true) and command:find("-f active,ssid", 1, true) then calls.network = calls.network + 1; return "yes:" .. network end
 	if command:find("loginctl show-session", 1, true) then calls.lock = calls.lock + 1; return locked and "yes" or "no" end
 	if command:find("pactl get-sink-mute", 1, true) then calls.mute = calls.mute + 1; return "Mute: no" end
 	return original_line(command)
