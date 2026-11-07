@@ -89,23 +89,4 @@ function exportXkb(document) {
 	};
 }
 
-/** Augment the pure browser model's report with the installed tooling route. */
-function targetReport(document) {
-	const reports = loadLayoutSource().capabilities(document);
-	const index = reports.findIndex((entry) => entry.target === 'linux');
-	try {
-		reports[index] = exportXkb(document).report;
-	} catch (error) {
-		reports[index] = {
-			target: 'linux',
-			status: 'unavailable',
-			artifact: 'xkb',
-			reason: error.message,
-			blockers: [error.message],
-			...(error.details ? { details: error.details } : {})
-		};
-	}
-	return reports;
-}
-
-module.exports = { exportXkb, targetReport };
+module.exports = { exportXkb };

@@ -10,7 +10,7 @@ inline tables and arrays of tables are accepted. A canonical save retains data,
 not TOML comments or formatting.
 
 The generator foundation provides validation, interchange, an exact `.keylayout`
-preservation path and a partial Linux XKB export of admitted imports. It does **not** compile the superset,
+preservation path and partial Linux XKB / Windows KLC exports of admitted imports. It does **not** compile the superset,
 install layouts, change a driver, create the ISO/ANSI bundle, or replace either
 editor. Those consumers must use this model when the existing composer,
 navigation layer editor and layout manager are unified. The target remains
@@ -27,6 +27,7 @@ npm run layout-source -- validate source.toml
 npm run layout-source -- report source.toml
 npm run layout-source -- export-keylayout source.toml restored.keylayout
 npm run layout-source -- export-xkb source.toml new-output-directory
+npm run layout-source -- export-klc source.toml new-output-directory
 ```
 
 `import` takes an explicit `iso` or `ansi` keycode convention; the XML itself
@@ -76,9 +77,51 @@ The common registry corpus currently exports all four Ergopti variants with
 document-specific partial reports; Bépo's alternative hardware maps and Ergo-L's
 character-key control outputs are refused. Tests compare admitted files against
 the existing converter byte for byte. Installation, native keyboard execution,
-Windows generation and macOS bundles remain separate work. The pure browser
+Windows DLL generation and macOS bundles remain separate work. The pure browser
 model stays conservative; the CLI's `report` augments it with the installed Lua
 tooling route, including runtime failures.
+
+`export-klc` requires the same Lua runtime and explicit Windows metadata:
+
+```toml
+[exports.windows]
+locale = "fr-FR"
+layout_id = "0000040c"
+dll_name = "kbdlocal"
+```
+
+It creates `<dll_name>.klc` (UTF-16LE with BOM and CRLF) and `export.json` in a
+new directory. `exportKlc(document)` in `tools/lib/layout-source-klc.cjs` returns
+the bytes/report without writing. The existing Windows generator owns every
+character row, Caps Lock flag, dead-key transition, ligature and native key name.
+Its current limits are four UTF-16 units per ligature, one UTF-16 unit per dead
+character/result, standard Caps Lock (no SGCAP/CAPLOKALTGR), and its existing
+virtual-key allocation. Omissions are refused, including non-BMP or multi-unit
+dead results, Caps-only keys the underlying model cannot emit, empty/unbound
+stateful actions, cycles in keymap inheritance and Windows-reserved U+F000–U+F002 output.
+Chained dead keys are accepted when every destination has an emitted dead key.
+
+The name is one to eight lowercase letters/digits, starting with a letter.
+`layout_id` must be a language LCID of the form `0000xxxx`; a custom `A0nnxxxx`
+keyboard-layout ID cannot be reserved by KLC and is refused. Locale/LCID pairing
+is retained as supplied, without claiming native Windows validation. The layout
+name and optional author are written; quotes, backslashes and controls in quoted
+metadata are refused. New artifacts explicitly start at version 1.0 because the
+source schema has no release-version field; this is not the TOML schema version.
+
+KLC reports **partial**: source Ctrl/Command combinations are not compiled, and
+their actual source cells for all 24 affected modifier combinations are reported.
+The report also retains each source mapping of system/keypad keys the character
+table does not own. Windows supplies its normal control-key behavior; the KLC
+generator emits the standard decimal point. Its assigned virtual keys are listed;
+source shortcuts are not inferred from displayed characters. This does not certify shortcuts,
+native loading or installation. No DLL, C sources or installer are published.
+
+The common corpus exports Ergopti and Ergopti ANSI. Ergopti+ variants are refused
+for their Caps Lock behavior; Bépo and Ergo-L keep the same structural/control
+refusals as XKB. Tests compare character tables with the existing Windows golden
+generator and exercise UTF-16 ligatures, chained dead keys, metadata and refusal
+before output-directory creation.
 
 ## Imported documents and the lossless boundary
 
@@ -140,7 +183,7 @@ does not claim that every syntactically valid name is implemented.
 | `tap_holds[]`        | `key`, `tap`, `threshold_ms`                         | Exactly one of `hold_layer` or `hold_modifier`, referencing its declaration. Threshold is a positive safe integer in milliseconds. `tap` is a mapping.                                                                                               |
 | `windows`            | None                                                 | Unique `flags[]` identifiers and `nls[]` records. Each NLS record has `key`, `modifiers[]`, `function`, with optional `parameter_key`, `keyup_function`, `keyup_parameter_key`; source chords are unique.                                            |
 | `exports.macos`      | `format`                                             | `bundle`, `iso` or `ansi`; the future ordinary export defaults to `bundle`. The preservation command refuses any format other than the import's convention.                                                                                          |
-| `exports.windows`    | None                                                 | `locale`, `layout_id`, `dll_name` strings, retained for the future unsigned DLL/installer generator.                                                                                                                                                 |
+| `exports.windows`    | None                                                 | `locale`, `layout_id`, `dll_name` strings. KLC requires all three; `layout_id` must be a language LCID, while custom KLIDs remain reserved for a future installer.                                                                                   |
 | `exports.linux`      | None                                                 | `name`, `description` strings. XKB export requires an identifier name and a description without quotes, backslashes or controls.                                                                                                                     |
 
 A key mapping has exactly one of `text`, `dead_key`, `action`, `key` or
@@ -203,9 +246,9 @@ format = "bundle"
 
 The report covers macOS, Linux, Windows, the three driver emulators and web.
 Only a preserved imported `.keylayout` can report `native`; this denotes its
-artifact format, not native execution evidence. The CLI's Linux route reports
+artifact format, not native execution evidence. The CLI's Linux and Windows routes report
 `partial` with its actual projection losses or `unavailable` with the refusal
-reason. The pure browser model reports `tooling_export_required` for Linux;
+reason. The pure browser model reports `tooling_export_required` for Linux and Windows;
 other unfinished routes report `exporter_not_implemented`. The preservation
 route names edits it cannot compile. These are tool limitations, not claims that
 the operating system cannot express a feature. No route reports `emulated`

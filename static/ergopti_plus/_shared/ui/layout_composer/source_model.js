@@ -44,7 +44,7 @@ var LayoutSource = (function () {
 	const TARGETS = [
 		{ target: 'macos', artifact: 'keylayout' },
 		{ target: 'linux', artifact: 'xkb', unavailable: 'tooling_export_required' },
-		{ target: 'windows', artifact: 'keyboard_dll' },
+		{ target: 'windows', artifact: 'klc', unavailable: 'tooling_export_required' },
 		{ target: 'driver_macos', artifact: 'emulation' },
 		{ target: 'driver_linux', artifact: 'emulation' },
 		{ target: 'driver_windows', artifact: 'emulation' },

@@ -492,6 +492,50 @@ function M.parse(text)
 end
 
 
+--- Reads the admitted native-conversion subset and rejects unresolved references.
+--- The preservation reader remains permissive; converters must not turn missing
+--- maps or actions into apparently intentional empty character cells.
+--- @param text string Original XML.
+--- @return table|nil canonical
+--- @return string|nil reason Stable conversion refusal.
+function M.parse_conversion(text)
+	local admitted, refusal = M.admit_conversion_source(text)
+	if not admitted then return nil, "unsupported_keylayout:" .. refusal end
+	local canonical, reason = M.parse(text)
+	if not canonical then return nil, "keylayout_parse:" .. tostring(reason) end
+	local sets, actions = {}, {}
+	for _, set in ipairs(canonical.key_map_sets) do
+		sets[set.id] = {}
+		for _, map in ipairs(set.key_maps) do sets[set.id][map.index] = map end
+	end
+	for _, action in ipairs(canonical.actions) do actions[action.id] = true end
+	local root = sets[canonical.map_set]
+	if not root[canonical.default_index] then return nil, "undefined_default_keymap" end
+	for _, select in ipairs(canonical.selects) do
+		if not root[select.index] then return nil, "undefined_selected_keymap:" .. select.index end
+	end
+	for _, maps in pairs(sets) do
+		for _, map in pairs(maps) do
+			if map.base and (not sets[map.base.set] or not sets[map.base.set][map.base.index]) then return nil, "undefined_base_keymap" end
+			for _, key in ipairs(map.keys) do
+				if key.action and not actions[key.action] then return nil, "undefined_key_action:" .. key.action end
+			end
+		end
+	end
+	for _, maps in pairs(sets) do
+		for _, map in pairs(maps) do
+			local seen, current = {}, map
+			while current do
+				if seen[current] then return nil, "cyclic_base_keymap" end
+				seen[current] = true
+				current = current.base and sets[current.base.set][current.base.index] or nil
+			end
+		end
+	end
+	return canonical
+end
+
+
 
 
 

@@ -18,7 +18,9 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { loadLayoutSource } = require('../lib/layout-source.cjs');
-const { exportXkb, targetReport } = require('../lib/layout-source-xkb.cjs');
+const { exportXkb } = require('../lib/layout-source-xkb.cjs');
+const { exportKlc } = require('../lib/layout-source-klc.cjs');
+const { targetReport } = require('../lib/layout-source-report.cjs');
 const { REPO_ROOT, shared } = require('../lib/paths.cjs');
 
 const Source = loadLayoutSource();
@@ -699,10 +701,211 @@ try {
 		false,
 		'conversion refusal creates no output directory'
 	);
+
+	const windowsMetadata = { locale: 'fr-FR', layout_id: '0000040c', dll_name: 'kbdtest' };
+	const forWindows = (xml, id = 'windows_sample') => ({
+		...Source.importKeylayout(xml, id, 'iso'),
+		exports: { windows: clone(windowsMetadata) }
+	});
+	const golden = require('../codegen/codegen-windows-keyboard-layout.cjs').buildSources();
+	for (const entry of index.layouts) {
+		const document = Source.importKeylayout(
+			fs.readFileSync(path.join(registry, entry.file), 'utf8'),
+			entry.id,
+			entry.keycode_convention
+		);
+		document.exports = { windows: clone(windowsMetadata) };
+		if (entry.id === 'bepo' || entry.id === 'ergol' || entry.id.startsWith('ergopti_plus')) {
+			assert.throws(
+				() => exportKlc(document),
+				entry.id === 'bepo' ? /multiple_layout/ : entry.id === 'ergol' ? /control_output/ : /SGCAP/
+			);
+			assert.equal(
+				targetReport(document).find((row) => row.target === 'windows').status,
+				'unavailable'
+			);
+			continue;
+		}
+		const compiled = exportKlc(Source.read(Source.write(document)));
+		const bytes = compiled.files.get('kbdtest.klc');
+		assert(Buffer.isBuffer(bytes));
+		assert.deepEqual([...bytes.subarray(0, 2)], [0xff, 0xfe]);
+		const decoded = bytes.subarray(2).toString('utf16le');
+		assert(!/(?<!\r)\n/u.test(decoded), 'MSKLC uses CRLF');
+		assert(decoded.includes('LOCALEID\t"0000040c"'));
+		assert.equal(compiled.report.dead_keys, 7);
+		assert.equal(compiled.report.ligatures, 9);
+		assert.equal(compiled.report.uncompiled_modifiers.length, 24);
+		if (entry.id === 'ergopti') {
+			const fromLayout = (text) =>
+				text.replace(/\r\n/g, '\n').split('\nSHIFTSTATE\n')[1].split('\nDESCRIPTIONS\n')[0];
+			assert.equal(
+				fromLayout(decoded),
+				fromLayout(golden.klc),
+				'existing Windows generator golden: all native rows, ligatures, dead transitions and key names'
+			);
+		}
+	}
+	const klcXml = `<keyboard name="Portable KLC">
+<layouts><layout first="0" last="255" mapSet="base" modifiers="m"/></layouts>
+<modifierMap id="m" defaultIndex="0"><keyMapSelect mapIndex="1"><modifier keys="anyShift"/><modifier keys="caps"/></keyMapSelect><keyMapSelect mapIndex="2"><modifier keys="anyOption anyShift? caps?"/></keyMapSelect><keyMapSelect mapIndex="3"><modifier keys="command"/></keyMapSelect></modifierMap>
+<keyMapSet id="base"><keyMap index="0"><key code="0" action="letter"/><key code="1" action="acute_key"/><key code="2" output="🦆"/><key code="3" output="ffi"/><key code="4" action="grave_key"/></keyMap><keyMap index="1" baseMapSet="base" baseIndex="0"><key code="0" action="upper"/></keyMap><keyMap index="2" baseMapSet="base" baseIndex="0"><key code="0" output="€"/></keyMap><keyMap index="3" baseMapSet="base" baseIndex="0"><key code="0" output="x"/></keyMap></keyMapSet>
+<actions><action id="letter"><when state="none" output="a"/><when state="acute" output="á"/><when state="grave" output="à"/></action><action id="upper"><when state="none" output="A"/><when state="acute" output="Á"/><when state="grave" output="À"/></action><action id="acute_key"><when state="none" next="acute"/><when state="acute" output="´"/></action><action id="grave_key"><when state="none" next="grave"/><when state="acute" next="grave"/><when state="grave" output="&#x0060;"/></action></actions>
+<terminators><when state="acute" output="´"/><when state="grave" output="&#x0060;"/></terminators>
+</keyboard>`;
+	const windowsSource = forWindows(klcXml);
+	windowsSource.layout.author = 'Zoë';
+	const nativeKlc = exportKlc(windowsSource);
+	const klcText = nativeKlc.files.get('kbdtest.klc').subarray(2).toString('utf16le');
+	assert(klcText.includes('COMPANY\t"Zoë"'));
+	assert(klcText.includes('VERSION\t1.0'));
+	assert(klcText.includes('d83e\tdd86'), 'non-BMP output is a UTF-16 ligature');
+	assert(klcText.includes('0066\t0066\t0069'), 'three-character ligature retained');
+	assert(klcText.includes('0060\t0060@'), 'dead-key chaining retained');
+	assert.match(klcText, /\tA\t1\t0061\t0041\t-1\t-1\t20ac\t20ac/, 'Caps Lock is carried by CAPLOK');
+	const command = nativeKlc.report.uncompiled_modifiers.find(
+		(row) => row.modifiers.length === 1 && row.modifiers[0] === 'command'
+	);
+	assert.equal(
+		command.source_cells.find((cell) => cell.code === 0).text,
+		'x',
+		'report preserves the actual uncompiled Command cell'
+	);
+	assert.deepEqual(nativeKlc.report.system_keys, [], 'no system mappings is an array');
+	assert.equal(nativeKlc.report.virtual_keys.find((key) => key.key === 'KeyA').virtual_key, 'A');
+	assert.throws(
+		() =>
+			exportKlc({ ...windowsSource, exports: { windows: { ...windowsMetadata, unknown: true } } }),
+		{ code: 'source_unknown_field' }
+	);
+	assert.equal(targetReport(windowsSource).find((row) => row.target === 'windows').artifact, 'klc');
+	for (const [label, mutate, reason] of [
+		['long ligature', (xml) => xml.replace('output="ffi"', 'output="abcde"'), /at most 4/],
+		[
+			'long dead result',
+			(xml) => xml.replace('output="á"', 'output="á"'),
+			/unrepresentable_dead_transitions/
+		],
+		[
+			'non-BMP dead result',
+			(xml) => xml.replace('output="á"', 'output="🦆"'),
+			/unrepresentable_dead_transitions/
+		],
+		[
+			'long terminator',
+			(xml) =>
+				xml.replace(
+					'<terminators><when state="acute" output="´"/>',
+					'<terminators><when state="acute" output="xx"/>'
+				),
+			/one-unit terminator/
+		],
+		[
+			'missing map',
+			(xml) => xml.replace('defaultIndex="0"', 'defaultIndex="99"'),
+			/undefined_default_keymap/
+		],
+		[
+			'cyclic base',
+			(xml) =>
+				xml.replace('<keyMap index="0">', '<keyMap index="0" baseMapSet="base" baseIndex="1">'),
+			/cyclic_base_keymap/
+		],
+		[
+			'missing action',
+			(xml) => xml.replace('action="letter"', 'action="missing"'),
+			/undefined_key_action/
+		],
+		[
+			'control output',
+			(xml) => xml.replace('output="ffi"', 'output="&#x0009;"'),
+			/control_output_on_character_key/
+		],
+		[
+			'reserved WCH_NONE',
+			(xml) => xml.replace('output="ffi"', 'output="&#xF000;"'),
+			/reserved_windows_character/
+		],
+		[
+			'reserved WCH_DEAD',
+			(xml) => xml.replace('output="á"', 'output="&#xF001;"'),
+			/reserved_windows_character/
+		],
+		[
+			'reserved WCH_LGTR',
+			(xml) => xml.replace('output="ffi"', 'output="a&#xF002;"'),
+			/reserved_windows_character/
+		],
+		[
+			'action identifier newline',
+			(xml) => xml.replaceAll('acute_key', 'acute&#x000a;key'),
+			/control_action_identifier/
+		],
+		[
+			'sided modifier',
+			(xml) => xml.replace('keys="command"', 'keys="rightShift"'),
+			/modifier:rightShift/
+		],
+		[
+			'state range',
+			(xml) => xml.replace('state="acute" output="á"', 'state="acute" through="9" output="á"'),
+			/attribute:when.through/
+		]
+	]) {
+		const mutated = mutate(klcXml);
+		assert.notEqual(mutated, klcXml, `${label}: mutation pin exists`);
+		assert.throws(() => exportKlc(forWindows(mutated)), reason, label);
+	}
+	const capsOnly = `<keyboard name="Caps only"><layouts><layout first="0" last="255" mapSet="base" modifiers="m"/></layouts><modifierMap id="m" defaultIndex="0"><keyMapSelect mapIndex="1"><modifier keys="caps"/></keyMapSelect></modifierMap><keyMapSet id="base"><keyMap index="0"><key code="0" output="a"/></keyMap><keyMap index="1" baseMapSet="base" baseIndex="0"><key code="1" output="s"/></keyMap></keyMapSet></keyboard>`;
+	assert.throws(() => exportKlc(forWindows(capsOnly)), /unrepresented_caps_character_key/);
+	for (const change of [
+		{ dll_name: '../file' },
+		{ dll_name: 'toolongname' },
+		{ locale: 'bad"locale' },
+		{ layout_id: 'a000040c' },
+		{ layout_id: '00000000' }
+	])
+		assert.throws(
+			() =>
+				exportKlc({ ...windowsSource, exports: { windows: { ...windowsMetadata, ...change } } }),
+			/exports.windows/
+		);
+	assert.throws(
+		() =>
+			exportKlc({ ...windowsSource, layout: { ...windowsSource.layout, author: 'Author\nline' } }),
+		/layout.author/
+	);
+	assert.throws(() => exportKlc({ ...windowsSource, remap: { KeyA: 'KeyB' } }), /remap/);
+	fs.writeFileSync(toml, Source.write(windowsSource));
+	const klcDirectory = path.join(directory, 'klc');
+	assert.equal(cli('export-klc', toml, klcDirectory, 'unexpected').status, 1);
+	assert.equal(fs.existsSync(klcDirectory), false, 'unknown KLC arguments precede mkdir');
+	const cliKlc = cli('export-klc', toml, klcDirectory);
+	assert.equal(cliKlc.status, 0, cliKlc.stderr);
+	assert.deepEqual(fs.readdirSync(klcDirectory).sort(), ['export.json', 'kbdtest.klc']);
+	assert.deepEqual(
+		fs.readFileSync(path.join(klcDirectory, 'kbdtest.klc')),
+		nativeKlc.files.get('kbdtest.klc')
+	);
+	assert.equal(
+		cli('export-klc', toml, klcDirectory).status,
+		1,
+		'existing KLC output directory refused'
+	);
+	fs.writeFileSync(
+		toml,
+		Source.write(forWindows(klcXml.replace('output="ffi"', 'output="abcde"')))
+	);
+	assert.equal(cli('export-klc', toml, path.join(directory, 'refused-klc')).status, 1);
+	assert.equal(
+		fs.existsSync(path.join(directory, 'refused-klc')),
+		false,
+		'KLC refusal precedes mkdir'
+	);
 } finally {
 	fs.rmSync(directory, { recursive: true, force: true });
 }
 
 console.log(
-	`[OK] layout source: ${preserved.length} exact XML/TOML round trips, ${invalid.length} invalid-source controls, XKB golden corpus and target/CLI refusal boundaries`
+	`[OK] layout source: ${preserved.length} exact XML/TOML round trips, ${invalid.length} invalid-source controls, XKB/KLC golden corpus and target/CLI refusal boundaries`
 );
