@@ -1029,7 +1029,7 @@ async function main() {
 		async () => {
 			assert.equal(
 				(await require('./fixtures/site-deploy-admission-controls.cjs').run()).controls,
-				155
+				156
 			);
 		}
 	);
