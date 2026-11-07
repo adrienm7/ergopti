@@ -196,6 +196,12 @@ _HotstringsOverrideReadDocument(Path, &Records := 0, &Physical := 0, &Snapshot :
 	Snapshot := FSReadWithStatus(Path)
 	if Snapshot["status"] != FS_STATUS_OK && Snapshot["status"] != FS_STATUS_ABSENT
 		throw ValueError("Hotstring overrides must be readable exact UTF-8.")
+	; Most installs have no override file: its empty document needs no parse,
+	; which every boot paid (startup smoke, 2026-11-07).
+	if Snapshot["status"] == FS_STATUS_ABSENT {
+		Records := [], Physical := []
+		return _TOML_DocumentTable()
+	}
 	return TOML_ParseDocument(Snapshot["content"], &Records, &Physical)
 }
 
