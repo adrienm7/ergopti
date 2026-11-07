@@ -106,7 +106,8 @@ into an exported `.keylayout`, since macOS may refuse to load it.
       `_shared/lua/layouts/composer.lua` and `composer_check` (whose `composition.json` beside `composed.keylayout`
       already shows the superset idea), `_shared/ui/layout_composer/`, the composer corpus vectors, and the Windows
       installer from `layout/windows-klc-installer`. Each target gets a golden-vector test against the same corpus.
-      Linux milestone implemented: `tools/layout-source.cjs export-xkb` exports admitted unchanged imports into a new directory with XKB symbols/types, XCompose and `export.json`. Its report names actual modifier/output losses and always marks this projection partial; unsupported constructs refuse before writing. Windows, macOS bundles, edited mappings and native driver loading remain open.
+      Linux milestone implemented: `tools/layout-source.cjs export-xkb` exports admitted unchanged imports into a new directory with XKB symbols/types, XCompose and `export.json`. Its report names actual modifier/output losses and always marks this projection partial; unsupported constructs refuse before writing. macOS bundles, edited mappings and native driver loading remain open.
+      Windows milestone implemented: `tools/layout-source.cjs export-klc` reuses the existing Windows generator for admitted unchanged imports and writes a UTF-16LE `.klc` plus `export.json` into a new directory. The report names Ctrl/Command, system-key and virtual-key limits; unsupported Caps/dead-key/Unicode constructs refuse before writing. Native DLL compilation, installation and loading remain open.
 - [ ] **Two uses of one source.** (1) The TOML source generates a standalone installable layout per OS that never
       assumes ErgoptiPlus is installed: it carries as many features as that OS expresses natively (macOS bundle,
       Linux XKB with its extra levels and dead keys, Windows DLL and installer), and the export says what was left
