@@ -1523,6 +1523,9 @@ _DriverInputInitPending := false
 LLM_Menu_ActivateRuntime()
 if !ConfigMigrateBootReadsClose(ConfigurationFile)
 	LoggerError("ErgoptiPlus", "The configuration registry changed during boot; every later write of this session is refused.")
+; The stretch served its boot consumers one admitted snapshot; prove it once.
+if !ConfigTomlBootReadsRelease(ConfigurationFile)
+	LoggerError("ErgoptiPlus", "The configuration snapshot the boot read is no longer its admitted generation.")
 _DriverReady := true
 if _LLM_Menu_RuntimeActivated
 	_MenuStartupCommands.NotifyReady()
