@@ -122,11 +122,7 @@ M._load_shared_const = _load_shared_const
 
 local CONFIG     = _load_shared_const()
 local IDLE_HIDE_S = CONFIG.idle_hide_s
--- Minimum interval between mouseMoved updates of _last_mouse_sec.
--- Each mouseMoved fires hundreds of times/sec; without throttling, every
--- move re-enters the Lua VM, adding jitter to the input pipeline.
--- Non-move events (clicks, scrollWheel) bypass the throttle and always win.
-local MOUSE_MOVE_THROTTLE_SEC = 0.2
+
 
 
 
@@ -151,7 +147,6 @@ local _generation        = 0
 local _wpm_history       = {}
 local _show_graph        = false
 local _use_source_colors = true
-local _last_active_sec   = 0    -- wall clock of the last keystroke seen by this widget
 local _last_mouse_sec    = 0    -- wall clock of the last mouse/touchpad event
 
 -- Current-cycle canvas geometry, shared with the mouseCallback closure below.
@@ -255,10 +250,13 @@ update_widget_body = function(generation)
 	-- mouse moved since the last keystroke.
 	WPMModel.push_history(canon, _wpm_history, display_wpm, active_source)
 	local show
-	show, _last_active_sec = WPMModel.widget_visible({
+	show = WPMModel.widget_visible({
 		wpm = display_wpm, source = active_source, tooltip_visible = tooltip_visible, now_s = now,
-		last_active_s = _last_active_sec, last_mouse_s = _last_mouse_sec, idle_hide_s = IDLE_HIDE_S,
+		last_input_s = stats.last_input_time, last_mouse_s = _last_mouse_sec, idle_hide_s = IDLE_HIDE_S,
 	})
+
+	-- The pointer belongs to the canvas while its drag is in progress.
+	if _drag_start_mouse then show = true end
 
 	if show then
 		-- hs.screen.mainScreen() is documented as possibly returning nil (e.g. no
@@ -554,15 +552,10 @@ function M.start(show_graph)
 			hs.eventtap.event.types.leftMouseDown,
 			hs.eventtap.event.types.rightMouseDown,
 			hs.eventtap.event.types.scrollWheel,
-		}, function(e)
+		}, function()
 			if not _running or generation ~= _generation then return false end
-			local now = hs.timer.absoluteTime() / 1000000000
-			local is_move = e:getType() == hs.eventtap.event.types.mouseMoved
-			-- Throttle mouseMoved: only update at most every MOUSE_MOVE_THROTTLE_SEC.
-			-- Click and scroll events bypass the throttle — they must always register.
-			if not is_move or (now - _last_mouse_sec) >= MOUSE_MOVE_THROTTLE_SEC then
-				_last_mouse_sec = now
-			end
+			-- Even a single move immediately after a key must hide the widget.
+			_last_mouse_sec = hs.timer.absoluteTime() / 1000000000
 			return false  -- do not consume the event
 		end)
 	end, debug.traceback)

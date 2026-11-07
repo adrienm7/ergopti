@@ -59,6 +59,7 @@ local function new_live_tracker()
 		window_ms = Timings.ms("keystats", "wpm_window_ms"),
 		min_duration_ms = Timings.ms("keystats", "wpm_min_duration_ms"),
 		idle_reset_ms = Timings.ms("keystats", "wpm_idle_reset_ms"),
+		source_hold_ms = Timings.ms("ui", "wpm_color_hold_ms"),
 	})
 end
 local _live = new_live_tracker()
@@ -948,6 +949,9 @@ local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
 	if Metrics and not is_correction then
 		Metrics.on_keydown(ch, timestamp_ms)
 	end
+	if type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
+		LiveWpm.record_input(_live, timestamp_ms)
+	end
 	if not is_correction and type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
 		LiveWpm.record(_live, 1, timestamp_ms)
 	end
@@ -1145,6 +1149,8 @@ end
 function M.record_physical_key(app_id, scancode, timestamp_ms)
 	if not may_record() then return end
 	if type(scancode) ~= "number" or scancode <= 0 then return end
+	-- The history stamp is rounded; pointer activity uses this same precise clock.
+	LiveWpm.record_input(_live, Monotonic.now_ms())
 	local resolved_app = (type(app_id) == "string" and app_id ~= "") and app_id or "Unknown"
 	local live, dated = app_pair(resolved_app, timestamp_ms)
 	local code = math.floor(scancode)
@@ -2092,6 +2098,7 @@ end
 function M.suspend_collection()
 	if not _suspended then
 		_suspended = true
+		_live = new_live_tracker()
 		settle_capture_policy()
 		Logger.info(LOG, "Metrics collection suspended by the user.")
 	end
@@ -2122,6 +2129,7 @@ function M.set_enabled(enabled)
 		return false
 	end
 	_enabled = wanted
+	if not wanted then _live = new_live_tracker() end
 	settle_capture_policy()
 	Logger.debug(LOG, "Metrics collection: %s.", tostring(_enabled))
 	return true
@@ -3199,6 +3207,7 @@ function M.stop()
 		-- The open session ends with the daemon, before the final flush takes it.
 		if may_record() then queue_session_events(forward_session(clock, "stop"), clock) end
 		_flush_stopping = true
+		_live = new_live_tracker()
 		if _reset_request then finish_reset_request(_reset_request, false) end
 		_maintenance.advance()
 		_flush_generation = _flush_generation + 1

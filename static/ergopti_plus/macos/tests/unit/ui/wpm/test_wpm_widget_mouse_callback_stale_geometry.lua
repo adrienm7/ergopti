@@ -71,7 +71,7 @@ helpers.describe("wpm_widget: mouseCallback reads live geometry across a graph-m
 		package.loaded["modules.keystats"] = {
 			-- A non-zero wpm keeps update_widget_body's "show" branch active on
 			-- every cycle, regardless of the idle-timer bookkeeping.
-			get_live_stats = function() return { wpm = 42 } end,
+			get_live_stats = function() return { wpm = 42, last_input_time = hs.timer.absoluteTime() / 1000000000 } end,
 		}
 		-- GraphicsRenderer captures `hs` at module load. Reload it under this
 		-- scenario's canvas constructor rather than reusing a prior test's adapter.
