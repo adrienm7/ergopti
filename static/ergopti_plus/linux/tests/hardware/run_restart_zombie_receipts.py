@@ -18,9 +18,13 @@ import time
 
 WORKER = r"""
 local R = require("modules.updater.restarter")
-io.write(R.relay_command(tonumber(os.getenv("ERGOPTI_RELAY_TARGET")),
+-- The relay holds only the process it was started for: the production reader
+-- captures the target's kernel start tick, as the restart does before dispatch.
+local target = tonumber(os.getenv("ERGOPTI_RELAY_TARGET"))
+io.write(R.relay_command(target,
 	os.getenv("ERGOPTI_RELAY_WRAPPER"),
-	{os.getenv("ERGOPTI_RELAY_PAYLOAD"), os.getenv("ERGOPTI_RELAY_RECEIPT")}))
+	{os.getenv("ERGOPTI_RELAY_PAYLOAD"), os.getenv("ERGOPTI_RELAY_RECEIPT")},
+	nil, assert(R.process_start_time(target), "the target's start tick is unreadable")))
 """
 PAYLOAD = "literal ' payload\nsecond line"
 PR_SET_NAME, PR_SET_CHILD_SUBREAPER = 15, 36  # Native Linux prctl operations.
