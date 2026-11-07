@@ -316,13 +316,18 @@ helpers.describe("Main early pause restoration", function()
 				local first = assert(source:find("\tlocal script_actions = ScriptActions.new({", 1, true))
 				local last = assert(source:find("\t-- A control can change", first, true))
 				local before_watch = source:sub(first, last - 1)
-				local applications = 0
+				local applications, pause_steps = 0, {}
 				local environment = setmetatable({ ScriptActions = require("modules.shortcuts.script_actions"),
 					Logger = require("logger.shim"), LOG = "Main early pause test", privacy_owners = {},
-					keystats = { cancel_hold_intervals = function() end }, engine = { reset = function() end },
+					keystats = {
+						cancel_hold_intervals = function() end,
+						discard_roi = function() pause_steps[#pause_steps + 1] = "roi" end,
+					}, engine = { reset = function() end },
 					MagicKeySource = { cancel_capture = function() end }, perform_reload = function() end,
 					shutdown = { request = function() end },
 					TapHold = { set_paused = function(paused)
+						helpers.assert_eq(pause_steps, { "roi" }, "pause retires ROI before native remapping")
+						pause_steps[#pause_steps + 1] = "remapper"
 						applications = applications + 1; helpers.assert_true(paused); return acknowledged
 					end } }, { __index = _G })
 				local text = "return function()\n" .. before_watch .. "\nreturn script_actions\nend"
@@ -339,6 +344,7 @@ helpers.describe("Main early pause restoration", function()
 				package.loaded["modules.keymap.pause_layout_switch"] = previous_switch
 				if not ran then error(controller, 0) end
 				helpers.assert_eq(applications, 1, "startup must apply the normal remapper transition once")
+				helpers.assert_eq(pause_steps, { "roi", "remapper" }, "both acknowledgement outcomes retire the ROI fragment exactly once")
 				helpers.assert_eq(#layout_switches, 1, "the restored pause switches the desktop layout once")
 				helpers.assert_true(layout_switches[1])
 				if acknowledged then
