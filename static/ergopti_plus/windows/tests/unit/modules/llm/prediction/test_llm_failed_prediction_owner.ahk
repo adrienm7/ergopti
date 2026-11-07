@@ -587,11 +587,45 @@ for _RUAG_Mode in ["ordinary-two", "cost-two", "integer-three", "cost-three", "i
 ; Actual native fallback InputHook -> Bridge -> OnKeystroke -> native timer ->
 ; FirePrediction -> genuine managed HTTP. No provider service or fake subject.
 global _LDP_Debt := []
+; Whether the real engine armed after a baseline, as an event, not a sampled
+; window: the debounce timer is active only between the arm and its fire, so a
+; busy runner can miss it. A fresh pending token, a fire (request id) or the
+; remote reservation that fire made is monotonic proof of the arm.
+_LDP_ArmedSince(ArmToken, RequestId, Counter) {
+    global _LLM_Engine, _LLM_Remote_AsyncCounter
+    Pending := _LLM_Engine_Plan().Pending
+    return (_LLM_Engine["timer_active"] && IsObject(Pending) && Pending["token"] != ArmToken)
+        || _LLM_Engine.Get("request_id", 0) > RequestId || _LLM_Remote_AsyncCounter > Counter
+}
+
+; Wait for the native producer and the real deferred prefix owner to finish a
+; burst, and, when the burst is admitted, for its arm event. The deadline only
+; bounds that event; it is never a measured duration.
+_LDP_AwaitBurst(State, Expected, MustArm, ArmToken, RequestId, Counter) {
+    global _LLM_Bridge_PrefixObserver
+    Started := A_TickCount
+    while (State.InputChars != Expected || State.InputCompleted != State.InputCallbacks
+            || IsObject(_LLM_Bridge_PrefixObserver) || (MustArm && !_LDP_ArmedSince(ArmToken, RequestId, Counter)))
+            && TickElapsed64(Started) < 2000
+        Sleep(5)
+    if IsObject(State.Failure)
+        throw State.Failure
+    if MustArm && !_LDP_ArmedSince(ArmToken, RequestId, Counter)
+        _TestPrint("# LLM_DEBOUNCE_PRIVACY_TRACE " . KL_JsonEncode(Map("now", _LDP_PrivacyTraceState(),
+            "completed", State.InputCompleted, "callbacks", State.InputCallbacks, "trace", State.PrivacyTrace)))
+}
+
 _LDP_PrivacyTraceState() {
     global _LLM_Bridge_Buffer, _LLM_Bridge_ContentGeneration, _LLM_Bridge_BufferSource
     global _LLM_Bridge_ReadLiveFocus, _LLM_Engine, SFD_FIELD_CACHE, _PrefixDeferredGeneration
+    global _LLM_Bridge_PrefixObserver, _LLM_Remote_AsyncCounter
     Source := _LLM_Bridge_BufferSource
+    Pending := _LLM_Engine_Plan().Pending
     return Map("buffer_units", StrLen(_LLM_Bridge_Buffer), "engine_units", StrLen(_LLM_Engine.Get("last_buffer", "")),
+        "timer_active", _LLM_Engine.Get("timer_active", false) ? 1 : 0,
+        "pending_token", IsObject(Pending) ? Pending["token"] : 0,
+        "request_id", _LLM_Engine.Get("request_id", 0), "async_counter", _LLM_Remote_AsyncCounter,
+        "observer_pending", IsObject(_LLM_Bridge_PrefixObserver) ? 1 : 0,
         "content_generation", _LLM_Bridge_ContentGeneration, "lifecycle", _PrefixDeferredGeneration,
         "source_hwnd", Source is Map ? Source.Get("hwnd", 0) : 0,
         "source_control", Source is Map ? Source.Get("control", 0) : 0,
@@ -942,6 +976,8 @@ _LDP_Native(Mode, Calls, Lines) {
         AssertTrue(State.Hook.InProgress)
         PreviousSendLevel := A_SendLevel
         PreviousKeyDelay := A_KeyDelay, PreviousKeyDuration := A_KeyDuration
+        ; Baselines of the arm event: A may arm and even fire before the snapshot.
+        BeforeCounter := _LLM_Remote_AsyncCounter, BeforeRequestId := _LLM_Engine.Get("request_id", 0)
         try {
             if StyleProbe
                 SetKeyDelay(-1, -1)
@@ -952,23 +988,12 @@ _LDP_Native(Mode, Calls, Lines) {
             if StyleProbe
                 SetKeyDelay(PreviousKeyDelay, PreviousKeyDuration)
         }
-        Started := A_TickCount
-        while State.InputChars != Canary && TickElapsed64(Started) < 2000
-            Sleep(5)
-        if IsObject(State.Failure)
-            throw State.Failure
+        ; An admitted origin waits for its arm; a private one for the owner that purges it.
+        _LDP_AwaitBurst(State, Canary, AllowedOrigin, 0, BeforeRequestId, BeforeCounter)
         AssertEqual(Canary, State.InputChars, "the actual I1 native callback observes the complete typed canary")
         AssertEqual(Canary, ControlGetText(State.TypedControl), "the same actual text is present in the original native Edit")
-        if StyleProbe {
-            Started := A_TickCount
-            while (State.InputCompleted != State.InputCallbacks || IsObject(_LLM_Bridge_PrefixObserver))
-                && TickElapsed64(Started) < 2000
-                Sleep(5)
-            if IsObject(State.Failure)
-                throw State.Failure
-            AssertEqual(State.InputCallbacks, State.InputCompleted, "the native producer must finish before its context is sampled")
-            AssertFalse(IsObject(_LLM_Bridge_PrefixObserver), "the real deferred prefix owner must finish before the request receipt is sampled")
-        }
+        AssertEqual(State.InputCallbacks, State.InputCompleted, "the native producer must finish before its context is sampled")
+        AssertFalse(IsObject(_LLM_Bridge_PrefixObserver), "the real deferred prefix owner must finish before the request receipt is sampled")
         SnapshotCritical := Critical("On")
         try {
             PrivatePurged := !AllowedOrigin && _LLM_Bridge_Buffer == ""
@@ -980,12 +1005,16 @@ _LDP_Native(Mode, Calls, Lines) {
             } else {
                 AssertEqual(Canary, _LLM_Bridge_Buffer)
                 AssertEqual(Canary, _LLM_Engine["last_buffer"])
-                AssertTrue(_LLM_Engine["timer_active"] && IsObject(_LLM_Engine_Plan().Pending),
+                AssertTrue(_LDP_ArmedSince(0, BeforeRequestId, BeforeCounter),
                     "admitted source text must own the genuine native debounce timer")
-                ArmToken := _LLM_Engine_Plan().Pending["token"]
+                ; A timer that already fired leaves no pending token to supersede.
+                Pending := _LLM_Engine_Plan().Pending
+                ArmToken := _LLM_Engine["timer_active"] && IsObject(Pending) ? Pending["token"] : 0
             }
             InputCount := State.InputCallbacks, DownCount := State.InputDowns
-            BeforeCounter := _LLM_Remote_AsyncCounter
+            ; BeforeCounter stays the pre-typing baseline: an A request reserved
+            ; before this snapshot still belongs to this case's single reservation.
+            BeforeFreshRequestId := _LLM_Engine.Get("request_id", 0)
         } finally Critical(SnapshotCritical)
         if Switches {
             ; No Send/keys/click: this is an application's ordinary activation.
@@ -1016,31 +1045,15 @@ _LDP_Native(Mode, Calls, Lines) {
                 SendLevel(2)
                 SendEvent("{Text}" . AllowedCanary)
             } finally SendLevel(PreviousSendLevel)
-            ; Wait for the event, not a sampled window: the deferred prefix observer
-            ; arms the engine, and its debounce timer is active for debounce_ms only.
-            ; A fresh pending token, or the request that timer already reserved, is
-            ; the monotonic proof that fresh B input armed the real engine.
-            FreshBArmed := () => (_LLM_Engine["timer_active"] && IsObject(_LLM_Engine_Plan().Pending)
-                    && _LLM_Engine_Plan().Pending["token"] != ArmToken)
-                || _LLM_Remote_AsyncCounter > BeforeCounter
-            Started := A_TickCount
-            while (State.InputChars != Canary . AllowedCanary || State.InputCompleted != State.InputCallbacks
-                    || IsObject(_LLM_Bridge_PrefixObserver) || !FreshBArmed())
-                    && TickElapsed64(Started) < 2000
-                Sleep(5)
-            if IsObject(State.Failure)
-                throw State.Failure
-            if !FreshBArmed()
-                _TestPrint("# LLM_DEBOUNCE_PRIVACY_TRACE " . KL_JsonEncode(Map("observer_pending", IsObject(_LLM_Bridge_PrefixObserver),
-                    "timer_active", _LLM_Engine["timer_active"], "pending", IsObject(_LLM_Engine_Plan().Pending),
-                    "completed", State.InputCompleted, "callbacks", State.InputCallbacks, "trace", State.PrivacyTrace)))
+            _LDP_AwaitBurst(State, Canary . AllowedCanary, true, ArmToken, BeforeFreshRequestId, BeforeCounter)
             AssertEqual(Canary . AllowedCanary, State.InputChars, "both actual I1 input bursts must be observed in order")
             AssertEqual(AllowedCanary, ControlGetText(BControl), "the fresh allowed context is genuinely present in native B")
             AssertEqual(PriorCallbacks + StrLen(AllowedCanary), State.InputCallbacks)
             FreshBCompletedAtSnapshot := State.InputCompleted
             FreshBBufferExact := _LLM_Bridge_Buffer == AllowedCanary
             FreshBEngineExact := _LLM_Engine["last_buffer"] == AllowedCanary
-            AssertTrue(FreshBArmed(), "fresh B input supersedes the original A arm through the real engine")
+            AssertTrue(_LDP_ArmedSince(ArmToken, BeforeFreshRequestId, BeforeCounter),
+                "fresh B input supersedes the original A arm through the real engine")
             InputCount := State.InputCallbacks, DownCount := State.InputDowns
         }
         PendingAfterSwitch := IsObject(_LLM_Engine_Plan().Pending)
