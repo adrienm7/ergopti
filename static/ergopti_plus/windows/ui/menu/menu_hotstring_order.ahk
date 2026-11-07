@@ -97,7 +97,9 @@ _HS_OrderSnapshot(Category, Path := unset) {
 
 /** Writes only against the exact source behind the menu, under the config lease. */
 _HS_OrderWrite(Snapshot, Path, Updates) {
-	return _TOML_BatchWriteImpl(Path, Updates, [], "write", Snapshot["content"], Snapshot["presence"])
+	; Configuration roots can contain dotted metadata and inline tables; only
+	; the semantic writer retains those namespaces and their schema generation.
+	return TOML_ConfigBatchWrite(Path, Updates, [], 0, Snapshot["content"], Snapshot["presence"])
 }
 
 /** Commits one order or its reset before repainting; a refused write changes nothing. */
