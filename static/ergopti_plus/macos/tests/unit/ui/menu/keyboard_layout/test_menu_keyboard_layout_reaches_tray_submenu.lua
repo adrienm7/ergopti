@@ -43,6 +43,23 @@ helpers.describe("Keyboard layout submenu reaches the tray populated", function(
 		helpers.assert_true(seen["menu.layout.menubar_icon"], "the menubar icon row must be in the rendered submenu")
 	end)
 
+	-- The emulated rows group handed its finished rows back as `items` too, so
+	-- « Rangées émulées » opened onto nothing.
+	helpers.it("the emulated rows submenu carries its four switches", function()
+		local row = tray_row(make_ctx())
+		local emulated
+		for _, child in ipairs(row and row.menu or {}) do
+			if child.title == "menu.layout.emulated_rows" then emulated = child.menu end
+		end
+		helpers.assert_true(type(emulated) == "table", "the emulated rows group must be in the rendered submenu")
+		local rows = { "number_row", "top_row", "home_row", "bottom_row" }
+		helpers.assert_eq(#emulated, #rows, "one switch per emulated row")
+		for index, name in ipairs(rows) do
+			helpers.assert_eq(emulated[index].title, "menu.layout.emulate_" .. name)
+			helpers.assert_eq(type(emulated[index].fn), "function", name .. " can be switched")
+		end
+	end)
+
 	helpers.it("the pause/resume pickers are collected before the manifest renders them", function()
 		local row = tray_row(make_ctx())
 		local seen = titles(row and row.menu)

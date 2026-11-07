@@ -895,10 +895,19 @@ function M.build(ctx)
 		render_ctx.feature_rows[path] = function() return emulation_switch(path, "menu.layout.emulate_" .. row) end
 	end
 	-- « Rangées émulées »: the four layout.emulate_<row> switches of the
-	-- manifest's layout_emulated_rows_group, as Windows builds them.
+	-- manifest's layout_emulated_rows_group, as Windows builds them. The
+	-- renderer hands back finished menu rows while `items` takes row data, so
+	-- they convert back first: passed as is, every row lacked a label and the
+	-- submenu opened onto nothing.
 	local group_builders = {
 		layout_emulated_rows = function()
-			return { items = ManifestMenu.build("layout_emulated_rows_group", "Layout", nil, nil, render_ctx, {}) or {} }
+			local rendered = ManifestMenu.build("layout_emulated_rows_group", "Layout", nil, nil, render_ctx, {})
+			local child_rows = ManifestMenu.native_child_rows(rendered)
+			if child_rows == nil then
+				Logger.error(LOG, "The emulated rows could not be converted — their submenu is left out.")
+				return nil
+			end
+			return { items = child_rows }
 		end,
 	}
 	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, group_builders, render_ctx, {
