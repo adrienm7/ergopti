@@ -4106,7 +4106,7 @@
 	"platform_reason.action_continuous_swipe_is_macos": "仅限 macOS：连续滑动会在手指移动时跟随它们，只有 macOS 驱动能读取这一点。Windows 从触控板设置收到已完成的手势，Linux 在滑动结束后才执行：请使用对应的单步操作。",
 	"platform_reason.action_download_mark_is_each_systems": "每个系统以自己的方式标记下载的文件（macOS 的隔离属性，Windows 的 Web 标记），并提供去除自身标记的操作。Linux 不标记下载的文件。",
 	"platform_reason.action_executable_permission_is_unix": "Windows 上没有：在那里文件能否运行取决于扩展名，而不是执行权限。",
-	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "Linux 尚未实现此功能：此操作需要与文件管理器集成，以识别其活动文件夹。",
+	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "此操作需要与所用文件管理器专门集成，以识别活动文件夹。",
 	"platform_reason.action_line_deletion_is_macos": "仅限 macOS：Cmd+Delete 在 macOS 文本框中删除到行首或行尾。Windows 和 Linux 的文本框没有这样的键：请用 Shift+Home 或 Shift+End 选到行边缘，然后删除。",
 	"platform_reason.action_lookup_is_macos_dictionary": "仅限 macOS：查询会针对指针下的单词打开系统词典面板。Windows 和 Linux 没有系统词典面板。",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "仅限 macOS：这些操作切换保存在 Karabiner-Elements 中的导航层。在 Windows 和 Linux 上，该层跟随按住的键，没有可设置的开关。",
