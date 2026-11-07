@@ -208,13 +208,18 @@ function hotstringsRenderTimes(configRoot) {
 // the parse counter does not see used to read it (+1 parse); 424b4a26d8's
 // boot-tail proof of the served config snapshot costs one registry compare
 // (+1). An absent hotstring override file, parsed as an empty document on
-// every boot since 3e25e5d71c, no longer is.
+// every boot since 3e25e5d71c, no longer is. Against the 2026-11-04 counts
+// (be1d107b6a), every fixture moved by the same amounts, so no hotstring owner
+// is involved: the typed personal_info.toml parse adds 118 slow lexer steps
+// (suspend-marker 391 -> 509, realistic 13420 -> 13538), and the settings
+// added to the generated config template since then add 4 flat values
+// (realistic 1197 -> 1201).
 const BOOT_OPERATION_CEILINGS = {
 	'config.snapshot_read': { all: 9 },
 	'toml.document_parse': { all: 15, [REALISTIC_HOTSTRINGS_FIXTURE]: 18 },
 	'config_migrate.registry_deep_compares': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
-	'toml.document_slow_steps': { all: 11943, [REALISTIC_HOTSTRINGS_FIXTURE]: 13420 },
-	'toml.flat_values': { all: 2181, [REALISTIC_HOTSTRINGS_FIXTURE]: 1199 }
+	'toml.document_slow_steps': { all: 11943, [REALISTIC_HOTSTRINGS_FIXTURE]: 13538 },
+	'toml.flat_values': { all: 2181, [REALISTIC_HOTSTRINGS_FIXTURE]: 1201 }
 };
 
 /**
