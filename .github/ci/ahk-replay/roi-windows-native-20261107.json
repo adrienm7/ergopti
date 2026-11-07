@@ -1,0 +1,20 @@
+{
+	"expected_count": 4,
+	"native_http_client_e2e": false,
+	"native_hotstring_e2e": false,
+	"native_proxy_relay_owner_e2e": false,
+	"filters": [
+		{
+			"contains": "roi-windows-native-probe",
+			"expected_count": 2
+		},
+		{
+			"contains": "ROI half-life: keys uses the retained monotonic age",
+			"expected_count": 1
+		},
+		{
+			"contains": "ROI half-life: days31 uses the retained monotonic age",
+			"expected_count": 1
+		}
+	]
+}

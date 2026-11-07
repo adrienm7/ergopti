@@ -91,6 +91,54 @@ _ROIP_TransactionPublishesBoundedSurvivors() {
 Test("keystats ROI: prune transaction swaps bounded survivors (roi-prune-bounded)",
 	_ROIP_TransactionPublishesBoundedSurvivors)
 
+; Native qualification keeps code-unit observations in the runner's durable TAP.
+; No Lua lowercase table supplies either the native input or its measured output.
+_ROIN_Utf16Units(Text) {
+	Units := []
+	loop StrLen(Text)
+		Units.Push(NumGet(StrPtr(Text), (A_Index - 1) * 2, "UShort"))
+	return Units
+}
+
+_ROIN_NativeLowercase() {
+	Samples := Map("ascii", "ABCD", "dotted-i", Chr(0x130),
+		"greek-sigma-word", Chr(0x39F) . Chr(0x3A3),
+		"deseret-capital", Chr(0x10400), "e-acute", Chr(0xC9))
+	for Id, Text in Samples {
+		Lower := StrLower(Text)
+		_TestPrint("# roi-windows-native-case " . KL_JsonEncode(Map("id", Id,
+			"input_units", _ROIN_Utf16Units(Text), "lower_units", _ROIN_Utf16Units(Lower),
+			"input_length", StrLen(Text), "lower_length", StrLen(Lower),
+			"ahk_version", A_AhkVersion, "os_version", A_OSVersion, "language", A_Language)))
+		AssertEqual(StrLen(Text), StrLen(Lower), "native StrLower retains the allocated UTF-16 length")
+	}
+	AssertEqual("abcd", StrLower(Samples["ascii"]))
+	AssertEqual(2, StrLen(Samples["deseret-capital"]), "a supplementary scalar is two native units")
+	AssertEqual(4, StrLen(Chr(0x1F600) . Chr(0x1F600)), "two supplementary scalars reach the native minimum word size")
+}
+Test("ROI parity: native lowercase and UTF16 observations (roi-windows-native-probe)", _ROIN_NativeLowercase)
+
+_ROIN_NativeMapPrune() {
+	Bmp := Chr(0xE000) . "end", Supplementary := Chr(0x10000) . "end"
+	Counts := Map("zzzz", 2, Bmp, 2, "aaaa", 2, Supplementary, 2, "mmmm", 2, "noise", 1)
+	Enumerated := []
+	for Word in Counts
+		Enumerated.Push(_ROIN_Utf16Units(Word))
+	Operations := 0
+	Survivors := KL_Roi_SelectWordCountSurvivors(Counts, 2, &Operations)
+	Retained := []
+	for Word in Survivors
+		Retained.Push(_ROIN_Utf16Units(Word))
+	_TestPrint("# roi-windows-native-map " . KL_JsonEncode(Map("enumerated", Enumerated,
+		"retained", Retained, "operations", Operations)))
+	AssertEqual(2, Survivors.Count)
+	AssertTrue(Survivors.Has(Bmp) && Survivors.Has(Supplementary), "the last UTF-16 keys survive equal frequencies")
+	AssertFalse(Survivors.Has("noise"), "single-use words never survive the selection")
+	OnlyRepeated := KL_Roi_SelectWordCountSurvivors(Map("repeated", 4, "noise-a", 1, "noise-b", 1), 250, &Operations)
+	AssertEqual(1, OnlyRepeated.Count, "the target is an upper bound after removing count-one noise")
+}
+Test("ROI parity: native Map enumeration and prune observations (roi-windows-native-probe)", _ROIN_NativeMapPrune)
+
 #Include test_roi_halflife_native64_owner.ahk
 
 
