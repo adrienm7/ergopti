@@ -1249,6 +1249,26 @@ OPENS_SUBMENU.layout_variant_choices = [
 	'layout_bundle_variant_add'
 ].map(layoutOwner);
 
+// Windows draws « Install the Ergopti system layout » from the install state:
+// the install command when absent, the update command for another build.
+OPENS_SUBMENU.layout_system_install = [
+	'layout_system_install_commands',
+	'layout_system_update_commands'
+].map((menu) => ({
+	menu,
+	platforms: ['ahk'],
+	kind: 'compose',
+	native_sources: { ahk: 'windows/modules/keymap/system_layout_install.ahk' }
+}));
+// Each Linux accented-letter shortcut opens its letter picker frame.
+for (const id of ['e_grave', 'e_circ', 'e_acute', 'a_grave'])
+	OPENS_SUBMENU[id] = {
+		menu: 'accented_letter_picker_frame',
+		platforms: ['linux'],
+		kind: 'compose',
+		native_sources: { linux: 'linux/ui/menu/menu_layouts.lua' }
+	};
+
 // Preserve the existing macOS excluded-applications route and add actual Linux frames.
 OPENS_SUBMENU.agent_disabled_apps = [
 	...(Array.isArray(OPENS_SUBMENU.agent_disabled_apps)
@@ -5731,7 +5751,9 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // is a row of the Linux AI submenu now that the AI context is its own buffer.
 // hs 23 → 24, linux 22 → 23: the Debug checks gathered in one Tests submenu
 // (debug_tests_menu, 7ba86d9506) render through the shared renderer.
-const RENDERED_THROUGH_SHARED = { hs: 24, linux: 23 };
+// hs 24 → 25, linux 23 → 24: the « Rangées émulées » group (layout_emulated_rows_group)
+// renders its four rows through the shared renderer on both.
+const RENDERED_THROUGH_SHARED = { hs: 25, linux: 24 };
 
 const DRIVER_ROOTS = {
 	hs: path.join(SP, 'macos'),
