@@ -74,8 +74,21 @@ _LRNX_Inject() {
 		_LRNX_Target()
 		Rows := []
 		if _LRNX.Mode != "plain" {
-			Rows.Push([0xA0, 0x2A, 0])
+			; Shift-down is its own injection, acknowledged by the system key
+			; state before the row key follows: batched with the key, the
+			; receiver could translate the key before it saw Shift (one CI run
+			; read 'q' for 'Q'). The released Shift-up still travels with the key,
+			; so it still precedes the admitted row callback.
+			ShiftDown := _LRNX_Packets([[0xA0, 0x2A, 0]])
+			_LRNX_Require(DllCall("SendInput", "UInt", 1, "Ptr", ShiftDown, "Int", 40, "UInt") == 1,
+				"The native Shift-down must be accepted.")
 			_LRNX.ShiftOwned := true
+			Acknowledged := A_TickCount
+			while !(DllCall("GetAsyncKeyState", "Int", 0x10, "Short") & 0x8000) && A_TickCount - Acknowledged < 500
+				Sleep(5)
+			_LRNX_Require(DllCall("GetAsyncKeyState", "Int", 0x10, "Short") & 0x8000,
+				"The system must acknowledge the native Shift-down before the row key.")
+			_LRNX_Target()
 		}
 		Rows.Push([0, 0x10, 8], [0, 0x10, 10])
 		if _LRNX.Mode == "released"
