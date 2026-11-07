@@ -355,8 +355,11 @@ _KLRSQL_ConsumerFailureRetainsOwnedDiagnostic() {
 			"a throwing walker row must reject the unpublished cold candidate")
 		AssertEqual(0, Failed.Get("db", 0),
 			"the partially replayed database handle must be closed, never published")
+		; A refusal before the walker replay has no failure context to report;
+		; naming the receipt tells that refusal from a missing diagnostic.
 		AssertEqual(1, Diagnostics.Length,
-			"one poison row must emit exactly one owned replay diagnostic")
+			"one poison row must emit exactly one owned replay diagnostic; cold receipt has failure="
+			. (Failed.Has("failure") ? KL_JsonEncode(Failed["failure"]) : "<none: refused before the walker replay>"))
 		Failure := Failed.Get("failure", 0)
 		AssertTrue(Failure is Map,
 			"the cold-builder receipt must retain the replay failure context")

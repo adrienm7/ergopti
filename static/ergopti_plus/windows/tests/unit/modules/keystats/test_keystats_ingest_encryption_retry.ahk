@@ -77,7 +77,8 @@ _KIER_EncryptionRetry(Mode) {
 		JournalBeforeRetry := FileRead(Keystats.today_log_path, "UTF-8")
 		JournalRead := _KL_JournalReadLines(Keystats.today_log_path, 0, 10, KL_JsonDecode)
 		AssertEqual(Mode = "mixed" ? 2 : 1, JournalRead["entries"].Length,
-			"the synthetic journal must retain every refused event: " . JournalBeforeRetry)
+			"the synthetic journal must retain every refused event: " . JournalBeforeRetry
+			. " (refusal=" . Refused.Get("reason", "") . ", requeued=" . Keystats._pending_entries.Length . ")")
 		AssertEqual(0, Keystats._pending_entries.Length,
 			"durably journaled rows must not also be requeued")
 		KL_Enc_SetMachineIdOverride("00000000-0000-0000-0000-000000000001")
