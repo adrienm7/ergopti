@@ -60,6 +60,8 @@ helpers.describe("accessibility copies adapter (accessibility-other-copies)", fu
 			helpers.assert_eq(spawn.args[4], "com.ergoptiplus.app.hammerspoon")
 			helpers.assert_eq(spawn.args[5], OWN)
 			helpers.assert_contains(spawn.args[6], "/LaunchServices.framework/Support/lsregister")
+			helpers.assert_eq(spawn.args[7], copies.REGISTERED_PATHS_AWK, "the awk program is its own argument")
+			helpers.assert_contains(spawn.args[7], "ident == id", "the program keeps each record of the bundle id")
 			local script = spawn.args[2]
 			helpers.assert_contains(script, "/usr/bin/mdfind", "Spotlight lists the indexed copies")
 			helpers.assert_contains(script, '"$lsr" -dump', "LaunchServices lists every registered one")
