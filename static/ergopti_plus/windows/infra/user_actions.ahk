@@ -228,30 +228,11 @@ global USER_COMMAND_OUT_VARIABLE := "ERGOPTI_USER_COMMAND_OUT"
 global USER_COMMAND_ERR_VARIABLE := "ERGOPTI_USER_COMMAND_ERR"
 
 ; A copy of this process's environment with the command's private variables.
+; They REPLACE any inherited spelling of the same name: appended after it, the
+; inherited row came first in the block and cmd.exe ran the inherited command
+; and redirections instead of the stored ones.
 _UserCommandEnvironment(Added) {
-	Source := DllCall("GetEnvironmentStringsW", "Ptr")
-	if !Source
-		throw OSError("The environment could not be read.")
-	Rows := []
-	try {
-		At := Source
-		while (Row := StrGet(At, "UTF-16")) != "" {
-			Rows.Push(Row)
-			At += (StrLen(Row) + 1) * 2
-		}
-	} finally DllCall("FreeEnvironmentStringsW", "Ptr", Source)
-	for Name, Value in Added
-		Rows.Push(Name . "=" . Value)
-	Size := 2
-	for Row in Rows
-		Size += (StrLen(Row) + 1) * 2
-	Block := Buffer(Size + 2, 0)
-	At := Block.Ptr
-	for Row in Rows {
-		StrPut(Row, At, "UTF-16")
-		At += (StrLen(Row) + 1) * 2
-	}
-	return Block
+	return ShellRunner_BuildEnvironment(Added)
 }
 
 ; The outer cmd.exe parses this line with the private variables unexpanded, so the
