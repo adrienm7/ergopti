@@ -20,7 +20,7 @@ _GTN_WinWaitIsQualified() {
 		"neither gesture dispatch nor its deferred worker may block in WinWait")
 	Assert(InStr(RequestBody, "FileName, Pattern") > 0,
 		"the shared job must retain the exact filename separately from diagnostics")
-	Assert(InStr(PollBody, 'Ops.FindWindow(Job["file_name"])') > 0,
+	Assert(InStr(PollBody, 'Ops.FindWindow(Job["file_name"], Admits)') > 0,
 		"every deferred window probe must resolve the exact requested basename")
 }
 Test("TakeNote: the non-blocking shared job targets only the qualified Notepad window",
