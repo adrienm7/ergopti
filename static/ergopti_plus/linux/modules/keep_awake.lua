@@ -111,7 +111,7 @@ function M.new(ports)
 			"--", "sh", "-c", "printf '" .. READY .. "'; exec cat >/dev/null",
 		}, {
 			owner = "keep-awake", stdin_owner = session.input,
-			capture_tail = true, max_output_bytes = 1024,
+			capture_tail = true,
 			on_output = function(chunk, kind)
 				if current ~= session or session.stopping or kind ~= "stdout" or session.active then return end
 				session.output = (session.output .. chunk):sub(1, #READY)
