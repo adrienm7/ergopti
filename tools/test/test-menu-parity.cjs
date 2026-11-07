@@ -73,6 +73,7 @@ const {
 	delegatedMenuSources,
 	combineMenuVisibility
 } = require('../lib/menu-shared-delegation.cjs');
+const { hotstringOrderMenuSource } = require('../lib/menu-hotstring-order-binding.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -1394,6 +1395,89 @@ OPENS_SUBMENU.personal_main_sections = {
 };
 
 const PERSONAL_DEFAULT_GROUP_PROOF = OPENS_SUBMENU.hotstring_personal[0].selected_group.ahk;
+
+// The category list appends the shared parent. Its dynamic section labels open
+// the move commands, while the reset footer belongs to the parent itself.
+const sectionOrderOwner = (menu, kind) => ({
+	menu,
+	platforms: ['ahk', 'hs', 'linux'],
+	kind,
+	hotstring_order_owner: true,
+	native_sources: {
+		ahk: 'windows/ui/menu/menu_hotstring_order.ahk',
+		hs: 'macos/ui/menu/menu_hotstrings.lua',
+		linux: 'linux/ui/menu/menu_hotstrings.lua'
+	}
+});
+OPENS_SUBMENU.hotstring_category_sections.push(
+	sectionOrderOwner('hotstring_order_parent', 'compose')
+);
+OPENS_SUBMENU.hotstring_order_children = [
+	sectionOrderOwner('hotstring_order_moves', 'submenu'),
+	sectionOrderOwner('hotstring_order_footer', 'compose')
+];
+
+// Shared callbacks/getters are admitted only through the renderer function port
+// and the returned native rows. Mutations exercise the actual producer text.
+{
+	const assert = require('node:assert/strict');
+	const shared = readSourceFile(path.join(SP, '_shared/lua/hotstrings/section_order.lua'));
+	for (const platform of ['hs', 'linux']) {
+		const source = readSourceFile(
+			path.join(SP, sectionOrderOwner('', '').native_sources[platform])
+		);
+		assert(hotstringOrderMenuSource(source, shared), `${platform}: shared section order reached`);
+		for (const changed of [
+			source.replace(
+				'local SectionOrder = require("hotstrings.section_order")',
+				'-- local SectionOrder = require("hotstrings.section_order")'
+			),
+			source.replaceAll('SectionOrder.menu(', 'UnownedOrder.menu('),
+			source.replaceAll(
+				'SectionOrder.menu(ManifestMenu.template_rows,',
+				'SectionOrder.menu(Foreign.template_rows,'
+			),
+			source.replaceAll(
+				'for _, row in ipairs(order_rows) do',
+				'for _, row in ipairs(unpublished_rows) do'
+			),
+			source + '\nSectionOrder = Foreign\n',
+			source + '\nManifestMenu = Foreign\n',
+			source + '\nManifestMenu.template_rows = Foreign\n',
+			source.replace(
+				'local SectionOrder = require("hotstrings.section_order")',
+				'if false then local SectionOrder = require("hotstrings.section_order") end'
+			)
+		])
+			assert.equal(
+				hotstringOrderMenuSource(changed, shared),
+				'',
+				`${platform}: withdrawn native port`
+			);
+		for (const [from, to] of [
+			['pcall(template_rows, ...)', 'pcall(other_renderer, ...)'],
+			[
+				'local COMMAND = require("config_keys").COMMAND',
+				'local COMMAND = require("config_keys").COMMAND\nCOMMAND = Foreign'
+			],
+			['hotstring_order_up_ready = function()', 'unused_up_ready = function()'],
+			['hotstring_order_down_ready = function()', 'unused_down_ready = function()'],
+			['hotstring_order_ready = admitted', 'hotstring_order_ready = unrelated'],
+			['return move(-1)', 'return true'],
+			['return move(1)', 'return true'],
+			['commit(nil) == true', 'true'],
+			['hotstring_order_children = entries', 'hotstring_order_children = {}'],
+			['render("hotstring_order_parent"', 'render("unrelated_parent"']
+		]) {
+			assert(shared.includes(from), `mutation pin exists: ${from}`);
+			assert.equal(
+				hotstringOrderMenuSource(source, shared.replace(from, to)),
+				'',
+				`${platform}: withdrawn shared owner ${from}`
+			);
+		}
+	}
+}
 
 /**
  * The native personal provider must actually consume its declared command head.
@@ -5363,63 +5447,73 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 											platform,
 											target
 										)
-									: opened.completed_parent?.[platform] === 'llm'
-										? require('../lib/menu-native-llm-parent-binding.cjs').nativeLlmParentPublication(
-												readSourceFile(path.join(SP, file)),
-												readSourceFile(path.join(SP, 'macos/ui/menu/builder.lua')),
-												manifest[target],
-												manifest.top_level,
-												platform
-											)
-										: opened.forwarded_template?.[platform] === 'layout'
-											? require('../lib/menu-native-layout-binding.cjs').nativeLayoutTemplatePublication(
+									: opened.hotstring_order_owner && platform !== 'ahk'
+										? Boolean(
+												hotstringOrderMenuSource(
 													readSourceFile(path.join(SP, file)),
-													target,
-													manifest[target]
+													readSourceFile(path.join(SP, '_shared/lua/hotstrings/section_order.lua'))
 												)
-											: opened.personal_section_choice === true
-												? require('../lib/menu-hotstring-language-binding.cjs').personalSectionChoicePublication(
+											)
+										: opened.completed_parent?.[platform] === 'llm'
+											? require('../lib/menu-native-llm-parent-binding.cjs').nativeLlmParentPublication(
+													readSourceFile(path.join(SP, file)),
+													readSourceFile(path.join(SP, 'macos/ui/menu/builder.lua')),
+													manifest[target],
+													manifest.top_level,
+													platform
+												)
+											: opened.forwarded_template?.[platform] === 'layout'
+												? require('../lib/menu-native-layout-binding.cjs').nativeLayoutTemplatePublication(
 														readSourceFile(path.join(SP, file)),
-														platform,
-														manifest
+														target,
+														manifest[target]
 													)
-												: opened.personal_default_choice === true
-													? require('../lib/menu-hotstring-language-binding.cjs').personalDefaultChoicePublication(
+												: opened.personal_section_choice === true
+													? require('../lib/menu-hotstring-language-binding.cjs').personalSectionChoicePublication(
 															readSourceFile(path.join(SP, file)),
 															platform,
 															manifest
 														)
-													: opened.selected_group?.[platform]
-														? publishesSelectedMenuGroup(
+													: opened.personal_default_choice === true
+														? require('../lib/menu-hotstring-language-binding.cjs').personalDefaultChoicePublication(
 																readSourceFile(path.join(SP, file)),
-																path.extname(file),
-																target,
-																manifest[target],
-																opened.selected_group[platform]
+																platform,
+																manifest
 															)
-														: opened.observed_construction === true && platform === 'ahk'
-															? shortcutConstructionPublication(
-																	Object.fromEntries(
-																		[
-																			'windows/ui/menu/menu_shortcuts.ahk',
-																			'windows/infra/manifest_menu.ahk'
-																		].map((owned) => [owned, readSourceFile(path.join(SP, owned))])
-																	),
+														: opened.selected_group?.[platform]
+															? publishesSelectedMenuGroup(
+																	readSourceFile(path.join(SP, file)),
+																	path.extname(file),
 																	target,
-																	file
+																	manifest[target],
+																	opened.selected_group[platform]
 																)
-															: publishesTemplate(
-																	readSourceFile(path.join(SP, file)),
-																	path.extname(file),
-																	target
-																) ||
-																publishesIncludedCommands(
-																	readSourceFile(path.join(SP, file)),
-																	path.extname(file),
-																	target,
-																	manifest,
-																	platform
-																))
+															: opened.observed_construction === true && platform === 'ahk'
+																? shortcutConstructionPublication(
+																		Object.fromEntries(
+																			[
+																				'windows/ui/menu/menu_shortcuts.ahk',
+																				'windows/infra/manifest_menu.ahk'
+																			].map((owned) => [
+																				owned,
+																				readSourceFile(path.join(SP, owned))
+																			])
+																		),
+																		target,
+																		file
+																	)
+																: publishesTemplate(
+																		readSourceFile(path.join(SP, file)),
+																		path.extname(file),
+																		target
+																	) ||
+																	publishesIncludedCommands(
+																		readSourceFile(path.join(SP, file)),
+																		path.extname(file),
+																		target,
+																		manifest,
+																		platform
+																	))
 					)
 						errors.push(
 							`${menuKey}/${row.id}: ${kind} ${target} has no native template publication on ${platform}`

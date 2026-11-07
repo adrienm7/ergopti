@@ -10,6 +10,7 @@ const { scriptTokens, stripComments } = require('./script-source.cjs');
 const MODULES = new Set([
 	'menu.personal_files',
 	'menu.programmable_hotstrings',
+	'hotstrings.section_order',
 	'keymap.magic_key_source'
 ]);
 const values = (source) => scriptTokens(source, '.lua');
@@ -249,6 +250,27 @@ function delegatedMenuSources(
 			if (module === 'keymap.magic_key_source' && !magicRendererPort(native.src, tokens[i].value))
 				continue;
 			const shared = readFile(path.join(sharedRoot, module.replaceAll('.', '/') + '.lua'));
+			if (module === 'hotstrings.section_order') {
+				const src = require('./menu-hotstring-order-binding.cjs').hotstringOrderMenuSource(
+					native.src,
+					shared
+				);
+				const rel = module + '.menu';
+				if (src && !seen.has(rel)) {
+					seen.add(rel);
+					const { COMMAND } = require('./_generated/config_keys.cjs');
+					result.push({
+						rel,
+						src,
+						handlers: new Set([
+							COMMAND.HOTSTRING_ORDER_UP,
+							COMMAND.HOTSTRING_ORDER_DOWN,
+							COMMAND.HOTSTRING_ORDER_RESET
+						])
+					});
+				}
+				continue;
+			}
 			const bodies = methods(shared),
 				reached = new Set();
 			const visit = (name, visiting = new Set()) => {
