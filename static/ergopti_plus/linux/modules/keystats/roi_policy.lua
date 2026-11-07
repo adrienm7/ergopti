@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local M = {}
+local KEY = require("config_keys").KEY
 local Cipher = require("modules.keystats.text_cipher")
 local Preferences = require("infra.metrics_preferences")
 
@@ -24,7 +25,7 @@ end
 --- Rechecks the canonical preference outside the input callback.
 --- @return boolean
 function M.current()
-	local called, requested = pcall(Preferences.get, "metrics.encrypt", true)
+	local called, requested = pcall(Preferences.get, KEY.METRICS_ENCRYPT, true)
 	return called and M.text_enabled(requested)
 end
 
