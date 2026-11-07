@@ -3895,7 +3895,7 @@
 	"menu.global.uninstall": "卸载 Ergopti…",
 	"dialog.uninstall.window_title": "卸载",
 	"dialog.uninstall.confirm": "要卸载 Ergopti 吗？应用程序将关闭。您的设置、热字串、统计数据和凭据将被保留。",
-	"dialog.system_layout.window_title": "Ergopti 系统布局",
+	"dialog.system_layout.window_title": "系统布局 (Ergopti)",
 	"dialog.system_layout.confirm": "要将 Ergopti 键盘布局安装到 Windows 吗?\n\nWindows 会请求管理员权限。安装程序未签名,因此 Windows 可能提示发布者未知:这是预期的。随后布局会添加到您的语言中并被选中。",
 	"dialog.system_layout.elevation_refused": "未授予管理员权限:Ergopti 系统布局未安装。",
 	"dialog.system_layout.failed": "无法安装 Ergopti 系统布局:{1}",

@@ -3895,7 +3895,7 @@
 	"menu.global.uninstall": "Uninstall Ergopti…",
 	"dialog.uninstall.window_title": "Uninstall",
 	"dialog.uninstall.confirm": "Uninstall Ergopti? The application will close. Your settings, hotstrings, metrics and credentials will be kept.",
-	"dialog.system_layout.window_title": "Ergopti system layout",
+	"dialog.system_layout.window_title": "System layout (Ergopti)",
 	"dialog.system_layout.confirm": "Install the Ergopti keyboard layout into Windows?\n\nWindows will ask for administrator rights. The installer is not signed, so Windows may say that its publisher is unknown: this is expected. The layout is then added to your languages and selected.",
 	"dialog.system_layout.elevation_refused": "Administrator rights were not granted: the Ergopti system layout was not installed.",
 	"dialog.system_layout.failed": "The Ergopti system layout could not be installed: {1}",

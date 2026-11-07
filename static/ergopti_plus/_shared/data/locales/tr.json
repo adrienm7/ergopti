@@ -3895,7 +3895,7 @@
 	"menu.global.uninstall": "Ergopti’yi kaldır…",
 	"dialog.uninstall.window_title": "Kaldırma",
 	"dialog.uninstall.confirm": "Ergopti kaldırılsın mı? Uygulama kapanacak. Ayarlarınız, hotstring’leriniz, ölçümleriniz ve kimlik bilgileriniz korunacak.",
-	"dialog.system_layout.window_title": "Ergopti sistem düzeni",
+	"dialog.system_layout.window_title": "Sistem düzeni (Ergopti)",
 	"dialog.system_layout.confirm": "Ergopti klavye düzeni Windows'a yüklensin mi?\n\nWindows yönetici hakları isteyecek. Yükleyici imzalı değildir, bu yüzden Windows yayımcının bilinmediğini söyleyebilir: bu beklenen bir durumdur. Düzen ardından dillerinize eklenir ve seçilir.",
 	"dialog.system_layout.elevation_refused": "Yönetici hakları verilmedi: Ergopti sistem düzeni yüklenmedi.",
 	"dialog.system_layout.failed": "Ergopti sistem düzeni yüklenemedi: {1}",

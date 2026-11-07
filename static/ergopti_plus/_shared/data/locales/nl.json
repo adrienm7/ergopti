@@ -3895,7 +3895,7 @@
 	"menu.global.uninstall": "Ergopti verwijderen…",
 	"dialog.uninstall.window_title": "Verwijderen",
 	"dialog.uninstall.confirm": "Ergopti verwijderen? De toepassing wordt gesloten. Je instellingen, hotstrings, statistieken en inloggegevens blijven behouden.",
-	"dialog.system_layout.window_title": "Ergopti-systeemindeling",
+	"dialog.system_layout.window_title": "Systeemindeling (Ergopti)",
 	"dialog.system_layout.confirm": "De Ergopti-toetsenbordindeling in Windows installeren?\n\nWindows vraagt om beheerdersrechten. Het installatieprogramma is niet ondertekend, dus Windows kan melden dat de uitgever onbekend is: dat is verwacht. De indeling wordt daarna aan uw talen toegevoegd en geselecteerd.",
 	"dialog.system_layout.elevation_refused": "Er zijn geen beheerdersrechten verleend: de Ergopti-systeemindeling is niet geïnstalleerd.",
 	"dialog.system_layout.failed": "De Ergopti-systeemindeling kon niet worden geïnstalleerd: {1}",

@@ -3895,7 +3895,7 @@
 	"menu.global.uninstall": "Ergopti अनइंस्टॉल करें…",
 	"dialog.uninstall.window_title": "अनइंस्टॉल",
 	"dialog.uninstall.confirm": "Ergopti अनइंस्टॉल करें? ऐप बंद हो जाएगा। आपकी सेटिंग, हॉटस्ट्रिंग, मेट्रिक और लॉगिन जानकारी सुरक्षित रहेंगी।",
-	"dialog.system_layout.window_title": "Ergopti सिस्टम लेआउट",
+	"dialog.system_layout.window_title": "सिस्टम लेआउट (Ergopti)",
 	"dialog.system_layout.confirm": "Ergopti कीबोर्ड लेआउट को Windows में इंस्टॉल करें?\n\nWindows व्यवस्थापक अधिकार मांगेगा। इंस्टॉलर पर हस्ताक्षर नहीं है, इसलिए Windows प्रकाशक को अज्ञात बता सकता है: यह अपेक्षित है। फिर लेआउट आपकी भाषाओं में जोड़ा और चुना जाता है।",
 	"dialog.system_layout.elevation_refused": "व्यवस्थापक अधिकार नहीं दिए गए: Ergopti सिस्टम लेआउट इंस्टॉल नहीं हुआ।",
 	"dialog.system_layout.failed": "Ergopti सिस्टम लेआउट इंस्टॉल नहीं हो सका: {1}",
