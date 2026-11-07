@@ -70,14 +70,17 @@ with tempfile.TemporaryDirectory(prefix="ergopti-histogram-regression-") as temp
                             (*key, "token", count, count * 10, count, sources),
                         )
         connection.commit()
-    subprocess.run(
-        [
-            "luajit",
-            str(root / "tools/test/metrics-histogram-native.lua"),
-            str(root),
-            str(database),
-            str(arguments.readers_root.resolve()),
-        ],
-        check=True,
-        timeout=90,
-    )
+    # Hammerspoon embeds Lua 5.4 (math.type, integers); the Linux driver runs LuaJIT.
+    for interpreter, driver in (("luajit", "linux"), ("lua5.4", "macos")):
+        subprocess.run(
+            [
+                interpreter,
+                str(root / "tools/test/metrics-histogram-native.lua"),
+                str(root),
+                str(database),
+                str(arguments.readers_root.resolve()),
+                driver,
+            ],
+            check=True,
+            timeout=90,
+        )

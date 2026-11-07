@@ -3,6 +3,9 @@
 -- this checks SQL/Lua composition, not native Hammerspoon JSON conversion.
 local root, database = assert(arg[1]), assert(arg[2])
 local readers_root = assert(arg[3])
+-- Each driver's reader runs on its own interpreter: LuaJIT for Linux, Lua 5.4
+-- (as Hammerspoon embeds) for macOS.
+local drivers = { (assert(arg[4], 'the driver whose reader runs')) }
 package.path = root .. '/static/ergopti_plus/linux/?.lua;'
 	.. root .. '/static/ergopti_plus/_shared/lua/?.lua;'
 	.. root .. '/static/ergopti_plus/_shared/lua/?/init.lua;' .. package.path
@@ -11,7 +14,7 @@ local logger = {}
 for _, name in ipairs({ 'debug', 'info', 'trace', 'done', 'start', 'success' }) do
 	logger[name] = function() end
 end
-logger.warn = function(_, message) error(message) end
+logger.warn = function(_, message, ...) error(select('#', ...) > 0 and string.format(message, ...) or message) end
 logger.error = logger.warn
 package.loaded['logger.shim'] = logger
 package.loaded['infra.logger'] = logger
@@ -34,7 +37,10 @@ package.loaded['hs.sqlite3'] = {
 	open = function(path)
 		return {
 			exec = function(_, statement)
-				assert(statement == 'PRAGMA query_only = 1;', 'unexpected macOS write')
+				-- The reader's connection setup: read-only mode and the wait for a
+				-- writer's COMMIT. Anything else would be a write.
+				assert(statement == 'PRAGMA query_only = 1;' or statement:match('^PRAGMA busy_timeout = %d+;$'),
+					'unexpected macOS write')
 				return 0
 			end,
 			close = function() end,
@@ -65,7 +71,7 @@ local function histogram(value)
 end
 local codes = { 'c', 'bg', 'tg', 'qg', 'pg', 'hx', 'hp', 'w', 'w_bg' }
 local today = os.date('%Y-%m-%d')
-for _, driver in ipairs({ 'linux', 'macos' }) do
+for _, driver in ipairs(drivers) do
 	local reader = assert(loadfile(readers_root .. '/static/ergopti_plus/' .. driver .. '/modules/keystats/sqlite_reader.lua'))()
 	local manifest = reader.read_manifest(database, '2020-01-01', today)
 	for _, day in ipairs({ '2020-01-01', today }) do
