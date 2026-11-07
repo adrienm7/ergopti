@@ -1,0 +1,12 @@
+{
+	"expected_count": 1,
+	"native_http_client_e2e": false,
+	"native_hotstring_e2e": false,
+	"native_proxy_relay_owner_e2e": false,
+	"filters": [
+		{
+			"contains": "roi-windows-native-scalar-corpus",
+			"expected_count": 1
+		}
+	]
+}

@@ -118,6 +118,34 @@ _ROIN_NativeLowercase() {
 }
 Test("ROI parity: native lowercase and UTF16 observations (roi-windows-native-probe)", _ROIN_NativeLowercase)
 
+_ROIN_NativeScalarCorpus() {
+	global _DriverDir
+	Corpus := JsonParse(FileRead(_DriverDir . "\tests\fixtures\roi_native_lowercase_candidates.json", "UTF-8"))
+	Differences := 0
+	for Candidate in Corpus["candidates"] {
+		Text := Chr(Candidate[1]), Expected := ""
+		for Codepoint in Candidate[2]
+			Expected .= Chr(Codepoint)
+		Lower := StrLower(Text)
+		if !(Lower == Expected) {
+			Differences += 1
+			_TestPrint("# roi-windows-native-scalar-difference " . KL_JsonEncode(Map(
+				"codepoint", Candidate[1], "input_units", _ROIN_Utf16Units(Text),
+				"proposed_units", _ROIN_Utf16Units(Expected), "native_units", _ROIN_Utf16Units(Lower))))
+		}
+	}
+	_TestPrint("# roi-windows-native-scalar-summary " . KL_JsonEncode(Map(
+		"candidates", Corpus["candidates"].Length, "differences", Differences,
+		"js_changed", Corpus["js_changed"], "shared_changed", Corpus["shared_changed"],
+		"node", Corpus["node"], "node_unicode", Corpus["node_unicode"],
+		"shared_unicode", Corpus["shared_unicode"], "shared_data_sha256", Corpus["shared_data_sha256"],
+		"ahk_version", A_AhkVersion, "os_version", A_OSVersion, "language", A_Language)))
+	AssertEqual(Corpus["candidate_count"], Corpus["candidates"].Length,
+		"every generated scalar candidate must receive a native observation")
+	Assert(Corpus["candidates"].Length > 1400, "the probe must cover the complete lowercase candidate set")
+}
+Test("ROI parity: full native scalar lowercase observations (roi-windows-native-scalar-corpus)", _ROIN_NativeScalarCorpus)
+
 _ROIN_NativeMapPrune() {
 	Bmp := Chr(0xE000) . "end", Supplementary := Chr(0x10000) . "end"
 	Counts := Map("zzzz", 2, Bmp, 2, "aaaa", 2, Supplementary, 2, "mmmm", 2, "noise", 1)
