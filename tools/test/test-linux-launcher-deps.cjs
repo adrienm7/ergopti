@@ -415,7 +415,11 @@ for (const line of launcherCode.split(/\r?\n/)) {
 	}
 }
 
-const exportLine = (launcherCode.match(/^\s*export LUA_PATH=.*$/m) || [])[0] || '';
+// The launcher exports a literal ';;' when a root holds a Lua pattern
+// character (ERGOPTI_LITERAL_* then carry the roots); the composed export is
+// the one that names the trees.
+const exportLines = launcherCode.match(/^\s*(?:\*\)\s*)?export LUA_PATH=.*$/gm) || [];
+const exportLine = exportLines.find((line) => /\$\{[A-Z_]+\}/.test(line)) || exportLines[0] || '';
 if (exportLine === '') {
 	errors.push(
 		'no `export LUA_PATH=` line found in the launcher — the daemon would inherit whatever LUA_PATH the session had'
