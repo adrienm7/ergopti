@@ -99,10 +99,15 @@ const OWNER_FILE = path.join(WIN, 'infra', 'hotstrings', 'hotstring_send.ahk');
 const dispatch = stripComments(
 	read(path.join(WIN, 'infra', 'hotstrings', 'hotstring_dispatch.ahk'))
 );
-const gate = bodyOf(dispatch, '_HSE_PrepareDispatchDecision').text;
+const prepare = bodyOf(dispatch, '_HSE_PrepareDispatchDecision').text;
+const gate = bodyOf(dispatch, '_HSE_EvaluateTimeGate').text;
+check(
+	prepare.includes('_HSE_EvaluateTimeGate('),
+	'_HSE_PrepareDispatchDecision must still run its trigger through the time gate _HSE_EvaluateTimeGate; if the gate moved, move this check with it'
+);
 check(
 	gate.includes('LastSentCharacterKeyTime.Has(PrevKey)'),
-	'_HSE_PrepareDispatchDecision must still time a trigger from LastSentCharacterKeyTime; if the gate moved, move this check with it'
+	'_HSE_EvaluateTimeGate must still time a trigger from LastSentCharacterKeyTime; if the gate moved, move this check with it'
 );
 
 const ownerSource = stripComments(read(OWNER_FILE));
