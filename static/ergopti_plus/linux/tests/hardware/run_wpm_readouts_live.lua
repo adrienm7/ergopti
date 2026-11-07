@@ -40,7 +40,9 @@ if not Surface.is_available() then abort("the widget surface cannot bind GTK.") 
 if not Indicator.is_available() then abort("the tray library cannot bind.") end
 
 local Model = require("wpm_widget.model")
+local Activity = require("keystats.wpm_activity")
 local Constants = require("infra.wpm_constants")
+local Timings = require("infra.timings")
 local Widget = require("ui.wpm.widget")
 local Readout = require("ui.wpm.tray_readout")
 local canon = assert(Constants.load(), "the shared canon must load")
@@ -60,18 +62,25 @@ local function pump(seconds)
 end
 
 local clock = 100
+local activity = Activity.new(Timings.ms("ui", "wpm_color_hold_ms"))
+-- Fix the displayed speed for the pixel/geometry checks, while the production
+-- owner supplies physical-input timestamps and independently held sources.
+local function fresh(stats)
+	local now_ms = clock * 1000
+	Activity.record_input(activity, now_ms)
+	Activity.mark_source(activity, stats.source, stats.source_variant, now_ms)
+	return Activity.snapshot(activity, stats, now_ms)
+end
+
 local function tick(stats)
 	clock = clock + 1
+	stats = fresh(stats)
 	Widget.tick(stats, clock)
 	Readout.tick(stats, clock)
 	pump(0.3)
 end
 
-local typing_ai = { wpm = 72, source = "llm", source_variant = "llm", source_time = 1e9 }
-local function fresh(stats)
-	stats.source_time = clock + 1
-	return stats
-end
+local typing_ai = { wpm = 72, source = "llm", source_variant = "llm" }
 
 
 
@@ -89,7 +98,7 @@ assert(Widget.set_graph(false), "the pill fixture must explicitly select the com
 -- A place kept by an earlier run is not the default this checks.
 expect(Widget.reset_position(), "the widget starts from its default place")
 assert(Widget.start() == true, "the widget must start before testing its native geometry")
-tick(fresh(typing_ai))
+tick(typing_ai)
 expect(Surface.is_visible(), "the pill is on screen while the user types")
 
 local screen = assert(Surface.screen_frame(), "the monitor has a geometry")
@@ -119,13 +128,13 @@ expect(corner:byte(4) == 0, "the corner outside the rounded pill is transparent"
 -- =========================================
 
 expect(Widget.set_graph(true), "graph mode switches on")
-for _ = 1, 3 do tick(fresh(typing_ai)) end
+for _ = 1, 3 do tick(typing_ai) end
 local gx, gy = Surface.position()
 local graph = Model.graph_frame(canon, {}, typing_ai, Widget.frame_options(clock, true))
 expect(gx + graph.width == want_x + pill.width and gy + graph.height == want_y + pill.height,
 	"the graph keeps the pill's bottom-right corner")
 expect(Widget.set_graph(false), "and back to the pill")
-tick(fresh(typing_ai))
+tick(typing_ai)
 
 
 
