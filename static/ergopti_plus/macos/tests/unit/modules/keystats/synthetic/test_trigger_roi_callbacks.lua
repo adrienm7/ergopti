@@ -10,10 +10,13 @@
 
 local helpers = require("tests.helpers")
 local Fixtures = require("tests.support.keystats_provenance_fixture")
+local PreferenceManifest = helpers.load_with_stubs("infra.manifest_reader")
 
 --- Starts the real engine with observable persistence and native callback boundaries.
 local function fixture()
 	local f = Fixtures.load_keystats()
+	package.loaded["infra.manifest_reader"] = PreferenceManifest
+	package.loaded["infra.preferences"] = nil
 	f.hs.caffeinate = { watcher = { new = function()
 		return { start = function(self) return self end, stop = function(self) return self end }
 	end } }
@@ -29,6 +32,10 @@ local function fixture()
 		return true
 	end
 	package.loaded["infra.logger"].error = function(_, message) control.errors[#control.errors + 1] = message end
+	local source_path = os.tmpname()
+	assert(os.remove(source_path))
+	local _, source_status = require("infra.preferences").load(source_path)
+	helpers.assert_eq(source_status, "absent", "the plaintext fixture owns a real absent preference source")
 	helpers.assert_true(require("modules.keystats.text_cipher").set_enabled(false))
 	f.start()
 	f.state.active_app_name, f.state.session_app_name = "Editor", "Editor"
@@ -227,6 +234,161 @@ helpers.describe("macOS trigger ROI admission", function()
 		helpers.assert_eq(#c.roi(), 0, "a clean refusal cannot restore the discarded counts")
 		c.key("candidate ")
 		helpers.assert_eq(c.roi()[1].occurrences, 5)
+		helpers.assert_true(f.keystats.stop())
+	end)
+
+	for _, source in ipairs({
+		'[metrics]\nencrypt = "true"\n', '[metrics]\nencrypt = "false"\n',
+		'[metrics]\nencrypt = [true]\n', '[[metrics.encrypt]]\nvalue = true\n',
+		'[[metrics]]\nencrypt = false\n', 'metrics = []\n',
+		'[metrics]\nencrypt = true\n', '[metrics]\nencrypt = { invalid = true }\n',
+		'[metrics]\nencrypt = 1\n',
+	}) do
+		helpers.it("denies textual ROI from the actual non-OFF source " .. source:gsub("\n", " "), function()
+			local f, c = fixture()
+			local prefs = require("infra.preferences")
+			local cipher = require("modules.keystats.text_cipher")
+			for _ = 1, 4 do c.key("candidate ") end
+			c.key("fragment")
+			local path = os.tmpname()
+			local function write(contents)
+				local file = assert(io.open(path, "wb")); assert(file:write(contents)); assert(file:close())
+			end
+			local called, failure = xpcall(function()
+				write(source)
+				local saved, status = prefs.load(path)
+				helpers.assert_eq(status, "ok")
+				local projected = { keystats_encrypt = false }
+				prefs.merge_saved_data(projected, saved)
+				-- The ordinary reader keeps its existing defaults; only the ROI
+				-- gate needs the strict source verdict behind that projection.
+				helpers.assert_eq(projected.keystats_encrypt, source:find("encrypt = true", 1, true) ~= nil)
+				helpers.assert_eq(cipher.roi_text_enabled(), false)
+				helpers.assert_eq(f.state.trigger_roi.words, {})
+				helpers.assert_eq(f.state.trigger_roi.word, {})
+				for _ = 1, 5 do c.key("candidate ") end
+				helpers.assert_eq(#c.roi(), 0)
+				write("[metrics]\nencrypt = false\n")
+				helpers.assert_eq(select(2, prefs.load(path)), "ok")
+				helpers.assert_true(f.keystats.set_options({ encrypt = false }))
+				for _ = 1, 4 do c.key("candidate ") end
+				helpers.assert_eq(#c.roi(), 0, "source recovery cannot resurrect pre-revocation words")
+				c.key("candidate ")
+				helpers.assert_eq(c.roi()[1].occurrences, 5)
+			end, debug.traceback)
+			assert(os.remove(path))
+			helpers.assert_true(f.keystats.stop())
+			if not called then error(failure, 0) end
+		end)
+	end
+
+	helpers.it("revokes a refused reload before native I/O and keeps input free from reads and decoding", function()
+		local f, c = fixture()
+		local prefs = require("infra.preferences")
+		local cipher = require("modules.keystats.text_cipher")
+		local path = os.tmpname()
+		local file = assert(io.open(path, "wb")); assert(file:write("[metrics]\nencrypt = false\n")); assert(file:close())
+		helpers.assert_eq(select(2, prefs.load(path)), "ok")
+		helpers.assert_true(f.keystats.set_options({ encrypt = false }))
+		c.key("fragment")
+		local files = require("adapters.file_system")
+		local read = files.read_with_status
+		files.read_with_status = function(name, ...)
+			if name ~= path then return read(name, ...) end
+			helpers.assert_eq(f.state.trigger_roi.word, {}, "the old OFF fragment is revoked before a native read can reenter")
+			return nil, "error"
+		end
+		local called, saved, status = pcall(prefs.load, path)
+		files.read_with_status = read
+		helpers.assert_true(called)
+		helpers.assert_eq(status, "corrupt")
+		helpers.assert_eq(saved, {})
+		helpers.assert_eq(cipher.roi_text_enabled(), false)
+		local open = io.open
+		local rows = require("toml_codec.leaf_rows")
+		local decode = rows.decode_source
+		io.open = function() error("input cannot read preferences") end
+		rows.decode_source = function() error("input cannot decode preferences") end
+		local input_ok, input_error = pcall(function()
+			for _ = 1, 5 do c.key("secret ") end
+			helpers.assert_eq(#c.roi(), 0)
+		end)
+		io.open, rows.decode_source = open, decode
+		if input_ok then
+			helpers.assert_eq(select(2, prefs.load(path)), "ok")
+			helpers.assert_true(f.keystats.set_options({ encrypt = false }))
+			io.open = function() error("admitted input cannot read preferences") end
+			rows.decode_source = function() error("admitted input cannot decode preferences") end
+			input_ok, input_error = pcall(function()
+				for _ = 1, 5 do c.key("fresh ") end
+				helpers.assert_eq(c.roi()[1].word, "fresh")
+			end)
+			io.open, rows.decode_source = open, decode
+		end
+		assert(os.remove(path))
+		helpers.assert_true(f.keystats.stop())
+		if not input_ok then error(input_error, 0) end
+	end)
+
+	for _, source in ipairs({ '[metrics]\nencrypt = true\n', '[metrics]\nencrypt = "true"\n', '[metrics\n' }) do
+		helpers.it("revokes a changed read-only source without adopting it " .. source:gsub("\n", " "), function()
+			local f, c = fixture()
+			local prefs = require("infra.preferences")
+			local cipher = require("modules.keystats.text_cipher")
+			local path = os.tmpname()
+			local function write(contents)
+				local file = assert(io.open(path, "wb")); assert(file:write(contents)); assert(file:close())
+			end
+			local called, failure = xpcall(function()
+				write("[metrics]\nencrypt = false\n")
+				helpers.assert_eq(select(2, prefs.load(path)), "ok")
+				helpers.assert_true(f.keystats.set_options({ encrypt = false }))
+				local before = prefs.source_snapshot(path)
+				c.key("fragment")
+				write(source)
+				prefs.current_view(path, true)
+				helpers.assert_eq(cipher.roi_text_enabled(), false)
+				helpers.assert_eq(f.state.trigger_roi.word, {})
+				helpers.assert_eq(prefs.source_snapshot(path), before, "read-only views cannot grant overwrite authority")
+				write("[metrics]\nencrypt = false\n")
+				prefs.current_view(path, true)
+				helpers.assert_true(cipher.set_enabled(false))
+				helpers.assert_eq(cipher.roi_text_enabled(), false, "a read-only OFF view cannot reopen the retired source")
+				helpers.assert_eq(select(2, prefs.load(path)), "ok")
+				helpers.assert_true(f.keystats.set_options({ encrypt = false }))
+				helpers.assert_true(cipher.roi_text_enabled())
+			end, debug.traceback)
+			assert(os.remove(path))
+			helpers.assert_true(f.keystats.stop())
+			if not called then error(failure, 0) end
+		end)
+	end
+
+	helpers.it("keeps the exact source receipt when a reload is refused during an owned publication", function()
+		local f, c = fixture()
+		local prefs = require("infra.preferences")
+		local path = os.tmpname()
+		local file = assert(io.open(path, "wb")); assert(file:write("[metrics]\nencrypt = false\n")); assert(file:close())
+		helpers.assert_eq(select(2, prefs.load(path)), "ok")
+		helpers.assert_true(f.keystats.set_options({ encrypt = false }))
+		local before = prefs.source_snapshot(path)
+		c.key("fragment")
+		local writer = require("toml_codec.writer")
+		local previous = writer.batch_write
+		writer.batch_write = function()
+			local called, reason = pcall(prefs.load, path)
+			helpers.assert_eq(called, false)
+			helpers.assert_true(tostring(reason):find("publication is still active", 1, true) ~= nil)
+			return false, "controlled publication refusal"
+		end
+		local called, published = pcall(prefs.publish_owned, path, {}, before)
+		writer.batch_write = previous
+		assert(os.remove(path))
+		helpers.assert_true(called)
+		helpers.assert_eq(published, false)
+		helpers.assert_eq(prefs.source_snapshot(path), before, "refusing a reload cannot surrender the prior source receipt")
+		helpers.assert_eq(require("modules.keystats.text_cipher").roi_text_enabled(), false)
+		helpers.assert_eq(f.state.trigger_roi.word, {})
 		helpers.assert_true(f.keystats.stop())
 	end)
 

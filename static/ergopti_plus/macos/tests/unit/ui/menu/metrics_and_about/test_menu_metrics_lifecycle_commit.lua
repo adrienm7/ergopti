@@ -112,6 +112,10 @@ helpers.describe("menu_metrics: encryption refuses pending ROI work", function()
 			package.loaded["modules.keystats.log_manager"] = nil
 			package.loaded["modules.keystats.init"] = nil
 			local ctx = load_menu(false)
+			local path = os.tmpname()
+			assert(os.remove(path))
+			local _, source_status = require("infra.preferences").load(path)
+			helpers.assert_eq(source_status, "absent")
 			local cipher = require("modules.keystats.text_cipher")
 			helpers.assert_true(cipher.set_enabled(false))
 			local ports = { settled = true, available = true, migrations = 0, retirements = 0 }

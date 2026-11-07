@@ -186,7 +186,11 @@ local _requested_enabled = nil
 --- Admits textual ROI only when the requested and active postures are both known off.
 --- @return boolean
 function M.roi_text_enabled()
-	return _requested_enabled == false and Cipher.is_enabled() == false
+	if _requested_enabled ~= false or Cipher.is_enabled() ~= false then return false end
+	local preferences = package.loaded["infra.preferences"]
+	if type(preferences) ~= "table" or type(preferences.roi_encryption_requested) ~= "function" then return false end
+	local called, requested = pcall(preferences.roi_encryption_requested)
+	return called and requested == false
 end
 
 --- Closes textual capture before checking encryption availability or publishing a posture.
