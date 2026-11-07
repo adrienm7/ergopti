@@ -2719,35 +2719,31 @@ function pick(page, id, value) {
 		assert.ok(!written.includes(path), path + ' stays as configured');
 })();
 
-// macOS emulates no layout: the three emulation controls are drawn greyed with why, and
-// its host accepts none of their paths. The number-row order follows its host's
-// capability, as on Linux (number-row-order-macos, below).
-(function macosShowsWhyItLacksTheEmulationControls() {
-	for (const platform of ['macos']) {
+// macOS and Linux emulate a layout as Windows does (_shared/lua/layouts/emulation_settings.lua):
+// the three emulation controls apply there and draw no reason. A wrong platform list in
+// the manifest would grey them again.
+(function macosAndLinuxOfferTheEmulationControls() {
+	for (const platform of ['macos', 'linux']) {
 		const page = openWizard({ platform });
 		page.platform = platform;
 		goToPage(page, 'keyboard_layout');
 		const layout = pageOf(page, 'keyboard_layout');
 		const emulation = layout.controls.filter((control) => control.id !== 'number_row_order');
+		assert.deepEqual(
+			emulation.map((control) => control.id),
+			['emulated_layout', 'alt_gr_emulation', 'number_row_emulation'],
+			platform + ': the three emulation controls are listed'
+		);
 		assert.ok(
-			emulation.every((control) => !control.available),
-			platform + ': no emulation control applies'
+			emulation.every((control) => control.available && !control.reason_key),
+			platform + ': every emulation control applies'
 		);
 		const groups = controlGroups(page);
 		assert.equal(groups.size, 4, platform + ': the four controls are drawn');
-		for (const control of emulation) {
-			const group = groups.get(control.id);
-			const reason = group.children[group.children.length - 1];
-			assert.equal(
-				reason.textContent,
-				locale('en')[control.reason_key],
-				platform + ': ' + control.id + ' says why'
-			);
-		}
 	}
 })();
 
-// Linux and macOS emulate no layout, but apply the number-row order live to a layout of
+// Linux and macOS also apply the number-row order live to a layout of
 // ours (an X11 or GNOME/KDE session on Linux, the installed .keylayout typing now on
 // macOS). The catalogue offers that control; the host says at run time whether it holds
 // the capability, and why not otherwise (number-row-order-linux, number-row-order-macos).
@@ -2766,18 +2762,14 @@ for (const platform of ['linux', 'macos'])
 			const group = controlGroups(page).get('number_row_order');
 			return group.children[group.children.length - 1];
 		};
-		const unavailable = ['emulated_layout', 'alt_gr_emulation', 'number_row_emulation'];
-
 		// The host holds the capability: the choices follow the question and are written.
 		let page = openLinux({ number_row_live: true });
 		let layout = pageOf(page, 'keyboard_layout');
-		assert.deepEqual(
-			layout.controls.filter((control) => control.available).map((control) => control.id),
-			['number_row_order'],
-			'only the number-row order applies on ' + platform
+		assert.equal(
+			layout.controls.find((control) => control.id === 'number_row_order').available,
+			true,
+			'the number-row order applies on ' + platform
 		);
-		for (const id of unavailable)
-			assert.equal(layout.controls.find((control) => control.id === id).available, false, id);
 		answer(page, true);
 		assert.equal(
 			controlRadios(controlGroups(page).get('number_row_order')).get('digits').disabled,
