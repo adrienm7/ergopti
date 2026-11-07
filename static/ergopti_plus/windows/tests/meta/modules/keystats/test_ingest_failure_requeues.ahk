@@ -139,10 +139,10 @@ _IFR_TodayLogOpenRequeues() {
 	CatchWindow := SubStr(Src, OpenPos, 1000)
 	Assert(InStr(CatchWindow, "catch as err") > 0,
 		"the today.log open must have an explicit catch")
-	Assert(InStr(CatchWindow, "InsertAt") > 0,
+	Assert(InStr(CatchWindow, "_KL_JournalRestoreSnapshot(pending_snapshot)") > 0,
 		"the today.log open failure must re-queue the pending snapshot onto _pending_entries")
-	Assert(InStr(CatchWindow, "pending_snapshot") > 0,
-		"the re-queue must restore pending_snapshot, the only copy of those entries")
+	Assert(InStr(_DriverFuncBody("_KL_JournalRestoreSnapshot"), "Keystats._pending_entries.InsertAt") > 0,
+		"the re-queue must restore pending_snapshot, the only copy of those entries, onto _pending_entries")
 	Assert(InStr(CatchWindow, "today_log_open_failed") > 0,
 		"the failure must return a distinct reason so the caller can tell it from a data.sql failure")
 }
