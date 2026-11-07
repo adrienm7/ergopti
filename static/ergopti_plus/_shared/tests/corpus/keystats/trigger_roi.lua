@@ -24,6 +24,16 @@ return function(helpers)
 	end
 
 	helpers.describe("shared trigger ROI", function()
+		helpers.it("excludes lowercase equivalents of the complete admitted trigger registry", function()
+			local index = Roi.trigger_index({ { trigger = "UPPER" }, { trigger = "ÉCOLE" }, { trigger = "İ" } })
+			helpers.assert_true(Roi.known_trigger(index, "upper"))
+			helpers.assert_true(Roi.known_trigger(index, "école"))
+			helpers.assert_true(Roi.known_trigger(index, "i̇"))
+			helpers.assert_eq(Roi.known_trigger(index, "other"), false)
+			helpers.assert_nil(Roi.known_trigger(nil, "other"))
+			helpers.assert_eq(pcall(Roi.trigger_index, { { trigger = "bad\255" } }), false)
+		end)
+
 		helpers.it("counts accepted expansions cumulatively and never retains private identities", function()
 			local state = Roi.new(0)
 			for index = 1, 10 do

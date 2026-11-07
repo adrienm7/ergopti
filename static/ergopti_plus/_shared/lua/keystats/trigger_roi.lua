@@ -31,6 +31,29 @@ function M.utf16_length(text)
 	return count
 end
 
+--- Indexes only a registry's admitted mappings using the Windows lowercase exclusion rule.
+--- @param mappings table Dense array of admitted { trigger } records.
+--- @return table
+function M.trigger_index(mappings)
+	assert(type(mappings) == "table", "ROI requires admitted mappings")
+	local index = {}
+	for _, mapping in ipairs(mappings) do
+		assert(type(mapping) == "table" and M.utf16_length(mapping.trigger) ~= nil,
+			"ROI requires valid admitted trigger text")
+		index[Case.lower(mapping.trigger)] = true
+	end
+	return index
+end
+
+--- Looks up a trigger only after its registry has published a complete index.
+--- @param index table|nil
+--- @param word string
+--- @return boolean|nil
+function M.known_trigger(index, word)
+	if type(index) ~= "table" or M.utf16_length(word) == nil then return nil end
+	return index[Case.lower(word)] == true
+end
+
 --- Creates one process-lifetime accounting state; restarting capture must reuse it.
 --- @param now_ms number Monotonic start time.
 --- @return table
