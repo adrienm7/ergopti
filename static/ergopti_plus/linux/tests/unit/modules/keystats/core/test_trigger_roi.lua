@@ -122,8 +122,8 @@ Home.it("Linux trigger ROI: actual daemon callbacks exclude synthetic output and
 		local writer = start(collector)
 		local engine = require("modules.hotstrings.engine").new()
 		assert(engine:load_mappings({ { trigger = "KNOWN", replacement = "expansion", is_case_sensitive_strict = true } }))
-		local stop = {}
-		engine.on_char = function() error(stop) end
+		local stop, matched = {}, 0
+		engine.on_char = function() matched = matched + 1; error(stop) end
 		local admitted, paused = true, false
 		local environment = setmetatable({
 			keystats = collector, engine = engine, _cached_app_id = "Editor",
@@ -182,7 +182,9 @@ Home.it("Linux trigger ROI: actual daemon callbacks exclude synthetic output and
 			type_text("tail ")
 			type_text("sta")
 			environment.physical_privacy_admission = { code = 30, allowed = false }
-			helpers.assert_true(pcall(character, "x", 30), "the physical press's refusal wins over a later admitted context")
+			local before = matched
+			character("x", 30)
+			helpers.assert_eq(matched, before, "the physical press's refusal keeps its text out of the matcher")
 			type_text("le ")
 		end
 		admitted = false
