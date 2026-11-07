@@ -68,11 +68,11 @@ def main():
             assert expected in child.stdout, "native child did not execute its complete receipt set"
 
         check(
-            "personal location cannot override credential or no-follow policy (native40)",
+            "personal location cannot override credential or no-follow policy (native42)",
             lambda: receipt(
                 "location\n",
                 [interpreter, "tests/hardware/run_http_redirect_receipts.lua"],
-                "Native HTTP redirect receipts: 40 checks, 0 failures",
+                "Native HTTP redirect receipts: 42 checks, 0 failures",
             ),
         )
         check(
