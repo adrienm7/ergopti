@@ -71,17 +71,25 @@ KLR_ResolveSchemaPath() {
 }
 
 KLR_LoadSchema(db) {
+		KLRCache.schema_refusal := ""
 		schema_path := KLR_ResolveSchemaPath()
 		if !FileExist(schema_path)
-				return false
+				return _KLR_RefuseSchema("schema.sql is missing")
 		try schema := FSReadStrict(schema_path)
 		catch as err {
 				try LoggerError("KLReader", "Schema read failed: {1}.", err.Message)
-				return false
+				return _KLR_RefuseSchema("schema.sql is unreadable")
 		}
 		if !SQLite_Exec(db, schema)
-				return false
+				return _KLR_RefuseSchema("schema.sql was refused by SQLite")
 		return KLR_LoadMediaSchema(db)
+}
+
+; Records the closed reason a schema load refused with.
+; @returns {Boolean} false, the load's result.
+_KLR_RefuseSchema(Reason) {
+		KLRCache.schema_refusal := Reason
+		return false
 }
 
 ; Apply only the additive schema to a private cold or upgrade candidate.
@@ -90,10 +98,10 @@ KLR_LoadMediaSchema(db) {
 		try media_schema := FSReadStrict(_SharedDir . "\data\db\media_schema.sql")
 		catch as err {
 				try LoggerError("KLReader", "Semantic media schema read failed: {1}.", err.Message)
-				return false
+				return _KLR_RefuseSchema("media_schema.sql is unreadable")
 		}
 		if !SQLite_Exec(db, media_schema)
-				return false
+				return _KLR_RefuseSchema("media_schema.sql was refused by SQLite")
 		return KLR_LoadPurgeSchema(db)
 }
 
@@ -104,9 +112,11 @@ KLR_LoadPurgeSchema(db) {
 		try purge_schema := FSReadStrict(_SharedDir . "\data\db\purge_schema.sql")
 		catch as err {
 				try LoggerError("KLReader", "Metrics purge schema read failed: {1}.", err.Message)
-				return false
+				return _KLR_RefuseSchema("purge_schema.sql is unreadable")
 		}
-		return SQLite_Exec(db, purge_schema)
+		if !SQLite_Exec(db, purge_schema)
+				return _KLR_RefuseSchema("purge_schema.sql was refused by SQLite")
+		return true
 }
 
 
@@ -126,6 +136,9 @@ KLR_LoadPurgeSchema(db) {
 ; data.sql since the last call.
 class KLRCache {
 		static db := 0
+		; Why the last schema load refused, "" after one that loaded: a detached
+		; worker has no logger, and its failure line names this closed reason.
+		static schema_refusal := ""
 		; A validated worker image stays file-backed until new ledger bytes arrive.
 		static readonly := false
 		static last_sizes := Map()    ; absolute_path → byte_offset already loaded
