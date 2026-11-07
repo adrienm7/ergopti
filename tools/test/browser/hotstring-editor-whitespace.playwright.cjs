@@ -54,11 +54,18 @@ const { chromium, webkit } = require('playwright');
 					range.setEnd(node, end);
 					return range.getBoundingClientRect().top;
 				}
-				return { first: lineTop(0, 5), second: lineTop(6, 12), text: serializeEditor(editor) };
+				return {
+					first: lineTop(0, 5),
+					second: lineTop(6, 12),
+					text: serializeEditor(editor),
+					nodes: Array.from(editor.childNodes, (child) => child.nodeName),
+					whiteSpace: getComputedStyle(editor).whiteSpace,
+					height: editor.getBoundingClientRect().height
+				};
 			});
 			assert.ok(
 				layout.second > layout.first,
-				'a newline in the output must be visible as a new line'
+				`${name}: a newline in the output must be visible as a new line: ${JSON.stringify(layout)}`
 			);
 			assert.equal(layout.text, 'First\nSecond', 'the expansion text remains unchanged');
 			console.log(name + ': hotstring output editor displays literal newlines');
