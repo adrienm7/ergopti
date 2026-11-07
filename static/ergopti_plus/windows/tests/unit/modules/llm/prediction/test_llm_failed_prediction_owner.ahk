@@ -1016,19 +1016,31 @@ _LDP_Native(Mode, Calls, Lines) {
                 SendLevel(2)
                 SendEvent("{Text}" . AllowedCanary)
             } finally SendLevel(PreviousSendLevel)
+            ; Wait for the event, not a sampled window: the deferred prefix observer
+            ; arms the engine, and its debounce timer is active for debounce_ms only.
+            ; A fresh pending token, or the request that timer already reserved, is
+            ; the monotonic proof that fresh B input armed the real engine.
+            FreshBArmed := () => (_LLM_Engine["timer_active"] && IsObject(_LLM_Engine_Plan().Pending)
+                    && _LLM_Engine_Plan().Pending["token"] != ArmToken)
+                || _LLM_Remote_AsyncCounter > BeforeCounter
             Started := A_TickCount
-            while (State.InputChars != Canary . AllowedCanary || !_LLM_Engine["timer_active"]) && TickElapsed64(Started) < 2000
+            while (State.InputChars != Canary . AllowedCanary || State.InputCompleted != State.InputCallbacks
+                    || IsObject(_LLM_Bridge_PrefixObserver) || !FreshBArmed())
+                    && TickElapsed64(Started) < 2000
                 Sleep(5)
             if IsObject(State.Failure)
                 throw State.Failure
+            if !FreshBArmed()
+                _TestPrint("# LLM_DEBOUNCE_PRIVACY_TRACE " . KL_JsonEncode(Map("observer_pending", IsObject(_LLM_Bridge_PrefixObserver),
+                    "timer_active", _LLM_Engine["timer_active"], "pending", IsObject(_LLM_Engine_Plan().Pending),
+                    "completed", State.InputCompleted, "callbacks", State.InputCallbacks, "trace", State.PrivacyTrace)))
             AssertEqual(Canary . AllowedCanary, State.InputChars, "both actual I1 input bursts must be observed in order")
             AssertEqual(AllowedCanary, ControlGetText(BControl), "the fresh allowed context is genuinely present in native B")
             AssertEqual(PriorCallbacks + StrLen(AllowedCanary), State.InputCallbacks)
             FreshBCompletedAtSnapshot := State.InputCompleted
             FreshBBufferExact := _LLM_Bridge_Buffer == AllowedCanary
             FreshBEngineExact := _LLM_Engine["last_buffer"] == AllowedCanary
-            AssertTrue(_LLM_Engine["timer_active"] && IsObject(_LLM_Engine_Plan().Pending))
-            AssertTrue(_LLM_Engine_Plan().Pending["token"] != ArmToken, "fresh B input supersedes the original A arm through the real engine")
+            AssertTrue(FreshBArmed(), "fresh B input supersedes the original A arm through the real engine")
             InputCount := State.InputCallbacks, DownCount := State.InputDowns
         }
         PendingAfterSwitch := IsObject(_LLM_Engine_Plan().Pending)
