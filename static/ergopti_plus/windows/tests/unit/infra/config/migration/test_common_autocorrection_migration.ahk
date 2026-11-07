@@ -90,7 +90,7 @@ Test("common override migration: actual absent and acknowledged native publicati
 
 _CAO_NativeInitialization() {
 	global _HotstringsOverridesPath, _HotstringsOverrides, _HotstringsLegacyDelimiters
-	global _HotstringsCommonOverrideAdmitted
+	global _HotstringsCommonOverrideAdmitted, _LOGGER_TEST_SINK
 	SavedAdmission := HotstringsCommonOverrideAdmitted()
 	Saved := [_HotstringsOverridesPath, _HotstringsOverrides, _HotstringsLegacyDelimiters]
 	Directory := _CMG_NewDir(), Path := Directory . "\overrides.toml"
@@ -99,9 +99,27 @@ _CAO_NativeInitialization() {
 		HotstringsConfigInit(Path)
 		Assert(StrCompare(_CAO_Bytes("expected"), _CMG_Read(Path), true) == 0)
 		; The migrated file still spells the delays as absolute values of earlier
-		; builds; the boot step, which the entry script runs once the base delay is
-		; known, adopts them as effective delays.
-		AssertTrue(HotstringsOverridesBoot(), "the delay boot step must settle")
+		; builds, and it also holds content no override owns (a root key, an
+		; unknown table, a foreign table array). Rewriting the delays as offsets
+		; would drop that content, so the boot step refuses the rewrite and says
+		; so; the session still runs on the adopted delays and the next start
+		; retries (docs/memory/maintainer-decisions.md, 2026-11-07).
+		NativeLog := [], PriorLogSink := _LOGGER_TEST_SINK
+		try {
+			LoggerSetTestSink((Line) => NativeLog.Push(Line))
+			Booted := HotstringsOverridesBoot()
+		} finally {
+			_LOGGER_TEST_SINK := PriorLogSink
+		}
+		Trace := ""
+		for Line in NativeLog
+			Trace .= Line . "`n"
+		AssertFalse(Booted, "the delay rewrite must refuse an override file holding unrelated content")
+		AssertContains(Trace, "Cannot rewrite overrides without losing source data",
+			"the refusal names the content it would lose")
+		AssertContains(Trace, "the rewrite is retried at the next start", "the refusal is reported, never silent")
+		Assert(StrCompare(_CAO_Bytes("expected"), _CMG_Read(Path), true) == 0,
+			"a refused rewrite leaves every byte of the override file unchanged")
 		for Section in ["names", "abbreviations", "technical_terms"] {
 			Actual := _HotstringsOverrides["autocorrection"].Sections[Section]
 			AssertEqual(Section == "names" ? 0.2 : 0.875, Actual.Delay)
@@ -125,7 +143,7 @@ _CAO_NativeInitialization() {
 		DirDelete(Directory, true)
 	}
 }
-Test("common override migration: native initialization consumes acknowledged new section choices (common-autocorrection-split)",
+Test("common override migration: native initialization consumes acknowledged new section choices and refuses a lossy delay rewrite (common-autocorrection-split)",
 	_CAO_NativeInitialization)
 
 ; Production initialization, not a test flag, fences the actual native entrypoints.
