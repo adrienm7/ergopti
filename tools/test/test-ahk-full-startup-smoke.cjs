@@ -202,10 +202,17 @@ function hotstringsRenderTimes(configRoot) {
 // text one character at a time, and personal-file metadata decoded every
 // hotstring row. Lowering a ceiling is welcome; raising one needs the measured
 // reason in the commit.
+// Raised on 2026-11-07, measured per owner (the boot log's "Document parses by
+// owner" record): ad8268b7da reads personal_info.toml through the typed
+// document parser, which keeps its exact values, where the flat reader that
+// the parse counter does not see used to read it (+1 parse); 424b4a26d8's
+// boot-tail proof of the served config snapshot costs one registry compare
+// (+1). An absent hotstring override file, parsed as an empty document on
+// every boot since 3e25e5d71c, no longer is.
 const BOOT_OPERATION_CEILINGS = {
 	'config.snapshot_read': { all: 9 },
-	'toml.document_parse': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
-	'config_migrate.registry_deep_compares': { all: 13, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
+	'toml.document_parse': { all: 15, [REALISTIC_HOTSTRINGS_FIXTURE]: 18 },
+	'config_migrate.registry_deep_compares': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
 	'toml.document_slow_steps': { all: 11943, [REALISTIC_HOTSTRINGS_FIXTURE]: 13420 },
 	'toml.flat_values': { all: 2181, [REALISTIC_HOTSTRINGS_FIXTURE]: 1199 }
 };
