@@ -194,9 +194,9 @@ _CPC_ProfilePublisherRetainsOpeningImage() {
 _CPC_SectionOrderWriterContract(Body) {
 	Body := _StripFullLineComments(_DriverMaskBlockComments(&Body))
 	Publish := RegExMatch(Body,
-		'(?m)^\s*return\s+_TOML_BatchWriteImpl\(Path,\s*Updates,\s*\[\],\s*"write",\s*Snapshot\["content"\],\s*Snapshot\["presence"\]\)\s*$')
+		'(?m)^\s*return\s+TOML_ConfigBatchWrite\(Path,\s*Updates,\s*\[\],\s*0,\s*Snapshot\["content"\],\s*Snapshot\["presence"\]\)\s*$')
 	Code := _DriverMaskNonCode(&Body)
-	return Publish > 0 && RegExMatch(Code, '(?m)^\s*return\s+_TOML_BatchWriteImpl\(') == Publish
+	return Publish > 0 && RegExMatch(Code, '(?m)^\s*return\s+TOML_ConfigBatchWrite\(') == Publish
 }
 
 _CPC_SectionOrderPublishersRetainTheirOwner() {
@@ -205,7 +205,8 @@ _CPC_SectionOrderPublishersRetainTheirOwner() {
 	Ack := _StripFullLineComments(_DriverFuncBody("_ConfigInvokeCommitWriter"))
 	Assert(Writer != "" && Action != "" && Ack != "", "the order publisher, transaction and native receipt owners must exist")
 	Assert(_CPC_SectionOrderWriterContract(Writer), "order publication returns the retained source and presence writer's native receipt")
-	for Mutant in [StrReplace(Writer, "return _TOML", "Ignored := _TOML"),
+	for Mutant in [StrReplace(Writer, "return TOML", "Ignored := TOML"),
+		StrReplace(Writer, "TOML_ConfigBatchWrite", "_TOML_BatchWriteImpl"),
 		StrReplace(Writer, 'Snapshot["content"]', '""'), StrReplace(Writer, 'Snapshot["presence"]', "1")] {
 		Assert(StrCompare(Writer, Mutant, true) != 0, "each order publisher mutant must change executable source")
 		AssertFalse(_CPC_SectionOrderWriterContract(Mutant), "losing the native result or opening image must fail admission")

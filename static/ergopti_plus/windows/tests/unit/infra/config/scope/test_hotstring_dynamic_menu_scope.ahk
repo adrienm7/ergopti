@@ -303,7 +303,8 @@ for _HSCS_MenuVector in JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_h
 ; The independently inventoried writers run through the real configuration
 ; lease and native file publication. Repaint is a receipt of a committed order.
 _HSCS_OrderNativePublication() {
-	_HSCS_WithLiveConfig('[private]`ncredential = "keep-order-fixture"`n', Map("Hotstrings", false), Check)
+	_HSCS_WithLiveConfig('private_root = { flag = true, names = ["A", "a"] }`n'
+		. '[private]`ncredential = "keep-order-fixture"`n', Map("Hotstrings", false), Check)
 	Check(Fixture, _Options, _Calls) {
 		Repaints := 0, Notices := 0, Refusals := [], SavedSuspend := A_IsSuspended
 		Repaint(*) => Repaints += 1
@@ -323,6 +324,11 @@ _HSCS_OrderNativePublication() {
 			AssertEqual('["date","datefr"]', KL_JsonEncode(Parsed["hotstrings.order_overrides"]["dynamichotstrings"]))
 			AssertEqual("keep-order-fixture", Parsed["private"]["credential"], "native publication preserves unrelated configuration")
 			Written := FSReadUtf8Exact(Fixture.path)
+			Document := TOML_ParseDocumentShared(Written)
+			Original := TOML_ParseDocumentShared(Fixture.source)
+			AssertTrue(TOML_SameValue(Original["_meta"], Document["_meta"]), "root schema metadata keeps its exact typed value")
+			AssertTrue(TOML_SameValue(Original["private_root"], Document["private_root"]), "unrelated root inline data survives the native writer")
+			AssertTrue(ConfigSchemaCanPrepareWrite(Fixture.path), "the genuine native writer retains schema admission after publication")
 			AssertFalse(_HS_OrderCommit(Snapshot, 0, 0, Repaint, Notify), "an old menu cannot reset the intervening native publication")
 			AssertEqual(Written, FSReadUtf8Exact(Fixture.path))
 			AssertEqual(1, Repaints, "a stale source cannot repaint a success")
@@ -339,6 +345,9 @@ _HSCS_OrderNativePublication() {
 			Parsed := TOML_ParseFreshFile(Fixture.path)
 			AssertFalse(Parsed.Has("hotstrings.order_overrides") && Parsed["hotstrings.order_overrides"].Has("dynamichotstrings"))
 			AssertEqual("keep-order-fixture", Parsed["private"]["credential"])
+			ResetDocument := TOML_ParseDocumentShared(FSReadUtf8Exact(Fixture.path))
+			AssertTrue(TOML_SameValue(Original["private_root"], ResetDocument["private_root"]), "reset retains unrelated root data too")
+			AssertTrue(ConfigSchemaCanPrepareWrite(Fixture.path), "reset keeps the native source generation admitted")
 			AssertEqual(2, Repaints, "only the two native commits repaint")
 		} finally Suspend(SavedSuspend)
 	}
