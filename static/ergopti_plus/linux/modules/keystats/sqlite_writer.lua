@@ -1678,22 +1678,6 @@ _derived_sql.ngrams = function(device_id, date, app, ngrams, table_name)
 		local is_row  = type(value) == "table"
 		local count   = is_row and value.c or value
 		local sources = is_row and value.sources or nil
-		local function nonnegative(number)
-			return type(number) == "number" and number == number and number >= 0 and number < math.huge
-		end
-		if type(token) ~= "string" or not nonnegative(count) or (sources ~= nil and type(sources) ~= "table") then return nil end
-		if count == 0 then
-			-- This newly admitted no-op needs valid metadata. Positive rows retain
-			-- their historical numeric-source filter and coercion below.
-			if is_row then
-				for _, field in ipairs({ "td", "cd", "e" }) do
-					if value[field] ~= nil and not nonnegative(tonumber(value[field])) then return nil end
-				end
-			end
-			for source, source_count in pairs(sources or {}) do
-				if type(source) ~= "string" or not nonnegative(source_count) then return nil end
-			end
-		end
 		-- Total delay, delay sample count and error count. Hardcoded to zero
 		-- until 2026-08-06, which made every token read as free: the panel that
 		-- ranks sequences by what they cost ranked a column of zeroes.
@@ -1716,8 +1700,27 @@ _derived_sql.ngrams = function(device_id, date, app, ngrams, table_name)
 			})
 		end
 	end
-	-- Settling an open walk can produce a zero-count group: it is an admitted
-	-- no-op inside the transaction, not a malformed statement.
+	-- Keep the existing positive-row filter unchanged. Only a group that emits
+	-- nothing takes the new no-op admission path used when an open walk settles.
+	if #statements == 0 then
+		local function nonnegative(number)
+			return type(number) == "number" and number == number and number >= 0 and number < math.huge
+		end
+		for token, value in pairs(ngrams) do
+			local is_row = type(value) == "table"
+			local count = is_row and value.c or value
+			local sources = is_row and value.sources or nil
+			if type(token) ~= "string" or count ~= 0 or (sources ~= nil and type(sources) ~= "table") then return nil end
+			if is_row then
+				for _, field in ipairs({ "td", "cd", "e" }) do
+					if value[field] ~= nil and not nonnegative(tonumber(value[field])) then return nil end
+				end
+			end
+			for source, source_count in pairs(sources or {}) do
+				if type(source) ~= "string" or not nonnegative(source_count) then return nil end
+			end
+		end
+	end
 	return table.concat(statements, "\n")
 end
 
