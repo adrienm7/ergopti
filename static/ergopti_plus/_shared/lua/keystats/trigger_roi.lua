@@ -283,10 +283,7 @@ function M.tick(state, now_ms, app, timestamp)
 		or type(now_ms) ~= "number" or now_ms ~= now_ms or now_ms == math.huge or now_ms < state.last_check_ms
 		or now_ms - state.last_check_ms < Policy.halflife_check_ms then return false end
 	state.last_check_ms = now_ms
-	local keys = {}
-	for trigger in pairs(state.last_use) do keys[#keys + 1] = trigger end
-	table.sort(keys)
-	for _, trigger in ipairs(keys) do
+	for _, trigger in ipairs(require("table_util").sorted_keys(state.last_use)) do
 		local age = now_ms - state.last_use[trigger]
 		if age >= Policy.halflife_warn_days * MILLISECONDS_PER_DAY then
 			emit(state, "trigger_halflife", app, timestamp,
