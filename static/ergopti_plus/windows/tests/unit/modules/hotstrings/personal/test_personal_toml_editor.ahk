@@ -939,7 +939,8 @@ _PPNT_Source() {
    Included[Owner] := true
   }
  }
- for Symbol in ["_BuildEntry", "_AddEntry", "_SaveEntry", "NormaliseOutput", "_PersonalTomlCloneDetached"] {
+ for Symbol in ["_BuildEntry", "_AddEntry", "_SaveEntry", "NormaliseOutput", "_PersonalTomlCloneDetached",
+   "_PersonalEditorSectionActionCurrent", "_PersonalTomlOpeningSessionCurrent", "_PersonalTomlOpeningSessionIdentity"] {
   Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
   AssertTrue(Owner != "", "Every public handler and helper must have its genuine owner")
   Text := FSReadStrict(Owner)
