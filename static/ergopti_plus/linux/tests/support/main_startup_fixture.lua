@@ -201,6 +201,9 @@ function M.run(options)
 		elseif name == "adapters.wpm_surface" then
 			-- The floating WPM widget pumps its own window, tray or not.
 			return { pump = function() record("wpm.pump"); return 0 end }
+		elseif name == "infra.typed_input_withheld" then
+			-- The session's withheld-input summary is logged as the daemon exits.
+			return { summary = function() record("withheld.summary"); return "controlled withheld summary" end }
 		elseif name == "infra.reload_timing" then
 			-- The Reload this boot completes is reported once the boot is complete.
 			return { complete = function() record("reload.complete"); return nil end }

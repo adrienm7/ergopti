@@ -266,6 +266,7 @@ return {
 	"tests.unit.infra.scope.test_config_reset_failure",
 	"tests.unit.ui.menu.test_feature_notice",
 	"tests.unit.infra.lifecycle.test_quit_request",
+	"tests.unit.infra.lifecycle.test_typed_input_withheld",
 	"tests.unit.infra.scope.test_config_scope_transaction",
 	"tests.unit.infra.scope.test_script_log_level_snapshot",
 	"tests.unit.infra.scope.test_keyboard_layout_scope",
