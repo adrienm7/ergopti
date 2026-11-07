@@ -10,7 +10,9 @@ local function with_core(callback)
 		"modules.keystats.text_migration", "modules.keystats.kc_bridge" }, function()
 		local encrypted, available, migrating = false, true, false
 		package.loaded["modules.keystats.text_cipher"] = {
-			set_enabled = function(value) encrypted = value end,
+			set_enabled = function(value) encrypted = value; return true end,
+			prepare_roi_encryption = function() return true end,
+			abandon_roi_encryption = function() return true end,
 			is_enabled = function() return encrypted end,
 			is_available = function() return available end,
 		}

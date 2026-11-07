@@ -36,7 +36,7 @@ local function with_window(callback)
 			end },
 			axuielement = { windowElement = function() return nil end, observer = { new = function() return nil end } },
 		})
-		local state = { active_app_name = "Editor", trigger_roi = Roi.new(0),
+		local state = { active_app_name = "Editor", trigger_roi = Roi.new(0, true),
 			buffer_events = {}, buffer_text = "", rich_chunks = {} }
 		helpers.assert_true(tracker.init(state, { append_log = function() return true end, flush_buffer = function() return true end }, function() return native.paused end))
 		tracker.update_private_status()
@@ -104,7 +104,7 @@ helpers.describe("macOS trigger ROI context", function()
 
 	helpers.it("revokes fragments through the real current AX focus callback, not stale callbacks", function()
 		Native.with_runtime(function(runtime)
-			local roi = Roi.new(0)
+			local roi = Roi.new(0, true)
 			runtime.state.trigger_roi = roi
 			local context = { app = "Editor", window = 42, title = "Document", timestamp = "stamp" }
 			Roi.text(roi, "secr", context, function() return false end)

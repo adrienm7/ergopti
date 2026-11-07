@@ -29,6 +29,7 @@ local LedgerAppend = require("adapters.ledger_append")
 local JournalSeal = require("keystats.journal_seal")
 local TextCrypto = require("keystats.text_crypto")
 local TextCipher = require("modules.keystats.text_cipher")
+local TriggerRoi = require("keystats.trigger_roi")
 
 local Logger = require("infra.logger")
 local LOG    = "keystats.rotation"
@@ -317,6 +318,13 @@ local _UNSEAL_PORTS = {
 	is_envelope = function(value) return TextCrypto.unwrap(value) ~= nil end,
 }
 
+--- Reports whether this exact entry owns a previously started append receipt.
+--- @param entry table|nil
+--- @return boolean
+function M.has_pending_entry(entry)
+	return entry ~= nil and _pending_append ~= nil and _pending_append.entry == entry
+end
+
 --- Append one event, retaining its exact serialized receipt after any refusal.
 --- Hot-path success performs one write and no position query or body read.
 --- @param entry table The exact event retained by the deferred FIFO operation.
@@ -330,6 +338,14 @@ function M.append_log(entry)
 	if _pending_append and _pending_append.entry ~= entry then
 		Logger.error(LOG, "Cannot append another entry while the original journal append remains pending.")
 		return false
+	end
+	-- A receipt started before an encryption request must settle exactly while
+	-- the cipher is still off; a new textual row has no such authority.
+	if TriggerRoi.is_text_event(entry) then
+		local allowed = type(TextCipher.roi_text_enabled) == "function" and TextCipher.roi_text_enabled() == true
+		if not allowed and (not M.has_pending_entry(entry) or TextCipher.is_enabled() ~= false) then
+			return false
+		end
 	end
 	_append_active = true
 	local attempted, accepted = pcall(function()

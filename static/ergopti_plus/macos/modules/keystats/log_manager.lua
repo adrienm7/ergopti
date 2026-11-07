@@ -55,6 +55,7 @@ local PowerSource = require("adapters.power_source")
 local LOG     = "keystats.log_manager"
 
 local TextCipher = require("modules.keystats.text_cipher")
+local TriggerRoi = require("keystats.trigger_roi")
 local RebuildSnapshot = require("modules.keystats.rebuild_snapshot")
 local SqliteWriter = require("modules.keystats.sqlite_writer")
 local Aggregator   = require("modules.keystats.aggregator")
@@ -193,6 +194,7 @@ local _deferred_log_queue = {}
 local _deferred_log_head  = 1
 local _deferred_log_tail  = 0
 local _deferred_log_timer = nil
+local _deferred_log_busy = false
 
 --- Retry delay after a timer-allocation or sink failure. The ingest timer also
 --- retries the queue, so a one-shot scheduling failure cannot strand it.
@@ -663,55 +665,114 @@ local function _typing_entry_from_snapshot(snapshot)
 end
 
 
+--- Reads an explicit policy without treating an unavailable cipher as permission.
+local function roi_text_allowed()
+	if type(TextCipher.roi_text_enabled) ~= "function" then return false end
+	local called, allowed = pcall(TextCipher.roi_text_enabled)
+	return called and allowed == true
+end
+
+--- Drops selected operations while retaining the exact order of every other owner.
+local function compact_deferred_logs(keep)
+	local retained = {}
+	for index = _deferred_log_head, _deferred_log_tail do
+		local operation = assert(_deferred_log_queue[index], "keystats deferred-log queue is sparse")
+		if keep(operation) then retained[#retained + 1] = operation end
+	end
+	_deferred_log_queue, _deferred_log_head, _deferred_log_tail = retained, 1, #retained
+end
+
+--- Retires unwritten ROI text and settles only a receipt already started before the request.
+--- No plaintext row is rebuilt or truncated. A failed receipt keeps its exact FIFO owner.
+--- @return boolean settled Whether encryption may now publish its new posture.
+function M.retire_roi_text()
+	if _deferred_log_busy then return false end
+	local pending
+	compact_deferred_logs(function(operation)
+		if not operation.roi_text then return true end
+		if operation.entry ~= nil and type(Rotation.has_pending_entry) == "function"
+			and Rotation.has_pending_entry(operation.entry) then
+			assert(pending == nil, "multiple ROI entries own one journal receipt")
+			pending = operation
+			return true
+		end
+		return false
+	end)
+	if pending == nil then return true end
+	_deferred_log_busy = true
+	local called, accepted = pcall(Rotation.append_log, pending.entry)
+	_deferred_log_busy = false
+	if not called or accepted ~= true then return false end
+	compact_deferred_logs(function(operation) return operation ~= pending end)
+	return true
+end
+
+--- A started receipt is historical work; every unstarted textual operation is revocable.
+local function retire_deferred_roi(operation)
+	return operation.roi_text and not roi_text_allowed()
+		and not (operation.entry ~= nil and type(Rotation.has_pending_entry) == "function"
+			and Rotation.has_pending_entry(operation.entry))
+end
+
 --- Drains queued operations in strict insertion order.
 --- The head advances only after Rotation returns exact true, so either a thrown
 --- or non-throwing filesystem refusal leaves the exact item available for retry.
 --- @return boolean drained Whether the queue is now empty.
-_drain_deferred_logs = function()
+local function drain_deferred_operations()
 	while _has_deferred_logs() do
 		local operation = assert(_deferred_log_queue[_deferred_log_head],
 			"keystats deferred-log queue is sparse")
-		local is_builder = operation.kind == "typing_builder"
-			or operation.kind == "entry_builder"
-		if is_builder and operation.prepared ~= true then
-			local build_ok, built_or_err = xpcall(operation.build, debug.traceback)
-			local valid_typing = operation.kind ~= "typing_builder"
-				or (type(built_or_err) == "table"
-					and type(built_or_err.buffer_events) == "table"
-					and type(built_or_err.rich_chunks) == "table")
-			if not build_ok or type(built_or_err) ~= "table" or not valid_typing then
-				Logger.error(LOG, "Cannot prepare deferred keystats entry: %s.",
-					tostring(build_ok and "builder returned an invalid snapshot" or built_or_err))
-				return false
+		if retire_deferred_roi(operation) then
+			_deferred_log_queue[_deferred_log_head] = nil
+			_deferred_log_head = _deferred_log_head + 1
+		else
+			local is_builder = operation.kind == "typing_builder"
+				or operation.kind == "entry_builder"
+			if is_builder and operation.prepared ~= true then
+				local build_ok, built_or_err = xpcall(operation.build, debug.traceback)
+				local valid_typing = operation.kind ~= "typing_builder"
+					or (type(built_or_err) == "table"
+						and type(built_or_err.buffer_events) == "table"
+						and type(built_or_err.rich_chunks) == "table")
+				if not build_ok or type(built_or_err) ~= "table" or not valid_typing then
+					Logger.error(LOG, "Cannot prepare deferred keystats entry: %s.",
+						tostring(build_ok and "builder returned an invalid snapshot" or built_or_err))
+					return false
+				end
+				if operation.kind == "typing_builder" then
+					operation.value.buffer_events = built_or_err.buffer_events
+					operation.value.buffer_text = type(built_or_err.buffer_text) == "string"
+						and built_or_err.buffer_text or ""
+					operation.value.rich_chunks = built_or_err.rich_chunks
+				else
+					operation.value = built_or_err
+				end
+				operation.prepared = true
+				operation.build = nil
 			end
-			if operation.kind == "typing_builder" then
-				operation.value.buffer_events = built_or_err.buffer_events
-				operation.value.buffer_text = type(built_or_err.buffer_text) == "string"
-					and built_or_err.buffer_text or ""
-				operation.value.rich_chunks = built_or_err.rich_chunks
-			else
-				operation.value = built_or_err
+			-- Rotation retains the first serialized receipt after a refused write.
+			-- Reuse this exact prepared entry, including detached typing snapshots.
+			if operation.entry == nil then
+				operation.entry = (operation.kind == "entry" or operation.kind == "entry_builder")
+					and operation.value or _typing_entry_from_snapshot(operation.value)
 			end
-			operation.prepared = true
-			operation.build = nil
+			local entry = operation.entry
+			operation.roi_text = operation.roi_text or TriggerRoi.is_text_event(entry)
+			-- A builder may reenter the encryption boundary. Check the policy
+			-- again after construction, before any new receipt can start.
+			if not retire_deferred_roi(operation) then
+				local ok, accepted_or_err = xpcall(function()
+					return Rotation.append_log(entry)
+				end, debug.traceback)
+				if not ok or accepted_or_err ~= true then
+					Logger.error(LOG, "Cannot append deferred keystats entry: %s.",
+						tostring(accepted_or_err))
+					return false
+				end
+			end
+			_deferred_log_queue[_deferred_log_head] = nil
+			_deferred_log_head = _deferred_log_head + 1
 		end
-		-- Rotation retains the first serialized receipt after a refused write.
-		-- Reuse this exact prepared entry, including detached typing snapshots.
-		if operation.entry == nil then
-			operation.entry = (operation.kind == "entry" or operation.kind == "entry_builder")
-				and operation.value or _typing_entry_from_snapshot(operation.value)
-		end
-		local entry = operation.entry
-		local ok, accepted_or_err = xpcall(function()
-			return Rotation.append_log(entry)
-		end, debug.traceback)
-		if not ok or accepted_or_err ~= true then
-			Logger.error(LOG, "Cannot append deferred keystats entry: %s.",
-				tostring(accepted_or_err))
-			return false
-		end
-		_deferred_log_queue[_deferred_log_head] = nil
-		_deferred_log_head = _deferred_log_head + 1
 	end
 	_deferred_log_head = 1
 	_deferred_log_tail = 0
@@ -719,13 +780,28 @@ _drain_deferred_logs = function()
 end
 
 
+--- Prevents an encryption transition from mutating an in-flight FIFO traversal.
+_drain_deferred_logs = function()
+	if _deferred_log_busy then return false end
+	_deferred_log_busy = true
+	local called, accepted = xpcall(drain_deferred_operations, debug.traceback)
+	_deferred_log_busy = false
+	if not called then
+		Logger.error(LOG, "Deferred keystats drain failed: %s.", tostring(accepted))
+		return false
+	end
+	return accepted
+end
+
 --- Append a single event entry to today.log as a JSONL line.
 --- The FIFO owns the entry before this function returns; persistence occurs only
 --- from the retained drain after an eventtap callback has returned.
 --- @param entry table The event entry. Must contain a `type` field.
 --- @return boolean accepted True once the ordered outbox owns the entry.
 function M.append_log(entry)
-	_queue_deferred_log({ kind = "entry", value = entry })
+	local roi_text = TriggerRoi.is_text_event(entry)
+	if roi_text and not roi_text_allowed() then return false end
+	_queue_deferred_log({ kind = "entry", value = entry, roi_text = roi_text })
 	-- Queue insertion is the acceptance boundary. Persistence never runs in the
 	-- caller because append_log is reached from keyboard and mouse eventtaps.
 	-- The ingest tick and stop path independently retry accepted work if timer
@@ -736,15 +812,18 @@ end
 
 --- Defers construction and persistence of one non-typing entry.
 --- @param builder function Zero-argument function returning an entry table.
+--- @param roi_text boolean|nil Whether encryption revokes this textual ROI operation.
 --- @return boolean accepted True once the ordered outbox owns the builder.
-function M.defer_entry_builder(builder)
+function M.defer_entry_builder(builder, roi_text)
 	if not _require_state("defer_entry_builder") then return false end
 	if type(builder) ~= "function" then
 		Logger.error(LOG, "defer_entry_builder(): builder must be a function.")
 		return false
 	end
+	if roi_text == true and not roi_text_allowed() then return false end
 	_queue_deferred_log({
 		kind = "entry_builder",
+		roi_text = roi_text == true,
 		build = builder,
 		prepared = false,
 	})

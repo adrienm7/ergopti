@@ -29,6 +29,7 @@ local function fixture()
 		return true
 	end
 	package.loaded["infra.logger"].error = function(_, message) control.errors[#control.errors + 1] = message end
+	helpers.assert_true(require("modules.keystats.text_cipher").set_enabled(false))
 	f.start()
 	f.state.active_app_name, f.state.session_app_name = "Editor", "Editor"
 	f.state.active_win_title, f.state.roi_window_id = "Document", 42
@@ -162,4 +163,71 @@ helpers.describe("macOS trigger ROI admission", function()
 		helpers.assert_eq(#c.roi(), 1)
 		helpers.assert_eq(c.errors, {})
 	end)
+	helpers.it("retires words on requested or unknown encryption even when the provider stays off", function()
+		local f, c = fixture()
+		local cipher = require("modules.keystats.text_cipher")
+		local available = cipher.is_available
+		cipher.is_available = function()
+			helpers.assert_eq(next(f.state.trigger_roi.words), nil, "the requested transition revokes words before key lookup")
+			helpers.assert_eq(f.state.trigger_roi.word, {})
+			helpers.assert_eq(next(f.state.trigger_roi.last_use), nil)
+			return false
+		end
+		local ok, reason = xpcall(function()
+			for _ = 1, 4 do c.key("candidate ") end
+			c.key("fragment")
+			helpers.assert_true(f.keystats.log_hotstring("PUBLIC", "public replacement"))
+			helpers.assert_true(f.keystats.set_options({ encrypt = true }))
+			helpers.assert_eq(cipher.is_enabled(), false)
+			helpers.assert_eq(f.state.trigger_roi.words, {})
+			helpers.assert_eq(f.state.trigger_roi.last_use, {})
+			helpers.assert_eq(f.state.trigger_roi.word, {})
+			for _ = 1, 5 do c.key("candidate ") end
+			helpers.assert_eq(#c.roi(), 0)
+			for _ = 1, 9 do helpers.assert_true(f.keystats.log_private_hotstring("secret", "secret output")) end
+			helpers.assert_eq(c.roi()[1].session_fired, 10)
+			f.state.is_secure_field = true
+			helpers.assert_eq(f.keystats.log_private_hotstring("secret", "secret output"), false)
+			helpers.assert_eq(f.state.trigger_roi.fired, 10)
+			f.state.is_secure_field = false
+			helpers.assert_true(f.keystats.set_options({}))
+			for _ = 1, 5 do c.key("unknown ") end
+			helpers.assert_eq(f.state.trigger_roi.words, {})
+			helpers.assert_true(f.keystats.set_options({ encrypt = false }))
+			for _ = 1, 4 do c.key("candidate ") end
+			helpers.assert_eq(#c.roi(), 1, "prior counts cannot revive after encryption is off")
+			c.key("candidate ")
+			helpers.assert_eq(c.roi()[2].word, "candidate")
+		end, debug.traceback)
+		cipher.is_available = available
+		helpers.assert_true(f.keystats.stop())
+		if not ok then error(reason, 0) end
+	end)
+
+	helpers.it("retires text before a scope activation is refused by an existing migration", function()
+		local f, c = fixture()
+		local candidate = f.keystats.configuration_snapshot()
+		candidate.options.encrypt, candidate.cipher_enabled = true, true
+		for _ = 1, 4 do c.key("candidate ") end
+		c.key("fragment")
+		local migration = require("modules.keystats.text_migration")
+		local previous = migration.is_running
+		migration.is_running = function()
+			helpers.assert_eq(f.state.trigger_roi.words, {})
+			helpers.assert_eq(f.state.trigger_roi.word, {})
+			return true
+		end
+		local called, result = pcall(f.keystats.apply_configuration, candidate)
+		migration.is_running = previous
+		helpers.assert_true(called)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(f.state.options.encrypt, false)
+		helpers.assert_true(require("modules.keystats.text_cipher").roi_text_enabled())
+		for _ = 1, 4 do c.key("candidate ") end
+		helpers.assert_eq(#c.roi(), 0, "a clean refusal cannot restore the discarded counts")
+		c.key("candidate ")
+		helpers.assert_eq(c.roi()[1].occurrences, 5)
+		helpers.assert_true(f.keystats.stop())
+	end)
+
 end)
