@@ -1568,7 +1568,8 @@ require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: nati
 		local groups = { { word = "bad" }, { word = -1 }, { word = 0 / 0 }, { word = {} },
 			{ word = { c = 0, sources = "bad" } }, { word = { c = 0, td = "bad" } },
 			{ word = { c = 0, sources = { manual = -1 } } },
-			{}, { word = 0 }, { word = { c = 0, td = 0, cd = 0, e = 1, sources = { hotstring = 0 } } } }
+			{}, { word = 0 }, { word = { c = 0, td = 0, cd = 0, e = 1, sources = { hotstring = 0 } } },
+			{ word = "bad", valid = { c = 1, sources = { manual = 2, negative = -1, invalid = "bad" } } } }
 		for index, group in ipairs(groups) do
 			local expected = index > 7
 			local operation = assert(writer.start_flush("fixture", {
@@ -1584,6 +1585,7 @@ require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: nati
 			helpers.assert_true(operation:is_settled(), "the native transaction must retire")
 			helpers.assert_eq(operation.result.committed, expected, "only structurally valid zero-count groups may commit: " .. index)
 		end
-		helpers.assert_eq(writer.query_rows("SELECT count(*) FROM ngram_chars;"), { "0" }, "no no-op group invents a row")
+		helpers.assert_eq(writer.query_rows("SELECT count(*) FROM ngram_chars;"), { "1" }, "only the historical positive path writes a row")
+		helpers.assert_eq(writer.query_rows("SELECT token,c,esrc_json FROM ngram_chars;"), { 'valid|1|{"manual":2}' }, "mixed groups keep the original positive-row and source filters")
 	end)
 end)
