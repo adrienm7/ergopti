@@ -41,6 +41,12 @@ helpers.describe("actual Main startup capture admission", function()
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "hook.pump"))
 		-- (linux-reload-budget) The Reload this boot ends is measured to its completion.
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "reload.complete"))
+		-- An update watcher keeps the new installation only once the boot is complete.
+		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "updater.boot_ready"))
+		helpers.assert_true(position(state.events, "updater.boot_ready") < position(state.events, "hook.pump"))
+		helpers.assert_eq(state.boot_ready_reason, "daemon ready")
+		-- The WPM widget's window is pumped on the loop's tick, before the keyboard.
+		helpers.assert_true(position(state.events, "wpm.pump") < position(state.events, "hook.pump"))
 		helpers.assert_eq(state.pumps, 1)
 		helpers.assert_eq(state.pump_services, true)
 		helpers.assert_eq(state.loop_after_complete, false)
