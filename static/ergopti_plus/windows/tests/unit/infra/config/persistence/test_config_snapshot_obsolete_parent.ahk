@@ -58,7 +58,9 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 		{ target: MetricsFilters, key: "encrypt", path: "metrics.encrypt" },
 		{ target: WPMWidget, key: "visible", path: "metrics.wpm_widget_visible" },
 		{ target: WPMWidget, key: "use_colors", path: "metrics.wpm_widget_colors" },
-		{ target: WPMWidget, key: "show_graph", path: "metrics.wpm_widget_graph" }]
+		{ target: WPMWidget, key: "show_graph", path: "metrics.wpm_widget_graph" },
+		{ target: WPMTrayReadout, key: "running", path: "metrics.wpm_menubar_visible" },
+		{ target: WPMTrayReadout, key: "use_colors", path: "metrics.wpm_menubar_colors" }]
 	PriorFields := [], PriorApps := MetricsFilters.disabled_apps
 	Original := FSReadUtf8Exact(Path), Target := ManifestBuildFeaturesMap()
 	BeforeFeatures := _HSDeepCloneMap(Features), Borrowed := 0, Collected := 0
@@ -373,7 +375,9 @@ _FMS_PersonalFileCaseAlias(Path, Name) {
 		{ target: MetricsFilters, key: "encrypt", path: "metrics.encrypt" },
 		{ target: WPMWidget, key: "visible", path: "metrics.wpm_widget_visible" },
 		{ target: WPMWidget, key: "use_colors", path: "metrics.wpm_widget_colors" },
-		{ target: WPMWidget, key: "show_graph", path: "metrics.wpm_widget_graph" }]
+		{ target: WPMWidget, key: "show_graph", path: "metrics.wpm_widget_graph" },
+		{ target: WPMTrayReadout, key: "running", path: "metrics.wpm_menubar_visible" },
+		{ target: WPMTrayReadout, key: "use_colors", path: "metrics.wpm_menubar_colors" }]
 	PriorFields := [], PriorApps := MetricsFilters.disabled_apps
 	SavedFeatures := Features
 	SavedPersonalCache := _ReadPersonalTomlCache
