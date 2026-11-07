@@ -4090,7 +4090,6 @@
 	"menu.caps_word.pointer.other_buttons": "Andra musknappar",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Inte på Windows: systemet behåller styrplattans gester själv och skickar ingen beröring vidare till Ergopti. Rullning med två fingrar räknas fortfarande som rullning.",
 	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Inte på Windows: Windows lämnar varje gest färdig till drivrutinen, först när den är klar, från sina styrplatteinställningar, så ett svep kan inte upprepas steg för steg medan fingrarna rör sig. macOS och Linux följer fingrarna själva.",
-	"platform_reason.hotstring_menu_order_is_macos": "Endast macOS: menyn Hotstrings låter dig ändra ordningen på posterna i varje kategori och minns den. Windows och Linux har ingen kontroll för att ändra ordningen.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Endast macOS under detta namn: det är huvudbrytaren för macOS skrivmotor, som drivrutinen startar och stoppar. Windows har sin huvudbrytare som hotstrings-grind i category_enabled, och Linux slår på sina hotstring-grupper en i taget.",
 	"platform_reason.category_gates_are_windows": "Endast Windows: Windows har en huvudgrind per kategori framför kategorins egna brytare. macOS har sin hotstrings-huvudbrytare som hotstrings.enabled, och Linux slår på sina hotstring-grupper en i taget.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "Den här genvägen tillhör systemet som binder den: varje drivrutin erbjuder sina åtgärder på de kombinationer som dess eget system lämnar lediga (Windows-tangentkombinationer i Windows, Ctrl och Cmd i macOS, tangentbordsplatser i Linux) och sparar valet under sitt eget namn.",
@@ -4160,5 +4159,8 @@
 	"apps.encryptor.drop_hint": "Släpp filer här för att kryptera dem, eller .enc-filer för att dekryptera dem.",
 	"apps.cloner.msg_no_isolation": "Programmet har inget alternativ för en separat profil: på Windows är klonen en andra genväg som startar samma program med samma inställningar.",
 	"inventory.behavior.layout_emulation": "Skriver vald .keylayout ovanpå systemets layout; de tre drivrutinerna spelar upp ett korpus av tangenttryck.",
-	"platform_reason.profile_shortcut_uses_prompt_action": "I Windows och Linux tilldelar du ”AI-förutsägelse med en vald prompt” till ett kortkommando och väljer din egen profil i åtgärdsväljaren. Profilen gäller bara den begäran; åtgärden nekas om profilen är borttagen eller AI är avstängd."
+	"platform_reason.profile_shortcut_uses_prompt_action": "I Windows och Linux tilldelar du ”AI-förutsägelse med en vald prompt” till ett kortkommando och väljer din egen profil i åtgärdsväljaren. Profilen gäller bara den begäran; åtgärden nekas om profilen är borttagen eller AI är avstängd.",
+	"menu.hotstrings.section_order": "Avsnittens ordning",
+	"menu.hotstrings.move_up": "Flytta upp",
+	"menu.hotstrings.move_down": "Flytta ned"
 }

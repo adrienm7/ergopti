@@ -182,6 +182,19 @@ const LINUX_BODY = `
 			-- a section, and match_buffer has always taken a predicate to filter on
 			-- it. This driver simply passed nil for it.
 			local families = type(dyn.rule_families) == "function" and dyn.rule_families() or {}
+			local family_ids, family_names, family_rows, order_labels = {}, {}, {}, {}
+			for _, family in ipairs(ManifestMenu.get_dynamic_hotstring_families()) do
+				if family.id then family_ids[family.id] = family.section end
+			end
+			for _, family in ipairs(families) do
+				local name = family.separator and "-" or family_ids[family.id] or family.section
+				family_names[#family_names + 1] = name
+				family_rows[name] = family
+			end
+			local order_snapshot = HotstringPreferences.section_order_snapshot("dynamichotstrings")
+			local family_order = assert(SectionOrder.resolve(family_names, order_snapshot and order_snapshot.order))
+			families = {}
+			for _, name in ipairs(family_order) do families[#families + 1] = family_rows[name] end
 			if #families > 0 then
 				-- The existing shared boundary is the only admitted inert entry.
 				if type(boundaries) ~= "table" or getmetatable(boundaries) ~= nil or #boundaries ~= 1
@@ -206,6 +219,7 @@ const LINUX_BODY = `
 						local family_label = family.count
 							and string.format("%s (%d)", family.label, family.count)
 							or family.label
+						order_labels[family_ids[family.id] or family.section] = family_label
 						sub[#sub + 1] = {
 							-- Resolved by the manager, which owns both the locale key
 							-- and the engine that answers what "{date}" is today.
@@ -265,6 +279,19 @@ const LINUX_BODY = `
 					end
 				end
 			end
+
+			local order_rows = SectionOrder.menu(ManifestMenu.template_rows, family_order, order_labels, function(order)
+				if HotstringPreferences.set_section_order(order_snapshot, order) ~= true then
+					SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
+					return false
+				end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return true
+			end, function()
+				return order_snapshot ~= nil and ctx.paused ~= true
+					and (type(ctx.is_paused) ~= "function" or ctx.is_paused() == false)
+			end)
+			for _, row in ipairs(order_rows) do sub[#sub + 1] = row end
 
 			local programmable = ProgrammableMenuPolicy.build_entry_rows(ManifestMenu,
 				function() return ProgrammableHotstrings.build(ctx) end)

@@ -4090,7 +4090,6 @@
 	"menu.caps_word.pointer.other_buttons": "その他のマウスボタン",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Windows では非対応：システムがタッチパッドのジェスチャーを自ら処理し、Ergopti にタッチを渡しません。2 本指スクロールは引き続きスクロールとして扱われます。",
 	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Windows では使えません: Windows はタッチパッドの設定から、ジェスチャーが終わってから完成した形でドライバーに渡すため、指が動いている間にスワイプを一歩ずつ繰り返すことはできません。macOS と Linux は自分で指を追跡します。",
-	"platform_reason.hotstring_menu_order_is_macos": "macOS のみ：Hotstrings メニューで各カテゴリの項目を並べ替えられ、その順序が保存されます。Windows と Linux には並べ替えの操作がありません。",
 	"platform_reason.hotstrings_master_is_macos_engine": "この名前では macOS のみ：ドライバーが起動・停止する macOS の入力エンジンのマスタースイッチです。Windows はマスターを category_enabled の hotstrings ゲートとして持ち、Linux は hotstring グループを一つずつ切り替えます。",
 	"platform_reason.category_gates_are_windows": "Windows のみ：Windows はカテゴリごとに、そのカテゴリ自身のスイッチの手前にマスターゲートを一つ持ちます。macOS は hotstrings のマスターを hotstrings.enabled に持ち、Linux は hotstring グループを一つずつ切り替えます。",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "このショートカットはそれを割り当てるシステムのものです。各ドライバーは、そのシステムが空けている組み合わせ（Windows では Windows キーの組み合わせ、macOS では Ctrl と Cmd、Linux ではキーボードスロット）に操作を割り当て、選択を独自の名前で保存します。",
@@ -4160,5 +4159,8 @@
 	"apps.encryptor.drop_hint": "暗号化するファイル、または復号する .enc ファイルをここにドロップしてください。",
 	"apps.cloner.msg_no_isolation": "このプログラムには個別のプロファイルを使うオプションがありません。Windows では、クローンは同じ設定で同じプログラムを起動する 2 つ目のショートカットになります。",
 	"inventory.behavior.layout_emulation": "選択した .keylayout をシステムの配列の上で入力します。3つのドライバーが同じ打鍵コーパスを再生します。",
-	"platform_reason.profile_shortcut_uses_prompt_action": "Windows と Linux では、「選択したプロンプトによる AI 予測」をキーボードショートカットに割り当て、アクション選択画面でカスタムプロファイルを選びます。プロファイルはそのリクエストだけに適用されます。プロファイルが削除済み、または AI が無効の場合、アクションは拒否されます。"
+	"platform_reason.profile_shortcut_uses_prompt_action": "Windows と Linux では、「選択したプロンプトによる AI 予測」をキーボードショートカットに割り当て、アクション選択画面でカスタムプロファイルを選びます。プロファイルはそのリクエストだけに適用されます。プロファイルが削除済み、または AI が無効の場合、アクションは拒否されます。",
+	"menu.hotstrings.section_order": "セクションの順序",
+	"menu.hotstrings.move_up": "上へ移動",
+	"menu.hotstrings.move_down": "下へ移動"
 }

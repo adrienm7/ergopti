@@ -4090,7 +4090,6 @@
 	"menu.caps_word.pointer.other_buttons": "Andere muisknoppen",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Niet op Windows: het systeem houdt touchpadgebaren voor zichzelf en geeft geen aanraking door aan Ergopti. Scrollen met twee vingers telt nog steeds als scrollen.",
 	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Niet op Windows: Windows geeft het stuurprogramma elk gebaar kant-en-klaar, pas als het af is, vanuit de touchpadinstellingen, dus een veegbeweging kan zich niet stap voor stap herhalen terwijl de vingers bewegen. macOS en Linux volgen de vingers zelf.",
-	"platform_reason.hotstring_menu_order_is_macos": "Alleen macOS: het Hotstrings-menu laat je de items van elke categorie herordenen en onthoudt die volgorde. Windows en Linux hebben geen bediening om te herordenen.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Alleen macOS onder deze naam: het is de hoofdschakelaar van de macOS-typemotor, die het stuurprogramma start en stopt. Windows bewaart zijn hoofdschakelaar als hotstrings-poort van category_enabled en Linux schakelt zijn hotstringgroepen een voor een in.",
 	"platform_reason.category_gates_are_windows": "Alleen Windows: Windows heeft per categorie één hoofdpoort vóór de eigen schakelaars van de categorie. macOS bewaart zijn hotstrings-hoofdschakelaar als hotstrings.enabled en Linux schakelt zijn hotstringgroepen een voor een in.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "Deze sneltoets hoort bij het systeem dat hem toewijst: elk stuurprogramma biedt zijn acties aan op de combinaties die zijn eigen systeem vrijlaat (Windows-toetscombinaties op Windows, Ctrl en Cmd op macOS, toetsenbordslots op Linux) en bewaart de keuze onder zijn eigen naam.",
@@ -4160,5 +4159,8 @@
 	"apps.encryptor.drop_hint": "Zet hier bestanden neer om ze te versleutelen, of .enc-bestanden om ze te ontsleutelen.",
 	"apps.cloner.msg_no_isolation": "Dit programma heeft geen optie voor een apart profiel: op Windows is de kloon een tweede snelkoppeling die hetzelfde programma met dezelfde instellingen start.",
 	"inventory.behavior.layout_emulation": "Typt het gekozen .keylayout over de systeemindeling; de drie stuurprogramma's spelen één corpus van toetsaanslagen af.",
-	"platform_reason.profile_shortcut_uses_prompt_action": "Wijs in Windows en Linux “AI-voorspelling met een gekozen prompt” toe aan een sneltoets en kies je eigen profiel in de actiekiezer. Het profiel geldt alleen voor die aanvraag; bij een verwijderd profiel of uitgeschakelde AI wordt de actie geweigerd."
+	"platform_reason.profile_shortcut_uses_prompt_action": "Wijs in Windows en Linux “AI-voorspelling met een gekozen prompt” toe aan een sneltoets en kies je eigen profiel in de actiekiezer. Het profiel geldt alleen voor die aanvraag; bij een verwijderd profiel of uitgeschakelde AI wordt de actie geweigerd.",
+	"menu.hotstrings.section_order": "Volgorde van secties",
+	"menu.hotstrings.move_up": "Omhoog verplaatsen",
+	"menu.hotstrings.move_down": "Omlaag verplaatsen"
 }

@@ -687,6 +687,8 @@ function closedModuleExport(unit, lex, rootPositions) {
 		Logger: 'logger.shim',
 		Extensions: 'hotstrings.extensions',
 		PersonalFiles: 'hotstrings.personal_files',
+		SectionOrder: 'hotstrings.section_order',
+		HotstringPreferences: 'infra.hotstring_preferences',
 		PersonalFileMenu: 'menu.personal_files',
 		Languages: 'hotstrings.languages',
 		LocaleTable: '_generated.locale_table',

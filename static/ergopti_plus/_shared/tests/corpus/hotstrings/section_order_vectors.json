@@ -1,0 +1,78 @@
+{
+	"vectors": [
+		{
+			"name": "catalogue keeps separators and suppresses empty boundaries",
+			"source": ["-", "a", "-", "-", "b", "-"],
+			"expected": ["a", "-", "b"]
+		},
+		{
+			"name": "new sections append after saved order",
+			"source": ["a", "b", "c"],
+			"override": ["b", "a"],
+			"expected": ["b", "a", "c"]
+		},
+		{
+			"name": "obsolete names and duplicate saved entries do not duplicate menu rows",
+			"source": ["a", "b", "c"],
+			"override": ["gone", "b", "b", "-", "a"],
+			"expected": ["b", "-", "a", "c"]
+		},
+		{
+			"name": "explicit empty order restores all named sections",
+			"source": ["a", "-", "b"],
+			"override": [],
+			"expected": ["a", "b"]
+		},
+		{
+			"name": "up swaps across a separator",
+			"source": ["a", "-", "b", "c"],
+			"move": {
+				"name": "b",
+				"delta": -1
+			},
+			"expected": ["b", "-", "a", "c"]
+		},
+		{
+			"name": "down swaps named neighbours",
+			"source": ["a", "b", "c"],
+			"move": {
+				"name": "b",
+				"delta": 1
+			},
+			"expected": ["a", "c", "b"]
+		},
+		{
+			"name": "first section cannot move up",
+			"source": ["a", "b"],
+			"move": {
+				"name": "a",
+				"delta": -1
+			},
+			"refused": true
+		},
+		{
+			"name": "last section cannot move down",
+			"source": ["a", "b"],
+			"move": {
+				"name": "b",
+				"delta": 1
+			},
+			"refused": true
+		},
+		{
+			"name": "separator cannot move",
+			"source": ["a", "-", "b"],
+			"move": {
+				"name": "-",
+				"delta": 1
+			},
+			"refused": true
+		},
+		{
+			"name": "names are case sensitive",
+			"source": ["a", "A", "b"],
+			"override": ["A"],
+			"expected": ["A", "a", "b"]
+		}
+	]
+}

@@ -33,7 +33,7 @@ M.sections = {
 	["hotstrings.french_magickey"] = { description_key = "menu.hotstrings.magic_key", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["hotstrings.dynamic"] = { description_key = "menu.hotstrings.dynamic", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["hotstrings.personal"] = { description_key = "menu.hotstrings.personal", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
-	["hotstrings.order_overrides"] = { description_key = "menu.hotstrings", platforms = { "hs" }, subsections = {  } },
+	["hotstrings.order_overrides"] = { description_key = "menu.hotstrings", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm"] = { description_key = "menu.llm", platforms = { "ahk", "hs", "linux" }, subsections = { "display", "generation", "models", "profiles", "trigger", "navigation" } },
 	["llm.display"] = { description_key = "menu.llm.display", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.generation"] = { description_key = "menu.llm.generation", platforms = { "ahk", "hs", "linux" }, subsections = {  } },

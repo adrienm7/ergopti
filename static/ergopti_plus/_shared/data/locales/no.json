@@ -4090,7 +4090,6 @@
 	"menu.caps_word.pointer.other_buttons": "Andre museknapper",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Ikke på Windows: systemet beholder styreflatebevegelsene selv og sender ingen berøring videre til Ergopti. Rulling med to fingre teller fortsatt som rulling.",
 	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Ikke på Windows: Windows gir driveren hver bevegelse ferdig, først når den er fullført, fra styreplateinnstillingene, så et sveip kan ikke gjentas trinn for trinn mens fingrene beveger seg. macOS og Linux følger fingrene selv.",
-	"platform_reason.hotstring_menu_order_is_macos": "Bare macOS: Hotstrings-menyen lar deg endre rekkefølgen på elementene i hver kategori og husker den. Windows og Linux har ingen kontroll for å endre rekkefølgen.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Bare macOS under dette navnet: det er hovedbryteren for macOS’ skrivemotor, som driveren starter og stopper. Windows har hovedbryteren som hotstrings-porten i category_enabled, og Linux slår på hotstring-gruppene én etter én.",
 	"platform_reason.category_gates_are_windows": "Bare Windows: Windows har én hovedport per kategori foran kategoriens egne brytere. macOS har hotstrings-hovedbryteren som hotstrings.enabled, og Linux slår på hotstring-gruppene én etter én.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "Denne snarveien tilhører systemet som binder den: hver driver tilbyr handlingene sine på kombinasjonene systemet lar være ledige (Windows-tastkombinasjoner på Windows, Ctrl og Cmd på macOS, tastaturplasser på Linux) og lagrer valget under sitt eget navn.",
@@ -4160,5 +4159,8 @@
 	"apps.encryptor.drop_hint": "Slipp filer her for å kryptere dem, eller .enc-filer for å dekryptere dem.",
 	"apps.cloner.msg_no_isolation": "Dette programmet har ikke noe valg for en egen profil: på Windows er klonen en ekstra snarvei som starter samme program med de samme innstillingene.",
 	"inventory.behavior.layout_emulation": "Skriver valgt .keylayout over systemets oppsett; de tre driverne spiller av ett korpus av tastetrykk.",
-	"platform_reason.profile_shortcut_uses_prompt_action": "På Windows og Linux tilordner du «KI-prediksjon med en valgt prompt» til en hurtigtast og velger din egendefinerte profil i handlingsvelgeren. Profilen gjelder bare den forespørselen; handlingen avvises hvis profilen er slettet eller KI er slått av."
+	"platform_reason.profile_shortcut_uses_prompt_action": "På Windows og Linux tilordner du «KI-prediksjon med en valgt prompt» til en hurtigtast og velger din egendefinerte profil i handlingsvelgeren. Profilen gjelder bare den forespørselen; handlingen avvises hvis profilen er slettet eller KI er slått av.",
+	"menu.hotstrings.section_order": "Seksjonsrekkefølge",
+	"menu.hotstrings.move_up": "Flytt opp",
+	"menu.hotstrings.move_down": "Flytt ned"
 }

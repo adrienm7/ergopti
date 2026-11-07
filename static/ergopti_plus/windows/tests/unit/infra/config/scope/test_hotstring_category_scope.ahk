@@ -547,3 +547,22 @@ Test("hotstring-personal-menu: default rendering creates independent native menu
 
 
 #Include %A_LineFile%\..\..\..\..\..\..\..\_shared\modules\hotstrings\personal_scope.ahk
+
+
+; Cross-driver order vectors execute the native policy, not a source scan.
+_HSCS_OrderVector(Vector) {
+	Actual := Vector.Has("override") ? _HS_OrderResolve(Vector["source"], Vector["override"])
+		: _HS_OrderResolve(Vector["source"])
+	if Vector.Has("move")
+		Actual := _HS_OrderMove(Actual, Vector["move"]["name"], Vector["move"]["delta"])
+	if Vector.Get("refused", false) {
+		AssertFalse(Actual, "a boundary move must not publish another order")
+	} else {
+		Assert(Actual is Array, "a valid order must produce a complete list")
+		AssertEqual(Vector["expected"].Length, Actual.Length)
+		for Index, Name in Vector["expected"]
+			AssertEqual(Name, Actual[Index])
+	}
+}
+for _HSCS_OrderVectorValue in JsonParse(FileRead(_SharedDir . "\tests\corpus\hotstrings\section_order_vectors.json", "UTF-8"))["vectors"]
+	Test("hotstring-section-order: " . _HSCS_OrderVectorValue["name"], _HSCS_OrderVector.Bind(_HSCS_OrderVectorValue))

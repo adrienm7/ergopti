@@ -79,6 +79,7 @@ InitSubMenus() {
 					if EntryBySectionId.Has(SecId) {
 						Row := MenuRowFromManifest(EntryBySectionId[SecId], V1Cat)
 						if (Row != "") {
+							Row["section_order_id"] := SecId
 							Rows.Push(Row)
 							_PrevWasSep := false
 						}
@@ -94,6 +95,7 @@ InitSubMenus() {
 					}
 					Row := MenuRowFromManifest(Entry, V1Cat)
 					if (Row != "") {
+						Row["section_order_id"] := Parts[Parts.Length]
 						Rows.Push(Row)
 					}
 				}
@@ -101,6 +103,8 @@ InitSubMenus() {
 		}
 		PerfStage_End("Menu.cat.rows", _perfCat, Rows.Length)
 		_perfRender := PerfStage_Begin()
+		SplitPath(TomlPath, , , , &CategoryId)
+		Rows := _HS_OrderRows(CategoryId, Rows)
 		_HS_CategoryMenu(V1Cat, TomlPath, Rows, , Target)
 		PerfStage_End("Menu.cat.render", _perfRender, Rows.Length)
 	}
@@ -239,6 +243,7 @@ _BuildDynamicHotstringsSubmenu(Options := unset, TargetMenu := unset) {
 		}
 		Row := MenuRowFromManifest(Entry, "DynamicHotstrings")
 		if (Row != "") {
+			Row["section_order_id"] := StrLower(V1Id)
 			Rows.Push(Row)
 		}
 		if (V1Id == "TextExpansionPersonalInformation") {
@@ -247,6 +252,7 @@ _BuildDynamicHotstringsSubmenu(Options := unset, TargetMenu := unset) {
 				"action", PersonalInformationEditor))
 		}
 	}
+	Rows := _HS_OrderRows("dynamichotstrings", Rows)
 	return _HS_CategoryMenu("DynamicHotstrings", "", Rows,
 		(_Targets, Enabled) => _HS_SelectionNotice(GetCategoryTitle("DynamicHotstrings"), Enabled,
 			ToggleDynamicAllSections(Enabled, Options)), IsSet(TargetMenu) ? TargetMenu : unset)

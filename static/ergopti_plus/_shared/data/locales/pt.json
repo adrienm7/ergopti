@@ -4090,7 +4090,6 @@
 	"menu.caps_word.pointer.other_buttons": "Outros botões do rato",
 	"platform_reason.caps_word_gestures_stay_with_windows": "Não no Windows: o sistema guarda os gestos do touchpad para si e não transmite nenhum toque ao Ergopti. A rolagem com dois dedos continua a contar como rolagem.",
 	"platform_reason.gesture_modes_and_steps_need_finger_travel": "Não no Windows: o Windows entrega ao driver cada gesto pronto, só depois de concluído, a partir das definições do touchpad, por isso um deslize não pode repetir-se passo a passo enquanto os dedos se movem. O macOS e o Linux seguem os dedos por si próprios.",
-	"platform_reason.hotstring_menu_order_is_macos": "Só no macOS: o seu menu Hotstrings permite reordenar os itens de cada categoria e lembra-se dessa ordem. O Windows e o Linux não têm controlo para reordenar.",
 	"platform_reason.hotstrings_master_is_macos_engine": "Só no macOS com este nome: é o interruptor geral do motor de escrita do macOS, que o controlador inicia e pára. O Windows guarda o seu interruptor geral como a porta hotstrings de category_enabled, e o Linux liga os seus grupos de hotstrings um a um.",
 	"platform_reason.category_gates_are_windows": "Só no Windows: o Windows guarda uma porta geral por categoria, à frente dos interruptores próprios da categoria. O macOS guarda o interruptor geral dos hotstrings como hotstrings.enabled, e o Linux liga os seus grupos de hotstrings um a um.",
 	"platform_reason.shortcut_settings_are_stored_per_driver": "Este atalho pertence ao sistema que o atribui: cada controlador oferece as suas ações nas combinações que o seu sistema deixa livres (combinações com a tecla Windows no Windows, Ctrl e Cmd no macOS, ranhuras de teclado no Linux) e guarda a escolha com o seu próprio nome.",
@@ -4160,5 +4159,8 @@
 	"apps.encryptor.drop_hint": "Solte arquivos aqui para criptografá-los, ou arquivos .enc para descriptografá-los.",
 	"apps.cloner.msg_no_isolation": "Este programa não tem opção de perfil separado: no Windows, o clone é um segundo atalho que inicia o mesmo programa com as mesmas configurações.",
 	"inventory.behavior.layout_emulation": "Escreve o .keylayout escolhido sobre o esquema do sistema; os três controladores reproduzem um mesmo corpus de teclas.",
-	"platform_reason.profile_shortcut_uses_prompt_action": "No Windows e Linux, atribua «Previsão de IA com um prompt escolhido» a um atalho de teclado e escolha o seu perfil personalizado no seletor de ações. O perfil aplica-se apenas a esse pedido; um perfil eliminado ou a IA desativada impedem a ação."
+	"platform_reason.profile_shortcut_uses_prompt_action": "No Windows e Linux, atribua «Previsão de IA com um prompt escolhido» a um atalho de teclado e escolha o seu perfil personalizado no seletor de ações. O perfil aplica-se apenas a esse pedido; um perfil eliminado ou a IA desativada impedem a ação.",
+	"menu.hotstrings.section_order": "Ordem das secções",
+	"menu.hotstrings.move_up": "Mover para cima",
+	"menu.hotstrings.move_down": "Mover para baixo"
 }
