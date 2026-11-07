@@ -517,7 +517,11 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 		)
 		KLPFWorker.jobs[which] := job
 		try Foreground := KLPF_CaptureForegroundProjection(metrics_dir)
-		catch {
+		catch as Err {
+				; A refused build says why: an exception here refuses the dashboard
+				; build, and the caller only sees false.
+				try LoggerError("KLReader", "Could not capture the foreground projection for '{1}': {2} ({3}:{4})",
+						which, Err.Message, Err.File, Err.Line)
 				KLPF_CompleteJob(which, generation, "failed")
 				return false
 		}
