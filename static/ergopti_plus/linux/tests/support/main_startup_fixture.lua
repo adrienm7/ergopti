@@ -193,6 +193,14 @@ function M.run(options)
 				observed.driver_control = control_options
 				return { handle = function() return false end, stop = function() return true end }
 			end }
+		elseif name == "infra.updater_boot_ready" then
+			-- The update watcher that started this daemon is told once it is ready.
+			return { report = function(reason)
+				observed.boot_ready_reason = reason; record("updater.boot_ready"); return false
+			end }
+		elseif name == "adapters.wpm_surface" then
+			-- The floating WPM widget pumps its own window, tray or not.
+			return { pump = function() record("wpm.pump"); return 0 end }
 		elseif name == "infra.reload_timing" then
 			-- The Reload this boot completes is reported once the boot is complete.
 			return { complete = function() record("reload.complete"); return nil end }
