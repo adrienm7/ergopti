@@ -246,7 +246,10 @@ classified one at a time (`toml.document_slow_steps`), flat-parse values and
 registry deep compares (`BOOT_OPERATION_CEILINGS`). A `ConfigTomlReadSnapshot`
 hit compares the whole snapshot with its shadow twice, so a step that needs
 several boot values reads it once (`ConfigTomlBootSnapshot`, then
-`ConfigTomlBootSnapshotValue` per key). Action: compare boots by the summed
+`ConfigTomlBootSnapshotValue` per key). Within the boot read stretch
+(`ConfigMigrateBootReadsOpen` to its close) `ConfigTomlBootSnapshot` serves every
+consumer the one snapshot it admitted, and `ConfigTomlBootReadsRelease` proves
+it once at the boot tail: a new boot consumer costs no read. Action: compare boots by the summed
 `process_cpu` of the BootProfile resource lines over interleaved baseline and
 candidate runs on the smoke fixtures, never by one wall-clock run.
 

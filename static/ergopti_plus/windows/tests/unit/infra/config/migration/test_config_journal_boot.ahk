@@ -648,6 +648,49 @@ _CMJ_BootReadStretch() {
 }
 Test("config journal: the boot read stretch shares one comparison and never admits a write on it", _CMJ_BootReadStretch)
 
+; boot-operation-budget-2026-11-03: the boot's consumers read config.toml through
+; ConfigTomlBootSnapshot fourteen times, over the startup smoke's ceiling of
+; nine. The open stretch serves them the one snapshot it admitted, and its
+; release proves that snapshot once, refusing one mutated while it was served.
+_CMJ_BootSnapshotStretch() {
+	global ConfigurationFile, ConfigMigrateBootReadProof, _ConfigTomlSnapshotReads
+	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Source := _CMJ_CurrentSource(), Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	try {
+		ConfigurationFile := Path
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		ConfigMigrateBootReadsOpen()
+		Cache := ParseConfigTomlFile(Path)
+		Before := _ConfigTomlSnapshotReads
+		Served := ConfigTomlBootSnapshot(Cache)
+		AssertTrue(IsObject(Served), "the bootstrap cache has its actual snapshot owner")
+		loop 6
+			AssertTrue(ConfigTomlBootSnapshot(Cache) == Served, "every boot consumer shares the admitted snapshot")
+		AssertEqual(1, _ConfigTomlSnapshotReads - Before, "seven boot consumers pay one snapshot read")
+		AssertTrue(ConfigMigrateBootReadsClose(Path))
+		Before := _ConfigTomlSnapshotReads
+		AssertTrue(ConfigTomlBootReadsRelease(Path), "an unchanged served snapshot releases cleanly")
+		AssertEqual(1, _ConfigTomlSnapshotReads - Before, "the release proves the served snapshot once")
+		AssertTrue(ConfigTomlBootReadsRelease(Path), "a second release has nothing left to prove")
+		Before := _ConfigTomlSnapshotReads
+		ConfigTomlBootSnapshot(Cache), ConfigTomlBootSnapshot(Cache)
+		AssertEqual(2, _ConfigTomlSnapshotReads - Before, "after the stretch every read proves its image again")
+		ConfigMigrateBootReadsOpen()
+		Served := ConfigTomlBootSnapshot(Cache)
+		Served.Cache["tampered"] := Map()
+		AssertTrue(ConfigMigrateBootReadsClose(Path))
+		AssertFalse(ConfigTomlBootReadsRelease(Path), "a snapshot mutated while it was served is refused")
+	} finally {
+		ConfigMigrateBootReadProof.open := false
+		ConfigMigrateBootReadProof.registry := 0, ConfigMigrateBootReadProof.shadow := 0
+		try ConfigTomlBootReadsRelease(Path)
+		ConfigurationFile := IsSet(OldPath) ? OldPath : unset
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: the boot read stretch serves one admitted snapshot and proves it at release", _CMJ_BootSnapshotStretch)
+
 _CMJ_BootRegistryWithdrawal(When := "prepared") {
 	global ConfigurationFile, _LOGGER_TEST_SINK, LOGGER_MIN_LEVEL
 	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
