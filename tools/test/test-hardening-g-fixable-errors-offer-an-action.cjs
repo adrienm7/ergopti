@@ -96,11 +96,6 @@ const REQUIRED_OFFERS = [
 // must match a detected dialog or notice: `file` and one of its keys.
 const EXCEPTIONS = [
 	{
-		file: 'macos/ui/menu/menu_metrics.lua',
-		key: 'apps.encryptor.err_openssl_missing',
-		why: 'openssl ships with macOS; nothing the app could install replaces a system tool that is gone'
-	},
-	{
 		file: 'windows/infra/ui_style.ahk',
 		key: 'dialog.fatal_error.toml_key_missing',
 		why: 'a shipped style file lacks a key: the installation itself is damaged and only a reinstall fixes it'
