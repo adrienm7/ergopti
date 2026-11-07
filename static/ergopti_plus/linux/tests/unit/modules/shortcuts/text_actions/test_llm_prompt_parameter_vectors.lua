@@ -156,6 +156,41 @@ helpers.describe("llm_prompt_prediction parameter: what the binding editors show
 end)
 
 helpers.describe("llm_prompt_prediction parameter: the dispatcher hands the stored value over", function()
+	helpers.it("custom-profile-shortcut: persists and reloads an exact keyboard binding before dispatch", function()
+		local path = os.tmpname()
+		local file = assert(io.open(path, "wb"))
+		assert(file:write("[shortcuts.keyboard]\nprimary_p = \"llm_prompt_prediction\"\n"))
+		assert(file:close())
+		local G = helpers.load_module("modules.gestures.manager")
+		local seen = {}
+		local function initialize()
+			G.init({ enabled = false, persist = true, config_path = path, action_handlers = {
+				[ACTION] = function(binding, parameter)
+					seen[#seen + 1] = { binding, parameter }
+					return true
+				end,
+			} })
+		end
+		local okay, detail = xpcall(function()
+			initialize()
+			helpers.assert_true(G.set_action_parameter("keyboard__primary_p", ACTION, "user_private_notes|2"))
+			local saved = assert(io.open(path, "rb"))
+			local document = require("toml_codec").decode(saved:read("*a"))
+			assert(saved:close())
+			helpers.assert_eq(document.gesture_parameters.keyboard__primary_p__llm_prompt_prediction,
+				"user_private_notes|2", "the keyboard binding owns its custom profile parameter")
+			G = helpers.load_module("modules.gestures.manager")
+			initialize()
+			helpers.assert_eq(G.get_action_parameter("keyboard__primary_p", ACTION), "user_private_notes|2")
+			G.execute_action(ACTION, "keyboard__primary_p")
+			helpers.assert_eq(#seen, 1)
+			helpers.assert_eq(seen[1][1], "keyboard__primary_p")
+			helpers.assert_eq(seen[1][2], "user_private_notes|2")
+		end, debug.traceback)
+		assert(os.remove(path))
+		if not okay then error(detail, 0) end
+	end)
+
 	helpers.it("runs the handler with the binding's own value", function()
 		local G = helpers.load_module("modules.gestures.manager")
 		local seen = {}

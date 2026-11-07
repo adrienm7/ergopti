@@ -374,6 +374,7 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 			world.answer_each({ " et toute l'équipe.", " et toute la famille.", " et tous les collègues." })
 			helpers.assert_eq(#world.posts, 3, "no count of its own: the menu's")
 			helpers.assert_eq(world.shown[#world.shown].profile, "Formal", "the tooltip shows its label")
+			assert_menu_untouched(world)
 		end)
 	end)
 
@@ -392,6 +393,19 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 			helpers.assert_eq(world.handlers.llm_predict_rewrite("tap_3", nil), false)
 			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.disabled"))
 			helpers.assert_eq(#world.posts, 0)
+		end)
+	end)
+
+	helpers.it("custom-profile-shortcut: a configured custom prompt is inert while the AI is off", function()
+		scenario({ buffer = "Bonjour Marc", disabled = true, stored = {
+			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
+				{ id = "user_formal", label = "Formal", system_single = "Continue formally.", batch = false },
+			}),
+		} }, function(world)
+			helpers.assert_eq(world.handlers.llm_prompt_prediction("keyboard__primary_p", "user_formal|2"), false)
+			helpers.assert_eq(#world.posts, 0)
+			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.disabled"))
+			assert_menu_untouched(world)
 		end)
 	end)
 

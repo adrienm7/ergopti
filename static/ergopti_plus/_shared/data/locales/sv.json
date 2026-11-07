@@ -4159,5 +4159,6 @@
 	"apps.cloner.err_source_unreadable": "Programmet kan inte klonas: dess startare anger inget program.",
 	"apps.encryptor.drop_hint": "Släpp filer här för att kryptera dem, eller .enc-filer för att dekryptera dem.",
 	"apps.cloner.msg_no_isolation": "Programmet har inget alternativ för en separat profil: på Windows är klonen en andra genväg som startar samma program med samma inställningar.",
-	"inventory.behavior.layout_emulation": "Skriver vald .keylayout ovanpå systemets layout; de tre drivrutinerna spelar upp ett korpus av tangenttryck."
+	"inventory.behavior.layout_emulation": "Skriver vald .keylayout ovanpå systemets layout; de tre drivrutinerna spelar upp ett korpus av tangenttryck.",
+	"platform_reason.profile_shortcut_uses_prompt_action": "I Windows och Linux tilldelar du ”AI-förutsägelse med en vald prompt” till ett kortkommando och väljer din egen profil i åtgärdsväljaren. Profilen gäller bara den begäran; åtgärden nekas om profilen är borttagen eller AI är avstängd."
 }

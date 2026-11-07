@@ -4159,5 +4159,6 @@
 	"apps.cloner.err_source_unreadable": "このアプリケーションは複製できません：ランチャーにプログラムが指定されていません。",
 	"apps.encryptor.drop_hint": "暗号化するファイル、または復号する .enc ファイルをここにドロップしてください。",
 	"apps.cloner.msg_no_isolation": "このプログラムには個別のプロファイルを使うオプションがありません。Windows では、クローンは同じ設定で同じプログラムを起動する 2 つ目のショートカットになります。",
-	"inventory.behavior.layout_emulation": "選択した .keylayout をシステムの配列の上で入力します。3つのドライバーが同じ打鍵コーパスを再生します。"
+	"inventory.behavior.layout_emulation": "選択した .keylayout をシステムの配列の上で入力します。3つのドライバーが同じ打鍵コーパスを再生します。",
+	"platform_reason.profile_shortcut_uses_prompt_action": "Windows と Linux では、「選択したプロンプトによる AI 予測」をキーボードショートカットに割り当て、アクション選択画面でカスタムプロファイルを選びます。プロファイルはそのリクエストだけに適用されます。プロファイルが削除済み、または AI が無効の場合、アクションは拒否されます。"
 }

@@ -4159,5 +4159,6 @@
 	"apps.cloner.err_source_unreadable": "Esta aplicación no se puede clonar: su lanzador no indica ningún programa.",
 	"apps.encryptor.drop_hint": "Suelte aquí archivos para cifrarlos, o archivos .enc para descifrarlos.",
 	"apps.cloner.msg_no_isolation": "Este programa no tiene opción de perfil separado: en Windows, su clon es un segundo acceso directo que inicia el mismo programa con la misma configuración.",
-	"inventory.behavior.layout_emulation": "Escribe el .keylayout elegido sobre la distribución del sistema; los tres controladores reproducen un mismo corpus de pulsaciones."
+	"inventory.behavior.layout_emulation": "Escribe el .keylayout elegido sobre la distribución del sistema; los tres controladores reproducen un mismo corpus de pulsaciones.",
+	"platform_reason.profile_shortcut_uses_prompt_action": "En Windows y Linux, asigna «Predicción de IA con un prompt elegido» a un atajo de teclado y elige tu perfil personalizado en el selector de acciones. El perfil solo se aplica a esa solicitud; si se elimina el perfil o se desactiva la IA, se rechaza la acción."
 }
