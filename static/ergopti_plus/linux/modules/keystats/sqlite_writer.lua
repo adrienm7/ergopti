@@ -1700,14 +1700,15 @@ _derived_sql.ngrams = function(device_id, date, app, ngrams, table_name)
 			})
 		end
 	end
-	if #statements == 0 then return end
+	-- Settling an open walk can produce a zero-count group: it is an admitted
+	-- no-op inside the transaction, not a malformed statement.
 	return table.concat(statements, "\n")
 end
 
 function M.upsert_ngrams(device_id, date, app, ngrams, table_name)
 	if not M.is_available() then return end
 	local sql = _derived_sql.ngrams(device_id, date, app, ngrams, table_name)
-	if not sql then return end
+	if not sql or sql == "" then return end
 	return _exec_raw_batch(sql)
 end
 
