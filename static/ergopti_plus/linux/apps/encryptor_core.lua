@@ -123,14 +123,15 @@ end
 --- @param password string
 --- @param openssl string The openssl program to run.
 --- @return boolean ok
---- @return string|nil reason Why the conversion failed.
+--- @return string|nil reason Why the conversion failed: password_line_break, private_folder_not_created,
+---   stage_not_created, openssl_refused, creation_mask_unreadable or publish_failed; an error's text otherwise.
 function M.convert(format, mode, input, output, password, openssl)
 	assert(type(password) == "string" and password ~= "", "an Encryptor password is required")
 	-- OpenSSL's -pass file: reads the first line only; a line break would make
 	-- the key differ from the Windows driver's, which reads the whole password.
-	if password:find("[\r\n]") then return false, "the password holds a line break" end
+	if password:find("[\r\n]") then return false, "password_line_break" end
 	local private = read_line("umask 077; mktemp -d 2>/dev/null")
-	if not private or private:sub(1, 1) ~= "/" then return false, "cannot create a private folder" end
+	if not private or private:sub(1, 1) ~= "/" then return false, "private_folder_not_created" end
 	local password_file = private .. "/password"
 	local ok, reason = false, nil
 	local stage
@@ -142,14 +143,14 @@ function M.convert(format, mode, input, output, password, openssl)
 		local folder = output:match("^(.*)/[^/]*$") or "."
 		local base = output:match("([^/]*)$")
 		stage = read_line("mktemp " .. quote((folder == "" and "/" or folder) .. "/." .. base .. ".XXXXXX") .. " 2>/dev/null")
-		if not stage or stage == "" then reason = "cannot create a stage next to the output" return end
+		if not stage or stage == "" then reason = "stage_not_created" return end
 		local line = quote(openssl)
 		for _, word in ipairs(M.openssl_words(format, mode, input, stage, password_file)) do line = line .. " " .. quote(word) end
-		if not succeeded(line .. " 2>/dev/null") then reason = "openssl refused the conversion" return end
+		if not succeeded(line .. " 2>/dev/null") then reason = "openssl_refused" return end
 		-- mktemp creates the stage 0600; give the output the mode a new file gets.
 		-- 0666 & ~umask, spelt arithmetically: LuaJIT has no bitwise operators.
 		local mask = tonumber(previous or "", 8)
-		if not mask then reason = "cannot read the file creation mask" return end
+		if not mask then reason = "creation_mask_unreadable" return end
 		local bits = 0
 		for bit = 8, 0, -1 do
 			local value = 2 ^ bit
@@ -157,7 +158,7 @@ function M.convert(format, mode, input, output, password, openssl)
 		end
 		if not succeeded("chmod " .. string.format("%o", bits) .. " " .. quote(stage))
 			or not succeeded("mv -f " .. quote(stage) .. " " .. quote(output)) then
-			reason = "cannot publish the converted file"
+			reason = "publish_failed"
 			return
 		end
 		stage = nil
