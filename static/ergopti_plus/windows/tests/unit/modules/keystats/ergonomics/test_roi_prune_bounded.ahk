@@ -113,7 +113,9 @@ _KRCTX_ChildSource() {
 	PruneOwner := _DriverProductionFileForSymbol("KL_Roi_IncrementWordCount", _DriverDir)
 	AssertTrue(PruneOwner != "")
 	Source .= "#Include " . PruneOwner . "`n"
-	for Symbol in ["KL_MarkSynthetic", "KL_ClearSynthetic", "KL_Roi_RequireInit", "KL_Roi_DiscardWord", "KL_Roi_AdmitWordContext", "KL_Roi_OnChar", "KL_Roi_ProcessWord", "KL_Roi_PruneWordCounts", "_TextCodepointWidth"] {
+	; _TextCodepointWidth arrives with its whole owner through _KSD_ChildSource;
+	; a second copy of its body is a duplicate declaration the child refuses.
+	for Symbol in ["KL_MarkSynthetic", "KL_ClearSynthetic", "KL_Roi_RequireInit", "KL_Roi_DiscardWord", "KL_Roi_AdmitWordContext", "KL_Roi_OnChar", "KL_Roi_ProcessWord", "KL_Roi_PruneWordCounts"] {
 		Body := _DriverFuncBody(Symbol)
 		AssertTrue(Body != "", "The complete real ROI path must resolve: " . Symbol)
 		Source .= Body . "`n"
