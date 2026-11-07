@@ -252,7 +252,13 @@ function M.settings()
 	if not layouts then return nil, layouts_err end
 	local updater, updater_err = read_shared_json("modules/updater/defaults.json")
 	if not updater then return nil, updater_err end
-	return Registry.resolve(layouts, updater, require("modules.updater.manager").installed_channel())
+	-- The daemon runs without the updater (Main loads it optionally), so its
+	-- absence is this function's refusal, not a raise that ends the daemon.
+	local loaded, Updater = pcall(require, "modules.updater.manager")
+	if not loaded or type(Updater) ~= "table" or type(Updater.installed_channel) ~= "function" then
+		return nil, "the updater cannot name the installed channel: " .. tostring(loaded and "no installed_channel" or Updater)
+	end
+	return Registry.resolve(layouts, updater, Updater.installed_channel())
 end
 
 --- The first candidate path that exists under the driver root.

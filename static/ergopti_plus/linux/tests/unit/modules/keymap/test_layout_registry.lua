@@ -267,6 +267,21 @@ helpers.describe("layout manager (Linux): installing", function()
 		helpers.assert_contains(tostring(err), "modules/layouts/defaults.json is not valid JSON")
 	end)
 
+	helpers.it("reports, not raises, when the optional updater cannot load (layout-registry-convert)", function()
+		-- Main loads the updater optionally; the daemon key scenarios run without
+		-- it, and the registry's raise once ended the daemon at the first layout.
+		local LayoutRegistry = helpers.load_module("modules.keymap.layout_registry")
+		local name = "modules.updater.manager"
+		local saved_loaded, saved_preload = package.loaded[name], package.preload[name]
+		package.loaded[name] = nil
+		package.preload[name] = function() error("controlled unavailable updater") end
+		local called, settings, err = pcall(LayoutRegistry.settings)
+		package.loaded[name], package.preload[name] = saved_loaded, saved_preload
+		helpers.assert_true(called, "settings() must report, not raise: " .. tostring(settings))
+		helpers.assert_nil(settings)
+		helpers.assert_contains(tostring(err), "controlled unavailable updater")
+	end)
+
 	helpers.it("converts, installs and records a downloaded layout (layout-registry-convert)", function()
 		local layout = registry_file("ergol/ergol.keylayout")
 		local LayoutRegistry, deps, state = manager({
