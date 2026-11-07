@@ -428,7 +428,7 @@ local ADAPTER_SPECS = {
 	},
 	{
 		id       = "adapters.accessibility_permission",
-		contract = { "is_trusted", "last_known", "request_prompt" },
+		contract = { "is_trusted", "request_prompt" },
 		wired    = true,
 	},
 	{
@@ -439,7 +439,7 @@ local ADAPTER_SPECS = {
 	},
 	{
 		id       = "adapters.screen_capture",
-		contract = { "permission_state", "last_known_permission", "request_permission", "open_permission_settings",
+		contract = { "permission_state", "request_permission", "open_permission_settings",
 			"clipboard_change_count", "clipboard_has_image", "copy_image_file_to_clipboard" },
 		wired    = true,
 	},
