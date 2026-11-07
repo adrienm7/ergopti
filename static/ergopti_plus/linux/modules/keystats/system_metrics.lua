@@ -54,9 +54,6 @@ local StorageOwned = require("storage_owned")
 
 local LOG = "modules.keystats.system_metrics"
 
--- A wake earlier than this after local midnight is a night wake.
-local NIGHT_WAKE_END_MS = require("infra.timings").ms("keystats", "night_wake_end_ms")
-
 -- How often the machine's state is read, in milliseconds. Battery and lock
 -- state move on a scale of minutes; sampling faster spends subprocesses to
 -- learn the same answer.
@@ -483,7 +480,8 @@ function M.sample()
 	if asleep then
 		transition("wake", { asleep_ms = sleep_total })
 		local local_ts = os.date("%Y-%m-%d %H:%M:%S", math.floor(clock.wall_ms / 1000))
-		if require("keystats.aggregator_helpers").is_night_wake(local_ts, NIGHT_WAKE_END_MS) then
+		-- A wake earlier than [keystats] night_wake_end_ms after local midnight is a night wake.
+		if require("keystats.aggregator_helpers").is_night_wake(local_ts, require("infra.timings").ms("keystats", "night_wake_end_ms")) then
 			_day.night_wake_count = _day.night_wake_count + 1
 		end
 	end
