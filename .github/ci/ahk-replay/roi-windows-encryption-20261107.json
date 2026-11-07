@@ -1,0 +1,15 @@
+{
+	"expected_count": 26,
+	"native_http_client_e2e": false,
+	"native_hotstring_e2e": false,
+	"native_proxy_relay_owner_e2e": false,
+	"filters": [
+		{ "contains": "roi-encryption-publication", "expected_count": 12 },
+		{ "contains": "roi-lowercase-native-corpus", "expected_count": 1 },
+		{ "contains": "ROI half-life: keys uses the retained monotonic age", "expected_count": 1 },
+		{ "contains": "Keystats ROI word context: same-app", "expected_count": 1 },
+		{ "contains": "keystats-journal-repair-debt", "expected_count": 1 },
+		{ "contains": "keystats-journal-sealing", "expected_count": 4 },
+		{ "contains": "metrics-preferences-global-barrier-20260813", "expected_count": 6 }
+	]
+}
