@@ -4163,6 +4163,5 @@
 	"apps.cloner.err_source_unreadable": "Deze toepassing kan niet worden gekloond: haar starter noemt geen programma.",
 	"apps.encryptor.drop_hint": "Zet hier bestanden neer om ze te versleutelen, of .enc-bestanden om ze te ontsleutelen.",
 	"apps.cloner.msg_no_isolation": "Dit programma heeft geen optie voor een apart profiel: op Windows is de kloon een tweede snelkoppeling die hetzelfde programma met dezelfde instellingen start.",
-	"inventory.behavior.layout_emulation": "Typt het gekozen .keylayout over de systeemindeling; de drie stuurprogramma's spelen één corpus van toetsaanslagen af.",
-	"inventory.behavior.dead_native_lifetime": "Het oorspronkelijke systeem beheert wachtende compositie; registratie en reset staan los van een gedeelde tijdslimiet van het stuurprogramma."
+	"inventory.behavior.layout_emulation": "Typt het gekozen .keylayout over de systeemindeling; de drie stuurprogramma's spelen één corpus van toetsaanslagen af."
 }

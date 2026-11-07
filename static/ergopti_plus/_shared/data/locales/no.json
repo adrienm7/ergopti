@@ -4163,6 +4163,5 @@
 	"apps.cloner.err_source_unreadable": "Dette programmet kan ikke klones: oppstarteren angir ikke noe program.",
 	"apps.encryptor.drop_hint": "Slipp filer her for å kryptere dem, eller .enc-filer for å dekryptere dem.",
 	"apps.cloner.msg_no_isolation": "Dette programmet har ikke noe valg for en egen profil: på Windows er klonen en ekstra snarvei som starter samme program med de samme innstillingene.",
-	"inventory.behavior.layout_emulation": "Skriver valgt .keylayout over systemets oppsett; de tre driverne spiller av ett korpus av tastetrykk.",
-	"inventory.behavior.dead_native_lifetime": "Det native systemet styrer ventende komposisjon; registrering og tilbakestilling er atskilt fra en felles tidsgrense i driveren."
+	"inventory.behavior.layout_emulation": "Skriver valgt .keylayout over systemets oppsett; de tre driverne spiller av ett korpus av tastetrykk."
 }

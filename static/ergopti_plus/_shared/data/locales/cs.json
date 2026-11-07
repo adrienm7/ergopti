@@ -4163,6 +4163,5 @@
 	"apps.cloner.err_source_unreadable": "Tuto aplikaci nelze klonovat: její spouštěč neuvádí žádný program.",
 	"apps.encryptor.drop_hint": "Přetáhněte sem soubory k zašifrování nebo soubory .enc k dešifrování.",
 	"apps.cloner.msg_no_isolation": "Tento program nemá volbu samostatného profilu: ve Windows je jeho klon druhý zástupce, který spouští stejný program se stejným nastavením.",
-	"inventory.behavior.layout_emulation": "Píše zvolený .keylayout přes rozložení systému; všechny tři ovladače přehrávají jeden korpus stisků.",
-	"inventory.behavior.dead_native_lifetime": "Nativní systém řídí čekající skládání; zachytávání a resetování jsou oddělené od společného časového limitu ovladače."
+	"inventory.behavior.layout_emulation": "Píše zvolený .keylayout přes rozložení systému; všechny tři ovladače přehrávají jeden korpus stisků."
 }

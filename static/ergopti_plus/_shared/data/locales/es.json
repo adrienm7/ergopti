@@ -4163,6 +4163,5 @@
 	"apps.cloner.err_source_unreadable": "Esta aplicación no se puede clonar: su lanzador no indica ningún programa.",
 	"apps.encryptor.drop_hint": "Suelte aquí archivos para cifrarlos, o archivos .enc para descifrarlos.",
 	"apps.cloner.msg_no_isolation": "Este programa no tiene opción de perfil separado: en Windows, su clon es un segundo acceso directo que inicia el mismo programa con la misma configuración.",
-	"inventory.behavior.layout_emulation": "Escribe el .keylayout elegido sobre la distribución del sistema; los tres controladores reproducen un mismo corpus de pulsaciones.",
-	"inventory.behavior.dead_native_lifetime": "El sistema nativo gestiona la composición pendiente; las reglas de captura y reinicio son independientes de un plazo común del controlador."
+	"inventory.behavior.layout_emulation": "Escribe el .keylayout elegido sobre la distribución del sistema; los tres controladores reproducen un mismo corpus de pulsaciones."
 }
