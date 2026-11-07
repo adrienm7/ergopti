@@ -381,12 +381,18 @@ _HotPathReportSlow(Report, NowMs) {
 		try LoggerWarn("HotPath", "Slow {1} detail: {2}.", Report.Segment, Report.Detail)
 }
 
-/** Forgets every open frame and the rate limiter. Tests only. */
+/**
+ * Forgets every open frame and the rate limiter. Tests only. A discarded frame's
+ * billed child time goes with it: Open reuses the slot as it finds it, so a
+ * stale count would be subtracted from the next segment opened at that depth.
+ */
 _HotPathResetForTest() {
 	Owner := _HotPathNestingOwner()
 	Owner.Tracker.Depth := 0
-	loop HotPathNesting.MAX_DEPTH
+	loop HotPathNesting.MAX_DEPTH {
 		Owner.Tracker.Pending[A_Index] := ""
+		Owner.Tracker.Nested[A_Index] := 0
+	}
 	Owner.Gate.Reset()
 }
 
