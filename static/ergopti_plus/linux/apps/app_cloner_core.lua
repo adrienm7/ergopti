@@ -353,7 +353,8 @@ function M.write(plan)
 	ok, err = write_file(plan.desktop_path, plan.desktop_text)
 	if not ok then undo() return false, "cannot write the desktop entry: " .. tostring(err) end
 	-- Menus refresh from the folder; the cache update is a courtesy where installed.
-	os.execute("update-desktop-database " .. quote(applications) .. " >/dev/null 2>&1")
+	os.execute("command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "
+		.. quote(applications) .. " >/dev/null 2>&1")
 	return true
 end
 

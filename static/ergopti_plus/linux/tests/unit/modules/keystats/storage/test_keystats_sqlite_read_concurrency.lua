@@ -22,6 +22,11 @@ local helpers = require("tests.helpers")
 local Cmd = helpers.load_module("modules.keystats.sqlite_command")
 local Timings = require("infra.timings")
 
+-- These cases drive the real sqlite3 CLI, which every CI image installs:
+-- its absence is a broken host, never a skipped case.
+local SQLITE3_STATUS = os.execute("command -v sqlite3 >/dev/null 2>&1")
+assert(SQLITE3_STATUS == true or SQLITE3_STATUS == 0, "the sqlite3 CLI is not on PATH")
+
 --- Runs a shell command and returns its whole output.
 local function sh(command)
 	local pipe = assert(io.popen(command .. " 2>&1", "r"))

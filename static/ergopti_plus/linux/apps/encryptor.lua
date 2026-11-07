@@ -53,7 +53,7 @@ end
 local function reveal(path)
 	local folder = path:match("^(.*)/[^/]*$")
 	if not folder or folder == "" then folder = "/" end
-	os.execute("setsid xdg-open " .. require("text_utils").shell_quote(folder) .. " >/dev/null 2>&1 &")
+	os.execute("xdg-open " .. require("text_utils").shell_quote(folder) .. " >/dev/null 2>&1 &")
 end
 
 --- Runs the program.
