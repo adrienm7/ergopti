@@ -979,6 +979,9 @@ class Keystats {
     static by_device_dir  := ""
     static data_sql_path  := ""
 	static today_log_path   := ""
+    ; Production's journal bookmark: KLPF_CaptureForegroundProjection and
+    ; KLPF_ForegroundProjectionCurrent read it once the resident store matches.
+    static today_log_offset := 0
     ; Read by KL_LogHotstring (modules/keystats/keystats_hotstring_log.ahk):
     ; the app the row is attributed to, and the flush bookkeeping it updates.
     static session_app    := "test.exe"
