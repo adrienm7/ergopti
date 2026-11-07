@@ -140,13 +140,13 @@ def expected_snapshot(
         "pie_labels": []
         if empty
         else ([labels["Editor"]] if filtered else ["toString", labels["Editor"]]),
+        # The page plots exact hours (formatDurationDecimal, ms / 3600000): the
+        # charts keep their precision and only the tooltips round.
         "pie_hours": (
             []
             if empty
             else (
-                [0.02 if editor_ms == 60000 else 0.03]
-                if filtered
-                else ([0.03, 0.02] if editor_ms == 60000 else [0.07, 0.03])
+                [editor_ms / 3600000] if filtered else [browser_ms / 3600000, editor_ms / 3600000]
             )
         ),
         "filter_buttons": {

@@ -46,9 +46,9 @@ def snapshot(
         "pie_hours": []
         if empty
         else (
-            [{60000: 0.02, 120000: 0.03}[editor]]
+            [{60000: 1 / 60, 120000: 1 / 30}[editor]]
             if filtered
-            else ([0.03, 0.02] if editor == 60000 else [0.07, 0.03])
+            else ([1 / 30, 1 / 60] if editor == 60000 else [1 / 15, 1 / 30])
         ),
         "filter_buttons": {
             label: selection is None or label in selection,
