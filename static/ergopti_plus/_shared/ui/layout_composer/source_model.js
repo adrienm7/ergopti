@@ -43,7 +43,7 @@ var LayoutSource = (function () {
 	];
 	const TARGETS = [
 		{ target: 'macos', artifact: 'keylayout' },
-		{ target: 'linux', artifact: 'xkb' },
+		{ target: 'linux', artifact: 'xkb', unavailable: 'tooling_export_required' },
 		{ target: 'windows', artifact: 'keyboard_dll' },
 		{ target: 'driver_macos', artifact: 'emulation' },
 		{ target: 'driver_linux', artifact: 'emulation' },
@@ -490,7 +490,7 @@ var LayoutSource = (function () {
 	function capabilities(source) {
 		validate(source);
 		const blockers = exportBlockers(source);
-		return TARGETS.map(({ target, artifact }) => ({
+		return TARGETS.map(({ target, artifact, unavailable = 'exporter_not_implemented' }) => ({
 			target,
 			status: artifact === 'keylayout' && blockers.length === 0 ? 'native' : 'unavailable',
 			artifact,
@@ -499,13 +499,8 @@ var LayoutSource = (function () {
 					? blockers.length
 						? 'source_edits_not_compiled'
 						: 'original_keylayout_preserved'
-					: target === 'linux'
-						? 'tooling_export_required'
-						: 'exporter_not_implemented',
-			blockers:
-				artifact === 'keylayout'
-					? blockers
-					: [target === 'linux' ? 'tooling_export_required' : 'exporter_not_implemented']
+					: unavailable,
+			blockers: artifact === 'keylayout' ? blockers : [unavailable]
 		}));
 	}
 

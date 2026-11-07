@@ -44,6 +44,17 @@ function roundTrip(xml, id, convention) {
 		['macos']
 	);
 	assert(report.every((entry) => entry.reason.length > 0));
+	assert.deepEqual(
+		report.find((entry) => entry.artifact === 'xkb'),
+		{
+			target: 'linux',
+			status: 'unavailable',
+			artifact: 'xkb',
+			reason: 'tooling_export_required',
+			blockers: ['tooling_export_required']
+		},
+		'the explicit export catalogue reports tool availability independently of the host'
+	);
 	preserved.push(xml);
 	return imported;
 }
