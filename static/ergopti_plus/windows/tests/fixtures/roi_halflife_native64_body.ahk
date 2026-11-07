@@ -9,6 +9,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\roi_encryption_epoch_cutpoint.ahk
 
 _RHL_Require(Condition, Message) {
 	if !Condition
@@ -356,10 +357,37 @@ _RHL_Keys() {
 	_RHL_Require(_RHL.Errors == 0, "No swallowed hook dependency error may qualify the assertions.")
 }
 
+_RHL_EncryptionEpoch() {
+	global _RHL, KL_ENC_Enabled
+	Keystats.initialized := true
+	Keystats.session_app := "roi-clock-fixture.exe"
+	MetricsFilters.secure_field := false
+	MetricsFilters.encrypt := false, KL_ENC_Enabled := false
+	_RHL_AcquireFocus(Keystats.session_app, "private ROI fixture")
+	_RHL.PushTick := 1000
+	KL_Roi_OnHotstring(_RHL.Trigger, 7, false)
+	_RHL_Require(KLRoi.trigger_last_use.Count == 1 && _RHL.PushReads == 1,
+		"Only the genuine producer may prepare the old trigger.")
+	_RHL.CurrentTick := 1000 + 31 * 86400000
+	_RHL_Require(KL_Roi_Start(), "The genuine lifecycle must own the half-life callback.")
+	BeforeEpoch := KLRoiPrivacy.epoch
+	State := _KRECP_Install(3)
+	try KLRoi.halflife_fn.Call()
+	finally _KRECP_Restore(State)
+	_RHL_Require(State.Calls == 1 && KLRoiPrivacy.epoch == BeforeEpoch + 1
+		&& !KLRoiPrivacy.blocked && _RHL.TickReads == 1,
+		"The actual retained snapshot must cross ON and clean OFF at its post-snapshot preference lookup.")
+	_RHL_Require(KLRoi.trigger_last_use.Count == 0 && Keystats._pending_entries.Length == 0
+		&& KLRoi.session_saved_chars == 7 && KLRoi.session_fired_count == 1 && _RHL.Errors == 0,
+		"The old half-life entry cannot acquire the new epoch at the actual central append.")
+	FileAppend("RECEIPT roi-encryption-half-life cuts=" . State.Calls . " epoch=" . KLRoiPrivacy.epoch . "`n", "*", "UTF-8")
+}
+
 _RHL_Main() {
 	if A_Args.Length != 2
 		ExitApp(2)
 	Persistent(true)
+	KL_Roi_SetCanonicalPolicyKnown(true)
 	global _RHL := {Mode: A_Args[1], Log: A_Args[2] . "\private.log", Trigger: "private-fixture-trigger",
 		Origin: 0, PushTick: 0, SampleTick: 0, CurrentTick: 0, Armed: false, PushReads: 0, TickReads: 0,
 		LastNative: 0, TimerCalls: 0, TickDone: false, CapturedBeforeTimer: -1,
@@ -369,6 +397,8 @@ _RHL_Main() {
 	try {
 		if _RHL.Mode == "keys"
 			_RHL_Keys()
+		else if _RHL.Mode == "encryption-epoch"
+			_RHL_EncryptionEpoch()
 		else {
 			_RHL_Exercise()
 			_RHL_NonpositiveUsage()

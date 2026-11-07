@@ -11,6 +11,11 @@ _KRSC_ChildSource() {
 	AssertTrue(RoiOwner != "")
 	; _TextCodepointWidth arrives with its whole owner through _KSD_ChildSource.
 	Source .= "#Include " . RoiOwner . "`n"
+	for Symbol in ["KL_Roi_TextAllowed", "KL_Enc_IsEnabled", "_KL_JournalPendingEntries"] {
+		PolicyOwner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
+		AssertTrue(PolicyOwner != "", "The real ROI policy dependency must resolve")
+		Source .= "#Include " . PolicyOwner . "`n"
+	}
 	return Source . "#Include " . _DriverDir . "\tests\fixtures\context_roi_stale_owner_body.ahk`n"
 }
 _KRSC_Case(Mode) {

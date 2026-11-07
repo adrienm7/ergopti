@@ -23,10 +23,11 @@ _CSTT_SaveRuntime() {
 		Filters[Name] := MetricsFilters.%Name%
 	return { Enabled: MetricsShortcuts.enabled, Filters: Filters,
 		Apps: MetricsFilters.disabled_apps, Cipher: KL_Enc_IsEnabled(),
-		Visible: WPMWidget.visible, Colors: WPMWidget.use_colors, Graph: WPMWidget.show_graph }
+		RoiKnown: KLRoiPrivacy.canonical_known, Visible: WPMWidget.visible, Colors: WPMWidget.use_colors, Graph: WPMWidget.show_graph }
 }
 
 _CSTT_RestoreRuntime(Saved) {
+	KLRoiPrivacy.canonical_known := Saved.RoiKnown
 	MetricsShortcuts.enabled := Saved.Enabled
 	MetricsFilters.disabled_apps := Saved.Apps
 	for Name, Value in Saved.Filters

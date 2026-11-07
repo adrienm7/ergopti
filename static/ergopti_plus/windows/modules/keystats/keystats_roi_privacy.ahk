@@ -13,6 +13,7 @@ class KLRoiPrivacy {
 	static blocked := false
 	static started := Map()
 	static request_owner := 0
+	static canonical_known := false
 }
 
 KL_Roi_IsTextEntry(Entry) {
@@ -23,8 +24,7 @@ KL_Roi_IsTextEntry(Entry) {
 ; The requested preference and effective cipher must both be known off. A missing
 ; provider or malformed setting cannot turn encryption failure into plaintext.
 KL_Roi_TextPostureOff() {
-	global MetricsFilters
-	if !IsSet(MetricsFilters) || !MetricsFilters.HasOwnProp("encrypt")
+	if !KLRoiPrivacy.canonical_known || !IsSet(MetricsFilters) || !MetricsFilters.HasOwnProp("encrypt")
 		return false
 	Requested := MetricsFilters.encrypt
 	if !(Requested is Integer) || Requested != 0
@@ -37,7 +37,6 @@ KL_Roi_TextPostureOff() {
 
 ; Only memory is changed here. Native persistence keeps its existing owner.
 KL_Roi_BlockText() {
-	global KLRoi, Keystats
 	PreviousCritical := Critical("On")
 	try {
 		if !KLRoiPrivacy.blocked
@@ -105,17 +104,29 @@ KL_Roi_EndEncryptionRequest(Owner) {
 	} finally Critical(PreviousCritical)
 }
 
-KL_Roi_CommitEncryptionPolicy(Requested) {
+; The metrics reader may substitute defaults for an outdated raw TOML value.
+; That compatibility behavior must not grant ROI permission to record words.
+KL_Roi_SetCanonicalPolicyKnown(Known) {
+	PreviousCritical := Critical("On")
+	try {
+		KLRoiPrivacy.canonical_known := (Known is Integer) && Known == 1
+		if !KLRoiPrivacy.canonical_known
+			KL_Roi_BlockText()
+	} finally Critical(PreviousCritical)
+}
+
+KL_Roi_CommitEncryptionPolicy(Requested, CanonicalKnown := true) {
+	KL_Roi_SetCanonicalPolicyKnown(CanonicalKnown)
 	if !KL_Roi_RequestEncryption(Requested)
 		return false
 	if Requested
 		return true
 	PreviousCritical := Critical("On")
 	try {
-		if KL_Roi_TextPostureOff()
-			KLRoiPrivacy.blocked := false
-		else
+		if !KL_Roi_TextPostureOff()
 			KL_Roi_BlockText()
+		else if KLRoiPrivacy.blocked && !IsObject(KLRoiPrivacy.request_owner) && KL_Roi_EncryptionReady()
+			KLRoiPrivacy.blocked := false
 		return true
 	} finally Critical(PreviousCritical)
 }

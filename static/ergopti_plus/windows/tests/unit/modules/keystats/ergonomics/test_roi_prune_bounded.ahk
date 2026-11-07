@@ -114,14 +114,14 @@ _KRCTX_ChildSource() {
 	PruneOwner := _DriverProductionFileForSymbol("KL_Roi_IncrementWordCount", _DriverDir)
 	AssertTrue(PruneOwner != "")
 	Source .= "#Include " . PruneOwner . "`n"
-	for Symbol in ["KL_Roi_TextAllowed", "KL_Enc_IsEnabled", "_KL_JournalPendingEntries"] {
+	for Symbol in ["KL_Roi_TextAllowed", "KL_Enc_IsEnabled", "_KL_JournalPendingEntries", "KLW_PopLast"] {
 		PolicyOwner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(PolicyOwner != "", "The real ROI text policy dependency must resolve.")
 		Source .= "#Include " . PolicyOwner . "`n"
 	}
 	; _TextCodepointWidth arrives with its whole owner through _KSD_ChildSource;
 	; a second copy of its body is a duplicate declaration the child refuses.
-	for Symbol in ["KL_MarkSynthetic", "KL_ClearSynthetic", "KL_Roi_RequireInit", "KL_Roi_DiscardWord", "KL_Roi_AdmitWordContext", "KL_Roi_OnChar", "KL_Roi_ProcessWord", "KL_Roi_PruneWordCounts", "KL_Roi_OnHotstring"] {
+	for Symbol in ["KL_MarkSynthetic", "KL_ClearSynthetic", "KL_Roi_RequireInit", "KL_Roi_DiscardWord", "KL_Roi_AdmitWordContext", "KL_Roi_OnChar", "KL_Roi_ProcessWord", "KL_Roi_PruneWordCounts", "KL_Roi_OnHotstring", "KL_Roi_OnKey"] {
 		Body := _DriverFuncBody(Symbol)
 		AssertTrue(Body != "", "The complete real ROI path must resolve: " . Symbol)
 		Source .= Body . "`n"
@@ -203,6 +203,10 @@ Test("Keystats ROI word context: synthetic marker without hook callbacks retires
 for _KRCTX_PolicyMode in ["policy-on", "policy-unknown", "policy-resume"]
 	Test("ROI encryption: real capture and central append " . _KRCTX_PolicyMode . " (roi-encryption-publication)",
 		_KRCTX_Case.Bind(_KRCTX_PolicyMode))
+
+for _KRCTX_EpochMode in ["epoch-char", "epoch-word", "epoch-word-sink", "epoch-hotstring", "epoch-key"]
+	Test("ROI encryption: interrupted " . _KRCTX_EpochMode . " cannot revive text (roi-encryption-publication)",
+		_KRCTX_Case.Bind(_KRCTX_EpochMode))
 
 _KROI_LowercaseCorpus() {
 	global _SharedDir

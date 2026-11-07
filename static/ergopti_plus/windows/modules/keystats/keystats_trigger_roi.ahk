@@ -158,6 +158,7 @@ KL_Roi_RequireInit(func_name) {
 ; @param net_saved {Integer} Characters saved by this expansion.
 ; @param is_private {Boolean} True when the mapping is the user's personal data.
 KL_Roi_OnHotstring(trigger, net_saved, is_private := false) {
+	InputEpoch := KLRoiPrivacy.epoch
 	; Deferred fire callbacks outlive native Suspend unless their generation is
 	; retired. Keep the sink itself fail-closed too: no stale caller may mutate
 	; session savings or half-life state while the driver is paused.
@@ -174,7 +175,7 @@ KL_Roi_OnHotstring(trigger, net_saved, is_private := false) {
 			return
 		KLRoi.session_saved_chars += Max(0, net_saved)
 		KLRoi.session_fired_count += 1
-		TextAllowed := KL_Roi_TextAllowed()
+		TextAllowed := KL_Roi_TextAllowed() && InputEpoch == KLRoiPrivacy.epoch
 		if !is_private && TextAllowed
 			KLRoi.trigger_last_use[StrLower(trigger)] := A_TickCount
 		EmitSnapshot := (Mod(KLRoi.session_fired_count,
@@ -242,7 +243,8 @@ KL_Roi_AdmitWordContext(Snapshot := unset) {
 
 ; Called from KL_Hook_OnChar on every character. Accumulates the current
 ; word and flushes it at word boundaries.
-KL_Roi_OnChar(Text) {
+KL_Roi_OnChar(Text, InputEpoch := unset) {
+	InputEpoch := IsSet(InputEpoch) ? InputEpoch : KLRoiPrivacy.epoch
 	if !KL_Roi_TextAllowed()
 		return
 	if !KL_Roi_RequireInit("KL_Roi_OnChar") || !KL_Roi_AdmitWordContext()
@@ -255,7 +257,7 @@ KL_Roi_OnChar(Text) {
 		Position += Width
 		CaptureCritical := Critical("On")
 		try {
-			if !KL_Roi_TextAllowed()
+			if !KL_Roi_TextAllowed() || InputEpoch != KLRoiPrivacy.epoch
 				return
 			if (c != " " and c != "`t" and c != "`n" and c != "`r"
 					and c != "." and c != "," and c != "!" and c != "?") {
@@ -277,12 +279,13 @@ KL_Roi_OnChar(Text) {
 		} finally Critical(CaptureCritical)
 		if (overflowed)
 			continue
-		KL_Roi_ProcessWord(word)
+		KL_Roi_ProcessWord(word, InputEpoch)
 	}
 }
 
 ; Special keys arrive through OnKeyDown rather than the character callback.
 KL_Roi_OnKey(vk) {
+	InputEpoch := KLRoiPrivacy.epoch
 	if !KL_Roi_TextAllowed()
 		return
 	if !KL_Roi_RequireInit("KL_Roi_OnKey") || !KL_Roi_AdmitWordContext()
@@ -290,16 +293,24 @@ KL_Roi_OnKey(vk) {
 	switch vk {
 		case 0x08:
 			; An overflow lost its prefix; backspacing cannot reconstruct it.
-			if !KLRoi.word_overflowed
-				KLRoi.current_word := KLW_PopLast(KLRoi.current_word)
-		case 0x0D: KL_Roi_OnChar("`n")
-		case 0x09: KL_Roi_OnChar("`t")
+			CaptureCritical := Critical("On")
+			try {
+				if KL_Roi_TextAllowed() && InputEpoch == KLRoiPrivacy.epoch && !KLRoi.word_overflowed
+					KLRoi.current_word := KLW_PopLast(KLRoi.current_word)
+			} finally Critical(CaptureCritical)
+		case 0x0D: KL_Roi_OnChar("`n", InputEpoch)
+		case 0x09: KL_Roi_OnChar("`t", InputEpoch)
 		case 0x1B, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2E:
-			KL_Roi_DiscardWord()
+			CaptureCritical := Critical("On")
+			try {
+				if InputEpoch == KLRoiPrivacy.epoch
+					KL_Roi_DiscardWord()
+			} finally Critical(CaptureCritical)
 	}
 }
 
-KL_Roi_ProcessWord(word) {
+KL_Roi_ProcessWord(word, InputEpoch := unset) {
+	InputEpoch := IsSet(InputEpoch) ? InputEpoch : KLRoiPrivacy.epoch
 	if !KL_Roi_TextAllowed()
 		return
 		global _TriggerSet
@@ -316,19 +327,21 @@ KL_Roi_ProcessWord(word) {
 		cnt := 0
 		CaptureCritical := Critical("On")
 		try {
-			if !KL_Roi_TextAllowed()
+			if !KL_Roi_TextAllowed() || InputEpoch != KLRoiPrivacy.epoch
 				return
 			map_size := KL_Roi_IncrementWordCount(KLRoi, key, &cnt)
 		} finally Critical(CaptureCritical)
 
 		; Emit candidate event on threshold crossing
 		if (cnt = KLRoiConst.REPEAT_THRESHOLD) {
-				KL_AppendLog(Map(
+				Entry := Map(
 						"type",        "new_trigger_candidate",
 						"app",         Keystats.session_app,
 						"word",        word,
 						"occurrences", cnt
-				))
+				)
+				Entry._KL_RoiCaptureEpoch := InputEpoch
+				KL_AppendLog(Entry)
 		}
 
 		; Prune the tracking map when it grows too large. The prune is GUARANTEED
@@ -378,6 +391,7 @@ KL_Roi_PruneWordCounts() {
 ; ==========================================
 
 KL_Roi_HalflifeTick() {
+	InputEpoch := KLRoiPrivacy.epoch
 	if !KL_Roi_TextAllowed()
 		return
 	if !KL_Roi_RequireInit("KL_Roi_HalflifeTick")
@@ -396,6 +410,8 @@ KL_Roi_HalflifeTick() {
 		
 		previous_critical := Critical("On")
 		try {
+				if !KL_Roi_TextAllowed() || InputEpoch != KLRoiPrivacy.epoch
+						return
 				snapshot := Map()
 				for trig, last_tick in KLRoi.trigger_last_use
 						snapshot[trig] := last_tick
@@ -404,6 +420,8 @@ KL_Roi_HalflifeTick() {
 		}
 
 		for trig, last_tick in snapshot {
+				if InputEpoch != KLRoiPrivacy.epoch || !KL_Roi_TextAllowed()
+						return
 				; A_TickCount and retained fire ticks share the native64 domain.
 				; A fire may arrive after this frame sampled now but before its map
 				; snapshot: leave that newer observation for a subsequent timer.
@@ -411,12 +429,14 @@ KL_Roi_HalflifeTick() {
 						continue
 				age := TickElapsed64(last_tick, now)
 				if (age >= threshold) {
-						KL_AppendLog(Map(
+						Entry := Map(
 								"type",    "trigger_halflife",
 								"app",     Keystats.session_app,
 								"trigger", trig,
 								"days_since_use", Round(age / 86400000, 1)
-						))
+						)
+						Entry._KL_RoiCaptureEpoch := InputEpoch
+						KL_AppendLog(Entry)
 				}
 		}
 }

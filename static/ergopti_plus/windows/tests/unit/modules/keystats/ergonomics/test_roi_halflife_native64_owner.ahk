@@ -45,7 +45,7 @@ _RHL_ChildSource(Mode := "") {
 	global _DriverDir
 	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 	for Symbol in ["MF_ShouldFilter", "WallClockTimestamp", "TickElapsed64", "HotPath_Now", "WICaptureBoundedFocusSnapshot",
-		"KL_Roi_TextAllowed", "KL_Enc_IsEnabled"] {
+		"KL_Roi_TextAllowed", "KL_Enc_IsEnabled", "_KL_JournalPendingEntries"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(Owner != "", "The child must include the actual owner of " . Symbol)
 		Source .= "#Include " . Owner . "`n"
@@ -164,3 +164,6 @@ _RHL_Case(Mode) {
 for _RHL_Mode in ["days31", "days46", "era31", "future", "keys"]
 	Test("ROI half-life: " . _RHL_Mode . " uses the retained monotonic age (roi-halflife-native64-owner)",
 		_RHL_Case.Bind(_RHL_Mode))
+
+Test("ROI encryption: interrupted half-life snapshot cannot revive text (roi-encryption-publication)",
+	_RHL_Case.Bind("encryption-epoch"))

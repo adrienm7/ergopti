@@ -1,12 +1,16 @@
 ﻿; tests/fixtures/roi_context_word_owner_body.ahk
 ; Actual public ROI chars, MF context transitions and canonical candidate append.
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\roi_encryption_epoch_cutpoint.ahk
 
 _KRCTX_Main() {
 	global _KSD
+	KL_Roi_SetCanonicalPolicyKnown(true)
 	Keystats.initialized := true
 	MetricsFilters.secure_field := false
 	Mode := A_Args[1]
+	if SubStr(Mode, 1, 6) == "epoch-"
+		return _KRCTX_EpochMain(Mode)
 	if SubStr(Mode, 1, 7) == "policy-"
 		return _KRCTX_PolicyMain(Mode)
 	Changed := Mode != "same-app" && Mode != "same-context-refresh"
@@ -107,9 +111,45 @@ _KRCTX_PolicyMain(Mode) {
 		. " saved=" . KLRoi.session_saved_chars . " fired=" . KLRoi.session_fired_count . "`n", "*", "UTF-8")
 }
 
+_KRCTX_EpochMain(Mode) {
+	global _KSD, KL_ENC_Enabled
+	MetricsFilters.encrypt := false, KL_ENC_Enabled := false
+	A := {App: "fixture-roi-a.exe", Title: "Fixture public ROI A", Hwnd: 401}
+	_KSD_Acquire(A)
+	_KSD_Require(KL_Hook_RefreshContext(true), "The genuine focus owner must admit the producer.")
+	if Mode == "epoch-word-sink"
+		Loop 4
+			KL_Roi_ProcessWord("oldword")
+	if Mode == "epoch-key"
+		KL_Roi_OnChar("oldword")
+	BeforeEpoch := KLRoiPrivacy.epoch
+	State := _KRECP_Install(Mode == "epoch-word-sink" ? 3 : 1,
+		Mode == "epoch-key" ? KL_Roi_OnChar.Bind("freshword") : 0)
+	try {
+		switch Mode {
+			case "epoch-char": KL_Roi_OnChar("oldword")
+			case "epoch-word", "epoch-word-sink": KL_Roi_ProcessWord("oldword")
+			case "epoch-hotstring": KL_Roi_OnHotstring("oldtrigger", 7)
+			case "epoch-key": KL_Roi_OnKey(0x08)
+			default: throw Error("Unknown producer epoch cutpoint.")
+		}
+	} finally _KRECP_Restore(State)
+	_KSD_Require(State.Calls == 1 && KLRoiPrivacy.epoch == BeforeEpoch + 1
+		&& !KLRoiPrivacy.blocked, "A real ON request and clean OFF settlement must occur at the selected read.")
+	_KSD_Require(KLRoi.current_word == (Mode == "epoch-key" ? "freshword" : "")
+		&& KLRoi.word_counts.Count == 0 && KLRoi.trigger_last_use.Count == 0
+		&& Keystats._pending_entries.Length == 0, "An interrupted old producer cannot mutate or publish after OFF resumes.")
+	_KSD_Require(KLRoi.session_fired_count == (Mode == "epoch-hotstring" ? 1 : 0)
+		&& KLRoi.session_saved_chars == (Mode == "epoch-hotstring" ? 7 : 0),
+		"Epoch retirement must preserve the real numeric savings.")
+	_KSD_Require(_KSD.Errors == 0, "No hidden production dependency error can qualify an epoch assertion.")
+	FileAppend("RECEIPT roi-encryption-epoch mode=" . Mode . " cuts=" . State.Calls
+		. " epoch=" . KLRoiPrivacy.epoch . "`n", "*", "UTF-8")
+}
+
 if A_Args.Length != 2 || !(A_Args[1] == "same-app" || A_Args[1] == "cross-app" || A_Args[1] == "same-context-refresh"
 	|| A_Args[1] == "cross-window" || A_Args[1] == "cross-title" || A_Args[1] == "synthetic-gap"
-	|| A_Args[1] == "policy-on" || A_Args[1] == "policy-unknown" || A_Args[1] == "policy-resume")
+	|| SubStr(A_Args[1], 1, 6) == "epoch-" || A_Args[1] == "policy-on" || A_Args[1] == "policy-unknown" || A_Args[1] == "policy-resume")
 	throw Error("The private ROI context case needs an exact mode and owned directory.")
 global _KSD := {Mode: A_Args[1], Log: A_Args[2] . "\private.log", Probes: 0, Errors: 0, LogCalls: 0, FlushCalls: 0, Failure: 0}
 try {
