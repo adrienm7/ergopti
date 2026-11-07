@@ -366,13 +366,32 @@ local function _ensure_linux_device_schema()
 		Logger.error(LOG, "Cannot safely upgrade an unrecognized legacy device registry schema.")
 		return false
 	end
+	-- The shipped purge triggers read devices, so the rename below would point
+	-- them at the dropped table. Every driver installs them on its store, and
+	-- they made every legacy store they reached look user-extended, so the
+	-- upgrade was refused for good. They are this schema's own: the rebuild
+	-- drops them and _ensure_media_schema, next in the same open, creates them.
+	local purge = _read_media_resource("data/db/purge_schema.sql")
+	if purge == nil then return false end
+	local owned_triggers, owned_names, drops = {}, {}, {}
+	for name in purge:gmatch("CREATE TRIGGER IF NOT EXISTS ([%w_]+)") do
+		if not owned_triggers[name] then
+			owned_triggers[name] = true
+			owned_names[#owned_names + 1] = "'" .. _sql_escape(name) .. "'"
+			drops[#drops + 1] = "DROP TRIGGER IF EXISTS " .. name .. ";"
+		end
+	end
+	if #owned_names == 0 then
+		Logger.error(LOG, "The packaged purge schema declares no trigger — the device registry is not upgraded.")
+		return false
+	end
 	-- Rebuilding drops indexes and triggers attached to devices, and SQLite's
 	-- rename can rewrite dependent foreign keys or views to the old name.
 	-- Refuse when such schema or an extra column may exist; preserve user extensions.
 	local dependencies = _query_scalar([[
 SELECT (SELECT count(*) FROM sqlite_master
         WHERE (type='index' AND tbl_name='devices' AND sql IS NOT NULL)
-           OR type IN ('trigger','view'))
+           OR (type IN ('trigger','view') AND name NOT IN (]] .. table.concat(owned_names, ",") .. [[)))
      + (SELECT count(*) FROM sqlite_master AS m JOIN pragma_foreign_key_list(m.name) AS f
         WHERE m.type='table' AND f."table"='devices')
      + (SELECT count(*) FROM pragma_index_list('devices') WHERE origin='u')
@@ -386,6 +405,8 @@ SELECT (SELECT count(*) FROM sqlite_master
 	end
 	return _exec([[
 BEGIN;
+]] .. table.concat(drops, "\n") .. [[
+
 ALTER TABLE devices RENAME TO devices_pre_linux;
 CREATE TABLE devices (
   device_id TEXT PRIMARY KEY,

@@ -119,6 +119,13 @@ COMMIT;
 ]]))
 	Writer.close_db()
 	assert(Writer.open_db(database), "real legacy schema failed to migrate")
+	-- The store already held the shipped purge triggers, which read devices:
+	-- the upgrade drops them and the same open recreates them on the new table.
+	local purge_file = assert(io.open("../_shared/data/db/purge_schema.sql", "rb"))
+	local purge = assert(purge_file:read("*a")); assert(purge_file:close())
+	local _, shipped = purge:gsub("CREATE TRIGGER IF NOT EXISTS [%w_]+", "")
+	local triggers = assert(Writer.query_rows("SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name LIKE 'metrics_purge_%' AND sql NOT LIKE '%devices_pre_linux%';"))
+	assert(shipped > 0 and tonumber(triggers[1]) == shipped, "the purge triggers must survive the registry upgrade on devices")
 	local rows = assert(Writer.query_rows("SELECT name,created_at,imported_data_sql_size,imported_data_sql_sha256 FROM devices WHERE device_id='legacy';"))
 	assert(#rows == 1 and rows[1] == "Legacy|first|53|legacy-digest")
 	Writer.register_device("new-linux", "Native", "linux", "", "native-signature")
@@ -137,10 +144,14 @@ check("shipped legacy DDL migrates with a real SQLite database", function()
 	local ddl = assert(schema:match("(CREATE TABLE IF NOT EXISTS devices%s*%b())%s*;"))
 	local legacy, replacements = ddl:gsub(",%s*'linux'", "", 1)
 	assert(replacements == 1, "canonical legacy transform must remove one Linux value")
+	-- The whole shipped store with only the registry's old CHECK, as a store from
+	-- before Linux holds the event tables the purge triggers of the open read.
+	local start, finish = assert(schema:find(ddl, 1, true))
+	local historical = schema:sub(1, start - 1) .. legacy .. schema:sub(finish + 1)
 	local path = root .. "/historical.sqlite"
 	local handle = ffi.new("sqlite3 *[1]")
 	assert(sqlite.sqlite3_open_v2(path, handle, 6, nil) == 0)
-	assert(sqlite.sqlite3_exec(handle[0], legacy .. ";", nil, nil, nil) == 0)
+	assert(sqlite.sqlite3_exec(handle[0], historical, nil, nil, nil) == 0)
 	assert(sqlite.sqlite3_close(handle[0]) == 0)
 	assert(Writer.open_db(path), "the actual shipped legacy DDL must migrate")
 	Writer.close_db()
