@@ -2,83 +2,23 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-11-05. Latest stable: [v1.0.8](https://github.com/adrienm7/ergopti/releases/tag/v1.0.8).
+Updated: 2026-11-07. Latest stable: [v1.0.8](https://github.com/adrienm7/ergopti/releases/tag/v1.0.8).
 This file shrinks toward deletion after the next field reports: each machine section is one line per check, naming
 the field-run step or the hand action that proves it and the commits it confirms. Conventions and tags:
 [workflow and verification memory](docs/memory/workflow-and-verification.md). Finished items are in Git
 (`git show 2a0083cb11:TODO.md` is the long form before this shrink).
 
-## Delete the integrated remote branches (maintainer, from a local clone)
+## Windows CI reliability (2026-11-07)
 
-The cloud proxy refuses remote branch deletion (403). Checked 2026-11-07: every commit of these branches is on `dev`
-by subject; the few that are not were superseded there (same fix landed under another commit, or a format-only
-commit). Keep `main`, `dev`, `gh-pages`, `sparkle-appcasts`, `next/*`, `field/*` and the live `ci3/*`. Run:
-
-```bash
-git push origin --delete \
-  ccr-b8f5b035-hkq2b3 \
-  ci-fix/linux \
-  ci-fix/macos \
-  ci-fix/windows \
-  ci2/common \
-  ci2/linux \
-  ci2/macos \
-  ci2/windows \
-  decisions/align-linux-macos \
-  decisions/align-remaining \
-  decisions/align-windows \
-  decisions/dashboard-hot-journal \
-  decisions/dead-keys \
-  decisions/hotstrings-ai \
-  decisions/linux-gesture-axes \
-  decisions/linux-metrics-ledger \
-  decisions/macos-gesture-axes \
-  decisions/update-repair \
-  feat/predictions-stop-on-activity \
-  fix/codeql-alerts \
-  fix/personal-hotstring-paren-left \
-  fix/red-js-gates \
-  input/windows-leftovers \
-  layout/emulation-parity \
-  layout/emulation-windows \
-  layout/system-switch-parity \
-  layout/windows-klc-installer \
-  linux/desktop-leftovers \
-  llm/pause-dead-ollama \
-  metrics/export-purge \
-  parity/dead-keys \
-  parity/deep-macos-linux \
-  parity/deep-windows \
-  parity/end-to-end \
-  parity/inventory \
-  parity/migration-update \
-  parity/native-ui \
-  parity/oneshot-capsword \
-  parity/repeat-wordreset \
-  parity/sequential \
-  perf/boot-menu-all-drivers \
-  perf/macos-field-2026-11-06 \
-  release109/config-i18n \
-  release109/menus-ui \
-  tmp/preflight-dev \
-  tmp/preflight-dev-capsword-25e224d3f8 \
-  tmp/preflight-dev-dead-keys-04ebe10 \
-  tmp/preflight-dev-one-shot-acb52cfb2b43 \
-  tmp/preflight-dev-one-shot-followup-4ca161c3e512 \
-  tmp/preflight-dev-parity-context-07299374d0 \
-  tmp/preflight-dev-parity-pause-19c96ca \
-  tmp/preflight-dev-sequential-2026-11-05 \
-  wave3/app-cloner-encryptor \
-  wave3/clipboard-selection \
-  wave3/input-policies \
-  wave3/inventory-triage \
-  wave3/linux-desktop \
-  wave3/linux-desktop-gates \
-  wave3/metrics \
-  wave3/ui-leftovers \
-  wave3/updaters-release \
-  wave3/windows-deep
-```
+- [ ] **[CODE] Suspend entry re-reads config.toml:** the suspend-marker boot re-enters its pause before ready, and
+      ToggleSuspend costs 8 document parses and 5 registry compares more than the fresh boot. Its startup-smoke
+      ceilings are 16 and 14 for that reason; cut those reads and lower them back to the shared 14 and 13.
+- [ ] **[TEST] layout-row-external-native-flags (released):** fails about every other hosted run with « q » for « Q ».
+      09fb9c0458 prints the receiver's Shift state and the sender's output; read them on the next failure and
+      fix the test race or the lost flag they show.
+- [ ] **[TEST] LLM debounce privacy probes:** an allowed context arms the engine but sends no request about every
+      other hosted run. 09fb9c0458 prints the engine and detector state against the 1 s verdict TTL on the next
+      failure; fix the cause it shows.
 
 ## Layout generator from an Ergopti TOML source (maintainer request, 2026-11-06)
 
