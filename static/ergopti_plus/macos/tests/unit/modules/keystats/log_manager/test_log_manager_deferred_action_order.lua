@@ -270,6 +270,113 @@ helpers.describe("log_manager deferred action boundaries", function()
 		helpers.assert_eq(fixture.appended[1].text, "old")
 		helpers.assert_eq(fixture.appended[2].action, "after")
 	end)
+	helpers.it("retires queued ROI builders without evaluating them or discarding numerical rows", function()
+		helpers.with_stub_scope({ "modules.keystats.text_cipher", "modules.keystats.init", "modules.keystats" }, function()
+			package.loaded["modules.keystats.text_cipher"] = nil
+			package.loaded["modules.keystats.init"], package.loaded["modules.keystats"] = nil, nil
+			local fixture = load_fixture()
+			local cipher = require("modules.keystats.text_cipher")
+			helpers.assert_true(cipher.set_enabled(false))
+			local built = 0
+			helpers.assert_true(fixture.log_manager.defer_entry_builder(function()
+				built = built + 1
+				return { type = "new_trigger_candidate", word = "retired", occurrences = 5 }
+			end, true))
+			helpers.assert_true(fixture.log_manager.append_log({ type = "roi_snapshot", session_saved = 20, session_fired = 10 }))
+			helpers.assert_true(cipher.set_enabled(true))
+			helpers.assert_true(fixture.fire_next())
+			helpers.assert_eq(built, 0)
+			helpers.assert_eq(#fixture.appended, 1)
+			helpers.assert_eq(fixture.appended[1].session_fired, 10)
+			helpers.assert_eq(fixture.log_manager.append_log({ type = "trigger_halflife", trigger = "blocked" }), false)
+			helpers.assert_true(cipher.set_enabled(false))
+			helpers.assert_true(fixture.log_manager.append_log({ type = "new_trigger_candidate", word = "fresh", occurrences = 5 }))
+			helpers.assert_true(fixture.fire_next())
+			helpers.assert_eq(fixture.appended[2].word, "fresh")
+		end)
+	end)
+
+	helpers.it("rechecks a reentrant encryption request before a built ROI row can start writing", function()
+		helpers.with_stub_scope({ "modules.keystats.text_cipher", "modules.keystats.init", "modules.keystats" }, function()
+			package.loaded["modules.keystats.text_cipher"] = nil
+			package.loaded["modules.keystats.init"], package.loaded["modules.keystats"] = nil, nil
+			local fixture = load_fixture()
+			local cipher = require("modules.keystats.text_cipher")
+			helpers.assert_true(cipher.set_enabled(false))
+			helpers.assert_true(fixture.log_manager.defer_entry_builder(function()
+				helpers.assert_eq(cipher.set_enabled(true), false, "the traversing FIFO cannot publish a new posture")
+				return { type = "new_trigger_candidate", word = "revoked", occurrences = 5 }
+			end, true))
+			helpers.assert_true(fixture.log_manager.append_log({ type = "roi_snapshot", session_fired = 10 }))
+			helpers.assert_true(fixture.fire_next())
+			helpers.assert_eq(#fixture.appended, 1)
+			helpers.assert_eq(fixture.appended[1].type, "roi_snapshot")
+			helpers.assert_true(cipher.abandon_roi_encryption(false))
+			helpers.assert_true(cipher.roi_text_enabled())
+		end)
+	end)
+
+	helpers.it("settles the exact partial ROI append before publishing encryption and never rebuilds it", function()
+		helpers.with_stub_scope({ "modules.keystats.text_cipher", "modules.keystats.init", "modules.keystats" }, function()
+			package.loaded["modules.keystats.text_cipher"] = nil
+			package.loaded["modules.keystats.init"], package.loaded["modules.keystats"] = nil, nil
+			local fixture = load_fixture()
+			local cipher = require("modules.keystats.text_cipher")
+			helpers.assert_true(cipher.set_enabled(false))
+			local sink = package.loaded["modules.keystats.rotation"]
+			local real = assert(loadfile(helpers.driver_root() .. "modules/keystats/rotation.lua"))()
+			for name, callback in pairs(real) do sink[name] = callback end
+			local path, original_open = os.tmpname(), io.open
+			local handles, faults, builds = {}, 3, 0
+			io.open = function(name, mode)
+				local file, reason, code = original_open(name, mode)
+				if not file or name ~= path or mode ~= "a+" then return file, reason, code end
+				handles[#handles + 1] = file
+				return {
+					setvbuf = function(_, ...) return file:setvbuf(...) end,
+					seek = function(_, ...) return file:seek(...) end,
+					read = function(_, ...) return file:read(...) end,
+					close = function() return file:close() end,
+					write = function(_, bytes)
+						if faults > 0 then
+							faults = faults - 1
+							assert(file:write(bytes:sub(1, 8)))
+							return nil, "controlled partial append", 28
+						end
+						return file:write(bytes)
+					end,
+				}
+			end
+			local entry = { type = "new_trigger_candidate", word = "original", occurrences = 5,
+				timestamp = "2026-11-07 10:00:00.000", app = "Editor" }
+			local ok, reason = xpcall(function()
+				sink.init({ paths = { today_log_path = path }, state = {}, recovery_turn_bytes = 4096 })
+				helpers.assert_true(fixture.log_manager.defer_entry_builder(function() builds = builds + 1; return entry end, true))
+				helpers.assert_true(fixture.log_manager.defer_entry_builder(function() error("unstarted text must be retired") end, true))
+				helpers.assert_true(fixture.fire_next())
+				helpers.assert_true(sink.has_pending_entry(entry))
+				helpers.assert_eq(cipher.set_enabled(true), false)
+				helpers.assert_eq(cipher.is_enabled(), false, "a refused receipt cannot publish ON")
+				helpers.assert_eq(cipher.roi_text_enabled(), false, "new text stays closed while debt is retained")
+				helpers.assert_eq(cipher.set_enabled(false), false, "an OFF refresh cannot reopen capture over unresolved debt")
+				helpers.assert_eq(cipher.roi_text_enabled(), false)
+				helpers.assert_eq(cipher.abandon_roi_encryption(false), true, "the recovered receipt can settle under the former OFF posture")
+				helpers.assert_eq(cipher.is_enabled(), false)
+				helpers.assert_eq(builds, 1)
+				helpers.assert_eq(sink.has_pending_entry(entry), false)
+				local file = assert(original_open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close())
+				helpers.assert_eq(bytes, hs.json.encode(entry) .. "\n", "the exact row must occur once without truncation or regenerated identity")
+				helpers.assert_true(cipher.set_enabled(true))
+				helpers.assert_eq(cipher.is_enabled(), true)
+				helpers.assert_eq(sink.append_log({ type = "new_trigger_candidate", word = "later", timestamp = entry.timestamp }), false)
+			end, debug.traceback)
+			io.open = original_open
+			for _, file in ipairs(handles) do pcall(file.close, file) end
+			os.remove(path)
+			if not ok then error(reason, 0) end
+		end)
+	end)
+
 end)
 
 for _, name in ipairs({

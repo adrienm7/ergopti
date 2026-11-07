@@ -521,21 +521,42 @@ local function discard_roi_word()
 	if CoreState.trigger_roi then TriggerRoi.discard(CoreState.trigger_roi) end
 end
 
+--- Retires every unpersisted ROI word before an encryption policy transition.
+function M.revoke_roi_text()
+	if CoreState.trigger_roi then TriggerRoi.set_text_enabled(CoreState.trigger_roi, false) end
+end
+
+--- Requires both the requested configuration and cipher owner to explicitly admit text.
+local function roi_text_enabled()
+	if not CoreState.options or CoreState.options.encrypt ~= false then return false end
+	local cipher = require("modules.keystats.text_cipher")
+	if type(cipher.roi_text_enabled) ~= "function" then return false end
+	local called, allowed = pcall(cipher.roi_text_enabled)
+	return called and allowed == true
+end
+
+--- Refreshes the process owner without reviving previously retired text.
+local function sync_roi_text()
+	if CoreState.trigger_roi then TriggerRoi.set_text_enabled(CoreState.trigger_roi, roi_text_enabled()) end
+end
+
 --- Transfers ROI events to the existing outbox without formatting time in the event tap.
 local function drain_roi()
 	if not CoreState.trigger_roi then return true end
+	sync_roi_text()
 	return TriggerRoi.drain(CoreState.trigger_roi, function(event)
 		return LogManager.defer_entry_builder(function()
 			local entry = TableUtil.shallow_copy(event)
 			if type(entry.timestamp) == "number" then entry.timestamp = Timestamp.format_epoch(entry.timestamp) end
 			return entry
-		end) == true
+		end, TriggerRoi.is_text_event(event)) == true
 	end)
 end
 
 --- Counts only admitted physical text under the context already published by native observers.
 local function record_roi_key(chars, keycode)
 	if not CoreState.trigger_roi then return end
+	sync_roi_text()
 	local context = { app = CoreState.active_app_name, window = CoreState.roi_window_id,
 		title = CoreState.active_win_title, timestamp = Timestamp.now_epoch() }
 	local function known(word)
@@ -552,6 +573,7 @@ end
 --- Samples software-only half-life on the already owned maintenance timer.
 local function tick_roi()
 	if not CoreState.trigger_roi then return end
+	sync_roi_text()
 	if not M.may_persist() then discard_roi_word(); return end
 	TriggerRoi.tick(CoreState.trigger_roi, hs.timer.absoluteTime() / 1000000,
 		CoreState.active_app_name or "Unknown", Timestamp.now_epoch())
@@ -1235,11 +1257,13 @@ function M.set_options(opts)
 
 	local TextCipher = require("modules.keystats.text_cipher")
 	local want = CoreState.options.encrypt == true
+	if CoreState.options.encrypt ~= false and TextCipher.prepare_roi_encryption() ~= true then return false end
 	if want and not TextCipher.is_available() then
 		Logger.error(LOG, "At-rest encryption is configured on but no key can be derived — staying off.")
 		want = false
 	end
-	TextCipher.set_enabled(want)
+	if TextCipher.set_enabled(want, CoreState.options.encrypt ~= false) ~= true then return false end
+	sync_roi_text()
 
 	-- Pick up a conversion a previous session left unfinished. A RESUME only:
 	-- starting one unconditionally would re-read every stored row at every boot,
@@ -1247,6 +1271,7 @@ function M.set_options(opts)
 	require("modules.keystats.text_migration").resume_for_posture(want)
 
 	Logger.debug(LOG, "Options updated (at-rest encryption: %s).", tostring(want))
+	return true
 end
 
 --- Copies only plain configuration data, never native handles or metrics records.
@@ -1366,15 +1391,23 @@ function M.apply_configuration(config)
 		assert(type(config[key]) == "boolean", "invalid metrics filter: " .. key)
 	end
 	assert(type(config.options.encrypt) == "boolean", "invalid metrics encryption preference")
-	if require("modules.keystats.text_migration").is_running() then return false end
 	local cipher = require("modules.keystats.text_cipher")
 	local enabled = config.cipher_enabled
 	if enabled == nil then enabled = config.options.encrypt end
 	assert(type(enabled) == "boolean", "invalid native encryption posture")
-	if enabled and cipher.is_available() ~= true then return false end
-	cipher.set_enabled(enabled)
+	if (enabled or config.options.encrypt) and cipher.prepare_roi_encryption() ~= true then return false end
+	if require("modules.keystats.text_migration").is_running() then
+		cipher.abandon_roi_encryption(CoreState.options.encrypt)
+		return false
+	end
+	if enabled and cipher.is_available() ~= true then
+		cipher.abandon_roi_encryption(CoreState.options.encrypt)
+		return false
+	end
+	if cipher.set_enabled(enabled, config.options.encrypt) ~= true then return false end
 	if cipher.is_enabled() ~= enabled then return false end
 	CoreState.options = copy_configuration(config.options)
+	sync_roi_text()
 	CoreState.disabled_apps = _physical_configuration_binding
 		and require("keystats.physical_configuration_observation").own_apps(config.disabled_apps)
 		or copy_configuration(config.disabled_apps)
@@ -1768,6 +1801,7 @@ function M.log_hotstring(trigger, replacement, h_type)
 	end
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
 	if CoreState.trigger_roi then
+		sync_roi_text()
 		TriggerRoi.hotstring(CoreState.trigger_roi, trigger, replacement, false,
 			CoreState.last_flush_time, app_name, Timestamp.now_epoch())
 		drain_roi()
@@ -1782,6 +1816,7 @@ end
 function M.log_private_hotstring(trigger, replacement)
 	discard_roi_word()
 	if not M.may_persist() or not CoreState.trigger_roi then return false end
+	sync_roi_text()
 	local accepted = TriggerRoi.hotstring(CoreState.trigger_roi, trigger, replacement, true,
 		hs.timer.absoluteTime() / 1000000, CoreState.active_app_name or "Unknown", Timestamp.now_epoch())
 	if accepted then drain_roi() end
@@ -2271,7 +2306,7 @@ function M.start(script_control)
 		Logger.start(LOG, "Starting keystats engine…")
 		CoreState.collection_suspended = false
 		if not CoreState.trigger_roi then
-			CoreState.trigger_roi = TriggerRoi.new(hs.timer.absoluteTime() / 1000000)
+			CoreState.trigger_roi = TriggerRoi.new(hs.timer.absoluteTime() / 1000000, roi_text_enabled())
 		end
 		CoreState.roi_window_id = nil
 		_script_control = script_control

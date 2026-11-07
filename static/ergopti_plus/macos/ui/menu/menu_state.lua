@@ -611,7 +611,11 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	end
 	local cipher_ok, TextCipher = pcall(require, "modules.keystats.text_cipher")
 	if cipher_ok and type(TextCipher) == "table" and type(TextCipher.set_enabled) == "function" then
-		try("metrics", "keystats.text_cipher.set_enabled", TextCipher.set_enabled, state.keystats_encrypt)
+		local called, committed = try("metrics", "keystats.text_cipher.set_enabled", TextCipher.set_enabled,
+			state.keystats_encrypt == true, state.keystats_encrypt ~= false)
+		if not called or committed ~= true then
+			Logger.error(LOG, "Configured encryption remains unpublished while a prior journal write is pending.")
+		end
 	end
 
 	-- Start/stop engines

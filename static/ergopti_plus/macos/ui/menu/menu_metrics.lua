@@ -327,7 +327,7 @@ function M.build(ctx)
 		-- the tick through these instead of the handler setting it.
 		metrics_menubar_wpm    = function() return state.keystats_menubar_wpm end,
 		metrics_menubar_colors = function() return state.keystats_menubar_colors end,
-		metrics_encrypt_enabled = function() return state.keystats_encrypt end,
+		metrics_encrypt_enabled = function() return require("modules.keystats.text_cipher").is_enabled() == true end,
 		-- The user's pause is a runtime state of the keystats module, never a stored
 		-- preference: the tick reads the module itself.
 		metrics_suspended = function() return kl_mod.is_collection_suspended() end,
@@ -512,22 +512,29 @@ function M.build(ctx)
 		-- real backend, and it refuses to tick when no key can be derived.
 		local TextCipher = require("modules.keystats.text_cipher")
 		local want = not state.keystats_encrypt
+		if want and TextCipher.prepare_roi_encryption() ~= true then
+			dialog.block_alert(i18n.get("dialog.metrics.encrypt_confirm_title"),
+				i18n.get("dialog.metrics.encryption_pending_write"), i18n.get("button.ok"))
+			return false
+		end
 		if want and not TextCipher.is_available() then
-			-- Existing keys, already translated in all 21 locales: the only
-			-- way the key derivation fails on a Mac is a missing openssl,
-			-- which is exactly what this message says.
+			TextCipher.abandon_roi_encryption(state.keystats_encrypt)
 			dialog.block_alert(
 				i18n.get("dialog.metrics.encryptor_error_title"),
-				i18n.get("apps.encryptor.err_openssl_missing"),
+				i18n.get("dialog.metrics.encryption_unavailable"),
 				i18n.get("button.ok"))
-			return
+			return false
 		end
-		TextCipher.set_enabled(want)
+		if TextCipher.set_enabled(want) ~= true then
+			dialog.block_alert(i18n.get("dialog.metrics.encrypt_confirm_title"),
+				i18n.get("dialog.metrics.encryption_pending_write"), i18n.get("button.ok"))
+			return false
+		end
 		state.keystats_encrypt = want
 		if save_prefs() ~= true then return false end
 		local Keystats = require("modules.keystats")
 		if type(Keystats.set_options) == "function" then
-			Keystats.set_options({ encrypt = want })
+			if Keystats.set_options({ encrypt = want }) ~= true then return false end
 		end
 		-- The rows already stored predate this click, and the setting is
 		-- worthless to a user with a year of logs unless they are converted
@@ -536,6 +543,7 @@ function M.build(ctx)
 		-- would convert nothing and report success.
 		require("modules.keystats.text_migration").start_for_posture(want)
 		updateMenu()
+		return true
 	end
 
 

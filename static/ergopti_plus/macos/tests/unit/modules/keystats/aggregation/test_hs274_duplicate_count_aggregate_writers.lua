@@ -176,7 +176,9 @@ helpers.describe("HS-274 actual aggregate and disabled-app policy writers (wp3)"
 			package.loaded["modules.keystats.text_cipher"] = {
 				is_available = function() return ports.available end,
 				is_enabled = function() return ports.encrypted end,
-				set_enabled = function(value) if ports.accept_cipher then ports.encrypted = value end end,
+				set_enabled = function(value) if ports.accept_cipher then ports.encrypted = value end; return ports.accept_cipher end,
+				prepare_roi_encryption = function() return true end,
+				abandon_roi_encryption = function() return true end,
 			}
 			package.loaded["modules.keystats.text_migration"] = { is_running = function() return ports.migrating end }
 			package.loaded["adapters.physical_observation_clock"] = nil

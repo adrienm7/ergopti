@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local function load_menu(start_result)
-	local ctx = { saves = 0, updates = 0, menubar_starts = 0, widget_starts = 0 }
+	local ctx = { saves = 0, updates = 0, menubar_starts = 0, widget_starts = 0, alerts = {}, revocations = 0 }
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
 	_G.hs = hs_stub
@@ -28,12 +28,13 @@ local function load_menu(start_result)
 	package.loaded["modules.keystats"] = setmetatable({
 		DEFAULT_STATE = defaults,
 		start = function() return start_result end,
-		set_options = function() end,
+		set_options = function() return true end,
+		revoke_roi_text = function() ctx.revocations = ctx.revocations + 1 end,
 		set_disabled_apps = function() end,
 	}, { __index = function() return function() end end })
 	package.loaded["infra.app_picker"] = { build_menu = function() return {} end }
 	package.loaded["infra.dialog_util"] = {
-		block_alert = function() return "button.activate" end,
+		block_alert = function(_, body) ctx.alerts[#ctx.alerts + 1] = body; return "button.activate" end,
 	}
 	package.loaded["infra.i18n"] = nil
 	local renderer_i18n = require("infra.i18n")
@@ -51,6 +52,7 @@ local function load_menu(start_result)
 	}))
 	local capture = function(_, _, _, _, render_ctx)
 			ctx.commands = render_ctx.commands
+			ctx.getters = render_ctx.state_getters
 			return {}
 		end
 	renderer.build = capture
@@ -98,5 +100,71 @@ helpers.describe("menu_metrics: strict keystats lifecycle reaches the checkmark"
 			"WPM menubar cannot start when the keystats security watcher failed")
 		helpers.assert_eq(0, ctx.widget_starts,
 			"WPM widget cannot start when the keystats security watcher failed")
+	end)
+end)
+
+
+helpers.describe("menu_metrics: encryption refuses pending ROI work", function()
+	local function with_cipher_menu(body)
+		helpers.with_stub_scope({ "modules.keystats.text_cipher", "modules.keystats.log_manager",
+			"modules.keystats.init", "modules.keystats", "modules.keystats.text_migration" }, function()
+			package.loaded["modules.keystats.text_cipher"] = nil
+			package.loaded["modules.keystats.log_manager"] = nil
+			package.loaded["modules.keystats.init"] = nil
+			local ctx = load_menu(false)
+			local cipher = require("modules.keystats.text_cipher")
+			helpers.assert_true(cipher.set_enabled(false))
+			local ports = { settled = true, available = true, migrations = 0, retirements = 0 }
+			cipher.is_available = function() return ports.available end
+			package.loaded["modules.keystats.log_manager"] = { retire_roi_text = function()
+				ports.retirements = ports.retirements + 1
+				return ports.settled
+			end }
+			package.loaded["modules.keystats.text_migration"] = { start_for_posture = function()
+				ports.migrations = ports.migrations + 1
+			end }
+			body(ctx, cipher, ports)
+		end)
+	end
+
+	helpers.it("does not publish or tick ON while the earlier textual receipt remains pending", function()
+		with_cipher_menu(function(ctx, cipher, ports)
+			ports.settled = false
+			helpers.assert_eq(ctx.commands.encryption(), false)
+			helpers.assert_eq(ctx.state.keystats_encrypt, false)
+			helpers.assert_eq(ctx.getters.metrics_encrypt_enabled(), false)
+			helpers.assert_eq(ctx.saves, 0)
+			helpers.assert_eq(ports.migrations, 0)
+			helpers.assert_eq(cipher.roi_text_enabled(), false)
+			helpers.assert_eq(ctx.alerts, { "dialog.metrics.encryption_pending_write" })
+			helpers.assert_true(ctx.revocations > 0)
+			ports.settled = true
+			helpers.assert_true(ctx.commands.encryption())
+			helpers.assert_true(ctx.getters.metrics_encrypt_enabled())
+			helpers.assert_eq(ctx.saves, 1)
+			helpers.assert_eq(ports.migrations, 1)
+		end)
+	end)
+
+	helpers.it("abandons a clean provider refusal under OFF without restoring the retired text", function()
+		with_cipher_menu(function(ctx, cipher, ports)
+			ports.available = false
+			helpers.assert_eq(ctx.commands.encryption(), false)
+			helpers.assert_eq(ctx.state.keystats_encrypt, false)
+			helpers.assert_eq(ctx.saves, 0)
+			helpers.assert_eq(ports.migrations, 0)
+			helpers.assert_eq(ctx.alerts, { "dialog.metrics.encryption_unavailable" })
+			helpers.assert_true(ctx.revocations > 0)
+			helpers.assert_true(cipher.roi_text_enabled(), "fresh OFF capture can resume after a clean refusal")
+		end)
+	end)
+
+	helpers.it("does not claim an active cipher from an ON preference whose provider stayed off", function()
+		with_cipher_menu(function(ctx, cipher)
+			ctx.state.keystats_encrypt = true
+			helpers.assert_true(cipher.set_enabled(false, true))
+			helpers.assert_eq(ctx.getters.metrics_encrypt_enabled(), false)
+			helpers.assert_eq(cipher.roi_text_enabled(), false)
+		end)
 	end)
 end)
