@@ -318,7 +318,8 @@ route_plan_from_entries() {
 # cannot evaluate a PAC. When the caller names the origins it downloads from,
 # redirect targets included, in OPAQUE_NETWORK_PAC_PROBE_URLS (or the single
 # OPAQUE_NETWORK_PAC_PROBE_URL), the launcher resolves each one through the
-# system (PAC, WPAD) and the plan above turns the answers into HTTPS_PROXY plus
+# system (PAC, WPAD), walking its ordered list within that origin's budget,
+# and the plan above turns the selected answers into HTTPS_PROXY plus
 # a NO_PROXY entry for each origin the PAC sends direct, or no relay at all when
 # every answer is DIRECT. A host the lookups did not name still follows
 # HTTPS_PROXY: the plan cannot see a redirect that leaves the inventory.

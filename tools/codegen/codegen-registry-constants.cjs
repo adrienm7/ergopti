@@ -8,7 +8,7 @@
  * parse it at runtime: macos/_generated/registry_limits.lua, the [limits] byte
  * caps for the macOS modules loaded before infra.timings exists, and
  * LauncherTimings.generated.swift, the [launcher] durations of the Swift
- * launcher's sleeps and polls.
+ * launcher's sleeps and polls plus its shared LLM route-probe budget.
  *
  * WHY THIS EXISTS:
  * infra.timings parses the registry through the TOML reader, whose cache
@@ -120,6 +120,12 @@ function swiftName(key) {
 	return key.slice(0, -'_ms'.length).replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
 }
 
+// The route worker shares the Linux/Windows LLM probe budget, not a launcher copy.
+const probeKey = 'managed_proxy_probe_timeout_ms';
+const probeMs = registry.llm?.[probeKey];
+if (!Number.isSafeInteger(probeMs) || probeMs < 1 || probeMs > MAX_LAUNCHER_MS)
+	fail(`[llm].${probeKey} must be an integer from 1 to ${MAX_LAUNCHER_MS} milliseconds.`);
+
 const swiftRows = Object.entries(launcher)
 	.map(
 		([key, value]) =>
@@ -135,7 +141,8 @@ const swift = `// Sources/ErgoptiPlus/LauncherTimings.generated.swift
 // MODULE: Launcher Timings
 // DESCRIPTION:
 // The [launcher] section of the timing registry: every sleep and poll interval
-// of the launcher, its fixtures and its tests, in the units the sleep APIs take.
+// of the launcher, its fixtures and its tests, plus the shared LLM route-probe
+// budget, in the units the sleep APIs take.
 // ==============================================================================
 
 import Foundation
@@ -156,6 +163,7 @@ struct RegistryDuration: Sendable {
 
 enum LauncherTimings {
 ${swiftRows}
+	static let managedProxyProbeTimeout = RegistryDuration(section: "llm", key: "${probeKey}", milliseconds: ${probeMs})
 }
 `;
 
@@ -163,5 +171,5 @@ fs.writeFileSync(OUTPUT_LUA, lua);
 fs.writeFileSync(OUTPUT_SWIFT, swift);
 console.log(`[OK] ${path.relative(ROOT, OUTPUT_LUA)} (${Object.keys(limits).length} limit(s))`);
 console.log(
-	`[OK] ${path.relative(ROOT, OUTPUT_SWIFT)} (${Object.keys(launcher).length} duration(s))`
+	`[OK] ${path.relative(ROOT, OUTPUT_SWIFT)} (${Object.keys(launcher).length + 1} duration(s))`
 );
