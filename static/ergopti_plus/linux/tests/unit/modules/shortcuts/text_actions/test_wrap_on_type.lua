@@ -761,7 +761,8 @@ local function with_daemon_wrap(body, options)
 	local manager_name, clipboard_name = "modules.shortcuts.manager", "adapters.clipboard"
 	local previous_manager, previous_clipboard = package.loaded[manager_name], package.loaded[clipboard_name]
 	local ok, err = pcall(function()
-		local state = { primary = "baseline", typed = {}, reads = 0, resets = 0, invalidations = 0, automation = 0 }
+		local state = { primary = "baseline", typed = {}, reads = 0, resets = 0, invalidations = 0, automation = 0,
+			roi_discards = 0 }
 		local shortcuts = helpers.load_module(manager_name)
 		shortcuts.init(options and options.manager_init or { enabled = true, persist = false })
 		assert(shortcuts.set_wrap_on_type_enabled(true))
@@ -773,6 +774,7 @@ local function with_daemon_wrap(body, options)
 			opts = { dry_run = false }, shortcuts = shortcuts,
 			ScriptActions = require("modules.shortcuts.script_actions"), InputCaptureGate = require("infra.input_capture_gate"),
 			keystats = { cancel_hold_intervals = noop, set_private_window = noop,
+				discard_roi = function() state.roi_discards = state.roi_discards + 1 end,
 				is_private_window = function() return false end, set_window_title = noop, on_app_focus = noop,
 				observe_hold_focus = function()
 					if state.on_focus_observe then state.on_focus_observe() end
@@ -781,7 +783,10 @@ local function with_daemon_wrap(body, options)
 				state.automation = state.automation + 1; return false
 			end },
 			TapHold = { set_paused = noop, observe_copy_activity = noop }, shutdown = { request = noop }, perform_reload = noop,
-			engine = { reset = function() state.resets = state.resets + 1 end },
+			engine = { reset = function()
+				if state.on_reset then state.on_reset() end
+				state.resets = state.resets + 1
+			end },
 			Monotonic = { now_ms = function() return 1000 end },
 			WordReset = { click_resets_word = function() return true end },
 			-- The span installs the CapsWord output observer; no CapsWord runs here.
@@ -794,6 +799,7 @@ local function with_daemon_wrap(body, options)
 			.. "\nreturn script_actions", env)
 		local reset = assert(source:match("reset_text = function(.-)\n\t\tend,"))
 		local reset_text = evaluate("return function" .. reset .. "\nend", env)
+		state.reset_text = reset_text
 		env.secure_focus_guard = { blocks_text = function() return false end, prime = reset_text,
 			capture_text_owner = function() return { current = function() return true end, cached = function() return true end } end,
 			invalidate = function() state.invalidations = state.invalidations + 1; reset_text() end }
@@ -830,6 +836,14 @@ helpers.describe("wrap on type: genuine daemon lifetime wiring", function()
 			state.click()
 			helpers.assert_eq(state.invalidations, 1)
 			helpers.assert_true(state.resets >= 1)
+			local discarded, resets = state.roi_discards, state.resets
+			state.on_reset = function()
+				helpers.assert_eq(state.roi_discards, discarded + 1, "privacy retires ROI before resetting the hotstring buffer")
+			end
+			state.reset_text()
+			state.on_reset = nil
+			helpers.assert_eq(state.resets, resets + 1, "the real privacy callback crosses the observed reset boundary")
+			helpers.assert_eq(state.roi_discards, discarded + 1, "one privacy reset retires the ROI fragment once")
 			helpers.assert_true(state.wrap.selection_window_open())
 			state.primary = "selected"
 			helpers.assert_true(state.consume(symbol("(")))
