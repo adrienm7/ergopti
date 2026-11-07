@@ -134,6 +134,7 @@ check('the extractor ignores logs, SQL, phases, comments and shell functions', (
 		'M.SLOW_AWK = [[ if (a && b) { print $1 } ]]',
 		'Shell.run("has() { command -v \\"$1\\"; }; has slurp && echo ok 2>/dev/null")',
 		'local x = "[ -z \\"$P\\" ] && echo \'none\' && exit 0"',
+		'local probe = \'kill -0 "$pid" 2>/dev/null || failure="it quit during the probation"\'',
 		'return "ready", { chunk = data }'
 	].join('\n');
 	assert.deepEqual(programsIn(source), []);

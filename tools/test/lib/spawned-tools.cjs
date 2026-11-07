@@ -236,7 +236,8 @@ function shellPrograms(shell, continued = false, functions = new Set()) {
 		// A fragment joined after other text continues a command already named.
 		if (index === 0 && continued) continue;
 		if (/^\s*\(/.test(segment)) continue;
-		const words = segment.trim().split(/\s+/).filter(Boolean);
+		// A quoted run is one word, so an assignment such as failure="it quit" is skipped whole.
+		const words = segment.trim().match(/(?:[^\s"']+|"[^"]*"?|'[^']*'?)+/g) || [];
 		while (
 			words.length &&
 			(/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0]) ||
