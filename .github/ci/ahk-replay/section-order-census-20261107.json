@@ -1,0 +1,24 @@
+{
+	"expected_count": 4,
+	"native_http_client_e2e": false,
+	"native_hotstring_e2e": false,
+	"native_proxy_relay_owner_e2e": false,
+	"filters": [
+		{
+			"contains": "AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
+			"expected_count": 1
+		},
+		{
+			"contains": "AHK-15-persistence: every internal publisher retains its exact source and result owner",
+			"expected_count": 1
+		},
+		{
+			"contains": "AHK-15-persistence: actual semantic gateways retain census, native ACK and root-receipt mutation controls",
+			"expected_count": 1
+		},
+		{
+			"contains": "hotstring-section-order: native publication, stale source and strict receipts own repaint",
+			"expected_count": 1
+		}
+	]
+}

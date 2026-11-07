@@ -347,9 +347,10 @@ _CPC_InternalTomlPublishersConsumeResult() {
 	; against its captured source, finalizer and status-before-target chain.
 	; Info Bar and privacy now delegate their retained source to the public
 	; semantic gateway; their two former private calls are audited above/below.
-	; Section order adds one retained-source publisher under ConfigCommitUpdates;
-	; its original content, presence and native receipt are independently audited.
-	AssertEqual(9, Calls, "audit every internal publisher before changing its complete inventory")
+	; Section order now also delegates to TOML_ConfigBatchWrite, removing its
+	; former private call. Its exact source, presence, native receipt and refusal
+	; before repaint remain independently audited above, including mutations.
+	AssertEqual(8, Calls, "audit every internal publisher before changing its complete inventory")
 	Writer := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarWrite"))
 	Action := _StripFullLineComments(_DriverFuncBody("LLM_Menu_SetInfoBar"))
 	Command := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarCommand"))
