@@ -1144,6 +1144,20 @@ FSSameBytes(PathA, PathB) {
 	} catch {
 		return false
 	}
+	return _FSSameBuffers(A, B)
+}
+
+; Whether two files hold exactly the same bytes, preserving read failures: a
+; caller that reports what it compared must not read an unreadable file as a
+; different one.
+; @param PathA {String}
+; @param PathB {String}
+; @return {Boolean} Throws when either file cannot be read.
+FSSameBytesStrict(PathA, PathB) {
+	return _FSSameBuffers(FSReadBytesStrict(PathA), FSReadBytesStrict(PathB))
+}
+
+_FSSameBuffers(A, B) {
 	if (A.Size != B.Size)
 		return false
 	if (A.Size == 0)
