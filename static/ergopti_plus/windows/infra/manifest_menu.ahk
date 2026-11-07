@@ -693,6 +693,33 @@ _MR_ReplayIdentity(ManifestKey, RowId, Kind := "command", Value := unset) {
 	return Key
 }
 
+; AHK names a menu item by its caption: Menu.Add with a caption the menu already
+; holds updates that item instead of adding one, and Check or Disable reach the
+; first match. Two rows of one declaration may share a caption (the notification
+; area and widget « colour by source » checks), so a later twin gets one
+; zero-width space per earlier row with the same i18n key: it reads the same and
+; is its own native item.
+; @param ManifestKey {String} The declaration the row belongs to.
+; @param Id {String} The row's id.
+; @param I18nKey {String} The row's caption key.
+; @returns {String} "" for the first row with that caption.
+_MR_CaptionTwinSuffix(ManifestKey, Id, I18nKey) {
+	static ZeroWidthSpace := Chr(0x200B)
+	if I18nKey == ""
+		return ""
+	Suffix := ""
+	for Entry in _MR_GetMenuDef(ManifestKey) {
+		if !(Entry is Map) || !_MR_IsForAhk(Entry)
+			continue
+		if _MR_Get(Entry, "id") == Id
+			return Suffix
+		if _MR_Get(Entry, "i18n") == I18nKey
+			Suffix .= ZeroWidthSpace
+	}
+	; A row nested below this declaration's top level has no twin here.
+	return ""
+}
+
 ; Renders the same declared command/check in full and native-built menus.
 _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters) {
 	if !_MR_CommandLiteralPrefix(Item, &Prefix) {
@@ -724,6 +751,9 @@ _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters) {
 	}
 	if Item.Has("label_prefix")
 		Label := Prefix . (IsSet(Label) ? Label : t(I18nKey))
+	Twin := _MR_CaptionTwinSuffix(ManifestKey, Id, I18nKey)
+	if Twin != ""
+		Label := (IsSet(Label) ? Label : t(I18nKey)) . Twin
 	Disabled := MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters)
 	ReasonKey := _MR_Get(Item, "disabled_reason_key")
 	if Disabled && ReasonKey != "" && !_MR_DisabledReason(Item, ManifestKey, StateGetters, &ReasonKey)
