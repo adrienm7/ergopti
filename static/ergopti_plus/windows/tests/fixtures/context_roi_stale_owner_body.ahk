@@ -35,6 +35,7 @@ _KRSC_Getter() {
 }
 _KRSC_Main() {
 	global _KRSC, _KSD
+	KL_Roi_SetCanonicalPolicyKnown(true)
 	Keystats.initialized := true
 	MetricsFilters.secure_field := false
 	_KRSC.BSnapshot := _KSD_Acquire(_KRSC.B)

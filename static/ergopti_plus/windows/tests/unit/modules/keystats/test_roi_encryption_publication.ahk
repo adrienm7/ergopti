@@ -61,6 +61,8 @@ _KREP_Repair(State, Fh, Boundary) {
 
 _KREP_Journal(Mode) {
 	global KL_ENC_Enabled
+	SavedKnown := KLRoiPrivacy.canonical_known
+	KL_Roi_SetCanonicalPolicyKnown(true)
 	Saved := [MetricsFilters.encrypt, KL_ENC_Enabled, Keystats._pending_entries,
 		KLRoiPrivacy.epoch, KLRoiPrivacy.blocked, KLRoiPrivacy.started, KLRoiPrivacy.request_owner]
 	Path := _FSWL_Path() . "-roi-encryption"
@@ -88,6 +90,12 @@ _KREP_Journal(Mode) {
 				AssertFalse(KL_Roi_EncryptionReady(Port))
 				AssertEqual(RepairsBefore, State["repairs"], "a preference request must never initiate compensation")
 				AssertEqual(1, KLRoiPrivacy.started.Count, "the unacknowledged append keeps its exact row")
+				MetricsFilters.encrypt := false
+				KL_Roi_EndEncryptionRequest(State["request_owner"])
+				State["request_owner"] := 0
+				AssertTrue(KL_Roi_CommitEncryptionPolicy(false))
+				AssertTrue(KLRoiPrivacy.blocked, "an OFF refresh cannot reopen text over unresolved compensation")
+				AssertFalse(KL_Roi_AdmitTextEntry(_KREP_Entry(914)))
 				AssertFalse(_KL_JournalPendingEntries(Port)["ok"])
 				State["repair_allowed"] := true
 			}
@@ -124,6 +132,7 @@ _KREP_Journal(Mode) {
 			Fh.Close()
 		if FileExist(Path)
 			FileDelete(Path)
+		KLRoiPrivacy.canonical_known := SavedKnown
 		MetricsFilters.encrypt := Saved[1], KL_ENC_Enabled := Saved[2]
 		Keystats._pending_entries := Saved[3]
 		KLRoiPrivacy.epoch := Saved[4], KLRoiPrivacy.blocked := Saved[5]
@@ -137,6 +146,8 @@ for _KREP_Mode in ["before", "off", "after", "rollback", "debt"]
 
 _KREP_UnknownPolicy() {
 	global KL_ENC_Enabled
+	SavedKnown := KLRoiPrivacy.canonical_known
+	KL_Roi_SetCanonicalPolicyKnown(true)
 	Saved := [MetricsFilters.encrypt, KL_ENC_Enabled, Keystats._pending_entries,
 		KLRoiPrivacy.epoch, KLRoiPrivacy.blocked, KLRoiPrivacy.started, KLRoiPrivacy.request_owner]
 	try {
@@ -154,6 +165,7 @@ _KREP_UnknownPolicy() {
 			AssertTrue(KL_Roi_AdmitTextEntry(_KREP_Entry(913, "roi_snapshot")))
 		}
 	} finally {
+		KLRoiPrivacy.canonical_known := SavedKnown
 		MetricsFilters.encrypt := Saved[1], KL_ENC_Enabled := Saved[2], Keystats._pending_entries := Saved[3]
 		KLRoiPrivacy.epoch := Saved[4], KLRoiPrivacy.blocked := Saved[5]
 		KLRoiPrivacy.started := Saved[6], KLRoiPrivacy.request_owner := Saved[7]
@@ -186,6 +198,8 @@ _KREP_IngestRequest(State) {
 
 _KREP_Ingest(Mode) {
 	global KL_ENC_Enabled
+	SavedKnown := KLRoiPrivacy.canonical_known
+	KL_Roi_SetCanonicalPolicyKnown(true)
 	SavedPolicy := [MetricsFilters.encrypt, KL_ENC_Enabled, KLRoiPrivacy.epoch,
 		KLRoiPrivacy.blocked, KLRoiPrivacy.started, KLRoiPrivacy.request_owner]
 	Names := ["initialized", "_shutting_down", "today_log_path", "today_log_offset",
@@ -256,6 +270,7 @@ _KREP_Ingest(Mode) {
 				Keystats.DeleteProp(Name)
 		}
 		KLWV.windows := Windows
+		KLRoiPrivacy.canonical_known := SavedKnown
 		MetricsFilters.encrypt := SavedPolicy[1], KL_ENC_Enabled := SavedPolicy[2]
 		KLRoiPrivacy.epoch := SavedPolicy[3], KLRoiPrivacy.blocked := SavedPolicy[4]
 		KLRoiPrivacy.started := SavedPolicy[5], KLRoiPrivacy.request_owner := SavedPolicy[6]
@@ -267,3 +282,50 @@ _KREP_Ingest(Mode) {
 for _KREP_IngestMode in ["before", "after", "rollback"]
 	Test("ROI encryption: actual ingestion " . _KREP_IngestMode . " preserves history and dense retries (roi-encryption-publication)",
 		_KREP_Ingest.Bind(_KREP_IngestMode))
+
+_KREP_CanonicalPolicy() {
+	global _ConfigDir, _AhkSubDir, _ConfigBootReadFailed
+	SavedDir := _ConfigDir, SavedSubdir := _AhkSubDir
+	SavedReadFailure := _ConfigBootReadFailed
+	SavedRuntime := _CSTT_SaveRuntime()
+	SavedPrivacy := [KLRoiPrivacy.epoch, KLRoiPrivacy.blocked, KLRoiPrivacy.started,
+		KLRoiPrivacy.request_owner, Keystats._pending_entries]
+	Root := _FSWL_Path() . "-roi-policy\"
+	DirCreate(Root)
+	try {
+		_AhkSubDir := ""
+		KLRoiPrivacy.started := Map(), KLRoiPrivacy.request_owner := 0
+		for Index, Raw in ['encrypt = "true"', "encrypt = false", ""] {
+			_ConfigDir := Root . Index . "\"
+			Path := CS_GetTomlPath()
+			_CSTT_WriteConfig(Path, Raw)
+			Before := FSReadUtf8Exact(Path)
+			CS_Load()
+			AssertFalse(MetricsFilters.encrypt, "the existing metrics reader keeps its manifest-compatible value")
+			AssertEqual(Index != 1, KLRoiPrivacy.canonical_known,
+				"ROI must distinguish a malformed raw preference from a legitimate absent leaf")
+			AssertEqual(Index != 1, KL_Roi_TextAllowed())
+			AssertEqual(Before, FSReadUtf8Exact(Path), "policy observation never rewrites the user source")
+		}
+		_ConfigDir := Root . "unreadable\"
+		Path := CS_GetTomlPath()
+		DirCreate(Path)
+		CS_Load()
+		AssertTrue(_ConfigBootReadFailed, "the actual source owner must refuse the unreadable native path")
+		AssertFalse(KLRoiPrivacy.canonical_known)
+		AssertFalse(KL_Roi_TextAllowed(), "a failed real configuration read cannot authorize ROI text")
+		MetricsFiltersApplyManifestDefaults()
+		AssertFalse(KL_Roi_TextAllowed(), "default initialization cannot reopen an unknown canonical policy")
+	} finally {
+		_CSTT_RestoreRuntime(SavedRuntime)
+		KLRoiPrivacy.epoch := SavedPrivacy[1], KLRoiPrivacy.blocked := SavedPrivacy[2]
+		KLRoiPrivacy.started := SavedPrivacy[3], KLRoiPrivacy.request_owner := SavedPrivacy[4]
+		Keystats._pending_entries := SavedPrivacy[5]
+		_ConfigDir := SavedDir, _AhkSubDir := SavedSubdir
+		_ConfigBootReadFailed := SavedReadFailure
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("ROI encryption: actual raw config keeps malformed policy unknown (roi-encryption-publication)",
+	_KREP_CanonicalPolicy)
