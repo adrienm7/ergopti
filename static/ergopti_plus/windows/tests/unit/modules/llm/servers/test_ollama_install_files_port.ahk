@@ -426,7 +426,8 @@ _AP70_Launch(Scope, Args) {
 	while !State["done"] && !TickExpired64(Started, 30000)
 		Sleep(10)
 	AssertTrue(State["done"], "the real CLI and canonical ShellRunner owner must finish within the fixture bound")
-	AssertEqual(0, State["code"], "the native file operation must succeed before comparing its receipt")
+	AssertEqual(0, State["code"], "the native file operation must succeed before comparing its receipt"
+		. " (argv tail=" . Args[Args.Length] . ") stdout=" . Trim(State["stdout"]) . " stderr=" . Trim(State["stderr"]))
 	return State
 }
 
