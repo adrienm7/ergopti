@@ -158,6 +158,14 @@ KL_Roi_AdmitTextEntry(Entry) {
 	return true
 }
 
+; Stamps a producer's text entry with the privacy epoch it was captured under,
+; inside the KL_AppendLog call: the personal-info sink scan reads that call's
+; Map, so a row built in a separate variable would leave the sink unjudged.
+KL_Roi_CapturedEntry(Entry, InputEpoch) {
+	Entry._KL_RoiCaptureEpoch := InputEpoch
+	return Entry
+}
+
 KL_Roi_KeepPendingEntry(Entry) {
 	if !KL_Roi_IsTextEntry(Entry) || KLRoiPrivacy.started.Has(Entry)
 		return true

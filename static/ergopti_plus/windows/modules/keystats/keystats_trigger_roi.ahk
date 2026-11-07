@@ -334,14 +334,12 @@ KL_Roi_ProcessWord(word, InputEpoch := unset) {
 
 		; Emit candidate event on threshold crossing
 		if (cnt = KLRoiConst.REPEAT_THRESHOLD) {
-				Entry := Map(
+				KL_AppendLog(KL_Roi_CapturedEntry(Map(
 						"type",        "new_trigger_candidate",
 						"app",         Keystats.session_app,
 						"word",        word,
 						"occurrences", cnt
-				)
-				Entry._KL_RoiCaptureEpoch := InputEpoch
-				KL_AppendLog(Entry)
+				), InputEpoch))
 		}
 
 		; Prune the tracking map when it grows too large. The prune is GUARANTEED
@@ -429,14 +427,12 @@ KL_Roi_HalflifeTick() {
 						continue
 				age := TickElapsed64(last_tick, now)
 				if (age >= threshold) {
-						Entry := Map(
+						KL_AppendLog(KL_Roi_CapturedEntry(Map(
 								"type",    "trigger_halflife",
 								"app",     Keystats.session_app,
 								"trigger", trig,
 								"days_since_use", Round(age / 86400000, 1)
-						)
-						Entry._KL_RoiCaptureEpoch := InputEpoch
-						KL_AppendLog(Entry)
+						), InputEpoch))
 				}
 		}
 }
