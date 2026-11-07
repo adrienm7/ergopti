@@ -338,7 +338,9 @@ helpers.describe("log_manager deferred action boundaries", function()
 			local fixture = load_fixture()
 			helpers.assert_true(cipher.set_enabled(false))
 			local sink = package.loaded["modules.keystats.rotation"]
-			local real = assert(loadfile(helpers.driver_root() .. "modules/keystats/rotation.lua"))()
+			package.loaded["modules.keystats.rotation"] = nil
+			local real = require("modules.keystats.rotation")
+			package.loaded["modules.keystats.rotation"] = sink
 			for name, callback in pairs(real) do sink[name] = callback end
 			local path, original_open = os.tmpname(), io.open
 			local handles, faults, builds = {}, 3, 0
