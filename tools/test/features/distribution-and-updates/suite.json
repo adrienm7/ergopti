@@ -641,6 +641,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-macos-owned-runtime-code-hash-rule.cjs"],
 			"repro": "node tools/test/test-macos-owned-runtime-code-hash-rule.cjs"
+		},
+		{
+			"id": "js-macos-build-scripts-bash32",
+			"ordinal": 603,
+			"name": "the macOS app build and the scripts it starts use only Bash 3.2 cd options",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-build-scripts-bash32.cjs"],
+			"repro": "npm run test:macos-build-scripts-bash32"
 		}
 	]
 }
