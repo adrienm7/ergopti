@@ -9,8 +9,8 @@ _KRSC_ChildSource() {
 	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
 	RoiOwner := _DriverProductionFileForSymbol("KL_Roi_OnChar", _DriverDir)
 	AssertTrue(RoiOwner != "")
+	; _TextCodepointWidth arrives with its whole owner through _KSD_ChildSource.
 	Source .= "#Include " . RoiOwner . "`n"
-	Source .= _DriverFuncBody("_TextCodepointWidth") . "`n"
 	return Source . "#Include " . _DriverDir . "\tests\fixtures\context_roi_stale_owner_body.ahk`n"
 }
 _KRSC_Case(Mode) {
