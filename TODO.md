@@ -10,9 +10,10 @@ the field-run step or the hand action that proves it and the commits it confirms
 
 ## Windows CI reliability (2026-11-07)
 
-- [ ] **[CODE] Suspend entry re-reads config.toml:** the suspend-marker boot re-enters its pause before ready, and
-      ToggleSuspend costs 8 document parses and 5 registry compares more than the fresh boot. Its startup-smoke
-      ceilings are 16 and 14 for that reason; cut those reads and lower them back to the shared 14 and 13.
+- [ ] **[CODE] Boot counts 2 more TOML parses than on 2026-11-05:** every seeded startup-smoke boot counts 16
+      document parses and 14 registry compares against ceilings of 14 and 13 (19c96ca86f counted 14 and 13). The
+      compare is 424b4a26d8's boot-tail snapshot proof; the parses came with the 2026-11-06 integration. The boot
+      log's `toml.document_parse_by.<caller><parent>` counters name each parser; remove or share the new one.
 - [ ] **[TEST] layout-row-external-native-flags (released):** fails about every other hosted run with « q » for « Q ».
       09fb9c0458 prints the receiver's Shift state and the sender's output; read them on the next failure and
       fix the test race or the lost flag they show.
