@@ -98,4 +98,24 @@ helpers.describe("personal_info @-combo: all or nothing", function()
 		helpers.assert_eq(#values, 0, "and a nil combo must not throw on the keystroke path")
 	end)
 
+	helpers.it("personal-unicode-alias: case expansion never turns one alias into two fields", function()
+		local aliases = { ["İ"] = "first_name", i = "last_name", ["ß"] = "first_name", s = "last_name" }
+		local function resolved(combo)
+			return table.concat(PersonalInfo._resolve_combo_for_test(INFO, aliases, combo), "|")
+		end
+		helpers.assert_eq(resolved("İi"), "Marie|Dupont", "dotted capital I remains its exact scalar")
+		helpers.assert_eq(resolved("ẞs"), "Marie|Dupont", "sharp S's uppercase expansion is not two aliases")
+		helpers.assert_eq(resolved("i\u{0307}"), "", "a decomposed spelling is not normalized")
+	end)
+
+	helpers.it("personal-unicode-alias: final sigma and compatibility case twins refuse ambiguity", function()
+		local aliases = { ["ς"] = "first_name", ["K"] = "last_name" }
+		local function resolved(combo)
+			return table.concat(PersonalInfo._resolve_combo_for_test(INFO, aliases, combo), "|")
+		end
+		helpers.assert_eq(resolved("Σk"), "Marie|Dupont")
+		aliases["σ"] = "last_name"
+		helpers.assert_eq(resolved("Σk"), "", "two sigma mappings must not select an arbitrary field")
+	end)
+
 end)

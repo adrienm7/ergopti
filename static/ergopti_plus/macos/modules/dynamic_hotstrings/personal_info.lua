@@ -28,6 +28,7 @@ if not ok_kl then keystats = nil end
 local FileSystem = require("adapters.file_system")
 local BasicString = require("toml_codec.basic_string")
 local TomlCodec = require("toml_codec.codec")
+local UnicodeCase = require("unicode_case")
 
 -- The shared personal-info field classification, used ONLY by the preview
 -- provider below. Optional-require rather than a hard dependency so a driver
@@ -186,10 +187,17 @@ end
 -- ===========================================
 -- ===========================================
 
+--- Accepts one cased Unicode scalar, without normalizing the user's alias.
+--- @param value any Candidate alias.
+--- @return boolean accepted
+local function is_alias(value)
+	if type(value) ~= "string" then return false end
+	local okay, length = pcall(utf8.len, value)
+	return okay and length == 1 and UnicodeCase.upper(value) ~= UnicodeCase.lower(value)
+end
+
 --- Validates a decoded section before filling genuinely absent schema fields.
---- The `info` section is a closed schema. The `letters` section is an open alias
---- map: any single lowercase ASCII letter (the alphabet the combo collector
---- accepts) may name a field, so user-added aliases survive load and save.
+--- The `info` section is closed; `letters` is an open map of cased scalar aliases.
 --- @param document table Decoded TOML document.
 --- @param section string Section name (without brackets).
 --- @return table|nil values Validated values, or nil for invalid declared data.
@@ -201,7 +209,7 @@ local function parse_toml_section(document, section)
 		if type(key) ~= "string" then return nil end
 		-- An alias outside the collector alphabet could never be typed; refuse it
 		-- explicitly rather than dropping it and erasing it on the next save.
-		if section == "letters" and not key:match("^[a-z]$") then return nil end
+		if section == "letters" and not is_alias(key) then return nil end
 	end
 	local result = {}
 	for key, default in pairs(DEFAULT_CONFIG[section]) do
@@ -269,11 +277,12 @@ local function serialize_config(candidate)
 	table.sort(alias_keys)
 	for _, key in ipairs(alias_keys) do
 		local value = _letters[key]
-		if type(key) ~= "string" or not key:match("^[a-z]$") or type(value) ~= "string" then
+		if not is_alias(key) or type(value) ~= "string" then
 			Logger.error(LOG, "Personal-info serializer rejected a non-string letter mapping.")
 			return nil
 		end
-		lines[#lines + 1] = key .. " = \"" .. escape_toml(value) .. "\""
+		local encoded_key = key:match("^[A-Za-z]$") and key or '"' .. escape_toml(key) .. '"'
+		lines[#lines + 1] = encoded_key .. " = \"" .. escape_toml(value) .. "\""
 	end
 	lines[#lines + 1] = ""
 	return table.concat(lines, "\n")
@@ -503,9 +512,22 @@ local function resolve_combo(combo)
 	local fields = {}
 	if type(combo) ~= "string" then return parts, fields end
 
-	for i = 1, #combo do
-		local letter = combo:sub(i, i)
-		local key    = _letters[letter]
+	local okay, length = pcall(utf8.len, combo)
+	if not okay or not length then return parts, fields end
+	for _, codepoint in utf8.codes(combo) do
+		local letter = utf8.char(codepoint)
+		if not is_alias(letter) then return {}, {} end
+		local lower = UnicodeCase.lower(letter)
+		local upper = UnicodeCase.upper(letter)
+		local key
+		for alias, field in pairs(_letters) do
+			-- Never merge conflicting case twins or multi-scalar case expansions.
+			if alias == letter or (is_alias(lower) and UnicodeCase.lower(alias) == lower)
+				or (is_alias(upper) and UnicodeCase.upper(alias) == upper) then
+				if key and key ~= field then return {}, {} end
+				key = field
+			end
+		end
 		local value  = key and _info[key] or nil
 		if type(value) ~= "string" or value == "" then return {}, {} end
 		table.insert(parts, value)
@@ -539,7 +561,7 @@ end
 --- @return boolean injected True only when the keymap accepted the transaction.
 local function do_expand(combo)
 	Logger.debug(LOG, "Injecting personal data…")
-	local n_back = 1 + #combo
+	local n_back = 1 + utf8.len(combo)
 	local parts  = resolve_combo(combo)
 	_replacing = true
 	-- Two strings serve the historical emitter return contract; neither identifies
@@ -704,7 +726,7 @@ local function interceptor(event, _km_buffer, ctx)
 				_state = STATE_IDLE
 				_combo = ""
 			elseif #_combo > 0 then
-				_combo = _combo:sub(1, -2)
+				_combo = _combo:sub(1, utf8.offset(_combo, -1) - 1)
 			else
 				_state = STATE_IDLE
 			end
@@ -812,8 +834,8 @@ local function interceptor(event, _km_buffer, ctx)
 			return nil
 		end
 
-		-- Collect lowercase letters for the combo
-		if char:match("^[a-z]$") then
+		-- Preserve the typed scalar; resolution checks exact and case-equivalent aliases.
+		if is_alias(char) then
 			_combo = _combo .. char
 			return nil
 		end
@@ -1009,7 +1031,7 @@ function M.start(base_dir, keymap_module, info_toml_path, refresh_personal_data)
 			if _active_start_token ~= token or _keymap ~= callback_keymap then return nil end
 			if not _enabled or type(buf) ~= "string" then return nil end
 			
-			local match = buf:match("@([a-z]+)$")
+			local match = buf:match("@([^@]+)$")
 			if match then
 				-- The interceptor owns collection entry. It may deliberately remain
 				-- IDLE because a static mapping already claims this `@` sequence.

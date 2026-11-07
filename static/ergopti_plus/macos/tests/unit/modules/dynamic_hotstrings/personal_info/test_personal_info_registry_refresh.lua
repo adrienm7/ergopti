@@ -290,6 +290,19 @@ helpers.describe("personal-info save refreshes literal prefix mappings", functio
 end)
 
 helpers.describe("personal-info aliases and literal prefix output (PIM-001, PIM-002)", function()
+	helpers.it("personal-unicode-alias: preserves quoted cased keys through an unrelated save", function()
+		local source = '[info]\ncity = "Lyon"\n[letters]\n"é" = "city"\n"𐐨" = "city"\n'
+		with_fixture(function(fixture)
+			local resolved = fixture.PersonalInfo._resolve_combo_for_test(
+				fixture.PersonalInfo.get_info(), fixture.PersonalInfo.get_letters(), "É𐐀")
+			helpers.assert_eq(table.concat(resolved, "|"), "Lyon|Lyon")
+			helpers.assert_true(fixture.PersonalInfo.save_info({ last_name = "Durand" }))
+			local decoded = require("toml_codec.codec").decode(fixture.read_file())
+			helpers.assert_eq(decoded.letters["é"], "city")
+			helpers.assert_eq(decoded.letters["𐐨"], "city")
+		end, source)
+	end)
+
 	helpers.it("keeps a user-added lowercase alias through load and an unrelated save (PIM-001)", function()
 		local source = table.concat({
 			"[info]",
