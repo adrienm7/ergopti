@@ -233,6 +233,12 @@ CryptoAesCbc(keyBuf, ivBuf, dataPtr, dataLen, encrypt) {
 						throw Error("BCryptGenerateSymmetricKey failed")
 
 				fn := encrypt ? "BCryptEncrypt" : "BCryptDecrypt"
+				; An empty plaintext still seals one padding block, but CNG refuses a
+				; NULL input address even for zero bytes; an empty Buffer has none.
+				if (dataLen == 0) {
+						emptyInput := Buffer(1, 0)
+						dataPtr := emptyInput.Ptr
+				}
 
 				; BCrypt updates the IV in place for chaining, so a fresh copy is passed —
 				; and re-copied before the second call, since the sizing call touches it.
