@@ -283,6 +283,9 @@ if not MENU_ROWS_FILE then
 			end,
 			focused_identity = function() return "owned-e2e-window" end,
 			focused_text_identity = function() return "owned-e2e-text-field" end,
+			-- Main binds the metrics' pointer and desktop sources at boot; this
+			-- scripted window grants neither, as on Wayland.
+			metrics_sources = function() return {} end,
 		}
 	end
 end
