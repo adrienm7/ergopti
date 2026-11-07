@@ -61,6 +61,7 @@ local function with_stubbed_sqlite(responder, body)
 		end,
 		read_exit_receipt = NativeCommand.read_exit_receipt,
 		sanitise_error = NativeCommand.sanitise_error,
+		ERROR_CATEGORY = NativeCommand.ERROR_CATEGORY,
 		escape_literal = NativeCommand.escape_literal,
 	}
 	io.popen = function()
