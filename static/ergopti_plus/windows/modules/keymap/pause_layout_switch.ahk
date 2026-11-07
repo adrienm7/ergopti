@@ -33,7 +33,12 @@
 
 
 ; Whether an event already chose the layout this session: the start then defers to it.
-global _PauseLayoutSwitchEventApplied := false
+; A class static, not a global initializer: the entry script includes this file
+; after its boot tail calls PauseLayoutSwitch_ApplyStartup, and a global
+; assignment the auto-execute flow has not reached yet is unset there.
+class PauseLayoutSwitchState {
+	static event_applied := false
+}
 
 /**
  * The three settings as the policy reads them.
@@ -64,9 +69,8 @@ PauseLayoutSwitch_Apply(Event, SelectFn := 0) {
 	global Features
 	if !IsSet(Features)
 		throw Error("the layout settings are not loaded")
-	global _PauseLayoutSwitchEventApplied
 	Target := PauseSwitchPolicyTarget(PauseLayoutSwitch_Settings(Features), Event)
-	_PauseLayoutSwitchEventApplied := true
+	PauseLayoutSwitchState.event_applied := true
 	if (Target == "")
 		return 1
 	if !HasMethod(SelectFn, "Call")
@@ -88,9 +92,8 @@ PauseLayoutSwitch_Apply(Event, SelectFn := 0) {
  *   or a pause transition already chose it; false when the switch was refused.
  */
 PauseLayoutSwitch_ApplyStartup(Paused, SelectFn := 0) {
-	global _PauseLayoutSwitchEventApplied
 	Event := PauseSwitchPolicyStartupEvent(Paused)
-	if _PauseLayoutSwitchEventApplied {
+	if PauseLayoutSwitchState.event_applied {
 		try LoggerDebug("PauseLayoutSwitch", "Startup layout switch skipped: a pause transition already chose the layout.")
 		return 1
 	}
