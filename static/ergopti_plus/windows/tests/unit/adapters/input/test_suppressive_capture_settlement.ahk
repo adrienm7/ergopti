@@ -3,7 +3,7 @@
 _SICS_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
-	for Symbol in ["SIHO_StartOwned", "JsonParse"] {
+	for Symbol in ["SIHO_StartOwned", "JsonParse", "TextCaseTitle"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "the real capture dependency must have one owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
@@ -97,7 +97,7 @@ for _SICS_Owner in ["one-shot", "dead-key"]
 _SICU_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
-	for Symbol in ["SIHO_StartOwned", "JsonParse"] {
+	for Symbol in ["SIHO_StartOwned", "JsonParse", "TextCaseTitle"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "the native capture dependency requires its real owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
@@ -343,7 +343,7 @@ for _SICU_PacketMode in ["delete", "enter", "backspace", "unicode"]
 _SNR_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
-	for Symbol in ["SIHO_StartOwned", "JsonParse"] {
+	for Symbol in ["SIHO_StartOwned", "JsonParse", "TextCaseTitle"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The genuine scalar capture dependency must exist: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
@@ -424,7 +424,7 @@ for _SNR_Owner in ["one-shot", "dead-key"]
 _OSPC_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
-	for Symbol in ["SIHO_StartOwned", "JsonParse", "_TextTailCodeUnits"] {
+	for Symbol in ["SIHO_StartOwned", "JsonParse", "_TextTailCodeUnits", "TextCaseTitle"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The real one-shot/control dependency must exist: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
