@@ -29,21 +29,27 @@ local LSREGISTER = "/System/Library/Frameworks/CoreServices.framework/Frameworks
 -- The runtime lives inside the launcher; the dialog names the app the user sees.
 local EMBEDDED_SUFFIX = "/Contents/Frameworks/Hammerspoon.app"
 
--- $1 bundle identifier, $2 this copy's path, $3 lsregister. Prints one line per
--- other copy whose designated requirement differs; exits 3 when this copy has
--- no readable requirement, since nothing could then be compared.
+-- An awk program over `lsregister -dump`: prints the path of every record whose
+-- identifier is the awk variable id. A separate argument rather than inline
+-- script text, so the shell script holds no awk statements.
+M.REGISTERED_PATHS_AWK = [[
+/^-----/ { if (ident == id && path != "") print path; path = ""; ident = "" }
+/^path:/ { sub(/^path: */, ""); sub(/ \(0x[0-9a-f]+\)$/, ""); path = $0 }
+/^identifier:/ { sub(/^identifier: */, ""); ident = $0 }
+END { if (ident == id && path != "") print path }
+]]
+
+-- $1 bundle identifier, $2 this copy's path, $3 lsregister, $4 the awk program.
+-- Prints one line per other copy whose designated requirement differs; exits 3
+-- when this copy has no readable requirement, since nothing could then be compared.
 M.SCRIPT = table.concat({
-	'id="$1"; own="$2"; lsr="$3"',
+	'id="$1"; own="$2"; lsr="$3"; registered_paths="$4"',
 	'requirement() { /usr/bin/codesign -d -r- "$1" 2>/dev/null | /usr/bin/sed -n "s/^designated => //p"; }',
 	'canonical() { (cd "$1" 2>/dev/null && /bin/pwd -P); }',
 	'own_path=$(canonical "$own"); own_req=$(requirement "$own")',
 	'[ -n "$own_path" ] && [ -n "$own_req" ] || exit 3',
 	'{ /usr/bin/mdfind "kMDItemCFBundleIdentifier == \'$id\'" 2>/dev/null',
-	'  "$lsr" -dump 2>/dev/null | /usr/bin/awk -v id="$id" \'',
-	'    /^-----/ { if (ident == id && path != "") print path; path = ""; ident = "" }',
-	'    /^path:/ { sub(/^path: */, ""); sub(/ \\(0x[0-9a-f]+\\)$/, ""); path = $0 }',
-	'    /^identifier:/ { sub(/^identifier: */, ""); ident = $0 }',
-	'    END { if (ident == id && path != "") print path }\'',
+	'  "$lsr" -dump 2>/dev/null | /usr/bin/awk -v id="$id" "$registered_paths"',
 	'} | /usr/bin/grep \'\\.app$\' | /usr/bin/sort -u | while IFS= read -r copy; do',
 	'  path=$(canonical "$copy"); [ -n "$path" ] && [ "$path" != "$own_path" ] || continue',
 	'  [ "$(requirement "$path")" = "$own_req" ] || printf "%s\\n" "$path"',
@@ -85,7 +91,7 @@ function M.find(bundle_id, own_path, on_done)
 	if type(on_done) ~= "function" then error("accessibility_copies.find: on_done must be a function", 2) end
 	local ShellRunner = require("adapters.shell_runner")
 	local handle = ShellRunner.spawn("/bin/sh", { "-c", M.SCRIPT, "accessibility_copies", bundle_id, own_path,
-		LSREGISTER }, function(exit_code, stdout, stderr)
+		LSREGISTER, M.REGISTERED_PATHS_AWK }, function(exit_code, stdout, stderr)
 		if exit_code == 0 then
 			on_done(M.parse(stdout))
 		elseif exit_code == 3 then
