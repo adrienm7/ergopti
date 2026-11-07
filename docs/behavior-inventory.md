@@ -24,7 +24,7 @@ Edit `_shared/modules/features/behaviors.json` after reviewing the named owners,
 
 ## hotstrings.backspace_restore
 
-- windows: [static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk](../static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk) — `_OnPrefixKeyDown`, SHA-256 `1b8b1ecd86352debd1fdd6c92636bafaead2324ff3ea8d6ba390254b08582780`; [static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk](../static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk) — `HSE_UndoExpansion(Undo`, SHA-256 `247ab39752f6c1aa72058ea4736a31e3fc71d0d7e1351b3c363477abe50bca96`.
+- windows: [static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk](../static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk) — `_OnPrefixKeyDown`, SHA-256 `00ec602245ada57862e5468dd180108f0181b076a1ab8834cc49eb87258a05b2`; [static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk](../static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk) — `HSE_UndoExpansion(Undo`, SHA-256 `247ab39752f6c1aa72058ea4736a31e3fc71d0d7e1351b3c363477abe50bca96`.
 - macos: [static/ergopti_plus/macos/modules/keymap/init.lua](../static/ergopti_plus/macos/modules/keymap/init.lua) — `hotstrings.shortcut_resets_word`, SHA-256 `df9dc50253b5bc91ed2b342e10de539cbf862ad84634a66ed042df5d3d9e69a4`.
 - linux: [static/ergopti_plus/linux/ergopti_hotstrings.lua](../static/ergopti_plus/linux/ergopti_hotstrings.lua) — `local undo = _undoable`, SHA-256 `73ee865a9baff5ef3028d825b55e421ffe615335015324c67ed67c4fe0502bfe`.
 
