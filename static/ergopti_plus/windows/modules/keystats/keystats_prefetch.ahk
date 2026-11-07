@@ -100,6 +100,9 @@ class KLPFWorker {
 		; Why the last KLPF_RequestBuild returned false, "" after one that started:
 		; the caller only sees false, and the reason names the refusing step.
 		static last_build_refusal := ""
+		; Why the last KLPF_BuildAndWriteToPath returned false: the detached
+		; worker's failure line carries it, since the worker owns no logger.
+		static last_projection_refusal := ""
 		; Test seam: production leaves this at 0 and always uses ShellRunner.
 		static spawn_fn := 0
 		; Test seam for atomic-publication failure; production uses KLPF_MoveAtomic.
@@ -944,7 +947,9 @@ KLPF_WorkerRefuse(reason) {
 ; arguments, SQL, paths, app names or typed text. The detached process has no
 ; logger ownership; its one-line stdout transcript is intentionally structural.
 KLPF_WorkerFailureDiagnostic(phase, failure := 0) {
-		failure_type := IsObject(failure) ? Type(failure) : "failure"
+		; A closed refusal reason (a String this module authored) names itself.
+		failure_type := IsObject(failure) ? Type(failure)
+				: (failure is String && failure != "") ? failure : "failure"
 		location := ""
 		if failure is Error {
 				file_name := ""
@@ -1098,7 +1103,7 @@ KLPF_WorkerMain() {
 						if (Outcome is String) && Outcome = "full_required"
 								ExitApp(KLPFWorker.FULL_REQUIRED_EXIT_CODE)
 						if !Outcome
-								KLPF_WorkerFail(stage, phase)
+								KLPF_WorkerFail(stage, phase, KLPFWorker.last_projection_refusal)
 						; The finished snapshot supersedes every rebuild preview, even a
 						; partial read of it: the rebuild itself is over.
 						Publisher.Retire()
@@ -1141,9 +1146,17 @@ KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
 ; the explicit "full_required" outcome when a supplied checkpoint cannot admit
 ; this delta.
 ; @param Refused {VarRef} Receives the refused queries of the read, empty when complete.
+; Records the closed reason a projection refused with.
+; @returns {Boolean} false, the projection's result.
+_KLPF_RefuseProjection(Reason) {
+		KLPFWorker.last_projection_refusal := Reason
+		return false
+}
+
 KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", HistorySeed := unset,
 		&Refused := unset, CapturedForeground := unset) {
 		Refused := []
+		KLPFWorker.last_projection_refusal := ""
 		if (dbg = "") {
 				try DirCreate(LoggerLogsDir())
 				dbg := LoggerLogsDir() . "prefetch_debug.log"
@@ -1156,7 +1169,8 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", Hi
 				KLPF_DbgWrite(dbg, "FAIL: KLR_BuildDatabase returned 0")
 				try LoggerError("KLReader", "Metrics DB build failed (winsqlite3.dll/schema.sql/data.sql) — dashboard '{1}' shows no data.", which)
 				KLPF_SettleReaderCache(false)
-				return false
+				return _KLPF_RefuseProjection("the metrics database could not be built"
+						. (KLRCache.schema_refusal != "" ? ": " . KLRCache.schema_refusal : ""))
 		}
 		t_db := A_TickCount
 		KLPF_DbgWrite(dbg, "PERF db=" . (t_db - t0) . "ms")
@@ -1228,7 +1242,7 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", Hi
 				; read must never become it, or the next open would not read again.
 				KLPF_DbgWrite(dbg, "REFUSED: an incomplete read cannot replace the published snapshot")
 				KLPF_SettleReaderCache(false)
-				return false
+				return _KLPF_RefuseProjection("an incomplete read cannot replace the published snapshot")
 		}
 		written := KLPF_WriteAtomic(path, json)
 		if written && !Incomplete && !(which = "typing" && mode != "full") {
@@ -1240,7 +1254,7 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", Hi
 		t_write := A_TickCount
 		KLPF_DbgWrite(dbg, "PERF write=" . (t_write - t_json) . "ms total=" . (t_write - t0) . "ms")
 		if !written
-				return false
+				return _KLPF_RefuseProjection("the snapshot could not be written atomically")
 		return Incomplete ? "incomplete" : true
 }
 
