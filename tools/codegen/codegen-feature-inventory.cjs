@@ -216,7 +216,7 @@ function render(
 							os,
 							{
 								en: locales.en[reasonKey],
-								fr: locales.fr[entry.reason_key] || locales.en[reasonKey]
+								fr: locales.fr[reasonKey]
 							}
 						])
 				)
