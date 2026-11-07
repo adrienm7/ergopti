@@ -531,7 +531,10 @@
 			"id": "permissions",
 			"kind": "items",
 			"columns": ["id", "state"],
-			"platforms": ["macos", "linux"]
+			"platforms": ["macos", "linux"],
+			"probe": {
+				"macos": "local_state"
+			}
 		},
 		{
 			"id": "peripherals",
