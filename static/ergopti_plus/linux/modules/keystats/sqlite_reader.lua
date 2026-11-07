@@ -111,7 +111,7 @@ local function read_rows(sqlite_path, sql, media_owned)
 		-- Named, never hidden: a hot rollback journal reads as a write attempt to
 		-- a read-only connection, and only the writer's next open recovers it.
 		local cause = SqliteCommand.sanitise_error(body)
-		if cause == "attempt to write a readonly database" then
+		if cause == SqliteCommand.ERROR_CATEGORY.READONLY_WRITE then
 			cause = "hot rollback journal awaiting the writer's recovery"
 		end
 		Logger.warn(LOG, "SQLite read refused: %s (%s).", reason, cause)

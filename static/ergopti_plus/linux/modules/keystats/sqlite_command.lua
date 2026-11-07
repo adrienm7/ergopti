@@ -198,6 +198,22 @@ end
 -- ==============================
 -- ==============================
 
+--- The sqlite3 diagnostic categories M.sanitise_error returns, in SQLite's own
+--- wording; a caller that decides on one compares with this table's entry.
+M.ERROR_CATEGORY = {
+	SYNTAX = "syntax error",
+	LOCKED = "database is locked",
+	FULL = "database or disk is full",
+	READONLY_WRITE = "attempt to write a readonly database",
+	CANNOT_OPEN = "unable to open database file",
+	MALFORMED = "database disk image is malformed",
+	IO = "disk i/o error",
+	NO_MEMORY = "out of memory",
+	CONSTRAINT = "constraint failed",
+}
+local ERROR_CATEGORY_ORDER = { "SYNTAX", "LOCKED", "FULL", "READONLY_WRITE", "CANNOT_OPEN", "MALFORMED", "IO",
+	"NO_MEMORY", "CONSTRAINT" }
+
 --- Makes a sqlite3 diagnostic safe to log.
 --- sqlite3 can echo arbitrary SQL, including unquoted and single-quoted user
 --- data. Return only fixed diagnostic categories, never native output bytes.
@@ -206,9 +222,8 @@ end
 function M.sanitise_error(text)
 	if type(text) ~= "string" or text == "" then return "" end
 	local lower = text:lower()
-	for _, category in ipairs({ "syntax error", "database is locked", "database or disk is full",
-		"attempt to write a readonly database", "unable to open database file", "database disk image is malformed",
-		"disk i/o error", "out of memory", "constraint failed" }) do
+	for _, name in ipairs(ERROR_CATEGORY_ORDER) do
+		local category = M.ERROR_CATEGORY[name]
 		if lower:find(category, 1, true) then return category end
 	end
 	return "SQLite command failed"
