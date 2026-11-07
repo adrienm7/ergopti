@@ -74,6 +74,15 @@ function M.discard(state)
 	state.generation = state.generation + 1
 end
 
+--- Identifies the two ROI payloads that contain user text, without invoking caller metatables.
+--- @param event table|nil Canonical event record with a type field.
+--- @return boolean
+function M.is_text_event(event)
+	if type(event) ~= "table" then return false end
+	local kind = rawget(event, "type")
+	return kind == "new_trigger_candidate" or kind == "trigger_halflife"
+end
+
 --- Retires all unpersisted text when encryption is requested, without erasing numerical totals.
 --- Drivers also retire their accepted but unwritten textual outbox operations at this boundary.
 --- @param state table

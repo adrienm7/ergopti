@@ -174,6 +174,16 @@ return function(helpers)
 			helpers.assert_eq(Roi.tick(state, 0, "Editor", "backward"), false)
 		end)
 
+		helpers.it("classifies canonical text events without promoting numeric rows or external getters", function()
+			helpers.assert_true(Roi.is_text_event({ type = "new_trigger_candidate" }))
+			helpers.assert_true(Roi.is_text_event({ type = "trigger_halflife" }))
+			helpers.assert_eq(Roi.is_text_event({ type = "roi_snapshot" }), false)
+			helpers.assert_eq(Roi.is_text_event(nil), false)
+			helpers.assert_eq(Roi.is_text_event(setmetatable({}, {
+				__index = function() error("foreign event getter must not run") end,
+			})), false)
+		end)
+
 		helpers.it("withholds textual metrics under encryption while retaining cumulative savings", function()
 			local state = Roi.new(0, false)
 			for index = 1, 10 do
