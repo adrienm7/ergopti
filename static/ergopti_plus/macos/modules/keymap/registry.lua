@@ -36,6 +36,7 @@ local RI          = require("modules.keymap.registry_index")
 for k, v in pairs(RI) do M[k] = v end
 
 local PersonalFiles = require("hotstrings.personal_files")
+local TriggerRoi = require("keystats.trigger_roi")
 local LOG    = "keymap.registry"
 local _state = nil  -- Injected via M.init(); required before all public functions.
 
@@ -46,6 +47,7 @@ local _state = nil  -- Injected via M.init(); required before all public functio
 -- that touches it. Dropped by sort_mappings, which is the one funnel every
 -- registration, removal and group toggle passes through.
 local _classify_cache = {}
+local _roi_trigger_index = nil
 
 local _sort_deferred = false
 local _sort_pending  = false
@@ -356,6 +358,7 @@ local function rebuild_tail_indexes()
 			lbucket[#lbucket + 1] = m
 		end
 	end
+	_roi_trigger_index = TriggerRoi.trigger_index(_state.mappings)
 	_state.mappings_by_tail_char      = tail_idx
 	_state.mappings_by_star_tail_char = star_idx
 	_state.mappings_by_first_char     = first_idx
@@ -463,6 +466,7 @@ end
 function M.drop_classify_cache()
 	Groups.note_registry_mutation("cache")
 	_classify_cache = {}
+	_roi_trigger_index = nil
 	return true
 end
 
@@ -525,6 +529,15 @@ function M.classify_trigger(str)
 
 	_classify_cache[str] = { exact, pref, suff }
 	return exact, pref, suff
+end
+
+--- Reports whether the admitted corpus already owns a word, regardless of its case.
+--- @param word string Candidate word.
+--- @return boolean|nil Nil while a registry mutation has not committed its indexes.
+function M.is_known_trigger(word)
+	if not _state or _sort_deferred or _sort_pending then return nil end
+	if not _roi_trigger_index then _roi_trigger_index = TriggerRoi.trigger_index(_state.mappings) end
+	return TriggerRoi.known_trigger(_roi_trigger_index, word)
 end
 
 --- Returns true when `str` matches a registered trigger exactly.

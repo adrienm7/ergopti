@@ -660,7 +660,12 @@ local function do_expand(combo)
 	-- Tagged synthetic events are filtered before interceptors, so ownership can
 	-- end with the transaction. A delay here would only hide real physical input.
 	_replacing = false
-	if ok then Logger.info(LOG, "Personal data injection completed.") end
+	if ok then
+		if keystats and type(keystats.log_private_hotstring) == "function" then
+			pcall(keystats.log_private_hotstring, "@" .. combo .. _trigger, echoed)
+		end
+		Logger.info(LOG, "Personal data injection completed.")
+	end
 	return ok
 end
 

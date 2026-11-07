@@ -24,6 +24,7 @@ local Logger = require("infra.logger")
 local i18n   = require("infra.i18n")
 local SecureFieldDetector = require("adapters.secure_field_detector")
 local TimerScheduler = require("adapters.timer_scheduler")
+local TriggerRoi = require("keystats.trigger_roi")
 local AXResponsiveness = require("adapters.accessibility_permission")
 local LOG    = "keystats.context_tracker"
 local M      = {}
@@ -82,6 +83,11 @@ local function require_state(func_name)
 		return false
 	end
 	return true
+end
+
+--- Revokes a candidate fragment when an already observed context crosses a boundary.
+local function discard_roi_word()
+	if _state and _state.trigger_roi then TriggerRoi.discard(_state.trigger_roi) end
 end
 
 --- Reports whether the user paused metrics collection from the Metrics menu.
@@ -195,11 +201,12 @@ end
 local function run_foreground_context_write(source, writer, ...)
 	if _state and source == "resync" then _state.foreground_refresh_pending = true end
 	local results = table.pack(pcall(run_context_write, source, writer, ...))
-	if not results[1] then
-		if _state then _state.foreground_refresh_pending = true end
-		error(results[2], 0)
+	if _state and (not results[1] or results[2] == false) then
+		_state.foreground_refresh_pending = true
+		_state.roi_window_id = nil
+		discard_roi_word()
 	end
-	if _state and results[2] == false then _state.foreground_refresh_pending = true end
+	if not results[1] then error(results[2], 0) end
 	return table.unpack(results, 2, results.n)
 end
 
@@ -496,6 +503,7 @@ local function update_secure_field_state(element, app_pid, focus_refused)
 	local is_secure = focus_refused == true
 		or SecureFieldDetector.isElementSecure(element, secure_element_observer(app_pid)) or in_secure_app
 	if is_secure ~= _state.is_secure_field then
+		discard_roi_word()
 		_state.is_secure_field = is_secure
 		if is_secure then
 			-- Discard any buffered input that may have been captured before detection
@@ -844,6 +852,7 @@ function M.update_ax_observer(app_pid)
 				or watcher ~= observer then return end
 			Logger.callback(LOG, "Accessibility observer", function()
 				if event == "AXFocusedUIElementChanged" then
+					discard_roi_word()
 					return run_context_write("secure_focus", function()
 					-- Revoke callback authority before crossing the native detach boundary.
 					-- The exact old element remains retained until removal commits, so a
@@ -1023,10 +1032,12 @@ end
 function M.update_private_status()
 	if not require_state("update_private_status") then return end
 	mark_context("window", false)
+	local previous_window, previous_title = _state.roi_window_id, _state.active_win_title
+	_state.roi_window_id = nil
 	-- « pause = tout éteint »: a paused script records NOTHING
 	-- (project-suspend-pause-invariant). Window TITLES are the most identifying
 	-- payload this module handles, and the browser window watchers keep firing while paused.
-	if _is_paused() then return end
+	if _is_paused() then discard_roi_word(); return end
 
 	-- Each window read below waits out the messaging timeout on an application
 	-- that does not answer, as loginwindow right after a wake (1512 ms, field
@@ -1046,6 +1057,7 @@ function M.update_private_status()
 	_state.session_document_path = nil
 
 	if not win then
+		discard_roi_word()
 		_state.is_private_window = false
 		require_modifier_settlement()
 		return
@@ -1056,6 +1068,14 @@ function M.update_private_status()
 	-- the new classification and its exact modifier settlement are published.
 	local native_title = win:title()
 	local title = native_title or ""
+	-- Window identity is read beside the existing title observation, never on a key.
+	local identified, window_id = pcall(function() return win:id() end)
+	if identified and type(window_id) == "number" and window_id > 0 then
+		_state.roi_window_id = window_id
+	end
+	if not _state.roi_window_id or previous_window ~= _state.roi_window_id or previous_title ~= title then
+		discard_roi_word()
+	end
 	_state.is_private_window = PrivateWindow.matches(title, get_private_keywords())
 	require_modifier_settlement()
 
@@ -1161,6 +1181,10 @@ end
 function M.app_watcher_cb(app_name, event_type, app_object)
 	if not activation_event(event_type) then return end
 	if not _state or not _log_manager or not _is_paused then return end  -- called before init — silently skip
+	if _state.active_app_name ~= app_name or not app_object then
+		discard_roi_word()
+		_state.roi_window_id = nil
+	end
 	-- « pause = tout éteint »: a paused script records NOTHING
 	-- (project-suspend-pause-invariant). ProcessLifecycle.onAppActivate keeps
 	-- delivering activations while paused, so the gate has to live here.

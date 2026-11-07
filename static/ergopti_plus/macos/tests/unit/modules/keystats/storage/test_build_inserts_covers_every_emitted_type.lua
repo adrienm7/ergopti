@@ -49,6 +49,7 @@ local _TIMINGS_MS = { keystats = { max_keystroke_delay_ms = 5000 } }
 --- entry here fails section 2 — that is what keeps this suite honest over time.
 local PRODUCER_ARGS = {
 	log_hotstring           = { "btw", "by the way", "personal" },
+	log_private_hotstring   = { "private", "private replacement" },
 	log_llm                 = { "some context", { { to_type = "prediction" } }, "TestApp", { backend = "ollama" } },
 	log_llm_failed          = { "some context", "TestApp", { backend = "ollama", failure_reason = "timeout" } },
 	log_shortcut            = { "Cmd+C", "TestApp" },
