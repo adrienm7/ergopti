@@ -26,9 +26,6 @@ local Physical = require("modules.keystats.aggregator.physical")
 local Walker = require("keystats.walker")
 local AggHelper = require("keystats.aggregator_helpers")
 
--- A wake earlier than this after local midnight is a night wake.
-local NIGHT_WAKE_END_MS = require("infra.timings").ms("keystats", "night_wake_end_ms")
-
 
 
 
@@ -219,7 +216,7 @@ function M.walk_system_event(entry)
 	elseif action == "unlock" then s.locked_ms = s.locked_ms + (entry.duration_ms or 0)
 	elseif action == "wake"   then
 		s.sleep_ms  = s.sleep_ms  + (entry.duration_ms or 0)
-		if AggHelper.is_night_wake(entry.timestamp, NIGHT_WAKE_END_MS) then
+		if AggHelper.is_night_wake(entry.timestamp, require("infra.timings").ms("keystats", "night_wake_end_ms")) then
 			s.night_wake_count = s.night_wake_count + 1
 		end
 	end

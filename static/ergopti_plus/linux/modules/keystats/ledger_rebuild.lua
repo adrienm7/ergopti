@@ -37,9 +37,6 @@ local Helpers = require("keystats.aggregator_helpers")
 
 local SEPARATOR = "\1"
 
--- A wake earlier than this after local midnight is a night wake.
-local NIGHT_WAKE_END_MS = require("infra.timings").ms("keystats", "night_wake_end_ms")
-
 --- System-day stat names a manifest_increment row may bump (macOS events.lua).
 local MANIFEST_STAT_FIELDS = { hs_suggested = true, llm_suggested = true }
 
@@ -153,7 +150,7 @@ local function walk_system(batch, date, action, meta, timestamp)
 	elseif action == "unlock" then day.locked_ms = day.locked_ms + duration
 	elseif action == "wake" then
 		day.sleep_ms = day.sleep_ms + duration
-		if Helpers.is_night_wake(timestamp, NIGHT_WAKE_END_MS) then day.night_wake_count = day.night_wake_count + 1 end
+		if Helpers.is_night_wake(timestamp, require("infra.timings").ms("keystats", "night_wake_end_ms")) then day.night_wake_count = day.night_wake_count + 1 end
 	end
 end
 
