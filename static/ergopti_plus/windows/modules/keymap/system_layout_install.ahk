@@ -40,6 +40,18 @@ global SLI_ARCHITECTURE_KEY := "HKLM\SYSTEM\CurrentControlSet\Control\Session Ma
 ; The running install, "" stage when none: "elevated" then "user".
 global _SystemLayoutJob := Map("stage", "", "pid", 0, "result", "", "klid", "", "spec", 0)
 
+; The install record every entry reads. A record that is not a job (no stage)
+; is a broken owner, never an idle one: fail fast instead of starting an
+; installer or reporting a state nobody owns.
+_SystemLayout_Job() {
+	global _SystemLayoutJob
+	if !(_SystemLayoutJob is Map)
+		throw TypeError("The system layout install record is not a job.")
+	if (!_SystemLayoutJob.Has("stage"))
+		throw ValueError("The system layout install record has no stage.")
+	return _SystemLayoutJob
+}
+
 /**
  * The shared description of the layout Windows installs.
  * @param {Func} ReadFn Optional port: ReadFn(Path) returns the text or false.
@@ -137,10 +149,9 @@ SystemLayout_Status(Spec, Ports := 0) {
  * @returns {Array} Provider rows.
  */
 SystemLayout_MenuRows(StatusFn := 0, InstallFn := 0) {
-	global _SystemLayoutJob
 	if !HasMethod(InstallFn, "Call")
 		InstallFn := SystemLayout_Install
-	if (_SystemLayoutJob["stage"] != "")
+	if (_SystemLayout_Job()["stage"] != "")
 		return _SystemLayout_DeclaredRows(MenuRenderer_StatusRows("layout_menu", "layout_system_install", "installing"))
 	if !HasMethod(StatusFn, "Call")
 		StatusFn := () => SystemLayout_Status(SystemLayout_Spec())
@@ -176,7 +187,7 @@ _SystemLayout_DeclaredRows(Rows) => Rows is Array ? Rows : []
  */
 SystemLayout_Install(ConfirmFn := 0, RunFn := 0, TellFn := 0) {
 	global _SystemLayoutJob, DriverPid
-	if (_SystemLayoutJob["stage"] != "")
+	if (_SystemLayout_Job()["stage"] != "")
 		return false
 	if !HasMethod(ConfirmFn, "Call")
 		ConfirmFn := () => Ui_MsgBox(t("dialog.system_layout.confirm"), t("dialog.system_layout.window_title"), "YesNo Default2 Icon?") == "Yes"
@@ -239,7 +250,7 @@ _SystemLayout_ReadOutcome(Path) {
  */
 SystemLayout_Poll(RunFn := 0, FinishFn := 0) {
 	global _SystemLayoutJob
-	Job := _SystemLayoutJob
+	Job := _SystemLayout_Job()
 	if (Job["stage"] == "")
 		return ""
 	if !HasMethod(RunFn, "Call")

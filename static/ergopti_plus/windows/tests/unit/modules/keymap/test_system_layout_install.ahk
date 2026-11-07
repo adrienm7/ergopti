@@ -205,3 +205,27 @@ Test("system layout install: asks first, a UAC refusal changes nothing", _SLI_In
 Test("system layout install: elevated step, user languages, then the switch", _SLI_PollChain)
 Test("system layout install: a failed install is told and selects nothing", _SLI_PollFailure)
 Test("system layout install: an unreadable DLL is not another build", _SLI_SameFile)
+
+/** A record without a stage is a broken owner: every entry refuses it. */
+_SLI_BrokenRecord() {
+	global _SystemLayoutJob
+	Saved := _SystemLayoutJob
+	Started := 0
+	Run(Command, &Pid) {
+		Started += 1
+	}
+	try {
+		for Broken in [Map(), "", 0] {
+			_SystemLayoutJob := Broken
+			AssertThrows(() => SystemLayout_MenuRows(() => Map("status", "not_installed", "klid", "")),
+				"the menu row never reads a broken record as idle")
+			AssertThrows(() => SystemLayout_Install(() => true, Run, (Message) => 0),
+				"no installer starts over a broken record")
+			AssertThrows(() => SystemLayout_Poll(Run, (Klid) => 0), "the poll never reads a broken record as done")
+		}
+		AssertEqual(0, Started, "nothing ran")
+	} finally {
+		_SystemLayoutJob := Saved
+	}
+}
+Test("system layout install: a broken install record fails fast", _SLI_BrokenRecord)
