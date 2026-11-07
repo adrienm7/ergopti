@@ -2211,8 +2211,12 @@ LLM_Bridge_OnKeyActivity(VK) {
 }
 
 ; True for a key that types a character in the current layout without a
-; shortcut modifier (MAPVK_VK_TO_CHAR; the high bit marks a dead key).
+; shortcut modifier (MAPVK_VK_TO_CHAR; the high bit marks a dead key), and for
+; VK_PACKET (0xE7), which carries the Unicode character an IME, a remote
+; session or another app's {Text} send typed: the layout maps it to nothing.
 _LLM_Bridge_KeyTypesText(VK) {
+	if VK == 0xE7
+		return true
 	if IsSet(_PrefixShortcutModifierHeld) && _PrefixShortcutModifierHeld()
 		return false
 	return (DllCall("MapVirtualKeyW", "UInt", VK, "UInt", 2, "UInt") & 0xFFFF) >= 0x20
