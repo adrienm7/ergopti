@@ -313,7 +313,7 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `open_system_settings` | ⚙ System settings | yes | yes | yes |
 | `pick_color` | 🎨 HEX colour under cursor | yes | yes | yes |
 | `open_emoji_picker` | 😀 Emoji picker | yes | yes | yes |
-| `take_note` | 📝 Take a note | yes | no, R21 | no, R21 |
+| `take_note` | 📝 Take a note | yes | no, R21 | yes (tool:xdg-open, tool:xdg-mime) |
 | `activity_simulation` | 🖱 Simulate activity (anti-sleep) | yes | yes | no, R22 |
 | `display_mirror_toggle` | 🖥 Mirror displays (on/off) | yes | yes | no, R23 |
 | `search_web` | 🔍 Web search [configurable] | yes | yes | yes (tool:xclip, tool:xdg-open) |
@@ -418,7 +418,7 @@ actions that do the same on that OS. The modifier + key shortcuts
 | R18 | `platform_reason.action_executable_permission_is_unix` | Not on Windows: a file runs there because of its extension, not because of an executable permission. |
 | R19 | `platform_reason.action_file_manager_folder_is_unreadable_on_linux` | Not on Linux: its file managers tell no other application which folder they show. |
 | R20 | `platform_reason.action_text_recognition_is_live_text_on_macos` | On macOS, Live Text reads the text of any capture or image: take one with the equivalent action, then select its text. |
-| R21 | `platform_reason.action_take_note_uses_notepad` | Windows only: this opens the day's notes file in Notepad, the editor every Windows ships. macOS has its own Quick Note (Fn+Q), and Linux has no editor every desktop ships. |
+| R21 | `platform_reason.action_take_note_uses_notepad` | macOS provides Quick Note (Fn+Q) instead of opening a plain-text notes file. |
 | R22 | `platform_reason.action_keep_awake_is_the_desktops_inhibitor` | Not on Linux: each Linux desktop keeps a session awake through its own idle inhibitor (the presentation mode of KDE and Xfce, a Caffeine extension on GNOME); turn it on there. |
 | R23 | `platform_reason.action_mirroring_is_the_systems_projection_menu` | No toggle on Linux: GNOME and KDE choose Duplicate in their own Super+P display switcher; bind that key as a keystroke. |
 | R24 | `platform_reason.action_office_bold_key_is_windows` | Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”. |

@@ -1238,16 +1238,11 @@
 	{
 		"path": "sg_actions.take_note",
 		"labels": { "fr": "📝 Prendre une note", "en": "📝 Take a note" },
-		"platforms": { "windows": true, "macos": false, "linux": false },
+		"platforms": { "windows": true, "macos": false, "linux": true },
 		"reasons": {
 			"macos": {
-				"en": "Windows only: this opens the day's notes file in Notepad, the editor every Windows ships. macOS has its own Quick Note (Fn+Q), and Linux has no editor every desktop ships.",
-				"fr": "Windows uniquement : cette action ouvre le fichier de notes du jour dans le Bloc-notes, l’éditeur livré avec tout Windows. macOS a sa propre Note rapide (Fn+Q), et Linux n’a pas d’éditeur livré avec tous les bureaux.",
-				"equivalents": []
-			},
-			"linux": {
-				"en": "Windows only: this opens the day's notes file in Notepad, the editor every Windows ships. macOS has its own Quick Note (Fn+Q), and Linux has no editor every desktop ships.",
-				"fr": "Windows uniquement : cette action ouvre le fichier de notes du jour dans le Bloc-notes, l’éditeur livré avec tout Windows. macOS a sa propre Note rapide (Fn+Q), et Linux n’a pas d’éditeur livré avec tous les bureaux.",
+				"en": "macOS provides Quick Note (Fn+Q) instead of opening a plain-text notes file.",
+				"fr": "macOS propose Note rapide (Fn+Q) au lieu d’ouvrir un fichier de notes en texte brut.",
 				"equivalents": []
 			}
 		}

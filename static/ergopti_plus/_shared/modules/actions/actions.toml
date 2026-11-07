@@ -1252,9 +1252,9 @@ platform = "all"
 emit_ahk = "#."
 
 [sg_actions.take_note]
-platform = "ahk"
+platform = "ahk,linux"
 reason_hs = "platform_reason.action_take_note_uses_notepad"
-reason_linux = "platform_reason.action_take_note_uses_notepad"
+requires_linux = ["tool:xdg-open", "tool:xdg-mime"]
 
 [sg_actions.activity_simulation]
 # One keep-awake session per machine, stopped by the first physical input on
