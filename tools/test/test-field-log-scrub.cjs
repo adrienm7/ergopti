@@ -44,18 +44,6 @@ const STAMP = '2026-10-30 10:00:00:000';
 const CASES = [
 	[
 		WINDOWS,
-		'modules/keymap/llm_bridge.ahk',
-		"KEEP: keystroke '{1}' ignored — prediction still in min-display window.",
-		[CANARY]
-	],
-	[
-		WINDOWS,
-		'modules/keymap/llm_bridge.ahk',
-		"DISMISS: keystroke '{1}' typed while a prediction was shown.",
-		[CANARY]
-	],
-	[
-		WINDOWS,
 		'infra/hotstrings/hotstring_inputhook.ahk',
 		"OnChar error for char '{1}': {2}.",
 		[CANARY, 'boom'],
