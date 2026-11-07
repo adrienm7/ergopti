@@ -23,7 +23,7 @@
 ;
 ; One character blocked the real expansion and licensed the fallback that
 ; replaced it. Both halves of that are fixed by giving the boundary question a
-; single answer: _HSE_WordBoundarySet(), derived on every read, which the preview
+; single answer: _HSE_WordBoundarySet(), checked against live inputs, which the preview
 ; set is assigned from — no cache on either side, so neither can go stale.
 ;
 ; The doubling is a FALLBACK. It must never win a buffer where a registered

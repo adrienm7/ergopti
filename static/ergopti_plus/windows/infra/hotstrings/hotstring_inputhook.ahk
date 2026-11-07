@@ -161,9 +161,9 @@ _PrefixLogSafe(Text) {
 	return StrLen(Text)
 }
 
-; The preview boundary set. NOT a cached copy any more: it delegates to the
-; matcher's own derivation so the tooltip and the engine cannot answer the
-; word-boundary question differently. A cache here was tried twice — first a
+; The preview boundary set delegates to the matcher's own derivation, with
+; no separate snapshot that could disagree about the same word boundary.
+; A preview-owned cache was tried twice — first a
 ; compile-time snapshot, then a refreshed copy built from a WIDER expression
 ; than the matcher used — and both drifted, each time producing suggestions the
 ; engine then refused to fire.
