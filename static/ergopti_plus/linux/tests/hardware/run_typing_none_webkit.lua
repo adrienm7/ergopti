@@ -111,8 +111,10 @@ String((() => {
 end)
 -- END rendered-table NONE regression.
 eval("document.querySelector('[onclick=\"open_app_modal()\"]').click(); document.querySelector('[onclick=\"select_all_apps()\"]').click(); document.querySelector('[onclick=\"close_app_modal()\"]').click(); 'clicked'"); assert(wait("String(app_state.app_selection_mode==='all' && !app_state.loading_data && app_state.data.c.h?.count===7)"),'ALL restore deadline')
-check('actual ALL restore preserves literal counts',function() assert(eval("String(app_state.data.c.h.count===7 && app_state.data.c.u===undefined && app_state.data.c.z.count===2)")=='true') end)
-check('actual retained query renders healthy counts',function() assert(eval("apply_local_filters(); apply_local_filters(); String(app_state.data.c.h.count===7 && app_state.data.c.u===undefined && typingFilterPerformance.hits>0)")=='true') end)
+-- Every selection mode but an explicit NONE keeps Unknown (matches_typing_app_selection),
+-- so the restored ALL shows its live count again, as the initial prefetch did.
+check('actual ALL restore preserves literal counts',function() assert(eval("String(app_state.data.c.h.count===7 && app_state.data.c.u?.count===3 && app_state.data.c.z.count===2)")=='true') end)
+check('actual retained query renders healthy counts',function() assert(eval("apply_local_filters(); apply_local_filters(); String(app_state.data.c.h.count===7 && app_state.data.c.u?.count===3 && typingFilterPerformance.hits>0)")=='true') end)
 assert(checks==9,'renderer subject floor9'); W.close_db()
 local file=assert(io.open(os.getenv('ERGOPTI_NATIVE_WEBVIEW_RECEIPT') or (profile .. '/receipt.json'),'w')); assert(file:write(J.encode({checks=checks,passed=checks-failed,failed=failed})) and file:close())
 print(string.format('Native virtual WebKit: %d checks, %d failures',checks,failed)); os.exit(failed==0 and 0 or 1)
