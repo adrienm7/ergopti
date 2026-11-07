@@ -109,6 +109,5 @@
 	"linux_tray_paused_header": "platform_reason.tray_top_level_rows_are_each_drivers",
 	"llm_model_selector_commands": "platform_reason.menu_control_rows_are_laid_out_per_driver",
 	"hotstring_personal_default_choice": "platform_reason.menu_container_rows_are_built_per_driver",
-	"hotstring_personal_section_choice": "platform_reason.menu_container_rows_are_built_per_driver",
-	"accented_letter_picker_frame": "platform_reason.menu_container_rows_are_built_per_driver"
+	"hotstring_personal_section_choice": "platform_reason.menu_container_rows_are_built_per_driver"
 }
