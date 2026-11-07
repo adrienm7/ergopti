@@ -159,6 +159,9 @@ HealthCheck_StopWindowControl(*) {
 WebView_StopBrowserWarmup(*) {
 	return true
 }
+WPMTrayReadout_Shutdown(*) {
+	return true
+}
 MenuDispatcher_Shutdown(*) {
 	return true
 }
