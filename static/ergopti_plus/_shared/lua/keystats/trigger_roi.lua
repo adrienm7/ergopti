@@ -56,10 +56,12 @@ end
 
 --- Creates one process-lifetime accounting state; restarting capture must reuse it.
 --- @param now_ms number Monotonic start time.
+--- @param text_enabled boolean True only when encryption is known to be neither requested nor active.
 --- @return table
-function M.new(now_ms)
+function M.new(now_ms, text_enabled)
 	assert(type(now_ms) == "number" and now_ms == now_ms and now_ms >= 0 and now_ms < math.huge, "ROI requires a monotonic start time")
-	return { saved = 0, fired = 0, words = {}, word_count = 0, last_use = {},
+	assert(type(text_enabled) == "boolean", "ROI requires an explicit textual capture policy")
+	return { text_enabled = text_enabled, saved = 0, fired = 0, words = {}, word_count = 0, last_use = {},
 		word = {}, word_units = 0, overflow = false, generation = 0,
 		pending = {}, last_check_ms = now_ms }
 end
@@ -70,6 +72,23 @@ function M.discard(state)
 	state.word, state.word_units, state.overflow = {}, 0, false
 	state.context = nil
 	state.generation = state.generation + 1
+end
+
+--- Retires all unpersisted text when encryption is requested, without erasing numerical totals.
+--- Drivers also retire their accepted but unwritten textual outbox operations at this boundary.
+--- @param state table
+--- @param enabled boolean Exact admission decision, never a key/provider readiness fallback.
+function M.set_text_enabled(state, enabled)
+	assert(type(enabled) == "boolean", "ROI requires an explicit textual capture policy")
+	state.text_enabled = enabled
+	if enabled then return end
+	M.discard(state)
+	state.words, state.word_count, state.last_use = {}, 0, {}
+	local pending = {}
+	for _, event in ipairs(state.pending) do
+		if event.type == "roi_snapshot" then pending[#pending + 1] = event end
+	end
+	state.pending = pending
 end
 
 --- Accepts an already captured wall time; macOS formats epoch values outside its input callback.
@@ -91,7 +110,7 @@ end
 --- @param context table|nil { app, window, title, timestamp }; nil revokes admission.
 --- @return boolean
 function M.observe(state, context)
-	if not valid_context(context) then M.discard(state); return false end
+	if not state.text_enabled or not valid_context(context) then M.discard(state); return false end
 	local previous = state.context
 	if not previous or previous.app ~= context.app or previous.window ~= context.window
 		or previous.title ~= context.title then M.discard(state) end
@@ -172,7 +191,7 @@ end
 --- @param known_trigger function Returns exactly false only for an unknown trigger.
 --- @return boolean
 function M.text(state, text, context, known_trigger)
-	if M.utf16_length(text) == nil or not M.observe(state, context) then M.discard(state); return false end
+	if not state.text_enabled or M.utf16_length(text) == nil or not M.observe(state, context) then M.discard(state); return false end
 	local lease = state.context
 	for _, cp in Utf8.codes(text) do
 		if BOUNDARIES[cp] then
@@ -226,7 +245,7 @@ function M.hotstring(state, trigger, replacement, is_private, now_ms, app, times
 		or type(app) ~= "string" or app == "" or not valid_timestamp(timestamp) then return false end
 	state.saved = state.saved + math.max(0, output - input)
 	state.fired = state.fired + 1
-	if not is_private then state.last_use[Case.lower(trigger)] = now_ms end
+	if not is_private and state.text_enabled then state.last_use[Case.lower(trigger)] = now_ms end
 	if state.fired % Policy.roi_snapshot_every == 0 then
 		emit(state, "roi_snapshot", app, timestamp, { session_saved = state.saved, session_fired = state.fired })
 	end
@@ -240,6 +259,7 @@ end
 --- @param timestamp string|number
 --- @return boolean
 function M.tick(state, now_ms, app, timestamp)
+	if not state.text_enabled then return false end
 	if type(app) ~= "string" or app == "" or not valid_timestamp(timestamp)
 		or type(now_ms) ~= "number" or now_ms ~= now_ms or now_ms == math.huge or now_ms < state.last_check_ms
 		or now_ms - state.last_check_ms < Policy.halflife_check_ms then return false end
@@ -276,9 +296,11 @@ function M.drain(state, record)
 	if state.draining or type(record) ~= "function" then return false end
 	state.draining = true
 	while #state.pending > 0 do
-		local ok, accepted = pcall(record, state.pending[1])
+		local event = state.pending[1]
+		local ok, accepted = pcall(record, event)
 		if not ok or accepted ~= true then state.draining = false; return false end
-		table.remove(state.pending, 1)
+		-- A sink can close text admission reentrantly and retire this exact row.
+		if state.pending[1] == event then table.remove(state.pending, 1) end
 	end
 	state.draining = false
 	return true

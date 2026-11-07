@@ -35,7 +35,7 @@ return function(helpers)
 		end)
 
 		helpers.it("counts accepted expansions cumulatively and never retains private identities", function()
-			local state = Roi.new(0)
+			local state = Roi.new(0, true)
 			for index = 1, 10 do
 				helpers.assert_true(Roi.hotstring(state, "😀", "😀😀", index == 10, index, "Editor", 123))
 			end
@@ -51,7 +51,7 @@ return function(helpers)
 		end)
 
 		helpers.it("emits only the fifth unknown word and keeps that occurrence's case", function()
-			local state = Roi.new(0)
+			local state = Roi.new(0, true)
 			repeat_word(state, "ÉCOLE", 4)
 			helpers.assert_eq(#rows(state), 0)
 			Roi.text(state, "École!", context(), unknown)
@@ -69,7 +69,7 @@ return function(helpers)
 		end)
 
 		helpers.it("uses exact Windows boundaries and UTF-16 minimum and maximum lengths", function()
-			local state = Roi.new(0)
+			local state = Roi.new(0, true)
 			repeat_word(state, "😀😀", 5)
 			helpers.assert_eq(rows(state)[1].word, "😀😀", "two supplementary scalars occupy four UTF-16 units")
 			Roi.text(state, "a:b;c-d ", context(), unknown)
@@ -90,7 +90,7 @@ return function(helpers)
 		end)
 
 		helpers.it("backspaces a scalar and discards edited, unknown, malformed and changed-context fragments", function()
-			local state = Roi.new(0)
+			local state = Roi.new(0, true)
 			Roi.text(state, "word😀", context(), unknown)
 			Roi.key(state, "Backspace", context(), unknown)
 			Roi.key(state, "Enter", context(), unknown)
@@ -118,7 +118,7 @@ return function(helpers)
 		end)
 
 		helpers.it("rejects a lookup that revokes admission, including the remaining text in its callback", function()
-			local state = Roi.new(0)
+			local state = Roi.new(0, true)
 			helpers.assert_eq(Roi.text(state, "first secret ", context(), function()
 				Roi.discard(state)
 				return false
@@ -128,7 +128,7 @@ return function(helpers)
 		end)
 
 		helpers.it("caps tracked words while preserving frequent candidates", function()
-			local state = Roi.new(0)
+			local state = Roi.new(0, true)
 			repeat_word(state, "frequent", 4)
 			for index = 1, 500 do repeat_word(state, "word" .. index, 1) end
 			helpers.assert_eq(state.word_count, 1, "singletons are discarded before bounded selection")
@@ -138,7 +138,7 @@ return function(helpers)
 		end)
 
 		helpers.it("retains the highest UTF-16 keys among equal-frequency survivors", function()
-			local state = Roi.new(0)
+			local state = Roi.new(0, true)
 			for index = 500, 1, -1 do repeat_word(state, string.format("word%04d", index), 2) end
 			repeat_word(state, "new-noise", 1)
 			helpers.assert_eq(state.word_count, 250)
@@ -147,7 +147,7 @@ return function(helpers)
 		end)
 
 		helpers.it("uses UTF-16 rather than UTF-8 ordering at the prune cutoff", function()
-			local state = Roi.new(0)
+			local state = Roi.new(0, true)
 			for index = 1, 249 do repeat_word(state, "￿word" .. index, 2) end
 			repeat_word(state, "𐀀word", 2)
 			repeat_word(state, "word", 2)
@@ -158,7 +158,7 @@ return function(helpers)
 		end)
 
 		helpers.it("warns only about public triggers used this process, with hourly cadence and one decimal", function()
-			local state = Roi.new(0)
+			local state = Roi.new(0, true)
 			Roi.hotstring(state, "PUBLIC", "replacement", false, 0, "Editor", "start")
 			Roi.hotstring(state, "PRIVATE", "replacement", true, 0, "Editor", "start")
 			local day = 24 * 60 * 60 * 1000
@@ -174,8 +174,57 @@ return function(helpers)
 			helpers.assert_eq(Roi.tick(state, 0, "Editor", "backward"), false)
 		end)
 
+		helpers.it("withholds textual metrics under encryption while retaining cumulative savings", function()
+			local state = Roi.new(0, false)
+			for index = 1, 10 do
+				helpers.assert_eq(Roi.text(state, "candidate ", context(), unknown), false)
+				Roi.hotstring(state, "secret", "secret output", false, index, "Editor", "stamp")
+			end
+			helpers.assert_eq(state.words, {})
+			helpers.assert_eq(state.last_use, {})
+			helpers.assert_eq(state.word, {})
+			Roi.tick(state, 31 * 24 * 60 * 60 * 1000, "Editor", "later")
+			local events = rows(state)
+			helpers.assert_eq(events, { { type = "roi_snapshot", app = "Editor", timestamp = "stamp",
+				session_saved = 70, session_fired = 10 } })
+		end)
+
+		helpers.it("retires text on an encryption request without resurrecting it when disabled", function()
+			local state = Roi.new(0, true)
+			repeat_word(state, "candidate", 5)
+			for index = 1, 10 do Roi.hotstring(state, "public", "expanded output", false, index, "Editor", "stamp") end
+			Roi.text(state, "secr", context(), unknown)
+			Roi.set_text_enabled(state, false)
+			helpers.assert_eq(state.words, {})
+			helpers.assert_eq(state.last_use, {})
+			helpers.assert_eq(state.word, {})
+			local events = rows(state)
+			helpers.assert_eq(#events, 1)
+			helpers.assert_eq(events[1].type, "roi_snapshot")
+			Roi.set_text_enabled(state, true)
+			Roi.text(state, "et ", context(), unknown)
+			helpers.assert_nil(state.words.secret)
+			helpers.assert_nil(state.words.candidate)
+			helpers.assert_eq(state.fired, 10)
+			helpers.assert_eq(pcall(Roi.set_text_enabled, state, nil), false)
+			helpers.assert_eq(pcall(Roi.new, 0), false)
+		end)
+
+		helpers.it("does not acknowledge another queued row when a sink revokes text reentrantly", function()
+			local state = Roi.new(0, true)
+			repeat_word(state, "candidate", 5)
+			for index = 1, 10 do Roi.hotstring(state, "public", "expanded output", false, index, "Editor", "stamp") end
+			local kinds = {}
+			helpers.assert_true(Roi.drain(state, function(event)
+				kinds[#kinds + 1] = event.type
+				if event.type == "new_trigger_candidate" then Roi.set_text_enabled(state, false) end
+				return true
+			end))
+			helpers.assert_eq(kinds, { "new_trigger_candidate", "roi_snapshot" })
+		end)
+
 		helpers.it("retains a refused or throwing event sink without duplicating an accepted head", function()
-			local state = Roi.new(0)
+			local state = Roi.new(0, true)
 			repeat_word(state, "candidate", 5)
 			local original = state.pending[1]
 			helpers.assert_eq(Roi.drain(state, function() return nil end), false)
