@@ -203,7 +203,7 @@ return {
 		{ kind = "action", id = "pick_color", platforms = { "hs", "linux" } },
 		{ kind = "action", id = "open_emoji_picker", platforms = { "hs", "linux" } },
 		{ kind = "action", id = "take_note", platforms = { "linux" } },
-		{ kind = "action", id = "activity_simulation", platforms = { "hs" } },
+		{ kind = "action", id = "activity_simulation", platforms = { "hs", "linux" } },
 		{ kind = "action", id = "display_mirror_toggle", platforms = { "hs" } },
 		{ kind = "action", id = "search_web", platforms = { "hs", "linux" } },
 		{ kind = "action", id = "copy_selected_path", platforms = { "hs", "linux" } },
@@ -283,7 +283,7 @@ return {
 		{ id = "document", platforms = { "hs" } },
 	},
 	actions = {
-		["activity_simulation"] = { family = "sg", label_key = "sg_actions.activity_simulation", platforms = { "hs" } },
+		["activity_simulation"] = { family = "sg", label_key = "sg_actions.activity_simulation", platforms = { "hs", "linux" }, requires = { linux = { "tool:systemd-inhibit" } } },
 		["alt_tab_monitor"] = { family = "sg", label_key = "sg_actions.alt_tab_monitor", platforms = { "hs", "linux" }, requires = { linux = { "session:x11", "tool:timeout", "tool:xdotool", "tool:xrandr", "tool:xprop", "tool:xwininfo", "tool:sha256sum" } } },
 		["alt_tab_windows"] = { family = "sg", label_key = "sg_actions.alt_tab_windows", platforms = { "hs" } },
 		["app_expose"] = { family = "sg", label_key = "sg_actions.app_expose", platforms = { "hs" } },

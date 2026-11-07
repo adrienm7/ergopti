@@ -560,6 +560,7 @@ return {
 	"tests.unit.modules.gestures.actions.test_pointer_warp",
 	"tests.unit.modules.gestures.actions.test_pointer_spotlight",
 	"tests.unit.modules.gestures.actions.test_take_note",
+	"tests.unit.modules.gestures.actions.test_keep_awake",
 	"tests.unit.modules.shortcuts.keyboard.test_accented_shortcuts",
 	"tests.unit.ui.editors.physical.test_physical_delivery_unqualified",
 	"tests.unit.infra.test_features_manifest_projection",

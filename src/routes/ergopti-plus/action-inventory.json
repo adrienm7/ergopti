@@ -1253,14 +1253,8 @@
 			"fr": "🖱 Simuler l'activité (anti-veille)",
 			"en": "🖱 Simulate activity (anti-sleep)"
 		},
-		"platforms": { "windows": true, "macos": true, "linux": false },
-		"reasons": {
-			"linux": {
-				"en": "Not on Linux: each Linux desktop keeps a session awake through its own idle inhibitor (the presentation mode of KDE and Xfce, a Caffeine extension on GNOME); turn it on there.",
-				"fr": "Pas sous Linux : chaque bureau Linux garde une session éveillée par son propre inhibiteur de veille (le mode présentation de KDE et Xfce, une extension Caffeine sous GNOME) ; activez-le là.",
-				"equivalents": []
-			}
-		}
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"reasons": {}
 	},
 	{
 		"path": "sg_actions.display_mirror_toggle",

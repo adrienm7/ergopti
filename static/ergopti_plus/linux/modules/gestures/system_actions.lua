@@ -256,6 +256,9 @@ end
 --- receives { run_background = fn(cmd), clipboard = adapter, emit_combo = fn,
 --- sleep_ms = fn } from the executor.
 M.HANDLERS = {
+	activity_simulation = function()
+		return require("modules.keep_awake").toggle()
+	end,
 	take_note = function(deps)
 		return require("modules.take_note").open(deps.run_background)
 	end,
