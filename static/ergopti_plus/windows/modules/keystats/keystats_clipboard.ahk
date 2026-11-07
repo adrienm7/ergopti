@@ -223,8 +223,13 @@ KL_Clip_OnChange(data_type) {
 	catch {
 		try LoggerWarn("Keystats", "Clipboard source privacy classification failed closed.")
 	}
-	if SourceFiltered
+	; The clipboard rows carry no title, so the central sink cannot repeat
+	; this title-aware verdict: the refusal is the outgoing-payload privacy
+	; policy and counts as its privacy hit, as the sink's own refusal does.
+	if SourceFiltered {
+		KL_RecordPrivacyHit()
 		return
+	}
 
 	Now := A_TickCount
 	RejectedBySuspend := false
@@ -315,8 +320,13 @@ KL_Clip_OnPaste() {
 	catch {
 		try LoggerWarn("Keystats", "Clipboard paste source privacy classification failed closed.")
 	}
-	if SourceFiltered
+	; The clipboard rows carry no title, so the central sink cannot repeat
+	; this title-aware verdict: the refusal is the outgoing-payload privacy
+	; policy and counts as its privacy hit, as the sink's own refusal does.
+	if SourceFiltered {
+		KL_RecordPrivacyHit()
 		return
+	}
 
 	Now := A_TickCount
 	CopyLag := (CopyTick > 0) ? TickElapsed64(CopyTick, Now) : -1
