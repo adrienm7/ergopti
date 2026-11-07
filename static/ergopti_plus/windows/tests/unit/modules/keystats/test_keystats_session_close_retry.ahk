@@ -276,6 +276,9 @@ _KLSCR_ShutdownCloseNativeChain() {
 			AssertTrue(Body != "", "each actual native-chain function must be present")
 			Source .= Body . "`n"
 		}
+		; KL_AppendLog admits trigger-ROI text through its privacy owner. The close
+		; chain carries no ROI row, so reaching that owner here is a failure.
+		Source .= 'KL_Roi_AdmitTextEntry(Entry) {`n`tthrow Error("A trigger-ROI row reached the session close chain.")`n}`n'
 		ContextOwner := _DriverProductionFileForSymbol("_KL_ContextProject", _DriverDir)
 		AssertTrue(ContextOwner != "", "The actual inactive context close still needs its genuine owner")
 		Source .= "#Include " . ContextOwner . "`n"
