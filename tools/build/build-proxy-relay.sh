@@ -24,9 +24,9 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # The macOS build runs this under /bin/bash 3.2, whose cd has no -e: -P already
 # resolves the physical directory, and an empty PWD is refused below.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 IFS= read -r -d '' REPO_ROOT < <(CDPATH= cd -P -- "${SCRIPT_DIR}/../.." && printf '%s\0' "$PWD")
 [[ -n "$REPO_ROOT" && -d "$REPO_ROOT" ]] || { echo "[ERR] Repository root unresolved." >&2; exit 1; }
 SOURCE_DIR="${REPO_ROOT}/static/ergopti_plus/_shared/go/native_http"
