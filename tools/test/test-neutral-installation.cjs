@@ -52,8 +52,12 @@ const NEUTRAL_LAYOUT = {
 	hs: {
 		driver: 'macos',
 		values: {
+			ergopti_base: false,
 			direct_access_digits: 'native',
 			number_row_reorder_edges: false,
+			ergopti_alt_gr: false,
+			ergopti_variant: 'none',
+			emulated_layout: '',
 			pause_switch_enabled: false,
 			// Layout ids; "" is « no change ».
 			on_pause: '',
@@ -63,8 +67,12 @@ const NEUTRAL_LAYOUT = {
 	linux: {
 		driver: 'linux',
 		values: {
+			ergopti_base: false,
 			direct_access_digits: 'native',
 			number_row_reorder_edges: false,
+			ergopti_alt_gr: false,
+			ergopti_variant: 'none',
+			emulated_layout: '',
 			pause_switch_enabled: false,
 			on_pause: '',
 			on_resume: ''
