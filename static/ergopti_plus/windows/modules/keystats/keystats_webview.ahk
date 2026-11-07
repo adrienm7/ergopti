@@ -424,7 +424,7 @@ KLWV_Open(which, metrics_dir) {
 			)
 			if KLWV.close_during_open.Get(which, false)
 					KLWV_Hide(which, g)
-			SetTimer(KLWV_DelayedFirstPush.Bind(which, Epoch), -TimingsGet("keystats", "first_push_delay_ms"))
+			TimerArmOneShotMs(KLWV_DelayedFirstPush.Bind(which, Epoch), TimingsGet("keystats", "first_push_delay_ms"))
 			KLWV_ArmRebuildWatch(which, Epoch)
 			KLWV_FitWebView(which)
 			KLWV_OpenTimingMark(which, "navigate", Timing)
@@ -490,7 +490,7 @@ KLWV_Hide(which, GuiObj) {
 	} finally {
 		KLWV.retiring.Delete(which)
 		if Pending.Has("metrics_dir")
-			SetTimer(KLWV_Open.Bind(which, Pending["metrics_dir"]), -1)
+			TimerArmOneShotMs(KLWV_Open.Bind(which, Pending["metrics_dir"]), 1)
 	}
 	return 1
 }
@@ -666,8 +666,8 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 			; returns so no ingest work nests inside the WebView message loop.
 			if !RegExMatch(msg, '"maintenance_id"\s*:\s*(\d{1,15})\b', &mid)
 				return
-			SetTimer(KLWV_RunMaintenance.Bind(which, Epoch, SubStr(action, StrLen("metrics_") + 1),
-				Integer(mid[1]), entry["metrics_dir"]), -1)
+			TimerArmOneShotMs(KLWV_RunMaintenance.Bind(which, Epoch, SubStr(action, StrLen("metrics_") + 1),
+				Integer(mid[1]), entry["metrics_dir"]), 1)
 				case "ready":
 						; Page just finished loading and signals it's ready to
 						; receive pushes. Inject i18n strings first (fetch() is
