@@ -408,6 +408,7 @@ _MI_StageAgent() => 0
 _MI_StageShortcuts() => 0
 _MI_StageTapHolds() => 0
 _MI_StageGestures() => 0
+_MI_StageApps() => 0
 _MI_StageConfiguration() => 0
 _MI_StageLanguage() => 0
 _MI_StageAbout() => 0
