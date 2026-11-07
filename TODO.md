@@ -97,6 +97,7 @@ into an exported `.keylayout`, since macOS may refuse to load it.
       user-defined ones, held or locked, per-key Caps Lock mode, dead keys with chaining and multi-character
       results, ligatures, physical remapping, per-modifier alternative keys, key names, ISO base and ANSI rule,
       export metadata. Lossless round trip `.keylayout` → TOML → `.keylayout` for everything the `.keylayout` holds.
+      Foundation implemented: [TOML v1 interchange](docs/design/layout-source-format.md), strict structural validation and `tools/layout-source.cjs` preserve imported XML exactly, including unmodelled constructs. Edited mappings and new layouts still need compilers; the source model is not yet the unified editor or a driver input.
 - [ ] **One generator, every target.** From the TOML, generate the macOS bundle, the Linux XKB files, the Windows
       `.klc` plus the keyboard DLL and its unsigned installer, the AutoHotkey emulation tables, the Hammerspoon and
       Linux emulation tables, and the web emulation used by the site and the composer. Each export reports per
@@ -187,10 +188,7 @@ and the next module candidates. The audit is paused at the maintainer's request.
 - [x] **Linux:** evaluate accented-key shortcut remapping on layouts where those keys are not shortcut letters (`platform_reason.accented_shortcuts_are_windows`). Done (aligned on Windows): `linux/modules/shortcuts/accented_shortcuts.lua` turns Ctrl, Alt or Super (Shift riding along) on a key whose plain press types è, ê, é or à in the loaded keymap into the chord on the chosen letter, from the keyboard hook's consumption callback under the Shortcuts master; AltGr is left alone and a digit-row key stays a digit while the row types digits first. The four `shortcuts.<letter>` settings and the « Raccourcis sur les lettres accentuées » letter pickers of the layout menu are declared for `linux`; the reason now names macOS alone (`platform_reason.accented_shortcuts_need_a_layout_file_on_macos`, 21 locales).
 - [ ] **Linux:** evaluate X11 implementations of pointer centering, pointer teleportation and mouse spotlight; Wayland restricts these operations (`sg_actions.center_mouse`, `teleport_mouse`, `spotlight_mouse`). Evaluate file-manager-specific implementations of open-terminal-here and new-text-file-here. Progress (aligned on Windows/macOS): `center_mouse` and `teleport_mouse` run on X11 (`linux/modules/gestures/pointer_warp.lua`: RandR monitors, xdotool position and move; teleport cycles the RandR order and shows `shortcuts.no_other_monitor` with one monitor) and require `session:x11` so the picker greys them under Wayland; unlike macOS, teleport shows no spotlight afterwards. `spotlight_mouse` runs on X11 too (`linux/modules/gestures/pointer_spotlight.lua`, drawn by `linux/adapters/spotlight_overlay.lua`): a yellow ring around the pointer and a red × at the centre of every other RandR monitor, click-through GTK popups, dismissed after 5 s or by a pointer move of more than 5 px (Windows' rule), with the Windows/macOS sizes and colours; it requires `session:x11` like the two others, and its Linux reason is retired from the 21 locales (`test_pointer_spotlight.lua`). Without a compositor the windows are shaped to the stroke, so the translucent fill shows only on a composited desktop. The look is still three copies (Windows `ui/spotlight/init.ahk`, macOS `system_mouse.lua`, Linux `pointer_spotlight.lua`): a shared constants file would let the three read one. Left: the file-manager items.
 - [x] **Windows and Linux:** implement equivalents of the macOS bundled App Cloner (isolated application copies and profiles) and Encryptor (file encryption/decryption by drag-and-drop). These are bundled apps, distinct from the shared text and metrics encryption features. Decided 2026-11-06 (align on the most complete OS): macOS defines both; Windows and Linux follow. Done (branch `wave3/app-cloner-encryptor`): the tray's Applications submenu is declared on the three drivers; each app runs as its own process. The Encryptor container is `_shared/data/encryptor/format.json` (OpenSSL's `enc` envelope) with shared vectors that Node, the macOS helper, the Linux openssl path and the Windows CNG path all decrypt and, with the same salt, write byte for byte (`test-encryptor-shared-vectors.cjs`, `test_encryptor_core.lua`, `test_bundled_apps.ahk`); its drop targets are a Linux desktop entry (`%F`, Open With) and a Windows Send To shortcut plus a drop window. App Cloner reads `_shared/data/app_cloner/families.json` (macOS's names pinned by `test-app-cloner-families.cjs`): Linux writes a desktop entry and an sh launcher with the family's profile option or private XDG folders; Windows writes a Start menu shortcut with the family's profile option, and says when a program of no family can only get a second shortcut. Colour-tinted icons stay macOS-only (the Linux icon is a theme name drawn by the desktop, Windows has no icon toolchain in the driver): both offer the original icon or an image. Physical checks: « To confirm on the Windows PC » and « To confirm on Linux ».
-- [ ] **Linux:** implement the `activity_simulation` (keep-awake) action; Windows and macOS declare it and Linux says "turn it on in your desktop" (`platform_reason.action_keep_awake_is_the_desktops_inhibitor`). Align on the most complete OS: take a session idle inhibitor through `org.freedesktop.ScreenSaver.Inhibit` / `org.freedesktop.login1` (or `systemd-inhibit` as a held child), released on toggle-off and on driver exit. Owners: `_shared/modules/actions/actions.toml` (`platform`, `reason_linux`), `linux/modules/gestures/manager.lua` (action dispatch), a new inhibitor module under `linux/modules/`, 21-locale reason retired.
-- [ ] **Linux:** implement the `take_note` action (Windows opens the day's notes file in Notepad, `windows/modules/take_note.ahk`; macOS has Quick Note as equivalent). Open the same day's notes file with `xdg-open`, and refuse with a precise message where no text handler is registered. Owners: `_shared/modules/actions/actions.toml`, `linux/modules/gestures/manager.lua`, `platform_reason.action_take_note_uses_notepad` (retire or narrow).
 - [ ] **Windows and Linux:** category item reordering. macOS persists per-category hotstring menu orders (`hotstrings.order_overrides`, `macos/ui/menu/menu_hotstrings.lua`, `macos/infra/preferences.lua`); Windows and Linux have no reordering control (`platform_reason.hotstring_menu_order_is_macos`). Align on macOS: declare the section for `ahk` and `linux`, store the order in config.toml and add the move-up/move-down rows to each driver's Hotstrings menu.
-- [ ] **Windows and Linux:** custom LLM profile shortcuts. macOS offers a shortcut prompt per custom profile (`llm_custom_profile_controls.llm_profile_shortcut`, `macos/ui/menu/menu_llm/profiles_manager.lua`); verify whether the Windows profile menu (`windows/ui/menu/menu_llm/menu_profiles.ahk`) and the Linux profile menu (`linux/modules/llm/profile_settings.lua`) bind a per-profile shortcut. If not, port it, otherwise record the equivalent in the row's reason.
 - [x] Triage each OS-specific configuration entry, action and greyed menu item in the generated [feature inventory](docs/feature-inventory.md). The recorded reason and equivalent distinguish OS-specific mechanisms from actual product gaps. Recheck runtime and hardware behavior before declaring parity. Done (6 November 2026): every row of the inventory is classified (counts in `docs/feature-inventory.md` headings). Rows with an equivalent or a genuine OS mechanism carry a precise reason in 21 locales: path and action reasons were already specific; the 157 hidden menu entries (275 rows) that printed "Review the platform-specific presentation and equivalent." now take their reason from `static/ergopti_plus/_shared/modules/menu/hidden_row_reasons.json` (the generator refuses an unmapped or stale entry), and four one-word Linux reasons (`libinput_reader_is_linux_only`, `only_linux_rereads_its_catalogue`, `only_linux_migrates_in_the_background`, `only_linux_lacks_metric_sources`) and the two Linux generation-settings reasons (which said "two" settings; Linux lists five) were rewritten. Missing features are the existing entries above (incremental gestures, accented shortcuts, Windows WPM readout, tap-hold word reset, physical shortcut editor, token streaming, personal shortcuts file, X11 pointer actions, file-manager actions, macOS shortcut-only restore) plus the four new Linux/Windows entries added above.
 
 ## One-shot Shift parity follow-up
@@ -307,8 +305,6 @@ and the next module candidates. The audit is paused at the maintainer's request.
 - [x] **[PARITY] Wrap management:** decide Windows supplementary Unicode scalar support; its UTF-16-length validator currently rejects scalar pairs accepted by macOS. Linux custom pair management is already tracked above; parameter-specific custom delimiters are available. Done: decided 2026-11-06: Windows accepts a supplementary scalar as one custom symbol like macOS and Linux (see the wrap-scalar commit).
 - [x] **[CODE] Wrap documentation:** correct the shared catalogue README claiming two drivers and obsolete open/close/label_key shape; retain trigger normalization separately from spaced output delimiters. Done: the shared catalogue README now names the three drivers, the real {left, right} group shape, and keeps trigger normalization separate from spaced output delimiters.
 - [x] **[CI] macOS wrap fixtures:** remove combined-run module-cache/i18n contamination: the combined selection reports 255 passes and four failures while the affected delivery fixture alone passes 12/0. Do not replace actual production owners with more forgiving stubs. Done: the delivery fixture now loads the real i18n and a fresh gestures owner instead of a get-only i18n double; the combined --only=wrap run passes 266/0.
-
-- [ ] **[PARITY] macOS personal aliases:** widen the macOS combo collector from `[a-z]` to cased letters like Windows and Linux.
 
 ## Native runtime, editor and diagnostics parity follow-up
 
@@ -714,6 +710,9 @@ three-OS CI is green on the final source. See the handoff above for the current 
 
 ## To confirm on the Mac
 
+- [ ] PAC route lists: compile and run `ManagedProxyRouteWorkerTests`, then use a real PAC with a dead relay followed by DIRECT or a live relay; preserve ordered selection, the shared timeout and refusal after expiry.
+- [ ] Personal aliases: configure cased Unicode aliases, type and erase a combo one scalar at a time, and confirm preview and expansion agree in native applications.
+
 - [ ] **MRT-004 « Réparer le service »:** decided 2026-11-06, not built: a new authenticated helper role that adopts an existing exact Core/VirtualHIDDevice plist and settles the first-start `core.json` fence; needs a Swift build and native macOS qualification, then i18n in the 21 locales.
 
 Check out `dev` (or the branch to test), set Debug > Log level > DEBUG, then run
@@ -874,6 +873,9 @@ Hands needed:
 
 ## To confirm on the Windows PC
 
+- [ ] Hotstring preview boundaries: run `preview-word-opening` and `boundary-cache` on native Windows; type punctuation before a word, change custom delimiters and the magic key, and confirm preview and expansion still agree.
+- [ ] Remote authentication: exercise real IBM and Google token services; local request/refusal tests do not qualify their live responses.
+
 - [ ] **Windows personal-info eager pre-generation:** measure boot cost at the highest accepted pattern length; cover the accepted-agent policy test, the wrap-scalar test and the 2026-11-06 AHK changes with a native run.
 
 Run by the PC agent from a fresh `dev` on a `fix/windows-pc-<date>` branch; push the branch, the coordinator
@@ -981,6 +983,9 @@ Account and tester actions (maintainer, from the PC):
 
 ## To confirm on Linux
 
+- [ ] Daily notes: `take_note` opens the current daily file with the registered text editor without replacing its contents; an absent text handler shows the specific refusal.
+- [ ] Keep awake: `activity_simulation` prevents idle sleep in real X11 and Wayland sessions and releases the logind inhibitor on toggle-off, pause, quit and daemon termination.
+
 No machine is available. First `bash tools/dev/collect-linux-field-report.sh` on a real desktop: the field run
 without a click (53c1766514), the report marks, and `driver_reload` (one daemon restart under a real user manager).
 
@@ -1050,21 +1055,15 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
 State on 2026-11-01. Whole AHK suite at d85a24eb53: 17277/17288 in parallel, the other 11 (clipboard and focus contention
 between workers) green alone. All live checks pass, typed by the harness.
 
-- **LLM.** Windows has a production `retry_extra_tokens` owner and regression tests; the outstanding parity gap is Linux sequential retry/refill behavior (see the platform audit). Real IBM and Google token services were never tried.
 - **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
   keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left, the rest of the menu files need
   `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers and sleeps
   before the registry loads. PAR-83: the host in `ollama_managed_files.ps1`. Moving `tests/run_*.ahk` to
   `tests/runners/` is not worth it (455 `A_ScriptDir` uses, 1,908 includes).
 - **Tests.** Source assertions left to convert to behaviour; `--reverse` on the `llm` group has 3 order-dependent reds.
-- **Proxy override.** `_NetworkCheck_FetchPac` and the COM WinHttp use of `api_remote.ahk:603` are not checked against the
-  override; `SystemProxy_IsLoopbackUrl` knows only named loopback hosts.
 - **Field report.** `field/win-2026-11-01-dev` ran with no driver; run it again with one.
 - **Signing follow-ups.** Delete `.github/ci/stable_windows_signing_exception.json` once SignPath is configured; flip
   update enforcement to `required` after the `off` release. The relay exe and the vendor binaries are unsigned.
-- **Hotstring word start, follow-ups of 4a91f19d1c.** The preview bubble still finds the typed word with the old
-  boundary list (`hotstring_match.ahk`); move it to `_HSE_CharOpensWord`. The boundary check rebuilds its list on
-  every call (about 30 µs per key); build it once per delimiter change.
 - **Older findings.** The seven "Remaining findings" of
   [the 2026-10-28 Windows audit](docs/audits/windows-2026-10-28/README.md); item 36 updater production coupling (the
   first trusted PowerShell host acquisition); a408a29790 (the four longest AHK unit shards split) was never landed.
@@ -1127,9 +1126,6 @@ between workers) green alone. All live checks pass, typed by the harness.
   November: App Cloner on the managed Python with pinned PyObjC 12.1 (managed-pyobjc.json, ensure-managed-pyobjc.sh
   under the native PTY guardian, consent offer from the Apps menu, stable link `native-bootstrap/app-cloner/python3`;
   existing clones keep /usr/bin/python3 until re-cloned).
-- **Proxy variables in `network-retry.sh`.** Four hand-typed spellings of the proxy variables now live there (the
-  direct override and the refused sign-in start, 3597ee4f, among them); `test-proxy-policy-single-source` allows 4.
-  Factor one `clear_proxy_environment()` both paths call, then lower the allowance.
 - **Checks left to a program from the Mac session.** Done on 1 November: `field_tap_hold_thresholds` (9901da4d94;
   PAR-15 is confirmed by the next field run's result);
   the HTTPS downgrade refusal is already covered by `ManagedPACSourceTests` and `ManagedBootstrapDownloadTests`.
@@ -1143,12 +1139,6 @@ between workers) green alone. All live checks pass, typed by the harness.
   Qianfan confirmed; left: SambaNova toggle unverified (its docs answer 403 to automated reads), Chutes Qwen field
   inferred; watch Perplexity Sonar chat completions (ended
   2026-09-27), `dashscope-intl`, Moonshot K2 retiring by December.
-- **Linux: scalable three-finger swipes (maintainer, 3 November).** macOS steps tab_next / tab_prev with the swipe's
-  distance (mode "incremental"); the Linux gesture manager acts once, when the swipe ends, and has no per-slot mode, so
-  a long swipe moves one tab. Its evdev decoder sees the travel, so it could count steps at the end of the swipe (live
-  stepping would need a new path in `linux/modules/gestures/manager.lua`). Not small: the mode settings, their menu
-  rows and the step accounting are macOS-only today. Linux recommends no swipe anyway (the desktop acts on them), so
-  this is for users who bind one.
 - **Tooling found on the way (4 November).** `tools/ci/seal-windows-updater-original-source.cjs --write` leaves
   about 90 MB in the temp folder per run; remove it on exit. On the Windows PC these fail on a clean `dev` for
   environment reasons, so only CI proves them: `test-site-github-release` and the site deploy admission controls
@@ -1218,8 +1208,3 @@ Each closes on a named green hosted or native run, recorded here.
       `_shared/data/db/purge_schema.sql`; writers `request_metrics_maintenance` (Linux keystats, macOS `log_manager`) and
       `KL_RunMetricsMaintenance` (Windows); the Windows path is checked by source contracts only and still wants a live
       Windows run.
-
-- **PAC list walk on macOS.** Linux probes a `PROXY a; DIRECT` list before the Ollama start
-  (`llm.managed_proxy_probe_timeout_ms`). Decided 2026-11-06 (align on the most complete OS, Linux): Windows walks
-  it too (`Get-ErgoptiOwnedProxyEnvironment -Probe`, `test-windows-route-plan.cjs`); macOS
-  (`resolve_system_route_for_probe`) still exports the first entry and follows next.
