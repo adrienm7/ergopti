@@ -612,7 +612,8 @@ _STRP_PrivateFireIsNotKeyedInTheHalflifeMap() {
 		"and it is TOLD that the trigger it received is a redaction, so it can skip the half-life map instead of merging every private mapping of the same length onto one entry")
 
 	Body := _DriverFuncBody("KL_Roi_OnHotstring")
-	Assert(RegExMatch(Body, "if !is_private[\r\n\t ]+KLRoi\.trigger_last_use"),
+	AssertTrue(Body != "", "The real ROI hotstring owner must resolve before checking privacy.")
+	Assert(RegExMatch(Body, "if !is_private && TextAllowed[\r\n\t ]+KLRoi\.trigger_last_use"),
 		"KL_Roi_OnHotstring must skip trigger_last_use for a private mapping: its keys are triggers, a redaction is not a trigger, and KL_Roi_HalflifeTick writes those keys straight back out into a persisted row")
 	Assert(RegExMatch(Body, "session_saved_chars[ \t]*\+="),
 		"while still accumulating the savings — dropping the metric would be the wrong fix here for exactly the reason it would be at the sink")

@@ -44,7 +44,8 @@ _RHL_ReplaceClock(Body, Name) {
 _RHL_ChildSource(Mode := "") {
 	global _DriverDir
 	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
-	for Symbol in ["MF_ShouldFilter", "WallClockTimestamp", "TickElapsed64", "HotPath_Now", "WICaptureBoundedFocusSnapshot"] {
+	for Symbol in ["MF_ShouldFilter", "WallClockTimestamp", "TickElapsed64", "HotPath_Now", "WICaptureBoundedFocusSnapshot",
+		"KL_Roi_TextAllowed", "KL_Enc_IsEnabled"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(Owner != "", "The child must include the actual owner of " . Symbol)
 		Source .= "#Include " . Owner . "`n"

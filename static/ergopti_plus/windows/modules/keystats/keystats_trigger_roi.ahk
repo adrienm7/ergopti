@@ -174,7 +174,8 @@ KL_Roi_OnHotstring(trigger, net_saved, is_private := false) {
 			return
 		KLRoi.session_saved_chars += Max(0, net_saved)
 		KLRoi.session_fired_count += 1
-		if !is_private
+		TextAllowed := KL_Roi_TextAllowed()
+		if !is_private && TextAllowed
 			KLRoi.trigger_last_use[StrLower(trigger)] := A_TickCount
 		EmitSnapshot := (Mod(KLRoi.session_fired_count,
 			KLRoiConst.ROI_SNAPSHOT_EVERY) = 0)
@@ -242,6 +243,8 @@ KL_Roi_AdmitWordContext(Snapshot := unset) {
 ; Called from KL_Hook_OnChar on every character. Accumulates the current
 ; word and flushes it at word boundaries.
 KL_Roi_OnChar(Text) {
+	if !KL_Roi_TextAllowed()
+		return
 	if !KL_Roi_RequireInit("KL_Roi_OnChar") || !KL_Roi_AdmitWordContext()
 		return
 	; A failed dead-key composition can deliver several characters in one callback.
@@ -250,23 +253,28 @@ KL_Roi_OnChar(Text) {
 		Width := _TextCodepointWidth(Text, Position, Units)
 		c := SubStr(Text, Position, Width)
 		Position += Width
-		if (c != " " and c != "`t" and c != "`n" and c != "`r"
-				and c != "." and c != "," and c != "!" and c != "?") {
-			if KLRoi.word_overflowed
-				continue
-			; Bound UTF-16 storage before appending the entire codepoint.
-			if StrLen(KLRoi.current_word) + Width > KLRoiConst.MAX_INPROGRESS_WORD_LEN {
-				KLRoi.current_word := ""
-				KLRoi.word_overflowed := true
+		CaptureCritical := Critical("On")
+		try {
+			if !KL_Roi_TextAllowed()
+				return
+			if (c != " " and c != "`t" and c != "`n" and c != "`r"
+					and c != "." and c != "," and c != "!" and c != "?") {
+				if KLRoi.word_overflowed
+					continue
+				; Bound UTF-16 storage before appending the entire codepoint.
+				if StrLen(KLRoi.current_word) + Width > KLRoiConst.MAX_INPROGRESS_WORD_LEN {
+					KLRoi.current_word := ""
+					KLRoi.word_overflowed := true
+					continue
+				}
+				KLRoi.current_word .= c
 				continue
 			}
-			KLRoi.current_word .= c
-			continue
-		}
-		word := KLRoi.current_word
-		KLRoi.current_word := ""
-		overflowed := KLRoi.word_overflowed
-		KLRoi.word_overflowed := false
+			word := KLRoi.current_word
+			KLRoi.current_word := ""
+			overflowed := KLRoi.word_overflowed
+			KLRoi.word_overflowed := false
+		} finally Critical(CaptureCritical)
 		if (overflowed)
 			continue
 		KL_Roi_ProcessWord(word)
@@ -275,6 +283,8 @@ KL_Roi_OnChar(Text) {
 
 ; Special keys arrive through OnKeyDown rather than the character callback.
 KL_Roi_OnKey(vk) {
+	if !KL_Roi_TextAllowed()
+		return
 	if !KL_Roi_RequireInit("KL_Roi_OnKey") || !KL_Roi_AdmitWordContext()
 		return
 	switch vk {
@@ -290,6 +300,8 @@ KL_Roi_OnKey(vk) {
 }
 
 KL_Roi_ProcessWord(word) {
+	if !KL_Roi_TextAllowed()
+		return
 		global _TriggerSet
 		if (StrLen(word) < KLRoiConst.MIN_WORD_LEN)
 				return
@@ -302,7 +314,12 @@ KL_Roi_ProcessWord(word) {
 		; Bump count in a short transaction so snapshot generations cannot observe
 		; half of the read/modify/write pair.
 		cnt := 0
-		map_size := KL_Roi_IncrementWordCount(KLRoi, key, &cnt)
+		CaptureCritical := Critical("On")
+		try {
+			if !KL_Roi_TextAllowed()
+				return
+			map_size := KL_Roi_IncrementWordCount(KLRoi, key, &cnt)
+		} finally Critical(CaptureCritical)
 
 		; Emit candidate event on threshold crossing
 		if (cnt = KLRoiConst.REPEAT_THRESHOLD) {
@@ -361,6 +378,8 @@ KL_Roi_PruneWordCounts() {
 ; ==========================================
 
 KL_Roi_HalflifeTick() {
+	if !KL_Roi_TextAllowed()
+		return
 	if !KL_Roi_RequireInit("KL_Roi_HalflifeTick")
 		return
 	; SetTimer bypasses Suspend — skip the iteration and KL_AppendLog call

@@ -92,6 +92,7 @@ Test("keystats ROI: prune transaction swaps bounded survivors (roi-prune-bounded
 	_ROIP_TransactionPublishesBoundedSurvivors)
 
 #Include test_roi_halflife_native64_owner.ahk
+#Include ../test_roi_encryption_publication.ahk
 
 
 _KRCTX_ChildSource() {
@@ -113,9 +114,14 @@ _KRCTX_ChildSource() {
 	PruneOwner := _DriverProductionFileForSymbol("KL_Roi_IncrementWordCount", _DriverDir)
 	AssertTrue(PruneOwner != "")
 	Source .= "#Include " . PruneOwner . "`n"
+	for Symbol in ["KL_Roi_TextAllowed", "KL_Enc_IsEnabled", "_KL_JournalPendingEntries"] {
+		PolicyOwner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
+		AssertTrue(PolicyOwner != "", "The real ROI text policy dependency must resolve.")
+		Source .= "#Include " . PolicyOwner . "`n"
+	}
 	; _TextCodepointWidth arrives with its whole owner through _KSD_ChildSource;
 	; a second copy of its body is a duplicate declaration the child refuses.
-	for Symbol in ["KL_MarkSynthetic", "KL_ClearSynthetic", "KL_Roi_RequireInit", "KL_Roi_DiscardWord", "KL_Roi_AdmitWordContext", "KL_Roi_OnChar", "KL_Roi_ProcessWord", "KL_Roi_PruneWordCounts"] {
+	for Symbol in ["KL_MarkSynthetic", "KL_ClearSynthetic", "KL_Roi_RequireInit", "KL_Roi_DiscardWord", "KL_Roi_AdmitWordContext", "KL_Roi_OnChar", "KL_Roi_ProcessWord", "KL_Roi_PruneWordCounts", "KL_Roi_OnHotstring"] {
 		Body := _DriverFuncBody(Symbol)
 		AssertTrue(Body != "", "The complete real ROI path must resolve: " . Symbol)
 		Source .= Body . "`n"
@@ -193,3 +199,27 @@ for _KRCTX_Mode in ["same-app", "cross-app", "same-context-refresh", "cross-wind
 
 Test("Keystats ROI word context: synthetic marker without hook callbacks retires the fragment (roi-context-word-owner)",
 	_KRCTX_Case.Bind("synthetic-gap"))
+
+for _KRCTX_PolicyMode in ["policy-on", "policy-unknown", "policy-resume"]
+	Test("ROI encryption: real capture and central append " . _KRCTX_PolicyMode . " (roi-encryption-publication)",
+		_KRCTX_Case.Bind(_KRCTX_PolicyMode))
+
+_KROI_LowercaseCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\keystats\roi_lowercase_vectors.json", "UTF-8"))
+	AssertEqual(1488, Corpus["vectors"].Length)
+	AssertEqual(3, Corpus["context_vectors"].Length)
+	Count := 0
+	for Group in ["vectors", "context_vectors"] {
+		for Vector in Corpus[Group] {
+			Count += 1
+			AssertTrue(StrLower(Vector[1]) == Vector[2],
+				"The real native lowercase differs from qualified ROI vector " . Count)
+		}
+	}
+	_TestPrint("# roi-lowercase-qualified " . KL_JsonEncode(Map("vectors", Count,
+		"ahk_version", A_AhkVersion, "windows_version", A_OSVersion, "language", A_Language,
+		"source_run", Corpus["qualification"]["run_url"])))
+}
+Test("ROI lowercase: real StrLower matches all qualified scalar and context vectors (roi-lowercase-native-corpus)",
+	_KROI_LowercaseCorpus)

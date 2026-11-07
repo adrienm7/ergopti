@@ -139,6 +139,8 @@ _MF_FilterConfigKey(Prop) {
 
 _MF_PublishFlagCandidate(Prop, Target) {
 	MetricsFilters.%Prop% := Target
+	if Prop == "encrypt" && !KL_Roi_CommitEncryptionPolicy(Target)
+		throw Error("ROI text policy did not acknowledge the encryption preference.")
 }
 
 _MF_BuildFilterTogglePlan(Prop) {
@@ -158,6 +160,8 @@ MF_CommitFilterToggle(Prop, WriterFn := 0, NotifyFn := 0) {
 }
 
 _MF_ApplyEncryptionCandidate(Target, ApplyFn := 0) {
+	if Target && !KL_Roi_EncryptionReady()
+		return false
 	if HasMethod(ApplyFn, "Call") {
 		Applied := ApplyFn.Call(Target)
 		return (Applied is Integer) && Applied == 1
@@ -176,6 +180,13 @@ _MF_EncryptionCandidateAvailable(AvailableFn := 0) {
 _MF_BuildEncryptionTogglePlan(Outcome, ApplyFn := 0, AvailableFn := 0) {
 	OldValue := !!MetricsFilters.encrypt
 	Target := !OldValue
+	Outcome["roi_owner"] := KL_Roi_BeginEncryptionRequest(Target)
+	if !IsObject(Outcome["roi_owner"])
+		throw Error("An encryption preference transition already owns ROI admission.")
+	if Target && !KL_Roi_EncryptionReady() {
+		Outcome["pending_write"] := true
+		return { noop: true }
+	}
 	if Target && !_MF_EncryptionCandidateAvailable(AvailableFn) {
 		try LoggerError("Keystats", "At-rest encryption requested but no key can be derived - staying off.")
 		return { noop: true }
@@ -191,15 +202,15 @@ _MF_BuildEncryptionTogglePlan(Outcome, ApplyFn := 0, AvailableFn := 0) {
 	}
 }
 
-_MF_NotifyEncryptionUnavailable(NotifyFn := 0) {
+_MF_NotifyEncryptionUnavailable(NotifyFn := 0, PendingWrite := false) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _MF_NotifyEncryptionUnavailable(NotifyFn)
+		try return _MF_NotifyEncryptionUnavailable(NotifyFn, PendingWrite)
 		finally Critical(InheritedCritical)
 	}
 	try {
-		Message := t("dialog.metrics.encryption_unavailable")
+		Message := t(PendingWrite ? "dialog.metrics.encryption_pending_write" : "dialog.metrics.encryption_unavailable")
 		Options := Map("title", t("dialog.metrics.encrypt_confirm_title"),
 			"level", "error")
 		Presented := HasMethod(NotifyFn, "Call")
@@ -220,14 +231,19 @@ _MF_NotifyEncryptionUnavailable(NotifyFn := 0) {
 MF_CommitEncryptionToggle(WriterFn := 0, NotifyFn := 0, ApplyFn := 0,
 		AvailableFn := 0) {
 	Outcome := Map("accepted", false)
-	Committed := MF_SaveBuiltToIni("the at-rest encryption preference",
-		_MF_BuildEncryptionTogglePlan.Bind(Outcome, ApplyFn, AvailableFn),
-		WriterFn, NotifyFn)
-	if !Committed
-		return false
-	if Outcome.Get("accepted", false)
-		return true
-	return _MF_NotifyEncryptionUnavailable(NotifyFn)
+	try {
+		Committed := MF_SaveBuiltToIni("the at-rest encryption preference",
+			_MF_BuildEncryptionTogglePlan.Bind(Outcome, ApplyFn, AvailableFn),
+			WriterFn, NotifyFn)
+		if !Committed
+			return false
+		if Outcome.Get("accepted", false)
+			return true
+		return _MF_NotifyEncryptionUnavailable(NotifyFn, Outcome.Get("pending_write", false))
+	} finally {
+		if IsObject(Outcome.Get("roi_owner", 0))
+			KL_Roi_EndEncryptionRequest(Outcome["roi_owner"])
+	}
 }
 
 _MF_BuildDisabledAppsPlan(Selected, Receipt := 0, DurableOutcome := 0) {

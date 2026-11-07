@@ -617,6 +617,9 @@ KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
 		; the row. Check its immutable preimage after that call, before allocating.
 		if FrozenClosing && !_KL_IsFrozenSessionClose(entry, FrozenClose, PublishCommit?)
 			return false
+		if (entry["type"] == "new_trigger_candidate" || entry["type"] == "trigger_halflife")
+			&& !KL_Roi_AdmitTextEntry(entry)
+			return false
 		KL_AssignStableEventId(entry)
 		if FrozenClosing && !_KL_IsFrozenSessionClose(entry, FrozenClose, PublishCommit?, true)
 			return false
