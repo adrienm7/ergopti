@@ -337,7 +337,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.clear_notifications`: This system lets no application dismiss notifications: clear them in the notification centre, which the equivalent action opens. Equivalent actions: `notification_center`.
 - [ ] `sg_actions.unblock_file_selection`: Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file. Equivalent actions: `remove_quarantine_selection`.
 - [ ] `sg_actions.ocr_screenshot`: On macOS, Live Text reads the text of any capture or image: take one with the equivalent action, then select its text. Equivalent actions: `screen_capture`.
-- [ ] `sg_actions.take_note`: Windows only: this opens the day's notes file in Notepad, the editor every Windows ships. macOS has its own Quick Note (Fn+Q), and Linux has no editor every desktop ships.
+- [ ] `sg_actions.take_note`: macOS provides Quick Note (Fn+Q) instead of opening a plain-text notes file.
 - [ ] `sg_actions.microsoft_bold`: Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”.
 - [ ] `sg_actions.one_shot_shift`: This system offers the same action under another name: use the equivalent action. Equivalent actions: `sticky_shift`.
 - [ ] `sg_actions.caps_word`: This system offers the same action under another name: use the equivalent action. Equivalent actions: `capsword`.
@@ -348,7 +348,7 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.open_list_vars`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 - [ ] `sg_actions.open_key_history`: Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open.
 
-## linux — 73 actions not declared
+## linux — 72 actions not declared
 
 - [ ] `sg_actions.lookup`: macOS only: Look Up opens the system dictionary panel on the word under the pointer. Windows and Linux have no system dictionary panel.
 - [ ] `sg_actions.system_app_switcher`: macOS only: macOS switches between applications, each holding its windows. Windows and Linux switch between windows with Alt+Tab: use the equivalent action. Equivalent actions: `app_switcher`.
@@ -371,7 +371,6 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.unblock_file_selection`: Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file.
 - [ ] `sg_actions.open_terminal_here`: Not on Linux: its file managers tell no other application which folder they show.
 - [ ] `sg_actions.new_text_file_here`: Not on Linux: its file managers tell no other application which folder they show.
-- [ ] `sg_actions.take_note`: Windows only: this opens the day's notes file in Notepad, the editor every Windows ships. macOS has its own Quick Note (Fn+Q), and Linux has no editor every desktop ships.
 - [ ] `sg_actions.activity_simulation`: Not on Linux: each Linux desktop keeps a session awake through its own idle inhibitor (the presentation mode of KDE and Xfce, a Caffeine extension on GNOME); turn it on there.
 - [ ] `sg_actions.display_mirror_toggle`: No toggle on Linux: GNOME and KDE choose Duplicate in their own Super+P display switcher; bind that key as a keystroke.
 - [ ] `sg_actions.microsoft_bold`: Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”.

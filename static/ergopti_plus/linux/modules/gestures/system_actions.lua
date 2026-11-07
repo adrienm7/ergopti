@@ -256,6 +256,9 @@ end
 --- receives { run_background = fn(cmd), clipboard = adapter, emit_combo = fn,
 --- sleep_ms = fn } from the executor.
 M.HANDLERS = {
+	take_note = function(deps)
+		return require("modules.take_note").open(deps.run_background)
+	end,
 	-- X11 pointer moves (modules/gestures/pointer_warp.lua); Wayland refuses.
 	center_mouse = function(deps) require("modules.gestures.pointer_warp").center_mouse(deps) end,
 	teleport_mouse = function(deps)
