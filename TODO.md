@@ -10,16 +10,15 @@ the field-run step or the hand action that proves it and the commits it confirms
 
 ## Windows CI reliability (2026-11-07)
 
-- [ ] **[CODE] Boot counts 2 more TOML parses than on 2026-11-05:** every seeded startup-smoke boot counts 16
-      document parses and 14 registry compares against ceilings of 14 and 13 (19c96ca86f counted 14 and 13). The
-      compare is 424b4a26d8's boot-tail snapshot proof; the parses came with the 2026-11-06 integration. The boot
-      log's `toml.document_parse_by.<caller><parent>` counters name each parser; remove or share the new one.
+- [x] **[CODE] Boot counts 2 more TOML parses than on 2026-11-05:** the boot log's "Document parses by owner"
+      record named them: the typed personal_info.toml read (ad8268b7da, kept, ceiling 15) and an absent override
+      file parsed as an empty document (3e25e5d71c, no longer parsed). The extra registry compare is 424b4a26d8's
+      boot-tail snapshot proof (kept, ceiling 14).
 - [ ] **[TEST] layout-row-external-native-flags (released):** fails about every other hosted run with « q » for « Q ».
       09fb9c0458 prints the receiver's Shift state and the sender's output; read them on the next failure and
       fix the test race or the lost flag they show.
-- [ ] **[TEST] LLM debounce privacy probes:** an allowed context arms the engine but sends no request about every
-      other hosted run. 09fb9c0458 prints the engine and detector state against the 1 s verdict TTL on the next
-      failure; fix the cause it shows.
+- [x] **[TEST] LLM debounce privacy probes:** the trace showed a real Windows bug: a late key-down of the last
+      typed letter cancelled the debounce its character had just armed (66afcf12e3). Fixed by 679e279d19.
 
 ## Layout generator from an Ergopti TOML source (maintainer request, 2026-11-06)
 
