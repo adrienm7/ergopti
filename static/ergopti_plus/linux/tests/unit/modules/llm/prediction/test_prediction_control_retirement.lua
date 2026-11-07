@@ -107,6 +107,8 @@ local function scenario(options, body)
 			is_wayland = function() return false end, kind = function() return "x11" end }
 		package.loaded["adapters.keyboard_hook"] = { held_text_modifier_codes = function() return {} end,
 			held_shortcut_modifier_codes = function() return {} end, held_forwarded_keys = function() return {} end,
+			-- The fixture's evdev A=30 and space=57 belong to this physical provider.
+			get_layout = function() return "qwerty" end,
 			emergency_stop = function() state.stopped = true end }
 		local layout = require("adapters.keyboard_layout")
 		layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} },

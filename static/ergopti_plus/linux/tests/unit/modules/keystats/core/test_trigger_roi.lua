@@ -117,6 +117,96 @@ helpers.it("Linux trigger ROI: the real engine excludes strict Unicode triggers 
 	helpers.assert_eq(engine:is_known_trigger("école"), false, "an admitted empty catalogue removes old exclusions")
 end)
 
+Home.it("Linux trigger ROI: refused collection never captures physical metadata or the calendar", function()
+	Native.with(function(collector)
+		local writer = start(collector)
+		local hook, calendar = require("adapters.keyboard_hook"), require("modules.keystats.calendar")
+		local original_layout, original_capture = hook.get_layout, calendar.capture
+		local function refused(owner)
+			local physical, clocks = 0, 0
+			hook.get_layout = function() physical = physical + 1; error("refused input consulted its physical provider") end
+			calendar.capture = function() clocks = clocks + 1; error("refused input consulted its calendar") end
+			local ok, failure = xpcall(function()
+				helpers.assert_eq(collector.observe_roi_context(owner), false)
+				helpers.assert_eq(collector.record_roi_text("withheld ", owner, unknown), false)
+				helpers.assert_eq(collector.record_roi_key("backspace", {}, owner, unknown), false)
+			end, debug.traceback)
+			hook.get_layout, calendar.capture = original_layout, original_capture
+			if not ok then error(failure, 0) end
+			helpers.assert_eq({ physical, clocks }, { 0, 0 }, "refusal precedes both metadata owners")
+		end
+		local configuration = assert(collector.configuration_snapshot())
+		configuration.enabled = false; helpers.assert_true(collector.apply_configuration(configuration))
+		refused(context())
+		configuration.enabled = true; helpers.assert_true(collector.apply_configuration(configuration))
+		collector.suspend_collection(); refused(context()); collector.resume_collection()
+		collector.set_secure_field(true); refused(context()); collector.set_secure_field(false)
+		configuration.disabled_apps = { "Editor" }; helpers.assert_true(collector.apply_configuration(configuration))
+		refused(context())
+		configuration.disabled_apps = {}; helpers.assert_true(collector.apply_configuration(configuration))
+		refused(nil)
+		refused("unknown")
+		for _, owner in ipairs({ {}, { app_id = "Editor", title = "Document" },
+			{ app_id = "Unknown", title = "Document", native_identity = "owned" },
+			{ app_id = "Editor", native_identity = "owned" },
+			{ app_id = "Editor", title = "Document", native_identity = 0 },
+			{ app_id = "Editor", title = "Document", native_identity = math.huge } }) do refused(owner) end
+		local physical, clocks = 0, 0
+		hook.get_layout = function() physical = physical + 1; return original_layout() end
+		calendar.capture = function() clocks = clocks + 1; return original_capture() end
+		local ok, failure = xpcall(function()
+			helpers.assert_true(collector.observe_roi_context(context()))
+			helpers.assert_true(collector.record_roi_text("x", context(), unknown))
+			helpers.assert_true(collector.record_roi_key("backspace", {}, context(), unknown))
+		end, debug.traceback)
+		hook.get_layout, calendar.capture = original_layout, original_capture
+		if not ok then error(failure, 0) end
+		helpers.assert_eq({ physical, clocks }, { 3, 3 }, "admitted observations retain both real capture owners")
+		for _ = 1, 5 do collector.record_roi_text("admitted ", context(), unknown) end
+		Native.flush(collector)
+		local actual = rows(writer)
+		helpers.assert_eq(#actual, 1)
+		helpers.assert_eq(actual[1].meta.word, "admitted")
+	end)
+end)
+
+Home.it("Linux trigger ROI: early cipher refusal still retires queued text and keeps numerical totals", function()
+	Native.with(function(collector)
+		local writer = start(collector)
+		local hook, cipher = require("adapters.keyboard_hook"), require("modules.keystats.text_cipher")
+		local original_layout, original_enabled = hook.get_layout, cipher.is_enabled
+		local probes = { { "on", "observe" }, { "unknown", "text" }, { "on", "key" }, { "unknown", "shortcut" } }
+		for _, probe in ipairs(probes) do
+			local configuration = assert(collector.configuration_snapshot())
+			configuration.enabled = true; helpers.assert_true(collector.apply_configuration(configuration))
+			for _ = 1, 5 do collector.record_roi_text("retiredcandidate ", context(), unknown) end
+			local now = require("infra.monotonic").now_ms()
+			for index = 1, 10 do collector.record_hotstring("Editor", "x", "xx", now + index, "static", 1, true) end
+			if probe[1] == "unknown" then
+				configuration.enabled = false; helpers.assert_true(collector.apply_configuration(configuration))
+			end
+			local physical = 0
+			hook.get_layout = function() physical = physical + 1; error("closed cipher policy consulted physical metadata") end
+			cipher.is_enabled = function() if probe[1] == "on" then return true end end
+			local ok, failure = xpcall(function()
+				if probe[2] == "observe" then helpers.assert_eq(collector.observe_roi_context(context()), false)
+				elseif probe[2] == "text" then helpers.assert_eq(collector.record_roi_text("withheld ", context(), unknown), false)
+				else helpers.assert_eq(collector.record_roi_key(probe[2] == "key" and "backspace" or "shortcut", {}, context(), unknown), false) end
+			end, debug.traceback)
+			hook.get_layout, cipher.is_enabled = original_layout, original_enabled
+			if not ok then error(failure, 0) end
+			helpers.assert_eq(physical, 0)
+			Native.flush(collector)
+		end
+		local actual = rows(writer)
+		helpers.assert_eq(#actual, #probes, "every entry point retires queued text while numerical snapshots survive")
+		for index, event in ipairs(actual) do
+			helpers.assert_eq(event.kind, "roi_snapshot")
+			helpers.assert_eq(event.meta, { session_saved = index * 10, session_fired = index * 10 })
+		end
+	end)
+end)
+
 Home.it("Linux trigger ROI: actual daemon callbacks exclude synthetic output and interrupted physical fragments", function()
 	Native.with(function(collector)
 		local writer = start(collector)

@@ -1348,15 +1348,27 @@ end
 --- Admits metadata already joined by the existing privacy owner to a native window.
 --- @param context table|nil { app_id, native_identity, title }.
 --- @return table|nil Portable context stamped at this observation.
-function Roi.context(context, clock)
-	if not Roi.sync() or not may_record() or type(context) ~= "table" or M.is_unrecorded_app(context.app_id) then return nil end
-	return { app = context.app_id, window = context.native_identity, title = context.title, timestamp = clock.ts }
+--- @return table|nil Capture clock, only after policy and identity admit the input.
+function Roi.context(context)
+	-- Cipher synchronisation must still retire pending text when another gate
+	-- refuses capture. Neither refusal may consult physical or calendar owners.
+	if not Roi.sync() or not may_record() or type(context) ~= "table" or M.is_unrecorded_app(context.app_id) then
+		Roi.owner.discard(Roi.state)
+		return nil
+	end
+	local portable = { app = context.app_id, window = context.native_identity, title = context.title }
+	if not Roi.owner.valid_context_identity(portable) then Roi.owner.discard(Roi.state); return nil end
+	local clock = capture_input_clock()
+	portable.timestamp = clock.ts
+	return portable, clock
 end
 
 --- Publishes focus observations even when no character was typed between windows.
 --- @param context table|nil Existing privacy owner's joined native context.
 function M.observe_roi_context(context)
-	return Roi.owner.observe(Roi.state, Roi.context(context, capture_input_clock()))
+	local portable = Roi.context(context)
+	if not portable then return false end
+	return Roi.owner.observe(Roi.state, portable)
 end
 
 --- Observes admitted physical text and excludes the live catalogue's known triggers.
@@ -1364,8 +1376,9 @@ end
 --- @param context table Existing privacy owner's joined native context.
 --- @param known_trigger function Returns exactly false only for an unknown trigger.
 function M.record_roi_text(text, context, known_trigger)
-	local clock = capture_input_clock()
-	local admitted = Roi.owner.text(Roi.state, text, Roi.context(context, clock), known_trigger)
+	local portable, clock = Roi.context(context)
+	if not portable then return false end
+	local admitted = Roi.owner.text(Roi.state, text, portable, known_trigger)
 	Roi.queue(clock)
 	return admitted
 end
@@ -1380,9 +1393,10 @@ function M.record_roi_key(key, detail, context, known_trigger)
 		pageup = "PageUp", pagedown = "PageDown", home = "Home", ["end"] = "End",
 		left = "Left", right = "Right", up = "Up", down = "Down", delete = "Delete", insert = "Delete" }
 	local mods = type(detail) == "table" and type(detail.mods) == "table" and detail.mods or {}
-	if key == "shortcut" or mods.ctrl or mods.alt or mods.meta then Roi.owner.discard(Roi.state); return false end
-	local clock = capture_input_clock()
-	local admitted = Roi.owner.key(Roi.state, names[key], Roi.context(context, clock), known_trigger)
+	if key == "shortcut" or mods.ctrl or mods.alt or mods.meta then Roi.sync(); Roi.owner.discard(Roi.state); return false end
+	local portable, clock = Roi.context(context)
+	if not portable then return false end
+	local admitted = Roi.owner.key(Roi.state, names[key], portable, known_trigger)
 	Roi.queue(clock)
 	return admitted
 end

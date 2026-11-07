@@ -116,12 +116,20 @@ local function valid_timestamp(value)
 		or (type(value) == "number" and value == value and value >= 0 and value < math.huge)
 end
 
---- Whether a supplied context identifies one admitted application and window.
-local function valid_context(context)
+--- Whether supplied metadata identifies one application and native window.
+--- Drivers can reject an identity before capturing timestamps or physical metadata.
+--- @param context table|nil { app, window, title }.
+--- @return boolean
+function M.valid_context_identity(context)
 	return type(context) == "table" and type(context.app) == "string"
 		and context.app ~= "" and context.app ~= "Unknown"
-		and type(context.title) == "string" and valid_timestamp(context.timestamp) and ((type(context.window) == "number" and context.window > 0 and context.window < math.huge)
+		and type(context.title) == "string" and ((type(context.window) == "number" and context.window > 0 and context.window < math.huge)
 			or (type(context.window) == "string" and context.window ~= ""))
+end
+
+--- Whether a supplied context identifies one admitted application and window.
+local function valid_context(context)
+	return M.valid_context_identity(context) and valid_timestamp(context.timestamp)
 end
 
 --- Publishes every observed context change, including changes with no intervening key.
