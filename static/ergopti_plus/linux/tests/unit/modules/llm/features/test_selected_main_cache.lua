@@ -29,19 +29,29 @@ helpers.describe("Main selected payload cache boundary", function()
 				.. "local _undoable={trigger='old',replacement='OLD'}; local LOG='Main cache test'; "
 				.. control_source .. "; return " .. replace_source .. ",handle_control,function() return _undoable end end"))()
 			local engine = require("modules.hotstrings.engine").new()
+			helpers.assert_true(engine:load_mappings({}))
 			for ch in ("btw"):gmatch(".") do engine:on_char(ch) end
 			helpers.assert_eq(engine:current_buffer(), "btw")
 			local reset, resets = engine.reset, 0
 			engine.reset = function(self, ...) resets = resets + 1; return reset(self, ...) end
-			local undo_outputs, corrections = 0, 0
+			local undo_outputs, corrections, roi_keys = 0, 0, 0
+			local context = { app_id = "Editor", title = "Selected document", native_identity = "x11:selection:1" }
 			local injector = { prepare_selected = state.injector.prepare_selected,
 				inject = function() undo_outputs = undo_outputs + 1; return { ok = true } end }
 			local replace, control, undo = factory(injector, { selection = owner }, { dry_run = false }, engine,
 				{ observe_key = function() end }, { now_ms = function() return 0 end }, require("logger.shim"),
 				{ is_paused = function() return false end }, { withdraw = function() state.allowed = false; owner.cancel() end },
-				{ blocks_text = function() return false end },
+				{ blocks_text = function() return false end, current_context = function() return context end },
 				{ is_password_app = function() return false end, is_unrecorded_app = function() return false end, suppress = function() end, unsuppress = function() end,
-					record_correction = function() corrections = corrections + 1 end })
+					record_correction = function() corrections = corrections + 1 end,
+					discard_roi = function() error("an admitted control must keep its joined ROI context") end,
+					record_roi_key = function(key, detail, observed, known)
+						helpers.assert_eq(key, "backspace")
+						helpers.assert_eq(detail, {})
+						helpers.assert_eq(observed, context)
+						helpers.assert_eq(known("old"), false, "the callback queries the genuinely admitted empty catalogue")
+						roi_keys = roi_keys + 1
+					end })
 			local token = state.read()
 			state.inserted = { first = 0, last = 1, text = "☃" }
 			local committed
@@ -53,6 +63,7 @@ helpers.describe("Main selected payload cache boundary", function()
 			control("backspace", {})
 			helpers.assert_eq(undo_outputs, 0, "a Backspace cannot replay the old expansion during the async wait")
 			helpers.assert_eq(corrections, 1, "the physical Backspace still counts as one manual correction")
+			helpers.assert_eq(roi_keys, 1, "the admitted physical edit reaches ROI before the preserved Undo boundary")
 			engine:on_char("x")
 			state.inserted = nil
 			state.deliver()
