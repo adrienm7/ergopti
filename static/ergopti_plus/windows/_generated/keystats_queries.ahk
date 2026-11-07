@@ -633,6 +633,23 @@ KeystatsQuery(Name, Params := Map()) {
 			["slot", "meta_json", "s?"],
 			["literal", ")`;"]
 		],
+		"events.roi", [
+			["literal", "INSERT OR IGNORE INTO events_roi (device_id, id, ts, date, kind, app, meta_json) VALUES ("],
+			["slot", "device_id", "s"],
+			["literal", ", "],
+			["slot", "id", "i"],
+			["literal", ", "],
+			["slot", "ts", "s"],
+			["literal", ", "],
+			["slot", "date", "s"],
+			["literal", ", "],
+			["slot", "kind", "s"],
+			["literal", ", "],
+			["slot", "app", "s"],
+			["literal", ", "],
+			["slot", "meta_json", "s?"],
+			["literal", ")`;"]
+		],
 		"events.hotstring", [
 			["literal", "INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars) VALUES ("],
 			["slot", "device_id", "s"],

@@ -1386,6 +1386,35 @@ check('llm: the catalogue stores the rows of the three drivers', () => {
 	);
 });
 
+check('trigger ROI events round-trip the Windows metadata and replay idempotently', () => {
+	const db = freshDb();
+	const events = [
+		{ kind: 'roi_snapshot', meta: { session_saved: 20, session_fired: 10 } },
+		{ kind: 'new_trigger_candidate', meta: { word: "d'apostrophe\r\n\u0000é", occurrences: 5 } },
+		{ kind: 'trigger_halflife', meta: { trigger: 'lowercase', days_since_use: 30.2 } }
+	];
+	for (const [offset, event] of events.entries()) {
+		const sql = catalogue('events.roi', {
+			device_id: 'device-a',
+			id: offset + 1,
+			...STAMP,
+			app: "Editor's app",
+			kind: event.kind,
+			meta_json: JSON.stringify(event.meta)
+		});
+		db.exec(sql);
+		db.exec(sql);
+	}
+	const stored = db.prepare('SELECT kind, app, meta_json FROM events_roi ORDER BY id').all();
+	assert.equal(stored.length, 3);
+	for (const [offset, row] of stored.entries()) {
+		assert.equal(row.kind, events[offset].kind);
+		assert.equal(row.app, "Editor's app");
+		assert.deepEqual(JSON.parse(row.meta_json), events[offset].meta);
+	}
+	db.close();
+});
+
 if (failures > 0) {
 	console.error(`\n${failures} keystats write catalogue check(s) failed.`);
 	process.exit(1);
