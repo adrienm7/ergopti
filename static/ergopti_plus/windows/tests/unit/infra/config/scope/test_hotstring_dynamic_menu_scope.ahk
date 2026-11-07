@@ -86,6 +86,40 @@ _HSCS_WithDynamicBootState(Body) {
 	}
 }
 
+; Walk the real native order subtree, including dispatcher ownership and the
+; edge/pause restrictions. A new parent cannot replace a family or its editor.
+_HSCS_DynamicOrderSubtree(Built, Position, Labels) {
+	global _MenuDispatchCallbacks
+	AssertEqual(t("menu.hotstrings.section_order"), _CTC_LabelAt(Built, Position), "the order parent follows the complete family list")
+	Handle := DllCall("GetSubMenu", "ptr", Built.Handle, "int", Position, "ptr")
+	Assert(Handle != 0, "the order row opens a real native submenu")
+	OrderMenu := MenuFromHandle(Handle)
+	AssertEqual(Labels.Length + 2, TrayMenuItemCount(OrderMenu), "each family plus the separator and reset has one owned row")
+	for Index, Label in Labels {
+		AssertEqual(Label, _CTC_LabelAt(OrderMenu, Index - 1), "movable families retain their native order and caption")
+		ChildHandle := DllCall("GetSubMenu", "ptr", Handle, "int", Index - 1, "ptr")
+		Assert(ChildHandle != 0, "each family owns its move commands")
+		Moves := MenuFromHandle(ChildHandle)
+		AssertEqual(2, TrayMenuItemCount(Moves), "each family has exactly the two directional commands")
+		for Direction, Key in ["menu.hotstrings.move_up", "menu.hotstrings.move_down"] {
+			AssertEqual(t(Key), _CTC_LabelAt(Moves, Direction - 1))
+			Id := DllCall("GetMenuItemID", "ptr", ChildHandle, "int", Direction - 1, "uint")
+			Assert(_MenuDispatchCallbacks.Has(Id), "each order command belongs to the real menu dispatcher")
+			State := DllCall("GetMenuState", "ptr", ChildHandle, "uint", Direction - 1, "uint", 0x400, "uint")
+			Assert(State != 0xFFFFFFFF, "the native command state must be readable")
+			Disabled := A_IsSuspended || Direction == 1 && Index == 1 || Direction == 2 && Index == Labels.Length
+			AssertEqual(Disabled, !!(State & 3), "edge moves and every paused move are disabled")
+		}
+	}
+	AssertTrue(TrayMenuIsSeparatorAt(OrderMenu, Labels.Length), "reset is separated from the family moves")
+	AssertEqual(t("hs_config.btn_reset_default"), _CTC_LabelAt(OrderMenu, Labels.Length + 1))
+	ResetId := DllCall("GetMenuItemID", "ptr", Handle, "int", Labels.Length + 1, "uint")
+	Assert(_MenuDispatchCallbacks.Has(ResetId), "reset belongs to the same native dispatcher")
+	State := DllCall("GetMenuState", "ptr", Handle, "uint", Labels.Length + 1, "uint", 0x400, "uint")
+	Assert(State != 0xFFFFFFFF, "the reset state must be readable")
+	AssertEqual(A_IsSuspended, !!(State & 3), "reset respects pause")
+}
+
 ; Dynamic scopes have eight canonical families and their master,
 ; hotstrings.dynamic.enabled, which the whole-family selection writes with them.
 ; The native submenu applies in-process while the master or pause is off. The
@@ -104,12 +138,20 @@ _HSCS_DynamicMenuLive(Enabled, Paused := false) {
 	Source .= '[hotstrings.dynamic.future_family]`nenabled = true`n[private]`ncredential = "retain-dynamic-fixture"`n'
 	_HSCS_WithLiveConfig(Source, Map("Hotstrings", false, "Rolls", true), Check)
 	Check(Fixture, Options, Calls) {
-		global CategoryEnabled
+		global CategoryEnabled, _DYNAMIC_HOTSTRINGS_ORDER, _LegacyDynamicHotstringsKeyMap
 		SavedSuspend := A_IsSuspended, Built := 0
 		try {
 			Suspend(Paused)
 			Built := _BuildDynamicHotstringsSubmenu(Options)
-			AssertEqual(12, TrayMenuItemCount(Built), "two shared commands, two separators, seven displayed families and their editor")
+			AssertEqual(13, TrayMenuItemCount(Built), "two commands, two separators, seven families, their editor and the order parent")
+			Labels := []
+			for Id in _DYNAMIC_HOTSTRINGS_ORDER {
+				if Id == "-"
+					continue
+				Entry := ManifestFindEntryByPath("hotstrings.dynamic." . _LegacyDynamicHotstringsKeyMap[Id])
+				Labels.Push(MenuRowFromManifest(Entry, "DynamicHotstrings")["label"])
+			}
+			_HSCS_DynamicOrderSubtree(Built, 12, Labels)
 			AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.enable_all_sections")), "the old checkbox is retired")
 			AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.category_enable")), "there is no invented dynamic category switch")
 			AssertEqual(1, _CTC_CountLabel(Built, t("menu.shortcuts.edit_personal_info")), "the existing editor stays reachable")
@@ -208,8 +250,8 @@ _HSCS_DynamicSharedOrder(Corpus, Vector) {
 			AssertEqual(Id, _DYNAMIC_HOTSTRINGS_ORDER[Index], "the boot order must follow the independent vector")
 		Built := _BuildDynamicHotstringsSubmenu()
 		try {
-			AssertEqual(12, TrayMenuItemCount(Built), "all shared commands, families, separators and editor survive")
-			Position := 3
+			AssertEqual(13, TrayMenuItemCount(Built), "all shared commands, families, separators, editor and order parent survive")
+			Position := 3, Labels := []
 			for Index, Id in Expected {
 				if Id == "-" {
 					State := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint")
@@ -222,6 +264,7 @@ _HSCS_DynamicSharedOrder(Corpus, Vector) {
 					Row := MenuRowFromManifest(Entry, "DynamicHotstrings")
 					Assert(Row is Map, "the independent family must produce its native row")
 					AssertEqual(Row["label"], _CTC_LabelAt(Built, Position), "the actual native menu must follow the shared order")
+					Labels.Push(Row["label"])
 					if ExpectedId == "text_expansion_personal_information" {
 						Position += 1
 						AssertEqual(t("menu.shortcuts.edit_personal_info"), _CTC_LabelAt(Built, Position),
@@ -230,7 +273,10 @@ _HSCS_DynamicSharedOrder(Corpus, Vector) {
 				}
 				Position += 1
 			}
-			AssertEqual(12, Position, "every native row is accounted for")
+			AssertEqual(12, Position, "the original family and editor rows precede the order parent")
+			_HSCS_DynamicOrderSubtree(Built, Position, Labels)
+			Position += 1
+			AssertEqual(TrayMenuItemCount(Built), Position, "every native row including the complete order subtree is accounted for")
 		} finally _CTC_ReleaseMenu(Built)
 	}
 }
@@ -252,6 +298,48 @@ Test("hotstring dynamic shared metadata: independent and detached", _HSCS_Dynami
 for _HSCS_MenuVector in JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_hotstrings\menu_vectors.json", "UTF-8"))["vectors"]
 	Test("hotstring dynamic shared order: " . _HSCS_MenuVector["id"],
 		_HSCS_DynamicSharedOrder.Bind(JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_hotstrings\menu_vectors.json", "UTF-8")), _HSCS_MenuVector))
+
+
+; The independently inventoried writers run through the real configuration
+; lease and native file publication. Repaint is a receipt of a committed order.
+_HSCS_OrderNativePublication() {
+	_HSCS_WithLiveConfig('[private]`ncredential = "keep-order-fixture"`n', Map("Hotstrings", false), Check)
+	Check(Fixture, _Options, _Calls) {
+		Repaints := 0, Notices := 0, SavedSuspend := A_IsSuspended
+		Repaint(*) => Repaints += 1
+		Notify(*) => Notices += 1
+		try {
+			Suspend(false)
+			Snapshot := _HS_OrderSnapshot("dynamichotstrings", Fixture.path)
+			Assert(Snapshot is Map, "the real menu must capture its admitted configuration source")
+			AssertTrue(_HS_OrderCommit(Snapshot, ["date", "datefr"], 0, Repaint, Notify))
+			AssertEqual(1, Repaints)
+			AssertEqual(0, Notices)
+			Parsed := TOML_ParseFreshFile(Fixture.path)
+			AssertEqual('["date","datefr"]', KL_JsonEncode(Parsed["hotstrings.order_overrides"]["dynamichotstrings"]))
+			AssertEqual("keep-order-fixture", Parsed["private"]["credential"], "native publication preserves unrelated configuration")
+			Written := FSReadUtf8Exact(Fixture.path)
+			AssertFalse(_HS_OrderCommit(Snapshot, 0, 0, Repaint, Notify), "an old menu cannot reset the intervening native publication")
+			AssertEqual(Written, FSReadUtf8Exact(Fixture.path))
+			AssertEqual(1, Repaints, "a stale source cannot repaint a success")
+			AssertEqual(1, Notices, "the canonical owner reports the stale-source refusal")
+			Snapshot := _HS_OrderSnapshot("dynamichotstrings", Fixture.path)
+			for Receipt in [0, "1", 2] {
+				Writer := ((Value) => (*) => Value)(Receipt)
+				AssertFalse(_HS_OrderCommit(Snapshot, 0, Writer, Repaint, Notify), "refused or malformed native receipts cannot acknowledge reset")
+				AssertEqual(Written, FSReadUtf8Exact(Fixture.path))
+				AssertEqual(1, Repaints)
+			}
+			AssertEqual(4, Notices, "each malformed native receipt is reported")
+			AssertTrue(_HS_OrderCommit(Snapshot, 0, 0, Repaint, Notify), "a fresh reset commits through the same native owner")
+			Parsed := TOML_ParseFreshFile(Fixture.path)
+			AssertFalse(Parsed.Has("hotstrings.order_overrides") && Parsed["hotstrings.order_overrides"].Has("dynamichotstrings"))
+			AssertEqual("keep-order-fixture", Parsed["private"]["credential"])
+			AssertEqual(2, Repaints, "only the two native commits repaint")
+		} finally Suspend(SavedSuspend)
+	}
+}
+Test("hotstring-section-order: native publication, stale source and strict receipts own repaint", _HSCS_OrderNativePublication)
 
 
 ; A family switched on while the dynamic master is off would stay silent: the
