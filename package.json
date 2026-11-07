@@ -197,6 +197,7 @@
 		"test:macos-bundle-payload": "node ./tools/test/test-macos-bundle-payload.cjs",
 		"test:macos-keyboard-layout-bundle": "node ./tools/test/test-macos-keyboard-layout-bundle.cjs",
 		"test:macos-owned-runtime-code-hash-rule": "node ./tools/test/test-macos-owned-runtime-code-hash-rule.cjs",
+		"test:macos-build-scripts-bash32": "node ./tools/test/test-macos-build-scripts-bash32.cjs",
 		"test:macos-launcher-universal": "node ./tools/test/test-macos-launcher-universal.cjs",
 		"test:macos-swift-launcher-ci": "node ./tools/test/test-macos-swift-launcher-ci.cjs",
 		"test:item36-native-qualification": "node ./tools/test/test-item36-native-qualification.cjs",
