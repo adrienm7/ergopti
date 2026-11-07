@@ -46,7 +46,7 @@
 	"source_sha256": {
 		"static/ergopti_plus/windows/_generated/update_channels.ahk": "67d2977b59553b5a58cc9386dc1a3304e56a3706dc57d7c07a221e7075680a4b",
 		"static/ergopti_plus/windows/_generated/update_schedule.ahk": "d13e790c22ce73d57a6dd7b6ace50d73f3f2b74ca43593a0f9177d0c89decaf7",
-		"static/ergopti_plus/windows/infra/config_io.ahk": "f0e5a6814f47773ac66d009af6e293a5d136d18a3a295604f0e3d83547798273",
+		"static/ergopti_plus/windows/infra/config_io.ahk": "0da5bcc8c9a42658a093b2ad182787b79cef18a87d87fd0233b7ac3d2e2962fc",
 		"static/ergopti_plus/windows/infra/config_migrate.ahk": "6123574c18829321c817b9bfe0419edd0490edea914e74d44371f0208d2b8f78",
 		"static/ergopti_plus/windows/infra/config_transition_runtime.ahk": "b1a258c9027ca56419cf7f2d564226b11d4598ed6712a48b5c43aa65d5b045f7",
 		"static/ergopti_plus/windows/infra/config_write_lease.ahk": "44b46dff8e60970a22d58410b0125a5495af634228a647a5d8616335845adf2a",
@@ -70,7 +70,7 @@
 	"diagnostic_only": true,
 	"private_cost_fixture_admitted": false,
 	"role": "candidate",
-	"source_pin_base": "bb1b1354f4b8b35f1ec76f444d9bca055401e29c",
+	"source_pin_base": "792e2e3b12ef90a06bf55c012a4648d566186f36",
 	"runtime_qualification": "UNRUN",
 	"source_authority": "Pins are data; actual HEAD/Git object/API/artifact receiving remains independently required."
 }
