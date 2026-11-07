@@ -2019,8 +2019,8 @@
 		"path": "metrics.encrypt",
 		"family": "setting",
 		"labels": {
-			"fr": "Chiffrer les logs sur le disque (Sécurité)",
-			"en": "Encrypt logs on disk (Security)"
+			"fr": "Chiffrer le texte saisi (ROI : totaux numériques uniquement)",
+			"en": "Encrypt typing text (ROI: numeric totals only)"
 		},
 		"platforms": {
 			"windows": true,
