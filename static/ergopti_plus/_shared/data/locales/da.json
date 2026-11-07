@@ -4159,5 +4159,6 @@
 	"apps.cloner.err_source_unreadable": "Programmet kan ikke klones: dets starter angiver intet program.",
 	"apps.encryptor.drop_hint": "Slip filer her for at kryptere dem, eller .enc-filer for at dekryptere dem.",
 	"apps.cloner.msg_no_isolation": "Programmet har ingen indstilling for en separat profil: på Windows er klonen en ekstra genvej, der starter det samme program med de samme indstillinger.",
-	"inventory.behavior.layout_emulation": "Skriver den valgte .keylayout oven på systemets layout; de tre drivere afspiller ét korpus af tastetryk."
+	"inventory.behavior.layout_emulation": "Skriver den valgte .keylayout oven på systemets layout; de tre drivere afspiller ét korpus af tastetryk.",
+	"platform_reason.profile_shortcut_uses_prompt_action": "På Windows og Linux kan du tildele “AI-forudsigelse med en valgt prompt” til en tastaturgenvej og vælge din egen profil i handlingsvælgeren. Profilen gælder kun denne forespørgsel; handlingen afvises, hvis profilen er slettet eller AI er slået fra."
 }

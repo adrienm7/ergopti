@@ -4159,5 +4159,6 @@
 	"apps.cloner.err_source_unreadable": "Deze toepassing kan niet worden gekloond: haar starter noemt geen programma.",
 	"apps.encryptor.drop_hint": "Zet hier bestanden neer om ze te versleutelen, of .enc-bestanden om ze te ontsleutelen.",
 	"apps.cloner.msg_no_isolation": "Dit programma heeft geen optie voor een apart profiel: op Windows is de kloon een tweede snelkoppeling die hetzelfde programma met dezelfde instellingen start.",
-	"inventory.behavior.layout_emulation": "Typt het gekozen .keylayout over de systeemindeling; de drie stuurprogramma's spelen één corpus van toetsaanslagen af."
+	"inventory.behavior.layout_emulation": "Typt het gekozen .keylayout over de systeemindeling; de drie stuurprogramma's spelen één corpus van toetsaanslagen af.",
+	"platform_reason.profile_shortcut_uses_prompt_action": "Wijs in Windows en Linux “AI-voorspelling met een gekozen prompt” toe aan een sneltoets en kies je eigen profiel in de actiekiezer. Het profiel geldt alleen voor die aanvraag; bij een verwijderd profiel of uitgeschakelde AI wordt de actie geweigerd."
 }

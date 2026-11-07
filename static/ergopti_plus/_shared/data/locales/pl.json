@@ -4159,5 +4159,6 @@
 	"apps.cloner.err_source_unreadable": "Tej aplikacji nie można sklonować: jej program uruchamiający nie wskazuje żadnego programu.",
 	"apps.encryptor.drop_hint": "Upuść tutaj pliki, aby je zaszyfrować, lub pliki .enc, aby je odszyfrować.",
 	"apps.cloner.msg_no_isolation": "Ten program nie ma opcji osobnego profilu: w systemie Windows jego klon to drugi skrót uruchamiający ten sam program z tymi samymi ustawieniami.",
-	"inventory.behavior.layout_emulation": "Pisze wybrany .keylayout na układzie systemu; trzy sterowniki odtwarzają jeden korpus naciśnięć."
+	"inventory.behavior.layout_emulation": "Pisze wybrany .keylayout na układzie systemu; trzy sterowniki odtwarzają jeden korpus naciśnięć.",
+	"platform_reason.profile_shortcut_uses_prompt_action": "W Windows i Linux przypisz „Predykcję AI z wybranym promptem” do skrótu klawiaturowego i wybierz własny profil w selektorze działań. Profil dotyczy tylko tego żądania; usunięty profil lub wyłączona AI powodują odrzucenie działania."
 }

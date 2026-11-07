@@ -4159,5 +4159,6 @@
 	"apps.cloner.err_source_unreadable": "Bu uygulama klonlanamaz: başlatıcısı herhangi bir program belirtmiyor.",
 	"apps.encryptor.drop_hint": "Şifrelemek için dosyaları, şifresini çözmek için .enc dosyalarını buraya bırakın.",
 	"apps.cloner.msg_no_isolation": "Bu programın ayrı profil seçeneği yok: Windows'ta klonu, aynı programı aynı ayarlarla başlatan ikinci bir kısayoldur.",
-	"inventory.behavior.layout_emulation": "Seçilen .keylayout'u sistem düzeninin üzerine yazar; üç sürücü tek bir tuş vuruşu derlemini yeniden oynatır."
+	"inventory.behavior.layout_emulation": "Seçilen .keylayout'u sistem düzeninin üzerine yazar; üç sürücü tek bir tuş vuruşu derlemini yeniden oynatır.",
+	"platform_reason.profile_shortcut_uses_prompt_action": "Windows ve Linux’ta “Seçilen istemle yapay zekâ tahmini” eylemini bir klavye kısayoluna atayın ve eylem seçicisinde özel profilinizi seçin. Profil yalnızca o isteğe uygulanır; profil silinmişse veya yapay zekâ kapalıysa eylem reddedilir."
 }

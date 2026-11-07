@@ -609,6 +609,25 @@ for (const id of ['send_text', 'send_key', 'send_shortcut', 'llm_prompt_predicti
 	);
 }
 
+// Custom profile shortcuts use this action on Windows and Linux. The host's
+// opaque user id must survive the picker; a label or active profile is no substitute.
+for (const host of ['ahk', 'linux']) {
+	const page = loadPage(host);
+	vm.runInContext(
+		"promptChoices = [{ value: 'user_private_notes', label: 'Private notes' }]; doConfirm('llm_prompt_prediction')",
+		page.context
+	);
+	page.byId['param-profile'].value = 'user_private_notes';
+	page.byId['param-count'].value = '2';
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 &&
+			page.posted[0].id === 'llm_prompt_prediction' &&
+			page.posted[0].parameter === 'user_private_notes|2',
+		`${host}: the custom profile id and count reach the binding owner unchanged`
+	);
+}
+
 // 8. "Edit the current action" appears only when the current action takes a
 //    parameter, and reopens it: the page's editor, or the host's prompt.
 {

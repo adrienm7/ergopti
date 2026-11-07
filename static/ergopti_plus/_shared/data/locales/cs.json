@@ -4159,5 +4159,6 @@
 	"apps.cloner.err_source_unreadable": "Tuto aplikaci nelze klonovat: její spouštěč neuvádí žádný program.",
 	"apps.encryptor.drop_hint": "Přetáhněte sem soubory k zašifrování nebo soubory .enc k dešifrování.",
 	"apps.cloner.msg_no_isolation": "Tento program nemá volbu samostatného profilu: ve Windows je jeho klon druhý zástupce, který spouští stejný program se stejným nastavením.",
-	"inventory.behavior.layout_emulation": "Píše zvolený .keylayout přes rozložení systému; všechny tři ovladače přehrávají jeden korpus stisků."
+	"inventory.behavior.layout_emulation": "Píše zvolený .keylayout přes rozložení systému; všechny tři ovladače přehrávají jeden korpus stisků.",
+	"platform_reason.profile_shortcut_uses_prompt_action": "Ve Windows a Linuxu přiřaďte klávesové zkratce „Predikce AI se zvoleným promptem“ a ve výběru akcí zvolte vlastní profil. Profil platí pouze pro tento požadavek; smazaný profil nebo vypnutá AI akci odmítne."
 }

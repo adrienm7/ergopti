@@ -4159,5 +4159,6 @@
 	"apps.cloner.err_source_unreadable": "无法克隆此应用程序：其启动器未指定任何程序。",
 	"apps.encryptor.drop_hint": "将文件拖放到此处进行加密，或拖放 .enc 文件进行解密。",
 	"apps.cloner.msg_no_isolation": "此程序没有单独配置文件的选项：在 Windows 上，其克隆是以相同设置启动同一程序的第二个快捷方式。",
-	"inventory.behavior.layout_emulation": "在系统布局之上输入所选的 .keylayout；三个驱动程序重放同一套按键语料。"
+	"inventory.behavior.layout_emulation": "在系统布局之上输入所选的 .keylayout；三个驱动程序重放同一套按键语料。",
+	"platform_reason.profile_shortcut_uses_prompt_action": "在 Windows 和 Linux 上，将“使用所选提示词的 AI 预测”分配给键盘快捷键，然后在操作选择器中选择自定义配置。该配置仅适用于本次请求；如果配置已删除或 AI 已关闭，操作将被拒绝。"
 }

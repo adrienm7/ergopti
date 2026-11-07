@@ -4159,5 +4159,6 @@
 	"apps.cloner.err_source_unreadable": "Dette programmet kan ikke klones: oppstarteren angir ikke noe program.",
 	"apps.encryptor.drop_hint": "Slipp filer her for å kryptere dem, eller .enc-filer for å dekryptere dem.",
 	"apps.cloner.msg_no_isolation": "Dette programmet har ikke noe valg for en egen profil: på Windows er klonen en ekstra snarvei som starter samme program med de samme innstillingene.",
-	"inventory.behavior.layout_emulation": "Skriver valgt .keylayout over systemets oppsett; de tre driverne spiller av ett korpus av tastetrykk."
+	"inventory.behavior.layout_emulation": "Skriver valgt .keylayout over systemets oppsett; de tre driverne spiller av ett korpus av tastetrykk.",
+	"platform_reason.profile_shortcut_uses_prompt_action": "På Windows og Linux tilordner du «KI-prediksjon med en valgt prompt» til en hurtigtast og velger din egendefinerte profil i handlingsvelgeren. Profilen gjelder bare den forespørselen; handlingen avvises hvis profilen er slettet eller KI er slått av."
 }

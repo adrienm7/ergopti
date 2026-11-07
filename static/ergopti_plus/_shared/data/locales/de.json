@@ -4159,5 +4159,6 @@
 	"apps.cloner.err_source_unreadable": "Diese Anwendung kann nicht geklont werden: Ihr Starter nennt kein Programm.",
 	"apps.encryptor.drop_hint": "Legen Sie hier Dateien ab, um sie zu verschlüsseln, oder .enc-Dateien, um sie zu entschlüsseln.",
 	"apps.cloner.msg_no_isolation": "Dieses Programm hat keine Option für ein eigenes Profil: Unter Windows ist sein Klon eine zweite Verknüpfung, die dasselbe Programm mit denselben Einstellungen startet.",
-	"inventory.behavior.layout_emulation": "Tippt das gewählte .keylayout über dem Systemlayout; die drei Treiber spielen ein gemeinsames Tastenanschlag-Korpus ab."
+	"inventory.behavior.layout_emulation": "Tippt das gewählte .keylayout über dem Systemlayout; die drei Treiber spielen ein gemeinsames Tastenanschlag-Korpus ab.",
+	"platform_reason.profile_shortcut_uses_prompt_action": "Weisen Sie unter Windows und Linux „KI-Vorhersage mit gewähltem Prompt“ einem Tastenkürzel zu und wählen Sie Ihr eigenes Profil in der Aktionsauswahl. Das Profil gilt nur für diese Anfrage; bei gelöschtem Profil oder deaktivierter KI wird die Aktion abgelehnt."
 }
