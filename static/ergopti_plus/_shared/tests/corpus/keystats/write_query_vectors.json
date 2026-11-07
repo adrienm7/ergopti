@@ -128,6 +128,28 @@
 			"sql": "INSERT INTO devices (device_id, name, os, os_version, host_signature, created_at, updated_at) VALUES ('dev''1', 'Mac'||char(13)||'', 'darwin', '', 'sig', '2026-10-01T00:00:00Z', '2026-10-02T00:00:00Z') ON CONFLICT(device_id) DO UPDATE SET name = excluded.name, os = excluded.os, os_version = excluded.os_version, host_signature = excluded.host_signature, updated_at = excluded.updated_at;"
 		},
 		{
+			"name": "devices.import_watermark",
+			"dialect": "native",
+			"values": {
+				"size": 1048576,
+				"digest": "ab'cd",
+				"updated_at": "2026-11-07T00:00:00Z",
+				"device_id": "dev'2"
+			},
+			"sql": "UPDATE devices SET imported_data_sql_size=1048576, imported_data_sql_sha256='ab''cd', updated_at='2026-11-07T00:00:00Z' WHERE device_id='dev''2';"
+		},
+		{
+			"name": "devices.import_watermark",
+			"dialect": "cli_json",
+			"values": {
+				"size": 1048576,
+				"digest": "ab'cd",
+				"updated_at": "2026-11-07T00:00:00Z",
+				"device_id": "dev'2"
+			},
+			"sql": "UPDATE devices SET imported_data_sql_size=1048576, imported_data_sql_sha256='ab''cd', updated_at='2026-11-07T00:00:00Z' WHERE device_id='dev''2';"
+		},
+		{
 			"name": "agg.app_day",
 			"dialect": "native",
 			"values": {
