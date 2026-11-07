@@ -211,6 +211,57 @@ KL_Hook_AdvanceContextWatermarks(Elapsed, NowTick := unset) {
 		} finally Critical(PreviousCritical)
 }
 
+; Split the open foreground app and title intervals at local midnight, as the
+; macOS (split_active_app_at_midnight) and Linux producers do. Switch rows are
+; bucketed by their timestamp date, so an interval carried across midnight
+; would otherwise credit the whole closed day to the following one. The closed
+; share is a destination-less closure (not a switch) stamped on PreviousDate.
+; Retrying after a refused rollover is a no-op: the watermarks already sit at
+; the boundary, so no second closed-day share remains.
+; @param PreviousDate {String} The closed "YYYY-MM-DD" journal day.
+; @returns {Boolean} Whether the open intervals now start at the boundary.
+KL_Hook_SplitContextAtMidnight(PreviousDate) {
+		Stamp := KL_NowTimestamp()
+		if !RegExMatch(Stamp, "^(\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2}):(\d{2})\.(\d{3})$", &Wall) || Wall[1] = PreviousDate {
+			try LoggerError("Keystats", "Midnight context split refused: the wall clock {1} is not past {2}.", Stamp, PreviousDate)
+			return false
+		}
+		TodayMs := ((Wall[2] * 60 + Wall[3]) * 60 + Wall[4]) * 1000 + Wall[5]
+		PreviousCritical := Critical("On")
+		try {
+			if !Keystats.initialized || KLHook.capture_stopping || KL_CaptureHeld()
+				return false ; stop closes the tail itself; resume reseeds a paused interval
+			if KLHook.prev_app == "" || KLHook.app_entered_at == 0
+				return true
+			; A pending transition or stop froze the current origins in its receipts;
+			; moving them here would orphan that frame's exact acknowledgement.
+			if IsObject(KLHook.context_transition) || IsObject(KLHook.context_stop) {
+				try LoggerWarn("Keystats", "Midnight context split deferred to the pending context transition.")
+				return false
+			}
+			Now := A_TickCount
+			Boundary := Now - TodayMs
+			App := KLHook.prev_app, Title := KLHook.prev_title
+			AppMs := Max(0, TickElapsed64(KLHook.app_entered_at, Now) - TodayMs)
+			TitleMs := Title != "" && KLHook.title_entered_at != 0
+				? Max(0, TickElapsed64(KLHook.title_entered_at, Now) - TodayMs) : 0
+			; Advance both watermarks in this claim, before the writers yield, so any
+			; later frame freezes the post-boundary origin and never the closed day.
+			KLHook.app_entered_at := Max(KLHook.app_entered_at, Boundary)
+			if KLHook.title_entered_at != 0
+				KLHook.title_entered_at := Max(KLHook.title_entered_at, Boundary)
+		} finally Critical(PreviousCritical)
+		ClosedStamp := PreviousDate . " 23:59:59.999"
+		Written := true
+		if AppMs > 0
+			Written := KL_LogAppSwitch(App, "", AppMs, Title, , , , , , ClosedStamp) && Written
+		if TitleMs > 0
+			Written := KL_LogWindowSwitch(App, Title, "", TitleMs, , , , , , ClosedStamp) && Written
+		if !Written
+			try LoggerWarn("Keystats", "Midnight context split share for {1} was not recorded (privacy or pause refusal).", PreviousDate)
+		return true
+}
+
 KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 		EntryCritical := Critical("On")
 		try {

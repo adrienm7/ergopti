@@ -787,7 +787,8 @@ _KL_PublishBufferSnapshot(Snapshot, AttemptFlushTick, PublishGuard := unset, Pre
 ; ===================================================
 
 KL_LogAppSwitch(prev_app, next_app, duration_ms := 0, prev_title := "",
-	PublishGuard := unset, PublishCommit := unset, PublishRefuse := unset, &RejectedBySuspend := false, AppendFn := unset) {
+	PublishGuard := unset, PublishCommit := unset, PublishRefuse := unset, &RejectedBySuspend := false, AppendFn := unset,
+	Timestamp := "") {
 	RejectedBySuspend := false
     ; The outgoing title classifies private browsing without persisting that
     ; title in an app-switch record. Live focus already names the destination.
@@ -805,25 +806,33 @@ KL_LogAppSwitch(prev_app, next_app, duration_ms := 0, prev_title := "",
         return false
     }
     Writer := IsSet(AppendFn) ? AppendFn : KL_AppendLog
-    return Writer.Call(Map(
+    Entry := Map(
         "type",        "app_switch",
         "prev_app",    prev_app,
         "next_app",    next_app,
         "duration_ms", duration_ms
-    ), &RejectedBySuspend, PublishGuard?, PublishCommit?, , PublishRefuse?)
+    )
+    ; A calendar closure stamps the closed day; every other row is stamped now.
+    if Timestamp != ""
+        Entry["timestamp"] := Timestamp
+    return Writer.Call(Entry, &RejectedBySuspend, PublishGuard?, PublishCommit?, , PublishRefuse?)
 }
 
 KL_LogWindowSwitch(app_name, prev_title, next_title, duration_ms := 0,
-	PublishGuard := unset, PublishCommit := unset, PublishRefuse := unset, &RejectedBySuspend := false, AppendFn := unset) {
+	PublishGuard := unset, PublishCommit := unset, PublishRefuse := unset, &RejectedBySuspend := false, AppendFn := unset,
+	Timestamp := "") {
 	RejectedBySuspend := false
     Writer := IsSet(AppendFn) ? AppendFn : KL_AppendLog
-    return Writer.Call(Map(
+    Entry := Map(
         "type",        "window_switch",
         "app",         app_name,
         "prev_title",  prev_title,
         "next_title",  next_title,
         "duration_ms", duration_ms
-    ), &RejectedBySuspend, PublishGuard?, PublishCommit?, , PublishRefuse?)
+    )
+    if Timestamp != ""
+        Entry["timestamp"] := Timestamp
+    return Writer.Call(Entry, &RejectedBySuspend, PublishGuard?, PublishCommit?, , PublishRefuse?)
 }
 
 
@@ -984,8 +993,12 @@ KL_LogLlmAccepted(prediction_text, app_name, all_predictions, chosen_index) {
 KL_MidnightCheck() {
     if A_IsSuspended
         return
-    if (Keystats.today_log_date != "" && Keystats.today_log_date != KL_Today())
+    if (Keystats.today_log_date != "" && Keystats.today_log_date != KL_Today()) {
+        ; Rows are bucketed by their timestamp date: close the closed day's share
+        ; of the open foreground interval before the rollover drains its journal.
+        KL_Hook_SplitContextAtMidnight(Keystats.today_log_date)
         KL_DayRollover()
+    }
 }
 
 
