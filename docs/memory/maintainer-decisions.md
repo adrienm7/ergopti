@@ -50,10 +50,10 @@ Plasma keyboard daemon over D-Bus, or setxkbmap; other Wayland compositors show
 `menu.layout.active_layouts_unsupported_desktop`). Installing Ergopti into the
 system is on every OS: macOS from the `.bundle` rows (`layout_bundle`), Linux
 for the user from the layout manager (install.sh on Xorg), and Windows from
-Layout > « Install the Ergopti system layout » (`layout_system_install`,
+Layout > « Download the Ergopti system layout installer » (`layout_system_install`,
 `windows/modules/keymap/system_layout_install.ahk`). The Windows installer is
-UNSIGNED by decision (2026-11-06): the driver starts it through UAC only after a
-dialog that says so, and the row's label says it too. Its keyboard DLL is
+UNSIGNED by decision (2026-11-06), and the row's label says it; since 2026-11-07
+(provisional, below) the row opens its download instead of running it. Its keyboard DLL is
 generated from the registry `.keylayout` (`codegen-windows-keyboard-layout.cjs`,
 written from kbd.h, no MSKLC; kalamine may be read for ideas, never copied)
 and built in CI
@@ -721,3 +721,21 @@ themselves and build no DLL. `test-driver-tree-parity.cjs` records them by
 raising `BASELINE_UNION` 63 → 65 with a dated note. Action: no counterpart
 folder is created on macOS or Linux, and these files are not moved into another
 folder to dodge the count.
+
+## The Windows layout installer ships outside the exe (2026-11-07, provisional)
+
+Provisional coordinator decision, 2026-11-07, to confirm with the maintainer.
+The elevated keyboard layout installer and its P/Invoke
+(`windows/vendor/keyboard_layout/*.ps1`) and the keyboard DLL builds never ship
+in `ErgoptiPlus.exe`: the exclude group `system-layout-installer` of
+`tools/build/windows_bundle_manifest.json` keeps them out, and no antivirus
+ceiling of `tools/ci/windows-exe-av-surface.json` is raised for them. They ship
+only as `Ergopti_windows_layout.zip` (`release_asset` of
+`_shared/modules/layouts/windows_system_layout.json`), an asset of every release
+(`ci-release.yml` preflight and notes, pinned by
+`test-release-notes-assets-are-uploaded.cjs`). Layout > « Download the Ergopti
+system layout installer » (`layout_system_install`) says whether the layout is
+installed and opens that asset of the running release; the driver never starts
+an elevated process for it. Action: install or update the layout through the
+release asset; do not move the scripts back into the bundle or raise a ceiling
+to do so.

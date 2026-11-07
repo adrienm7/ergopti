@@ -956,8 +956,11 @@ jobs:
         shell: pwsh
         run: ./tools/build/build_windows_nav_owner.ps1
 
-      # Before the static bundle: the driver ships the DLLs in vendor/ for
-      # Layout > « Install the Ergopti system layout ».
+      # The stand-alone layout package every release publishes (release_asset
+      # of _shared/modules/layouts/windows_system_layout.json), uploaded with
+      # assets-windows below. The DLLs land in vendor/keyboard_layout, which
+      # the static bundle excludes: the exe never carries the elevated
+      # installer, and its tray row opens this asset's download instead.
       - name: Build the Ergopti keyboard layout DLLs
         shell: pwsh
         run: ./tools/build/build_windows_keyboard_layout.ps1 -PackagePath static/ergopti_plus/windows/build/Ergopti_windows_layout.zip
@@ -965,14 +968,6 @@ jobs:
       - name: Install and probe the Ergopti keyboard layout
         shell: pwsh
         run: ./tools/test/test-windows-keyboard-layout.ps1
-
-      - name: Upload the Ergopti keyboard layout package
-        uses: actions/upload-artifact@v4
-        with:
-          name: ergopti-keyboard-layout-windows
-          retention-days: 7
-          if-no-files-found: error
-          path: static/ergopti_plus/windows/build/Ergopti_windows_layout.zip
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -1356,6 +1351,7 @@ jobs:
             static/ergopti_plus/windows/ErgoptiPlus.exe
             static/ergopti_plus/windows/ErgoptiPlus.exe.sig
             static/ergopti_plus/windows/windows-signing-qualification.json
+            static/ergopti_plus/windows/build/Ergopti_windows_layout.zip
             static/ergopti/windows/Ergopti_windows.exe
 
   launch-windows:

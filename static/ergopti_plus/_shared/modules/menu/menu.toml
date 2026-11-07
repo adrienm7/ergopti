@@ -2123,19 +2123,20 @@ status_rows.no_bundle = [{ type = "label", i18n = "menu.layout.no_bundle" }]
 platforms = ["hs"]
 reason_key = "platform_reason.layout_install_is_the_macos_bundle"
 
-# Windows installs Ergopti as a system layout from the keyboard DLL the release
-# ships (maintainer decision of 2026-11-06: an unsigned installer, run through
-# UAC after a dialog that says so; modules/keymap/system_layout_install.ahk).
-# The row says where the layout stands; once installed it is one of the user's
-# layouts, listed and switched by « Input sources » and the pause switch below.
+# Windows installs Ergopti as a system layout from the unsigned stand-alone
+# package every release publishes (Ergopti_windows_layout.zip, maintainer
+# decision of 2026-11-06). The exe carries neither that elevated installer nor
+# its DLL (provisional coordinator decision of 2026-11-07): this row says
+# whether the layout is installed and opens the package's download
+# (modules/keymap/system_layout_install.ahk). Once installed it is one of the
+# user's layouts, listed and switched by « Input sources » and the pause switch
+# below.
 [[menu.layout_menu]]
 type = "list"
 id = "layout_system_install"
 platforms = ["ahk"]
 reason_key = "platform_reason.layout_system_install_is_windows"
-status_rows.unbuilt = [{ type = "label", i18n = "menu.layout.system_layout_unbuilt" }]
 status_rows.installed = [{ type = "label", i18n = "menu.layout.system_layout_installed" }]
-status_rows.installing = [{ type = "label", i18n = "menu.layout.system_layout_installing" }]
 status_rows.unreadable = [{ type = "label", i18n = "menu.layout.system_layout_unreadable" }]
 
 # Two axes of the emulation, kept apart (maintainer, 2026-11-03): which Ergopti
@@ -3368,8 +3369,9 @@ type = "command"
 id = "layout_open_preferences"
 i18n = "menu.layout.open_prefs"
 
-# The command of Layout > « Install the Ergopti system layout » (Windows) when
-# the layout is not installed, and when another build of it is (an update).
+# The commands of Layout > « Download the Ergopti system layout installer »
+# (Windows): the download when the layout is not installed, and the update shown
+# under an installed one, since the driver ships no build to compare with.
 [[menu.layout_system_install_commands]]
 type = "command"
 id = "system_layout_install"

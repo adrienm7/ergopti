@@ -7,10 +7,11 @@ Installs or removes the Ergopti keyboard layout DLL as a Windows system
 layout: the DLL builds into System32 (and the 32-bit build into SysWOW64 of a
 64-bit Windows) and its entry under
 HKLM\SYSTEM\CurrentControlSet\Control\Keyboard Layouts. It must run elevated:
-the driver starts it through UAC (modules/keymap/system_layout_install.ahk)
-and the release package's install.cmd does the same. Adding the layout to a
-user's language list is not done here: an elevated process may be another
-account, so the driver adds it for its own user once this succeeds.
+the release package's install.cmd (Ergopti_windows_layout.zip) starts it
+through UAC; ErgoptiPlus.exe never ships nor starts it, its tray row opens that
+package's download. Adding the layout to a user's language list is not done
+here: an elevated process may be another account, so the package adds it for
+its own user once this succeeds.
 
 FEATURES & RATIONALE:
 1. The KLID is the one already naming the DLL, or the first free A0nn<language>
@@ -54,7 +55,7 @@ $DisplayNameResource = 1000
 
 <#
 .SYNOPSIS
-Writes the outcome the driver reads.
+Writes the outcome the package entry point reads.
 #>
 function Write-Outcome {
 	param([string]$Status, [string]$Klid, [string]$Message)

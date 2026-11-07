@@ -83,8 +83,8 @@ const ATTACHES_DOWNLOADED_ARTIFACTS = /find\s+release-assets\s+-type\s+f/;
 const DOWNLOADS_RELEASE_ARTIFACTS =
 	/uses:\s*actions\/download-artifact[\s\S]*?pattern:\s*assets-\*/;
 
-// Floors — today: 10 linked assets across 3 assets-* upload steps naming 13
-// files (macOS 4, Windows 2, Linux 7).
+// Floors — today: 11 linked assets across 3 assets-* upload steps naming 14
+// files (macOS 4, Windows 3, Linux 7).
 const MIN_LINKED_ASSETS = 5;
 const MIN_UPLOAD_STEPS = 3;
 const MIN_UPLOAD_PATHS = 13;
@@ -432,6 +432,54 @@ const applicationSection = releaseBody.indexOf(
 );
 if (layoutSection < 0 || applicationSection <= layoutSection) {
 	errors.push('release notes must explain keyboard layouts before the companion application');
+}
+
+// The Windows tray row « Download the Ergopti system layout » opens the asset
+// windows_system_layout.json names (modules/keymap/system_layout_install.ahk);
+// the exe no longer carries the elevated installer, so every release must link,
+// require and upload exactly that name, built by the package job.
+const windowsLayoutAsset = JSON.parse(
+	fs.readFileSync(
+		path.join(
+			ROOT,
+			'static',
+			'ergopti_plus',
+			'_shared',
+			'modules',
+			'layouts',
+			'windows_system_layout.json'
+		),
+		'utf8'
+	)
+).release_asset;
+if (!/^[A-Za-z0-9._-]+\.zip$/.test(windowsLayoutAsset || '')) {
+	errors.push('windows_system_layout.json release_asset is absent or not a .zip file name');
+} else {
+	if (!linked.has(windowsLayoutAsset))
+		errors.push(
+			`the release notes do not link ${windowsLayoutAsset}, the Windows tray row's download`
+		);
+	if (!required.includes(windowsLayoutAsset))
+		errors.push(
+			`"${PREFLIGHT}" does not require ${windowsLayoutAsset}, the Windows tray row's download`
+		);
+	const windowsUploads = uploads.filter((u) => u.artifact === 'assets-windows');
+	if (
+		!windowsUploads.some((u) =>
+			u.files.some((file) => file.split('/').pop() === windowsLayoutAsset)
+		)
+	)
+		errors.push(`assets-windows does not upload ${windowsLayoutAsset}`);
+	if (
+		!pipeline
+			.text()
+			.includes(
+				`build_windows_keyboard_layout.ps1 -PackagePath static/ergopti_plus/windows/build/${windowsLayoutAsset}`
+			)
+	)
+		errors.push(
+			`no Windows job builds ${windowsLayoutAsset} with build_windows_keyboard_layout.ps1`
+		);
 }
 
 // Fresh public macOS artifacts are admitted by their actual canonical owner,

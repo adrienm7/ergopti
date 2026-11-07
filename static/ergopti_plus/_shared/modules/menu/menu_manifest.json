@@ -2374,22 +2374,10 @@
 			],
 			"reason_key": "platform_reason.layout_system_install_is_windows",
 			"status_rows": {
-				"unbuilt": [
-					{
-						"type": "label",
-						"i18n": "menu.layout.system_layout_unbuilt"
-					}
-				],
 				"installed": [
 					{
 						"type": "label",
 						"i18n": "menu.layout.system_layout_installed"
-					}
-				],
-				"installing": [
-					{
-						"type": "label",
-						"i18n": "menu.layout.system_layout_installing"
 					}
 				],
 				"unreadable": [

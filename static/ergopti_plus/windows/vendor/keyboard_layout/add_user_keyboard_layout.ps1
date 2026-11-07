@@ -32,7 +32,7 @@ $ErrorActionPreference = "Stop"
 
 <#
 .SYNOPSIS
-Writes the outcome the driver reads.
+Writes the outcome the package entry point reads.
 #>
 function Write-Outcome {
 	param([string]$Status, [string]$Message)
