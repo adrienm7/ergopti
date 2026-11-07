@@ -45,13 +45,14 @@ assert(not document.text:find("/private-owner",1,true) and not document.text:fin
 if #raw>=8192 then assert(#document.text>=8192,"immediate-write corpus lost its large native write") end
 local name=document.name
 local revealed = 0
-local result
+local result, revealed_path
 Report.perform({action="save", name=name, text=document.text},
  {diagnostics_dir=directory}, {redaction=rules,schema=schema}, {home="/private-owner",user="privateowner"},
  {reveal=function(path,done)
-  assert(path==directory.."/"..name);revealed=revealed+1;done({ok=true,code=0})
+  revealed=revealed+1;revealed_path=path;done({ok=true,code=0})
  end},snapshot,{current=function()return true end,complete=function(value)result=value end})
-print(Json.encode({ok=result.ok, revealed=revealed, path=result.path, expected=document.text,name=name}))
+print(Json.encode({ok=result.ok, revealed=revealed, revealed_path=revealed_path, path=result.path,
+ expected=document.text,name=name}))
 """
 
 
@@ -77,6 +78,8 @@ def main():
         ("buffered-close-failure", "close", "x" * 128, 32, None),
         ("zero-byte-close-failure", "zero", "x" * 128, 0, None),
         ("immediate-write-failure", "write", "x" * 8192, 32, None),
+        # A report never replaces another: an existing one, writable or not,
+        # is kept and the new report takes the next free numbered name.
         ("readonly-existing-file", "readonly", "x" * 128, None, "file"),
         ("unwritable-directory", "unwritable", "x" * 128, None, "directory"),
     )
@@ -120,27 +123,44 @@ def main():
                     assert target.read_bytes() == expected.encode()[:limit], (
                         "unexpected native short-file bytes"
                     )
-                if limit is not None or refusal:
+                if refusal == "file":
+                    sibling = target.with_name(target.stem + "-1" + target.suffix)
+                    assert target.read_bytes() == b"existing report preserved\n", (
+                        "the existing report was replaced"
+                    )
+                    assert sibling.read_bytes() == expected.encode(), (
+                        "the new report is not under the next free name"
+                    )
+                    assert receipt == {
+                        "ok": True,
+                        "revealed": 1,
+                        "revealed_path": str(sibling),
+                        "path": str(sibling),
+                    }, f"numbered save receipt differs: {receipt}"
+                elif limit is not None or refusal:
                     assert receipt["ok"] is False, f"incomplete save reported success: {receipt}"
                     assert receipt["revealed"] == 0, f"incomplete save revealed: {receipt}"
                     assert receipt.get("path") is None
-                    if refusal == "file":
-                        assert target.read_bytes() == b"existing report preserved\n"
-                    elif refusal == "directory":
+                    if refusal == "directory":
                         assert not target.exists()
                 else:
                     assert target.read_bytes() == expected.encode(), (
                         "saved bytes differ from the approved host projection"
                     )
-                    assert receipt == {"ok": True, "revealed": 1, "path": str(target)}
+                    assert receipt == {
+                        "ok": True,
+                        "revealed": 1,
+                        "revealed_path": str(target),
+                        "path": str(target),
+                    }
                 print(f"PASS {kind}")
             except (AssertionError, subprocess.TimeoutExpired, json.JSONDecodeError) as error:
                 failures += 1
                 print(f"FAIL {kind}: {error}")
             finally:
                 directory.chmod(0o700)
-                if target.exists():
-                    target.chmod(0o600)
+                for leftover in directory.iterdir():
+                    leftover.chmod(0o600)
     print(f"Native diagnostics save receipts: {len(cases)} checks, {failures} failures")
     return int(failures > 0)
 
