@@ -4163,6 +4163,5 @@
 	"apps.cloner.err_source_unreadable": "Programmet kan inte klonas: dess startare anger inget program.",
 	"apps.encryptor.drop_hint": "Släpp filer här för att kryptera dem, eller .enc-filer för att dekryptera dem.",
 	"apps.cloner.msg_no_isolation": "Programmet har inget alternativ för en separat profil: på Windows är klonen en andra genväg som startar samma program med samma inställningar.",
-	"inventory.behavior.layout_emulation": "Skriver vald .keylayout ovanpå systemets layout; de tre drivrutinerna spelar upp ett korpus av tangenttryck.",
-	"inventory.behavior.dead_native_lifetime": "Det inbyggda systemet styr väntande komposition; registrering och återställning är skilda från en gemensam tidsgräns i drivrutinen."
+	"inventory.behavior.layout_emulation": "Skriver vald .keylayout ovanpå systemets layout; de tre drivrutinerna spelar upp ett korpus av tangenttryck."
 }

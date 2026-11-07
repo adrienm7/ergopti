@@ -4163,6 +4163,5 @@
 	"apps.cloner.err_source_unreadable": "Diese Anwendung kann nicht geklont werden: Ihr Starter nennt kein Programm.",
 	"apps.encryptor.drop_hint": "Legen Sie hier Dateien ab, um sie zu verschlüsseln, oder .enc-Dateien, um sie zu entschlüsseln.",
 	"apps.cloner.msg_no_isolation": "Dieses Programm hat keine Option für ein eigenes Profil: Unter Windows ist sein Klon eine zweite Verknüpfung, die dasselbe Programm mit denselben Einstellungen startet.",
-	"inventory.behavior.layout_emulation": "Tippt das gewählte .keylayout über dem Systemlayout; die drei Treiber spielen ein gemeinsames Tastenanschlag-Korpus ab.",
-	"inventory.behavior.dead_native_lifetime": "Das native System verwaltet ausstehende Komposition; Erfassungs- und Rücksetzregeln sind von einem gemeinsamen Treiberzeitlimit getrennt."
+	"inventory.behavior.layout_emulation": "Tippt das gewählte .keylayout über dem Systemlayout; die drei Treiber spielen ein gemeinsames Tastenanschlag-Korpus ab."
 }

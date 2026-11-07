@@ -88,6 +88,32 @@ helpers.describe("linux/infra/i18n.lua", function()
 		helpers.assert_eq(s, "this.key.does.not.exist", "falls back to key name")
 	end)
 
+	-- A key written twice decodes under the default decoder, the last value
+	-- winning, and refuses under the lossless one every owner reading a whole
+	-- catalogue uses: one duplicated inventory key in all 21 files once failed
+	-- every such reader on Linux.
+	helpers.it("every locale catalogue decodes losslessly, with no key written twice", function()
+		local Json = require("json")
+		local Paths = require("infra.paths")
+		local directory = Paths.shared("data/locales")
+		local listing = assert(io.popen("ls " .. require("text_utils").shell_quote(directory)))
+		local names = {}
+		for name in listing:lines() do
+			if name:match("^%a%a%.json$") then names[#names + 1] = name end
+		end
+		listing:close()
+		helpers.assert_true(#names > 1, "the catalogues must be listed")
+		local seen_english = false
+		for _, name in ipairs(names) do
+			seen_english = seen_english or name == "en.json"
+			local file = assert(io.open(directory .. "/" .. name, "rb"))
+			local text = file:read("*a")
+			file:close()
+			helpers.assert_type(Json.decode_lossless(text), "table", name .. " must decode losslessly")
+		end
+		helpers.assert_true(seen_english, "the canonical English catalogue must be among them")
+	end)
+
 	helpers.it("i18n.get_locale returns default 'fr'", function()
 		local i18n = require("infra.i18n")
 		helpers.assert_eq(i18n.get_locale(), "fr", "default locale is fr")

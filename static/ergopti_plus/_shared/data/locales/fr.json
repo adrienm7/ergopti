@@ -4163,6 +4163,5 @@
 	"apps.cloner.err_source_unreadable": "Cette application ne peut pas être clonée : son lanceur ne désigne aucun programme.",
 	"apps.encryptor.drop_hint": "Déposez des fichiers ici pour les chiffrer, ou des fichiers .enc pour les déchiffrer.",
 	"apps.cloner.msg_no_isolation": "Ce programme n'a pas d'option de profil séparé : sous Windows, son clone est un second raccourci qui démarre le même programme avec les mêmes réglages.",
-	"inventory.behavior.layout_emulation": "Tape le .keylayout choisi par-dessus la disposition du système ; les trois pilotes rejouent un même corpus de frappes.",
-	"inventory.behavior.dead_native_lifetime": "Le système natif gère la composition en attente ; les règles de capture et de réinitialisation sont distinctes d’un délai commun au pilote."
+	"inventory.behavior.layout_emulation": "Tape le .keylayout choisi par-dessus la disposition du système ; les trois pilotes rejouent un même corpus de frappes."
 }

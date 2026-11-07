@@ -4163,6 +4163,5 @@
 	"apps.cloner.err_source_unreadable": "This application cannot be cloned: its launcher names no program.",
 	"apps.encryptor.drop_hint": "Drop files here to encrypt them, or .enc files to decrypt them.",
 	"apps.cloner.msg_no_isolation": "This program has no option for a separate profile: on Windows its clone is a second shortcut that starts the same program with the same settings.",
-	"inventory.behavior.layout_emulation": "Types the chosen .keylayout over the system layout; the three drivers replay one keystroke corpus.",
-	"inventory.behavior.dead_native_lifetime": "The native OS owns pending composition; capture and reset rules are separate from a shared driver timeout."
+	"inventory.behavior.layout_emulation": "Types the chosen .keylayout over the system layout; the three drivers replay one keystroke corpus."
 }

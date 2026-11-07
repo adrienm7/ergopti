@@ -4163,6 +4163,5 @@
 	"apps.cloner.err_source_unreadable": "Tej aplikacji nie można sklonować: jej program uruchamiający nie wskazuje żadnego programu.",
 	"apps.encryptor.drop_hint": "Upuść tutaj pliki, aby je zaszyfrować, lub pliki .enc, aby je odszyfrować.",
 	"apps.cloner.msg_no_isolation": "Ten program nie ma opcji osobnego profilu: w systemie Windows jego klon to drugi skrót uruchamiający ten sam program z tymi samymi ustawieniami.",
-	"inventory.behavior.layout_emulation": "Pisze wybrany .keylayout na układzie systemu; trzy sterowniki odtwarzają jeden korpus naciśnięć.",
-	"inventory.behavior.dead_native_lifetime": "Natywny system zarządza oczekującym składaniem; przechwytywanie i resetowanie są niezależne od wspólnego limitu czasu sterownika."
+	"inventory.behavior.layout_emulation": "Pisze wybrany .keylayout na układzie systemu; trzy sterowniki odtwarzają jeden korpus naciśnięć."
 }

@@ -4163,6 +4163,5 @@
 	"apps.cloner.err_source_unreadable": "이 응용 프로그램은 복제할 수 없습니다. 실행기에 프로그램이 지정되어 있지 않습니다.",
 	"apps.encryptor.drop_hint": "암호화할 파일이나 복호화할 .enc 파일을 여기에 놓으세요.",
 	"apps.cloner.msg_no_isolation": "이 프로그램에는 별도 프로필 옵션이 없습니다. Windows에서 클론은 같은 설정으로 같은 프로그램을 시작하는 두 번째 바로 가기입니다.",
-	"inventory.behavior.layout_emulation": "선택한 .keylayout을 시스템 자판 위에서 입력합니다. 세 드라이버가 같은 키 입력 코퍼스를 재생합니다.",
-	"inventory.behavior.dead_native_lifetime": "기본 운영 체제가 대기 중인 조합을 관리합니다. 캡처 및 초기화 규칙은 드라이버 공통 시간 제한과 별개입니다."
+	"inventory.behavior.layout_emulation": "선택한 .keylayout을 시스템 자판 위에서 입력합니다. 세 드라이버가 같은 키 입력 코퍼스를 재생합니다."
 }
