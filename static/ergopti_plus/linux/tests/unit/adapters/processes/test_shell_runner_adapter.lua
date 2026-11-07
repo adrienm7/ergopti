@@ -18,12 +18,12 @@
 --- normalisation that is dead on one of the two.
 
 local helpers = require("tests.helpers")
-local sh      = helpers.load_module("adapters.shell_runner")
+local sh      = helpers.fresh_module("adapters.shell_runner")
 
 helpers.describe("linux-picker-native-capabilities", function()
 	helpers.it("linux-picker-native-capabilities: checks executable access without spawning and observes filesystem changes", function()
 		local native = require("luv")
-		local shell = helpers.load_module("adapters.shell_runner")
+		local shell = helpers.fresh_module("adapters.shell_runner")
 		local directory = assert(native.fs_mkdtemp("/tmp/ergopti-capability-XXXXXX"))
 		local binary = directory .. "/literal '$(touch SHOULD_NOT_EXIST)'"
 		local descriptor = assert(native.fs_open(binary, "w", 448))
@@ -119,7 +119,7 @@ helpers.describe("linux-picker-native-capabilities", function()
 	end)
 
 	helpers.it("linux-picker-native-capabilities: keeps shell builtins and the controlled runner contract", function()
-		local shell = helpers.load_module("adapters.shell_runner")
+		local shell = helpers.fresh_module("adapters.shell_runner")
 		helpers.assert_true(shell.has_command("command"), "generic queries retain shell builtin semantics")
 		local calls = 0
 		shell._set_runner(function() calls = calls + 1; return false end)
@@ -138,7 +138,7 @@ helpers.describe("linux-shell-command-nul", function()
 		for index, command in ipairs({ "printf literal\0private-suffix", "printf literal\0", "\0printf literal" }) do
 			helpers.it("linux-shell-command-nul: " .. method .. " refuses byte position " .. index .. " before dispatch", function()
 				local calls = 0
-				local shell = helpers.load_module("adapters.shell_runner")
+				local shell = helpers.fresh_module("adapters.shell_runner")
 				shell._set_runner(function() calls = calls + 1; return "Shortened prefix stdout" end)
 				local value, output, reason
 				if method == "exec_stdin" or method == "exec_exact_stdin" then value = shell[method](command, "valid stdin")
@@ -160,7 +160,7 @@ helpers.describe("linux-shell-command-nul", function()
 	for _, method in ipairs({ "exec_stdin", "exec_exact_stdin" }) do
 		helpers.it("linux-shell-command-nul: " .. method .. " refuses a NUL-bearing textual stdin before dispatch", function()
 			local calls = 0
-			local shell = helpers.load_module("adapters.shell_runner")
+			local shell = helpers.fresh_module("adapters.shell_runner")
 			shell._set_runner(function() calls = calls + 1; return "Truncated prefix" end)
 			local value = shell[method]("cat", "prefix\0private-suffix")
 			shell._reset_runner()
@@ -174,7 +174,7 @@ helpers.describe("linux-shell-private-error-receipts", function()
 	for _, failure in ipairs({ "errno7", "errno24", "no errno", "open raised", "read raised", "close raised" }) do
 		helpers.it("linux-shell-private-error-receipts: " .. failure .. " cannot echo command arguments", function()
 			local Logger = require("logger.shim")
-			local shell = helpers.load_module("adapters.shell_runner")
+			local shell = helpers.fresh_module("adapters.shell_runner")
 			local previous_popen, previous_level = io.popen, Logger.get_level()
 			local canary = "SYNTHETIC_PRIVATE_PIPE_ARGUMENT"
 			Logger.set_level("debug")
@@ -255,7 +255,7 @@ helpers.describe("linux-checked-pipe-completion", function()
 	-- complete-frame transmitter failure through native children and pipes.
 	for _, failure in ipairs({ "read returned error", "read raised", "close returned error", "close raised", "missing trailer" }) do
 		helpers.it("linux-checked-pipe-completion: rejects " .. failure .. " and closes once", function()
-			local shell = helpers.load_module("adapters.shell_runner")
+			local shell = helpers.fresh_module("adapters.shell_runner")
 			local previous_popen, closes = io.popen, 0
 			local canary = "SYNTHETIC_PRIVATE_RECEIPT_ERROR"
 			io.popen = function()
