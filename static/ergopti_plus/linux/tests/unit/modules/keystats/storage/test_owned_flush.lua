@@ -1557,3 +1557,33 @@ require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: nati
 		helpers.assert_nil(writer.upsert_ngrams("fixture", "2026-11-07", "Editor", { word = 1 }, "not_a_table"), "an unknown table remains refused")
 	end)
 end)
+
+require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: native transactions refuse malformed no-op groups", function()
+	local Home = require("tests.support.keystats_home_fixture")
+	require("tests.support.keystats_native_fixture").with(function(collector)
+		helpers.assert_true(collector.init(Home.options({ sqlite_path = Home.fresh_db() })))
+		local writer = require("modules.keystats.sqlite_writer")
+		local now = require("infra.monotonic").now_ms
+		local uv = require("luv")
+		local groups = { { word = "bad" }, { word = -1 }, { word = 0 / 0 }, { word = {} },
+			{ word = { c = 0, sources = "bad" } }, { word = { c = 0, td = "bad" } },
+			{ word = { c = 0, sources = { manual = -1 } } },
+			{}, { word = 0 }, { word = { c = 0, td = 0, cd = 0, e = 1, sources = { hotstring = 0 } } } }
+		for index, group in ipairs(groups) do
+			local expected = index > 7
+			local operation = assert(writer.start_flush("fixture", {
+				raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {} },
+				upserts = { { kind = "ngrams", args = { "2026-11-07", "Editor", group, "ngram_chars" } } },
+			}))
+			local until_ms = now() + require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+			while not operation:is_settled() and now() < until_ms do
+				operation:pump()
+				if operation:is_retryable() then operation:cancel() end
+				uv.run("nowait"); uv.sleep(1)
+			end
+			helpers.assert_true(operation:is_settled(), "the native transaction must retire")
+			helpers.assert_eq(operation.result.committed, expected, "only structurally valid zero-count groups may commit: " .. index)
+		end
+		helpers.assert_eq(writer.query_rows("SELECT count(*) FROM ngram_chars;"), { "0" }, "no no-op group invents a row")
+	end)
+end)
