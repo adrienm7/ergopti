@@ -89,13 +89,12 @@ _SystemLayout_RegistryKlid(DllFile) {
 	return ""
 }
 
-; Whether two files hold the same bytes.
+; Whether two files hold the same bytes; an unreadable file throws instead of
+; reading as another build.
 _SystemLayout_SameFile(PathA, PathB) {
 	if (FileGetSize(PathA) != FileGetSize(PathB))
 		return false
-	A := FileRead(PathA, "RAW")
-	B := FileRead(PathB, "RAW")
-	return DllCall("ntdll\RtlCompareMemory", "Ptr", A, "Ptr", B, "UPtr", A.Size, "UPtr") == A.Size
+	return FSSameBytesStrict(PathA, PathB)
 }
 
 /**
@@ -209,11 +208,12 @@ SystemLayout_Install(ConfirmFn := 0, RunFn := 0, TellFn := 0) {
 }
 
 _SystemLayout_Run(Command, &Pid) {
-	Run(Command, , "Hide", &Pid)
+	Pid := SystemControl().Launch(Command, "", "Hide")
 }
 
+; The poll re-arms under its own callback identity, so one owner coalesces.
 _SystemLayout_Arm() {
-	SetTimer(SystemLayout_Poll, -TimingsGet("adapters", "system_layout_install_poll_ms"))
+	TimerArmOneShotMs(SystemLayout_Poll, TimingsGet("adapters", "system_layout_install_poll_ms"))
 }
 
 ; Reads one step's JSON outcome; false when it wrote none or no valid one.
@@ -297,8 +297,11 @@ SystemLayout_Poll(RunFn := 0, FinishFn := 0) {
 ; Loads the new layout into the session's list, switches to it unless the
 ; driver is paused (the pause layout stays), and redraws the menu.
 _SystemLayout_Finish(Klid) {
-	if !DllCall("LoadKeyboardLayoutW", "Str", Klid, "UInt", 0, "Ptr")
-		try LoggerError("SystemLayout", "Windows did not load layout {1} (error {2}).", Klid, A_LastError)
+	try {
+		KLS_Load(Klid)
+	} catch as Err {
+		try LoggerError("SystemLayout", "Windows did not load layout {1}: {2}.", Klid, Err.Message)
+	}
 	; A try without braces would take the else as its own.
 	if A_IsSuspended {
 		try LoggerInfo("SystemLayout", "Layout {1} is not selected now: the driver is paused.", Klid)

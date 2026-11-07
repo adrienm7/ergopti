@@ -182,6 +182,21 @@ KLS_Select(Klid, ListFn := 0, PostFn := 0, LookupFn := 0) {
 	return false
 }
 
+/**
+ * Loads an installed layout into the session's layout list: a layout that has
+ * just been installed is not in it until then.
+ * @param {String} Klid Layout id.
+ * @returns {Integer} The layout handle; throws when Windows refuses it.
+ */
+KLS_Load(Klid) {
+	if !(Klid is String) || Klid == ""
+		throw ValueError("a layout id is required")
+	Hkl := DllCall("LoadKeyboardLayoutW", "Str", Klid, "UInt", 0, "Ptr")
+	if !Hkl
+		throw OSError(A_LastError, -1, "LoadKeyboardLayoutW refused " . Klid)
+	return Hkl
+}
+
 ; Posts the language change to the foreground window, as the user's own layout
 ; hotkey does. PostMessage throws when there is no foreground window.
 _KLS_PostRequest(Hkl) {

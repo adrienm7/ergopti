@@ -178,8 +178,30 @@ _SLI_PollFailure() {
 	AssertEqual(Format(t("dialog.system_layout.failed"), "no DLL"), Told[1])
 }
 
+/** The live comparison: an unreadable DLL is a failure, never another build. */
+_SLI_SameFile() {
+	Dir := A_Temp . "\ergopti_sli_same_" . A_TickCount
+	DirCreate(Dir)
+	try {
+		Shipped := Dir . "\shipped.dll"
+		Copy := Dir . "\copy.dll"
+		Other := Dir . "\other.dll"
+		FileAppend("ABCD", Shipped, "UTF-8-RAW")
+		FileAppend("ABCD", Copy, "UTF-8-RAW")
+		FileAppend("ABCE", Other, "UTF-8-RAW")
+		AssertTrue(_SystemLayout_SameFile(Shipped, Copy), "the same bytes are the installed build")
+		AssertFalse(_SystemLayout_SameFile(Shipped, Other), "other bytes of the same size are another build")
+		Lock := FileOpen(Copy, "r -rwd")
+		try AssertThrows(() => _SystemLayout_SameFile(Shipped, Copy), "a DLL that cannot be read must not read as outdated")
+		finally Lock.Close()
+	} finally {
+		DirDelete(Dir, true)
+	}
+}
+
 Test("system layout install: the status follows the build, the registry and System32", _SLI_Status)
 Test("system layout install: one menu row per state", _SLI_MenuRows)
 Test("system layout install: asks first, a UAC refusal changes nothing", _SLI_Install)
 Test("system layout install: elevated step, user languages, then the switch", _SLI_PollChain)
 Test("system layout install: a failed install is told and selects nothing", _SLI_PollFailure)
+Test("system layout install: an unreadable DLL is not another build", _SLI_SameFile)
