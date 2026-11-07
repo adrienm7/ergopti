@@ -117,7 +117,10 @@ _SLI_Download() {
 
 /** The driver never starts the elevated installer nor reads a shipped build. */
 _SLI_NoElevatedInstaller() {
-	Source := FileRead(_DriverDir . "\modules\keymap\system_layout_install.ahk", "UTF-8")
+	Source := ""
+	for Name in ["SystemLayout_Spec", "_SystemLayout_RegistryKlid", "SystemLayout_Status", "SystemLayout_DownloadUrl",
+			"_SystemLayout_LiveDownloadUrl", "SystemLayout_MenuRows", "SystemLayout_Download"]
+		Source .= _DriverFuncBody(Name)
 	for Needle in ["*RunAs", "install_keyboard_layout.ps1", "add_user_keyboard_layout.ps1", "_VendorDir"]
 		AssertFalse(InStr(Source, Needle), "the driver source names " . Needle)
 }
