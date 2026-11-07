@@ -77,7 +77,6 @@ _SADRD_AltGrModifierBalanced() {
 	NextUpPos := InStr(Body, "KeyUpFn.Call(ModKey)", false, RollbackPos + 1)
 	Assert(RefusalPos > 0 && RollbackPos > RefusalPos && ReturnPos > RollbackPos && NextUpPos > ReturnPos,
 		"the only extra release must be the rollback of a refused publication, followed by its return")
-	Ups -= 1
 
 	AssertEqual(1, Downs,
 		"the shared owner must acquire the resolved modifier exactly once")
