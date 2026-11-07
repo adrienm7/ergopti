@@ -305,14 +305,18 @@ for _HSCS_MenuVector in JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_h
 _HSCS_OrderNativePublication() {
 	_HSCS_WithLiveConfig('[private]`ncredential = "keep-order-fixture"`n', Map("Hotstrings", false), Check)
 	Check(Fixture, _Options, _Calls) {
-		Repaints := 0, Notices := 0, SavedSuspend := A_IsSuspended
+		Repaints := 0, Notices := 0, Refusals := [], SavedSuspend := A_IsSuspended
 		Repaint(*) => Repaints += 1
-		Notify(*) => Notices += 1
+		Notify(Message, *) {
+			Notices += 1
+			Refusals.Push(Message)
+		}
 		try {
 			Suspend(false)
 			Snapshot := _HS_OrderSnapshot("dynamichotstrings", Fixture.path)
 			Assert(Snapshot is Map, "the real menu must capture its admitted configuration source")
-			AssertTrue(_HS_OrderCommit(Snapshot, ["date", "datefr"], 0, Repaint, Notify))
+			AssertTrue(_HS_OrderCommit(Snapshot, ["date", "datefr"], 0, Repaint, Notify),
+				"the native publisher must commit: " . KL_JsonEncode(Refusals))
 			AssertEqual(1, Repaints)
 			AssertEqual(0, Notices)
 			Parsed := TOML_ParseFreshFile(Fixture.path)
