@@ -339,6 +339,11 @@ _PCA_DeadKeyChunk(Scenario) {
 		_HSResolveCache := Map("_chunk_probe|native", {
 			gen: _HSResolveGen, val: { ShowTooltip: false } })
 		LastSentCharacterKeyTime := Map()
+		; Initial was set, not typed: a scenario names the scalars it typed
+		; before the chunk, the reference a time gate measures from.
+		if Scenario.HasOwnProp("TypedBefore")
+			for Key in Scenario.TypedBefore
+				LastSentCharacterKeyTime[Key] := A_TickCount
 		HSE_WORD_TERMINATORS := Saved.Terminators . Chr(0x1F600)
 		if Scenario.HasOwnProp("Consume") && Scenario.Consume
 			HSE_CONSUMED_DELIMITERS := Saved.Consumed . "."
@@ -490,7 +495,7 @@ Test("prefix unicode-boundary-owner: the actual supplementary delimiter licenses
 Test("prefix unicode-boundary-owner: repeat dispatch agrees with actual native Unicode output", (*) =>
 	_PCA_DeadKeyChunk({ Initial: "a" . Chr(0x1F601), Chunk: "★", Magic: "★",
 		Flags: "", Trigger: "", Replacement: "", Expected: "a" . Chr(0x1F601) . Chr(0x1F601),
-		Sends: 1, End: "", Prefix: "a" . Chr(0x1F601) . Chr(0x1F601) }))
+		Sends: 1, End: "", Prefix: "a" . Chr(0x1F601) . Chr(0x1F601), TypedBefore: [Chr(0x1F601)] }))
 
 Test("prefix unicode-time-gate: supplementary penultimate scalar admits timed STAR", (*) =>
 	_PCA_DeadKeyChunk({ Initial: "A", Chunk: "a" . Chr(0x1F601) . "★", Flags: "*?C",

@@ -39,11 +39,12 @@
 ; @return The saved state, to be handed back to _NRP_Teardown.
 _NRP_Setup() {
 	global HSE_Suppressed, HSE_RebuildInProgress, HSE_RepeatEnabled
-	global HSE_PersonalInfoCombosEnabled
+	global HSE_PersonalInfoCombosEnabled, LastSentCharacterKeyTime
 	Saved := { Suppressed:    HSE_Suppressed,
 	           Rebuild:       HSE_RebuildInProgress,
 	           RepeatEnabled: HSE_RepeatEnabled,
-	           CombosEnabled: HSE_PersonalInfoCombosEnabled }
+	           CombosEnabled: HSE_PersonalInfoCombosEnabled,
+	           Stamps:        LastSentCharacterKeyTime }
 	HSE_RegistryClear()
 	HSE_HardReset()
 	HSE_Suppressed := 0
@@ -51,19 +52,30 @@ _NRP_Setup() {
 	HSE_RepeatEnabled := true
 	HSE_PersonalInfoCombosEnabled := false
 	HSE_FeedReset(true)
+	LastSentCharacterKeyTime := Map()
 	return Saved
+}
+
+; The doubling answers within the magic key's window, measured from the
+; repeated letter (repeat-window). A case that sets the buffer by hand never
+; typed that letter, so it stamps it as typed just now.
+; @param Letter {String} The letter the magic key repeats.
+_NRP_TypedJustNow(Letter) {
+	global LastSentCharacterKeyTime
+	LastSentCharacterKeyTime[Letter] := A_TickCount
 }
 
 ; @param Saved The value _NRP_Setup returned.
 _NRP_Teardown(Saved) {
 	global HSE_Suppressed, HSE_RebuildInProgress, HSE_RepeatEnabled
-	global HSE_PersonalInfoCombosEnabled
+	global HSE_PersonalInfoCombosEnabled, LastSentCharacterKeyTime
 	HSE_RegistryClear()
 	HSE_HardReset()
 	HSE_Suppressed := Saved.Suppressed
 	HSE_RebuildInProgress := Saved.Rebuild
 	HSE_RepeatEnabled := Saved.RepeatEnabled
 	HSE_PersonalInfoCombosEnabled := Saved.CombosEnabled
+	LastSentCharacterKeyTime := Saved.Stamps
 }
 
 ; @param Decision A value returned by HSE_PreviewNextDecision.
@@ -91,6 +103,7 @@ _NRP_RepeatFallbackIsNeverOffered() {
 	try {
 		MK := ScriptInformation["MagicKey"]
 		HSE_Buffer := "ef"
+		_NRP_TypedJustNow("f")
 		HSE_StartIsWordBoundary := true
 
 		Decision := HSE_PreviewNextDecision(HSE_Buffer, MK)
@@ -192,6 +205,7 @@ _NRP_EndCharRowSurvivesBesideDoubling() {
 		HSE_Register("", "ef", 0,
 			Map("Replacement", "EF", "OnlyText", true, "Category", "test", "Section", "endchar"))
 		HSE_Buffer := "ef"
+		_NRP_TypedJustNow("f")
 		HSE_StartIsWordBoundary := true
 
 		Assert(_NRP_IsDoubling(HSE_PreviewNextDecision(HSE_Buffer, MK)),
