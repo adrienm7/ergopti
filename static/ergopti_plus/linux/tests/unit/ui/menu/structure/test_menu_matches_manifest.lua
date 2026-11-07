@@ -438,7 +438,11 @@ local function full_context()
 			set_enabled     = noop,
 			get_rules_count = function() return 0 end,
 			active_count    = function() return 0 end,
-			rule_families   = function() return {} end,
+			-- Two independent sections make the declared order controls reachable.
+			rule_families   = function() return {
+				{ id = "date_fr", section = "datefr", label = "French date", enabled = true },
+				{ id = "date", section = "date", label = "International date", enabled = true },
+			} end,
 			-- The programmable row reads the source problem when it is drawn.
 			user_code_problem = function() return nil end,
 			set_rule_enabled = noop,

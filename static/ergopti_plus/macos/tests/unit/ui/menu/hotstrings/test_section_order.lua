@@ -30,7 +30,7 @@ helpers.describe("hotstring-section-order", function()
 		helpers.assert_eq(source, { "a", "b" })
 	end)
 	helpers.it("hotstring-section-order: menu callbacks preserve refusal and recheck pause before a move", function()
-		local paused, accepted, calls, chosen = false, false, 0, nil
+		local paused, pause_error, accepted, calls, chosen = false, false, false, 0, nil
 		local moves, reset = {}, nil
 		local manifest = { template_rows = function(name, commands, states, providers)
 			if name == "hotstring_order_moves" then
@@ -42,7 +42,10 @@ helpers.describe("hotstring-section-order", function()
 		local rows = Order.menu(manifest.template_rows, { "a", "-", "b" }, { a = "First", b = "Second" }, function(value)
 			calls, chosen = calls + 1, value
 			return accepted
-		end, function() return not paused end)
+		end, function()
+			if pause_error then error("injected pause reader failure") end
+			return not paused
+		end)
 		helpers.assert_eq(#rows[1].submenu, 2)
 		helpers.assert_eq(moves[1].states.hotstring_order_up_ready(), false)
 		helpers.assert_eq(moves[2].commands.hotstring_order_up(), false)
@@ -50,8 +53,28 @@ helpers.describe("hotstring-section-order", function()
 		paused = true
 		helpers.assert_eq(moves[2].commands.hotstring_order_up(), false)
 		helpers.assert_eq(calls, 1)
-		paused, accepted = false, true
+		paused, pause_error = false, true
+		helpers.assert_eq(moves[2].states.hotstring_order_up_ready(), false)
+		helpers.assert_eq(moves[2].commands.hotstring_order_up(), false)
+		helpers.assert_eq(reset(), false)
+		helpers.assert_eq(calls, 1, "a failing pause owner cannot publish an order")
+		pause_error, accepted = false, true
 		helpers.assert_eq(reset(), true)
 		helpers.assert_nil(chosen)
 	end)
+	helpers.it("hotstring-section-order: unavailable templates refuse only the order widget", function()
+		local writes = 0
+		local function commit() writes = writes + 1; return true end
+		local function ready() return true end
+		helpers.assert_eq(Order.menu(nil, { "a", "b" }, { a = "A", b = "B" }, commit, ready), {})
+		for _, rejected in ipairs({ "hotstring_order_moves", "hotstring_order_footer", "hotstring_order_parent" }) do
+			local function template(name)
+				if name == rejected then error("injected template withdrawal") end
+				return {}
+			end
+			helpers.assert_eq(Order.menu(template, { "a", "b" }, { a = "A", b = "B" }, commit, ready), {})
+		end
+		helpers.assert_eq(writes, 0)
+	end)
+
 end)
