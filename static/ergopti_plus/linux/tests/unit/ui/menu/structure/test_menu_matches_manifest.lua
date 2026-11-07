@@ -390,6 +390,16 @@ local function full_context()
 			set_action     = noop,
 			get_slots      = function() return {} end,
 			get_sg_names   = function() return {} end,
+			-- Each swipe slot's mode and step rows, read from the genuine defaults:
+			-- without them the slot submenus drop the sensitivity header.
+			MODE_SINGLE           = require("modules.gestures.manager").MODE_SINGLE,
+			MODE_INCREMENTAL      = require("modules.gestures.manager").MODE_INCREMENTAL,
+			DEFAULT_MODES         = require("modules.gestures.manager").DEFAULT_MODES,
+			DEFAULT_SENSITIVITIES = require("modules.gestures.manager").DEFAULT_SENSITIVITIES,
+			get_mode        = function(slot) return require("modules.gestures.manager").DEFAULT_MODES[slot] end,
+			get_sensitivity = function(slot) return require("modules.gestures.manager").DEFAULT_SENSITIVITIES[slot] end,
+			set_mode        = noop,
+			set_sensitivity = noop,
 		},
 		-- `keystats`, which is what _build_metrics reads. Named `metrics` in a
 		-- first draft, and the metrics submenu then collapsed to "(métriques non
