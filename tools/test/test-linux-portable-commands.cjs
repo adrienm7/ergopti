@@ -505,6 +505,21 @@ const PROGRAMS = {
 	niri: optionalTool('Niri window identity'),
 	lswt: optionalTool('wlr-foreign-toplevel window identity (labwc, Wayfire, river)'),
 	'update-desktop-database': optionalTool('desktop menu cache refresh after an App Cloner clone'),
+	'xdg-mime': why(
+		`queries the daily note's text editor; supplied by xdg-utils, installed with xdg-open by install.sh and declared by ${DEB_RECIPE} Depends and ${RPM_RECIPE} Requires`,
+		DRIVER,
+		{
+			proofs: [
+				{ file: INSTALLER, token: '_check_or_install xdg-open\\b' },
+				...['apt', 'dnf', 'zypper', 'pacman', 'xbps', 'apk'].map((manager) => ({
+					file: INSTALLER,
+					token: `${manager}:xdg-open\\) echo "xdg-utils" ;;`
+				})),
+				{ file: DEB_RECIPE, token: 'Depends:.*\\bxdg-utils\\b' },
+				{ file: RPM_RECIPE, token: 'Requires: +xdg-utils\\b' }
+			]
+		}
+	),
 	'xdg-open': why(
 		`opens links and files; declared dependency: install.sh _check_or_install, ${DEB_RECIPE} Depends and ${RPM_RECIPE} Requires`,
 		DRIVER,
