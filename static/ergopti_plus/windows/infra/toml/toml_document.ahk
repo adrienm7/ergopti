@@ -300,6 +300,9 @@ TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
 		throw TypeError("TOML document source must be a String")
 	_TOML_DocumentParses += 1
 	PerfCount("toml.document_parse")
+	; Which owner parsed: the boot's ceiling counts parses, and only the caller
+	; names tell a new boot reader from an old one (two appeared after 2026-11-05).
+	try PerfCount("toml.document_parse_by." . Error("", -2).What . "<" . Error("", -3).What)
 	PerfCount("toml.document_chars", StrLen(Source))
 	SlowStepsBefore := _TOML_DocumentSlowSteps
 	try return _TOML_ParseDocumentRecords(Source, &Records, &Physical)
