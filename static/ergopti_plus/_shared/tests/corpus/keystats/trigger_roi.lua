@@ -131,10 +131,30 @@ return function(helpers)
 			local state = Roi.new(0)
 			repeat_word(state, "frequent", 4)
 			for index = 1, 500 do repeat_word(state, "word" .. index, 1) end
-			helpers.assert_eq(state.word_count, 250)
+			helpers.assert_eq(state.word_count, 1, "singletons are discarded before bounded selection")
 			helpers.assert_eq(state.words.frequent, 4)
 			repeat_word(state, "frequent", 1)
 			helpers.assert_eq(rows(state)[1].word, "frequent")
+		end)
+
+		helpers.it("retains the highest UTF-16 keys among equal-frequency survivors", function()
+			local state = Roi.new(0)
+			for index = 500, 1, -1 do repeat_word(state, string.format("word%04d", index), 2) end
+			repeat_word(state, "new-noise", 1)
+			helpers.assert_eq(state.word_count, 250)
+			helpers.assert_nil(state.words.word0001)
+			helpers.assert_eq(state.words.word0500, 2)
+		end)
+
+		helpers.it("uses UTF-16 rather than UTF-8 ordering at the prune cutoff", function()
+			local state = Roi.new(0)
+			for index = 1, 249 do repeat_word(state, "￿word" .. index, 2) end
+			repeat_word(state, "𐀀word", 2)
+			repeat_word(state, "word", 2)
+			for index = 1, 250 do repeat_word(state, "noise" .. index, 1) end
+			helpers.assert_eq(state.word_count, 250)
+			helpers.assert_nil(state.words["𐀀word"], "the D800 surrogate sorts before the E000 scalar")
+			helpers.assert_eq(state.words["word"], 2)
 		end)
 
 		helpers.it("warns only about public triggers used this process, with hourly cadence and one decimal", function()
