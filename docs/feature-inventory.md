@@ -369,8 +369,8 @@ Each unchecked row is a triage item, not a confirmed missing feature. To update 
 - [ ] `sg_actions.run_apple_shortcut`: macOS only: Apple Shortcuts exist only on macOS. Elsewhere, run a command or a program instead. Equivalent actions: `run_command`, `run_program`.
 - [ ] `sg_actions.remove_quarantine_selection`: Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file.
 - [ ] `sg_actions.unblock_file_selection`: Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file.
-- [ ] `sg_actions.open_terminal_here`: Not on Linux: its file managers tell no other application which folder they show.
-- [ ] `sg_actions.new_text_file_here`: Not on Linux: its file managers tell no other application which folder they show.
+- [ ] `sg_actions.open_terminal_here`: Not yet implemented on Linux: this action requires integration with the file manager to identify its active folder.
+- [ ] `sg_actions.new_text_file_here`: Not yet implemented on Linux: this action requires integration with the file manager to identify its active folder.
 - [ ] `sg_actions.display_mirror_toggle`: No toggle on Linux: GNOME and KDE choose Duplicate in their own Super+P display switcher; bind that key as a keystroke.
 - [ ] `sg_actions.microsoft_bold`: Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”.
 - [ ] `sg_actions.layer_on`: macOS only: these switch the navigation layer kept inside Karabiner-Elements. On Windows and Linux the layer follows the key held down and has no switch to set.

@@ -4107,7 +4107,7 @@
 	"platform_reason.action_continuous_swipe_is_macos": "Bare macOS: et sammenhengende sveip følger fingrene mens de beveger seg, noe bare macOS-driveren leser. Windows får ferdige bevegelser fra styreplateinnstillingene, og Linux handler når sveipet er ferdig: bruk de tilsvarende handlingene i ett trinn.",
 	"platform_reason.action_download_mark_is_each_systems": "Hvert system merker nedlastede filer på sin egen måte (karanteneattributtet på macOS, nettmerket på Windows) og tilbyr handlingen som fjerner sitt eget merke. Linux merker ingen nedlastede filer.",
 	"platform_reason.action_executable_permission_is_unix": "Ikke på Windows: der kjører en fil på grunn av filtypen, ikke på grunn av en kjøretillatelse.",
-	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "Ikke på Linux: filbehandlerne forteller ingen annen app hvilken mappe de viser.",
+	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "Ennå ikke implementert på Linux: denne handlingen krever integrasjon med filbehandleren for å finne den aktive mappen.",
 	"platform_reason.action_line_deletion_is_macos": "Bare macOS: Cmd+Delete sletter til begynnelsen eller slutten av linjen i tekstfelt på macOS. Tekstfelt på Windows og Linux har ingen slik tast: merk til linjekanten med Shift+Home eller Shift+End, og slett deretter.",
 	"platform_reason.action_lookup_is_macos_dictionary": "Bare macOS: Slå opp åpner systemets ordbokspanel for ordet under pekeren. Windows og Linux har ikke noe ordbokspanel i systemet.",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Bare macOS: disse handlingene slår av og på navigasjonslaget som Karabiner-Elements holder. På Windows og Linux følger laget tasten som holdes nede, og har ingen bryter å stille.",

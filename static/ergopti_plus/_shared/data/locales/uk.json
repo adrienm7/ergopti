@@ -4107,7 +4107,7 @@
 	"platform_reason.action_continuous_swipe_is_macos": "Лише macOS: безперервний свайп іде за пальцями, поки вони рухаються, а це читає лише драйвер macOS. Windows отримує готові жести з налаштувань сенсорної панелі, а Linux діє після завершення свайпа: скористайтеся рівноцінними однокроковими діями.",
 	"platform_reason.action_download_mark_is_each_systems": "Кожна система по-своєму позначає завантажені файли (атрибут карантину в macOS, позначка Mark of the Web у Windows) і пропонує дію, що знімає її власну позначку. Linux не позначає завантажених файлів.",
 	"platform_reason.action_executable_permission_is_unix": "Не у Windows: там файл запускається через своє розширення, а не через право на виконання.",
-	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "Не в Linux: його файлові менеджери не повідомляють іншим застосункам, яку теку вони показують.",
+	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "Ще не реалізовано в Linux: для визначення активної теки потрібна інтеграція з файловим менеджером.",
 	"platform_reason.action_line_deletion_is_macos": "Лише macOS: Cmd+Delete видаляє до початку або кінця рядка в текстових полях macOS. Текстові поля Windows і Linux такої клавіші не мають: виділіть до краю рядка сполученням Shift+Home або Shift+End, а потім видаліть.",
 	"platform_reason.action_lookup_is_macos_dictionary": "Лише macOS: «Пошук» відкриває системну панель словника для слова під вказівником. У Windows і Linux немає системної панелі словника.",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Лише macOS: ці дії перемикають навігаційний шар, що зберігається в Karabiner-Elements. У Windows і Linux шар іде за утримуваною клавішею й не має перемикача.",

@@ -4107,7 +4107,7 @@
 	"platform_reason.action_continuous_swipe_is_macos": "macOS のみ：連続スワイプは指が動いている間それを追いかけますが、これを読み取れるのは macOS ドライバーだけです。Windows はタッチパッド設定から完了したジェスチャーを受け取り、Linux はスワイプが終わってから動作します：同等の 1 段階の操作を使ってください。",
 	"platform_reason.action_download_mark_is_each_systems": "システムごとにダウンロードしたファイルの印の付け方が異なり（macOS は検疫属性、Windows は Mark of the Web）、それぞれ自分の印を外す操作を用意しています。Linux はダウンロードしたファイルに印を付けません。",
 	"platform_reason.action_executable_permission_is_unix": "Windows にはありません：Windows ではファイルは実行権限ではなく拡張子によって実行されます。",
-	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "Linux にはありません：Linux のファイルマネージャーは、表示中のフォルダーを他のアプリに知らせません。",
+	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "Linux では未実装です。このアクションには、アクティブなフォルダーを特定するためにファイルマネージャーとの連携が必要です。",
 	"platform_reason.action_line_deletion_is_macos": "macOS のみ：Cmd+Delete は macOS のテキスト欄で行頭または行末まで削除します。Windows と Linux のテキスト欄にはこのキーがありません：Shift+Home または Shift+End で行の端まで選択してから削除してください。",
 	"platform_reason.action_lookup_is_macos_dictionary": "macOS のみ：調べる は、ポインタの下の単語についてシステムの辞書パネルを開きます。Windows と Linux にはシステムの辞書パネルがありません。",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "macOS のみ：これらの操作は Karabiner-Elements 内に保持されるナビゲーションレイヤーを切り替えます。Windows と Linux ではレイヤーは押し続けているキーに従い、設定するスイッチはありません。",
