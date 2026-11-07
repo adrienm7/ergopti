@@ -80,18 +80,32 @@ class PacHandler(http.server.BaseHTTPRequestHandler):
 
 
 def wrapper_lua_path(root):
-    """Evaluate the wrapper's own LUA_PATH export for an installed root."""
-    lines = [
-        line for line in WRAPPER.read_text().splitlines() if line.startswith("export LUA_PATH=")
+    """Evaluate the wrapper's own LUA_PATH block for an installed root.
+
+    The wrapper chooses between a search path and the literal-root mode in one
+    `case`, from the `unset ERGOPTI_LITERAL_…` line to its `esac`; the block is
+    run as written, so a root with no `;` or `?` must take the search path.
+    """
+    lines = WRAPPER.read_text().splitlines()
+    starts = [
+        i for i, line in enumerate(lines) if line.startswith("unset ERGOPTI_LITERAL_DRIVER_ROOT ")
     ]
-    if len(lines) != 1:
-        raise RuntimeError("The launcher wrapper must export LUA_PATH exactly once")
+    if len(starts) != 1:
+        raise RuntimeError("The launcher wrapper must build LUA_PATH in exactly one block")
+    ends = [i for i in range(starts[0], len(lines)) if lines[i] == "esac"]
+    if not ends:
+        raise RuntimeError("The launcher wrapper's LUA_PATH block has no esac")
+    block = "\n".join(lines[starts[0] : ends[0] + 1])
     script = (
         f'DRIVER_ROOT="{root}/linux"; SHARED_LUA="{root}/_shared/lua"\n'
-        + lines[0]
+        + block
+        + '\n[ -z "${ERGOPTI_LITERAL_DRIVER_ROOT+x}" ] || exit 3'
         + '\nprintf %s "$LUA_PATH"'
     )
-    return subprocess.run(["bash", "-c", script], check=True, capture_output=True, text=True).stdout
+    path = subprocess.run(["bash", "-c", script], check=True, capture_output=True, text=True).stdout
+    if not path.startswith(f"{root}/linux/?.lua;"):
+        raise RuntimeError(f"The launcher wrapper built an unexpected LUA_PATH: {path!r}")
+    return path
 
 
 class InstalledRoutePlan(unittest.TestCase):
