@@ -92,6 +92,23 @@ assert(next(manager.get_info()) == nil)
         string.format("at least 3 rules registered (got %d)", count))
     end)
 
+    helpers.it("seeds personal_info.toml in a configuration folder a fresh install has not created", function()
+      -- A fresh install starts before anything made the folder; the exclusive
+      -- create alone failed with ENOENT and the editor had no source.
+      local root = os.tmpname(); os.remove(root)
+      local path = root .. "/ergopti/personal_info.toml"
+      local ok, err = pcall(function()
+        dh.init({ trigger_char = "\\", personal_info_path = path })
+        local seeded = io.open(path, "rb")
+        helpers.assert_true(seeded ~= nil, "the default personal_info.toml must be written")
+        local text = seeded:read("*a"); seeded:close()
+        helpers.assert_true(text:find("[info]", 1, true) ~= nil, "the seed holds the shared placeholders")
+      end)
+      os.remove(path); os.remove(root .. "/ergopti"); os.remove(root)
+      dh.init({ trigger_char = "\\", personal_info_path = "/definitely/missing/personal_info.toml" })
+      if not ok then error(err, 0) end
+    end)
+
     helpers.it("is_enabled remains false until explicit activation", function()
       helpers.assert_true(dh.is_enabled() == false, "rule registration does not enable the master")
     end)

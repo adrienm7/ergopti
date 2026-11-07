@@ -153,6 +153,14 @@ local function _seed_missing_source(path)
 	local _, status = TomlWriter.read_classified(path)
 	if status ~= "absent" then return true end
 	Logger.info(LOG, "Writing default personal_info.toml at '%s'…", path)
+	-- A fresh install starts before anything created the configuration folder:
+	-- the exclusive create then failed with ENOENT, and the editor had no source.
+	local Shell = require("adapters.shell_runner")
+	local directory = require("native_path").dirname(path)
+	if not directory or not Shell.run("mkdir -p -- " .. Shell.quote(directory) .. " 2>/dev/null") then
+		Logger.error(LOG, "Could not create the configuration folder for personal_info.toml — the editor has no source.")
+		return false
+	end
 	local written, errno = require("adapters.file_system").write_new(path, _first_boot_source())
 	if written or errno == "EEXIST" or errno == 17 then return true end
 	Logger.error(LOG, "Could not create the default personal_info.toml (%s) — the editor has no source.",
