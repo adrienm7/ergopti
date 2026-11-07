@@ -19,8 +19,14 @@ if ([Console]::OutputEncoding.CodePage -ne $FixtureInitialOutputCodePage) {
 Initialize-OllamaManagedNative
 $FixtureRoot = Assert-OllamaLocalPath $FixtureRoot
 $Base = [Environment]::GetFolderPath('LocalApplicationData')
-if (-not [StringComparer]::OrdinalIgnoreCase.Equals([IO.Path]::GetDirectoryName($FixtureRoot), $Base) -or
-    [IO.Path]::GetFileName($FixtureRoot) -notlike ('ergopti-unicode-receipt-' + $FixtureNonce + '-*')) {
+# The managed owner admits one root folder inside a direct LocalApplicationData
+# child, as production's %LOCALAPPDATA%\Ergopti\ollama: the nonce names that
+# child and the root is its single 'ollama' folder.
+$FixtureParent = [IO.Path]::GetDirectoryName($FixtureRoot)
+if ($null -eq $FixtureParent -or
+    -not [StringComparer]::OrdinalIgnoreCase.Equals([IO.Path]::GetDirectoryName($FixtureParent), $Base) -or
+    [IO.Path]::GetFileName($FixtureParent) -notlike ('ergopti-unicode-receipt-' + $FixtureNonce + '-*') -or
+    [IO.Path]::GetFileName($FixtureRoot) -cne 'ollama') {
     throw 'Fixture root is outside its captured nonce namespace.'
 }
 $MarkerName = 'fixture-birth-' + $FixtureNonce + '.json'
@@ -55,6 +61,8 @@ try {
         if ($FixtureReceiptPath -eq '') { throw 'Fixture birth needs its separate receipt destination.' }
         # The actual native CreateDirectoryW is exclusive. An existing directory
         # throws here and never acquires this fixture's marker or birth receipt.
+        [Ergopti.Ollama.ManagedNative]::CreateProtectedDirectory($FixtureParent,
+            (New-OllamaPrivateSecurity).GetSecurityDescriptorBinaryForm())
         [Ergopti.Ollama.ManagedNative]::CreateProtectedDirectory($FixtureRoot,
             (New-OllamaPrivateSecurity).GetSecurityDescriptorBinaryForm())
         $Handle = [Ergopti.Ollama.ManagedNative]::OpenDirectory($FixtureRoot, $true)
@@ -95,6 +103,14 @@ try {
         } finally { $MarkerStream.Dispose() }
         [Ergopti.Ollama.ManagedNative]::DeleteExactDirectory($Handle)
         if (-not [Ergopti.Ollama.ManagedNative]::CloseHandle($Handle)) { throw 'Fixture retirement handle remains owned.' }
+        $Handle = [IntPtr]::Zero
+        # The nonce parent holds nothing else once its root is gone.
+        $Handle = [Ergopti.Ollama.ManagedNative]::OpenDirectory($FixtureParent, $true)
+        if ([IO.Directory]::EnumerateFileSystemEntries($FixtureParent).GetEnumerator().MoveNext()) {
+            throw 'Fixture parent retirement refuses a foreign child.'
+        }
+        [Ergopti.Ollama.ManagedNative]::DeleteExactDirectory($Handle)
+        if (-not [Ergopti.Ollama.ManagedNative]::CloseHandle($Handle)) { throw 'Fixture parent handle remains owned.' }
         $Handle = [IntPtr]::Zero
         [Console]::Out.WriteLine('FIXTURE_ROOT_RETIRED')
     }

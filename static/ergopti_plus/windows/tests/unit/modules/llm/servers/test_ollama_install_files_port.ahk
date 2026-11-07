@@ -480,16 +480,19 @@ _AP70_CodeUnits(Expected, Actual) {
 _AP70_ManagedUnicodeReceipt(Unicode) {
 	global _DriverDir
 	Scope := _CRWF_Fixture("managed-receipt")
-	Failure := 0, ManagedRoot := "", Birth := 0, Nonce := ""
+	Failure := 0, ManagedRoot := "", RootParent := "", Birth := 0, Nonce := ""
 	try {
-		; The managed owner deliberately requires a direct LocalApplicationData
-		; child. Resolve the input before launch to avoid the former 8.3 oracle.
+		; The managed owner deliberately requires one root folder inside a direct
+		; LocalApplicationData child, as %LOCALAPPDATA%\Ergopti\ollama: the
+		; nonce names the child. Resolve the input before launch to avoid the
+		; former 8.3 oracle.
 		Base := FSResolveDirectoryPath(EnvGet("LOCALAPPDATA"))
 		Nonce := StrLower(StrReplace(KLPF_NewOwnerId(), "-"))
-		ManagedRoot := Base . "\ergopti-unicode-receipt-" . Nonce
+		RootParent := Base . "\ergopti-unicode-receipt-" . Nonce
 			. (Unicode ? "-é-報告" : "-ascii")
-		AssertFalse(DirExist(ManagedRoot))
-		AssertFalse(FileExist(ManagedRoot))
+		ManagedRoot := RootParent . "\ollama"
+		AssertFalse(DirExist(RootParent))
+		AssertFalse(FileExist(RootParent))
 		BirthPath := Scope.Directory . "\root-birth.json"
 		_AP70_RootHelper(Scope, "acquire", ManagedRoot, Nonce, BirthPath)
 		ObservedBirth := JsonParse(FileRead(BirthPath, "UTF-8"))
@@ -545,6 +548,7 @@ _AP70_ManagedUnicodeReceipt(Unicode) {
 			try {
 				_AP70_RootHelper(CleanupScope, "cleanup", ManagedRoot, Nonce, "", Birth["root_identity"])
 				AssertFalse(DirExist(ManagedRoot), "Only the exact acquired root may acknowledge by-handle retirement")
+				AssertFalse(DirExist(RootParent), "the nonce parent retires with its root")
 			} catch Error as Err {
 				CleanupFailure := Err
 				throw Err
