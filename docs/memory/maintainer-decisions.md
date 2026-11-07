@@ -695,3 +695,18 @@ shared lifecycle (`managed_ollama_daemon_receipt.release_unpublished`, called by
 `managed_ollama_daemon_lifecycle` `terminate`), so every driver using it behaves the same.
 
 Pinned by `test_managed_ollama_daemon_protocol.lua` (`daemon-dead-unpublished-release`).
+
+## A lossy hotstring overrides rewrite is refused (2026-11-07)
+
+The safety check that refuses to rewrite a hotstring overrides file holding
+content no override owns (a root key, an unknown table or leaf, a foreign table
+array) wins over every migration that would rewrite it. On Windows the boot step
+`HotstringsOverridesBoot` therefore refuses to rewrite legacy absolute delays as
+offsets when `_HotstringsOverrideSourceIsRepresentable` refuses the source: it
+returns false, logs « Cannot rewrite overrides without losing source data » and
+that the rewrite is retried at the next start, leaves every byte of the file
+unchanged, and the session runs on the adopted delays. A migration never drops
+user bytes to finish; the user's cleanup or edit does. Action: a test of a
+migration whose source holds unrelated content expects this explicit refusal,
+not a settled rewrite. Pinned by `test_common_autocorrection_migration.ahk`
+(`common-autocorrection-split`, native initialization).
