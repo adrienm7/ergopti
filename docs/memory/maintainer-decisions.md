@@ -710,3 +710,14 @@ user bytes to finish; the user's cleanup or edit does. Action: a test of a
 migration whose source holds unrelated content expects this explicit refusal,
 not a settled rewrite. Pinned by `test_common_autocorrection_migration.ahk`
 (`common-autocorrection-split`, native initialization).
+
+## The Windows keyboard DLL folders are genuinely per-driver (2026-11-07, provisional)
+
+Provisional coordinator decision, to confirm with the maintainer.
+`windows/native/keyboard_layout` (the keyboard DLL sources generated from the
+.keylayout) and `windows/vendor/keyboard_layout` (its elevated installer) exist
+on Windows only: macOS and Linux install the .keylayout and XKB files
+themselves and build no DLL. `test-driver-tree-parity.cjs` records them by
+raising `BASELINE_UNION` 63 → 65 with a dated note. Action: no counterpart
+folder is created on macOS or Linux, and these files are not moved into another
+folder to dodge the count.
