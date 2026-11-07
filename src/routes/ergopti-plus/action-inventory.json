@@ -1019,8 +1019,8 @@
 		"platforms": { "windows": true, "macos": true, "linux": false },
 		"reasons": {
 			"linux": {
-				"en": "Not on Linux: its file managers tell no other application which folder they show.",
-				"fr": "Pas sous Linux : ses gestionnaires de fichiers n’indiquent à aucune autre application le dossier qu’ils affichent.",
+				"en": "Not yet implemented on Linux: this action requires integration with the file manager to identify its active folder.",
+				"fr": "Pas encore disponible sous Linux : cette action nécessite une intégration au gestionnaire de fichiers pour identifier son dossier actif.",
 				"equivalents": []
 			}
 		}
@@ -1031,8 +1031,8 @@
 		"platforms": { "windows": true, "macos": true, "linux": false },
 		"reasons": {
 			"linux": {
-				"en": "Not on Linux: its file managers tell no other application which folder they show.",
-				"fr": "Pas sous Linux : ses gestionnaires de fichiers n’indiquent à aucune autre application le dossier qu’ils affichent.",
+				"en": "Not yet implemented on Linux: this action requires integration with the file manager to identify its active folder.",
+				"fr": "Pas encore disponible sous Linux : cette action nécessite une intégration au gestionnaire de fichiers pour identifier son dossier actif.",
 				"equivalents": []
 			}
 		}

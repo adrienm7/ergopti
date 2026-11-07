@@ -1081,8 +1081,9 @@ platform = "hs,linux"
 reason_ahk = "platform_reason.action_executable_permission_is_unix"
 
 [sg_actions.open_terminal_here]
-# The folder of the active Finder or Explorer window. Linux is not
-# implemented, not impossible: its file managers expose no current folder.
+# The folder of the active Finder or Explorer window. Linux still needs a
+# file-manager-specific active-window/folder owner. Nautilus publishes all open
+# tab locations asynchronously; that list is not an active-folder receipt.
 platform = "hs,ahk"
 reason_linux = "platform_reason.action_file_manager_folder_is_unreadable_on_linux"
 

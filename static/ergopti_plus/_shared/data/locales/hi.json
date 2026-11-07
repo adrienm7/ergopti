@@ -4107,7 +4107,7 @@
 	"platform_reason.action_continuous_swipe_is_macos": "केवल macOS: लगातार स्वाइप उँगलियों के चलते समय उनका पीछा करता है, जिसे केवल macOS ड्राइवर पढ़ता है। Windows को टचपैड सेटिंग्स से पूरे इशारे मिलते हैं और Linux स्वाइप ख़त्म होने पर काम करता है: समकक्ष एक-चरण वाली क्रियाओं का उपयोग करें।",
 	"platform_reason.action_download_mark_is_each_systems": "हर सिस्टम डाउनलोड की गई फ़ाइलों को अपने ढंग से चिह्नित करता है (macOS पर क्वारंटीन विशेषता, Windows पर Mark of the Web) और अपना चिह्न हटाने वाली क्रिया देता है। Linux डाउनलोड की गई किसी फ़ाइल को चिह्नित नहीं करता।",
 	"platform_reason.action_executable_permission_is_unix": "Windows पर नहीं: वहाँ फ़ाइल अपने एक्सटेंशन के कारण चलती है, निष्पादन अनुमति के कारण नहीं।",
-	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "Linux पर नहीं: इसके फ़ाइल प्रबंधक किसी और ऐप को नहीं बताते कि वे कौन-सा फ़ोल्डर दिखा रहे हैं।",
+	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "Linux पर अभी लागू नहीं है: इस क्रिया के लिए सक्रिय फ़ोल्डर की पहचान करने हेतु फ़ाइल प्रबंधक के साथ एकीकरण आवश्यक है।",
 	"platform_reason.action_line_deletion_is_macos": "केवल macOS: Cmd+Delete macOS के टेक्स्ट फ़ील्ड में पंक्ति के आरंभ या अंत तक मिटाता है। Windows और Linux के टेक्स्ट फ़ील्ड में ऐसी कुंजी नहीं है: Shift+Home या Shift+End से पंक्ति के किनारे तक चुनें, फिर मिटाएँ।",
 	"platform_reason.action_lookup_is_macos_dictionary": "केवल macOS: Look Up पॉइंटर के नीचे वाले शब्द के लिए सिस्टम का शब्दकोश पैनल खोलता है। Windows और Linux में सिस्टम का शब्दकोश पैनल नहीं है।",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "केवल macOS: ये क्रियाएँ Karabiner-Elements में रखी नेविगेशन परत को बदलती हैं। Windows और Linux पर परत दबाकर रखी कुंजी का अनुसरण करती है और उसका कोई स्विच नहीं है।",
