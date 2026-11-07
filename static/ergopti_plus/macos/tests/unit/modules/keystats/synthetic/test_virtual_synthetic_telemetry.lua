@@ -57,7 +57,8 @@ local function keystats_uses_fenced_tag_ownership(handle_key)
 	local reject_at = code:find("if provenance then", 1, true)
 	local unreadable_at = code:find(
 		"if provenance_status == EventProvenance.STATUS_UNREADABLE then", 1, true)
-	local aggregate_at = code:find("if not CoreState.is_enabled then return end", 1, true)
+	local aggregate_at, _, disabled_body = code:find("if not CoreState%.is_enabled then%s*(.-)%s*end")
+	if disabled_body ~= "return" and disabled_body ~= "discard_roi_word(); return" then return false end
 	if not (classify_at and reject_at and unreadable_at and aggregate_at) then return false end
 	if not (classify_at < reject_at and reject_at < unreadable_at
 		and unreadable_at < aggregate_at) then

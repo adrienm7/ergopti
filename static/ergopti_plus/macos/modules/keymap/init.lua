@@ -1019,6 +1019,7 @@ M.reset_predictions_for_pause = LLMBridge.reset_predictions_for_pause
 
 M.classify_trigger   = Registry.classify_trigger
 M.has_exact_trigger  = Registry.has_exact_trigger
+M.is_known_trigger   = Registry.is_known_trigger
 -- The group name personal hotstrings are registered under. infra/personal_hotstrings
 -- loads the file with it at boot and ui/hotstring_editor reloads the SAME file with
 -- it on save. Exported so the two cannot drift: reloading under a different name

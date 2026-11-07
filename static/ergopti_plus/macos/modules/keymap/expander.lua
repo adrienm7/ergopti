@@ -1218,6 +1218,9 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	-- therefore skipped for private mappings — including the trigger, which is
 	-- itself a fragment of the secret. Non-private mappings are unaffected.
 	if is_private then
+		if keystats and type(keystats.log_private_hotstring) == "function" then
+			pcall(keystats.log_private_hotstring, trigger, repl_text)
+		end
 		Logger.debug(LOG, "Auto-expand: private mapping fired (content withheld).")
 	else
 		if keystats and type(keystats.log_hotstring) == "function" then
@@ -1363,6 +1366,9 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 		-- and replacement are both secrets and must reach neither the keystats
 		-- nor the log.
 		if is_private then
+			if keystats and type(keystats.log_private_hotstring) == "function" then
+				pcall(keystats.log_private_hotstring, trigger, repl_text)
+			end
 			Logger.debug(LOG, "Terminator-expand: private mapping fired (content withheld).")
 		else
 			if keystats and type(keystats.log_hotstring) == "function" then

@@ -349,6 +349,9 @@ local function interceptor(event, km_buffer, ctx)
 	-- is synchronous; keeping it true beyond this point would block re-entrancy.
 	_is_injecting = false
 	if ok then
+		if keystats and type(keystats.log_private_hotstring) == "function" then
+			pcall(keystats.log_private_hotstring, rule.suffix .. _trigger, result)
+		end
 		Logger.info(LOG, "Dynamic rule injection completed.")
 	end
 

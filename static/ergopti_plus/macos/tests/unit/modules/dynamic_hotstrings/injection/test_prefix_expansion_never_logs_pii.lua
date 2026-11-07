@@ -43,10 +43,15 @@ local Logger = helpers.load_with_stubs("infra.logger")
 --- Must run BEFORE the expander is loaded: it captures the module at require time.
 --- @return table The recorder table with a `calls` list.
 local function install_keystats_recorder()
-	local rec = { calls = {} }
+	local rec = { calls = {}, private_savings = {} }
 	package.loaded["modules.keystats"] = {
 		log_hotstring = function(trigger, replacement)
 			table.insert(rec.calls, { trigger = trigger, replacement = replacement })
+		end,
+		log_private_hotstring = function(trigger, replacement)
+			local roi = require("keystats.trigger_roi")
+			rec.private_savings[#rec.private_savings + 1] =
+				math.max(0, roi.utf16_length(replacement) - roi.utf16_length(trigger))
 		end,
 		log_hotstring_suggested = function() end,
 		notify_synthetic = function() end,
@@ -166,6 +171,8 @@ helpers.describe("personal-info prefix expansions never log their PII", function
 		end)
 
 		helpers.assert_eq(fired, true, "the private mapping must still expand normally")
+		helpers.assert_eq(rec.private_savings, { #SENTINEL_SSN - #SENTINEL_PREFIX },
+			"the private path transfers only a numeric saving after replacement commits")
 
 		-- The metrics sink: log_hotstring writes replacement + tag verbatim into
 		-- today.log, which the export replicates to every other device.
@@ -199,6 +206,7 @@ helpers.describe("personal-info prefix expansions never log their PII", function
 		helpers.assert_eq(fired, true, "the ordinary mapping must expand")
 		helpers.assert_eq(#rec.calls, 1,
 			"a non-private mapping must STILL be reported to the keystats — muting the expander wholesale is not the fix")
+		helpers.assert_eq(#rec.private_savings, 0)
 		helpers.assert_eq(rec.calls[1].trigger, "zqxtrig")
 		helpers.assert_eq(rec.calls[1].replacement, "ZQXREPLACEMENT")
 

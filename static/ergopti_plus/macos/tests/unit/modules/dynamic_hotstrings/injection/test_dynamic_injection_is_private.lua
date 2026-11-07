@@ -133,6 +133,12 @@ end)
 helpers.describe("rules_engine: the interceptor injection reaches inject_dynamic marked private", function()
 
 	helpers.it("hands is_private = true to keymap.inject_dynamic", function()
+		local private_calls = {}
+		package.loaded["modules.keystats"] = {
+			log_private_hotstring = function(trigger, replacement)
+				private_calls[#private_calls + 1] = { trigger, replacement }
+			end,
+		}
 		package.loaded["modules.dynamic_hotstrings.rules_engine"] = nil
 		local RE = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
 
@@ -151,6 +157,7 @@ helpers.describe("rules_engine: the interceptor injection reaches inject_dynamic
 			registry_transaction      = function(_, mutation) return mutation() == true end,
 			inject_dynamic = function(...)
 				captured.n          = select("#", ...)
+				captured.output     = select(2, ...)
 				captured.is_private = select(INJECT_DYNAMIC_PRIVATE_ARG, ...)
 				return true
 			end,
@@ -171,6 +178,8 @@ helpers.describe("rules_engine: the interceptor injection reaches inject_dynamic
 		interceptor(fake_event("*"), "td", { start_is_word_boundary = true })
 
 		helpers.assert_true(captured.n ~= nil, "the date rule must reach inject_dynamic at all")
+		helpers.assert_eq(private_calls, { { "td*", captured.output } },
+			"the private ROI input includes the consumed magic character exactly once")
 		helpers.assert_eq(captured.is_private, true,
 			"the module's own comment declines log_hotstring because the result may be a phone "
 			.. "number, an SSN or an IBAN — the other sink it reaches needs the same protection")
