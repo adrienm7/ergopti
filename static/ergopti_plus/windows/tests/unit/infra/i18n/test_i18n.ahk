@@ -899,7 +899,8 @@ _IDN_NorwegianCase(Region, NativeExpected, Expected) {
 	AssertEqual(1, Result.Calls, "real I18nInit observed the isolated native locale port")
 	AssertEqual(Expected, Result.Locale, "the declared language or current fallback is selected")
 }
-for _IDN_Row in [["nb-NO", "nb", "no"], ["nn-NO", "nn", "en"],
+; Both written forms read the one shipped Norwegian catalogue, as on macOS.
+for _IDN_Row in [["nb-NO", "nb", "no"], ["nn-NO", "nn", "no"],
 		["fr-FR", "fr", "fr"], ["en-US", "en", "en"]]
 	Test("i18n: native named region " . _IDN_Row[1] . " follows declared locale policy (i18n-native-norwegian)",
 		_IDN_NorwegianCase.Bind(_IDN_Row*))
