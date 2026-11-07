@@ -44,27 +44,31 @@ const { chromium, webkit } = require('playwright');
 			const marker = source.indexOf('// ======= 15/ Event Wiring');
 			assert.ok(marker > 0, 'real editor functions must load');
 			await page.addScriptTag({ content: source.slice(0, marker) });
+			// The editor's content height grows by one line for the newline. A
+			// Range rectangle is not used: WebKit measures a range that starts
+			// right after a hard break on the line before it.
 			const layout = await page.evaluate(() => {
 				const editor = document.getElementById('e-out');
-				parseToNodes('First\nSecond').forEach((node) => editor.appendChild(node));
-				const node = editor.firstChild;
-				function lineTop(start, end) {
-					const range = document.createRange();
-					range.setStart(node, start);
-					range.setEnd(node, end);
-					return range.getBoundingClientRect().top;
+				const single = editor.cloneNode(false);
+				single.id = 'e-single';
+				editor.after(single);
+				for (const element of [editor, single]) {
+					element.style.minHeight = '0';
+					element.style.maxHeight = 'none';
 				}
+				parseToNodes('First\nSecond').forEach((node) => editor.appendChild(node));
+				parseToNodes('First').forEach((node) => single.appendChild(node));
+				const lineHeight = parseFloat(getComputedStyle(editor).lineHeight);
 				return {
-					first: lineTop(0, 5),
-					second: lineTop(6, 12),
+					two: editor.scrollHeight,
+					one: single.scrollHeight,
+					lineHeight,
 					text: serializeEditor(editor),
-					nodes: Array.from(editor.childNodes, (child) => child.nodeName),
-					whiteSpace: getComputedStyle(editor).whiteSpace,
-					height: editor.getBoundingClientRect().height
+					whiteSpace: getComputedStyle(editor).whiteSpace
 				};
 			});
 			assert.ok(
-				layout.second > layout.first,
+				layout.lineHeight > 0 && layout.two - layout.one >= layout.lineHeight * 0.9,
 				`${name}: a newline in the output must be visible as a new line: ${JSON.stringify(layout)}`
 			);
 			assert.equal(layout.text, 'First\nSecond', 'the expansion text remains unchanged');
