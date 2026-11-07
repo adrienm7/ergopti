@@ -471,7 +471,7 @@ _MR_ApplyCategoryOff(Result, OffRule) {
 ; cannot bound a filesystem. This driver's own scan stops at _HS_SCAN_MAX_DEPTH
 ; (16) for the same tree
 global MR_MAX_LIST_DEPTH := 8
-; How many native menus _MR_UniqueNativeName remembers before it forgets the
+; How many native menus _MR_DeclaredTwinLabel remembers before it forgets the
 ; destroyed ones; a tray rebuild creates a few dozen.
 global MR_NATIVE_NAME_PRUNE_AT := 256
 
@@ -552,7 +552,6 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth, PopulationOwner := unset, Requir
 			Label := Label . " — " . _MR_ReasonHead(t(Row["disabled_reason_key"]))
 		; Rows carry literal text; only the native menu syntax treats & as a mnemonic.
 		Label := StrReplace(Label, "&", "&&")
-		Label := _MR_UniqueNativeName(TargetMenu, Label)
 
 		if (Row.Has("items") and Row["items"] is Array) {
 			if PopulationOwner is MenuPopulation && MenuPopulation_IsLeaf(Row["items"]) {
@@ -699,20 +698,23 @@ _MR_ReplayIdentity(ManifestKey, RowId, Kind := "command", Value := unset) {
 
 ; AHK names a menu item by its caption: Menu.Add with a caption the menu already
 ; holds updates that item instead of adding one, and Check or Disable reach the
-; first match. Two rows drawn into one menu may share a caption (the
+; first match. Two declared rows drawn into one menu may share a caption (the
 ; notification area and widget « colour by source » checks), so the later one
 ; gets a zero-width space per twin already drawn there: it reads the same and is
-; its own native item. Row data keeps the declared caption; only the native name
-; differs, and only when the menu really holds the caption.
+; its own native item. Only a DIFFERENT declared row earns it: drawing the same
+; row again, and every provider or template append, keeps Menu.Add's in-place
+; update, which the reload replay and template repairs rely on. Row data keeps
+; the declared caption; only the native name differs.
 ; @param TargetMenu {Menu} The menu the row is drawn into.
-; @param Label {String} The escaped caption the row would be added under.
-; @returns {String} The name to add the row under.
-_MR_UniqueNativeName(TargetMenu, Label) {
+; @param RowKey {String} The declaration and id of the row.
+; @param Label {String} The caption the row would be added under.
+; @returns {String} The caption to add the row under.
+_MR_DeclaredTwinLabel(TargetMenu, RowKey, Label) {
 	global MR_NATIVE_NAME_PRUNE_AT
 	static ZeroWidthSpace := Chr(0x200B), Drawn := Map()
-	; The names this renderer drew, per native menu, keep the common case free of
-	; native reads; a remembered name is confirmed natively, so a menu that was
-	; emptied or a recycled handle never earns a suffix it does not need.
+	; The captions declared rows drew, per native menu, keep the common case free
+	; of native reads; a remembered caption is confirmed natively, so a menu that
+	; was emptied or a recycled handle never earns a suffix it does not need.
 	Handle := TargetMenu.Handle
 	if !Drawn.Has(Handle) {
 		if Drawn.Count >= MR_NATIVE_NAME_PRUNE_AT {
@@ -728,9 +730,10 @@ _MR_UniqueNativeName(TargetMenu, Label) {
 		Drawn[Handle] := Names
 	}
 	Names := Drawn[Handle]
-	while Names.Has(Label) && _MR_MenuHoldsCaption(TargetMenu, Label)
+	while Names.Has(Label) && Names[Label] != RowKey
+			&& _MR_MenuHoldsCaption(TargetMenu, StrReplace(Label, "&", "&&"))
 		Label .= ZeroWidthSpace
-	Names[Label] := true
+	Names[Label] := RowKey
 	return Label
 }
 
@@ -828,6 +831,7 @@ _MR_RenderCommand(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 		return _MR_RenderGreyedStandIn(ResultMenu,
 			Map("id", _MR_Get(Item, "id"), "i18n", _MR_Get(Item, "i18n"),
 				"reason_key", Row["disabled_reason_key"]), ManifestKey)
+	Row["label"] := _MR_DeclaredTwinLabel(ResultMenu, ManifestKey . "`n" . _MR_Get(Item, "id"), Row["label"])
 	return _MR_RenderRows(ResultMenu, [Row], _MR_Get(Item, "id"), 1)
 }
 
