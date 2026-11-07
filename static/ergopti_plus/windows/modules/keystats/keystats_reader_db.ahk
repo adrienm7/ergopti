@@ -639,12 +639,19 @@ KLR_BuildColdCandidate(md, logPath) {
 
 		; Durable raw rows are authoritative on a cold build. Reconstruct every
 		; derived table on the candidate before it becomes observable.
+		KLRLastReplayFailure := Map()
 		if !KLR_PrepareTypingProjection(db) {
 				KLR_PrefetchDebug(logPath, "KLR typing projection FAILED")
 				try LoggerError("KLReader",
 						"Metrics DB build failed while preparing typing projections. Dashboard retains its last-good data.")
+				; The projection reads every typing row before the walker does, so a
+				; malformed row is rejected here: its owned context must survive.
+				Failure := KLRLastReplayFailure.Clone()
+				if Failure.Count && HasMethod(KLRReplayDiagnosticFn, "Call")
+						try KLRReplayDiagnosticFn.Call(Failure)
 				try SQLite_Close(db)
-				return Map("ok", false, "db", 0, "sizes", Map())
+				return Map("ok", false, "db", 0, "sizes", Map(),
+						"failure", Failure)
 		}
 		KLR_PrefetchDebug(logPath, "KLR typing projection in "
 				. (A_TickCount - phase_tick) . "ms")
@@ -1381,6 +1388,7 @@ _KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false, ThinkPause :
 		HaveCursor := false
 		LastDevice := ""
 		LastId := 0
+		RowIndex := 0
 		loop {
 				; A row-value bound exposes both columns to the planner, allowing a
 				; primary-index seek past this device's already completed IDs.
@@ -1390,11 +1398,11 @@ _KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false, ThinkPause :
 						? " AND (t.device_id, t.id) > (" . SQLite_Q(LastDevice) . "," . LastId . ")"
 						: ""
 				try Rows := SQLite_Query(db, Scoped
-						? "SELECT t.device_id, t.id, t.events_json FROM temp.klr_reader_typing_keys AS k "
+						? "SELECT t.device_id, t.id, t.ts, t.events_json FROM temp.klr_reader_typing_keys AS k "
 								. "JOIN events_typing AS t ON t.device_id=k.device_id AND t.id=k.event_id"
 								. CursorWhere . " ORDER BY k.device_id,k.event_id LIMIT " . PAGE_ROWS . ";"
 						:
-						"SELECT t.device_id, t.id, t.events_json "
+						"SELECT t.device_id, t.id, t.ts, t.events_json "
 						. "FROM events_typing AS t "
 						. "LEFT JOIN temp.klr_reader_typing_payload AS p "
 						. "ON p.device_id=t.device_id AND p.event_id=t.id "
@@ -1413,6 +1421,7 @@ _KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false, ThinkPause :
 				for Row in Rows {
 						DeviceId := KLR_RowValue(Row, "device_id", "")
 						EventId := KLR_RowValue(Row, "id", 0)
+						RowIndex += 1
 						ClearJson := ""
 						if !KLR_NormalizeTypingEventsJson(
 								KLR_RowValue(Row, "events_json", ""),
@@ -1421,6 +1430,8 @@ _KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false, ThinkPause :
 						try PauseCounts := _KLR_TypingPauseCounts(DecodedEvents, ThinkPause)
 						catch Error as Failure {
 								try LoggerError("KLReader", "Typing pause projection failed for device={1} id={2}.", DeviceId, EventId)
+								KLR_CaptureReplayFailure("typing-projection", DeviceId, RowIndex, EventId,
+										KLR_RowValue(Row, "ts", "unknown"), Failure.Message, Failure)
 								return false
 						}
 						BatchSql .= "INSERT INTO klr_reader_typing_counts "
