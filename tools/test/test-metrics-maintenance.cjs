@@ -290,12 +290,12 @@ check(
 		vm.runInContext("ask_metrics_maintenance('export')", context);
 		let id = vm.runInContext('confirm_metrics_maintenance()', context);
 		vm.runInContext(
-			`complete_metrics_maintenance(${id}, true, '/home/u/Downloads/x.sqlite')`,
+			`complete_metrics_maintenance(${id}, true, '/tmp/Downloads/x.sqlite')`,
 			context
 		);
 		assert.equal(
 			element('metrics_maintenance_text').textContent,
-			'exported /home/u/Downloads/x.sqlite'
+			'exported /tmp/Downloads/x.sqlite'
 		);
 		vm.runInContext("ask_metrics_maintenance('purge')", context);
 		id = vm.runInContext('confirm_metrics_maintenance()', context);
