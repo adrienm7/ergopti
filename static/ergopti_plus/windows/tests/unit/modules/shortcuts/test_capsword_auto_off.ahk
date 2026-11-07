@@ -619,7 +619,10 @@ _CWAOD_TinyPositive() {
         Pointer := Map()
         for Kind in CapsWordAutoOffPointerKinds()
             Pointer[Kind] := 0
-        for Seconds in [0, 0.0001] {
+        ; 0.0005 s is the smallest delay the shared policy keeps (one millisecond,
+        ; _shared/tests/corpus/caps_word/auto_off_vectors.json); below it the
+        ; policy refuses the value rather than rounding it to "never".
+        for Seconds in [0, 0.0005] {
             State := Map("ends", 0, "reason", "")
             CapsWordAutoOffReadConfig(Map("shortcuts.caps_word", Map("idle_timeout_seconds", Seconds, "terminators", []),
                 "shortcuts.caps_word.pointer", Pointer))
