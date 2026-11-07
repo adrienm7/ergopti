@@ -737,6 +737,7 @@ helpers.describe("installer-native-exit-receipt", function()
 			helpers.assert_eq(accepted, true, tostring(reason))
 			-- An actual parent component remains unsafe even though dots within
 			-- a filename are admitted. GNU tar may itself refuse the listing.
+			helpers.assert_true(Shell.run("command -v tar >/dev/null 2>&1"), "the tar CLI is not on PATH")
 			local unsafe = root .. "/unsafe.tar.gz"
 			helpers.assert_true(Shell.run("tar -czf " .. Shell.quote(unsafe) .. " -C " .. Shell.quote(root)
 				.. " --transform=" .. Shell.quote("s|^linux/notes[.][.]toml$|linux/../outside|") .. " linux _shared bin install.sh"))

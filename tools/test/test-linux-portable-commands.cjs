@@ -406,7 +406,17 @@ const PROGRAMS = {
 			probed: DRIVER_TEST
 		}
 	),
-	openssl: declaredByInstaller('openssl', 'hashing and the TLS helper', DRIVER_HOST),
+	openssl: why(
+		`hashing and the TLS helper; declared dependency: install.sh _check_or_install; the Encryptor tests probe it, installed by CI: ${DISTRO_PREP}`,
+		ALL,
+		{
+			proofs: [
+				{ file: INSTALLER, token: '_check_or_install openssl\\b', scopes: DRIVER_HOST },
+				{ file: DISTRO_PREP, token: ' openssl ', scopes: TEST }
+			],
+			probed: TEST
+		}
+	),
 	xkbcli: declaredByInstaller('xkbcli', 'keymap compilation', DRIVER_HOST),
 	pkexec: declaredByDeb('pkexec', 'privileged permission setup'),
 	modprobe: declaredByDeb('kmod', 'loads the uinput module'),
@@ -452,9 +462,11 @@ const PROGRAMS = {
 	iwgetid: optionalTool('Wi-Fi metric'),
 	'gnome-extensions': optionalTool('AppIndicator extension on GNOME'),
 	loginctl: optionalTool('logind sessions'),
-	tar: why('the installer probes it and refuses clearly when absent', DRIVER_HOST, {
-		probed: true
-	}),
+	tar: why(
+		`the installer probes it and refuses clearly when absent; the archive tests probe it, installed by CI: ${DISTRO_PREP}`,
+		ALL,
+		{ proof: { file: DISTRO_PREP, token: ' tar ', scopes: TEST }, probed: true }
+	),
 	localectl: optionalTool('system keyboard layout of systemd-localed'),
 	gsettings: optionalTool('GNOME settings'),
 	xrandr: optionalTool(
@@ -492,6 +504,7 @@ const PROGRAMS = {
 	swaymsg: optionalTool('Sway window identity', DRIVER_HOST),
 	niri: optionalTool('Niri window identity'),
 	lswt: optionalTool('wlr-foreign-toplevel window identity (labwc, Wayfire, river)'),
+	'update-desktop-database': optionalTool('desktop menu cache refresh after an App Cloner clone'),
 	'xdg-open': why(
 		`opens links and files; declared dependency: install.sh _check_or_install, ${DEB_RECIPE} Depends and ${RPM_RECIPE} Requires`,
 		DRIVER,
@@ -509,7 +522,7 @@ const PROGRAMS = {
 		`iproute2 listening sockets of the local-server detection test; installed by CI: ${DISTRO_PREP}`,
 		TEST,
 		{
-			proof: { file: DISTRO_PREP, token: '\\biproute2?(-ss)? curl ;;' },
+			proof: { file: DISTRO_PREP, token: '\\biproute2?(-ss)? nodejs curl ;;' },
 			probed: true
 		}
 	),

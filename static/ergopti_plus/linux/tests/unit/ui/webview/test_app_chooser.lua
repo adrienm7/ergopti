@@ -355,12 +355,15 @@ helpers.describe("application lookup owns its bounded native worker", function()
 		local elapsed = (uv.hrtime() - start) / 1e9
 		-- The child has no descendants; timeout waits for its native exit before
 		-- exec_checked returns. Check no matching worker survives the reply.
-		local listed, processes = Shell.exec_checked("ps -eo comm=,args=")
+		-- Read /proc, as the driver does: ps is not in every minimal image.
+		local listed, entries = Shell.exec_checked("ls /proc")
 		local survivor = false
-		for line in processes:gmatch("[^\n]+") do
-			if (line:match("^%s*luajit%s") or line:match("^%s*timeout%s"))
-				and line:find("desktop_application_resolution_worker.lua", 1, true)
-				and line:find(id, 1, true) then survivor = true end
+		for pid in (entries or ""):gmatch("%d+") do
+			local cmdline = io.open("/proc/" .. pid .. "/cmdline", "rb")
+			local args = cmdline and cmdline:read("*a") or ""
+			if cmdline then cmdline:close() end
+			if args:find("desktop_application_resolution_worker.lua", 1, true)
+				and args:find(id, 1, true) then survivor = true end
 		end
 		os.remove(worker); os.remove(fifo)
 		Shell.run("rmdir " .. Shell.quote(user .. "/applications") .. " " .. Shell.quote(system .. "/applications")
