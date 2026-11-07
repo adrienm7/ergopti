@@ -384,6 +384,13 @@ const GENERATORS = [
 		outputs: ['docs/design/owned-runtimes.md']
 	},
 	{
+		script: 'codegen/codegen-keystats-roi-case.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/lua/keystats/roi_case.lua',
+			'static/ergopti_plus/_shared/tests/corpus/keystats/roi_lowercase_vectors.json'
+		]
+	},
+	{
 		script: 'codegen/codegen-keystats-roi-policy.cjs',
 		outputs: ['static/ergopti_plus/_shared/lua/keystats/roi_policy.lua']
 	},

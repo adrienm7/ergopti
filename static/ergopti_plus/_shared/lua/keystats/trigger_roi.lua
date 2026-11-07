@@ -12,7 +12,7 @@
 
 local M = {}
 local Utf8 = require("compat.utf8")
-local Case = require("unicode_case")
+local Case = require("keystats.roi_case")
 local Policy = require("keystats.roi_policy")
 
 local BOUNDARIES = { [32] = true, [9] = true, [10] = true, [13] = true,
@@ -20,6 +20,16 @@ local BOUNDARIES = { [32] = true, [9] = true, [10] = true, [13] = true,
 local DISCARD_KEYS = { Escape = true, PageUp = true, PageDown = true, End = true,
 	Home = true, Left = true, Up = true, Right = true, Down = true, Delete = true }
 local MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
+
+--- Uses the qualified Windows ROI profile; general Unicode case conversion has different semantics.
+local function lower_key(text)
+	local characters = {}
+	for _, cp in Utf8.codes(text) do
+		local character = Utf8.char(cp)
+		characters[#characters + 1] = Case.lower[character] or character
+	end
+	return table.concat(characters)
+end
 
 --- Counts UTF-16 units, the Windows owner's StrLen contract, without accepting malformed UTF-8.
 --- @param text string
@@ -40,7 +50,7 @@ function M.trigger_index(mappings)
 	for _, mapping in ipairs(mappings) do
 		assert(type(mapping) == "table" and M.utf16_length(mapping.trigger) ~= nil,
 			"ROI requires valid admitted trigger text")
-		index[Case.lower(mapping.trigger)] = true
+		index[lower_key(mapping.trigger)] = true
 	end
 	return index
 end
@@ -51,7 +61,7 @@ end
 --- @return boolean|nil
 function M.known_trigger(index, word)
 	if type(index) ~= "table" or M.utf16_length(word) == nil then return nil end
-	return index[Case.lower(word)] == true
+	return index[lower_key(word)] == true
 end
 
 --- Creates one process-lifetime accounting state; restarting capture must reuse it.
@@ -179,7 +189,7 @@ local function complete(state, known_trigger)
 	local word, units, overflow = table.concat(state.word), state.word_units, state.overflow
 	state.word, state.word_units, state.overflow = {}, 0, false
 	if overflow or units < Policy.min_word_len or type(known_trigger) ~= "function" then return end
-	local key = Case.lower(word)
+	local key = lower_key(word)
 	local generation, context = state.generation, state.context
 	local ok, known = pcall(known_trigger, key)
 	if not ok or known ~= false or state.generation ~= generation or state.context ~= context then return end
@@ -254,7 +264,7 @@ function M.hotstring(state, trigger, replacement, is_private, now_ms, app, times
 		or type(app) ~= "string" or app == "" or not valid_timestamp(timestamp) then return false end
 	state.saved = state.saved + math.max(0, output - input)
 	state.fired = state.fired + 1
-	if not is_private and state.text_enabled then state.last_use[Case.lower(trigger)] = now_ms end
+	if not is_private and state.text_enabled then state.last_use[lower_key(trigger)] = now_ms end
 	if state.fired % Policy.roi_snapshot_every == 0 then
 		emit(state, "roi_snapshot", app, timestamp, { session_saved = state.saved, session_fired = state.fired })
 	end
