@@ -2199,7 +2199,35 @@ _LLM_Bridge_KeyOperatesTooltip(VK) {
 LLM_Bridge_OnKeyActivity(VK) {
 	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active) || _LLM_Bridge_KeyOperatesTooltip(VK)
 		return false
+	; A key that types keeps the pause its own character arms: the character
+	; cancels and re-arms the debounce on the char path. This key-down and that
+	; character are separate InputHook threads, and a key-down that ran after
+	; the last character cancelled the debounce it had just armed, so nothing
+	; was asked once the user stopped typing. A shown prediction or a request
+	; in flight still goes on any key.
+	if _LLM_Bridge_KeyTypesText(VK) && !_LLM_Bridge_PredictionBeyondDebounce()
+		return false
 	return LLM_Bridge_OnUserActivity("key vk=" . Format("0x{:02X}", VK))
+}
+
+; True for a key that types a character in the current layout without a
+; shortcut modifier (MAPVK_VK_TO_CHAR; the high bit marks a dead key).
+_LLM_Bridge_KeyTypesText(VK) {
+	if IsSet(_PrefixShortcutModifierHeld) && _PrefixShortcutModifierHeld()
+		return false
+	return (DllCall("MapVirtualKeyW", "UInt", VK, "UInt", 2, "UInt") & 0xFFFF) >= 0x20
+}
+
+; True when prediction work goes beyond the debounce a character re-arms: a
+; shown or loading prediction, or a request in flight.
+_LLM_Bridge_PredictionBeyondDebounce() {
+	global _LLM_Engine
+	if (IsSet(LLM_Tooltip_IsVisible) && LLM_Tooltip_IsVisible())
+			|| (IsSet(LLM_Tooltip_IsLoading) && LLM_Tooltip_IsLoading())
+		return true
+	if !LLM_Engine_IsBusy()
+		return false
+	return !(IsSet(_LLM_Engine) && (_LLM_Engine is Map) && _LLM_Engine.Get("timer_active", false))
 }
 
 _LLM_PointerWatch_Start(Port := 0) {
