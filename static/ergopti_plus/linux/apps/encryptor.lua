@@ -82,7 +82,7 @@ function M.main(argv)
 	return 0
 end
 
-if type(arg) == "table" and type(arg[0]) == "string" and arg[0]:match("([^/]+)$") == "encryptor.lua" then
+if type(arg) == "table" and type(arg[0]) == "string" and require("native_path").basename(arg[0]) == "encryptor.lua" then
 	local argv = {}
 	for index = 1, #arg do argv[index] = arg[index] end
 	os.exit(M.main(argv))

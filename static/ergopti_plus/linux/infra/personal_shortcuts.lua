@@ -30,6 +30,7 @@ local M = {}
 local Logger = require("logger.shim")
 local FileSystem = require("adapters.file_system")
 local Shell = require("adapters.shell_runner")
+local NativePath = require("native_path")
 
 local LOG = "infra.personal_shortcuts"
 local FILE_NAME = "personal_shortcuts.lua"
@@ -100,7 +101,7 @@ function M.ensure(path)
 	end
 	if FileSystem.exists(path) then return true end
 	-- The folder is private to the user, as the storage adapter creates it.
-	local directory = path:match("^(.*)/[^/]+$")
+	local directory = NativePath.dirname(path)
 	if directory and directory ~= "" and Shell.run("mkdir -p -m 700 " .. Shell.quote(directory) .. " 2>/dev/null") ~= true then
 		Logger.error(LOG, "The configuration folder '%s' could not be created.", directory)
 		return false

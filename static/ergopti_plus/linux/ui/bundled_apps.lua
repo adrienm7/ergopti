@@ -24,6 +24,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local TextUtils = require("text_utils")
+local NativePath = require("native_path")
 
 local LOG = "ui.bundled_apps"
 
@@ -61,7 +62,7 @@ local DEFAULT_DEPS = {
 		return true
 	end,
 	write_file = function(path, text)
-		local folder = path:match("^(.*)/[^/]+$")
+		local folder = NativePath.dirname(path)
 		local status = os.execute("mkdir -p " .. quote(folder))
 		if not (status == true or status == 0) then return false end
 		local file = io.open(path, "wb")
