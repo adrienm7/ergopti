@@ -257,7 +257,7 @@ function M.start(ports)
 			if type(direct) ~= "table" or direct.error ~= "untypable" then return false end
 			-- The session layout has no key for it: the expansions' clipboard route.
 			Logger.debug(LOG, "An emulated character has no key in the session layout: typed through the clipboard.")
-			local pasted = Injector.inject(0, text)
+			local pasted = Injector.inject(0, text, false, nil, nil, nil, true)
 			return type(pasted) == "table" and pasted.ok == true
 		end,
 		dispatch_char = ports.dispatch_char,

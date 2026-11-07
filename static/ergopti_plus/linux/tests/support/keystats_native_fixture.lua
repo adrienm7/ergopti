@@ -13,7 +13,8 @@ local helpers = require("tests.helpers")
 local Timings = require("infra.timings")
 local uv = require("luv")
 
-local MODULES = { "modules.keystats.keystats", "modules.keystats.metrics_collector", "modules.keystats.sqlite_writer" }
+local MODULES = { "modules.keystats.keystats", "modules.keystats.metrics_collector", "modules.keystats.sqlite_writer",
+	"modules.keystats.roi_policy" }
 
 -- Public vocabulary; true marks a physical phase that can own a native child.
 -- Unknown phases cannot claim new wait budgets.

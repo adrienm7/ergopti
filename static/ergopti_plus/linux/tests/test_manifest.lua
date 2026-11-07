@@ -463,6 +463,7 @@ return {
 	"tests.unit.modules.keystats.core.test_keystats_pointer_metrics",
 	"tests.unit.modules.keystats.core.test_keystats_window_switches",
 	"tests.unit.modules.keystats.core.test_keystats_session_events",
+	"tests.unit.modules.keystats.core.test_trigger_roi",
 	"tests.unit.modules.keystats.core.test_app_category_store_corpus",
 	"tests.unit.modules.keystats.storage.test_app_category_file",
 	"tests.unit.modules.keystats.core.test_keystats_system_events",

@@ -63,6 +63,8 @@ local function new_live_tracker()
 	})
 end
 local _live = new_live_tracker()
+local Roi = { owner = require("keystats.trigger_roi"), pending = {} }
+Roi.state = Roi.owner.new(Monotonic.now_ms(), false)
 
 -- The typing session's start and end and its idle spans (events_session), the
 -- state machine macOS and Windows run, ticked by the periodic flush.
@@ -883,6 +885,7 @@ function M.init(opts)
 		Logger.error(LOG, "At-rest encryption is configured on but unavailable — retaining ON and refusing plaintext persistence.")
 	end
 	TextCipher.set_enabled(_encrypt_enabled)
+	Roi.sync(true)
 	-- Resume only a pass a previous run left unfinished. Starting one
 	-- unconditionally would re-read every stored row at every daemon start, on
 	-- machines that may never have enabled the setting at all.
@@ -1282,12 +1285,117 @@ function M.record_suggestion(app_id, kind, timestamp_ms)
 	Logger.debug(LOG, "Suggestion offered (%s).", field)
 end
 
+--- Purges newly collected text while preserving cumulative numerical snapshots.
+function Roi.close_text()
+	Roi.owner.set_text_enabled(Roi.state, false)
+	for index = #Roi.pending, 1, -1 do
+		if Roi.pending[index].kind ~= "roi_snapshot" then table.remove(Roi.pending, index) end
+	end
+	-- During allocation the payload still aliases this provisional source. A
+	-- reentrant activation retires it before the writer can begin a new append.
+	-- After allocation returns, uncertain or acquired owners retain their debt.
+	if _flush_state and _flush_state.constructing == true then
+		local events = _flush_state.snapshot.buffers.roi
+		for index = #events, 1, -1 do
+			if events[index].kind ~= "roi_snapshot" then table.remove(events, index) end
+		end
+	end
+end
+
+--- Applies the requested and effective cipher policy without reopening old text.
+--- @param current boolean|nil Re-read canonical policy outside input callbacks.
+function Roi.sync(current)
+	local policy = require("modules.keystats.roi_policy")
+	if current == true then Roi.canonical_off = policy.current() end
+	local known_off = Roi.canonical_off == true
+	-- A refused activation with an unsettled owner must not reopen capture.
+	-- Only an off-input canonical observation after retirement can release it.
+	if current == true and Roi.activation_blocked and known_off and _encrypt_enabled == false
+		and not M.has_flush_debt() and not _flush_stopping then Roi.activation_blocked = false end
+	local enabled = not Roi.activation_blocked and policy.text_enabled(_encrypt_enabled)
+		and known_off
+	if enabled then Roi.owner.set_text_enabled(Roi.state, true) else Roi.close_text() end
+	return enabled
+end
+
+--- Transfers admitted ROI events to the same owned flush queue as other raw rows.
+function Roi.queue(clock)
+	return Roi.owner.drain(Roi.state, function(event)
+		local meta = {}
+		for key, value in pairs(event) do
+			if key ~= "type" and key ~= "app" and key ~= "timestamp" then meta[key] = value end
+		end
+		Roi.pending[#Roi.pending + 1] = {
+			ts = event.timestamp, date = clock.date, kind = event.type,
+			app = dashboard_app_name(event.app), meta = meta,
+		}
+		return true
+	end)
+end
+
+--- Counts only a completed expansion admitted by record_hotstring.
+function Roi.record_hotstring(app_id, trigger, replacement, timestamp_ms, is_private, clock)
+	Roi.sync()
+	Roi.owner.hotstring(Roi.state, trigger, replacement, is_private, timestamp_ms or clock.mono_ms, app_id, clock.ts)
+	Roi.queue(clock)
+end
+
+--- Drops an interrupted physical fragment without resetting accepted ROI counters.
+function M.discard_roi()
+	Roi.owner.discard(Roi.state)
+end
+
+--- Admits metadata already joined by the existing privacy owner to a native window.
+--- @param context table|nil { app_id, native_identity, title }.
+--- @return table|nil Portable context stamped at this observation.
+function Roi.context(context, clock)
+	if not Roi.sync() or not may_record() or type(context) ~= "table" or M.is_unrecorded_app(context.app_id) then return nil end
+	return { app = context.app_id, window = context.native_identity, title = context.title, timestamp = clock.ts }
+end
+
+--- Publishes focus observations even when no character was typed between windows.
+--- @param context table|nil Existing privacy owner's joined native context.
+function M.observe_roi_context(context)
+	return Roi.owner.observe(Roi.state, Roi.context(context, capture_input_clock()))
+end
+
+--- Observes admitted physical text and excludes the live catalogue's known triggers.
+--- @param text string Physical text, never synthetic output.
+--- @param context table Existing privacy owner's joined native context.
+--- @param known_trigger function Returns exactly false only for an unknown trigger.
+function M.record_roi_text(text, context, known_trigger)
+	local clock = capture_input_clock()
+	local admitted = Roi.owner.text(Roi.state, text, Roi.context(context, clock), known_trigger)
+	Roi.queue(clock)
+	return admitted
+end
+
+--- Observes a physical editing key in the keyboard hook's control vocabulary.
+--- @param key string Linux control-key name.
+--- @param detail table|nil Modifier metadata captured with the physical event.
+--- @param context table Existing privacy owner's joined native context.
+--- @param known_trigger function Live catalogue lookup.
+function M.record_roi_key(key, detail, context, known_trigger)
+	local names = { backspace = "Backspace", enter = "Enter", tab = "Tab", escape = "Escape",
+		pageup = "PageUp", pagedown = "PageDown", home = "Home", ["end"] = "End",
+		left = "Left", right = "Right", up = "Up", down = "Down", delete = "Delete", insert = "Delete" }
+	local mods = type(detail) == "table" and type(detail.mods) == "table" and detail.mods or {}
+	if key == "shortcut" or mods.ctrl or mods.alt or mods.meta then Roi.owner.discard(Roi.state); return false end
+	local clock = capture_input_clock()
+	local admitted = Roi.owner.key(Roi.state, names[key], Roi.context(context, clock), known_trigger)
+	Roi.queue(clock)
+	return admitted
+end
+
 --- @param replay_terminator string|nil Already typed delimiter erased and replayed after the replacement.
 function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, deletes, is_private, replay_terminator)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
 	if M.is_unrecorded_app(app_id) then return end
-	if type(replacement) ~= "string" or replacement == "" then return end
-	local live, dated, clock = app_pair(app_id, timestamp_ms, capture_input_clock())
+	if type(replacement) ~= "string" then return end
+	local clock = capture_input_clock()
+	Roi.record_hotstring(app_id, trigger, replacement, timestamp_ms, is_private, clock)
+	if replacement == "" then return end
+	local live, dated = app_pair(app_id, timestamp_ms, clock)
 	for _, app in ipairs({ live, dated }) do
 		app.hs_chars = app.hs_chars + char_count(replacement)
 		app.hs_triggers = app.hs_triggers + 1
@@ -1464,6 +1572,7 @@ end
 --- only after the producer confirms success, so cancelled streamed output never
 --- appears as a false logical keystroke.
 function M.record_synthetic_output(app_id, text, source, timestamp_ms, deletes, input_chars)
+	Roi.owner.discard(Roi.state)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
 	if M.is_unrecorded_app(app_id) then return end
 	if type(text) ~= "string" or text == "" then return end
@@ -1926,6 +2035,7 @@ local hold_password_app = M.is_unrecorded_app
 settle_capture_policy = function()
 	if not may_record() then _capture_boundary = _capture_boundary + 1 end
 	if not may_record() or hold_password_app(_hold_focus_app) then
+		Roi.owner.discard(Roi.state)
 		_pointer.discard_frames()
 		_pointer.forget_position()
 		retire_focus_prefix()
@@ -2255,15 +2365,18 @@ end
 --- @param enabled boolean
 --- @return boolean The posture actually in force after the call.
 function M.set_encrypt_enabled(enabled)
+	local want = (enabled == true)
+	if want then Roi.activation_blocked = true; Roi.close_text() end
 	if M.has_flush_debt() or _flush_stopping then return false end
 	if not Preferences.admit() then return false end
-	local want = (enabled == true)
 	if want and not TextCipher.is_available() then
 		Logger.error(LOG, "At-rest encryption requested but no key can be derived — keeping the current posture.")
+		Roi.sync(true)
 		return false
 	end
 	if not store_bool(KEY.METRICS_ENCRYPT, want) then
 		Logger.error(LOG, "At-rest encryption state was not persisted — it was not changed.")
+		Roi.sync(true)
 		return false
 	end
 	local changed = (want ~= _encrypt_enabled)
@@ -2272,6 +2385,7 @@ function M.set_encrypt_enabled(enabled)
 	-- plaintext untouched while the toggle is off, so an encrypting pass launched
 	-- first would convert nothing and report success.
 	TextCipher.set_enabled(want)
+	Roi.sync(true)
 	-- Persisted like its siblings. This one matters most of the three: a user who
 	-- turned encryption ON and found it off after a reboot would have a database
 	-- half encrypted and half not, with nothing saying when the posture changed.
@@ -2392,6 +2506,10 @@ end
 --- @param candidate table Configuration snapshot to apply or restore.
 --- @return boolean acknowledged
 function M.apply_configuration(candidate)
+	if type(candidate) == "table" and (candidate.encrypt == true or candidate.cipher_enabled == true) then
+		Roi.activation_blocked = true
+		Roi.close_text()
+	end
 	if M.has_flush_debt() or _flush_stopping then return false end
 	if type(candidate) ~= "table" or TextMigration.is_running() then return false end
 	for _, key in ipairs({ LEAF.ENABLED, LEAF.PRIVATE_FILTER_ENABLED, LEAF.SECURE_FILTER_ENABLED,
@@ -2418,6 +2536,7 @@ function M.apply_configuration(candidate)
 	_secure_filter_enabled = candidate.secure_filter_enabled
 	_system_auth_filter_enabled = candidate.system_auth_filter_enabled
 	_encrypt_enabled = candidate.encrypt
+	Roi.sync(true)
 	_disabled_list = {}
 	for index, app in ipairs(candidate.disabled_apps) do _disabled_list[index] = app end
 	_disabled_apps = exclusion_set(_disabled_list)
@@ -2558,11 +2677,12 @@ end
 
 --- Composes one immutable snapshot without advancing public watermarks.
 local function capture_flush(close_session)
+	Roi.sync(true)
 	local clock = observe_calendar()
 	local date = clock.date
 	local calendar_snapshot = snapshot_calendar(clock)
 	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {}, windows = {},
-		sessions = {}, system = {}, media = {}, network = {} }, upserts = {} }
+		sessions = {}, system = {}, media = {}, network = {}, roi = {} }, upserts = {} }
 	local add = setmetatable({}, { __index = function(_, kind)
 		return function(_, ...)
 			payload.upserts[#payload.upserts + 1] = { kind = kind, args = copy_flush_value({ ... }) }
@@ -2572,7 +2692,7 @@ local function capture_flush(close_session)
 		typing = _pending_typing_events, hotstrings = _pending_hotstring_events,
 		shortcuts = _pending_shortcut_events, switches = _pending_app_switch_events,
 		llm = _pending_llm_events, windows = _pending_window_switch_events, sessions = _pending_session_events,
-		network = _pending_network_events,
+		network = _pending_network_events, roi = Roi.pending,
 		system = _pending_system_events, media = _pending_media_events,
 	}
 	local _pending_typing_events, _pending_hotstring_events = buffers.typing, buffers.hotstrings
@@ -2698,6 +2818,7 @@ local function capture_flush(close_session)
 		payload.raw.shortcuts = _pending_shortcut_events
 		_pending_shortcut_events = {}
 	end
+	payload.raw.roi = buffers.roi
 	if #_pending_network_events > 0 then
 		payload.raw.network = _pending_network_events
 		_pending_network_events = {}
@@ -3044,6 +3165,15 @@ local function restore_flush_buffers(buffers)
 	_pending_shortcut_events = prepend(buffers.shortcuts, _pending_shortcut_events)
 	_pending_llm_events = prepend(buffers.llm, _pending_llm_events)
 	_pending_network_events = prepend(buffers.network, _pending_network_events)
+	-- A reentrant activation can retire text while this source is detached.
+	-- Nil acquisition owns no append: purge before clearing the reservation or
+	-- a subsequent known-OFF observation would resurrect the revoked source.
+	if not Roi.sync(true) then
+		for index = #buffers.roi, 1, -1 do
+			if buffers.roi[index].kind ~= "roi_snapshot" then table.remove(buffers.roi, index) end
+		end
+	end
+	Roi.pending = prepend(buffers.roi, Roi.pending)
 	_pending_window_switch_events = prepend(buffers.windows, _pending_window_switch_events)
 	_pending_session_events = prepend(buffers.sessions, _pending_session_events)
 	_pending_system_events = prepend(buffers.system, _pending_system_events)
@@ -3073,7 +3203,7 @@ local function dispatch_flush(close_session)
 	if #payload.raw.typing == 0 and #payload.raw.hotstrings == 0 and #payload.raw.shortcuts == 0
 		and #payload.raw.llm == 0 and #payload.raw.switches == 0 and #payload.raw.windows == 0
 		and #payload.raw.sessions == 0 and #payload.raw.system == 0 and #payload.raw.media == 0
-		and #payload.raw.network == 0
+		and #payload.raw.network == 0 and #payload.raw.roi == 0
 		and #payload.upserts == 0 then
 		_last_flush_committed = true
 		prune_calendar(snapshot.calendar)
@@ -3088,12 +3218,15 @@ local function dispatch_flush(close_session)
 	_pending_shortcut_events, _pending_app_switch_events = {}, {}
 	_pending_llm_events = {}
 	_pending_network_events = {}
+	Roi.pending = {}
 	_pending_window_switch_events = {}
 	_pending_session_events = {}
 	_pending_system_events = {}
 	-- Media left out of this flush (no media store yet) stays pending.
 	if #payload.raw.media > 0 then _pending_media_events = {} end
+	state.constructing = true
 	local called, operation = pcall(SqliteWriter.start_flush, _device_id, payload)
+	state.constructing = false
 	if not called then
 		Logger.error(LOG, "SQLite dispatch raised; uncertain ownership and source remain retained.")
 		return false
@@ -3166,9 +3299,14 @@ end
 --- @return boolean True only after durable COMMIT and native cleanup ACK.
 function M.flush()
 	if _flush_stopping then return false end
+	Roi.sync(true)
 	local clock = observe_calendar()
 	-- The periodic flush is the session's idle check (timings ingest_tick_ms).
-	if may_record() then queue_session_events(forward_session(clock, "tick", clock.mono_ms), clock) end
+	if may_record() then
+		queue_session_events(forward_session(clock, "tick", clock.mono_ms), clock)
+		Roi.owner.tick(Roi.state, clock.mono_ms, _focused_app_id or "Unknown", clock.ts)
+		Roi.queue(clock)
+	end
 	-- The sampler admits raw transitions at capture, independently of machine
 	-- aggregates. Retain the existing conservative drain gate as well: reopening
 	-- recording cannot authorize a forbidden sample, and closing it drops queues.
@@ -3203,9 +3341,12 @@ end
 --- @return boolean True only when no native flush work remains acquired.
 function M.stop()
 	if not _flush_stopping then
+		Roi.sync(true)
 		local clock = observe_calendar()
 		-- The open session ends with the daemon, before the final flush takes it.
 		if may_record() then queue_session_events(forward_session(clock, "stop"), clock) end
+		Roi.owner.finish(Roi.state, _focused_app_id or "Unknown", clock.ts)
+		Roi.queue(clock)
 		_flush_stopping = true
 		_live = new_live_tracker()
 		if _reset_request then finish_reset_request(_reset_request, false) end
@@ -3288,7 +3429,7 @@ end
 --- Whether fresh capture still needs a durable reset boundary.
 has_reset_input = function()
 	return next(_pending_typing_events) ~= nil or #_pending_hotstring_events > 0
-		or #_pending_shortcut_events > 0 or #_pending_llm_events > 0 or #_pending_network_events > 0
+		or #_pending_shortcut_events > 0 or #_pending_llm_events > 0 or #_pending_network_events > 0 or #Roi.pending > 0
 		or #_pending_window_switch_events > 0 or #_pending_session_events > 0
 		or #_pending_system_events > 0 or #_pending_app_switch_events > 0
 end
@@ -3551,14 +3692,14 @@ end
 --- @return integer
 function M._pending_buffer_count_for_test()
 	local count = #_pending_hotstring_events + #_pending_shortcut_events + #_pending_llm_events
-		+ #_pending_network_events
+		+ #_pending_network_events + #Roi.pending
 		+ #_pending_app_switch_events + #_pending_window_switch_events
 	for _, stream in pairs(_pending_typing_events) do
 		for _, pending in ipairs(stream.runs) do count = count + #pending.events end
 	end
 	if _flush_state then
 		local held = _flush_state.snapshot.buffers
-		count = count + #held.hotstrings + #held.shortcuts + #held.llm + #held.switches + #held.windows
+		count = count + #held.hotstrings + #held.shortcuts + #held.llm + #held.switches + #held.windows + #held.roi
 		for _, stream in pairs(held.typing) do
 			for _, pending in ipairs(stream.runs) do count = count + #pending.events end
 		end

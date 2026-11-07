@@ -55,7 +55,8 @@ local function with_main(mappings, body, overrides)
 			opts = { dry_run = false },
 			keystats = { is_password_app = function() return false end,
 				is_unrecorded_app = function() return false end, suppress = function() end,
-				unsuppress = function() end, on_keydown = function() end,
+				unsuppress = function() end, on_keydown = function() end, record_roi_text = function() end,
+					discard_roi = function() end, record_roi_key = function() end,
 				record_correction = function() end,
 				record_hotstring = function(_, trigger, replacement, _, _, _, private)
 					observations.recorded[#observations.recorded + 1] = { replacement = replacement, private = private }

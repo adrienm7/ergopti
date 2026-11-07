@@ -1256,6 +1256,7 @@ local function main()
 		on_pause_change = function(paused)
 			if privacy_owners.end_wrap_selection then privacy_owners.end_wrap_selection() end
 			if paused then keystats.cancel_hold_intervals() end
+			keystats.discard_roi()
 			if paused and gestures then gestures.release_clicks() end
 			-- A paused script ends CapsWord, as on Windows: its CapsLock unlocks.
 			if paused and shortcuts then shortcuts.cancel_caps_word("script paused") end
@@ -1312,6 +1313,7 @@ local function main()
 			return true, keystats.is_context_protected(context.app_id, context.title)
 		end,
 		reset_text = function()
+			keystats.discard_roi()
 			_undoable = nil
 			_last_offered = nil
 			if tooltip_preview then tooltip_preview.hide() end
@@ -1324,13 +1326,14 @@ local function main()
 	-- been joined. Until then the previous context is retired and no new interval
 	-- may start, including when the asynchronous probe settles after startup.
 	local function publish_admitted_focus()
-		if secure_focus_guard.blocks_text() then return false end
+		if secure_focus_guard.blocks_text() then keystats.discard_roi(); return false end
 		local context = secure_focus_guard.current_context()
 		if type(context) ~= "table" or type(context.app_id) ~= "string" or context.app_id == ""
 			or keystats.is_unrecorded_app(context.app_id) then return false end
 		local now = math.floor(Monotonic.now_ms())
 		keystats.set_window_title(context.app_id, context.title, now)
 		keystats.on_app_focus(context.app_id, now)
+		keystats.observe_roi_context(context)
 		return true
 	end
 	local function refresh_admitted_focus(immediate)
@@ -1420,6 +1423,13 @@ local function main()
 		-- the off-input-path settle/probe cycle. Nothing from the new control may
 		-- reach a hotstring, metric buffer, log, or model in that interval.
 		if ch == "\t" then
+			local admission = physical_privacy_admission
+			physical_privacy_admission = nil
+			if not (admission and admission.code == scancode and not admission.allowed)
+				and not secure_focus_guard.blocks_text() then
+				keystats.record_roi_text(ch, secure_focus_guard.current_context(),
+					function(word) return engine:is_known_trigger(word) end)
+			end
 			secure_focus_guard.invalidate()
 			return
 		end
@@ -1428,10 +1438,12 @@ local function main()
 		-- Counted, never the character: these returns once lost typing silently.
 		if admission and admission.code == scancode then
 			if not admission.allowed then
+				keystats.discard_roi()
 				require("infra.typed_input_withheld").record("press_not_admitted")
 				return
 			end
 		elseif secure_focus_guard.blocks_text() then
+			keystats.discard_roi()
 			require("infra.typed_input_withheld").record("field_not_admitted")
 			return
 		end
@@ -1489,6 +1501,8 @@ local function main()
 		end
 
 		keystats.on_keydown(ch, now_ms, app_id, scancode)
+		keystats.record_roi_text(ch, secure_focus_guard.current_context(),
+			function(word) return engine:is_known_trigger(word) end)
 
 		-- `is_terminator` opens the engine's end-char path, where a trigger that
 		-- did NOT opt into auto_expand is allowed to fire. Without it every entry
@@ -2020,6 +2034,13 @@ local function main()
 	-- 8.6a) Initialise dynamic hotstrings (@-tag expansions).
 	-- 8.7) Define the control-key callback.
 	local function handle_control(key_name, detail)
+		if script_actions.is_paused() or (physical_privacy_admission and not physical_privacy_admission.allowed)
+			or secure_focus_guard.blocks_text() then
+			keystats.discard_roi()
+		else
+			keystats.record_roi_key(key_name, detail, secure_focus_guard.current_context(),
+				function(word) return engine:is_known_trigger(word) end)
+		end
 		if user_hotstring_native then user_hotstring_native.observe_input() end
 		-- Forwarded document controls retire the AI's old caret independently of
 		-- the hotstring word-reset options. Consumed offer chords never get here;
@@ -2328,6 +2349,7 @@ local function main()
 	})
 
 	local function on_click()
+		keystats.discard_roi()
 		TapHold.observe_copy_activity()
 		-- PRIMARY's baseline belongs to the pre-navigation selection. Its reader
 		-- checks fresh privacy first; actual wrapping remains gated after settle.
@@ -2374,11 +2396,12 @@ local function main()
 	-- had been typed. This daemon is the observer's one owner; a restarted
 	-- session replaces the previous session's observer.
 	injector.set_output_observer(nil)
-	if not injector.set_output_observer(function(text)
+	if not injector.set_output_observer(function(text, physical_input)
+		if physical_input ~= true then keystats.discard_roi() end
 		if shortcuts and shortcuts.is_enabled() and shortcuts.is_caps_word_active() then
 			shortcuts.caps_word_observe_text(text)
 		end
-	end) then
+	end, keystats.discard_roi) then
 		Logger.error(LOG, "CapsWord cannot observe the text the daemon types; injected delimiters will not end it.")
 	end
 
@@ -3190,6 +3213,7 @@ local function main()
 
 	if process_lifecycle then
 		process_lifecycle.onFocusChange(function(appName, windowTitle)
+			keystats.discard_roi()
 			wrap_on_type.end_selection_window()
 			keystats.observe_hold_focus(appName)
 			keystats.set_private_window(keystats.is_private_window(windowTitle))

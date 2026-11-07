@@ -94,6 +94,7 @@ local function insert_rows(db, first_id, date)
 		{ "events.hotstring", { app = "kate", kind = "fired", trigger = "btw", replacement = "by the way", h_type = "user",
 			net_saved_chars = 7 } },
 		{ "events.session", { kind = "session_start", duration_ms = 0 } },
+		{ "events.roi", { app = "kate", kind = "new_trigger_candidate", meta_json = require("json").encode({ word = tricky, occurrences = 5 }) } },
 		{ "events.llm", { app = "kate", kind = "suggested", context = "ctx", predictions_json = "[]", prediction = "p",
 			all_predictions_json = "[]", chosen_index = 0, deletes = 0, deleted_text = "", net_saved_chars = 0, count = 1,
 			prompt_tokens = 1, completion_tokens = 1, total_tokens = 2, est_cost_usd = 0 } },
@@ -110,7 +111,7 @@ local function insert_rows(db, first_id, date)
 		.. "+(SELECT count(*) FROM events_app_switch)+(SELECT count(*) FROM events_window_switch)"
 		.. "+(SELECT count(*) FROM events_shortcut)+(SELECT count(*) FROM events_system)"
 		.. "+(SELECT count(*) FROM events_hotstring)+(SELECT count(*) FROM events_session)"
-		.. "+(SELECT count(*) FROM events_llm);"))
+		.. "+(SELECT count(*) FROM events_llm)+(SELECT count(*) FROM events_roi);"))
 	assert(tonumber(count) == first_id + #rows - 1, "a fixture row was refused by the schema")
 	return first_id + #rows - 1
 end

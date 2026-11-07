@@ -1088,6 +1088,29 @@ _raw_sql.network = function(device_id, events, first_id)
 	return table.concat(statements, "\n")
 end
 
+--- Renders the portable trigger ROI payload without dropping its typed metadata.
+--- @param events table Array of { ts, date, kind, app, meta }.
+_raw_sql.roi = function(device_id, events, first_id)
+	local statements = {}
+	local kinds = { roi_snapshot = true, new_trigger_candidate = true, trigger_halflife = true }
+	for index, event in ipairs(events) do
+		assert(kinds[event.kind] == true and type(event.meta) == "table", "Invalid trigger ROI event")
+		if event.kind == "roi_snapshot" then
+			for key, value in pairs(event.meta) do
+				assert((key == "session_saved" or key == "session_fired") and type(value) == "number"
+					and value == value and value >= 0 and value < math.huge, "Invalid numeric ROI snapshot")
+			end
+			assert(type(event.meta.session_saved) == "number" and type(event.meta.session_fired) == "number", "Incomplete ROI snapshot")
+		end
+		statements[index] = Queries.render("events.roi", "cli_json", {
+			device_id = device_id, id = first_id + index - 1,
+			ts = event.ts, date = event.date, kind = event.kind, app = event.app,
+			meta_json = Json.encode(event.meta),
+		})
+	end
+	return table.concat(statements, "\n")
+end
+
 --- Plans admitted semantic media entries as raw events_system rows and their
 --- derived press and hold rows, so the flush that owns the raw source commits
 --- its projections in the same transaction (media never reaches the numeric
@@ -1829,6 +1852,15 @@ function M.start_flush(device_id, payload)
 	payload.raw.system = payload.raw.system or {}
 	payload.raw.media = payload.raw.media or {}
 	payload.raw.network = payload.raw.network or {}
+	payload.raw.roi = payload.raw.roi or {}
+	array(payload.raw.roi)
+	-- New ROI text cannot enter an owned persistence operation under encryption.
+	-- Historical ledger rows keep the capture policy under which they were saved.
+	if not require("modules.keystats.roi_policy").current() then
+		for index = #payload.raw.roi, 1, -1 do
+			if payload.raw.roi[index].kind ~= "roi_snapshot" then table.remove(payload.raw.roi, index) end
+		end
+	end
 	-- Media rows need the admitted policy and the tap threshold their holds are split by.
 	if #payload.raw.media > 0 and (not M.media_available() or type(payload.media_threshold_ms) ~= "number") then
 		return nil
@@ -1836,7 +1868,7 @@ function M.start_flush(device_id, payload)
 	local media_threshold_ms = payload.media_threshold_ms
 	local path, count = _db_path, 0
 	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm", "windows", "sessions", "system", "media",
-		"network" }
+		"network", "roi" }
 	for _, name in ipairs(families) do
 		array(payload.raw[name])
 		count = count + #payload.raw[name]
