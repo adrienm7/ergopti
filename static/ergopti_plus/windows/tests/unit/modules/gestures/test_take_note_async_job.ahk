@@ -100,14 +100,16 @@ class _TakeNoteFakeOps {
 		return _TakeNoteFakeOps.window_exists
 	}
 
-	static FindWindow(FileName) {
+	static FindWindow(FileName, Admits := 0) {
 		_TakeNoteFakeOps.last_pattern := FileName
 		_TakeNoteFakeOps.last_file_name := FileName
 		_TakeNoteFakeOps.calls.Push("find-window")
 		if _TakeNoteFakeOps.windows.Length == 0
 			return _TakeNoteFakeOps.window_exists ? 4242 : 0
+		; The same rule as the native lookup: title first, then the job's admission.
 		for Candidate in _TakeNoteFakeOps.windows {
 			if _TakeNoteTitleMatchesFile(Candidate.Title, FileName)
+					&& (!HasMethod(Admits, "Call") || Admits.Call(Candidate.Hwnd))
 				return Candidate.Hwnd
 		}
 		return 0
@@ -191,9 +193,10 @@ class _TakeNoteFakeOps {
 }
 
 _TNAJ_Reset(NowTick := 100) {
-	global _TakeNotePending, _TakeNoteNextId
+	global _TakeNotePending, _TakeNoteNextId, _TakeNoteDocumentWindows
 	_TakeNotePending := Map()
 	_TakeNoteNextId := 0
+	_TakeNoteDocumentWindows := Map()
 	_TakeNoteFakeOps.Reset(NowTick)
 }
 
@@ -304,6 +307,38 @@ _TNAJ_SubstringCollisionsNeverOwnTheRequestedDocument() {
 Test("take note async: substring title collisions never own the requested document "
 	. "(ahk6-05-takenote-exact-title)",
 	_TNAJ_SubstringCollisionsNeverOwnTheRequestedDocument)
+
+; Two folders' Notes.txt share their Notepad title: the window opened for one
+; folder never answers a request for the other (takenote-native-document-owner).
+_TNAJ_SameNameInAnotherFolderLaunchesItsOwnWindow() {
+	global _TakeNotePending
+	_TNAJ_Reset()
+	_TakeNoteFakeOps.file_exists := true
+	_TakeNoteFakeOps.windows := [{ Hwnd: 505, Title: "Notes.txt - Notepad" }]
+	First := TakeNoteRequest(false, "C:\A", false, _TakeNoteFakeOps)
+	_TakeNoteFakeOps.RunNext()
+	AssertFalse(_TakeNotePending.Has(First))
+	AssertEqual(505, _TakeNoteFakeOps.last_target, "the first folder's note owns its window")
+	AssertEqual(0, _TakeNoteFakeOps.launch_count)
+
+	Second := TakeNoteRequest(false, "C:\B", false, _TakeNoteFakeOps)
+	_TakeNoteFakeOps.RunNext()
+	AssertEqual(1, _TakeNoteFakeOps.launch_count, "another folder's same-named note gets its own Notepad")
+	AssertTrue(_TakeNotePending.Has(Second), "the window bound to C:\A cannot stand for C:\B")
+	_TakeNoteFakeOps.windows.Push({ Hwnd: 606, Title: "Notes.txt - Notepad" })
+	_TakeNoteFakeOps.RunNext()
+	AssertFalse(_TakeNotePending.Has(Second))
+	AssertEqual(606, _TakeNoteFakeOps.last_target, "the second folder's note is the window launched for it")
+
+	Again := TakeNoteRequest(false, "C:\A", false, _TakeNoteFakeOps)
+	_TakeNoteFakeOps.RunNext()
+	AssertFalse(_TakeNotePending.Has(Again))
+	AssertEqual(505, _TakeNoteFakeOps.last_target, "the first folder's note keeps its own window")
+	AssertEqual(1, _TakeNoteFakeOps.launch_count, "reusing a bound window launches nothing")
+}
+Test("take note async: a same-named note in another folder gets its own window "
+	. "(takenote-native-document-owner)",
+	_TNAJ_SameNameInAnotherFolderLaunchesItsOwnWindow)
 
 _TNAJ_ExactTitleIsRevalidatedAfterActivation() {
 	global _TakeNotePending

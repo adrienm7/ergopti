@@ -15,6 +15,10 @@ global _TakeNoteNextId := 0
 global _TakeNoteGeneration := 0
 global TAKE_NOTE_POLL_INTERVAL_MS := 50
 global TAKE_NOTE_LAUNCH_TIMEOUT_MS := 7000
+; Notepad window -> the lowercased full path of the note this module opened in
+; it. Notepad titles a document by its file name alone, so two folders' Notes.txt
+; read the same; this binding is what tells their windows apart.
+global _TakeNoteDocumentWindows := Map()
 
 
 _TakeNoteTitleMatchesFile(Title, FileName) {
@@ -72,7 +76,9 @@ class _TakeNoteNative {
 		return true
 	}
 
-	static FindWindow(FileName) {
+	; @param Admits {Func|0} Admits(Hwnd) is false for a window that cannot stand
+	;   for the requested note (one bound to another folder's note of that name).
+	static FindWindow(FileName, Admits := 0) {
 		try Hwnds := WinGetList("ahk_exe notepad.exe")
 		catch
 			return 0
@@ -81,6 +87,7 @@ class _TakeNoteNative {
 			catch
 				continue
 			if _TakeNoteTitleMatchesFile(Title, FileName)
+					&& (!HasMethod(Admits, "Call") || Admits.Call(Hwnd))
 				return Hwnd
 		}
 		return 0
@@ -127,6 +134,24 @@ class _TakeNoteNative {
 	}
 }
 
+
+; Whether a Notepad window may stand for the note at PathKey: a window this
+; module opened for another folder's note of the same name never does.
+; @param PathKey {String} The job's lowercased full note path.
+; @param Hwnd {Integer} A Notepad window whose title names the note's file.
+; @returns {Boolean}
+_TakeNoteWindowAdmits(PathKey, Hwnd) {
+	global _TakeNoteDocumentWindows
+	return !_TakeNoteDocumentWindows.Has(Hwnd) || _TakeNoteDocumentWindows[Hwnd] == PathKey
+}
+
+; Records that Hwnd shows the note at PathKey, once the job proved it focused.
+_TakeNoteBindWindow(Hwnd, PathKey) {
+	global _TakeNoteDocumentWindows
+	if !(_TakeNoteDocumentWindows is Map)
+		throw TypeError("The TakeNote window bindings are not a Map.")
+	_TakeNoteDocumentWindows[Hwnd] := PathKey
+}
 
 ; Resolve the feature settings once, without performing any OS or file work.
 ; Both the Win+N shortcut and the gesture action call this same entry seam.
@@ -355,6 +380,7 @@ _TakeNotePoll(JobId) {
 		Job := _TakeNotePending[JobId]
 	} finally Critical(PreviousCritical)
 	Ops := Job["ops"]
+	Admits := _TakeNoteWindowAdmits.Bind(Job["path_key"])
 	try {
 		if _TakeNoteAbortIfUnavailable(JobId, Job)
 			return
@@ -368,7 +394,7 @@ _TakeNotePoll(JobId) {
 				throw Error("note file creation was refused")
 			if _TakeNoteAbortIfUnavailable(JobId, Job)
 				return
-			WindowAlreadyOpen := Ops.FindWindow(Job["file_name"]) != 0
+			WindowAlreadyOpen := Ops.FindWindow(Job["file_name"], Admits) != 0
 			if _TakeNoteAbortIfUnavailable(JobId, Job)
 				return
 			Job["append_newline"] := Job["append_on_launch"] and !WindowAlreadyOpen
@@ -379,7 +405,7 @@ _TakeNotePoll(JobId) {
 				return
 		}
 
-		WindowHwnd := Ops.FindWindow(Job["file_name"])
+		WindowHwnd := Ops.FindWindow(Job["file_name"], Admits)
 		if _TakeNoteAbortIfUnavailable(JobId, Job)
 			return
 		if !WindowHwnd {
@@ -421,6 +447,7 @@ _TakeNotePoll(JobId) {
 		}
 		if _TakeNoteAbortIfUnavailable(JobId, Job)
 			return
+		_TakeNoteBindWindow(WindowHwnd, Job["path_key"])
 		if Job["append_newline"] and !Ops.SendFinal("^{End}{Enter}")
 			throw Error("final note input was refused")
 		_TakeNoteFinish(JobId, Job)

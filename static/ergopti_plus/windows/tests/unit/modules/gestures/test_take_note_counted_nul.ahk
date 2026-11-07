@@ -31,7 +31,7 @@ class _TNNU_Ops {
 	Launch(Path) {
 		throw Error("The existing-note control must not launch Notepad.")
 	}
-	FindWindow(FileName) {
+	FindWindow(FileName, Admits := 0) {
 		this.Effects.Push("find-window")
 		return 4242
 	}
