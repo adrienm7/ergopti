@@ -9,6 +9,11 @@ global _PersonalEditorEntryBusy := false
 global _PersonalEditorData := 0
 global _PersonalEditorSection := "private"
 global _PersonalEditorPrioCtrl := 0
+; The handlers prove their editor session before reading the model; the
+; fixture's window is that one admitted native session.
+global _PersonalEditorOpeningSource := 0
+global _PersonalEditorSessionEpoch := 1
+global _PersonalEditorGui := 0
 LoggerWarn(*) => 0
 LoggerError(*) => 0
 LoggerDebug(*) => 0
@@ -104,10 +109,13 @@ _PPNC_Paste(Edit, Text, ExpectedNative) {
 }
 _PPNC_Run(Mode) {
  global _PPNC_State, _PersonalEditorData, _PersonalEditorPrioCtrl, _PersonalEditorSection
+ global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch, _PersonalEditorGui
  Fields := StrSplit(Mode, "-")
  _PPNC_Require(Fields.Length == 2 && (Fields[1] == "add" || Fields[1] == "save") && (Fields[2] == "invalid" || Fields[2] == "current"), "Explicit public handler and input mode are required")
  Adding := Fields[1] == "add", Invalid := Fields[2] == "invalid"
  Window := Gui("", "Private personal priority paste")
+ _PersonalEditorGui := Window
+ _PersonalEditorOpeningSource := Map("admitted", 1, "window", Window, "epoch", _PersonalEditorSessionEpoch, "kind", "native")
  try {
   Trigger := Window.AddEdit("w180", "abcd")
   Output := Window.AddEdit("w180", "replacement")
