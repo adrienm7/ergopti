@@ -337,6 +337,9 @@ function build_keycode_layout_for_driver(driver_meta, ahk_layout) {
  * Names the special keys of a keycode layout from the shared key name table,
  * in the user's language and for the recording OS. Called again when the
  * locale arrives (i18n:applied), so it keeps its unnamed source.
+ * An empty or absent layout names the static QWERTY fallback (KEYCODE_NAMES)
+ * that every reader uses without a layout: naming the special keys alone would
+ * leave a non-empty map without a single letter.
  * @param {Object} layout - Map of `kc_str` → label (hs.keycodes.map or built).
  * @param {Object|undefined} driver_meta - `{ os }`; absent means macOS.
  * @returns {Object} A new map whose named keys read as key names.
@@ -346,7 +349,8 @@ function name_keycode_layout(layout, driver_meta) {
 	const platform = DRIVER_OS_PLATFORMS[os];
 	if (!platform) throw new Error('metrics heatmap: unknown driver OS ' + os);
 	const ids = is_pc_scancode_driver(driver_meta) ? PC_KEYCODE_KEY_IDS : MAC_KEYCODE_KEY_IDS;
-	const out = { ...(layout || {}) };
+	const delivered = layout && typeof layout === 'object' && Object.keys(layout).length > 0;
+	const out = { ...(delivered ? layout : KEYCODE_NAMES) };
 	Object.entries(ids).forEach(([kc, id]) => {
 		out[kc] = keyNameLabel(id, platform);
 	});
