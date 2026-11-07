@@ -280,7 +280,12 @@ _UCHReloadRestoresConfiguredAdmission() {
 	Saved := [_ConfigDir, _UserHotstringsOwner, _UserHotstringsLoader, _UserHotstringsLoadEpoch,
 		_UserHotstringsLastRepair, _UserHotstringsProblem, CategoryEnabled]
 	SavedMenuReady := IsSet(_DriverMenuReady) ? _DriverMenuReady : unset
-	Node := Features["hotstrings"]["dynamic"]["user_code"], SavedEnabled := Node["enabled"]
+	; The reload restores the configured posture, so the fixture configures the
+	; enable it asks for, as the menu toggle persists it first.
+	Dynamic := Features["hotstrings"]["dynamic"], HadNode := Dynamic.Has("user_code")
+	if !HadNode
+		Dynamic["user_code"] := Map("enabled", false)
+	Node := Dynamic["user_code"], SavedEnabled := Node["enabled"]
 	PackageRoots := _UCHPackageRoots(), Fixture := _ScopeOwnerFixture()
 	try {
 		_ConfigDir := Fixture.directory . "\", _DriverMenuReady := false, _UserHotstringsProblem := ""
@@ -306,7 +311,10 @@ _UCHReloadRestoresConfiguredAdmission() {
 				"a successful reload restores the configured admission, not the refusal posture")
 		}
 	} finally {
-		Node["enabled"] := SavedEnabled
+		if HadNode
+			Node["enabled"] := SavedEnabled
+		else
+			Dynamic.Delete("user_code")
 		Assert(UserHotstringsInvalidate("reload-admission-fixture-cleanup"))
 		_ConfigDir := Saved[1], _UserHotstringsOwner := Saved[2], _UserHotstringsLoader := Saved[3]
 		_UserHotstringsLoadEpoch := Saved[4], _UserHotstringsLastRepair := Saved[5], _UserHotstringsProblem := Saved[6]
