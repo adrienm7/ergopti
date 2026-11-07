@@ -15,7 +15,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
 			"symbol": "_OnPrefixKeyDown",
-			"sha256": "1b8b1ecd86352debd1fdd6c92636bafaead2324ff3ea8d6ba390254b08582780"
+			"sha256": "00ec602245ada57862e5468dd180108f0181b076a1ab8834cc49eb87258a05b2"
 		},
 		{
 			"id": "windows-undo",
