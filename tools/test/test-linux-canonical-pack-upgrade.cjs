@@ -73,15 +73,22 @@ if (installer.includes('install -m 0644 "${toml}" "${dest}"')) {
 }
 const configManager = fs.readFileSync(CONFIG_MANAGER, 'utf8');
 function resolutionLayersOrdered(source) {
-	const resolver = /^local function resolve_paths\(\)\r?\n[\s\S]*?^end\b/m.exec(source)?.[0];
+	const resolver = /^local function resolve_paths\((?:cold_boot)?\)\r?\n[\s\S]*?^end\b/m.exec(
+		source
+	)?.[0];
 	if (!resolver) return false;
-	const bundled = [...resolver.matchAll(/Loader\.find_toml_files\(bundled\)/g)];
-	// Additional personal discovery now supplies its shared scan-depth bound.
-	// Admit that precise owner, retaining the same explicit user-directory root;
-	// an arbitrary depth or a different source must not satisfy this guard.
+	// The bundled scan may demand a complete enumeration of a root that must
+	// exist (find_toml_files(dir, max_depth, require_complete, allow_absent_root)).
+	const bundled = [
+		...resolver.matchAll(/Loader\.find_toml_files\(bundled(?:, nil, true, false)?\)/g)
+	];
+	// Additional personal discovery now supplies its shared scan-depth bound and,
+	// outside a cold boot, demands a complete enumeration. Admit that precise
+	// owner, retaining the same explicit user-directory root; an arbitrary depth
+	// or a different source must not satisfy this guard.
 	const user = [
 		...resolver.matchAll(
-			/Loader\.find_toml_files\(_config_dir(?:, PersonalFiles\.additional_scan_max_depth)?\)/g
+			/Loader\.find_toml_files\(_config_dir(?:, PersonalFiles\.additional_scan_max_depth(?:, not cold_boot)?)?\)/g
 		)
 	];
 	return bundled.length === 1 && user.length === 1 && bundled[0].index < user[0].index;
@@ -93,10 +100,12 @@ if (!resolutionLayersOrdered(configManager)) {
 }
 // Mutate the actual production calls: neither a missing layer nor reversed
 // precedence can inherit a match from another function or an unrelated root.
-const resolver = /^local function resolve_paths\(\)\r?\n[\s\S]*?^end\b/m.exec(configManager)[0];
-const bundledCall = /Loader\.find_toml_files\(bundled\)/.exec(resolver)[0];
+const resolver = /^local function resolve_paths\((?:cold_boot)?\)\r?\n[\s\S]*?^end\b/m.exec(
+	configManager
+)[0];
+const bundledCall = /Loader\.find_toml_files\(bundled(?:, nil, true, false)?\)/.exec(resolver)[0];
 const userCall =
-	/Loader\.find_toml_files\(_config_dir(?:, PersonalFiles\.additional_scan_max_depth)?\)/.exec(
+	/Loader\.find_toml_files\(_config_dir(?:, PersonalFiles\.additional_scan_max_depth(?:, not cold_boot)?)?\)/.exec(
 		resolver
 	)[0];
 for (const [layer, call] of [
