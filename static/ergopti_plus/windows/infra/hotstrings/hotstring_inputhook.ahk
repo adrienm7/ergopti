@@ -2017,9 +2017,9 @@ _PrefixWordTailFromEngine() {
 	return IsSet(HSE_Buffer) ? _PrefixWordTail(HSE_Buffer) : ""
 }
 
-; The trailing word of an arbitrary buffer, using the shared boundary set. One
-; definition of "the word currently being typed", so every consumer agrees on
-; where it starts.
+; The trailing word of an arbitrary buffer, using the matcher's word-opening
+; predicate. ASCII symbols open a word even when they do not complete a
+; hotstring; consulting the delimiter set alone leaves those symbols in previews.
 _PrefixWordTail(Buf) {
 	global _MAX_BUFFER_LEN
 	if (Buf == "")
@@ -2030,7 +2030,7 @@ _PrefixWordTail(Buf) {
 	while Position > 0 {
 		Start := _TextCodepointStart(Buf, Position)
 		Ch := SubStr(Buf, Start, Position - Start + 1)
-		if _TextCompleteTailScalar(Ch) != "" && InStr(Boundaries, Ch, true)
+		if _TextCompleteTailScalar(Ch) != "" && _HSE_CharOpensWord(Ch, Boundaries)
 			break
 		Tail := Ch . Tail
 		Position := Start - 1
@@ -2172,7 +2172,7 @@ _PrefixAppendTypedChar(Char) {
 	; live trigger prefix. HSE_Buffer deliberately keeps the terminator (triggers
 	; may contain one as a non-final char); the preview only tracks the current
 	; word, so it starts fresh here.
-	if CompletedScalar != "" && InStr(_PrefixWordBoundaries(), CompletedScalar, true) {
+	if _HSE_CharOpensWord(CompletedScalar, _PrefixWordBoundaries()) {
 		_ResetPrefixBuffer(false)
 		; The boundary itself may be the body of a boundary-leading star trigger
 		; (for example " ★"). HSE_Buffer retains it, so ask the canonical oracle

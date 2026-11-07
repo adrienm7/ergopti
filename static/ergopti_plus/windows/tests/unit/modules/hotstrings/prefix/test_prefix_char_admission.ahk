@@ -871,3 +871,32 @@ Test("prefix: a key typed after the verified Notepad edit follows the expansion 
 #Include test_prefix_bridge_idle_fragment.ahk
 
 #Include test_prefix_bridge_shortcut_fragment.ahk
+
+
+/** The preview and matcher agree on symbols outside the configured delimiter list. */
+_PCA_AsciiWordOpening() {
+	global HSE_WORD_TERMINATORS
+	Saved := HSE_WORD_TERMINATORS
+	try {
+		HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
+		for Boundary in StrSplit("=-(+/<>{}[]!#$%&,:;?\^``|~") {
+			AssertTrue(_HSE_WordBoundaryAllows(Boundary . "teh", { Length: 3, InWord: false }),
+				"the existing matcher admits an ASCII symbol before the word")
+			AssertEqual("teh", _PrefixWordTail("earlier" . Boundary . "teh"),
+				"preview-word-opening: the current word starts after the same ASCII symbol")
+		}
+		for WordChar in ["a", "A", "7", "_", "@", "é", "★", Chr(0x1F601)]
+			AssertEqual("earlier" . WordChar . "teh", _PrefixWordTail("earlier" . WordChar . "teh"),
+				"word characters and the Unicode magic selector keep the preceding text")
+	} finally {
+		HSE_WORD_TERMINATORS := Saved
+	}
+}
+Test("prefix preview-word-opening: the recovered word follows the matcher symbol policy",
+	_PCA_AsciiWordOpening)
+Test("prefix preview-word-opening: a scalar symbol clears the current word", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "foo", Chunk: "=", Flags: "", Trigger: "",
+		Replacement: "", Expected: "foo=", Sends: 0, End: "", Prefix: "" }))
+Test("prefix preview-word-opening: a grouped symbol starts the following word", (*) =>
+	_PCA_DeadKeyChunk({ Initial: "foo", Chunk: "(th", Flags: "", Trigger: "",
+		Replacement: "", Expected: "foo(th", Sends: 0, End: "", Prefix: "th" }))
