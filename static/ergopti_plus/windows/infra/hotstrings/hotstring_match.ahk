@@ -587,32 +587,51 @@ _HSE_CharOpensWord(Ch, Boundaries) {
 		return Ch != "" && (InStr(Boundaries, Ch, true) > 0 || !HSE_IsWordChar(Ch))
 }
 
-; THE word-boundary set, DERIVED on every read rather than cached.
-; 
-; A cached copy is precisely how this bug happened: the preview held one snapshot
-; and the matcher another, and they drifted. Any cache here would need every
-; writer of HSE_WORD_TERMINATORS to remember to refresh it — and the test suite
-; proved that assumption false immediately, leaving a stale set behind that made
-; the matcher reject every word boundary. The catalogue's Unicode magic slot is
-; a completion selector, not punctuation opening another word. Keep whitespace,
-; custom delimiters and quotes independent of whether their output is consumed.
+; One derivation for the matcher and preview, memoized by its exact inputs.
+; Comparing the live delimiter string avoids requiring every writer to remember
+; a refresh. The catalogue owns stable entry maps: updateMagicKey replaces the
+; star entry's chars, so retain that entry, never its old chars array. A new
+; catalogue is discovered once; ordinary keystrokes never copy its full list.
+; The Unicode magic slot is a completion selector, not punctuation opening
+; another word. ASCII magic slots retain their punctuation role.
 _HSE_WordBoundarySet() {
 		global HSE_WORD_TERMINATORS, HOTSTRINGS_QUOTE_WORD_BOUNDARIES, HSE_Terminators
-		Boundaries := HSE_WORD_TERMINATORS . HOTSTRINGS_QUOTE_WORD_BOUNDARIES
-		; Before catalogue initialization the bare engine has only its own parser
-		; delimiters. Once owned, derive from the live slot rather than copying ★.
-		if IsSet(HSE_Terminators) {
-				for Entry in HSE_Terminators.all() {
-						if Entry["key"] != "star"
-								continue
-						for Char in Entry["chars"]
-								if Ord(Char) > 127
-										Boundaries := StrReplace(Boundaries, Char, "", true)
-						break
+		static Cache := 0
+		Catalogue := IsSet(HSE_Terminators) ? HSE_Terminators : 0
+		if Cache is Object && Cache.Catalogue == Catalogue {
+				MagicEntry := Cache.MagicEntry
+		} else {
+				MagicEntry := 0
+				if Catalogue is Object {
+						for Entry in Catalogue.all() {
+								if Entry["key"] == "star" {
+										MagicEntry := Entry
+										break
+								}
+						}
 				}
 		}
+		MagicChars := ""
+		if MagicEntry is Map
+				for Char in MagicEntry["chars"]
+						if Ord(Char) > 127
+								MagicChars .= Char
+		if Cache is Object && Cache.Catalogue == Catalogue
+				&& Cache.Words == HSE_WORD_TERMINATORS
+				&& Cache.Quotes == HOTSTRINGS_QUOTE_WORD_BOUNDARIES
+				&& Cache.MagicChars == MagicChars
+				return Cache.Boundaries
+		Boundaries := HSE_WORD_TERMINATORS . HOTSTRINGS_QUOTE_WORD_BOUNDARIES
+		if MagicEntry is Map
+				for Char in MagicEntry["chars"]
+						if Ord(Char) > 127
+								Boundaries := StrReplace(Boundaries, Char, "", true)
+		Cache := { Catalogue: Catalogue, MagicEntry: MagicEntry,
+				Words: HSE_WORD_TERMINATORS, Quotes: HOTSTRINGS_QUOTE_WORD_BOUNDARIES,
+				MagicChars: MagicChars, Boundaries: Boundaries }
 		return Boundaries
 }
+
 
 
 
