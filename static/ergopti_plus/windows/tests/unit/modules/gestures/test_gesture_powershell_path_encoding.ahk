@@ -70,14 +70,19 @@ _GPSE_Complete(State, Code, Output, ErrorText) {
 	State.Calls += 1
 }
 
-_GPSE_Wait(Task, State) {
+; The completion callback is the settle event; the deadline only bounds it. A
+; stalled task names its stage and whether its process still runs, so a slow
+; cold start reads differently from a callback that was never delivered.
+_GPSE_Wait(Task, State, Stage) {
 	AssertTrue(Task.start(), "the exact private native task must start")
+	Pid := Task.processId()
 	Started := A_TickCount
 	while State.Calls == 0 && TickElapsed(Started) < 15000 {
 		_SR_TreePoll()
 		Sleep(10)
 	}
-	AssertEqual(1, State.Calls, "the private native task must settle once")
+	AssertEqual(1, State.Calls, "the private native task must settle once: stage=" . Stage
+		. " pid=" . Pid . " alive=" . (ProcessExist(Pid) ? 1 : 0) . " elapsed_ms=" . TickElapsed(Started))
 	AssertEqual("", State.ErrorText, State.Output)
 	AssertEqual(0, State.Code, State.Output)
 }
@@ -114,7 +119,7 @@ _GPSE_Parse(Tasks, PowerShell, Probe, Artifact, Output) {
 		["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", Probe, Artifact, Output],
 		_GPSE_Complete.Bind(State))
 	Tasks.Push(Task)
-	_GPSE_Wait(Task, State)
+	_GPSE_Wait(Task, State, "parser")
 	Retirement := Task.terminate()
 	AssertTrue(Retirement is Integer && Retirement == 1, "the exact parser process tree must retire")
 	Result := JsonParse(FSReadStrict(Output))
@@ -143,7 +148,7 @@ _GPSE_Case(Caller, Unicode) {
 		Task := ShellRunner_SpawnTreeOwnedCommand(A_AhkPath, Command, _GPSE_Environment(Directory), Root,
 			_GPSE_Complete.Bind(State))
 		Tasks.Push(Task)
-		_GPSE_Wait(Task, State)
+		_GPSE_Wait(Task, State, "producer")
 		Retirement := Task.terminate()
 		AssertTrue(Retirement is Integer && Retirement == 1, "the artifact producer must physically retire")
 		AssertContains(State.Output, "PASS gesture-powershell-producer " . Caller)
