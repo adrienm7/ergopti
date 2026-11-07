@@ -223,6 +223,8 @@ _MMP_TypedKeyKeepsItsPause() {
 	try {
 		AssertFalse(LLM_Bridge_OnKeyActivity(0x41), "a typing key keeps the debounce its character armed")
 		AssertEqual(0, _MMP_StopHits, "the armed pause is not cancelled")
+		AssertFalse(LLM_Bridge_OnKeyActivity(0xE7), "a VK_PACKET character keeps the debounce it armed")
+		AssertEqual(0, _MMP_StopHits, "a Unicode text key does not cancel the pause")
 		AssertTrue(LLM_Bridge_OnKeyActivity(0x74), "a non-typing key still cancels the pending pause")
 		AssertEqual(1, _MMP_StopHits, "F5 cancels the debounce")
 	} finally {
