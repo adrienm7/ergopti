@@ -1404,6 +1404,7 @@ local function main()
 		-- and corrupting the output (the "abcd"→"acd" class of race bug).
 		if injector._is_injecting() then
 			injector._queue_char({ char = ch, scancode = scancode })
+			require("infra.typed_input_withheld").record("queued_during_injection")
 			return
 		end
 		if script_actions.is_paused() then return end
@@ -1424,9 +1425,16 @@ local function main()
 		end
 		local admission = physical_privacy_admission
 		physical_privacy_admission = nil
+		-- Counted, never the character: these returns once lost typing silently.
 		if admission and admission.code == scancode then
-			if not admission.allowed then return end
-		elseif secure_focus_guard.blocks_text() then return end
+			if not admission.allowed then
+				require("infra.typed_input_withheld").record("press_not_admitted")
+				return
+			end
+		elseif secure_focus_guard.blocks_text() then
+			require("infra.typed_input_withheld").record("field_not_admitted")
+			return
+		end
 
 		-- Retain this field before preview, metrics or prediction callbacks yield.
 		local destination = secure_focus_guard.capture_text_owner()
@@ -1733,7 +1741,7 @@ local function main()
 			local buf = engine:current_buffer()
 			local start_is_boundary = engine:buffer_starts_at_word_boundary()
 			if prediction_engine then
-				pcall(function()
+				local predicted, prediction_err = pcall(function()
 					-- The AI completes its own typing context, not the word buffer.
 					prediction_engine.on_char(ch, engine:ai_context():text(), {
 						app_id = app_id,
@@ -1742,6 +1750,10 @@ local function main()
 							and tooltip_preview.is_showing() or false,
 					})
 				end)
+				-- Its error type is recorded: a discarded raise left later triggers silent.
+				if not predicted then
+					require("infra.typed_input_withheld").record("prediction_refused", prediction_err)
+				end
 			end
 			-- Dynamic hotstrings: check if the trigger character just fired an
 			-- @-tag expansion (e.g. "@p★" → first name, "td★" → date).
@@ -3525,6 +3537,8 @@ local function main()
 	local stats = keystats.get_session_stats()
 	Logger.info(LOG, "Session ended: %d keystroke(s), ~%d word(s), %ds.",
 		stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
+	-- What the text callback kept from the engines this session, by reason.
+	Logger.info(LOG, "%s", require("infra.typed_input_withheld").summary())
 	-- Metrics persistence was acknowledged by the shutdown coordinator.
 	-- The last chance to emit the withheld counts of every open streak.
 	Logger.flush_repeats(true)

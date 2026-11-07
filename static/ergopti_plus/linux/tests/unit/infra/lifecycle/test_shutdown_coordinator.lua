@@ -1036,7 +1036,8 @@ helpers.describe("shutdown coordinator: final native output acknowledgement", fu
 	helpers.it("completes final teardown only after destroy and close both acknowledge", function()
 		with_output("acknowledged", function(finish, injector, writer, broker, _, calls)
 			finish()
-			helpers.assert_eq(calls.success, 2)
+			-- Session ended, the withheld-input summary, then Daemon exiting.
+			helpers.assert_eq(calls.success, 3)
 			helpers.assert_eq(calls.destroy, 1)
 			helpers.assert_eq(calls.close, 1)
 			helpers.assert_eq(writer.is_open(), false)
@@ -1051,7 +1052,8 @@ helpers.describe("shutdown coordinator: final native output acknowledgement", fu
 		with_output("absent", function(finish, injector, writer, _, _, calls)
 			helpers.assert_eq(injector.close_fast_channel(), true)
 			finish()
-			helpers.assert_eq(calls.success, 2)
+			-- Session ended, the withheld-input summary, then Daemon exiting.
+			helpers.assert_eq(calls.success, 3)
 			helpers.assert_eq(calls.destroy, 0)
 			helpers.assert_eq(calls.close, 0)
 			helpers.assert_eq(writer.has_output_debt(), false)
