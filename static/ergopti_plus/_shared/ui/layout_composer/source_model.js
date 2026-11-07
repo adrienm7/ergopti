@@ -61,6 +61,7 @@ var LayoutSource = (function () {
 		'keys',
 		'remap',
 		'shortcuts',
+		// config-key-literal-ok: field of the versioned layout format, not application config.
 		'tap_holds',
 		'windows'
 	];
@@ -352,9 +353,11 @@ var LayoutSource = (function () {
 				},
 				(entry) => `${entry.key}:${entry.modifiers.slice().sort().join(',')}`
 			);
+		// config-key-literal-ok: field of the versioned layout format, not application config.
 		if (own(source, 'tap_holds'))
 			list(
 				source.tap_holds,
+				// config-key-literal-ok: schema diagnostic path, not application config.
 				'tap_holds',
 				(entry, at) => {
 					record(
