@@ -16,31 +16,8 @@ local Converter = require("layouts.xkb_converter")
 
 local function export()
 	local input = assert(Json.decode(io.read("*a")))
-	local admitted, refusal = Keylayout.admit_conversion_source(input.xml)
-	if not admitted then return { ok = false, reason = "unsupported_keylayout:" .. refusal } end
-	local canonical, reason = Keylayout.parse(input.xml)
-	if not canonical then return { ok = false, reason = "keylayout_parse:" .. tostring(reason) } end
-	-- The permissive canonical reader retains unresolved references. Conversion
-	-- must not turn those into an apparently intentional empty character cell.
-	local sets, actions = {}, {}
-	for _, set in ipairs(canonical.key_map_sets) do
-		sets[set.id] = {}
-		for _, map in ipairs(set.key_maps) do sets[set.id][map.index] = map end
-	end
-	for _, action in ipairs(canonical.actions) do actions[action.id] = true end
-	local root = sets[canonical.map_set]
-	if not root[canonical.default_index] then return { ok = false, reason = "undefined_default_keymap" } end
-	for _, select in ipairs(canonical.selects) do
-		if not root[select.index] then return { ok = false, reason = "undefined_selected_keymap", index = select.index } end
-	end
-	for _, maps in pairs(sets) do
-		for _, map in pairs(maps) do
-			if map.base and (not sets[map.base.set] or not sets[map.base.set][map.base.index]) then return { ok = false, reason = "undefined_base_keymap" } end
-			for _, key in ipairs(map.keys) do
-				if key.action and not actions[key.action] then return { ok = false, reason = "undefined_key_action", action = key.action } end
-			end
-		end
-	end
+	local canonical, reason = Keylayout.parse_conversion(input.xml)
+	if not canonical then return { ok = false, reason = reason } end
 	local codes, code_error = Converter.keycodes(input.keycodes, input.convention)
 	if not codes then return { ok = false, reason = code_error } end
 	local placed, untouched = {}, {}

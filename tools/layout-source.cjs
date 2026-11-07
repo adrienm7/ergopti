@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Imports .keylayout into the versioned TOML source, validates source documents,
  * reports implemented target support, preserves .keylayout files and exports
- * an explicitly partial XKB projection through the existing shared converter.
+ * explicitly partial XKB and KLC projections through their existing converters.
  * Existing destinations are refused so a failed experiment cannot replace a
  * user's source. See docs/design/layout-source-format.md for the current limits.
  * ==============================================================================
@@ -17,7 +17,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { loadLayoutSource } = require('./lib/layout-source.cjs');
-const { exportXkb, targetReport } = require('./lib/layout-source-xkb.cjs');
+const { exportXkb } = require('./lib/layout-source-xkb.cjs');
+const { exportKlc } = require('./lib/layout-source-klc.cjs');
+const { targetReport } = require('./lib/layout-source-report.cjs');
 
 /** Decode UTF-8 strictly while retaining an original byte-order mark. */
 function readText(file) {
@@ -54,9 +56,10 @@ function main(args) {
 		process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 		return;
 	}
-	if (command === 'export-xkb' && values.length === 2) {
+	if ((command === 'export-xkb' || command === 'export-klc') && values.length === 2) {
 		const [input, output] = values;
-		const compiled = exportXkb(source.read(readText(input)));
+		const compile = command === 'export-xkb' ? exportXkb : exportKlc;
+		const compiled = compile(source.read(readText(input)));
 		fs.mkdirSync(output);
 		for (const [name, text] of compiled.files)
 			fs.writeFileSync(path.join(output, name), text, { encoding: 'utf8', flag: 'wx' });
@@ -64,7 +67,7 @@ function main(args) {
 		return;
 	}
 	throw new Error(
-		'Usage: layout-source.cjs import <id> <iso|ansi> <input.keylayout> <output.toml> | validate <source.toml> | report <source.toml> | export-keylayout <source.toml> <output.keylayout> | export-xkb <source.toml> <new-output-directory>'
+		'Usage: layout-source.cjs import <id> <iso|ansi> <input.keylayout> <output.toml> | validate <source.toml> | report <source.toml> | export-keylayout <source.toml> <output.keylayout> | export-xkb <source.toml> <new-output-directory> | export-klc <source.toml> <new-output-directory>'
 	);
 }
 
