@@ -189,6 +189,13 @@ const ALLOWED = {
 			reason: 'arg[0] has its backslashes rewritten to "/" first, which native_path never does'
 		}
 	},
+	'linux/adapters/clipboard_owner_worker.lua': {
+		basename: {
+			count: 1,
+			reason:
+				'ffi-only child started without the shared Lua root on package.path; its arg[0] has its backslashes rewritten to "/" first'
+		}
+	},
 	'linux/adapters/input_source_group_worker.lua': {
 		basename: {
 			count: 1,

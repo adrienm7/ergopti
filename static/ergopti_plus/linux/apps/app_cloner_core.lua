@@ -26,6 +26,7 @@
 local M = {}
 
 local Json = require("json")
+local NativePath = require("native_path")
 local TextUtils = require("text_utils")
 
 local quote = TextUtils.shell_quote
@@ -60,7 +61,7 @@ end
 --- @param has_marker function|nil has_marker(program, marker) -> boolean.
 --- @return string family
 function M.family(catalogue, program, has_marker)
-	local name = (program:match("([^/]+)$") or program):lower():gsub("%.exe$", "")
+	local name = (NativePath.basename(program) or program):lower():gsub("%.exe$", "")
 	for _, family in ipairs(catalogue.detection_order) do
 		for _, executable in ipairs(catalogue.families[family].executables or {}) do
 			if name == executable then return family end
@@ -326,8 +327,8 @@ end
 --- @return boolean ok
 --- @return string|nil reason
 function M.write(plan)
-	local root = plan.launcher_path:match("^(.*)/[^/]+$")
-	local applications = plan.desktop_path:match("^(.*)/[^/]+$")
+	local root = NativePath.dirname(plan.launcher_path)
+	local applications = NativePath.dirname(plan.desktop_path)
 	local function undo()
 		os.execute("rm -rf " .. quote(root))
 		os.remove(plan.desktop_path)

@@ -27,6 +27,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local ShellRunner = require("adapters.shell_runner")
+local TableUtil = require("table_util")
 
 local LOG = "modules.gestures.background_commands"
 
@@ -182,9 +183,7 @@ end
 --- Number of commands whose result has not been collected yet.
 --- @return integer
 function M.pending_count()
-	local count = 0
-	for _ in pairs(_pending) do count = count + 1 end
-	return count
+	return TableUtil.count(_pending)
 end
 
 --- Collects finished results now, leaving the deferred collector armed
