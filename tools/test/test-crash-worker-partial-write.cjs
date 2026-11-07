@@ -38,13 +38,17 @@ function run(worker, mode) {
 		];
 		// Ignored SIGXFSZ survives exec, so the kernel refuses the write with EFBIG
 		// instead of killing the runtime; a 1-2 KiB limit is far below the 16 KiB document.
+		// .NET's W^X double mapping sizes a shared-memory file at start, which the same
+		// limit refuses ("Failed to create CoreCLR, HRESULT: 0x8007000C"); the receiving
+		// write is ordinary file I/O, so the runtime starts without that mapping.
 		const result =
 			mode === 'FileSizeLimit'
 				? spawnSync(
 						bashExecutable(),
 						['-c', 'trap "" XFSZ; ulimit -f 2; exec "$0" "$@"', RUNTIME, ...args],
 						{
-							encoding: 'utf8'
+							encoding: 'utf8',
+							env: { ...process.env, DOTNET_EnableWriteXorExecute: '0' }
 						}
 					)
 				: spawnSync(RUNTIME, args, { encoding: 'utf8', windowsHide: true });
