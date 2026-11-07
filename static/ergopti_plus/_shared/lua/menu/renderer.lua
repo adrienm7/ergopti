@@ -1421,7 +1421,8 @@ function M.new(deps)
 							for _, child in ipairs(included) do rows[#rows + 1] = child end
 						end
 					elseif item.type == "list" then
-						local fields = { type = true, id = true, platforms = true, unavailable = true }
+						-- reason_key explains the platforms the list is not for; it draws nothing here.
+						local fields = { type = true, id = true, platforms = true, unavailable = true, reason_key = true }
 						for field in pairs(item) do
 							if not fields[field] then
 								Logger.error(LOG, "Invalid child-template list in '%s' — rows refused.", key)
