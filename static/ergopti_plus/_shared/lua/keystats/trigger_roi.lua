@@ -110,17 +110,37 @@ local function emit(state, kind, app, timestamp, fields)
 	return true
 end
 
+--- Mirrors AHK Map string enumeration, whose native comparison is over UTF-16 units.
+local function utf16_sort_key(text)
+	local bytes = {}
+	local function append(unit)
+		bytes[#bytes + 1] = string.char(math.floor(unit / 256), unit % 256)
+	end
+	for _, cp in Utf8.codes(text) do
+		if cp <= 0xFFFF then append(cp)
+		else
+			cp = cp - 0x10000
+			append(0xD800 + math.floor(cp / 0x400))
+			append(0xDC00 + cp % 0x400)
+		end
+	end
+	return table.concat(bytes)
+end
+
 --- Shrinks the frequency map deterministically while retaining the most repeated words.
 local function prune(state)
 	if state.word_count <= Policy.max_tracked_words then return end
 	local ranked = {}
-	for word, count in pairs(state.words) do ranked[#ranked + 1] = { word = word, count = count } end
+	for word, count in pairs(state.words) do
+		if count > 1 then ranked[#ranked + 1] = { word = word, count = count, order = utf16_sort_key(word) } end
+	end
 	table.sort(ranked, function(a, b)
-		if a.count == b.count then return a.word < b.word end
+		if a.count == b.count then return a.order > b.order end
 		return a.count > b.count
 	end)
-	state.words, state.word_count = {}, Policy.prune_target_words
-	for index = 1, Policy.prune_target_words do
+	state.words = {}
+	state.word_count = math.min(#ranked, Policy.prune_target_words)
+	for index = 1, state.word_count do
 		local row = ranked[index]
 		state.words[row.word] = row.count
 	end
