@@ -114,6 +114,7 @@ _WRCF_ChildSource() {
 		}
 		Code .= Definition . "`n"
 	}
+	Code .= _WRCF_CustomPairSource()
 	Body := _DriverFuncBody("SendInstant")
 	AssertTrue(Body != "")
 	Body := StrReplace(Body, "SetTimer(RestoreCallback, -SEND_INSTANT_PASTE_DELAY_MS)",
@@ -129,6 +130,18 @@ _WRCF_ChildSource() {
 	AssertEqual(3, Count, "Only the native paste/direct transports may be decorated with owned-window guards")
 	Code .= Overlaid . SubStr(Body, Position) . "`n"
 	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\wrap_clipboard_render_focus_body.ahk")
+}
+
+; WrapTextIfSelected asks the saved custom pairs which delimiters a key owns.
+; The child receives that real lookup with the owner's own empty default, so
+; the built-in delimiters stay the ones wrapped.
+_WRCF_CustomPairSource() {
+	Definition := _DriverFuncBody("WrapSymbols_CustomPairFor")
+	AssertTrue(Definition != "", "The real custom-pair lookup must exist")
+	Source := FSReadStrict(_DriverProductionFileForSymbol("WrapSymbols_CustomPairFor"))
+	AssertTrue(RegExMatch(Source, "m)^global _WS_Custom := \[\][ `t]*$", &Default),
+		"The custom-pair owner must declare its empty default list")
+	return Default[0] . "`n" . Definition . "`n"
 }
 
 _WRCF_Complete(State, Code, Output, ErrorText) {
@@ -210,6 +223,7 @@ _WTE_ChildSource() {
 		AssertTrue(Definition != "", "The unchanged trigger admission owner must exist: " . Name)
 		Code .= Definition . "`n"
 	}
+	Code .= _WRCF_CustomPairSource()
 	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\wrap_trigger_epoch_body.ahk")
 }
 
@@ -423,6 +437,11 @@ _GTTL_ChildSource() {
 	Title := _DriverFuncBody("TextCaseTitle")
 	Title := StrReplace(Title, "TextCaseTitle(Text) {", "_GTTL_ActualTextCaseTitle(Text) {", true, &Transforms)
 	AssertEqual(1, Transforms, "The actual title-case implementation must remain unchanged behind a passive running-phase observer")
+	; The title of a word's first character comes from the generated Unicode
+	; title table, so the child carries that real lookup beside the transform.
+	Character := _DriverFuncBody("TextCaseTitleCharacter")
+	AssertTrue(Character != "", "The actual title-case character lookup must exist")
+	Title .= "`n" . Character . "`n#Include " . _DriverDir . "\_generated\unicode_title.ahk"
 	return Code . Title . "`n" . FSReadStrict(_DriverDir . "\tests\fixtures\gesture_title_transform_target_body.ahk")
 }
 _GTTL_Case(Mode) {
