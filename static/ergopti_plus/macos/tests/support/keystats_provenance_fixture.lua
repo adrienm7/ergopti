@@ -129,8 +129,9 @@ function M.load_keystats()
 		start = function() return true end,
 		stop = function() return true end,
 	}
+	local keyboard_event
 	package.loaded["adapters.keyboard_hook"] = {
-		start = function() return true end,
+		start = function(opts) keyboard_event = opts.onEvent; return true end,
 		stop = function() return true end,
 		isRunning = function() return true end,
 	}
@@ -146,6 +147,7 @@ function M.load_keystats()
 
 	local fixture = {
 		keystats = keystats,
+		dispatch = function(event) return assert(keyboard_event, "start the physical hook first")(event) end,
 		state = state,
 		flushes = flushes,
 		hs = _G.hs,

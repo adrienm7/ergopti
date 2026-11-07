@@ -25,7 +25,7 @@ local helpers = require("tests.helpers")
 helpers.describe("wpm_widget: update_widget() survives a nil hs.screen.mainScreen() (F-HIGH-11)", function()
 	local function load_widget_with_nil_screen()
 		local logged_errors = {}
-		package.loaded["modules.keystats"] = { get_live_stats = function() return { wpm = 5 } end }
+		package.loaded["modules.keystats"] = { get_live_stats = function() return { wpm = 5, last_input_time = hs.timer.absoluteTime() / 1000000000 } end }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.logger"].error = function(_log, fmt, ...)
 			table.insert(logged_errors, string.format(tostring(fmt), ...))
@@ -148,7 +148,7 @@ helpers.describe("wpm_menubar: update_menubar() crashes are caught (F-HIGH-11)",
 			helpers.assert_eq(#state.items, 0)
 			helpers.assert_eq(Menubar.stop(), true)
 
-			keystats.get_live_stats = function() return { wpm = 42 } end
+			keystats.get_live_stats = function() return { wpm = 42, last_input_time = hs.timer.absoluteTime() / 1000000000 } end
 			helpers.assert_eq(Menubar.start(), true,
 				"Repairing the stats source must allow a real restart")
 			helpers.assert_eq(Menubar.is_running(), true)

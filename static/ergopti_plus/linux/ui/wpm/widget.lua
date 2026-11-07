@@ -69,9 +69,7 @@ local _state = {
 	graph = DEFAULTS.graph,
 	anchor = nil,
 	history = {},
-	last_active_s = 0,
 	last_mouse_s = 0,
-	pointer = nil,
 	last_draw_s = nil,
 	last_frame = nil,
 	shown = false,
@@ -408,14 +406,15 @@ end
 -- =========================================
 -- =========================================
 
---- Records whether the pointer moved since the last refresh.
-local function watch_pointer(Surface, now_s)
-	if type(Surface.pointer_position) ~= "function" then return end
-	local x, y = Surface.pointer_position()
-	if not x then return end
-	local last = _state.pointer
-	if last and (last.x ~= x or last.y ~= y) then _state.last_mouse_s = now_s end
-	_state.pointer = { x = x, y = y }
+--- Captures pointer activity at its callback time, before a later key can arrive.
+--- Polling position during rendering reverses mouse-then-key order within a tick.
+--- @param kind string Native pointer event kind.
+--- @param value number|nil Native value.
+--- @param now_s number Monotonic seconds.
+function M.observe_pointer(kind, value, now_s)
+	if kind == "press" or kind == "absolute_motion" or (kind == "motion" and value ~= 0) then
+		_state.last_mouse_s = now_s
+	end
 end
 
 --- Refreshes the widget. Called from the daemon's periodic tick; it redraws
@@ -434,17 +433,15 @@ function M.tick(stats, now_s)
 	if not canon or not Surface or not Surface.is_available() then return nil end
 
 	local opts = M.frame_options(now_s, _state.use_source_colors)
-	local source = Model.active_source(stats, HOLD_S, now_s)
+	local source = Model.active_source(stats, HOLD_S, now_s, canon)
 	local wpm = tonumber(stats and stats.wpm) or 0
 	Model.push_history(canon, _state.history, wpm, source)
-	watch_pointer(Surface, now_s)
 
-	local show, last_active = Model.widget_visible({
+	local show = Model.widget_visible({
 		wpm = wpm, source = source, tooltip_visible = M.tooltip_visible(), now_s = now_s,
-		last_active_s = _state.last_active_s, last_mouse_s = _state.last_mouse_s,
+		last_input_s = stats and stats.last_input_time, last_mouse_s = _state.last_mouse_s,
 		idle_hide_s = IDLE_HIDE_S,
 	})
-	_state.last_active_s = last_active
 	-- A drag moves the pointer; the widget the user is holding must not vanish.
 	if Surface.is_dragging() then show = true end
 	if not show then
@@ -499,9 +496,7 @@ function M._reset()
 	_state.graph = DEFAULTS.graph
 	_state.anchor = nil
 	_state.history = {}
-	_state.last_active_s = 0
 	_state.last_mouse_s = 0
-	_state.pointer = nil
 	_state.last_draw_s = nil
 	_state.last_frame = nil
 	_state.shown = false

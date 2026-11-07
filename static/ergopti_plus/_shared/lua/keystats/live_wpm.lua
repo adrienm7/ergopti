@@ -20,6 +20,7 @@
 local M = {}
 
 local Metrics = require("keystats.metrics")
+local Activity = require("keystats.wpm_activity")
 
 
 
@@ -31,7 +32,7 @@ local Metrics = require("keystats.metrics")
 -- =========================================
 
 --- A fresh tracker.
---- @param opts table { window_ms, min_duration_ms, idle_reset_ms } from the shared timings.
+--- @param opts table { window_ms, min_duration_ms, idle_reset_ms, source_hold_ms } from the shared timings.
 --- @return table
 function M.new(opts)
 	if type(opts) ~= "table" then error("live_wpm.new requires its timings", 2) end
@@ -44,6 +45,7 @@ function M.new(opts)
 		window_ms = opts.window_ms,
 		min_duration_ms = opts.min_duration_ms,
 		idle_reset_ms = opts.idle_reset_ms,
+		activity = Activity.new(opts.source_hold_ms),
 		stamps = {},
 		last_active_ms = nil,
 		source = "none",
@@ -87,6 +89,13 @@ function M.record(tracker, count, now_ms)
 	prune(tracker, now_ms)
 end
 
+--- Records a physical input independently of the effective character count.
+--- @param tracker table
+--- @param now_ms number
+function M.record_input(tracker, now_ms)
+	Activity.record_input(tracker.activity, now_ms)
+end
+
 --- Names where the last text came from: "hotstring" (with its group as the
 --- variant), "llm", or any other producer's name.
 --- @param tracker table
@@ -98,6 +107,7 @@ function M.mark_source(tracker, source, variant, now_ms)
 	tracker.source = source
 	tracker.source_variant = (type(variant) == "string" and variant ~= "") and variant or source
 	tracker.source_ms = now_ms
+	Activity.mark_source(tracker.activity, source, variant, now_ms)
 end
 
 
@@ -109,10 +119,10 @@ end
 -- =========================================
 -- =========================================
 
---- The readout's numbers, in the shape the macOS keystats has always returned.
+--- Effective speed, the last producer, and separately owned input/source activity.
 --- @param tracker table
 --- @param now_ms number
---- @return table { wpm, source, source_variant, source_time } — source_time in seconds.
+--- @return table { wpm, source, source_variant, source_time, last_input_time, source_holds } — times in seconds.
 function M.stats(tracker, now_ms)
 	prune(tracker, now_ms)
 	local wpm = 0
@@ -122,12 +132,12 @@ function M.stats(tracker, now_ms)
 		local window = math.max(now_ms - tracker.stamps[1], tracker.min_duration_ms)
 		wpm = math.floor(Metrics.compute_wpm_from_events(count, window) + 0.5)
 	end
-	return {
+	return Activity.snapshot(tracker.activity, {
 		wpm = wpm,
 		source = tracker.source,
 		source_variant = tracker.source_variant,
 		source_time = tracker.source_ms and tracker.source_ms / 1000 or 0,
-	}
+	}, now_ms)
 end
 
 return M

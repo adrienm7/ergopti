@@ -25,6 +25,7 @@ local hs       = hs
 local utf8     = utf8
 local Logger   = require("infra.logger")
 local Timings  = require("infra.timings")
+local WPMActivity = require("keystats.wpm_activity")
 local Manifest = require("infra.manifest_reader")
 local ConfigKeys = require("config_keys")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
@@ -242,6 +243,7 @@ local CoreState = {
 	passive_kind          = nil,
 
 	-- Last autocomplete source (for the WPM overlay)
+	wpm_activity          = WPMActivity.new(Timings.ms("ui", "wpm_color_hold_ms")),
 	last_source_type      = "none",
 	last_source_variant   = "none",
 	last_source_time      = 0,
@@ -873,6 +875,7 @@ local function handle_key(event_obj)
 				if not down_at then
 					-- Press — record timestamp and credit the kc dict
 					CoreState.modifier_down_at[keycode] = now
+					WPMActivity.record_input(CoreState.wpm_activity, now)
 					if credits then
 						LogManager.log_modifier_press(keycode, current_cached_app_name())
 					end
@@ -894,6 +897,7 @@ local function handle_key(event_obj)
 
 		local flags   = event_obj:getFlags() or {}
 		local keycode = event_obj:getKeyCode()
+		if not SILENT_KEYCODES[keycode] then WPMActivity.record_input(CoreState.wpm_activity, now) end
 
 		-- Shortcuts: flush then log immediately without entering the typing pipeline.
 		-- Current-process shortcuts (including paste-backed replacements) already
@@ -1389,6 +1393,7 @@ function M.suspend_collection()
 		ContextTracker.suspend_collection_context()
 	end
 	CoreState.collection_suspended = true
+	CoreState.wpm_activity = WPMActivity.new(Timings.ms("ui", "wpm_color_hold_ms"))
 	assert(settle_context_modifiers(), "Metrics pause modifier settlement remains pending")
 	Logger.info(LOG, "Metrics collection suspended by the user.")
 end
@@ -1431,6 +1436,7 @@ function M.reset_session()
 	CoreState.is_micro_idle       = false
 	CoreState.recent_typing_eff   = {}
 	CoreState.recent_typing_phys  = {}
+	CoreState.wpm_activity = WPMActivity.new(Timings.ms("ui", "wpm_color_hold_ms"))
 	CoreState.last_source_type    = "none"
 	CoreState.last_source_variant = "none"
 	CoreState.last_source_time    = 0
@@ -1615,6 +1621,9 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, physical
 	CoreState.last_source_type    = source_type
 	CoreState.last_source_variant = type(source_variant) == "string" and source_variant or source_type
 	CoreState.last_source_time    = timestamp_ms / 1000
+	if operation.text ~= "" then
+		WPMActivity.mark_source(CoreState.wpm_activity, source_type, source_variant, timestamp_ms)
+	end
 	return true
 end
 
@@ -1648,13 +1657,13 @@ function M.get_live_stats()
 		end
 	end
 
-	return {
+	return WPMActivity.snapshot(CoreState.wpm_activity, {
 		wpm            = wpm_eff,
 		wpm_physical   = wpm_phys,
 		source         = CoreState.last_source_type,
 		source_variant = CoreState.last_source_variant,
 		source_time    = CoreState.last_source_time,
-	}
+	}, now)
 end
 
 --- Exposes the in-memory today N-gram index for read-only access.
@@ -1981,6 +1990,7 @@ end
 local function teardown_runtime(opts)
 	_runtime_generation = _runtime_generation + 1
 	CoreState.is_enabled = false
+	CoreState.wpm_activity = WPMActivity.new(Timings.ms("ui", "wpm_color_hold_ms"))
 	CoreState.is_secure_field = true
 	local steps = {
 		{
@@ -2281,6 +2291,7 @@ function M.start(script_control)
 			CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
 			CoreState.recent_typing_eff = {}
 			CoreState.recent_typing_phys = {}
+			CoreState.wpm_activity = WPMActivity.new(Timings.ms("ui", "wpm_color_hold_ms"))
 	
 			local caffeinate_created, caffeinate_candidate = xpcall(function()
 				return hs.caffeinate.watcher.new(function(...)
