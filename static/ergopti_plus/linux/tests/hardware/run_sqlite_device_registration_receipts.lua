@@ -32,6 +32,13 @@ local checks, failures = 0, 0
 Keystats.init({ sqlite_path = database, log_dir = root .. "/logs" })
 assert(Keystats.is_enabled())
 local device = assert(assert(Writer.query_rows("SELECT device_id FROM devices;"))[1])
+-- The host facts the genuine registration wrote: the ledger identity names the
+-- device and signs it with the machine id when the host has one, so neither is
+-- derived here from the device id.
+local registered = table.concat(assert(Writer.query_rows("SELECT name,os,os_version,host_signature FROM devices;")), "\n")
+local hostname_file = assert(io.open("/proc/sys/kernel/hostname", "rb"))
+local hostname = assert(hostname_file:read("*l")):gsub("%s+", ""); hostname_file:close()
+assert(registered:sub(1, #hostname + 7) == hostname .. "|linux|", "the genuine registration names this host: " .. registered)
 local function check(name, test)
 	checks = checks + 1
 	local ok, err = xpcall(test, debug.traceback)
@@ -72,8 +79,7 @@ check("genuine collector startup preserves creation/import metadata and schema e
 	assert(immutable() == expected_immutable, "startup replaced durable fields it does not own")
 end)
 check("genuine collector startup refreshes mutable native host metadata", function()
-	local hostname = device:sub(#"linux-" + 1)
-	assert(rows("SELECT name,os,os_version,host_signature FROM devices;") == hostname .. "|linux||" .. hostname)
+	assert(rows("SELECT name,os,os_version,host_signature FROM devices;") == registered)
 	assert(rows("SELECT updated_at FROM devices;") ~= "2000-01-02T00:00:00Z")
 end)
 check("registration preserves schema/index/trigger and actually fires its update trigger", function()
