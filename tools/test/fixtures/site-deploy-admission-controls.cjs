@@ -872,7 +872,10 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 		// A newer push moved the target past this source: the run admits nothing,
 		// writes no receipt and ends without a failure, since that push deploys.
 		const moved = fixture();
-		moved.reference = { ...moved.reference, object: { type: 'commit', sha: 'b'.repeat(40) } };
+		moved.reference = {
+			ref: 'refs/heads/' + moved.run.head_branch,
+			object: { type: 'commit', sha: 'b'.repeat(40) }
+		};
 		const supersededOutput = path.join(temporary, 'superseded-outputs.txt'),
 			supersededReceipt = path.join(temporary, 'superseded.json');
 		await owner.main(
@@ -1032,7 +1035,7 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 	}
 	assert.equal(
 		controls,
-		155,
+		156,
 		'all original controls and both-target writer custody controls execute'
 	);
 	return {
