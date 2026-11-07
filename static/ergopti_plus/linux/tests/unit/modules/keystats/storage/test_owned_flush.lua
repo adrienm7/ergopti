@@ -1533,3 +1533,27 @@ helpers.describe("dashboard export and purge through the owning writer", functio
 		end)
 	end)
 end)
+
+require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: native stop commits admitted zero-count groups", function()
+	local Home = require("tests.support.keystats_home_fixture")
+	local Native = require("tests.support.keystats_native_fixture")
+	Native.with(function(collector)
+		helpers.assert_true(collector.init(Home.options({ sqlite_path = Home.fresh_db() })))
+		require("tests.support.metrics_consent_fixture").enable(collector)
+		local now = require("infra.monotonic").now_ms()
+		for index = 1, 10 do collector.record_hotstring("Editor", "😀", "😀😀", now + index, "static", 1, index == 10) end
+		Native.flush(collector)
+		Native.flush(collector)
+		local until_ms = now + require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+		while not collector.stop() and require("infra.monotonic").now_ms() < until_ms do
+			require("luv").run("nowait")
+			require("luv").sleep(1)
+		end
+		helpers.assert_true(collector.stop(), "the native stop must retire")
+		helpers.assert_true(collector.get_flush_status().committed, "an empty n-gram group must not refuse the closing transaction")
+		local writer = require("modules.keystats.sqlite_writer")
+		helpers.assert_nil(writer.upsert_ngrams("fixture", "2026-11-07", "Editor", {}, "ngram_chars"), "the public empty insertion remains a no-op")
+		helpers.assert_nil(writer.upsert_ngrams("fixture", "2026-11-07", "Editor", nil, "ngram_chars"), "malformed input remains refused")
+		helpers.assert_nil(writer.upsert_ngrams("fixture", "2026-11-07", "Editor", { word = 1 }, "not_a_table"), "an unknown table remains refused")
+	end)
+end)
