@@ -817,6 +817,21 @@
 		},
 		{
 			"os": "linux",
+			"tool": "`update-desktop-database`",
+			"programs": ["update-desktop-database"],
+			"used_for": "Refreshes the desktop menu cache after an App Cloner clone (`linux/apps/app_cloner_core.lua`)",
+			"today": "Host, optional",
+			"current_class": "OPT",
+			"version_needed": "any",
+			"if_missing": "Menus pick the clone up from its folder at their next scan",
+			"pin_possible": "No (follows the desktop's menu cache)",
+			"decision": "OPT",
+			"decision_text": "OPT",
+			"alternative": null,
+			"status": "done"
+		},
+		{
+			"os": "linux",
 			"tool": "`lswt`",
 			"programs": ["lswt"],
 			"used_for": "The focused window on wlr-foreign-toplevel compositors such as labwc, Wayfire and river (`linux/adapters/window_info.lua`)",
