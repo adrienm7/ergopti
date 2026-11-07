@@ -51,14 +51,16 @@ local function publish(state, save_prefs, values)
 		Logger.error(LOG, "No preference state to store the layout emulation settings in.")
 		return false
 	end
+	-- A list, not a key → value map: a leaf that was absent has a nil previous
+	-- value, which a map would drop, leaving the refused value in the state.
 	local previous = {}
 	for path, value in pairs(values) do
 		local key = flat_key(path)
-		previous[key] = state[key]
+		previous[#previous + 1] = { key = key, value = state[key] }
 		state[key] = value
 	end
 	if save_prefs() ~= true then
-		for key, value in pairs(previous) do state[key] = value end
+		for _, entry in ipairs(previous) do state[entry.key] = entry.value end
 		Logger.error(LOG, "Layout emulation settings were not persisted.")
 		return false
 	end
