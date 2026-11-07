@@ -8300,7 +8300,7 @@ const LINUX_SIMULTANEOUS_ENTRY = `bash ${LINUX_SIMULTANEOUS_HARNESS}`;
 const LINUX_SIMULTANEOUS_INSTALL_STEP = `Install prerequisites for ${LINUX_SIMULTANEOUS_STEP}`;
 const LINUX_SIMULTANEOUS_INSTALL_WORKFLOW = [
 	'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \\',
-	'  dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv xclip'
+	'  dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv lua-lgi xclip'
 ];
 const LINUX_SIMULTANEOUS_NATIVE_WORKFLOW = [
 	'sudo modprobe uinput',
@@ -8409,7 +8409,7 @@ for (const [what, from, to, target] of [
 		'--no-install-recommends',
 		'install'
 	],
-	['missing X11 clipboard prerequisite', 'lua-luv xclip', 'lua-luv', 'install'],
+	['missing X11 clipboard prerequisite', 'lua-lgi xclip', 'lua-lgi', 'install'],
 	[
 		'disabled install step',
 		linuxRow(LINUX_SIMULTANEOUS_INSTALL_STEP, NOT_CANCELLED),
