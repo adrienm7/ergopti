@@ -314,8 +314,8 @@ end
 --- `[gestures.sensitivities]` override them. An incremental slot acts while
 --- the fingers move (modules/gestures/incremental_tracker.lua).
 M.MODE_SINGLE, M.MODE_INCREMENTAL = "x1", "incremental"
-local MODES_SECTION = "gestures.modes"
-local SENSITIVITIES_SECTION = "gestures.sensitivities"
+local MODES_SECTION = ConfigKeys.KEY.GESTURES_MODES
+local SENSITIVITIES_SECTION = ConfigKeys.KEY.GESTURES_SENSITIVITIES
 M.DEFAULT_MODES, M.DEFAULT_SENSITIVITIES = {}, {}
 -- The manifest declares a mode and a step for every swipe direction; taps and
 -- the axis slots have none.

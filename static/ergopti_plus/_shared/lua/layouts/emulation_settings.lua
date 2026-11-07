@@ -24,6 +24,7 @@
 local ConfigKeys = require("config_keys")
 local NumberRowPolicy = require("layout.number_row_policy")
 local RowsPolicy = require("layout.layout_rows_policy")
+local TableUtil = require("table_util")
 
 local M = {}
 
@@ -31,6 +32,7 @@ local M = {}
 M.VARIANT_LAYOUTS = { none = "ergopti", ergopti = "ergopti", ergopti_plus = "ergopti_plus" }
 
 local KEY = ConfigKeys.KEY
+local LEAF = ConfigKeys.LEAF
 
 local function boolean(value)
 	if type(value) == "boolean" then return true end
@@ -111,8 +113,8 @@ end
 --- The paths a menu switch of the emulation writes directly.
 M.SWITCHES = {
 	[KEY.LAYOUT_ERGOPTI_BASE] = "base", [KEY.LAYOUT_ERGOPTI_ALT_GR] = "alt_gr",
-	[KEY.LAYOUT_EMULATE_NUMBER_ROW] = "emulate_number_row", [KEY.LAYOUT_EMULATE_TOP_ROW] = "emulate_top_row",
-	[KEY.LAYOUT_EMULATE_HOME_ROW] = "emulate_home_row", [KEY.LAYOUT_EMULATE_BOTTOM_ROW] = "emulate_bottom_row",
+	[KEY.LAYOUT_EMULATE_NUMBER_ROW] = LEAF.EMULATE_NUMBER_ROW, [KEY.LAYOUT_EMULATE_TOP_ROW] = LEAF.EMULATE_TOP_ROW,
+	[KEY.LAYOUT_EMULATE_HOME_ROW] = LEAF.EMULATE_HOME_ROW, [KEY.LAYOUT_EMULATE_BOTTOM_ROW] = LEAF.EMULATE_BOTTOM_ROW,
 }
 
 --- The value of one switch in resolved settings.
@@ -148,10 +150,8 @@ end
 --- @param sparse_operation function The manifest reader's sparse_operation.
 --- @return table operations
 function M.operations(values, sparse_operation)
-	local paths, operations = {}, {}
-	for path in pairs(values) do paths[#paths + 1] = path end
-	table.sort(paths)
-	for _, path in ipairs(paths) do operations[#operations + 1] = sparse_operation(path, values[path]) end
+	local operations = {}
+	for _, path in ipairs(TableUtil.sorted_keys(values)) do operations[#operations + 1] = sparse_operation(path, values[path]) end
 	return operations
 end
 
