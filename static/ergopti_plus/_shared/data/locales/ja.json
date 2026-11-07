@@ -3895,7 +3895,7 @@
 	"menu.global.uninstall": "Ergopti をアンインストール…",
 	"dialog.uninstall.window_title": "アンインストール",
 	"dialog.uninstall.confirm": "Ergopti をアンインストールしますか？アプリケーションは終了します。設定、ホットストリング、統計情報、認証情報は保持されます。",
-	"dialog.system_layout.window_title": "Ergopti システムレイアウト",
+	"dialog.system_layout.window_title": "システムレイアウト (Ergopti)",
 	"dialog.system_layout.confirm": "Ergopti キーボードレイアウトを Windows にインストールしますか?\n\nWindows が管理者権限を求めます。インストーラーは署名されていないため、Windows が発行元を不明と表示することがありますが、これは想定どおりです。その後、レイアウトが言語に追加され、選択されます。",
 	"dialog.system_layout.elevation_refused": "管理者権限が許可されませんでした。Ergopti システムレイアウトはインストールされていません。",
 	"dialog.system_layout.failed": "Ergopti システムレイアウトをインストールできませんでした:{1}",

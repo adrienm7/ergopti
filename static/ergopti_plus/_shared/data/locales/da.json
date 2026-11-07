@@ -3895,7 +3895,7 @@
 	"menu.global.uninstall": "Afinstaller Ergopti…",
 	"dialog.uninstall.window_title": "Afinstallation",
 	"dialog.uninstall.confirm": "Vil du afinstallere Ergopti? Programmet lukkes. Dine indstillinger, hotstrings, målinger og loginoplysninger bevares.",
-	"dialog.system_layout.window_title": "Ergopti-systemlayout",
+	"dialog.system_layout.window_title": "Systemlayout (Ergopti)",
 	"dialog.system_layout.confirm": "Installere Ergopti-tastaturlayoutet i Windows?\n\nWindows beder om administratorrettigheder. Installationsprogrammet er ikke signeret, så Windows kan sige, at udgiveren er ukendt: det er forventet. Layoutet føjes derefter til dine sprog og vælges.",
 	"dialog.system_layout.elevation_refused": "Der blev ikke givet administratorrettigheder: Ergopti-systemlayoutet blev ikke installeret.",
 	"dialog.system_layout.failed": "Ergopti-systemlayoutet kunne ikke installeres: {1}",
