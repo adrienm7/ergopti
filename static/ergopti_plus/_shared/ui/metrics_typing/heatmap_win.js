@@ -350,7 +350,8 @@ function name_keycode_layout(layout, driver_meta) {
 	if (!platform) throw new Error('metrics heatmap: unknown driver OS ' + os);
 	const ids = is_pc_scancode_driver(driver_meta) ? PC_KEYCODE_KEY_IDS : MAC_KEYCODE_KEY_IDS;
 	const delivered = layout && typeof layout === 'object' && Object.keys(layout).length > 0;
-	const out = { ...(delivered ? layout : KEYCODE_NAMES) };
+	const fallback = typeof KEYCODE_NAMES === 'object' && KEYCODE_NAMES ? KEYCODE_NAMES : {};
+	const out = { ...(delivered ? layout : fallback) };
 	Object.entries(ids).forEach(([kc, id]) => {
 		out[kc] = keyNameLabel(id, platform);
 	});
