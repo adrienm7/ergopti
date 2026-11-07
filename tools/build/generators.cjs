@@ -384,6 +384,10 @@ const GENERATORS = [
 		outputs: ['docs/design/owned-runtimes.md']
 	},
 	{
+		script: 'codegen/codegen-keystats-roi-policy.cjs',
+		outputs: ['static/ergopti_plus/_shared/lua/keystats/roi_policy.lua']
+	},
+	{
 		script: 'codegen/codegen-keystats-queries.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/lua/keystats/queries.lua',
