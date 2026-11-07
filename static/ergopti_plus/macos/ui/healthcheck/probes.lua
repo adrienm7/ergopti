@@ -33,7 +33,7 @@
 ---    timeout without sections.
 --- 8. local_state reads the main-thread facts phase A leaves out (the
 ---    versions, the keyboard state, the USB devices, the Wi-Fi signal, the
----    module contract check) in slices of the phase A budget, on timers after
+---    permissions, the module contract check) in slices of the phase A budget, on timers after
 ---    phase A; local, like the configuration.
 --- ==============================================================================
 
@@ -461,7 +461,7 @@ local function configuration(schema, overrides)
 end
 
 --- The main-thread facts phase A leaves out (ui.healthcheck.core
---- local_state_steps: the Wi-Fi signal, the module contract check), run in
+--- local_state_steps: the Wi-Fi signal, the permissions, the module contract check), run in
 --- slices between run-loop turns: each slice stops once it has held the main
 --- thread for the phase A budget, so opening the window never stalls the
 --- event taps behind them. A raising step costs its own fact and turns the

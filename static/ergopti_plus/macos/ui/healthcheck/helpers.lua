@@ -409,33 +409,43 @@ local function permission_state(id, granted, detail)
 	return "unknown"
 end
 
+-- The reader of each macOS permission, never prompting. Accessibility and
+-- Screen Recording are TCC queries answered by another process (9.2 ms of a
+-- 10.2 ms phase A in the 2026-11-06 field report): the local_state probe reads
+-- them, one per step, after phase A.
+local PERMISSION_READERS = {
+	accessibility    = function()
+		return permission_state("accessibility", require("adapters.accessibility_permission").is_trusted())
+	end,
+	screen_recording = function()
+		return permission_state("screen_recording", require("adapters.screen_capture").permission_state())
+	end,
+	-- Hammerspoon has no query for Input Monitoring that does not prompt, and
+	-- the grant belongs to the Karabiner grabber rather than to this process
+	input_monitoring = function() return "unknown" end,
+	-- A remap owner that never loaded is unknown
+	login_items      = function()
+		local remap = package.loaded["platform.remap"]
+		if type(remap) ~= "table" or type(remap.guardian_state) ~= "function" then return "unknown" end
+		return GUARDIAN_PERMISSION[remap.guardian_state()] or "unknown"
+	end,
+}
+
+--- One macOS permission, read live without prompting.
+--- @param id string A schema permission id.
+--- @return table { id, state } with state "granted", "missing", "unknown" or a guardian state.
+function H.read_permission(id)
+	local reader = PERMISSION_READERS[id]
+	if not reader then error("no reader for the permission " .. tostring(id)) end
+	return { id = id, state = read("the permission " .. id, reader) or "unknown" }
+end
+
 --- The macOS permissions, read without prompting, in the schema's order.
 --- @param ids table The schema's permission ids for this driver, ordered.
 --- @return table
 function H.collect_permissions(ids)
-	local states = {
-		accessibility    = function()
-			return permission_state("accessibility", require("adapters.accessibility_permission").is_trusted())
-		end,
-		screen_recording = function()
-			return permission_state("screen_recording", require("adapters.screen_capture").permission_state())
-		end,
-		-- Hammerspoon has no query for Input Monitoring that does not prompt, and
-		-- the grant belongs to the Karabiner grabber rather than to this process
-		input_monitoring = function() return "unknown" end,
-		-- Phase A only reads memory: a remap owner that never loaded is unknown
-		login_items      = function()
-			local remap = package.loaded["platform.remap"]
-			if type(remap) ~= "table" or type(remap.guardian_state) ~= "function" then return "unknown" end
-			return GUARDIAN_PERMISSION[remap.guardian_state()] or "unknown"
-		end,
-	}
 	local items = {}
-	for _, id in ipairs(ids) do
-		local reader = states[id]
-		if not reader then error("no reader for the permission " .. tostring(id)) end
-		items[#items + 1] = { id = id, state = read("the permission " .. id, reader) or "unknown" }
-	end
+	for _, id in ipairs(ids) do items[#items + 1] = H.read_permission(id) end
 	return { items = items }
 end
 
