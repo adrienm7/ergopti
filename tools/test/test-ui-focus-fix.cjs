@@ -213,9 +213,15 @@ const ALLOWLIST = [
 		reason: 'hotstring preview tooltip drawn through the overlay adapter'
 	},
 	{
+		file: 'linux/adapters/spotlight_overlay.lua',
+		kinds: { 'linux.keepAbove': 1, 'linux.popup': 3 },
+		reason: 'mouse spotlight: click-through, focus-free locator popups dismissed on mouse move'
+	},
+	{
 		file: 'linux/ergopti_hotstrings.lua',
-		kinds: { 'overlay.adapter': 1 },
-		reason: 'not an overlay: reports whether the overlay adapter is available, creates nothing'
+		kinds: { 'overlay.adapter': 2 },
+		reason:
+			'not an overlay: reports whether the overlay adapter is available and pumps the WPM surface events, creates nothing'
 	}
 ];
 
