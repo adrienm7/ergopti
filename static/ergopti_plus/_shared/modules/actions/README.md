@@ -416,7 +416,7 @@ actions that do the same on that OS. The modifier + key shortcuts
 | R16 | `platform_reason.action_notifications_are_cleared_from_their_centre` | This system lets no application dismiss notifications: clear them in the notification centre, which the equivalent action opens. |
 | R17 | `platform_reason.action_download_mark_is_each_systems` | Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file. |
 | R18 | `platform_reason.action_executable_permission_is_unix` | Not on Windows: a file runs there because of its extension, not because of an executable permission. |
-| R19 | `platform_reason.action_file_manager_folder_is_unreadable_on_linux` | Not yet implemented on Linux: this action requires integration with the file manager to identify its active folder. |
+| R19 | `platform_reason.action_file_manager_folder_is_unreadable_on_linux` | This action requires a file-manager-specific integration to identify the active folder. |
 | R20 | `platform_reason.action_text_recognition_is_live_text_on_macos` | On macOS, Live Text reads the text of any capture or image: take one with the equivalent action, then select its text. |
 | R21 | `platform_reason.action_take_note_uses_notepad` | macOS provides Quick Note (Fn+Q) instead of opening a plain-text notes file. |
 | R22 | `platform_reason.action_mirroring_is_the_systems_projection_menu` | No toggle on Linux: GNOME and KDE choose Duplicate in their own Super+P display switcher; bind that key as a keystroke. |
