@@ -1128,6 +1128,14 @@ _LDP_Native(Mode, Calls, Lines) {
             AssertTrue(FreshBEngineExact, "the armed engine must contain exactly B")
         }
         ExpectedPosts := (AllowedOrigin || Retyped) ? 1 : 0
+        ; A missing request on an allowed context is intermittent on hosted
+        ; runners: record the engine and detector state, and every native
+        ; character's before/after trace, before the verdict.
+        if Posts != ExpectedPosts
+            _TestPrint("# LLM_DEBOUNCE_MISSING_REQUEST " . KL_JsonEncode(Map("mode", Mode,
+                "expected_posts", ExpectedPosts, "posts", Posts, "native_request_delta", NativeDelta,
+                "settled_ms", TickElapsed64(Started), "ttl_ms", SFD_FIELD_CACHE_TTL_MS,
+                "now", _LDP_PrivacyTraceState(), "trace", State.PrivacyTrace)))
         AssertEqual(ExpectedPosts, Posts, "only the genuinely allowed context may produce one HTTP request")
         if ExpectedPosts
             AssertEqual(1, NativeDelta, "the live control creates its genuine remote reservation once")

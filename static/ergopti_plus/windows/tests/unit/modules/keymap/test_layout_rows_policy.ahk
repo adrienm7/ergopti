@@ -488,7 +488,13 @@ _LRNX_Case(Mode) {
 			_SR_TreePoll()
 			Sleep(10)
 		}
-		FileAppend("# external-row-flags " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText . "`n", "*")
+		; Through the results file: the runner does not forward a test's raw stdout,
+		; and this line is what tells a test-side translation race from a lost flag.
+		ReceiverReceipt := ""
+		try ReceiverReceipt := FileRead(Record["receipt"], "UTF-8")
+		_TestPrint("# external-row-flags " . Mode . " code=" . State.Code . " received=" . Record["received"]
+			. " receipt=" . ReceiverReceipt . " edit=" . Record["edit"].Value
+			. " stdout=" . StrReplace(State.Output, "`n", " | ") . " stderr=" . StrReplace(State.ErrorText, "`n", " | "))
 		AssertEqual(1, State.Calls, "the external sender must settle exactly once")
 		AssertEqual(1, Record["received"], "the parent-owned receiver must actually observe exactly one keydown")
 		AssertEqual(ExpectedHost, Record["edit"].Value, "the separate receiving process must obtain the host character exactly once")
