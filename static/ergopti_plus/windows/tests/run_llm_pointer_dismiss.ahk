@@ -34,7 +34,8 @@ global _TooltipActiveSurface := 0
 global _LLM_Bridge_Active := true
 global _LLM_Engine := Map("reset_on_nav", false)
 
-LLM_Engine_IsBusy() => false
+global _MMP_Busy := false
+LLM_Engine_IsBusy() => _MMP_Busy
 LLM_Engine_StopGeneration() {
 	global _MMP_StopHits
 	_MMP_StopHits += 1
@@ -211,6 +212,26 @@ _MMP_TooltipKeysDoNotCancel() {
 	}
 }
 Test("key-activity: accept, select and modifier keys keep the prediction", _MMP_TooltipKeysDoNotCancel)
+
+; A letter's key-down can run after the letter's own character re-armed the
+; debounce: it must leave that pause alone, or nothing fires once typing stops.
+_MMP_TypedKeyKeepsItsPause() {
+	global _MMP_StopHits, _MMP_Busy, _LLM_Engine
+	_MMP_SetState(false, false, false)
+	_MMP_Busy := true
+	_LLM_Engine["timer_active"] := true
+	try {
+		AssertFalse(LLM_Bridge_OnKeyActivity(0x41), "a typing key keeps the debounce its character armed")
+		AssertEqual(0, _MMP_StopHits, "the armed pause is not cancelled")
+		AssertTrue(LLM_Bridge_OnKeyActivity(0x74), "a non-typing key still cancels the pending pause")
+		AssertEqual(1, _MMP_StopHits, "F5 cancels the debounce")
+	} finally {
+		_MMP_Busy := false
+		_LLM_Engine.Delete("timer_active")
+	}
+}
+Test("key-activity: a typing key keeps the pause its character armed (key-activity-typing-pause)",
+	_MMP_TypedKeyKeepsItsPause)
 
 _MMP_IdleKeepsPrediction() {
 	global _MMP_HideHits, _MMP_StopHits
