@@ -28,7 +28,7 @@ local assert_eq   = helpers.assert_eq
 
 describe("infra.monotonic", function()
 
-	local Monotonic = helpers.load_module("infra.monotonic")
+	local Monotonic = helpers.fresh_module("infra.monotonic")
 
 	it("now_ms returns a positive number", function()
 		local t = Monotonic.now_ms()
