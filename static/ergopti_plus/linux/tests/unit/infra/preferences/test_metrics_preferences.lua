@@ -30,6 +30,33 @@ local function with_config(source, body)
 	end)
 end
 
+helpers.it("strict metrics encryption: real-file reload distinguishes malformed source from absent defaults", function()
+	with_config("", function(preferences, path)
+		for _, case in ipairs({
+			{ source = "", expected = false, known = true },
+			{ source = "[metrics]\nencrypt = true\n", expected = true, known = true },
+			{ source = '[metrics]\nencrypt = "true"\n', expected = false, known = false },
+			{ source = "[metrics]\nencrypt = false\n", expected = false, known = true },
+			{ source = "metrics = false\n", expected = false, known = false },
+			{ source = "metrics = []\n", expected = false, known = false },
+			{ source = "[[metrics]]\nencrypt = false\n", expected = false, known = false },
+			{ source = "metrics = {}\n", expected = false, known = true },
+			{ source = "[metrics]\nencrypt = 0\n", expected = false, known = false },
+			{ source = "[metrics]\nencrypt = []\n", expected = false, known = false },
+			{ source = "[metrics]\nencrypt = true\n", expected = true, known = true },
+			{ source = "[metrics]\n", expected = false, known = true },
+		}) do
+			local file = assert(io.open(path, "wb"))
+			assert(file:write(case.source)); assert(file:close())
+			helpers.assert_eq(preferences.get("metrics.encrypt"), case.expected, "ordinary neutral-default behavior is unchanged")
+			local strict = preferences.get("metrics.encrypt", true)
+			if case.known then helpers.assert_eq(strict, case.expected) else helpers.assert_nil(strict) end
+			local fresh = helpers.load_module("infra.metrics_preferences")
+			helpers.assert_eq(fresh.get("metrics.encrypt", true), strict, "fresh and retained owners classify the same source")
+		end
+	end)
+end)
+
 helpers.describe("canonical metrics preferences", function()
 	helpers.it("cleanup retains canonical metric choices and offers only unknown neighbors", function()
 		with_config('[metrics]\nenabled = true\nwpm_widget_colors = false\nfuture = 42\n', function(_, path)
