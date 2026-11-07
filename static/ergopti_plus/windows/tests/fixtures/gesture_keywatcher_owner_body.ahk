@@ -87,11 +87,18 @@ HotPath_Now() => 0
 HotPath_LogIfSlow(*) => 0
 GestureActionParameterSpec(*) => ""
 GestureActionIsAssignable(Name) => Name == "none" || Name == "left_click_toggle" || Name == "right_click_toggle"
-ConfigCommitUpdates(*) {
+; The actual assignment plan is built, written, then published, as
+; ConfigCommitBuilt does; only the durable write takes the fixture's verdict.
+ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, ExistingOwner := 0) {
 	global _GKO
+	Plan := BuildFn.Call()
+	_GKO_Require(IsObject(Plan) && Plan.HasOwnProp("updates") && Plan.updates is Array && Plan.updates.Length >= 1,
+		"the actual assignment plan must carry its durable update batch")
 	if _GKO.HasOwnProp("DuringWrite") && IsObject(_GKO.DuringWrite)
 		_GKO.DuringWrite.Call()
-	return _GKO.Commit
+	if !_GKO.Commit
+		return false
+	return Plan.publish.Call()
 }
 
 _GKO_AttemptBinding(Button, Binding) {

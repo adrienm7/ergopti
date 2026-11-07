@@ -89,7 +89,8 @@ _GKO_Source(OwnerReceipt) {
 	ConfigOwner := _DriverProductionFileForSymbol("_GestureCommitAssignment")
 	AssertTrue(ConfigOwner != "", "the assignment publisher must have a real owner")
 	ConfigSource := FSReadStrict(ConfigOwner)
-	for Name in ["GestureSaveAssignment", "GestureBindingId", "_GestureCommitAssignment", "_GestureCloneActionParameters", "_GestureRunAction"] {
+	for Name in ["GestureSaveAssignment", "GestureBindingId", "_GestureCommitAssignment", "_GestureBuildAssignmentPlan",
+		"_GesturePublishAssignment", "_GestureCloneActionParameters", "_GestureRunAction"] {
 		Body := _DriverExtractFunctionBody(&ConfigSource, Name)
 		AssertTrue(Body != "", "the real assignment body must exist: " . Name)
 		Source .= Body . "`n"
