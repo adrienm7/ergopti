@@ -174,7 +174,9 @@ h.describe("native menu dialog captions", function()
 	end)
 
 	h.it("(linux-native-titles) real Uninstall callbacks brand confirmation and failure without changing body or refusal", function()
-		local names = { "ui.menu.builder", "ui.menu.uninstall", "infra.installation", "ui.modal", "ui.menu.llm_backend_rows" }
+		-- The prompt captures its Shell owner; load it under this scenario's authority.
+		local names = { "ui.menu.builder", "ui.menu.uninstall", "infra.installation", "ui.modal", "ui.menu.llm_backend_rows",
+			"ui.text_prompt" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local original_execute, original_checked = os.execute, Shell.exec_checked
