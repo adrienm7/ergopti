@@ -12,6 +12,20 @@ local helpers = require("tests.helpers")
 local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 
 
+--- Establishes an actual absent source before asking the cipher to admit plaintext.
+local function plaintext_cipher()
+	package.loaded["infra.preferences"] = nil
+	local path = os.tmpname()
+	assert(os.remove(path))
+	local logger = require("infra.logger")
+	local previous, errors = logger.error, {}
+	logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
+	local _, status = helpers.load_with_stubs("infra.preferences").load(path)
+	logger.error = previous
+	helpers.assert_eq(status, "absent", table.concat(errors, "; "))
+	return require("modules.keystats.text_cipher")
+end
+
 local function load_fixture(options)
 	options = options or {}
 	package.loaded["modules.keystats.log_manager"] = nil
@@ -274,8 +288,8 @@ helpers.describe("log_manager deferred action boundaries", function()
 		helpers.with_stub_scope({ "modules.keystats.text_cipher", "modules.keystats.init", "modules.keystats" }, function()
 			package.loaded["modules.keystats.text_cipher"] = nil
 			package.loaded["modules.keystats.init"], package.loaded["modules.keystats"] = nil, nil
+			local cipher = plaintext_cipher()
 			local fixture = load_fixture()
-			local cipher = require("modules.keystats.text_cipher")
 			helpers.assert_true(cipher.set_enabled(false))
 			local built = 0
 			helpers.assert_true(fixture.log_manager.defer_entry_builder(function()
@@ -300,8 +314,8 @@ helpers.describe("log_manager deferred action boundaries", function()
 		helpers.with_stub_scope({ "modules.keystats.text_cipher", "modules.keystats.init", "modules.keystats" }, function()
 			package.loaded["modules.keystats.text_cipher"] = nil
 			package.loaded["modules.keystats.init"], package.loaded["modules.keystats"] = nil, nil
+			local cipher = plaintext_cipher()
 			local fixture = load_fixture()
-			local cipher = require("modules.keystats.text_cipher")
 			helpers.assert_true(cipher.set_enabled(false))
 			helpers.assert_true(fixture.log_manager.defer_entry_builder(function()
 				helpers.assert_eq(cipher.set_enabled(true), false, "the traversing FIFO cannot publish a new posture")
@@ -320,8 +334,8 @@ helpers.describe("log_manager deferred action boundaries", function()
 		helpers.with_stub_scope({ "modules.keystats.text_cipher", "modules.keystats.init", "modules.keystats" }, function()
 			package.loaded["modules.keystats.text_cipher"] = nil
 			package.loaded["modules.keystats.init"], package.loaded["modules.keystats"] = nil, nil
+			local cipher = plaintext_cipher()
 			local fixture = load_fixture()
-			local cipher = require("modules.keystats.text_cipher")
 			helpers.assert_true(cipher.set_enabled(false))
 			local sink = package.loaded["modules.keystats.rotation"]
 			local real = assert(loadfile(helpers.driver_root() .. "modules/keystats/rotation.lua"))()
