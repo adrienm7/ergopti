@@ -184,9 +184,13 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 
 	helpers.it("every hotstring category carries its rendered sections and commands intact", function()
 		local Hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local saves, refreshes = 0, 0
 		local ctx = {
 			hotfiles = { "alpha.toml" }, get_group_name = function() return "alpha" end,
 			state = { hotstrings = {}, sections_order_overrides = {} },
+			is_paused = function() return false end,
+			save_prefs = function() saves = saves + 1; return true end,
+			updateMenu = function() refreshes = refreshes + 1 end,
 			applyTriggerChar = function(value) return value end,
 			keymap = {
 				is_group_enabled = function() return true end,
@@ -202,11 +206,46 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 		helpers.assert_eq(#rendered, 1)
 		helpers.assert_true(rendered[1].menu == rows[1].submenu,
 			"an already-rendered child passes through without translating or rebuilding commands")
-		helpers.assert_eq(#rendered[1].menu, 5, "two commands, a separator and both native sections")
+		helpers.assert_eq(#rendered[1].menu, 6, "two commands, a separator, both native sections and their order submenu")
 		helpers.assert_eq(rendered[1].menu[4].title, "One (1)")
 		helpers.assert_eq(rendered[1].menu[5].title, "Two (3)")
 		helpers.assert_eq(type(rendered[1].menu[1].fn), "function")
 		helpers.assert_eq(type(rendered[1].menu[2].fn), "function")
+		local translate = require("infra.i18n").get
+		local order = rendered[1].menu[6]
+		helpers.assert_eq(order.title, translate("menu.hotstrings.section_order"))
+		helpers.assert_eq(#order.menu, 4, "both section controls, a separator and reset survive native rendering")
+		helpers.assert_eq(order.menu[1].title, "One (1)")
+		helpers.assert_eq(order.menu[2].title, "Two (3)")
+		helpers.assert_eq(order.menu[3].title, "-")
+		helpers.assert_eq(order.menu[4].title, translate("hs_config.btn_reset_default"))
+		for _, section in ipairs({ order.menu[1], order.menu[2] }) do
+			helpers.assert_eq(#section.menu, 2)
+			helpers.assert_eq(section.menu[1].title, translate("menu.hotstrings.move_up"))
+			helpers.assert_eq(section.menu[2].title, translate("menu.hotstrings.move_down"))
+			helpers.assert_eq(type(section.menu[1].fn), "function")
+			helpers.assert_eq(type(section.menu[2].fn), "function")
+		end
+		helpers.assert_eq(order.menu[1].menu[1].disabled, true)
+		helpers.assert_eq(order.menu[2].menu[2].disabled, true)
+		local move_up = order.menu[2].menu[1].fn
+		helpers.assert_eq(move_up(), true)
+		helpers.assert_eq(ctx.state.sections_order_overrides.alpha, { "two", "one" })
+		helpers.assert_eq(saves, 1); helpers.assert_eq(refreshes, 1)
+		helpers.assert_eq(move_up(), false, "a rendered old command retains its stale-menu refusal")
+		helpers.assert_eq(saves, 1); helpers.assert_eq(refreshes, 1)
+		local function rebuilt_order()
+			return require("infra.manifest_menu").render_rows(Hotstrings.build_groups(ctx, nil, {}),
+				"category-dialect-proof")[1].menu[6]
+		end
+		order = rebuilt_order()
+		helpers.assert_eq(order.menu[1].title, "Two (3)")
+		helpers.assert_eq(order.menu[1].menu[2].fn(), true)
+		helpers.assert_eq(ctx.state.sections_order_overrides.alpha, { "one", "two" })
+		helpers.assert_eq(saves, 2); helpers.assert_eq(refreshes, 2)
+		helpers.assert_eq(rebuilt_order().menu[4].fn(), true)
+		helpers.assert_nil(ctx.state.sections_order_overrides.alpha)
+		helpers.assert_eq(saves, 3); helpers.assert_eq(refreshes, 3)
 	end)
 
 	helpers.it("the extension tree emits rows in the dialect it also reads", function()
