@@ -208,21 +208,29 @@ const headerKeys = new Set();
 	}
 })(MANIFEST);
 const FRAMED = /^\s*[—–]\s.*\s[—–]\s*$/u;
-// Capitals: every cased letter upper case, cased letters the majority of the
-// letters (so a Japanese title holding « GNOME » is not one), and one word of
-// five capitals for a menu row (units and acronyms such as « GB RAM » or « ANSI »
-// stay), of two for a header.
+// Capitals: every letter cased and upper case, and one word of five capitals
+// for a menu row (units and acronyms such as « GB RAM » or « ANSI » stay), of
+// two for a header. A value holding a letter of a script without case (Han,
+// kana, Hangul, Arabic, Hebrew, Devanagari) cannot shout in its own script:
+// its capitals are Latin names such as « GNOME, KDE or X11 ».
 function shouted(value, minimum) {
 	const text = value.replace(/%[sd]|\{[^}]*\}/g, '');
 	const letters = text.match(/\p{L}/gu) || [];
-	const cased = letters.filter((c) => c.toLowerCase() !== c.toUpperCase());
 	const longest = Math.max(0, ...(text.match(/\p{Lu}+/gu) || []).map((word) => word.length));
 	return (
 		longest >= minimum &&
-		cased.length * 2 >= letters.length &&
-		cased.every((c) => c === c.toUpperCase())
+		letters.every((c) => c.toLowerCase() !== c.toUpperCase() && c === c.toUpperCase())
 	);
 }
+for (const [value, minimum, expected] of [
+	['RÉGLAGES DU CLAVIER', 5, true],
+	['Réglages du clavier', 5, false],
+	['此桌面不可用（仅限 GNOME、KDE 或 X11）', 5, false],
+	['GB RAM', 5, false],
+	['— OPTIONS —', 2, true]
+])
+	if (shouted(value, minimum) !== expected)
+		throw new Error(`self-test: shouted(${JSON.stringify(value)}) must be ${expected}`);
 const localeDefects = [];
 for (const file of fs.readdirSync(LOCALE_DIR).filter((f) => f.endsWith('.json'))) {
 	const strings = JSON.parse(
