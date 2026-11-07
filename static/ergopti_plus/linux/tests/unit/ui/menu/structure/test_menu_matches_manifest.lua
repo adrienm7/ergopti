@@ -696,6 +696,28 @@ helpers.describe("menu certification: no empty submenu", function()
 				.. table.concat(empty, ", "))
 	end)
 
+	-- The group builder handed the renderer's finished rows back as row data:
+	-- none had a label, so « Rangées émulées » opened onto nothing.
+	helpers.it("lists the four emulated row switches under « Rangées émulées »", function()
+		local caption = i18n.get("menu.layout.emulated_rows")
+		local found
+		local function walk(items)
+			for _, item in ipairs(items or {}) do
+				if item.title == caption and type(item.menu) == "table" then found = item.menu end
+				if type(item.menu) == "table" then walk(item.menu) end
+			end
+		end
+		walk(build_full_menu(full_context()))
+		helpers.assert_eq(type(found), "table", "the emulated rows submenu is drawn")
+		local rows = { "number_row", "top_row", "home_row", "bottom_row" }
+		helpers.assert_eq(#found, #rows, "one switch per emulated row")
+		for index, row in ipairs(rows) do
+			helpers.assert_eq(found[index].title, i18n.get("menu.layout.emulate_" .. row))
+			helpers.assert_eq(type(found[index].fn), "function", row .. " can be switched")
+			helpers.assert_eq(type(found[index].checked), "boolean", row .. " shows its state")
+		end
+	end)
+
 end)
 
 
