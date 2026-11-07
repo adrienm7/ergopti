@@ -10,8 +10,10 @@
 _KLRPW_Profile(State, EventKind, Context, Statement, Elapsed) {
 	try {
 		SqlPtr := DllCall(SQLiteConst.DLL . "\sqlite3_sql", "Ptr", Statement, "Ptr")
+		; The page query is identified by its key prefix and payload column, not by
+		; its exact projection list, which grows with diagnostic identity columns.
 		if SqlPtr && RegExMatch(StrGet(SqlPtr, "UTF-8"),
-			"^SELECT\s+t\.device_id,\s*t\.id,\s*t\.events_json\s+FROM\s+") {
+			"^SELECT\s+t\.device_id,\s*t\.id,[^;]*?\bt\.events_json\s+FROM\s+") {
 			; SQLITE_STMTSTATUS_VM_STEP counts native work independently of CPU load.
 			State["steps"].Push(DllCall(SQLiteConst.DLL . "\sqlite3_stmt_status",
 				"Ptr", Statement, "Int", 4, "Int", 0, "Int"))
