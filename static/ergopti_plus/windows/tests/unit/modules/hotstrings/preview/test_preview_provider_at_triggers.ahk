@@ -37,7 +37,7 @@ _PIPP_Setup() {
 	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed
 	global HSE_RebuildInProgress, HSE_PersonalInfoCombosEnabled, HSE_RepeatEnabled
 	global _PrefixIndex, _TriggerSet, _PrefixBuffer
-	global PersonalInformation, PersonalInformationLetters
+	global PersonalInformation, PersonalInformationLetters, LastSentCharacterKeyTime
 	InfoWasSet := IsSet(PersonalInformation)
 	LettersWereSet := IsSet(PersonalInformationLetters)
 	Saved := { Index:         _PrefixIndex,
@@ -50,7 +50,9 @@ _PIPP_Setup() {
 	           InfoWasSet:    InfoWasSet,
 	           Info:          InfoWasSet ? PersonalInformation : 0,
 	           LettersWereSet: LettersWereSet,
-	           Letters:       LettersWereSet ? PersonalInformationLetters : 0 }
+	           Letters:       LettersWereSet ? PersonalInformationLetters : 0,
+	           Stamps:        LastSentCharacterKeyTime }
+	LastSentCharacterKeyTime := LastSentCharacterKeyTime.Clone()
 	HSE_RegistryClear()
 	HSE_HardReset()
 	HSE_Suppressed := 0
@@ -74,14 +76,24 @@ _PIPP_Setup() {
 	return Saved
 }
 
+; The repeat answers within the magic key's window, measured from the repeated
+; letter (repeat-window). A case that sets the buffer by hand never typed that
+; letter, so it stamps it as typed just now.
+; @param Letter {String} The letter the magic key repeats.
+_PIPP_TypedJustNow(Letter) {
+	global LastSentCharacterKeyTime
+	LastSentCharacterKeyTime[Letter] := A_TickCount
+}
+
 ; @param Saved The value _PIPP_Setup returned.
 _PIPP_Teardown(Saved) {
 	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed
 	global HSE_RebuildInProgress, HSE_PersonalInfoCombosEnabled, HSE_RepeatEnabled
 	global _PrefixIndex, _TriggerSet, _PrefixBuffer
-	global PersonalInformation, PersonalInformationLetters
+	global PersonalInformation, PersonalInformationLetters, LastSentCharacterKeyTime
 	HSE_RegistryClear()
 	HSE_HardReset()
+	LastSentCharacterKeyTime := Saved.Stamps
 	HSE_Suppressed := Saved.Suppressed
 	HSE_RebuildInProgress := Saved.Rebuild
 	HSE_PersonalInfoCombosEnabled := Saved.CombosEnabled
@@ -248,6 +260,7 @@ _PIPP_UnresolvableComboYieldsToRepeat() {
 		MK := ScriptInformation["MagicKey"]
 		_PIPP_RegisterAtTriggers()
 		HSE_Buffer := "@npz"
+		_PIPP_TypedJustNow("z")
 		HSE_StartIsWordBoundary := true
 
 		Rows := _PrefixCollectCandidates()
@@ -316,6 +329,7 @@ _PIPP_BlankFieldComboYieldsToRepeat() {
 		_PIPP_RegisterAtTriggers()
 		PersonalInformation["first_name"] := ""
 		HSE_Buffer := "@npn"
+		_PIPP_TypedJustNow("n")
 		HSE_StartIsWordBoundary := true
 
 		Rows := _PrefixCollectCandidates()

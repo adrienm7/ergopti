@@ -41,7 +41,7 @@ _RDGE_SaveState() {
 	global _PrefixInputContextGeneration, _PrefixInputHook
 	global _PrefixVisibleFireDecisions
 	global _HotstringsOverridesPath, _HotstringsOverrides, _HotstringsTerminatorRecords
-	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS, LastSentCharacterKeyTime
 	Hotstrings := Features["hotstrings"]
 	return {
 		ConfigurationFile: ConfigurationFile,
@@ -65,7 +65,8 @@ _RDGE_SaveState() {
 		Overrides: _HotstringsOverrides,
 		DelimiterOwner: _HotstringsTerminatorRecords,
 		WordLive: HSE_WORD_TERMINATORS,
-		ConsumedLive: HSE_CONSUMED_DELIMITERS
+		ConsumedLive: HSE_CONSUMED_DELIMITERS,
+		Stamps: LastSentCharacterKeyTime
 	}
 }
 
@@ -79,8 +80,9 @@ _RDGE_RestoreState(Saved) {
 	global _PrefixInputContextGeneration, _PrefixInputHook
 	global _PrefixVisibleFireDecisions
 	global _HotstringsOverridesPath, _HotstringsOverrides, _HotstringsTerminatorRecords
-	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS, LastSentCharacterKeyTime
 	ConfigurationFile := Saved.ConfigurationFile
+	LastSentCharacterKeyTime := Saved.Stamps
 	ScriptInformation["MagicKey"] := Saved.MagicKey
 	HSE_RepeatEnabled := Saved.RepeatEnabled
 	Hotstrings := Features["hotstrings"]
@@ -177,9 +179,12 @@ _RDGE_AcceptPostCommit(*) {
 _RDGE_CreateRepeatCandidate(Buffer) {
 	global ScriptInformation, HSE_Buffer, HSE_StartIsWordBoundary
 	global HSE_RuntimeDecisionGeneration
-	global _PrefixContentGeneration, _PrefixInputContextGeneration
+	global _PrefixContentGeneration, _PrefixInputContextGeneration, LastSentCharacterKeyTime
 	HSE_Buffer := Buffer
 	HSE_StartIsWordBoundary := true
+	; The repeat answers within the magic key's window, measured from the
+	; repeated letter (repeat-window): this buffer was set, not typed.
+	LastSentCharacterKeyTime := Map(_TextLastCodepoint(Buffer), A_TickCount)
 	_PrefixSetBuffer(Buffer)
 	Decision := HSE_PreviewNextDecision(
 		Buffer, ScriptInformation["MagicKey"])
