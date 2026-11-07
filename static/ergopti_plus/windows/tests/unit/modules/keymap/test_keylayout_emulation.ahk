@@ -654,12 +654,14 @@ Test("keylayout emulation: a pending dead key completes with the OS character on
 ; the selected layout's (o -> ô). The original registered callbacks are driven.
 _KLT_PendingDisabledRowCase() {
 	global Features, CategoryEnabled, LayerEnabled, KLE_Registered, KLE_State, KLE_Compositions
-	global KEYLAYOUT_NEUTRAL_STATE, _Stub_RecordedSends
+	global KEYLAYOUT_NEUTRAL_STATE, _Stub_RecordedSends, _HotstringRegistrar, _SendHook
 	global _KLE_ResetObserverRegistering, _KLE_ResetObserverCohort, _KLE_ResetObserverCapture, _KLE_ResetObserverGeneration
 	State := MasterGateState()
+	; The suite runs with the recorder hooks installed: later cases read their
+	; sends from them, so this case hands back the hooks it found.
 	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone(),
 		_KLE_ResetObserverRegistering, _KLE_ResetObserverCohort, _KLE_ResetObserverCapture,
-		_KLE_ResetObserverGeneration]
+		_KLE_ResetObserverGeneration, _HotstringRegistrar, _SendHook]
 	try {
 		Features := Map("layout", Map("emulated_layout", "ergopti_plus", "ergopti_base", true,
 			"ergopti_alt_gr", true, "ergopti_variant", "none", "direct_access_digits", "native",
@@ -719,7 +721,8 @@ _KLT_PendingDisabledRowCase() {
 		AssertEqual(1, _Stub_RecordedSends.Length)
 		AssertEqual(Selected, _Stub_RecordedSends[1].args[1], "an emulated row composes the selected layout's key")
 	} finally {
-		UninstallHotstringHooks()
+		_HotstringRegistrar := Saved[10]
+		_SendHook := Saved[11]
 		Features := Saved[1]
 		CategoryEnabled := Saved[2]
 		LayerEnabled := Saved[3]
