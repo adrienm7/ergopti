@@ -4106,7 +4106,7 @@
 	"platform_reason.action_continuous_swipe_is_macos": "Pouze macOS: plynulé přejetí sleduje prsty, dokud se pohybují, což čte jen ovladač pro macOS. Windows dostává hotová gesta z nastavení touchpadu a Linux jedná až po skončení přejetí: použijte odpovídající jednokrokové akce.",
 	"platform_reason.action_download_mark_is_each_systems": "Každý systém označuje stažené soubory po svém (atribut karantény v macOS, značka Mark of the Web ve Windows) a nabízí akci, která odstraní jeho vlastní značku. Linux stažené soubory neoznačuje.",
 	"platform_reason.action_executable_permission_is_unix": "Ne ve Windows: soubor se tam spouští podle přípony, ne podle oprávnění ke spuštění.",
-	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "V Linuxu zatím není implementováno: tato akce vyžaduje integraci se správcem souborů pro určení aktivní složky.",
+	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "Tato akce vyžaduje integraci s konkrétním správcem souborů, aby bylo možné určit aktivní složku.",
 	"platform_reason.action_line_deletion_is_macos": "Pouze macOS: Cmd+Delete maže v textových polích macOS až na začátek nebo konec řádku. Textová pole ve Windows a Linuxu takovou klávesu nemají: označte text k okraji řádku zkratkou Shift+Home nebo Shift+End a pak ho smažte.",
 	"platform_reason.action_lookup_is_macos_dictionary": "Pouze macOS: Vyhledat otevře systémový panel slovníku pro slovo pod ukazatelem. Windows a Linux systémový panel slovníku nemají.",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "Pouze macOS: tyto akce přepínají navigační vrstvu uloženou v Karabiner-Elements. Ve Windows a Linuxu vrstva sleduje drženou klávesu a nemá žádný přepínač.",

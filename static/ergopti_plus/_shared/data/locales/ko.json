@@ -4106,7 +4106,7 @@
 	"platform_reason.action_continuous_swipe_is_macos": "macOS 전용: 연속 스와이프는 손가락이 움직이는 동안 따라가며, 이를 읽는 것은 macOS 드라이버뿐입니다. Windows는 터치패드 설정에서 완료된 제스처를 받고 Linux는 스와이프가 끝난 뒤 동작합니다: 대응하는 한 단계 동작을 사용하세요.",
 	"platform_reason.action_download_mark_is_each_systems": "시스템마다 다운로드한 파일을 표시하는 방식이 다르며(macOS는 격리 속성, Windows는 Mark of the Web), 각자 자신의 표시를 지우는 동작을 제공합니다. Linux는 다운로드한 파일에 표시를 하지 않습니다.",
 	"platform_reason.action_executable_permission_is_unix": "Windows에는 없음: 그곳에서는 파일이 실행 권한이 아니라 확장자 때문에 실행됩니다.",
-	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "Linux에서는 아직 구현되지 않았습니다. 이 동작을 사용하려면 파일 관리자의 활성 폴더를 식별하는 연동이 필요합니다.",
+	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "이 동작에서 활성 폴더를 식별하려면 파일 관리자에 맞는 연동이 필요합니다.",
 	"platform_reason.action_line_deletion_is_macos": "macOS 전용: Cmd+Delete는 macOS 텍스트 필드에서 줄의 처음이나 끝까지 지웁니다. Windows와 Linux 텍스트 필드에는 그런 키가 없습니다: Shift+Home 또는 Shift+End로 줄 끝까지 선택한 뒤 지우세요.",
 	"platform_reason.action_lookup_is_macos_dictionary": "macOS 전용: 찾아보기는 포인터 아래 단어에 대한 시스템 사전 패널을 엽니다. Windows와 Linux에는 시스템 사전 패널이 없습니다.",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "macOS 전용: 이 동작들은 Karabiner-Elements 안에 보관되는 탐색 레이어를 전환합니다. Windows와 Linux에서는 레이어가 누르고 있는 키를 따르며 설정할 스위치가 없습니다.",

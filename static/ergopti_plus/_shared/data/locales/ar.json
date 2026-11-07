@@ -4106,7 +4106,7 @@
 	"platform_reason.action_continuous_swipe_is_macos": "macOS فقط: يتبع السحب المتواصل الأصابع أثناء حركتها، وهو ما لا يقرؤه إلا برنامج تشغيل macOS. يتلقى Windows إيماءات مكتملة من إعدادات لوحة اللمس، ويتصرف Linux بعد انتهاء السحب: استخدم الإجراءات المكافئة ذات الخطوة الواحدة.",
 	"platform_reason.action_download_mark_is_each_systems": "يَسِم كل نظام الملفات المنزّلة بطريقته (سمة الحجر في macOS، وعلامة الويب في Windows) ويقدّم الإجراء الذي يزيل علامته الخاصة. لا يَسِم Linux أي ملف منزّل.",
 	"platform_reason.action_executable_permission_is_unix": "ليس في Windows: يعمل الملف هناك بسبب امتداده، لا بسبب إذن التنفيذ.",
-	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "لم تُنفّذ بعد على Linux: يتطلب هذا الإجراء تكاملًا مع مدير الملفات لتحديد مجلده النشط.",
+	"platform_reason.action_file_manager_folder_is_unreadable_on_linux": "يتطلب هذا الإجراء تكاملًا خاصًا بمدير الملفات لتحديد المجلد النشط.",
 	"platform_reason.action_line_deletion_is_macos": "macOS فقط: يحذف Cmd+Delete حتى بداية السطر أو نهايته في حقول النص في macOS. لا تملك حقول النص في Windows وLinux مثل هذا المفتاح: حدّد حتى طرف السطر بـ Shift+Home أو Shift+End ثم احذف.",
 	"platform_reason.action_lookup_is_macos_dictionary": "macOS فقط: يفتح «البحث» لوحة قاموس النظام للكلمة الموجودة تحت المؤشر. لا توجد في Windows وLinux لوحة قاموس للنظام.",
 	"platform_reason.action_navigation_layer_switch_is_karabiner": "macOS فقط: تبدّل هذه الإجراءات طبقة التنقل المحفوظة داخل Karabiner-Elements. في Windows وLinux تتبع الطبقة المفتاح المضغوط ولا يوجد مفتاح تبديل لضبطه.",
