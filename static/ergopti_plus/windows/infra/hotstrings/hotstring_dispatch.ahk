@@ -1774,7 +1774,7 @@ HSE_UndoExpansion(Undo, FocusToken := unset) {
 						}
 				} finally Critical(AtCritical)
 		} catch as Err {
-				SendError := Err.Message
+				SendError := Type(Err)
 		} finally {
 				SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
 				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -HSE_SUPPRESS_RELEASE_DELAY_MS)
