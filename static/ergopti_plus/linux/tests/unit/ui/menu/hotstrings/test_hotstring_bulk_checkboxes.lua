@@ -820,17 +820,28 @@ helpers.describe("hotstring section order native menu", function()
 		local ok, detail = xpcall(function()
 			preferences._set_file_for_test(path)
 			local config = fake_config(true, true)
+			local get_category = config.get_category
+			config.get_category = function(id)
+				local category = get_category(id)
+				if id == "autocorrection" then category.sections_order = { "first", "-", "second" } end
+				return category
+			end
 			local menu = hotstrings_menu(config)
 			local category = assert(row_for(menu, "category.autocorrection") or row_for(menu, "autocorrection"))
 			local parent = assert(row_for(category.menu, "menu.hotstrings.section_order"))
 			local up = assert(row_for(parent.menu[2].menu, "menu.hotstrings.move_up"))
 			helpers.assert_eq(up.fn(), true)
 			local written = assert(io.open(path, "rb")); local content = written:read("*a"); written:close()
-			helpers.assert_eq(require("toml_codec").decode(content).hotstrings.order_overrides.autocorrection, { "second", "first" })
+			helpers.assert_eq(require("toml_codec").decode(content).hotstrings.order_overrides.autocorrection, { "second", "-", "first" })
 			menu = hotstrings_menu(config)
 			category = assert(row_for(menu, "category.autocorrection") or row_for(menu, "autocorrection"))
 			parent = assert(row_for(category.menu, "menu.hotstrings.section_order"))
 			helpers.assert_eq(parent.menu[1].title, "second (2)")
+			local first_section
+			for index, row in ipairs(category.menu) do if row.title == "second (2)" then first_section = index end end
+			helpers.assert_not_nil(first_section)
+			helpers.assert_eq(category.menu[first_section + 1].title, "-", "the declared boundary survives a move")
+			helpers.assert_eq(category.menu[first_section + 2].title, "first (1)")
 			local dynamic = assert(row_for(menu, "category.dynamic_hotstrings"))
 			local dynamic_order = assert(row_for(dynamic.menu, "menu.hotstrings.section_order"))
 			local move = assert(row_for(dynamic_order.menu[2].menu, "menu.hotstrings.move_up"))

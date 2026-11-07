@@ -10,6 +10,7 @@
 
 local M = {}
 local COMMAND = require("config_keys").COMMAND
+local Logger = require("logger.shim")
 
 --- Accepts only a dense text list, including an empty saved override.
 --- @param value any
@@ -74,30 +75,51 @@ end
 --- @param ready function Rechecks the native mutation admission at click time.
 --- @return table Declared parent rows.
 function M.menu(template_rows, order, labels, commit, ready)
+	-- A withdrawn template or failed pause reader disables only this control.
+	-- Sibling category commands must remain available through their own owners.
+	if type(template_rows) ~= "function" then
+		Logger.error("hotstrings.section_order", "Section-order templates are unavailable.")
+		return {}
+	end
+	local function admitted()
+		local called, value = pcall(ready)
+		if not called then Logger.error("hotstrings.section_order", "Section-order admission could not be read.") end
+		return called and value == true
+	end
+	local function render(...)
+		local called, rows = pcall(template_rows, ...)
+		if not called or type(rows) ~= "table" then
+			Logger.error("hotstrings.section_order", "Section-order template rendering was refused.")
+			return nil
+		end
+		return rows
+	end
 	local entries = {}
 	for _, name in ipairs(order) do
 		if name ~= "-" and labels[name] then
 			local function move(delta)
-				if ready() ~= true then return false end
+				if not admitted() then return false end
 				local next_order = M.move(order, name, delta, labels)
 				return next_order ~= nil and commit(next_order) == true
 			end
-			local children = template_rows("hotstring_order_moves", {
+			local children = render("hotstring_order_moves", {
 				[COMMAND.HOTSTRING_ORDER_UP] = function() return move(-1) end,
 				[COMMAND.HOTSTRING_ORDER_DOWN] = function() return move(1) end,
 			}, {
-				hotstring_order_up_ready = function() return ready() and M.move(order, name, -1, labels) ~= nil end,
-				hotstring_order_down_ready = function() return ready() and M.move(order, name, 1, labels) ~= nil end,
+				hotstring_order_up_ready = function() return admitted() and M.move(order, name, -1, labels) ~= nil end,
+				hotstring_order_down_ready = function() return admitted() and M.move(order, name, 1, labels) ~= nil end,
 			}, {})
-			if children then entries[#entries + 1] = { label = labels[name], items = children } end
+			if not children then return {} end
+			entries[#entries + 1] = { label = labels[name], items = children }
 		end
 	end
 	if #entries < 2 then return {} end
-	local reset = template_rows("hotstring_order_footer", {
-		[COMMAND.HOTSTRING_ORDER_RESET] = function() return ready() == true and commit(nil) == true end,
-	}, { hotstring_order_ready = ready }, {})
-	for _, row in ipairs(reset or {}) do entries[#entries + 1] = row end
-	return template_rows("hotstring_order_parent", {}, {}, { hotstring_order_children = entries }) or {}
+	local reset = render("hotstring_order_footer", {
+		[COMMAND.HOTSTRING_ORDER_RESET] = function() return admitted() and commit(nil) == true end,
+	}, { hotstring_order_ready = admitted }, {})
+	if not reset then return {} end
+	for _, row in ipairs(reset) do entries[#entries + 1] = row end
+	return render("hotstring_order_parent", {}, {}, { hotstring_order_children = entries }) or {}
 end
 
 return M

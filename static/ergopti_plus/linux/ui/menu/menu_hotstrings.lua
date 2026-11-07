@@ -313,7 +313,15 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			for _, name in ipairs(sections) do
 				if name == "-" then
-					sub[#sub + 1] = { separator = true }
+					if type(boundaries) ~= "table" or getmetatable(boundaries) ~= nil or #boundaries ~= 1
+						or type(boundaries[1]) ~= "table" or getmetatable(boundaries[1]) ~= nil
+						or boundaries[1].separator ~= true then
+						Logger.error(LOG, "Declared hotstring section boundary unavailable.")
+						return {}
+					end
+					for index in next, boundaries do if index ~= 1 then return {} end end
+					for key in next, boundaries[1] do if key ~= "separator" then return {} end end
+					sub[#sub + 1] = boundaries[1]
 				else
 					local section = (category.sections or {})[name]
 					-- A section an extension binds is drawn in that extension's submenu.

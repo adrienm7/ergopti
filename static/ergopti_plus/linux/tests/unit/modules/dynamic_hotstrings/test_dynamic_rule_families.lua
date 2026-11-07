@@ -52,6 +52,9 @@ local function with_storage(initial, writes_fail)
 	end
 	function storage.is_explicit(path) return storage.values[path] ~= nil end
 	function storage.has(path) return storage.values[path] ~= nil end
+	-- This family-state fixture has no persisted menu order. Its preference
+	-- owner still exposes that separate capability when the menu imports it.
+	function storage.section_order_snapshot() return nil end
 	--- The family leaves only: the fixture switches the master on first.
 	function storage.family_keys()
 		local keys = {}
