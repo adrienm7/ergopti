@@ -9,6 +9,7 @@
 
 #Include keystats_journal_owner.ahk
 #Include keystats_sql_append.ahk
+#Include keystats_roi_privacy.ahk
 
 _KL_RolloverPending() {
 	return IsSet(Keystats) && Keystats.HasOwnProp("rollover_pending") ? Keystats.rollover_pending : 0
@@ -174,9 +175,13 @@ _KL_JournalFlushDefault(Fh) {
 _KL_JournalRestoreSnapshot(Snapshot, StartIndex := 1) {
 	PreviousCritical := Critical("On")
 	try {
+		InsertIndex := 1
 		loop Snapshot.Length - StartIndex + 1 {
 			SnapshotIndex := StartIndex + A_Index - 1
-			Keystats._pending_entries.InsertAt(A_Index, Snapshot[SnapshotIndex])
+			if KL_Roi_KeepPendingEntry(Snapshot[SnapshotIndex]) {
+				Keystats._pending_entries.InsertAt(InsertIndex, Snapshot[SnapshotIndex])
+				InsertIndex += 1
+			}
 		}
 	} finally {
 		Critical(PreviousCritical)
@@ -440,7 +445,7 @@ _KL_JournalPendingEntriesOwned(Port, Owner, Token) {
 		(Fh, Boundary) => _KL_JournalRollbackAppend(Fh, Boundary, FlushFn))
 	PreviousCritical := Critical("On")
 	try {
-		Snapshot := Keystats._pending_entries
+		Snapshot := KL_Roi_PreparePending(Keystats._pending_entries)
 		Keystats._pending_entries := []
 	} finally {
 		Critical(PreviousCritical)
@@ -463,15 +468,23 @@ _KL_JournalPendingEntriesOwned(Port, Owner, Token) {
 
 	Journaled := 0
 	try {
-		for Entry in Snapshot {
+		Index := 1
+		while Index <= Snapshot.Length {
+			Entry := Snapshot[Index]
 			Line := StrReplace(EncodeFn.Call(Entry), "`n", "\n")
 			Line := StrReplace(Line, "`r", "")
+			if !KL_Roi_ClaimTextAppend(Entry) {
+				Snapshot.RemoveAt(Index)
+				continue
+			}
 			if !AppendFn.Call(Fh, Line)
 				throw Error("journal append port rejected the line")
 			Journaled += 1
+			Index += 1
 		}
 	} catch as Err {
-		Repaired := Owner.Rollback(Token, Fh, BatchStart, RollbackFn)
+		Repaired := Owner.Rollback(Token, Fh, BatchStart,
+			KL_Roi_RepairTextAppends.Bind(Snapshot, RollbackFn))
 		_KL_JournalRestoreSnapshot(Snapshot)
 		try LoggerError("Keystats",
 			"Journal append failed; batch retained (rollback={1}, error_type={2}, accepted_lines={3}, queued_lines={4}, native_code={5}).",
@@ -483,7 +496,8 @@ _KL_JournalPendingEntriesOwned(Port, Owner, Token) {
 	Flushed := false
 	try Flushed := FlushFn.Call(Fh) = true
 	if !Flushed {
-		Repaired := Owner.Rollback(Token, Fh, BatchStart, RollbackFn)
+		Repaired := Owner.Rollback(Token, Fh, BatchStart,
+			KL_Roi_RepairTextAppends.Bind(Snapshot, RollbackFn))
 		_KL_JournalRestoreSnapshot(Snapshot)
 		try LoggerError("Keystats",
 			"Journal flush failed; batch retained (rollback={1}, queued_lines={2}).",
@@ -491,5 +505,6 @@ _KL_JournalPendingEntriesOwned(Port, Owner, Token) {
 		return Map("ok", false, "journaled", 0,
 			"reason", Repaired ? "flush_failed" : "journal_repair_pending")
 	}
+	KL_Roi_SettleTextAppends(Snapshot, true)
 	return Map("ok", true, "journaled", Journaled)
 }

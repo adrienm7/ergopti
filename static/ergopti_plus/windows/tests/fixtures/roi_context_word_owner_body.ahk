@@ -7,6 +7,8 @@ _KRCTX_Main() {
 	Keystats.initialized := true
 	MetricsFilters.secure_field := false
 	Mode := A_Args[1]
+	if SubStr(Mode, 1, 7) == "policy-"
+		return _KRCTX_PolicyMain(Mode)
 	Changed := Mode != "same-app" && Mode != "same-context-refresh"
 	AppChanged := Mode == "cross-app"
 	A := {App: "fixture-roi-a.exe", Title: "Fixture public ROI A", Hwnd: 401}
@@ -53,8 +55,61 @@ _KRCTX_Main() {
 			&& Candidates[1]["app"] == A.App, "The genuine control must retain its candidate text, frequency and application.")
 }
 
+_KRCTX_PolicyMain(Mode) {
+	global KL_ENC_Enabled
+	MetricsFilters.encrypt := false, KL_ENC_Enabled := false
+	A := {App: "fixture-roi-a.exe", Title: "Fixture public ROI A", Hwnd: 401}
+	_KSD_Acquire(A)
+	_KSD_Require(KL_Hook_RefreshContext(true), "The real context owner must admit the typing fixture.")
+	Loop 4
+		KL_Roi_OnChar("oldword ")
+	KL_Roi_OnChar("frag")
+	KL_Roi_OnHotstring("oldtrigger", 3)
+	_KSD_Require(KLRoi.word_counts.Get("oldword", 0) == 4 && KLRoi.current_word == "frag"
+		&& KLRoi.trigger_last_use.Count == 1, "The actual owners must hold real pre-transition text.")
+	_KSD_Require(KL_AppendLog(Map("type", "new_trigger_candidate", "word", "pending-secret", "app", A.App)),
+		"The actual central writer must admit the earlier OFF row.")
+	Request := KL_Roi_BeginEncryptionRequest(true)
+	_KSD_Require(IsObject(Request), "The request must own its transition before any preference can publish.")
+	MetricsFilters.encrypt := Mode == "policy-unknown" ? "unknown" : true
+	_KSD_Require(KLRoi.current_word == "" && KLRoi.word_counts.Count == 0 && KLRoi.trigger_last_use.Count == 0,
+		"The idle request must clear all textual ROI memories without needing another key.")
+	Loop 5 {
+		KL_Roi_OnChar("hiddenword ")
+		KL_Roi_ProcessWord("directword")
+	}
+	Loop 9
+		KL_Roi_OnHotstring("private-trigger", 7, true)
+	_KSD_Require(KLRoi.session_fired_count == 10 && KLRoi.session_saved_chars == 66,
+		"Real private/public hotstring savings remain numeric under the text prohibition.")
+	_KSD_Require(KLRoi.current_word == "" && KLRoi.word_counts.Count == 0 && KLRoi.trigger_last_use.Count == 0,
+		"Neither callback nor direct word producer may reconstruct encrypted text.")
+	for Kind in ["new_trigger_candidate", "trigger_halflife"]
+		_KSD_Require(!KL_AppendLog(Map("type", Kind, "word", "blocked-secret", "app", A.App)),
+			"The genuine central queue must refuse direct textual ROI publication.")
+	Numeric := 0
+	for Row in Keystats._pending_entries {
+		_KSD_Require(!KL_Roi_IsTextEntry(Row), "No textual row may remain pending after ON.")
+		if Row["type"] == "roi_snapshot"
+			Numeric += 1
+	}
+	_KSD_Require(Numeric == 1, "The genuine periodic numeric snapshot retains its ordinary privacy/context gates.")
+	if Mode == "policy-resume"
+		MetricsFilters.encrypt := false
+	KL_Roi_EndEncryptionRequest(Request)
+	if Mode == "policy-resume" {
+		Loop 5
+			KL_Roi_OnChar("freshword ")
+		_KSD_Require(KLRoi.word_counts.Get("freshword", 0) == 5 && !KLRoi.word_counts.Has("oldword")
+			&& !KLRoi.word_counts.Has("fragfreshword"), "Only fresh OFF words may resume after a clean request refusal.")
+	}
+	FileAppend("RECEIPT roi-encryption-capture mode=" . Mode . " numeric=" . Numeric
+		. " saved=" . KLRoi.session_saved_chars . " fired=" . KLRoi.session_fired_count . "`n", "*", "UTF-8")
+}
+
 if A_Args.Length != 2 || !(A_Args[1] == "same-app" || A_Args[1] == "cross-app" || A_Args[1] == "same-context-refresh"
-	|| A_Args[1] == "cross-window" || A_Args[1] == "cross-title" || A_Args[1] == "synthetic-gap")
+	|| A_Args[1] == "cross-window" || A_Args[1] == "cross-title" || A_Args[1] == "synthetic-gap"
+	|| A_Args[1] == "policy-on" || A_Args[1] == "policy-unknown" || A_Args[1] == "policy-resume")
 	throw Error("The private ROI context case needs an exact mode and owned directory.")
 global _KSD := {Mode: A_Args[1], Log: A_Args[2] . "\private.log", Probes: 0, Errors: 0, LogCalls: 0, FlushCalls: 0, Failure: 0}
 try {

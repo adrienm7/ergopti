@@ -249,8 +249,13 @@ CS_Load() {
 
 		; The cipher owns a second live subsystem. Commit that subsystem first;
 		; after it returns, every remaining assignment below is non-throwing.
-		if Validated.Has("encrypt")
+		if Validated.Has("encrypt") {
+				if !KL_Roi_RequestEncryption(Validated["encrypt"])
+						throw Error("The ROI encryption request is invalid.")
+				if Validated["encrypt"] && !KL_Roi_EncryptionReady()
+						throw Error("Encryption cannot change while a previous log write is unsettled.")
 				KL_Enc_SetEnabled(Validated["encrypt"])
+		}
 
 		if Validated.Has("enabled")
 				MetricsShortcuts.enabled := Validated["enabled"]
@@ -265,6 +270,8 @@ CS_Load() {
 				MetricsFilters.system_auth := Validated[ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED]
 		if Validated.Has("encrypt")
 				MetricsFilters.encrypt := Validated["encrypt"]
+		if Validated.Has("encrypt") && !KL_Roi_CommitEncryptionPolicy(Validated["encrypt"])
+				throw Error("ROI text policy did not acknowledge the loaded encryption preference.")
 
 		if Validated.Has(ConfigLeaf.DISABLED_APPS)
 				MetricsFilters.disabled_apps := Validated[ConfigLeaf.DISABLED_APPS]
