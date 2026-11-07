@@ -107,6 +107,10 @@ helpers.describe('personal-info configuration transactions', function()
 		'info = false',
 		'info = [1]',
 		'[letters]\np = 42',
+		'[letters]\n"é\\u0301" = "first_name"',
+		'[letters]\n"1" = "first_name"',
+		'[letters]\n"😀" = "first_name"',
+		'[letters]\n"中文" = "first_name"',
 	}) do
 		helpers.it('(personal-config-refusal) rejects invalid declared data ' .. index, function()
 			with_subject(content, function(subject, state, start)
