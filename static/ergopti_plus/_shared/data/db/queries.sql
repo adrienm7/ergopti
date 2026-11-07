@@ -483,6 +483,11 @@ VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s action}}, {{s? meta
 INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json)
 VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{s app}}, {{s? meta_json}});
 
+-- name: events.roi
+-- doc: A cumulative savings snapshot, a manual-word candidate or a stale trigger warning.
+INSERT OR IGNORE INTO events_roi (device_id, id, ts, date, kind, app, meta_json)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{s app}}, {{s? meta_json}});
+
 -- name: events.hotstring
 -- doc: A hotstring that fired, was suggested, dismissed or nearly typed.
 INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars)

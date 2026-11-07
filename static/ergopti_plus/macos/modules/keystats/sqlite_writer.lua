@@ -648,6 +648,23 @@ function _builders.system(e, id, action_override)
 	})
 end
 
+--- Persists the three software trigger events using the Windows metadata shape.
+--- @param e table Admitted ROI event.
+--- @param id number Allocated event identity.
+--- @return string
+function _builders.roi(e, id)
+	local meta = {}
+	for key, value in pairs(e) do
+		if key ~= "type" and key ~= "timestamp" and key ~= "app" then meta[key] = value end
+	end
+	return Queries.render("events.roi", "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		kind = e.type, app = tostring(e.app or "Unknown"),
+		meta_json = _required_event_json(meta, "trigger ROI event"),
+	})
+end
+
 function _builders.hotstring(e, id, kind)
 	return Queries.render("events.hotstring", "native", {
 		device_id = tostring(_device_id), id = id,
@@ -716,6 +733,8 @@ function M.build_inserts(entry)
 		return { _builders.shortcut(entry, _alloc_event_id()) }
 	elseif t == "system_event" then
 		return { _builders.system(entry, _alloc_event_id()) }
+	elseif t == "roi_snapshot" or t == "new_trigger_candidate" or t == "trigger_halflife" then
+		return { _builders.roi(entry, _alloc_event_id()) }
 	elseif t == "hotstring" then
 		return { _builders.hotstring(entry, _alloc_event_id(), "fired") }
 	elseif t == "hotstring_suggested" then

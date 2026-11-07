@@ -739,7 +739,7 @@
 				"date": "v_date",
 				"app": "Code's",
 				"count_total": 7,
-				"max_cpm": 2.5e-5,
+				"max_cpm": 0.000025,
 				"max_chars": 7,
 				"length_buckets_json": "v_length_buckets_json",
 				"inter_delay_count": 7,
@@ -1155,6 +1155,34 @@
 				"est_cost_usd": 0.00125
 			},
 			"sql": "INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd) VALUES ('dev-1', 13, '2026-10-01 10:00:00.000', '2026-10-01', 'Code', 'accepted', 'it''s'||char(13)||'\nb'||char(0)||'c', '[\"a\"]', NULL, NULL, 1, 0, NULL, 4, 1, 10, 5, 15, 0.00125);"
+		},
+		{
+			"name": "events.roi",
+			"dialect": "native",
+			"values": {
+				"device_id": "device-a",
+				"id": 71,
+				"ts": "2026-11-07 10:00:00.000",
+				"date": "2026-11-07",
+				"kind": "new_trigger_candidate",
+				"app": "Editor's app",
+				"meta_json": "{\"word\":\"d'apostrophe\\r\\n\\u0000é\",\"occurrences\":5}"
+			},
+			"sql": "INSERT OR IGNORE INTO events_roi (device_id, id, ts, date, kind, app, meta_json) VALUES ('device-a', 71, '2026-11-07 10:00:00.000', '2026-11-07', 'new_trigger_candidate', 'Editor''s app', '{\"word\":\"d''apostrophe\\r\\n\\u0000é\",\"occurrences\":5}');"
+		},
+		{
+			"name": "events.roi",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "device-a",
+				"id": 71,
+				"ts": "2026-11-07 10:00:00.000",
+				"date": "2026-11-07",
+				"kind": "new_trigger_candidate",
+				"app": "Editor's app",
+				"meta_json": "{\"word\":\"d'apostrophe\\r\\n\\u0000é\",\"occurrences\":5}"
+			},
+			"sql": "INSERT OR IGNORE INTO events_roi (device_id, id, ts, date, kind, app, meta_json) VALUES ('device-a', 71, '2026-11-07 10:00:00.000', '2026-11-07', 'new_trigger_candidate', 'Editor''s app', '{\"word\":\"d''apostrophe\\r\\n\\u0000é\",\"occurrences\":5}');"
 		}
 	]
 }
