@@ -25,7 +25,7 @@ _OSRA_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
 	Code .= "#Include " . _DriverDir . "\_generated\config_keys.ahk`n"
-	for Symbol in ["SIHO_StartOwned", "JsonParse"] {
+	for Symbol in ["SIHO_StartOwned", "JsonParse", "TextCaseTitle"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "the real admission dependency must have one owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
