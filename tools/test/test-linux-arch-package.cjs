@@ -463,12 +463,11 @@ try {
 		}
 		stub('usermod', 'exit 73');
 		const refused = runHook('post_upgrade');
-		assert.equal(refused.status, 73, 'a failed account mutation must remain a package failure');
-		assert.doesNotMatch(
-			fs.readFileSync(calls, 'utf8'),
-			/modprobe|udevadm/,
-			'a refused hook must stop before later privileged work'
-		);
+		// setup_permissions.sh enrolls every other session before it reports the
+		// refusal (test-linux-package-setup.cjs pins that contract), so the hook
+		// ends failed and names the session it could not enroll.
+		assert.notEqual(refused.status, 0, 'a failed account mutation must remain a package failure');
+		assert.match(refused.stderr, /code=session-enrollment-failed session=1 uid=1000/);
 
 		const runtimeRoot = path.join(scratch, 'run\\native/user');
 		for (const uid of ['1000', '1001']) {
