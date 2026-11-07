@@ -1178,7 +1178,19 @@ if (process.platform === 'linux') {
 		);
 		assert.equal(transaction.signal, null, 'the native fixture must finish without a signal');
 		assert.equal(transaction.status, 0, diagnostics);
-		assert.match(diagnostics, /Ran 13 tests in /, 'every native transaction case must execute');
+		// Every declared case runs: the count comes from the fixture's own test methods.
+		const declared = (
+			fs
+				.readFileSync(path.join(ROOT, 'tools/test/linux_uninstall_transaction_test.py'), 'utf8')
+				.match(/^\s+def test_\w+\(/gm) || []
+		).length;
+		assert.ok(declared >= 13, 'the native transaction fixture declares its cases');
+		assert.match(
+			diagnostics,
+			new RegExp(`Ran ${declared} tests in `),
+			'every native transaction case must execute'
+		);
+		assert.doesNotMatch(diagnostics, /\bskipped=/, 'no native transaction case is skipped');
 		assert.match(diagnostics, /\nOK\s*$/, 'the native transaction fixture must pass');
 		assert.doesNotMatch(diagnostics, /\bskipped\b/i, 'native transaction cases cannot be skipped');
 		reportSuccess();
