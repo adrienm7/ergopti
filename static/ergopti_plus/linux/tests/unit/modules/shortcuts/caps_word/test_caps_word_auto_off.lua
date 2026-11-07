@@ -751,19 +751,23 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 		helpers.assert_contains(hook, "\t\t\t\t_dispatch_event(emitted_event, emitted_source)\n")
 		local daemon = source("ergopti_hotstrings.lua")
 		helpers.assert_contains(daemon, "onChar  = on_char,")
-		helpers.assert_contains(daemon, "injector.set_output_observer(function(text)")
+		helpers.assert_contains(daemon, "injector.set_output_observer(function(text, physical_input)")
 	end)
 
 	helpers.it("caps word auto-off, a delimiter in the daemon's own output ends CapsWord", function()
 		with_caps_word(nil, function(c)
 			local observed = assert(source("ergopti_hotstrings.lua"):match(
-				"injector%.set_output_observer%(function%(text%)(.-)\n\tend%) then"), "the daemon's output observer is missing")
+				"injector%.set_output_observer%(function%(text, physical_input%)(.-)\n\tend, keystats%.discard_roi%) then"), "the daemon's output observer is missing")
+			local discarded = 0
 			local observer = assert((loadstring or load)(
-				"return function(shortcuts) return function(text) " .. observed .. " end end"))()(c.manager)
+				"return function(shortcuts, keystats) return function(text, physical_input) " .. observed .. " end end"))()(c.manager,
+				{ discard_roi = function() discarded = discarded + 1 end })
 			helpers.assert_true(c.manager.toggle_caps_word())
-			observer("BONJOUR")
+			observer("BONJOUR", true)
+			helpers.assert_eq(discarded, 0, "physical remapping preserves the ROI fragment")
 			helpers.assert_true(c.manager.is_caps_word_active(), "letters keep CapsWord")
 			observer("c'est-à-dire,")
+			helpers.assert_eq(discarded, 1, "synthetic output retires the ROI fragment")
 			helpers.assert_eq(c.manager.is_caps_word_active(), false, "an expansion ending in a comma ends CapsWord")
 		end)
 	end)

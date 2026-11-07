@@ -80,6 +80,7 @@ local MODIFIER_CODES = EvdevCodes.LEVEL_MODIFIER_CODE
 -- never reaches the keyboard hook's character callback, yet CapsWord must end
 -- on a delimiter it contains. One owner, set by the daemon.
 local _output_observer = nil
+local _mutation_observer = nil
 
 
 -- =========================================
@@ -617,10 +618,16 @@ local function private_failure(reason, is_private)
 	return tostring(reason)
 end
 
-local function run_transaction(label, body, publication, prepared, data_attempt, is_private)
+local function run_transaction(label, body, publication, prepared, data_attempt, is_private, physical_input)
 	if prepared then
 		local checked, reason = pcall(prepared.current)
 		if not checked then return { ok = false, error = private_failure(reason, is_private), failed_phase = "replacement preflight", cleanup_ok = true } end
+	end
+	-- A later refusal can follow real deletion or partial output. Retire physical
+	-- fragments before synthetic mutation, without publishing successful text.
+	if physical_input ~= true and _mutation_observer then
+		local observed, failure = pcall(_mutation_observer)
+		if not observed then Logger.error(LOG, "The mutation observer failed: %s.", private_failure(failure, is_private)) end
 	end
 	local native_tx = OutputTransaction.new(prepared and prepared.channel or _uinput)
 	Perf.count("hotstring.expansions")
@@ -853,9 +860,11 @@ end
 --- Sets the one observer told of each successful injection's typed text.
 --- A second observer is refused: two owners would each believe they see all
 --- output. Pass nil to clear it (tests, a stopped daemon).
---- @param fn function|nil fn(text) called after the text was typed.
+--- @param fn function|nil fn(text, physical_input) called after the text was typed.
+--- @param before_mutation function|nil Called before admitted synthetic mutation, even if it later fails.
 --- @return boolean accepted
-function M.set_output_observer(fn)
+function M.set_output_observer(fn, before_mutation)
+	if before_mutation ~= nil and (type(before_mutation) ~= "function" or fn == nil) then return false end
 	if fn ~= nil and type(fn) ~= "function" then
 		Logger.error(LOG, "set_output_observer(): a function or nil is required, got %s.", type(fn))
 		return false
@@ -864,16 +873,16 @@ function M.set_output_observer(fn)
 		Logger.error(LOG, "set_output_observer(): an output observer is already installed.")
 		return false
 	end
-	_output_observer = fn
+	_output_observer, _mutation_observer = fn, before_mutation
 	return true
 end
 
 --- Tells the observer of typed text; its failure is logged, never raised into
 --- an injection that already succeeded.
 --- @param text string Exactly what was typed.
-local function notify_output(text, is_private)
+local function notify_output(text, is_private, physical_input)
 	if not _output_observer or text == "" then return end
-	local ok, err = pcall(_output_observer, text)
+	local ok, err = pcall(_output_observer, text, physical_input == true)
 	if not ok then Logger.error(LOG, "The output observer failed: %s.", private_failure(err, is_private)) end
 end
 
@@ -888,7 +897,8 @@ end
 ---   log, which the driver keeps for 14 days at a level that prints TRACE.
 --- @param replay_terminator string|nil Exact non-consumed carrier to type last.
 --- @param publication table|nil Retained full-phase and cached-key admission guards.
-function M.inject(backspace_count, replacement_text, is_private, replay_terminator, publication, on_payload_attempt)
+--- @param physical_input boolean|nil A consumed physical key, only without edits or private output.
+function M.inject(backspace_count, replacement_text, is_private, replay_terminator, publication, on_payload_attempt, physical_input)
 	if type(backspace_count) ~= "number" or type(replacement_text) ~= "string"
 			or (replay_terminator ~= nil and type(replay_terminator) ~= "string") then
 		-- The TYPES, not the values. This branch is reached BECAUSE the arguments
@@ -955,7 +965,7 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 			payload_attempted = true
 			if type(on_payload_attempt) == "function" then on_payload_attempt() end
 		end
-	end, is_private)
+	end, is_private, physical_input == true and backspace_count == 0 and not is_private and replay_terminator == nil)
 	local closed_ok, clipboard_closed = pcall(prepared.close_clipboard)
 	clipboard_closed = closed_ok and clipboard_closed == true
 	if not ran then
@@ -971,7 +981,8 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 	result.payload_attempted = payload_attempted
 	if result.ok then
 		Logger.done(LOG, "inject(): done (bc=%d).", backspace_count)
-		notify_output(replacement_text .. (replay_terminator or ""), is_private)
+		notify_output(replacement_text .. (replay_terminator or ""), is_private,
+			physical_input == true and backspace_count == 0 and not is_private and replay_terminator == nil)
 	end
 	return result
 end
@@ -1005,8 +1016,8 @@ function M.type_directly(text)
 	end
 	local result = run_transaction("type_directly()", function(tx)
 		if not send_text_native(tx, text) then error(tx.error() or "the key presses were refused", 0) end
-	end)
-	if result.ok then notify_output(text) end
+	end, nil, nil, nil, false, true)
+	if result.ok then notify_output(text, false, true) end
 	return result
 end
 

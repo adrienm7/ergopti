@@ -65,7 +65,7 @@ M.ROWS_PER_STEP = 500
 --- vocabulary: every driver's cache accepts exactly these tables and columns.
 M.RAW_STATEMENTS = {
 	"events.typing", "events.app_switch", "events.window_switch", "events.shortcut",
-	"events.system", "events.hotstring", "events.session", "events.llm", "events.network",
+	"events.system", "events.hotstring", "events.session", "events.llm", "events.network", "events.roi",
 }
 
 --- Meta keys holding the export state, committed together.

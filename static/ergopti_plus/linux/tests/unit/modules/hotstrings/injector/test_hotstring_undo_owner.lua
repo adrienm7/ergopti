@@ -120,7 +120,8 @@ local function with_undo(options, body)
 				RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false },
 				keyboard_hook = { held_modifiers = function() return {} end },
 				keystats = { is_password_app = function() return false end, is_unrecorded_app = function() return false end, suppress = function() end,
-					unsuppress = function() end, on_keydown = function() end, record_hotstring = function() end,
+					unsuppress = function() end, on_keydown = function() end, record_roi_text = function() end,
+					discard_roi = function() end, record_roi_key = function() end, record_hotstring = function() end,
 					-- The physical Backspace that requests the Undo is a manual correction.
 					record_correction = function() observations.corrections = (observations.corrections or 0) + 1 end },
 				engine = { reset = function() end, apply_expansion = function() end, on_char = function()

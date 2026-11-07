@@ -530,6 +530,7 @@ end
 function M.new()
 	-- Tail-char buckets: key = lower-cased last codepoint of trigger.
 	local _buckets = {}
+	local _trigger_index = nil
 	local _mapping_state = { generation = 0, mappings = 0, entries = 0, buckets = 0 }
 	-- Rolling buffer stored as an array of UTF-8 codepoint byte-strings.
 	local _buf_cps = {}
@@ -773,7 +774,15 @@ function M.new()
 		local bucket_count = TableUtil.count(candidate_buckets)
 		Logger.success(LOG, "Mappings loaded (%d mapping(s) → %d entry(ies), %d bucket(s)).",
 			loaded, registered, bucket_count)
+		-- Project only the compiled catalogue that is about to become live. A
+		-- refused reload retains the previous set just like the matching buckets.
+		local compiled = {}
+		for _, bucket in pairs(candidate_buckets) do
+			for _, entry in ipairs(bucket) do compiled[#compiled + 1] = entry end
+		end
+		local index = require("keystats.trigger_roi").trigger_index(compiled)
 		_buckets = candidate_buckets
+		_trigger_index = index
 		_mapping_state = {
 			generation = _mapping_state.generation + 1,
 			mappings = loaded,
@@ -781,6 +790,13 @@ function M.new()
 			buckets = bucket_count,
 		}
 		return true
+	end
+
+	--- Whether a word normalized by the qualified ROI case profile is already a live trigger, irrespective of case mode.
+	--- @param word string Physical word normalized by the qualified ROI case profile.
+	--- @return boolean|nil Nil until a catalogue has been admitted.
+	function engine:is_known_trigger(word)
+		return require("keystats.trigger_roi").known_trigger(_trigger_index, word)
 	end
 
 	--- Returns detached metadata for the last successfully published catalogue.
