@@ -143,6 +143,24 @@ const JUDGED = [
 	},
 	{
 		file: 'infra/hotstrings/hotstring_dispatch.ahk',
+		match: 'Undo: restored a private trigger (content withheld).',
+		verdict: 'not-personal',
+		why: 'the private branch itself: a constant sentence that interpolates nothing.'
+	},
+	{
+		file: 'infra/hotstrings/hotstring_dispatch.ahk',
+		match: 'Undo: restored the trigger ({1} char(s)).',
+		verdict: 'not-personal',
+		why: 'prints _TextCodepointLength(Undo.Trigger), the length of the restored trigger, never its text.'
+	},
+	{
+		file: 'infra/hotstrings/hotstring_dispatch.ahk',
+		match: 'Undo: restoring the trigger failed ({1}); the context is reset.',
+		verdict: 'not-personal',
+		why: 'the interpolation is Type(Err) of the failed send or the fixed "send refused", never the restored trigger.'
+	},
+	{
+		file: 'infra/hotstrings/hotstring_dispatch.ahk',
 		match: "A hotstring replacement resolved to '{1}', not String",
 		verdict: 'not-personal',
 		why: 'the only interpolation is Type(ResolvedBase), a runtime type name rather than the resolved value.'
