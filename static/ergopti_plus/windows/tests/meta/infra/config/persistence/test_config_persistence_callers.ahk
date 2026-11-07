@@ -189,8 +189,40 @@ _CPC_ProfilePublisherRetainsOpeningImage() {
 	AssertEqual(1, Calls, "exactly one independently audited opening-image publisher joins the inventory")
 }
 
+; The order menu adds one transaction and one retained-source native publisher.
+; Admit their executable result boundaries before changing either census.
+_CPC_SectionOrderWriterContract(Body) {
+	Body := _StripFullLineComments(_DriverMaskBlockComments(&Body))
+	Publish := RegExMatch(Body,
+		'(?m)^\s*return\s+_TOML_BatchWriteImpl\(Path,\s*Updates,\s*\[\],\s*"write",\s*Snapshot\["content"\],\s*Snapshot\["presence"\]\)\s*$')
+	Code := _DriverMaskNonCode(&Body)
+	return Publish > 0 && RegExMatch(Code, '(?m)^\s*return\s+_TOML_BatchWriteImpl\(') == Publish
+}
+
+_CPC_SectionOrderPublishersRetainTheirOwner() {
+	Writer := _DriverFuncBody("_HS_OrderWrite")
+	Action := _StripFullLineComments(_DriverFuncBody("_HS_OrderCommit"))
+	Ack := _StripFullLineComments(_DriverFuncBody("_ConfigInvokeCommitWriter"))
+	Assert(Writer != "" && Action != "" && Ack != "", "the order publisher, transaction and native receipt owners must exist")
+	Assert(_CPC_SectionOrderWriterContract(Writer), "order publication returns the retained source and presence writer's native receipt")
+	for Mutant in [StrReplace(Writer, "return _TOML", "Ignored := _TOML"),
+		StrReplace(Writer, 'Snapshot["content"]', '""'), StrReplace(Writer, 'Snapshot["presence"]', "1")] {
+		Assert(StrCompare(Writer, Mutant, true) != 0, "each order publisher mutant must change executable source")
+		AssertFalse(_CPC_SectionOrderWriterContract(Mutant), "losing the native result or opening image must fail admission")
+	}
+	Code := _DriverMaskNonCode(&Action)
+	Commit := RegExMatch(Code, 'if\s+!ConfigCommitUpdates\([^\r\n]+\)\s+return\s+false')
+	Assert(Commit > 0 && InStr(Code, "RebuildFn.Call()") > Commit && InStr(Code, "RebuildTrayMenu()") > Commit,
+		"a refused order transaction returns before either repaint route")
+	Assert(InStr(Action, "WriterFn := _HS_OrderWrite.Bind(Snapshot)") > 0,
+		"the default transaction writer retains the menu's original snapshot")
+	Assert(InStr(Ack, "if !((Written is Integer) && Written == 1)") > 0,
+		"the canonical transaction accepts only the native Integer-1 receipt")
+}
+
 _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	_CPC_ProfilePublisherRetainsOpeningImage()
+	_CPC_SectionOrderPublishersRetainTheirOwner()
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "driver source must be readable for the AHK-15 TOML caller scan")
 	Calls := 0
@@ -241,7 +273,11 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	; behind the same lease and source-ownership predicate.
 	; 54: the model browser's backend writer (_LLM_ModelBrowser_BackendWriter)
 	; returns TOML_ConfigBatchWrite's receipt behind its owned lease.
-	AssertEqual(54, Calls,
+	; 55-56: the section-order transaction (_HS_OrderCommit) refuses before
+	; repainting, and its publisher (_HS_OrderWrite) returns the exact-source
+	; native receipt. Both are independently admitted above and exercised by
+	; the real configuration owner in test_hotstring_dynamic_menu_scope.ahk.
+	AssertEqual(56, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
@@ -288,6 +324,7 @@ Test("AHK-15-persistence: privacy publication retains its source and rejects dis
 	_CPC_PrivacyPublisherRetainsSourceAndStrictResult)
 
 _CPC_InternalTomlPublishersConsumeResult() {
+	_CPC_SectionOrderPublishersRetainTheirOwner()
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "internal publisher inventory requires actual readable production source")
 	Lines := StrSplit(Src, "`n", "`r")
@@ -309,7 +346,9 @@ _CPC_InternalTomlPublishersConsumeResult() {
 	; against its captured source, finalizer and status-before-target chain.
 	; Info Bar and privacy now delegate their retained source to the public
 	; semantic gateway; their two former private calls are audited above/below.
-	AssertEqual(8, Calls, "audit every internal publisher before changing its complete inventory")
+	; Section order adds one retained-source publisher under ConfigCommitUpdates;
+	; its original content, presence and native receipt are independently audited.
+	AssertEqual(9, Calls, "audit every internal publisher before changing its complete inventory")
 	Writer := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarWrite"))
 	Action := _StripFullLineComments(_DriverFuncBody("LLM_Menu_SetInfoBar"))
 	Command := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_InfoBarCommand"))
