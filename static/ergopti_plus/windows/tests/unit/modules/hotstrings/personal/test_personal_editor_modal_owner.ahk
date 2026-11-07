@@ -531,10 +531,10 @@ _PEER_Case(Operation) {
 			Entry := Entries[Operation == "case-add" ? Entries.Length : 1]
 			if Operation == "case-add" {
 				AssertTrue(Entry["is_case_sensitive"])
-				AssertTrue(Entry.Get("strict_case", false), "The native checked case box must persist exact matching, as the shared editor does")
+				AssertTrue(Entry["is_case_sensitive_strict"], "The native checked case box must persist exact matching, as the shared editor does")
 			} else {
 				AssertTrue(!Entry["is_case_sensitive"])
-				AssertTrue(!Entry.Get("strict_case", false), "Unchecking must retire the old exact-match flag")
+				AssertTrue(!Entry["is_case_sensitive_strict"], "Unchecking must retire the old exact-match flag")
 			}
 			_PEER_RowsAgree(State)
 			; Exercise the genuine section loader and matcher after the native
