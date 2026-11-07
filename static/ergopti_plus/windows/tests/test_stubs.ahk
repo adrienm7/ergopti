@@ -971,6 +971,11 @@ class Keystats {
     ; Mirrors the production terminal lease read by KL_LogHotstring. Tests leave
     ; it false unless they explicitly exercise shutdown-owned publication.
     static _shutting_down := false
+    ; Production declares the resident store too (KL_ResolvePaths writes it);
+    ; KLPF_CaptureForegroundProjection reads it. A test that sets it and then
+    ; deletes the property it believes it created must leave the declared
+    ; field, not a class without one, for every later build.
+    static metrics_dir    := ""
     static by_device_dir  := ""
     static data_sql_path  := ""
 	static today_log_path   := ""
