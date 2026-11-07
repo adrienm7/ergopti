@@ -9,8 +9,8 @@ and `version = 1`. The executable schema is
 inline tables and arrays of tables are accepted. A canonical save retains data,
 not TOML comments or formatting.
 
-This is the first generator milestone. It provides validation, interchange and
-an exact `.keylayout` preservation path. It does **not** compile the superset,
+The generator foundation provides validation, interchange, an exact `.keylayout`
+preservation path and a partial Linux XKB export of admitted imports. It does **not** compile the superset,
 install layouts, change a driver, create the ISO/ANSI bundle, or replace either
 editor. Those consumers must use this model when the existing composer,
 navigation layer editor and layout manager are unified. The target remains
@@ -26,6 +26,7 @@ npm run layout-source -- import my_layout iso source.keylayout source.toml
 npm run layout-source -- validate source.toml
 npm run layout-source -- report source.toml
 npm run layout-source -- export-keylayout source.toml restored.keylayout
+npm run layout-source -- export-xkb source.toml new-output-directory
 ```
 
 `import` takes an explicit `iso` or `ansi` keycode convention; the XML itself
@@ -35,6 +36,49 @@ tool support, artifact and refusal reason. `export-keylayout` is explicitly a
 single-file preservation operation, not the future default bundle exporter.
 No command overwrites an existing destination, and an export refusal creates
 no file. Input must be valid UTF-8.
+
+`export-xkb` also requires Lua 5.4 on `PATH`. It creates a new directory containing
+`<name>.xkb`, `<name>.XCompose`, `xkb_types.txt` and `export.json`, and prints the
+same report. The reusable `exportXkb(document)` API in
+`tools/lib/layout-source-xkb.cjs` returns a file map and report without filesystem
+publication. It passes explicit input and assets to the shared Lua converter;
+it does not invoke the regeneration script or depend on the working directory.
+Compilation and admission finish before any output directory is created. A later
+filesystem write failure is reported and may leave an incomplete directory.
+
+The Linux result is explicitly **partial**, never a claim of native behavior
+parity. Seven character levels are generated: base, Caps, Shift, Shift+Caps,
+Command shortcuts, Option and Shift+Option. The report compares the actual
+source entries (including action identities) against native selection for all
+32 combinations of Shift, Caps, Option, Control and Command, listing changed
+physical keycodes for each combination. Option becomes AltGr; Linux Alt,
+Control and Super select the Command shortcut level. Source keycodes outside
+the character-key table stay system-owned and are listed. Empty character
+cells emit `NoSymbol` and are listed because inherited XKB behavior can differ
+from disabling a source key. XCompose needs support from the consuming client;
+macOS state cancellation and implicit fallback behavior are not certified.
+Stateful actions without a physical binding are listed; only a single-scalar
+action ID is admitted in that case, for its defined Unicode keysym fallback.
+
+The conversion boundary refuses alternative hardware layouts, additional
+modifier maps, sided modifiers, ranges/multipliers, unknown/duplicate XML
+attributes, non-decimal/fractional numeric attributes, missing keymap/action
+references, ambiguous transitions, controls on character keys or in action IDs,
+states and outputs,
+Compose conflicts and unplaced non-keypad typing keys. It reuses the canonical
+reader's tag scanner; it is not an additional XML parser or a DTD validator.
+Superset edits and physical relocations remain refused. Linux name/description
+metadata are compiled, while other target preferences do not affect this
+export. Description characters unsafe in the existing converter's XKB quoted
+string are refused. Registry-specific driver hints are not inferred from a name.
+
+The common registry corpus currently exports all four Ergopti variants with
+document-specific partial reports; Bépo's alternative hardware maps and Ergo-L's
+character-key control outputs are refused. Tests compare admitted files against
+the existing converter byte for byte. Installation, native keyboard execution,
+Windows generation and macOS bundles remain separate work. The pure browser
+model stays conservative; the CLI's `report` augments it with the installed Lua
+tooling route, including runtime failures.
 
 ## Imported documents and the lossless boundary
 
@@ -97,7 +141,7 @@ does not claim that every syntactically valid name is implemented.
 | `windows`            | None                                                 | Unique `flags[]` identifiers and `nls[]` records. Each NLS record has `key`, `modifiers[]`, `function`, with optional `parameter_key`, `keyup_function`, `keyup_parameter_key`; source chords are unique.                                            |
 | `exports.macos`      | `format`                                             | `bundle`, `iso` or `ansi`; the future ordinary export defaults to `bundle`. The preservation command refuses any format other than the import's convention.                                                                                          |
 | `exports.windows`    | None                                                 | `locale`, `layout_id`, `dll_name` strings, retained for the future unsigned DLL/installer generator.                                                                                                                                                 |
-| `exports.linux`      | None                                                 | `name`, `description` strings, retained for the future XKB exporter.                                                                                                                                                                                 |
+| `exports.linux`      | None                                                 | `name`, `description` strings. XKB export requires an identifier name and a description without quotes, backslashes or controls.                                                                                                                     |
 
 A key mapping has exactly one of `text`, `dead_key`, `action`, `key` or
 `disabled = true`. The `key` form may also contain a unique `modifiers` array.
@@ -159,15 +203,17 @@ format = "bundle"
 
 The report covers macOS, Linux, Windows, the three driver emulators and web.
 Only a preserved imported `.keylayout` can report `native`; this denotes its
-artifact format, not native execution evidence. Every other route reports
-`unavailable` with `exporter_not_implemented`, or names the edits that the
-preservation route cannot compile. This is a tool limitation, not a claim that
+artifact format, not native execution evidence. The CLI's Linux route reports
+`partial` with its actual projection losses or `unavailable` with the refusal
+reason. The pure browser model reports `tooling_export_required` for Linux;
+other unfinished routes report `exporter_not_implemented`. The preservation
+route names edits it cannot compile. These are tool limitations, not claims that
 the operating system cannot express a feature. No route reports `emulated`
 until a driver actually consumes the source.
 
 Next consumers must replace these conservative reports with measured per-feature
 native/emulated/impossible results and golden vectors before enabling export.
-The work still includes lossless structural import, actual target compilers,
+The work still includes lossless structural import, superset target compilers,
 ISO/ANSI derivation, bundle construction, the single shared editor, website
 embedding, and direct source loading by every driver. More detailed hardware,
 printing/palette and NLS semantics should evolve through an explicit versioned

@@ -855,4 +855,64 @@ function M.convert(canonical, options)
 	end
 end
 
+--- Reports how the shipped XKB type projects every source modifier combination.
+--- Raw key entries are compared, including action identity, so state-dependent
+--- differences are reported even when the neutral text happens to be equal.
+--- @param canonical table Schema-1 layout.
+--- @param keycodes table Array of { xkb_name, mac_code }.
+--- @param types string Shipped xkb_types.txt, the owner of native level selection.
+--- @return table report { source_levels, modifier_differences }
+function M.projection_report(canonical, keycodes, types)
+	local layout, native = index_layout(canonical), {}
+	local function signature(tokens)
+		table.sort(tokens)
+		return table.concat(tokens, "+")
+	end
+	for keys, level in types:gmatch("map%[([^%]]+)%]%s*=%s*Level(%d+)") do
+		local tokens = {}
+		for token in keys:gmatch("%a[%w_]*") do if token ~= "None" then tokens[#tokens + 1] = token end end
+		level = tonumber(level)
+		assert(XKB_LEVELS[level], "unknown XKB projection level")
+		native[signature(tokens)] = level
+	end
+	assert(native[""] == 1, "XKB type has no base mapping")
+	local modifiers = { { "shift", "Shift" }, { "caps", "Lock" }, { "option", "LevelThree" }, { "control", "Control" }, { "command", "Mod4" } }
+	local differences = {}
+	for mask = 0, 31 do
+		local source, target = {}, {}
+		for bit, pair in ipairs(modifiers) do
+			if math.floor(mask / 2 ^ (bit - 1)) % 2 == 1 then source[#source + 1] = pair[1]; target[#target + 1] = pair[2] end
+		end
+		-- XKB's default level is one for combinations absent from the type map.
+		local level = native[signature(target)] or 1
+		local original = key_map_index(layout, set_of(source))
+		local projected = key_map_index(layout, set_of(XKB_LEVELS[level]))
+		local changed = {}
+		for _, key in ipairs(keycodes) do
+			local before = key_entry(layout, canonical.map_set, original, key[2], 0)
+			local after = key_entry(layout, canonical.map_set, projected, key[2], 0)
+			if (before == nil) ~= (after == nil) or before and after and (before[1] ~= after[1] or before[2] ~= after[2]) then changed[#changed + 1] = key[2] end
+		end
+		if #changed > 0 then differences[#differences + 1] = { modifiers = source, level = level, key_codes = changed } end
+	end
+	local empty, bound = {}, {}
+	for level, modifiers_at_level in ipairs(XKB_LEVELS) do
+		local index = key_map_index(layout, set_of(modifiers_at_level))
+		local codes = {}
+		for _, key in ipairs(keycodes) do
+			local entry = key_entry(layout, canonical.map_set, index, key[2], 0)
+			if entry and entry[1] == "action" then bound[entry[2]] = true end
+			if resolve(layout, index, key[2]).kind == "none" then codes[#codes + 1] = key[2] end
+		end
+		if #codes > 0 then empty[#empty + 1] = { level = level, key_codes = codes } end
+	end
+	local unbound = {}
+	for _, action in ipairs(canonical.actions) do
+		for _, when in ipairs(action.whens) do
+			if when.state ~= "none" and not bound[action.id] then unbound[#unbound + 1] = action.id; break end
+		end
+	end
+	return { source_levels = TableUtil.deep_copy(XKB_LEVELS), modifier_differences = differences, empty_cells = empty, unbound_actions = unbound }
+end
+
 return M

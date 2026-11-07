@@ -447,17 +447,18 @@ var LayoutSource = (function () {
 	}
 
 	/** List every edit the preservation exporter would otherwise silently ignore. */
-	function exportBlockers(source) {
+	function exportBlockers(source, preservation = true) {
 		const blockers = [];
 		if (!source.imported_keylayout) return ['keylayout_generation_not_implemented'];
 		const imported = importedModel(source);
-		if (source.layout.name !== imported.name) blockers.push('layout.name');
+		if (preservation && source.layout.name !== imported.name) blockers.push('layout.name');
 		if (source.physical.base !== source.imported_keylayout.convention)
 			blockers.push('physical.base');
 		if (own(source.physical, 'ansi_extra_key')) blockers.push('physical.ansi_extra_key');
 		for (const field of EDITS)
 			if (own(source, field) && Object.keys(source[field]).length > 0) blockers.push(field);
 		if (
+			preservation &&
 			source.exports &&
 			source.exports.macos &&
 			source.exports.macos.format !== source.physical.base
@@ -474,9 +475,17 @@ var LayoutSource = (function () {
 		return source.imported_keylayout.text;
 	}
 
+	/** Admit an unmodified imported mapping for a target-specific converter. */
+	function conversionSource(source) {
+		validate(source);
+		const blockers = exportBlockers(source, false);
+		if (blockers.length) throw new SourceError('source_export_unavailable', blockers.join(', '));
+		return source.imported_keylayout;
+	}
+
 	/**
-	 * Report actual tool support, not speculative operating-system capability.
-	 * "unavailable" means no exporter/driver integration exists in this milestone.
+	 * Report this pure model's operations, not operating-system capability.
+	 * Native tooling augments this report after running its own admission checks.
 	 */
 	function capabilities(source) {
 		validate(source);
@@ -490,8 +499,13 @@ var LayoutSource = (function () {
 					? blockers.length
 						? 'source_edits_not_compiled'
 						: 'original_keylayout_preserved'
-					: 'exporter_not_implemented',
-			blockers: artifact === 'keylayout' ? blockers : ['exporter_not_implemented']
+					: target === 'linux'
+						? 'tooling_export_required'
+						: 'exporter_not_implemented',
+			blockers:
+				artifact === 'keylayout'
+					? blockers
+					: [target === 'linux' ? 'tooling_export_required' : 'exporter_not_implemented']
 		}));
 	}
 
@@ -513,6 +527,7 @@ var LayoutSource = (function () {
 		validate,
 		importKeylayout,
 		exportKeylayout,
+		conversionSource,
 		capabilities,
 		read,
 		write

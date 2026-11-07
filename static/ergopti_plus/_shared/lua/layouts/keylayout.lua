@@ -177,9 +177,12 @@ local function match_tag(text, at)
 	local self_closing = false
 	if text:sub(pos, pos) == "/" then self_closing = true; pos = pos + 1 end
 	if text:sub(pos, pos) ~= ">" then return nil end
-	local map = {}
-	for _, pair in ipairs(attrs) do map[pair[1]] = pair[2] end
-	return { closing = closing, name = name, attrs = map, self_closing = self_closing, next = pos + 1 }
+	local map, duplicate = {}, nil
+	for _, pair in ipairs(attrs) do
+		if map[pair[1]] ~= nil then duplicate = pair[1] end
+		map[pair[1]] = pair[2]
+	end
+	return { closing = closing, name = name, attrs = map, duplicate_attribute = duplicate, self_closing = self_closing, next = pos + 1 }
 end
 
 -- The elements a conversion reads. A tag of one of them that match_tag cannot
@@ -203,6 +206,94 @@ end
 -- (layouts/keylayout_rows.lua), so both read a tag the same way.
 M.strip_comments = strip_comments
 M.match_tag = match_tag
+
+-- The preservation exporter keeps everything, but the conversion form above
+-- intentionally projects part of Apple's format. A native source export must
+-- refuse constructs that disappear before the target converter can report them.
+local CONVERSION_ATTRIBUTES = {
+	keyboard = { group = true, id = true, name = true, maxout = true }, layouts = {},
+	layout = { first = true, last = true, mapSet = true, modifiers = true },
+	modifierMap = { id = true, defaultIndex = true }, keyMapSelect = { mapIndex = true }, modifier = { keys = true },
+	keyMapSet = { id = true }, keyMap = { index = true, baseMapSet = true, baseIndex = true },
+	key = { code = true, output = true, action = true }, actions = {}, action = { id = true },
+	when = { state = true, output = true, next = true }, terminators = {},
+}
+local CONVERSION_PARENT = {
+	keyboard = "", layouts = "keyboard", layout = "layouts", modifierMap = "keyboard", keyMapSelect = "modifierMap",
+	modifier = "keyMapSelect", keyMapSet = "keyboard", keyMap = "keyMapSet", key = "keyMap",
+	actions = "keyboard", action = "actions", when = { action = true, terminators = true }, terminators = "keyboard",
+}
+local CONVERSION_MODIFIERS = { anyShift = true, anyOption = true, anyControl = true, command = true, caps = true }
+local CONVERSION_NUMBERS = { first = true, last = true, defaultIndex = true, mapIndex = true, index = true, baseIndex = true, code = true }
+
+--- Refuses XML structure that the canonical conversion form cannot retain.
+--- This is a deliberately narrow conversion subset, not a native DTD validator.
+--- @param text string Original XML, before the lossy conversion projection.
+--- @return boolean admitted
+--- @return string|nil reason Stable path of the unsupported construct.
+function M.admit_conversion_source(text)
+	if type(text) ~= "string" then return false, "keylayout_text" end
+	local body, stack, position, root_count = strip_comments(text), {}, 1, 0
+	local counts = { layouts = 0, layout = 0, modifierMap = 0, actions = 0, terminators = 0 }
+	while position <= #body do
+		local open = body:find("<", position, true)
+		local between = body:sub(position, open and open - 1 or #body):gsub("^\239\187\191", "")
+		if between:find("%S") then return false, "xml_text_outside_attributes" end
+		if not open then break end
+		local declaration = body:match("^<%?xml%s.-%?>", open) or body:match("^<!DOCTYPE%s+keyboard%s+SYSTEM%s+[^>]+>", open)
+		if declaration then
+			if #stack > 0 or root_count > 0 then return false, "xml_declaration_position" end
+			position = open + #declaration
+		else
+			local tag = match_tag(body, open)
+			if not tag then return false, "xml_malformed_tag" end
+			local allowed = CONVERSION_ATTRIBUTES[tag.name]
+			if not allowed then return false, "element:" .. tag.name end
+			if tag.duplicate_attribute then return false, "duplicate_attribute:" .. tag.name .. "." .. tag.duplicate_attribute end
+			for attr in pairs(tag.attrs) do
+				if not allowed[attr] or tag.closing then return false, "attribute:" .. tag.name .. "." .. attr end
+				if CONVERSION_NUMBERS[attr] and (not tag.attrs[attr]:match("^%d+$") or tonumber(tag.attrs[attr]) > 2147483647) then return false, "numeric_attribute:" .. tag.name .. "." .. attr end
+			end
+			if tag.closing then
+				if tag.self_closing then return false, "xml_self_closing_end_tag" end
+				if not stack[#stack] or stack[#stack].name ~= tag.name then return false, "xml_unbalanced:" .. tag.name end
+				table.remove(stack)
+			else
+				local parent = stack[#stack]
+				local parent_name = parent and parent.name or ""
+				local wanted = CONVERSION_PARENT[tag.name]
+				if not (wanted == parent_name or type(wanted) == "table" and wanted[parent_name]) then return false, "parent:" .. tag.name end
+				if tag.name == "keyboard" then root_count = root_count + 1; if root_count ~= 1 then return false, "multiple_keyboards" end end
+				if counts[tag.name] ~= nil then counts[tag.name] = counts[tag.name] + 1; if counts[tag.name] > 1 then return false, "multiple_" .. tag.name end end
+				local identity = tag.attrs.id or tag.attrs.index or tag.attrs.code or tag.attrs.state
+				if tag.attrs.index or tag.attrs.code then identity = identity:gsub("^0+", ""); if identity == "" then identity = "0" end end
+				if identity and parent then
+					local token = tag.name .. ":" .. identity
+					if parent.seen[token] then return false, "duplicate:" .. token end
+					parent.seen[token] = true
+				end
+				if tag.name == "modifier" then
+					for token in (tag.attrs.keys or ""):gmatch("%S+") do
+						if not CONVERSION_MODIFIERS[token:gsub("%?$", "")] then return false, "modifier:" .. token end
+					end
+				elseif tag.name == "key" then
+					if (tag.attrs.output ~= nil) == (tag.attrs.action ~= nil) then return false, "key_output_kind" end
+				elseif tag.name == "keyMap" then
+					if tag.attrs.baseMapSet and not tag.attrs.baseIndex then return false, "base_without_index" end
+				elseif tag.name == "when" then
+					if tag.attrs.state == nil then return false, "when_without_state" end
+					if parent_name == "terminators" and tag.attrs.next then return false, "terminator_next" end
+					if parent_name == "action" and (tag.attrs.output == "" or not tag.attrs.output and not tag.attrs.next or tag.attrs.next == "") then return false, "empty_action_transition" end
+					if tag.attrs.next and tag.attrs.next ~= "" and tag.attrs.output and tag.attrs.output ~= "" then return false, "simultaneous_output_and_next" end
+				end
+				if not tag.self_closing then stack[#stack + 1] = { name = tag.name, seen = {} } end
+			end
+			position = tag.next
+		end
+	end
+	if #stack ~= 0 or root_count ~= 1 then return false, "xml_incomplete" end
+	return true
+end
 
 --- Parses a modifier `keys` attribute into sorted required and optional tokens.
 --- @param keys string
