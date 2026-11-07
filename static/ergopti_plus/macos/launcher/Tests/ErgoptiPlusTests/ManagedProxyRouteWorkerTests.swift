@@ -197,7 +197,7 @@ final class ManagedProxyRouteWorkerTests: XCTestCase {
 		address.sin_addr.s_addr = inet_addr("127.0.0.1")
 		let bound = withUnsafePointer(to: &address) { pointer in
 			pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-				bind(listener, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+				Darwin.bind(listener, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
 			}
 		}
 		XCTAssertEqual(bound, 0)
