@@ -5910,6 +5910,7 @@
 			"platforms": [
 				"linux"
 			],
+			"reason_key": "platform_reason.menu_container_rows_are_built_per_driver",
 			"i18n": "common.disabled",
 			"checked_when": [
 				"accented_letter_off_checked"
@@ -5923,7 +5924,8 @@
 			"id": "accented_letter_choices",
 			"platforms": [
 				"linux"
-			]
+			],
+			"reason_key": "platform_reason.menu_container_rows_are_built_per_driver"
 		}
 	],
 	"layout_native_record_choice": [

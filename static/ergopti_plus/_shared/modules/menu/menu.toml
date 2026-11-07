@@ -4881,6 +4881,7 @@ id = "layout_picker_choices"
 type = "check"
 id = "accented_letter_off"
 platforms = ["linux"]
+reason_key = "platform_reason.menu_container_rows_are_built_per_driver"
 i18n = "common.disabled"
 checked_when = ["accented_letter_off_checked"]
 
@@ -4891,6 +4892,7 @@ type = "---"
 type = "list"
 id = "accented_letter_choices"
 platforms = ["linux"]
+reason_key = "platform_reason.menu_container_rows_are_built_per_driver"
 
 # Complete macOS Layout frames; native providers supply exact records and callbacks.
 # Native record captions are literal data, never placeholder translation identities.
