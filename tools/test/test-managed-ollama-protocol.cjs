@@ -306,7 +306,10 @@ function receiveWindowsFilePort() {
 		} else {
 			// The actual CLI preserves its refusal exit; that is the control's input.
 			assert.equal(result.status, 1, 'Final root-close refusal must retain the actual CLI exit1.');
-			const fact = JSON.parse(stdout);
+			// The CLI emits one UTF-8 preamble before any receipt, so ShellRunner's
+			// FileRead selects UTF-8; the receipt is the JSON that follows it.
+			assert.ok(stdout.startsWith('﻿'), 'The actual CLI must emit its UTF-8 preamble first.');
+			const fact = JSON.parse(stdout.slice(1));
 			assert.equal(fact.ok, false);
 			assert.equal(fact.phase, 'refused');
 			assert.equal(fact.cleanup_pending, true);
