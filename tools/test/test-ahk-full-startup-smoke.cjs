@@ -118,7 +118,6 @@ const CHORD_CONFIGS = {
 // hotstrings are on too: their owner was counted by the first render before its
 // module had initialised, and the boot died before ready.
 const REALISTIC_HOTSTRINGS_FIXTURE = 'realistic-hotstrings';
-const SUSPEND_MARKER_FIXTURE = 'suspend-marker';
 // The paused boot keeps the AI on: its deferred AI hotkeys are the resume proof.
 const SUSPEND_MARKER_CONFIG = '[llm]\nenabled = true\n';
 const HOTSTRINGS_RENDER_BUDGET_MS = 2000;
@@ -203,24 +202,10 @@ function hotstringsRenderTimes(configRoot) {
 // text one character at a time, and personal-file metadata decoded every
 // hotstring row. Lowering a ceiling is welcome; raising one needs the measured
 // reason in the commit.
-// The suspend-marker boot re-enters its pause before the ready line: the first
-// _SuspendStateWatchdog consumes the marker and ToggleSuspend tears the
-// suspend-bypassing owners down, 8 document parses and 5 registry compares
-// more than the fresh boot (16 and 14 measured, 2026-11-07). With a prefix key
-// read as held the pause waits on a timer past ready and the boot counts fewer,
-// which is why the shared ceiling passed and failed by turns.
 const BOOT_OPERATION_CEILINGS = {
 	'config.snapshot_read': { all: 9 },
-	'toml.document_parse': {
-		all: 14,
-		[REALISTIC_HOTSTRINGS_FIXTURE]: 17,
-		[SUSPEND_MARKER_FIXTURE]: 16
-	},
-	'config_migrate.registry_deep_compares': {
-		all: 13,
-		[REALISTIC_HOTSTRINGS_FIXTURE]: 17,
-		[SUSPEND_MARKER_FIXTURE]: 14
-	},
+	'toml.document_parse': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
+	'config_migrate.registry_deep_compares': { all: 13, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
 	'toml.document_slow_steps': { all: 11943, [REALISTIC_HOTSTRINGS_FIXTURE]: 13420 },
 	'toml.flat_values': { all: 2181, [REALISTIC_HOTSTRINGS_FIXTURE]: 1199 }
 };
@@ -650,7 +635,7 @@ async function main() {
 		for (const fixture of [
 			'fresh-config',
 			'existing-config',
-			SUSPEND_MARKER_FIXTURE,
+			'suspend-marker',
 			'extension-neutral',
 			'extension-enabled',
 			'extension-master-off',
@@ -692,7 +677,7 @@ async function main() {
 						realisticPersonalHotstrings(file)
 					);
 			}
-			if (fixture === SUSPEND_MARKER_FIXTURE) {
+			if (fixture === 'suspend-marker') {
 				// ai-disabled-runtime-inert-2026-10-20 (#97): a boot with the AI off
 				// binds no AI hotkey, so only an AI-on paused boot still proves that
 				// the hotkeys its pause deferred are activated on resume.
@@ -742,7 +727,7 @@ async function main() {
 							: '')
 				);
 			}
-			const markerBearing = fixture === SUSPEND_MARKER_FIXTURE;
+			const markerBearing = fixture === 'suspend-marker';
 			const marker = path.join(configRoot, 'suspend_restore.marker');
 			if (markerBearing) fs.writeFileSync(marker, '1\n', 'utf8');
 			prepareStartupPersonalInclude(code.windows, path.join(configRoot, 'config'));
