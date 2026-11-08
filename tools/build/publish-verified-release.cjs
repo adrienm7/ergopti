@@ -131,9 +131,29 @@ function publishVerifiedRelease(tag, repository, files, run = github) {
 	const expected = expectedAssets(files);
 	if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository))
 		throw new Error('Invalid GitHub repository.');
-	const releasePath = `repos/${repository}/releases/tags/${encodeURIComponent(tag)}`;
+	// The release list, not releases/tags/<tag>: GitHub serves a release by its
+	// tag only once it is published, even when the tag exists, so the draft
+	// this gate reads answered 404 (v0.0.0-dev.167's complete draft).
+	const findRelease = () => {
+		const matches = [];
+		for (let page = 1; page <= 1000; page++) {
+			const rows = JSON.parse(
+				run(['api', `repos/${repository}/releases?per_page=100&page=${page}`])
+			);
+			if (!Array.isArray(rows) || rows.length > 100)
+				throw new Error('GitHub returned an invalid paginated release list.');
+			matches.push(...rows.filter((row) => row && row.tag_name === tag));
+			if (rows.length < 100) break;
+			if (page === 1000) throw new Error('GitHub release list exceeds the pagination bound.');
+		}
+		if (matches.length !== 1)
+			throw new Error(
+				`GitHub lists ${matches.length} releases named ${tag}, expected exactly one.`
+			);
+		return matches[0];
+	};
 	const inventory = (draft) => {
-		const release = JSON.parse(run(['api', releasePath]));
+		const release = findRelease();
 		if (!release || !Number.isSafeInteger(release.id) || release.id < 1 || release.tag_name !== tag)
 			throw new Error('GitHub did not acknowledge the expected release identity.');
 		const assets = [];
