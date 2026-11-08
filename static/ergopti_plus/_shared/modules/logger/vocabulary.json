@@ -168,6 +168,7 @@
 		"other_scope_occupied",
 		"other_scope_unverified",
 		"overflow",
+		"owned-runtime-not-admitted",
 		"owned_runtime_not_ready",
 		"parse_failed",
 		"paused",
