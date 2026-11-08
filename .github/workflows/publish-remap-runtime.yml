@@ -1,0 +1,129 @@
+# .github/workflows/publish-remap-runtime.yml
+#
+# Publishes the owned runtime artifact (ADR 011) that a green "Remap runtime
+# build" dispatch produced, so no maintainer downloads and re-uploads it by
+# hand. The prerelease remap-runtime-v<version> gets the exact file of that
+# run, after these checks:
+#   - the run is a successful runtime-artifact build of this repository;
+#   - its runtime-pin.json names the version tools/build/remap_runtime_publish.py
+#     declares at the checked-out ref, and the release URL that version gets;
+#   - the file has the pin's size and SHA-256, and the tag does not exist;
+#   - the asset downloaded back from the release has the same SHA-256.
+# The pin is then applied with `remap_runtime_publish.py apply` in a commit:
+# this workflow publishes the file only, never the pin.
+#
+# Only the repository owner can run it. The release is a prerelease that is
+# never "latest", so the application's update check keeps reading the app
+# releases. PAT_ERGOPTI creates the tag, which the repository's tag rule
+# refuses to the default token.
+
+name: Publish remap runtime
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Id of the green "Remap runtime build" run whose owned-remap-runtime artifact to publish
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: 'Publish the owned runtime artifact'
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Admit the build run
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]] || { echo "::error::run_id '$RUN_ID' is not a run id."; exit 1; }
+          read -r path event conclusion head_sha < <(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}" \
+              --jq '[.path, .event, .conclusion, .head_sha] | @tsv')
+          [ "$path" = ".github/workflows/remap-runtime-build.yml" ] || { echo "::error::Run $RUN_ID is $path, not the remap runtime build."; exit 1; }
+          [ "$event" = "workflow_dispatch" ] || { echo "::error::Run $RUN_ID was started by $event; only a dispatch builds the artifact."; exit 1; }
+          [ "$conclusion" = "success" ] || { echo "::error::Run $RUN_ID ended $conclusion, not success."; exit 1; }
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Run $RUN_ID has no commit."; exit 1; }
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "Run $RUN_ID: green runtime build of $head_sha."
+
+      - name: Download and verify the artifact
+        id: artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/runtime-artifact"
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" -n owned-remap-runtime -D "$work"
+          python3 - "$work" <<'PY' >> "$GITHUB_OUTPUT"
+          import hashlib, json, os, sys
+          sys.path.insert(0, "tools/build")
+          import remap_runtime_publish as publish
+
+          work = sys.argv[1]
+          with open(os.path.join(work, "runtime-pin.json"), encoding="utf-8") as handle:
+              pin = json.load(handle)
+          version = publish.RUNTIME_VERSION
+          name = publish.FILE_PREFIX + version + publish.FILE_SUFFIX
+          tag = publish.RELEASE_TAG_PREFIX + version
+          url = "https://github.com/" + os.environ["GITHUB_REPOSITORY"] + "/releases/download/" + tag + "/" + name
+          if sorted(os.listdir(work)) != sorted(["runtime-pin.json", name]):
+              sys.exit("The artifact holds " + ", ".join(sorted(os.listdir(work))) + ", not runtime-pin.json and " + name + ".")
+          if pin.get("version") != version or pin.get("file_name") != name or pin.get("source_url") != url:
+              sys.exit("runtime-pin.json names " + json.dumps(pin) + ", not version " + version + " at " + url + ".")
+          path = os.path.join(work, name)
+          with open(path, "rb") as handle:
+              data = handle.read()
+          digest = hashlib.sha256(data).hexdigest()
+          if len(data) != pin.get("size") or digest != pin.get("sha256"):
+              sys.exit("The file is " + str(len(data)) + " bytes, SHA-256 " + digest + ", not the pin's.")
+          print("tag=" + tag)
+          print("version=" + version)
+          print("file=" + path)
+          print("sha256=" + digest)
+          PY
+          echo "Verified the artifact against its pin."
+
+      - name: Create the prerelease with the artifact
+        env:
+          GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
+          RUN_ID: ${{ inputs.run_id }}
+          TAG: ${{ steps.artifact.outputs.tag }}
+          VERSION: ${{ steps.artifact.outputs.version }}
+          FILE: ${{ steps.artifact.outputs.file }}
+          TARGET: ${{ steps.run.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          [ -n "$GH_TOKEN" ] || { echo "::error::PAT_ERGOPTI is not set: the tag cannot be created."; exit 1; }
+          # Captured, never piped: a failing ls-remote must fail the step, not read as "tag free".
+          taken=$(git ls-remote --tags origin "refs/tags/$TAG")
+          [ -z "$taken" ] || { echo "::error::$TAG already exists; bump RUNTIME_VERSION for a new artifact."; exit 1; }
+          gh release create "$TAG" "$FILE" --repo "$GITHUB_REPOSITORY" --target "$TARGET" \
+              --title "Remap runtime $VERSION" --prerelease --latest=false \
+              --notes "Ergopti's owned Karabiner runtime (ADR 011): the signed installer helper of remap runtime build run $RUN_ID."
+          echo "Published $TAG from run $RUN_ID."
+
+      - name: Check the published asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.artifact.outputs.tag }}
+          SHA256: ${{ steps.artifact.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          back="$RUNNER_TEMP/published"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -D "$back"
+          actual=$(sha256sum "$back"/* | cut -d' ' -f1)
+          [ "$actual" = "$SHA256" ] || { echo "::error::The published asset has SHA-256 $actual, not $SHA256."; exit 1; }
+          echo "The published asset matches the pin: $actual."
