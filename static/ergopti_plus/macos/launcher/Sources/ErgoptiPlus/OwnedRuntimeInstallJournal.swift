@@ -290,15 +290,16 @@ final class OwnedRuntimeInstallJournal {
 	}
 	func recordRoot(name: String, descriptor: Int32) throws {
 		lock.lock(); defer { lock.unlock() }
-		guard nodes.isEmpty, Self.stage(name) else { throw OwnedRuntimeInstallFailure.source }
+		guard nodes.isEmpty else { throw OwnedRuntimeInstallFailure.refusedSource("journal-root-after-" + String(nodes.count)) }
+		guard Self.stage(name) else { throw OwnedRuntimeInstallFailure.refusedSource("journal-root-name") }
 		try record(path: name, descriptor: descriptor)
 	}
 	/// Record immediately after exclusive creation, before writing bytes or any publication effect.
 	func recordCreated(relative: String, descriptor: Int32) throws {
 		lock.lock(); defer { lock.unlock() }
-		guard let stageName else { throw OwnedRuntimeInstallFailure.source }
+		guard let stageName else { throw OwnedRuntimeInstallFailure.refusedSource("journal-no-root-" + relative) }
 		let path = stageName + "/" + relative
-		guard validRelative(path) else { throw OwnedRuntimeInstallFailure.source }
+		guard validRelative(path) else { throw OwnedRuntimeInstallFailure.refusedSource("journal-relative-" + String(path.utf8.count) + "-" + relative) }
 		try record(path: path, descriptor: descriptor)
 	}
 	private func record(path: String, descriptor: Int32) throws {

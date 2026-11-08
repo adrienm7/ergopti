@@ -7,6 +7,25 @@ import Foundation
 /// Errors keep publication refusal separate from custody that still needs cleanup.
 enum OwnedRuntimeInstallFailure: Error, Equatable {
 	case principal, source, protection, mutated, destination, copy, signature, cleanupPending
+
+	/// A `.source` refusal that names its check on the install trail first: some twenty checks share the case,
+	/// and a field install failed with a bare `publish-failed-source` that told none of them apart (field
+	/// report 2026-11-08). The check names a path relative to the tree or a syscall errno, never file bytes.
+	/// - Parameter check: Short check name, then any relative path or errno it saw.
+	/// - Returns: `.source`, so callers keep comparing the case as before.
+	static func refusedSource(_ check: String) -> OwnedRuntimeInstallFailure {
+		OwnedRuntimeInstallTrail.note("source-" + check)
+		return .source
+	}
+}
+
+/// The step a first install reached or stopped at, on the helper's standard error: the closed stdout result
+/// says only that a service step did not finish, so the hosted acceptance and a field log need the step.
+/// It lives beside the failure it explains, so every helper profile that compiles one compiles both.
+enum OwnedRuntimeInstallTrail {
+	static func note(_ step: String) {
+		try? FileHandle.standardError.write(contentsOf: Data(("OWNED_RUNTIME_INSTALL_TRAIL|" + step + "\n").utf8))
+	}
 }
 
 /// A scratch owns only vnodes created with exclusive native operations; cleanup never walks unknown children.
@@ -122,7 +141,7 @@ final class OwnedRuntimeInstallTree {
 		var completed = false
 		defer { if !completed { closeDescriptors() } }
 		try pinRoot()
-		guard let held = entries.first else { throw OwnedRuntimeInstallFailure.source }
+		guard let held = entries.first else { throw OwnedRuntimeInstallFailure.refusedSource("tree-no-root") }
 		if includeChildren { try descend(held) }
 		try verify(); completed = true
 	}
@@ -161,20 +180,23 @@ final class OwnedRuntimeInstallTree {
 	}
 	private func pinRoot() throws {
 		guard root.isFileURL, root.path.hasPrefix("/"), !root.path.contains("\0"), !root.path.contains("//") else {
-			throw OwnedRuntimeInstallFailure.source
+			throw OwnedRuntimeInstallFailure.refusedSource("root-path")
 		}
 		let parts = root.path.dropFirst().split(separator: "/", omittingEmptySubsequences: false).map(String.init)
-		guard !parts.isEmpty, parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else { throw OwnedRuntimeInstallFailure.source }
+		guard !parts.isEmpty, parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else { throw OwnedRuntimeInstallFailure.refusedSource("root-parts") }
 		var parent = open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
-		guard parent >= 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard parent >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("root-open-errno-" + String(errno)) }
 		ancestors.append(parent)
 		for part in parts {
 			var named = stat(), observed = stat()
-			guard fstatat(parent, part, &named, AT_SYMLINK_NOFOLLOW) == 0, named.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else {
-				throw OwnedRuntimeInstallFailure.source
+			guard fstatat(parent, part, &named, AT_SYMLINK_NOFOLLOW) == 0 else {
+				throw OwnedRuntimeInstallFailure.refusedSource("ancestor-stat-errno-" + String(errno) + "-" + part)
+			}
+			guard named.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else {
+				throw OwnedRuntimeInstallFailure.refusedSource("ancestor-not-directory-" + part)
 			}
 			let descriptor = openat(parent, part, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
-			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.source }
+			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("ancestor-open-errno-" + String(errno) + "-" + part) }
 			ancestors.append(descriptor)
 			guard fstat(descriptor, &observed) == 0, same(named, observed) else { throw OwnedRuntimeInstallFailure.mutated }
 			if protected { try protection(descriptor, observed) }
@@ -183,18 +205,23 @@ final class OwnedRuntimeInstallTree {
 		}
 		// A separate root descriptor gives the root node normal recursive custody.
 		let descriptor = dup(parent)
-		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.source }
-		var observed = stat(); guard fstat(descriptor, &observed) == 0 else { Darwin.close(descriptor); throw OwnedRuntimeInstallFailure.source }
+		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("root-dup-errno-" + String(errno)) }
+		var observed = stat()
+		guard fstat(descriptor, &observed) == 0 else {
+			let failure = OwnedRuntimeInstallFailure.refusedSource("root-fstat-errno-" + String(errno)); Darwin.close(descriptor); throw failure
+		}
 		entries.append(Entry(relative: "", descriptor: descriptor, parent: ancestors[ancestors.count - 2],
 			name: parts.last!, observed: observed, directory: true, digest: nil))
 		try protection(descriptor, observed)
 	}
 	private func bytes(_ descriptor: Int32, size: off_t) throws -> Data {
-		guard size >= 0, size <= 268_435_456 else { throw OwnedRuntimeInstallFailure.source }
+		guard size >= 0, size <= 268_435_456 else { throw OwnedRuntimeInstallFailure.refusedSource("file-size-" + String(size)) }
 		var output = Data(), buffer = [UInt8](repeating: 0, count: 65_536), offset: off_t = 0
 		while offset < size {
 			let count = buffer.withUnsafeMutableBytes { pread(descriptor, $0.baseAddress, min($0.count, Int(size - offset)), offset) }
-			guard count > 0 else { throw OwnedRuntimeInstallFailure.source }
+			guard count > 0 else {
+				throw OwnedRuntimeInstallFailure.refusedSource("file-read-" + String(count) + "-errno-" + String(errno) + "-at-" + String(offset) + "-of-" + String(size))
+			}
 			output.append(contentsOf: buffer.prefix(count)); offset += off_t(count)
 		}
 		return output
@@ -203,19 +230,23 @@ final class OwnedRuntimeInstallTree {
 		let path = parent.relative.isEmpty ? root : root.appendingPathComponent(parent.relative)
 		let names = try FileManager.default.contentsOfDirectory(atPath: path.path).sorted()
 		for name in names {
-			guard entries.count < 4096, !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains("\0") else {
-				throw OwnedRuntimeInstallFailure.source
+			let relative = parent.relative.isEmpty ? name : parent.relative + "/" + name
+			guard entries.count < 4096 else { throw OwnedRuntimeInstallFailure.refusedSource("entry-limit-" + String(entries.count)) }
+			guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains("\0") else {
+				throw OwnedRuntimeInstallFailure.refusedSource("entry-name")
 			}
 			var named = stat(), observed = stat()
-			guard fstatat(parent.descriptor, name, &named, AT_SYMLINK_NOFOLLOW) == 0 else { throw OwnedRuntimeInstallFailure.source }
+			guard fstatat(parent.descriptor, name, &named, AT_SYMLINK_NOFOLLOW) == 0 else {
+				throw OwnedRuntimeInstallFailure.refusedSource("entry-stat-errno-" + String(errno) + "-" + relative)
+			}
 			let directory = named.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR)
 			guard directory || (named.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) && named.st_nlink == 1) else {
-				throw OwnedRuntimeInstallFailure.source
+				let kind = String(named.st_mode & mode_t(S_IFMT), radix: 8)
+				throw OwnedRuntimeInstallFailure.refusedSource("entry-kind-" + kind + "-links-" + String(named.st_nlink) + "-" + relative)
 			}
 			let descriptor = openat(parent.descriptor, name, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK | (directory ? O_DIRECTORY : 0))
-			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.source }
+			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("entry-open-errno-" + String(errno) + "-" + relative) }
 			// Retain before any throwing validation; rejected entries still close their exact FD.
-			let relative = parent.relative.isEmpty ? name : parent.relative + "/" + name
 			entries.append(Entry(relative: relative, descriptor: descriptor, parent: parent.descriptor, name: name,
 				observed: named, directory: directory, digest: nil))
 			guard fstat(descriptor, &observed) == 0, same(named, observed) else { throw OwnedRuntimeInstallFailure.mutated }
@@ -223,7 +254,7 @@ final class OwnedRuntimeInstallTree {
 			var digest: Data?
 			if !directory {
 				let data = try bytes(descriptor, size: observed.st_size); byteCount += data.count
-				guard byteCount <= 536_870_912 else { throw OwnedRuntimeInstallFailure.source }
+				guard byteCount <= 536_870_912 else { throw OwnedRuntimeInstallFailure.refusedSource("tree-bytes-" + String(byteCount)) }
 				digest = Data(SHA256.hash(data: data))
 			}
 			let held = Entry(relative: relative, descriptor: descriptor, parent: parent.descriptor, name: name,
@@ -234,7 +265,7 @@ final class OwnedRuntimeInstallTree {
 	}
 	func verifyAnchor() throws {
 		guard !descriptorsClosed else { throw OwnedRuntimeInstallFailure.cleanupPending }
-		guard let root = entries.first else { throw OwnedRuntimeInstallFailure.source }
+		guard let root = entries.first else { throw OwnedRuntimeInstallFailure.refusedSource("anchor-no-root") }
 		var held = stat(), named = stat()
 		guard fstat(root.descriptor, &held) == 0, fstatat(root.parent, root.name, &named, AT_SYMLINK_NOFOLLOW) == 0,
 			held.st_dev == root.observed.st_dev, held.st_ino == root.observed.st_ino,
@@ -294,9 +325,9 @@ final class OwnedRuntimeInstallTree {
 	}
 	func duplicateRootDescriptor() throws -> Int32 {
 		guard !descriptorsClosed else { throw OwnedRuntimeInstallFailure.cleanupPending }
-		guard let root = entries.first else { throw OwnedRuntimeInstallFailure.source }
+		guard let root = entries.first else { throw OwnedRuntimeInstallFailure.refusedSource("duplicate-no-root") }
 		let descriptor = fcntl(root.descriptor, F_DUPFD_CLOEXEC, STDERR_FILENO + 1)
-		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.refusedSource("duplicate-errno-" + String(errno)) }
 		return descriptor
 	}
 	func copy(into destination: URL, custody: ((OwnedRuntimeInstallScratch) -> Void)? = nil,
