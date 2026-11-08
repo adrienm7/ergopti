@@ -49,7 +49,19 @@ if ($SourceArchive -eq '') {
 	if (-not (Test-Path -LiteralPath $SourceArchive -PathType Leaf)) {
 		$PrivateDownload = Join-Path $CacheRoot ([Guid]::NewGuid().ToString('N') + '.download')
 		try {
-			Invoke-WebRequest -Uri $Pin.url -OutFile $PrivateDownload -UseBasicParsing
+			# GitHub answered 504 for this release asset on three consecutive runs
+			# (2026-11-08): a transient failure is retried; the digest below still
+			# admits only the pinned archive.
+			for ($Attempt = 1; ; $Attempt++) {
+				try {
+					Invoke-WebRequest -Uri $Pin.url -OutFile $PrivateDownload -UseBasicParsing
+					break
+				} catch {
+					if ($Attempt -ge 6) { throw }
+					Write-Warning ("Duktape source download failed (attempt {0} of 6): {1}" -f $Attempt, $_.Exception.Message)
+					Start-Sleep -Seconds (10 * $Attempt)
+				}
+			}
 			if ((Get-FileHash -LiteralPath $PrivateDownload -Algorithm SHA256).Hash.ToLowerInvariant() -cne $Pin.sha256) {
 				throw 'Downloaded Duktape source identity refused.'
 			}
