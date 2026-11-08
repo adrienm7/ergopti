@@ -141,13 +141,22 @@ enum OwnedRuntimeInstallMainOperation {
 		do {
 			let source = try OwnedRuntimeInstallTree(root: helper, protected: false)
 			defer { _ = source.releaseOwnedDescriptors() }
+			// One refusal per cause: a single "helper_signature" for all three left an
+			// install refused on a signed release with nothing to tell them apart
+			// (field report 2026-11-05, issue #106).
 			var code: SecStaticCode?
 			guard SecStaticCodeCreateWithPath(helper as CFURL, [], &code) == errSecSuccess, let code,
 				let fields = OwnedRuntimePublisherSignature.information(code, role: .installer),
-				let certificates = fields[kSecCodeInfoCertificates as String] as? [SecCertificate], let certificate = certificates.first,
-				SecCertificateCopyData(certificate) as Data == publisher.leaf,
-				codeDirectoryHashes(fields) != nil, let slices = sliceCodeHashes(helper) else {
+				let certificates = fields[kSecCodeInfoCertificates as String] as? [SecCertificate],
+				let certificate = certificates.first else {
+				return refuse("helper_signature_invalid",
+					"the downloaded installer helper fails its strict signature check or is not Ergopti's installer")
+			}
+			guard SecCertificateCopyData(certificate) as Data == publisher.leaf else {
 				return refuse("helper_signature", "the downloaded installer helper is not signed with this launcher's certificate")
+			}
+			guard codeDirectoryHashes(fields) != nil, let slices = sliceCodeHashes(helper) else {
+				return refuse("helper_code_hashes", "the downloaded installer helper's code hashes could not be read")
 			}
 			let bytes = try Data(contentsOf: helper.appendingPathComponent(installerExecutable))
 			guard OwnedRuntimeInstallOwner.systemClosedExecutableForInstaller(bytes) else {
