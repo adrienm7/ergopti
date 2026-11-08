@@ -91,6 +91,7 @@ try {
 		['1.0.3', '1.0.3'],
 		['0.0.0-dev.9', '0.0.0~dev.9'],
 		['0.0.0-dev.10', '0.0.0~dev.10'],
+		['1.0.10-dev.170', '1.0.10~dev.170'],
 		['', JSON.parse(fs.readFileSync(sourcePackage, 'utf8')).version]
 	]) {
 		const versionEnv = { ...env, ERGOPTI_BUILD_VERSION: release };
@@ -221,11 +222,16 @@ try {
 		}
 		console.log(`PASS package-version-native-and-staging-${release || 'source-validation'}`);
 	}
-	for (const [before, after] of [
+	const nativeOrderPairs = [
 		['0.0.0~dev.9', '0.0.0~dev.10'],
 		['0.0.0~dev.10', '0.0.0'],
-		['1.0.3', '1.0.4']
-	])
+		['1.0.3', '1.0.4'],
+		// The dev series moved from the 0.0.0 core to the next patch on 2026-11-08.
+		['0.0.0~dev.169', '1.0.10~dev.170'],
+		['1.0.9', '1.0.10~dev.170'],
+		['1.0.10~dev.170', '1.0.10']
+	];
+	for (const [before, after] of nativeOrderPairs)
 		success(run('dpkg', ['--compare-versions', before, 'lt', after]));
 	assert.notEqual(
 		run('dpkg', ['--compare-versions', '0.0.0-dev.10', 'lt', '0.0.0']).status,
@@ -249,7 +255,7 @@ try {
 		['invalid commit', canonical.replace(/^commit=.+$/m, 'commit=bad')],
 		['malformed release', canonical.replace('version=1.0.3', 'version=broken')],
 		['duplicate release', canonical + 'version=1.0.3\n'],
-		['unknown release channel', canonical.replace('version=1.0.3', 'version=1.0.3-dev.2')],
+		['unknown release channel', canonical.replace('version=1.0.3', 'version=1.0.3-beta.2')],
 		['release build metadata', canonical.replace('version=1.0.3', 'version=1.0.3+local')]
 	]) {
 		fs.writeFileSync(stampPath, mutated);
@@ -279,7 +285,7 @@ try {
 		'source paths with apostrophes/newlines must remain literal'
 	);
 	console.log(
-		`PASS package-version-native archives=${archives} formats=4 refused=${refused} native-order-pairs=3 rpm-install-replays=${rpmInstallReplays} rpm-root-refusals=${rpmRootRefusals}`
+		`PASS package-version-native archives=${archives} formats=4 refused=${refused} native-order-pairs=${nativeOrderPairs.length} rpm-install-replays=${rpmInstallReplays} rpm-root-refusals=${rpmRootRefusals}`
 	);
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });
