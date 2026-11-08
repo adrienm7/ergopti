@@ -32,7 +32,7 @@ function Invoke-OwnedBoot([string] $Binary, [string] $Tag) {
             if ($clock.Elapsed.TotalSeconds -ge 120) { throw 'The compiled application exceeded the existing startup hang bound.' }
         }
         $exit = $process.ExitCode()
-        if ($exit -ne 0) { throw 'The compiled application did not exit successfully.' }
+        if ($exit -ne 0) { throw "The compiled application did not exit successfully (exit code $exit)." }
         if (!$process.WaitForIdle(5000)) { throw 'The compiled application left owned descendants alive.' }
         if ([IO.File]::ReadAllText((Join-Path $sandbox "$Tag.stderr.txt")).Trim().Length) {
             throw 'The compiled application emitted a native startup diagnostic.'
@@ -190,6 +190,21 @@ try {
 } finally {
     foreach ($name in $savedEnvironment.Keys) {
         [Environment]::SetEnvironmentVariable($name, $savedEnvironment[$name], 'Process')
+    }
+    # A failed launch left nothing to read once the sandbox was removed (the
+    # upgrade boot of 2026-11-08): its streams and the application's logs are
+    # kept with the evidence before the cleanup.
+    if (!$state.complete -and (Test-Path -LiteralPath $sandbox)) {
+        try {
+            $kept = Join-Path $EvidenceDirectory 'failure-diagnostics'
+            $null = New-Item -ItemType Directory -Path $kept -Force
+            Get-ChildItem -LiteralPath $sandbox -File -Filter '*.std*.txt' |
+                Copy-Item -Destination $kept
+            if (Test-Path -LiteralPath $profileRoot) {
+                Get-ChildItem -LiteralPath $profileRoot -Recurse -File -Filter '*.log' |
+                    ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $kept ('log-' + $_.Name)) }
+            }
+        } catch { Write-Warning ('Failure diagnostics could not be kept: ' + $_.Exception.Message) }
     }
     if ($state.cleanup_acknowledged -and (Test-Path -LiteralPath $sandbox)) {
         try { Remove-Item -LiteralPath $sandbox -Recurse -Force } catch { $state.cleanup_acknowledged = $false }
