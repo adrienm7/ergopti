@@ -10,6 +10,19 @@ import Security
 
 /// Signature observations alone are not publisher, installation, consent or runtime readiness capabilities.
 enum OwnedRuntimePublisherSignature {
+	/// The helper's code directory hashes: one per hash type, distinct, SHA-1 (20 bytes) or SHA-256 (32 bytes, as
+	/// signing information reports it). codesign writes only the SHA-256 directory for a macOS 11+ target, so the
+	/// published runtime carries one hash per slice; demanding two refused every install (field report 2026-11-05).
+	/// It lives here, in a file every helper profile compiles: the helper's report path reads it too, and its
+	/// home in OwnedRuntimeInstallMainOperation broke the installer build (remap runtime build 42524447885).
+	/// - Parameter fields: Signing information of the helper.
+	/// - Returns: The hashes, or nil when absent, duplicated, over two or of another length.
+	static func codeDirectoryHashes(_ fields: [String: Any]) -> [Data]? {
+		guard let hashes = fields[kSecCodeInfoCdHashes as String] as? [Data], (1...2).contains(hashes.count),
+			Set(hashes).count == hashes.count, hashes.allSatisfy({ $0.count == 20 || $0.count == 32 }) else { return nil }
+		return hashes
+	}
+
 	enum Role: String {
 		case launcher = "com.ergoptiplus.app"
 		case hammerspoon = "com.ergoptiplus.app.hammerspoon"

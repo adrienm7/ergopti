@@ -12,12 +12,12 @@ final class OwnedRuntimeInstallHelperHashesTests: XCTestCase {
 	func testTheSingleSha256DirectoryOfThePublishedHelperIsAdmitted() {
 		// remap-runtime-v16.3.0-ergopti.3: one CodeDirectory (SHA-256) per slice; two were demanded and every install refused
 		let sha256 = Data(repeating: 0xab, count: 32)
-		XCTAssertEqual(OwnedRuntimeInstallMainOperation.codeDirectoryHashes(fields([sha256])), [sha256])
+		XCTAssertEqual(OwnedRuntimePublisherSignature.codeDirectoryHashes(fields([sha256])), [sha256])
 	}
 
 	func testBothHashTypesStayAdmitted() {
 		let pair = [Data(repeating: 1, count: 20), Data(repeating: 2, count: 32)]
-		XCTAssertEqual(OwnedRuntimeInstallMainOperation.codeDirectoryHashes(fields(pair)), pair)
+		XCTAssertEqual(OwnedRuntimePublisherSignature.codeDirectoryHashes(fields(pair)), pair)
 	}
 
 	func testEverySliceOfAUniversalBinaryGivesItsTwentyByteCdhash() throws {
@@ -62,10 +62,10 @@ final class OwnedRuntimeInstallHelperHashesTests: XCTestCase {
 
 	func testAbsentDuplicatedOversizedOrMalformedHashesAreRefused() {
 		let hash = Data(repeating: 3, count: 32)
-		XCTAssertNil(OwnedRuntimeInstallMainOperation.codeDirectoryHashes([:]))
-		XCTAssertNil(OwnedRuntimeInstallMainOperation.codeDirectoryHashes(fields([])))
-		XCTAssertNil(OwnedRuntimeInstallMainOperation.codeDirectoryHashes(fields([hash, hash])))
-		XCTAssertNil(OwnedRuntimeInstallMainOperation.codeDirectoryHashes(fields([hash, Data(count: 20), Data(count: 48)])))
-		XCTAssertNil(OwnedRuntimeInstallMainOperation.codeDirectoryHashes(fields([Data(count: 16)])))
+		XCTAssertNil(OwnedRuntimePublisherSignature.codeDirectoryHashes([:]))
+		XCTAssertNil(OwnedRuntimePublisherSignature.codeDirectoryHashes(fields([])))
+		XCTAssertNil(OwnedRuntimePublisherSignature.codeDirectoryHashes(fields([hash, hash])))
+		XCTAssertNil(OwnedRuntimePublisherSignature.codeDirectoryHashes(fields([hash, Data(count: 20), Data(count: 48)])))
+		XCTAssertNil(OwnedRuntimePublisherSignature.codeDirectoryHashes(fields([Data(count: 16)])))
 	}
 }

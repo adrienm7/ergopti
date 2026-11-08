@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import tempfile
 import time
+import re
 import unittest
 import owned_runtime_product_build as product
 
@@ -390,6 +391,35 @@ class SwiftRosterClosureControls(unittest.TestCase):
                 declarations = [path for path, text in texts.items() if "enum Identifiers" in text]
                 self.assertTrue(users, "the roster no longer references Identifiers")
                 self.assertEqual(len(declarations), 1, users)
+
+    def test_rosters_declare_every_owned_type_they_reference(self):
+        # Remap runtime build 42524447885: the helper's report stage owner called
+        # OwnedRuntimeInstallMainOperation.codeDirectoryHashes, whose file no
+        # helper roster compiles, so the signed artifact could not be built.
+        for name, roster in (
+            ("report", product.REPORT_SOURCE_PATHS),
+            ("validator", product.VALIDATOR_SOURCES),
+        ):
+            with self.subTest(roster=name):
+                texts = {}
+                for relative in roster:
+                    if relative.endswith(".swift"):
+                        text = (self.REPOSITORY / relative).read_text(encoding="utf-8")
+                        # Comments and string literals name folders and types that are no reference.
+                        text = re.sub(r"//[^\n]*", "", text)
+                        texts[relative] = re.sub(r'"(?:[^"\\\n]|\\.)*"', '""', text)
+                declared = set()
+                for text in texts.values():
+                    declared |= set(
+                        re.findall(
+                            r"\b(?:enum|struct|class|protocol|actor|typealias)\s+(Owned\w+)", text
+                        )
+                    )
+                for relative, text in texts.items():
+                    missing = (
+                        set(re.findall(r"\b(Owned(?:Runtime|VirtualHID)\w*)\b", text)) - declared
+                    )
+                    self.assertEqual(missing, set(), relative)
 
 
 class ArchitectureCheckControls(unittest.TestCase):
