@@ -757,51 +757,60 @@ function reportFolder(paths) {
 				assert.match(collector, /git add -u -- '\*\.scpt'/);
 				const repo = fs.mkdtempSync(path.join(scratch, 'scpt-'));
 				const bin = fs.mkdtempSync(path.join(scratch, 'scpt-bin-'));
-				// osacompile writes a marker then the source; osadecompile prints the
-				// source back with its own indentation and CR line ends, as the real
-				// tool reformats; MANGLE makes the rebuilt script decompile wrong.
-				shim(bin, 'osacompile', '[ "$1" = -o ] || exit 64\n{ echo COMPILED; cat "$3"; } > "$2"');
+				// osacompile writes a marker then the source, and fails under FAIL;
+				// osadecompile prints it back with its own indentation, CR line ends
+				// and its own spelling of "thru", as the real tool respells the
+				// source (Encryptor's roundtrip_mismatch, field report 2026-11-08).
+				shim(
+					bin,
+					'osacompile',
+					'[ -z "$FAIL" ] || exit 3\n[ "$1" = -o ] || exit 64\n{ echo COMPILED; cat "$3"; } > "$2"'
+				);
 				shim(
 					bin,
 					'osadecompile',
-					'head -1 "$1" | grep -qx COMPILED || exit 1\ntail -n +2 "$1" | sed -e "s/^ */\t/" | tr "\\n" "\\r" | sed -e "s/kept/${MANGLE:-kept}/"'
+					'head -1 "$1" | grep -qx COMPILED || exit 1\ntail -n +2 "$1" | sed -e "s/^ */\t/" -e "s/thru/through/" | tr "\\n" "\\r"'
 				);
 				const folder = path.join(repo, 'Stale App.app');
 				fs.mkdirSync(folder);
 				fs.writeFileSync(
 					path.join(folder, 'main.applescript'),
-					'on run\n  -- keystats\n  return "kept"\nend run\n'
+					'on run\n  -- keystats\n  return text 1 thru 2 of "kept"\nend run\n'
 				);
 				fs.writeFileSync(
 					path.join(folder, 'main.scpt'),
-					'COMPILED\non run\n  -- metrics\n  return "kept"\nend run\n'
+					'COMPILED\non run\n  -- metrics\n  return text 1 thru 2 of "kept"\nend run\n'
 				);
-				fs.writeFileSync(path.join(repo, 'fresh.applescript'), 'say "hi"\n');
-				fs.writeFileSync(path.join(repo, 'fresh.scpt'), 'COMPILED\n    say "hi"\n\n');
+				fs.writeFileSync(path.join(repo, 'fresh.applescript'), 'say text 1 thru 2 of "hi"\n');
+				fs.writeFileSync(
+					path.join(repo, 'fresh.scpt'),
+					'COMPILED\n    say text 1 thru 2 of "hi"\n\n'
+				);
 				fs.writeFileSync(path.join(repo, 'lonely.applescript'), 'beep\n');
 				git(repo, 'init', '-q');
 				git(repo, 'add', '.');
 				const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
 				const tool = path.join(ROOT, 'tools/dev/recompile-applescripts.py');
-				const mangled = spawnSync('python3', [tool, repo], {
+				const refused = spawnSync('python3', [tool, repo], {
 					encoding: 'utf8',
-					env: { ...env, MANGLE: 'changed' }
+					env: { ...env, FAIL: '1' }
 				});
-				assert.equal(mangled.status, 1, mangled.stdout + mangled.stderr);
-				assert.match(
-					mangled.stdout,
-					/^scpt_failed:Stale App\.app\/main\.scpt:roundtrip_mismatch$/m
-				);
-				assert.match(mangled.stdout, /^scpt_recompiled:0$/m);
+				assert.equal(refused.status, 1, refused.stdout + refused.stderr);
+				assert.match(refused.stdout, /^scpt_failed:Stale App\.app\/main\.scpt:osacompile_exit_3$/m);
+				assert.match(refused.stdout, /^scpt_recompiled:0$/m);
 				assert.match(
 					fs.readFileSync(path.join(folder, 'main.scpt'), 'utf8'),
 					/metrics/,
-					'a rebuild that does not decompile to its source never replaces the script'
+					'a source that does not compile never replaces the script'
 				);
 				const result = spawnSync('python3', [tool, repo], { encoding: 'utf8', env });
 				assert.equal(result.status, 0, result.stdout + result.stderr);
 				assert.match(result.stdout, /^recompiled Stale App\.app\/main\.scpt$/m);
-				assert.match(result.stdout, /^up_to_date fresh\.scpt$/m);
+				assert.match(
+					result.stdout,
+					/^up_to_date fresh\.scpt$/m,
+					'the decompiler respelling the source is not a change'
+				);
 				assert.match(result.stdout, /^scpt_recompiled:1$/m);
 				assert.doesNotMatch(
 					result.stdout,
