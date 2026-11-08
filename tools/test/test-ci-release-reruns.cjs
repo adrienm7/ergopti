@@ -575,9 +575,9 @@ check('dev: a new commit publishes under the next dev tag', () => {
 	assert.equal(result.status, 0, result.stderr);
 	assert.deepEqual(result.outputs, {
 		release: 'true',
-		tag: 'v0.0.1-dev.3',
-		version: '0.0.1-dev.3',
-		title: 'Ergopti v0.0.1-dev.3',
+		tag: 'v0.0.0-dev.3',
+		version: '0.0.0-dev.3',
+		title: 'Ergopti v0.0.0-dev.3',
 		prerelease: 'true',
 		channel: 'dev'
 	});
@@ -607,7 +607,7 @@ check('dev: after a force push, a commit that an older tag contains is not publi
 		/::notice::This commit is already part of v0\.0\.0-dev\.2, /
 	);
 	git(forced, 'checkout', '--quiet', '--detach', b1);
-	releases(plan(forced, commit(forced, 'chore: b2'), 'refs/heads/dev'), 'v0.0.1-dev.4');
+	releases(plan(forced, commit(forced, 'chore: b2'), 'refs/heads/dev'), 'v0.0.0-dev.4');
 });
 
 check('dev: a failing git tag fails plan instead of reading as "never released"', () => {
@@ -633,14 +633,18 @@ check('dev: a failing git tag fails plan instead of reading as "never released"'
 
 check('dev: the first dev release is planned without any tag', () => {
 	const fresh = repository('fresh', 'dev');
-	releases(plan(fresh, commit(fresh, 'chore: first'), 'refs/heads/dev'), 'v0.0.1-dev.1');
+	releases(plan(fresh, commit(fresh, 'chore: first'), 'refs/heads/dev'), 'v0.0.0-dev.1');
 });
 
 check('dev: a dev tag is a prerelease of the patch after the last stable tag', () => {
 	const next = repository('next-patch', 'dev');
 	const s1 = commit(next, 'feat(macos)!: a breaking change');
 	git(next, 'tag', 'v1.0.9', s1);
-	git(next, 'tag', 'v0.0.0-dev.169', commit(next, 'feat: a feature'));
+	git(next, 'tag', 'v0.0.0-dev.168', commit(next, 'feat: a feature'));
+	// Up to the bridge, the counter keeps the legacy core installed builds
+	// still match, even after a stable tag.
+	releases(plan(next, commit(next, 'fix: the bridge'), 'refs/heads/dev'), 'v0.0.0-dev.169');
+	git(next, 'tag', 'v0.0.0-dev.169', 'HEAD');
 	// The legacy series' counter continues under the new core, whatever the
 	// subjects: the breaking and feat commits leave it at the next patch.
 	const first = plan(next, commit(next, 'fix: one'), 'refs/heads/dev');
@@ -891,15 +895,15 @@ check('dev: a Release-As, even a malformed one, is ignored with a notice', () =>
 		commit(work, 'feat: diagnostics\n\nRelease-As: 1.2.4'),
 		'refs/heads/dev'
 	);
-	releases(result, 'v0.0.1-dev.1');
+	releases(result, 'v0.0.0-dev.1');
 	assert.equal(result.outputs.prerelease, 'true');
 	assert.match(
 		result.stdout,
-		/::notice::Release-As '1\.2\.4' in commit [0-9a-f]{12} applies to main only: dev keeps v0\.0\.1-dev\.1\./
+		/::notice::Release-As '1\.2\.4' in commit [0-9a-f]{12} applies to main only: dev keeps v0\.0\.0-dev\.1\./
 	);
-	git(work, 'tag', 'v0.0.1-dev.1', 'HEAD');
+	git(work, 'tag', 'v0.0.0-dev.1', 'HEAD');
 	const malformed = plan(work, commit(work, 'fix: x\n\nRelease-As: v9'), 'refs/heads/dev');
-	releases(malformed, 'v0.0.1-dev.2');
+	releases(malformed, 'v0.0.0-dev.2');
 	assert.match(
 		malformed.stdout,
 		/::notice::Release-As 'v9' in commit [0-9a-f]{12} applies to main only/
@@ -919,7 +923,7 @@ check('a tag outside the series, even one the glob matches, does not count as pu
 	git(hotfix, 'tag', 'v0.0.0-dev.1', h1);
 	const h2 = commit(hotfix, 'chore: two');
 	git(hotfix, 'tag', 'v0.0.0-dev.1-hotfix', h2);
-	releases(plan(hotfix, h2, 'refs/heads/dev'), 'v0.0.1-dev.2');
+	releases(plan(hotfix, h2, 'refs/heads/dev'), 'v0.0.0-dev.2');
 });
 
 // ===============================================
