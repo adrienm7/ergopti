@@ -79,11 +79,14 @@ enum OwnedRuntimeInstallMainOperation {
 		let step = message[range.upperBound...].prefix { $0 == "_" || ("a"..."z").contains($0) }
 		return step.isEmpty || step.count > 32 ? nil : String(step)
 	}
-	/// The shell's stderr on one bounded log line: codesign and ditto say there why they refused.
+	/// The longest stderr one log line keeps. The helper names every refusal it meets on its trail, with the
+	/// file and line, so a failed install needs room for all of them, not only the first few.
+	static let oneLineLimit = 8000
+	/// The shell's stderr on one bounded log line: codesign, ditto and the helper's trail say there why they refused.
 	static func oneLine(_ message: String) -> String {
 		let flat = message.split(whereSeparator: { $0.isNewline }).map { $0.trimmingCharacters(in: .whitespaces) }
 			.filter { !$0.isEmpty }.joined(separator: " | ")
-		return flat.count > 600 ? String(flat.prefix(600)) + "…" : flat
+		return flat.count > oneLineLimit ? String(flat.prefix(oneLineLimit)) + "…" : flat
 	}
 
 	/// Writes the one answer line, then returns the exit status.

@@ -35,7 +35,7 @@ final class OwnedRuntimeFirstInstallOwner {
 			try source.verify(); try helper.verify()
 			try OwnedRuntimeInstallOwner.validateInstalledProductsForPeer(at: payload, leaf: leaf)
 			try source.verify(); try helper.verify()
-			guard publisher.current(), lifecycle.current(), signingLeaf(principal) == leaf else { throw OwnedRuntimeInstallFailure.principal }
+			guard publisher.current(), lifecycle.current(), signingLeaf(principal) == leaf else { throw OwnedRuntimeInstallFailure.traced(.principal) }
 			let owner = OwnedRuntimeFirstInstallOwner(publisher: publisher, principal: principal, leaf: leaf, payloadURL: payload,
 				helper: helper, source: source, lifecycle: lifecycle)
 			completed = true; return owner
@@ -45,13 +45,13 @@ final class OwnedRuntimeFirstInstallOwner {
 		OwnedRuntimePublisherSignature.currentLeaf(principal, role: .installer)
 	}
 	private func verify() throws {
-		guard publisher.current(), getuid() == 0, geteuid() == 0, Self.signingLeaf(principal) == leaf, lifecycle.current() else { throw OwnedRuntimeInstallFailure.principal }
+		guard publisher.current(), getuid() == 0, geteuid() == 0, Self.signingLeaf(principal) == leaf, lifecycle.current() else { throw OwnedRuntimeInstallFailure.traced(.principal) }
 		try source.verify(); try helper.verify()
 	}
 	/// File publication is performed in this helper's dedicated worker, never a resident Lua/launcher event loop.
 	func publishFirstInstallation() throws {
 		lock.lock(); defer { lock.unlock() }
-		guard !Thread.isMainThread, state == .held, journal == nil else { throw OwnedRuntimeInstallFailure.destination }
+		guard !Thread.isMainThread, state == .held, journal == nil else { throw OwnedRuntimeInstallFailure.traced(.destination) }
 		do {
 			try verify()
 			let parent = try OwnedRuntimeInstallTree(root: Self.parentURL, protected: true, includeChildren: false)
@@ -59,11 +59,11 @@ final class OwnedRuntimeFirstInstallOwner {
 			let daemonParent = try OwnedRuntimeInstallTree(root: URL(fileURLWithPath: "/Library/LaunchDaemons", isDirectory: true), protected: true, includeChildren: false)
 			let daemonDescriptor = try daemonParent.duplicateRootDescriptor(); defer { Darwin.close(daemonDescriptor) }
 			var existing = stat(); errno = 0
-			guard fstatat(parentDescriptor, "Runtime", &existing, AT_SYMLINK_NOFOLLOW) == -1, errno == ENOENT else { throw OwnedRuntimeInstallFailure.destination }
+			guard fstatat(parentDescriptor, "Runtime", &existing, AT_SYMLINK_NOFOLLOW) == -1, errno == ENOENT else { throw OwnedRuntimeInstallFailure.traced(.destination) }
 			errno = 0
 			guard fstatat(daemonDescriptor, Identifiers.ServiceLabels.macosCore + ".plist", &existing, AT_SYMLINK_NOFOLLOW) == -1,
-				errno == ENOENT else { throw OwnedRuntimeInstallFailure.destination }
-			guard let journal = OwnedRuntimeInstallJournal.create() else { throw OwnedRuntimeInstallFailure.cleanupPending }
+				errno == ENOENT else { throw OwnedRuntimeInstallFailure.traced(.destination) }
+			guard let journal = OwnedRuntimeInstallJournal.create() else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 			self.journal = journal
 			let stageName = ".runtime-install-" + UUID().uuidString
 			let stage = Self.parentURL.appendingPathComponent(stageName, isDirectory: true)
@@ -74,17 +74,17 @@ final class OwnedRuntimeFirstInstallOwner {
 			let copied = try OwnedRuntimeInstallTree(root: stage, protected: true)
 			try OwnedRuntimeInstallOwner.validateInstalledProductsForPeer(at: stage, leaf: leaf)
 			try copied.verify(); try copied.synchronize(); try verify(); try parent.verifyAnchor()
-			guard let scratch else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			guard let scratch else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 			try journal.beginPublication()
 			try scratch.publishRuntime()
 			let installedURL = Self.parentURL.appendingPathComponent("Runtime", isDirectory: true)
 			let installed = try OwnedRuntimeInstallTree(root: installedURL, protected: true)
 			try OwnedRuntimeInstallOwner.validateInstalledProductsForPeer(at: installedURL, leaf: leaf)
-			guard try source.matchesBytes(of: installed) else { throw OwnedRuntimeInstallFailure.mutated }
+			guard try source.matchesBytes(of: installed) else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 			try installed.verify(); try verify(); try parent.verifyAnchor()
 			try journal.finishPublished()
 			guard installed.releaseOwnedDescriptors(), copied.releaseOwnedDescriptors(),
-				parent.releaseOwnedDescriptors(), daemonParent.releaseOwnedDescriptors() else { throw OwnedRuntimeInstallFailure.cleanupPending }
+				parent.releaseOwnedDescriptors(), daemonParent.releaseOwnedDescriptors() else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 			state = .filesPublished
 		} catch { state = journal == nil && (error as? OwnedRuntimeInstallFailure) != .cleanupPending ? .refused : .cleanupPending; throw error }
 	}
@@ -105,7 +105,7 @@ final class OwnedRuntimeFirstInstallOwner {
 	/// Lends this exact original EX namespace only after native publication completed; no new lock descriptor or receipt.
 	func withPublishedNamespace<T>(_ body: (OwnedRuntimeServiceLifecycleLock) throws -> T) throws -> T {
 		lock.lock(); defer { lock.unlock() }
-		guard state == .filesPublished else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard state == .filesPublished else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		try verify(); return try body(lifecycle)
 	}
 	func snapshot() -> State { lock.lock(); defer { lock.unlock() }; return state }

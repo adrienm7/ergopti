@@ -43,11 +43,11 @@ final class OwnedRuntimeServiceLifecycleLock {
 			let image = try OwnedRuntimeInstallTree(root: Bundle.main.bundleURL, protected: exclusive, includeChildren: exclusive)
 			let admission = {
 				guard publisher.current(), exclusive || installed?.current() == true && installed?.leaf == publisher.leaf else {
-					throw OwnedRuntimeInstallFailure.principal
+					throw OwnedRuntimeInstallFailure.traced(.principal)
 				}
 				try image.verifyAnchor()
 				if exclusive { try image.verify() }
-				guard publisher.current(), exclusive || installed?.current() == true else { throw OwnedRuntimeInstallFailure.principal }
+				guard publisher.current(), exclusive || installed?.current() == true else { throw OwnedRuntimeInstallFailure.traced(.principal) }
 			}
 			return retained(try OwnedRuntimeServiceLifecycleLock(parentURL: parentURL, protected: true,
 				exclusive: exclusive, create: exclusive, admissionTree: image, publisher: publisher, installedPublisher: installed, admission: admission))
@@ -78,13 +78,13 @@ final class OwnedRuntimeServiceLifecycleLock {
 			opened = openat(parentDescriptor, Self.name, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
 			if opened >= 0 {
 				guard fchmod(opened, 0o644) == 0, fsync(opened) == 0, fsync(parentDescriptor) == 0 else {
-					throw OwnedRuntimeInstallFailure.cleanupPending
+					throw OwnedRuntimeInstallFailure.traced(.cleanupPending)
 				}
-			} else { guard errno == EEXIST else { throw OwnedRuntimeInstallFailure.cleanupPending } }
+			} else { guard errno == EEXIST else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) } }
 		}
 		if opened < 0 { opened = openat(parentDescriptor, Self.name, (exclusive ? O_RDWR : O_RDONLY) | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK) }
-		guard opened >= 0, flock(opened, (exclusive ? LOCK_EX : LOCK_SH) | LOCK_NB) == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
-		var held = stat(); guard fstat(opened, &held) == 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard opened >= 0, flock(opened, (exclusive ? LOCK_EX : LOCK_SH) | LOCK_NB) == 0 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
+		var held = stat(); guard fstat(opened, &held) == 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		descriptor = opened; identity = held
 		completed = true // All stored properties are initialized; deinit now owns both descriptors.
 		try verify()
@@ -101,19 +101,19 @@ final class OwnedRuntimeServiceLifecycleLock {
 			defer { acl_free(UnsafeMutableRawPointer(acl)) }
 			var entry: acl_entry_t?; errno = 0
 			guard acl_valid(acl) == 0, acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) == -1, errno == EINVAL else {
-				throw OwnedRuntimeInstallFailure.protection
+				throw OwnedRuntimeInstallFailure.traced(.protection)
 			}
-		} else if errno != ENOENT { throw OwnedRuntimeInstallFailure.protection } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
+		} else if errno != ENOENT { throw OwnedRuntimeInstallFailure.traced(.protection) } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
 	}
 	private func verify(checkAdmission: Bool = true) throws {
-		guard !revoked, !closeRefused else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard !revoked, !closeRefused else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		if checkAdmission { try admission() }; try parent.verifyAnchor()
 		var held = stat(), named = stat()
 		guard fstat(descriptor, &held) == 0, fstatat(parentDescriptor, Self.name, &named, AT_SYMLINK_NOFOLLOW) == 0,
 			held.st_dev == identity.st_dev, held.st_ino == identity.st_ino, named.st_dev == held.st_dev, named.st_ino == held.st_ino,
 			held.st_uid == identity.st_uid, named.st_uid == held.st_uid, !protected || held.st_uid == 0,
 			held.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), held.st_mode & 0o7777 == 0o644,
-			held.st_nlink == 1, held.st_size == 0 else { throw OwnedRuntimeInstallFailure.protection }
+			held.st_nlink == 1, held.st_size == 0 else { throw OwnedRuntimeInstallFailure.traced(.protection) }
 		try Self.emptyACL(descriptor)
 	}
 	func current() -> Bool { lock.lock(); defer { lock.unlock() }; do { try verify(); return true } catch { return false } }
@@ -137,7 +137,7 @@ final class OwnedRuntimeServiceLifecycleLock {
 	/// after the first intentional unlink makes this helper's resource paths unavailable.
 	func withBootstrapStageRemoval<T>(_ body: (() -> Bool) throws -> T) throws -> T {
 		lock.lock(); defer { lock.unlock() }
-		guard protected, exclusive, getuid() == 0, geteuid() == 0 else { throw OwnedRuntimeInstallFailure.principal }
+		guard protected, exclusive, getuid() == 0, geteuid() == 0 else { throw OwnedRuntimeInstallFailure.traced(.principal) }
 		try verify(); let creator = getpid(); var active = true; defer { active = false }
 		return try body {
 			guard active, getpid() == creator, getuid() == 0, geteuid() == 0 else { return false }
@@ -151,7 +151,7 @@ final class OwnedRuntimeServiceLifecycleLock {
 		try verify()
 		let destination = ownedRuntimeLifecycleChildDescriptor()
 		guard destination > STDERR_FILENO, destination != descriptor,
-			posix_spawn_file_actions_adddup2(&actions, descriptor, destination) == 0 else { throw OwnedRuntimeInstallFailure.source }
+			posix_spawn_file_actions_adddup2(&actions, descriptor, destination) == 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 	}
 	/// Close this process's references only. Explicit LOCK_UN would also unlock a surviving inherited CLI reference.
 	func retire() -> Bool {
@@ -172,7 +172,7 @@ final class OwnedRuntimeServiceLifecycleLock {
 	/// Real temporary namespace only. Injected admission refusal cannot create a publisher or installed capability.
 	static func fixtureRejectedInitializerRetirement(parent: URL, rejectAt: Int) throws -> Bool? {
 		guard rejectAt == 1 || rejectAt == 2, Thread.current.threadDictionary[initializerObservationKey] == nil else {
-			throw OwnedRuntimeInstallFailure.source
+			throw OwnedRuntimeInstallFailure.traced(.source)
 		}
 		let observation = InitializerRetirementObservation()
 		Thread.current.threadDictionary[initializerObservationKey] = observation
@@ -182,12 +182,12 @@ final class OwnedRuntimeServiceLifecycleLock {
 			let unexpected = try OwnedRuntimeServiceLifecycleLock(parentURL: parent, protected: false,
 				exclusive: true, create: true, admissionTree: nil, admission: {
 					admissions += 1
-					if admissions == rejectAt { throw OwnedRuntimeInstallFailure.principal }
+					if admissions == rejectAt { throw OwnedRuntimeInstallFailure.traced(.principal) }
 				})
 			_ = unexpected.retire()
-			throw OwnedRuntimeInstallFailure.source
+			throw OwnedRuntimeInstallFailure.traced(.source)
 		} catch OwnedRuntimeInstallFailure.principal {
-			guard admissions == rejectAt else { throw OwnedRuntimeInstallFailure.source }
+			guard admissions == rejectAt else { throw OwnedRuntimeInstallFailure.traced(.source) }
 			return observation.result
 		}
 	}

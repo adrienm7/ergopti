@@ -174,7 +174,7 @@ final class OwnedRuntimeCoreServiceOwner {
 			fields["Label"] as? String == label, fields["ProgramArguments"] as? [String] == [executable],
 			fields["UserName"] as? String == "root", let run = fields["RunAtLoad"] as? NSNumber,
 			CFGetTypeID(run) == CFBooleanGetTypeID(), !run.boolValue, let keep = fields["KeepAlive"] as? NSNumber,
-			CFGetTypeID(keep) == CFBooleanGetTypeID(), !keep.boolValue else { throw OwnedRuntimeInstallFailure.source }
+			CFGetTypeID(keep) == CFBooleanGetTypeID(), !keep.boolValue else { throw OwnedRuntimeInstallFailure.traced(.source) }
 	}
 	private static func parseJobPID(_ text: String) -> pid_t? {
 		guard text.utf8.count <= 131_072, !text.contains("\0") else { return nil }
@@ -238,11 +238,11 @@ private final class OwnedRuntimeCoreServicePlist {
 		var opened: Int32 = -1, completed = false
 		defer { if !completed { if opened >= 0 { Darwin.close(opened) }; Darwin.close(acquiredParentDescriptor) } }
 		opened = openat(parentDescriptor, name, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
-		guard opened >= 0 else { throw OwnedRuntimeInstallFailure.source }
-		var value = stat(); guard fstat(opened, &value) == 0, value.st_size > 0, value.st_size <= 65_536 else { throw OwnedRuntimeInstallFailure.source }
+		guard opened >= 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
+		var value = stat(); guard fstat(opened, &value) == 0, value.st_size > 0, value.st_size <= 65_536 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		identity = value; descriptor = opened
 		var data = Data(count: Int(value.st_size))
-		guard data.withUnsafeMutableBytes({ pread(opened, $0.baseAddress, $0.count, 0) }) == data.count else { throw OwnedRuntimeInstallFailure.source }
+		guard data.withUnsafeMutableBytes({ pread(opened, $0.baseAddress, $0.count, 0) }) == data.count else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		bytes = data
 		completed = true // Initialized self owns both descriptors before any final verification can throw.
 		try verify()
@@ -255,13 +255,13 @@ private final class OwnedRuntimeCoreServicePlist {
 	}
 	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
 	static func fixtureRejectedInitialization(file: URL) throws -> Bool? {
-		guard Thread.current.threadDictionary[initializerObservationKey] == nil else { throw OwnedRuntimeInstallFailure.source }
+		guard Thread.current.threadDictionary[initializerObservationKey] == nil else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		let observation = InitializerRetirementObservation()
 		Thread.current.threadDictionary[initializerObservationKey] = observation
 		defer { Thread.current.threadDictionary.removeObject(forKey: initializerObservationKey) }
 		do {
 			let unexpected = try OwnedRuntimeCoreServicePlist(parent: OwnedRuntimeInstallTree(root: file.deletingLastPathComponent(), protected: false, includeChildren: false), name: file.lastPathComponent)
-			_ = unexpected.retire(); throw OwnedRuntimeInstallFailure.destination
+			_ = unexpected.retire(); throw OwnedRuntimeInstallFailure.traced(.destination)
 		} catch OwnedRuntimeInstallFailure.source { return observation.result }
 		catch OwnedRuntimeInstallFailure.protection { return observation.result }
 	}
@@ -274,7 +274,7 @@ private final class OwnedRuntimeCoreServicePlist {
 		return !closeRefused
 	}
 	func verify() throws {
-		guard !closeAttempted else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard !closeAttempted else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		try parent.verifyAnchor()
 		var held = stat(), named = stat()
 		guard fstat(descriptor, &held) == 0, fstatat(parentDescriptor, name, &named, AT_SYMLINK_NOFOLLOW) == 0,
@@ -283,19 +283,19 @@ private final class OwnedRuntimeCoreServicePlist {
 			held.st_ctimespec.tv_sec == identity.st_ctimespec.tv_sec, held.st_ctimespec.tv_nsec == identity.st_ctimespec.tv_nsec,
 			named.st_dev == held.st_dev, named.st_ino == held.st_ino, held.st_uid == 0, named.st_uid == 0,
 			held.st_nlink == 1, held.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), held.st_mode & 0o6022 == 0 else {
-			throw OwnedRuntimeInstallFailure.protection
+			throw OwnedRuntimeInstallFailure.traced(.protection)
 		}
 		errno = 0
 		if let acl = acl_get_fd_np(descriptor, ACL_TYPE_EXTENDED) {
 			defer { acl_free(UnsafeMutableRawPointer(acl)) }
 			var entry: acl_entry_t?; errno = 0
 			guard acl_valid(acl) == 0, acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) == -1, errno == EINVAL else {
-				throw OwnedRuntimeInstallFailure.protection
+				throw OwnedRuntimeInstallFailure.traced(.protection)
 			}
-		} else if errno != ENOENT { throw OwnedRuntimeInstallFailure.protection } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
+		} else if errno != ENOENT { throw OwnedRuntimeInstallFailure.traced(.protection) } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
 		var current = Data(count: bytes.count)
 		guard current.withUnsafeMutableBytes({ pread(descriptor, $0.baseAddress, $0.count, 0) }) == current.count, current == bytes else {
-			throw OwnedRuntimeInstallFailure.mutated
+			throw OwnedRuntimeInstallFailure.traced(.mutated)
 		}
 	}
 }

@@ -76,7 +76,7 @@ private final class OwnedRuntimeBootstrapStagePlan {
 		snapshot = try OwnedRuntimeInstallTree(root: stage, protected: protected)
 		parentDescriptor = try parentTree.duplicateRootDescriptor()
 		// Initialized self owns the parent and captured nodes; deinit also runs after a late throw.
-		guard try FileManager.default.contentsOfDirectory(atPath: stage.path).sorted() == ["Helper.app"] else { throw OwnedRuntimeInstallFailure.source }
+		guard try FileManager.default.contentsOfDirectory(atPath: stage.path).sorted() == ["Helper.app"] else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		try snapshot.verify(); try capture(parent: parentDescriptor, name: stage.lastPathComponent, relative: "")
 		try snapshot.verify(); try parentTree.verifyAnchor()
 	}
@@ -107,35 +107,35 @@ private final class OwnedRuntimeBootstrapStagePlan {
 	}
 	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
 	static func fixtureRejectedInitializerRetirement(stage: URL) throws -> [OwnedRuntimeBootstrapStageOwner.InitializerCloseResult]? {
-		guard Thread.current.threadDictionary[observationKey] == nil else { throw OwnedRuntimeInstallFailure.source }
+		guard Thread.current.threadDictionary[observationKey] == nil else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		let observation = InitializerRetirementObservation()
 		Thread.current.threadDictionary[observationKey] = observation
 		defer { Thread.current.threadDictionary.removeObject(forKey: observationKey) }
 		do {
 			_ = try OwnedRuntimeBootstrapStagePlan(stage: stage, protected: false)
-			throw OwnedRuntimeInstallFailure.destination
-		} catch OwnedRuntimeInstallFailure.destination { throw OwnedRuntimeInstallFailure.destination }
+			throw OwnedRuntimeInstallFailure.traced(.destination)
+		} catch OwnedRuntimeInstallFailure.destination { throw OwnedRuntimeInstallFailure.traced(.destination) }
 		catch { return observation.result }
 	}
 	#endif
 	private func protection(_ descriptor: Int32, _ value: stat) throws {
-		guard value.st_mode & 0o6022 == 0, !protected || value.st_uid == 0 else { throw OwnedRuntimeInstallFailure.protection }
+		guard value.st_mode & 0o6022 == 0, !protected || value.st_uid == 0 else { throw OwnedRuntimeInstallFailure.traced(.protection) }
 		errno = 0
 		if let acl = acl_get_fd_np(descriptor, ACL_TYPE_EXTENDED) {
 			defer { acl_free(UnsafeMutableRawPointer(acl)) }
 			var entry: acl_entry_t?; errno = 0
 			guard acl_valid(acl) == 0, acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) == -1,
-				errno == EINVAL else { throw OwnedRuntimeInstallFailure.protection }
-		} else if errno != ENOENT { throw OwnedRuntimeInstallFailure.protection } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
+				errno == EINVAL else { throw OwnedRuntimeInstallFailure.traced(.protection) }
+		} else if errno != ENOENT { throw OwnedRuntimeInstallFailure.traced(.protection) } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
 	}
 	private func bytes(_ descriptor: Int32, size: off_t) throws -> Data {
-		guard size >= 0, size <= 268_435_456 else { throw OwnedRuntimeInstallFailure.source }
+		guard size >= 0, size <= 268_435_456 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		var output = Data(count: Int(size)), offset = 0
 		try output.withUnsafeMutableBytes { buffer in
 			while offset < buffer.count {
 				let count = pread(descriptor, buffer.baseAddress!.advanced(by: offset), buffer.count - offset, off_t(offset))
 				if count < 0, errno == EINTR { continue }
-				guard count > 0 else { throw OwnedRuntimeInstallFailure.source }; offset += count
+				guard count > 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }; offset += count
 			}
 		}; return output
 	}
@@ -147,22 +147,22 @@ private final class OwnedRuntimeBootstrapStagePlan {
 				&& value.st_ctimespec.tv_sec == expected.st_ctimespec.tv_sec && value.st_ctimespec.tv_nsec == expected.st_ctimespec.tv_nsec))
 	}
 	private func capture(parent: Int32, name: String, relative: String) throws {
-		guard nodes.count < 4096 else { throw OwnedRuntimeInstallFailure.source }
+		guard nodes.count < 4096 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		var named = stat()
-		guard fstatat(parent, name, &named, AT_SYMLINK_NOFOLLOW) == 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard fstatat(parent, name, &named, AT_SYMLINK_NOFOLLOW) == 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		let directory = named.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR)
-		guard directory || named.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) && named.st_nlink == 1 else { throw OwnedRuntimeInstallFailure.source }
+		guard directory || named.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) && named.st_nlink == 1 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		let descriptor = openat(parent, name, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK | (directory ? O_DIRECTORY : 0))
-		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		var retained = false; defer { if !retained { Darwin.close(descriptor) } }
-		var held = stat(); guard fstat(descriptor, &held) == 0, same(named, held, directory: directory) else { throw OwnedRuntimeInstallFailure.mutated }
+		var held = stat(); guard fstat(descriptor, &held) == 0, same(named, held, directory: directory) else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 		try protection(descriptor, held)
 		let digest = directory ? nil : Data(SHA256.hash(data: try bytes(descriptor, size: held.st_size)))
 		nodes.append(Node(descriptor: descriptor, parent: parent, name: name, relative: relative, identity: held, directory: directory, digest: digest)); retained = true
 		if directory {
 			let path = relative.isEmpty ? stage : stage.appendingPathComponent(relative)
 			for child in try FileManager.default.contentsOfDirectory(atPath: path.path).sorted() {
-				guard !child.isEmpty, child != ".", child != "..", !child.contains("/"), !child.contains("\0") else { throw OwnedRuntimeInstallFailure.source }
+				guard !child.isEmpty, child != ".", child != "..", !child.contains("/"), !child.contains("\0") else { throw OwnedRuntimeInstallFailure.traced(.source) }
 				try capture(parent: descriptor, name: child, relative: relative.isEmpty ? child : relative + "/" + child)
 			}
 		}
