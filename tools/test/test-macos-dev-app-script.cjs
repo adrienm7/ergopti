@@ -10,7 +10,9 @@
  * developer app recorded for this clone, stops a running ErgoptiPlus first
  * (quit, then the guardian launchd keeps alive booted out), fails naming the
  * survivors when a process outlives SIGKILL, refuses off macOS, and names a
- * retired ~/.hammerspoon bootstrap without deleting user configuration.
+ * retired ~/.hammerspoon bootstrap without deleting user configuration, and
+ * signs the build with the stable identity of ~/ErgoptiPlus-signing when it is
+ * there, naming the ad hoc signature otherwise.
  * ==============================================================================
  */
 
@@ -64,6 +66,7 @@ function fixture(name) {
 	fs.writeFileSync(
 		path.join(clone, 'tools/build/build_macos_app.sh'),
 		`echo "build ERGOPTI_DEV_SOURCE=$ERGOPTI_DEV_SOURCE ERGOPTI_LAUNCHER_ARCHS=$ERGOPTI_LAUNCHER_ARCHS" >> "${log}"
+[ -z "$MACOS_SIGNING_CERTIFICATE_BASE64" ] || echo "signed $MACOS_SIGNING_CERTIFICATE_BASE64 $MACOS_SIGNING_CERTIFICATE_PASSWORD" >> "${log}"
 app="$(cd "$(dirname "$0")/../.." && pwd)/build/macos/ErgoptiPlus.app"
 mkdir -p "$app/Contents"
 printf '%s' "$(cd "$(dirname "$0")/../.." && pwd)" > "$app/Contents/Info.plist"\n`
@@ -100,11 +103,16 @@ printf '%s' "$(cd "$(dirname "$0")/../.." && pwd)" > "$app/Contents/Info.plist"\
 
 /** Runs the real runner inside a fixture. */
 function run(paths, args = [], environment = {}) {
+	const inherited = { ...process.env };
+	// A maintainer shell may hold the real identity; the fixture decides.
+	delete inherited.MACOS_SIGNING_CERTIFICATE_BASE64;
+	delete inherited.MACOS_SIGNING_CERTIFICATE_PASSWORD;
+	delete inherited.ERGOPTI_SIGNING_DIR;
 	return spawnSync(bashExecutable(), [path.join(paths.clone, SCRIPT), ...args], {
 		encoding: 'utf8',
 		timeout: 20000,
 		env: {
-			...process.env,
+			...inherited,
 			PATH: `${paths.bin}${path.delimiter}${process.env.PATH}`,
 			HOME: paths.home,
 			XDG_CONFIG_HOME: path.join(paths.home, '.config'),
@@ -121,6 +129,33 @@ function check(name, body) {
 }
 
 try {
+	check('signs the developer app with the stable identity of ~/ErgoptiPlus-signing', () => {
+		// Field report 2026-11-08: an ad hoc developer app cannot install the owned
+		// runtime, so the field run went through a published release instead.
+		const paths = fixture('signed');
+		const identity = path.join(paths.home, 'ErgoptiPlus-signing');
+		fs.mkdirSync(identity);
+		fs.writeFileSync(path.join(identity, 'ErgoptiPlus-signing.p12.base64'), 'UDEyQkFTRTY0');
+		const result = run(paths, [], { MACOS_SIGNING_CERTIFICATE_PASSWORD: 'typed elsewhere' });
+		assert.equal(result.status, 0, result.stderr);
+		assert.match(
+			calls(paths),
+			/^build ERGOPTI_DEV_SOURCE=1 .*\nsigned UDEyQkFTRTY0 typed elsewhere\n/
+		);
+		assert.match(result.stdout, /Signing the developer app with the stable certificate of /);
+	});
+
+	check('names the ad hoc signature when no stable identity is there', () => {
+		const paths = fixture('adhoc');
+		const result = run(paths, [], { ERGOPTI_SIGNING_DIR: path.join(paths.home, 'absent') });
+		assert.equal(result.status, 0, result.stderr);
+		assert.doesNotMatch(calls(paths), /^signed /m);
+		assert.match(
+			result.stdout,
+			/WARNING: no .*absent\/ErgoptiPlus-signing\.p12\.base64: the developer app is signed ad hoc, so Ergopti's own Karabiner runtime refuses to install/
+		);
+	});
+
 	check('builds in developer source mode, then opens the app of this clone', () => {
 		const paths = fixture('build');
 		const result = run(paths);

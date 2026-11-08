@@ -81,8 +81,9 @@ Decisions to know:
 The owned runtime trusts only the stable certificate the CI signs with: the install role takes the helper only when
 it carries the launcher's own certificate leaf, the installed-source capture (`OwnedRuntimeInstalledPeerOwner`) needs
 the same leaf, and the manifest pins it in `capture.requirement`. An ad hoc developer app answers
-`refused|launcher_unsigned` (`install_launcher=refused:adhoc`). Maintainer decision (2026-11-04): the Mac runs the
-signed dev build CI publishes (same certificate as main), and the collector's `--installed` mode reports from it.
+`refused|launcher_unsigned` (`install_launcher=refused:adhoc`). Maintainer decision (2026-11-08, replacing the
+2026-11-04 one): the field run tests the dev branch itself, never a published release; the developer app is built
+signed with the maintainer's copy of that certificate (`~/ErgoptiPlus-signing`).
 No Developer ID for now: one administrator prompt and separate Login Items rows stay (TODO « Owned runtime with a
 Developer ID »).
 
@@ -133,16 +134,14 @@ branch for `.2`), and the downloaded-back asset must match the pin's digest and 
 One command, typed in the clone; nothing else needs a click:
 
 ```sh
-git switch dev && git pull && bash tools/dev/collect-macos-field-report.sh --installed
+git switch dev && git pull && bash tools/dev/collect-macos-field-report.sh
 ```
 
-A push to dev no longer publishes a prerelease by itself: when the fix to check is newer than the newest dev
-prerelease, request one first (a commit carrying `Dev-Prerelease: yes`, see `docs/memory/maintainer-decisions.md`)
-and wait for its release run. It installs or updates `/Applications/ErgoptiPlus.app` from the newest signed dev prerelease (size and SHA-256 from
-the release's `macos-publication.json`, strict deep signature, the CI certificate leaf the runtime manifest pins;
-`tools/dev/install-macos-dev-prerelease.sh`), quits the old copy, opens the new one with this clone as its field-run
-root (`open --env ERGOPTI_FIELD_RUN_ROOT=…`, admitted by the launcher only for a folder of this user holding the
-declaration), and runs the whole field run in it:
+It builds the developer app of this clone signed with the stable certificate (`tools/dev/run-macos-dev-app.sh` reads
+`~/ErgoptiPlus-signing/ErgoptiPlus-signing.p12.base64`, or `ERGOPTI_SIGNING_DIR`, and asks for the `.p12` password
+unless `MACOS_SIGNING_CERTIFICATE_PASSWORD` is set), rebuilds an app whose designated requirement is not the one the
+runtime manifest pins, stops when the build still lacks it, and runs the whole field run in it; no release is
+needed:
 
 1. `field_owned_install`: the owned runtime is installed with no click of Ergopti's. Type the administrator password
    when macOS asks (the terminal says so).

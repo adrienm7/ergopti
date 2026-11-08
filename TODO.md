@@ -1077,9 +1077,9 @@ between workers) green alone. All live checks pass, typed by the harness.
     macos-15, macos-15-intel and macos-26 (Remap runtime build run 41895547018: files, Core and VirtualHIDDevice jobs
     loaded, pqrs' package installed in the same shell, stage retired). The install is offered once by itself (one
     confirmation, one administrator prompt), the driver approval pane opens and is watched, the Tap-Holds row retries;
-    the field run and the collector (`--installed`) report every install fact.
-  - Decided: field-tested on the CI-signed dev build, never the ad hoc developer app; no Developer ID for now (item
-    below).
+    the field run and the collector report every install fact.
+  - Decided (2026-11-08): field-tested on the dev branch's developer app signed with the stable certificate, never a
+    published release and never an ad hoc app; no Developer ID for now (item below).
   - Next: the maintainer's WP9 pass (handoff checklist) once a signed dev build is authorized, then the shared-mode
     deletion. Done on 1 November: the per-OS feature requirements table (`docs/design/feature-requirements.md`) and
     the driver-only VirtualHIDDevice update offer (3ebab93a17).
