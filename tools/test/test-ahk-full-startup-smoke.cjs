@@ -213,13 +213,16 @@ function hotstringsRenderTimes(configRoot) {
 // is involved: the typed personal_info.toml parse adds 118 slow lexer steps
 // (suspend-marker 391 -> 509, realistic 13420 -> 13538), and the settings
 // added to the generated config template since then add 4 flat values
-// (realistic 1197 -> 1201).
+// (realistic 1197 -> 1201). neutral-defaults seeds the whole generated
+// template, which 8f859044ea grew by the two WPM notification-area settings,
+// and its boot parses that config.toml eight times: 11943 -> 12109 slow
+// steps (118 personal_info + 48) and 2179 -> 2191 flat values.
 const BOOT_OPERATION_CEILINGS = {
 	'config.snapshot_read': { all: 9 },
 	'toml.document_parse': { all: 15, [REALISTIC_HOTSTRINGS_FIXTURE]: 18 },
 	'config_migrate.registry_deep_compares': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
-	'toml.document_slow_steps': { all: 11943, [REALISTIC_HOTSTRINGS_FIXTURE]: 13538 },
-	'toml.flat_values': { all: 2181, [REALISTIC_HOTSTRINGS_FIXTURE]: 1201 }
+	'toml.document_slow_steps': { all: 12109, [REALISTIC_HOTSTRINGS_FIXTURE]: 13538 },
+	'toml.flat_values': { all: 2191, [REALISTIC_HOTSTRINGS_FIXTURE]: 1201 }
 };
 
 /**
