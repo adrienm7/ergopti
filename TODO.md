@@ -14,9 +14,12 @@ the field-run step or the hand action that proves it and the commits it confirms
       record named them: the typed personal_info.toml read (ad8268b7da, kept, ceiling 15) and an absent override
       file parsed as an empty document (3e25e5d71c, no longer parsed). The extra registry compare is 424b4a26d8's
       boot-tail snapshot proof (kept, ceiling 14).
-- [ ] **[TEST] layout-row-external-native-flags (released):** fails about every other hosted run with « q » for « Q ».
-      09fb9c0458 prints the receiver's Shift state and the sender's output; read them on the next failure and
-      fix the test race or the lost flag they show.
+- [x] **[TEST] layout-row-external-native-flags (released):** the receipt showed a test-side race: the receiving
+      keydown carried Shift (receipt Shift=1) and the sender passed, but the receiver's own translation ran under
+      the later state and wrote « q ». The probe now checks the character that keydown types under its own state.
+- [ ] **[TEST] llm-debounce-password-source-privacy (plain-stays):** the rolling context once lacked one unit
+      (« cnary ») while the Edit and the I1 callback held the whole canary. The test now prints
+      `LLM_DEBOUNCE_BUFFER_GAP` with the per-character trace; read it on the next failure.
 - [x] **[TEST] LLM debounce privacy probes:** the trace showed a real Windows bug: a late key-down of the last
       typed letter cancelled the debounce its character had just armed (66afcf12e3). Fixed by 679e279d19.
 
