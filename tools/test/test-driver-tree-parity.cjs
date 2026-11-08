@@ -260,8 +260,8 @@ const BASELINE_SHARED = 39;
 //   locales because those scripts run before LuaJIT can be assumed. The macOS
 //   and Windows installers are not shell scripts printing to a terminal, so a
 //   counterpart folder there would hold nothing.
-//   63 -> 65 on 2026-11-07 (provisional coordinator decision, to confirm with
-//   the maintainer) - windows/native/keyboard_layout holds the C, header,
+//   63 -> 65 on 2026-11-07, confirmed by the maintainer on 2026-11-08 -
+//   windows/native/keyboard_layout holds the C, header,
 //   resource and module-definition sources generated from the .keylayout that
 //   the Windows keyboard DLL compiles from, and windows/vendor/keyboard_layout
 //   the elevated installer of that DLL. macOS and Linux install the .keylayout

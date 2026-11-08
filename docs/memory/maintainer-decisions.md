@@ -53,7 +53,7 @@ for the user from the layout manager (install.sh on Xorg), and Windows from
 Layout > « Download the Ergopti system layout installer » (`layout_system_install`,
 `windows/modules/keymap/system_layout_install.ahk`). The Windows installer is
 UNSIGNED by decision (2026-11-06), and the row's label says it; since 2026-11-07
-(provisional, below) the row opens its download instead of running it. Its keyboard DLL is
+(confirmed 2026-11-08, below) the row opens its download instead of running it. Its keyboard DLL is
 generated from the registry `.keylayout` (`codegen-windows-keyboard-layout.cjs`,
 written from kbd.h, no MSKLC; kalamine may be read for ideas, never copied)
 and built in CI
@@ -711,9 +711,9 @@ migration whose source holds unrelated content expects this explicit refusal,
 not a settled rewrite. Pinned by `test_common_autocorrection_migration.ahk`
 (`common-autocorrection-split`, native initialization).
 
-## The Windows keyboard DLL folders are genuinely per-driver (2026-11-07, provisional)
+## The Windows keyboard DLL folders are genuinely per-driver (2026-11-07, confirmed 2026-11-08)
 
-Provisional coordinator decision, to confirm with the maintainer.
+Proposed by the coordinator on 2026-11-07, confirmed by the maintainer on 2026-11-08.
 `windows/native/keyboard_layout` (the keyboard DLL sources generated from the
 .keylayout) and `windows/vendor/keyboard_layout` (its elevated installer) exist
 on Windows only: macOS and Linux install the .keylayout and XKB files
@@ -722,9 +722,9 @@ raising `BASELINE_UNION` 63 → 65 with a dated note. Action: no counterpart
 folder is created on macOS or Linux, and these files are not moved into another
 folder to dodge the count.
 
-## The Windows layout installer ships outside the exe (2026-11-07, provisional)
+## The Windows layout installer ships outside the exe (2026-11-07, confirmed 2026-11-08)
 
-Provisional coordinator decision, 2026-11-07, to confirm with the maintainer.
+Proposed by the coordinator on 2026-11-07, confirmed by the maintainer on 2026-11-08.
 The elevated keyboard layout installer and its P/Invoke
 (`windows/vendor/keyboard_layout/*.ps1`) and the keyboard DLL builds never ship
 in `ErgoptiPlus.exe`: the exclude group `system-layout-installer` of

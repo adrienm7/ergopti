@@ -52,8 +52,8 @@ builds into System32 and SysWOW64 and registers the layout under the first free
 `A0nn040C` KLID. `add_user_keyboard_layout.ps1` then adds it to the user's
 languages, as the user. The package's `install.cmd` runs both.
 
-`ErgoptiPlus.exe` carries neither these scripts nor the DLLs (provisional
-coordinator decision of 2026-11-07, `docs/memory/maintainer-decisions.md`): the
+`ErgoptiPlus.exe` carries neither these scripts nor the DLLs (maintainer
+decision of 2026-11-08, `docs/memory/maintainer-decisions.md`): the
 exclude group `system-layout-installer` of `tools/build/windows_bundle_manifest.json`
 keeps `vendor/keyboard_layout` out of the bundle, whose UAC wording and P/Invoke
 counts `tools/test/test-windows-exe-av-surface.cjs` holds. Layout > « Download the
