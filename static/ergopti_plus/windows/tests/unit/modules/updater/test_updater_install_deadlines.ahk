@@ -36,11 +36,15 @@ _UpdaterTest_ExplicitChannelTransitionUsesReleasePolicy() {
 	ShouldOffer := _UpdaterTest_ResolveFunction("UpdateChannels_ShouldOffer")
 	Publish := _UpdaterTest_ResolveFunction("_Updater_PublishOneClickRelease")
 	Workflow := FileRead(A_ScriptDir . "\..\..\..\..\.github\workflows\ci.yml", "UTF-8")
-	TagTemplate := 'tag="v0.0.0-dev.${next_n}"'
+	; Since 2026-11-08 a dev tag is a prerelease of the patch after the last
+	; stable tag: the template is instantiated after a 1.0.0 stable tag.
+	TagTemplate := 'tag="v${maj}.${min}.$((pat + 1))-dev.${next_n}"'
 	Assert(InStr(Workflow, TagTemplate) > 0,
 		"the regression must consume the exact dev tag family owned by CI")
-	DevCandidate := StrReplace(
-		SubStr(TagTemplate, 6, StrLen(TagTemplate) - 6), "${next_n}", "117")
+	DevCandidate := SubStr(TagTemplate, 6, StrLen(TagTemplate) - 6)
+	for Placeholder, Value in Map("${maj}", "1", "${min}", "0", "$((pat + 1))", "1", "${next_n}", "117")
+		DevCandidate := StrReplace(DevCandidate, Placeholder, Value)
+	AssertEqual("v1.0.1-dev.117", DevCandidate)
 	AssertEqual(true, ShouldOffer.Call(
 		DevCandidate, "1.0.0", "dev", "main"),
 		"an explicit stable-to-dev transition must offer the CI dev candidate")
