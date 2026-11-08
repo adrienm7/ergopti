@@ -170,7 +170,7 @@ With [Homebrew](https://brew.sh), pick the stable or the dev channel:
 ```bash
 brew tap adrienm7/ergopti
 brew install --cask ergoptiplus        # stable releases
-brew install --cask ergoptiplus@dev   # every dev prerelease
+brew install --cask ergoptiplus@dev   # dev prereleases
 ```
 
 `brew upgrade` updates it with your other casks, and the app still updates

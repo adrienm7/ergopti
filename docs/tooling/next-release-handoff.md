@@ -136,7 +136,9 @@ One command, typed in the clone; nothing else needs a click:
 git switch dev && git pull && bash tools/dev/collect-macos-field-report.sh --installed
 ```
 
-It installs or updates `/Applications/ErgoptiPlus.app` from the newest signed dev prerelease (size and SHA-256 from
+A push to dev no longer publishes a prerelease by itself: when the fix to check is newer than the newest dev
+prerelease, request one first (a commit carrying `Dev-Prerelease: yes`, see `docs/memory/maintainer-decisions.md`)
+and wait for its release run. It installs or updates `/Applications/ErgoptiPlus.app` from the newest signed dev prerelease (size and SHA-256 from
 the release's `macos-publication.json`, strict deep signature, the CI certificate leaf the runtime manifest pins;
 `tools/dev/install-macos-dev-prerelease.sh`), quits the old copy, opens the new one with this clone as its field-run
 root (`open --env ERGOPTI_FIELD_RUN_ROOT=…`, admitted by the launcher only for a folder of this user holding the

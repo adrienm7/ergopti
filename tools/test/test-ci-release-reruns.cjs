@@ -523,6 +523,9 @@ function noRelease(result, notice) {
 	if (notice) assert.match(result.stdout, notice);
 }
 
+/** A dev commit message that requests a prerelease. */
+const REQUEST = '\n\nDev-Prerelease: yes';
+
 /** Asserts a plan run that publishes `tag`. */
 function releases(result, tag) {
 	assert.equal(result.status, 0, result.stdout + result.stderr);
@@ -570,7 +573,7 @@ check('dev: the notice says how to finish a half-published release without a dea
 
 check('dev: a new commit publishes under the next dev tag', () => {
 	git(dev, 'checkout', '--quiet', '--detach', d3);
-	const d4 = commit(dev, 'chore: four');
+	const d4 = commit(dev, 'chore: four' + REQUEST);
 	const result = plan(dev, d4, 'refs/heads/dev');
 	assert.equal(result.status, 0, result.stderr);
 	assert.deepEqual(result.outputs, {
@@ -607,7 +610,7 @@ check('dev: after a force push, a commit that an older tag contains is not publi
 		/::notice::This commit is already part of v0\.0\.0-dev\.2, /
 	);
 	git(forced, 'checkout', '--quiet', '--detach', b1);
-	releases(plan(forced, commit(forced, 'chore: b2'), 'refs/heads/dev'), 'v0.0.0-dev.4');
+	releases(plan(forced, commit(forced, 'chore: b2' + REQUEST), 'refs/heads/dev'), 'v0.0.0-dev.4');
 });
 
 check('dev: a failing git tag fails plan instead of reading as "never released"', () => {
@@ -633,7 +636,72 @@ check('dev: a failing git tag fails plan instead of reading as "never released"'
 
 check('dev: the first dev release is planned without any tag', () => {
 	const fresh = repository('fresh', 'dev');
-	releases(plan(fresh, commit(fresh, 'chore: first'), 'refs/heads/dev'), 'v0.0.0-dev.1');
+	releases(plan(fresh, commit(fresh, 'chore: first' + REQUEST), 'refs/heads/dev'), 'v0.0.0-dev.1');
+});
+
+check('dev: a push without a request runs CI and publishes nothing', () => {
+	const quiet = repository('quiet', 'dev');
+	git(quiet, 'tag', 'v1.0.9', commit(quiet, 'chore: stable'));
+	git(quiet, 'tag', 'v1.0.10-dev.170', commit(quiet, 'chore: last dev'));
+	noRelease(
+		plan(quiet, commit(quiet, 'fix: a field report'), 'refs/heads/dev'),
+		/::notice::No 'Dev-Prerelease: yes' line in a commit since v1\.0\.10-dev\.170: CI profile, no prerelease\. Request one with: git commit --allow-empty/
+	);
+});
+
+check('dev: a request on an older commit since the last dev tag still applies', () => {
+	const carried = repository('carried', 'dev');
+	git(carried, 'tag', 'v1.0.9', commit(carried, 'chore: stable'));
+	git(carried, 'tag', 'v1.0.10-dev.170', commit(carried, 'chore: last dev'));
+	commit(carried, 'fix: one' + REQUEST);
+	releases(plan(carried, commit(carried, 'fix: two'), 'refs/heads/dev'), 'v1.0.10-dev.171');
+});
+
+check('dev: a request before the last dev tag does not carry past it', () => {
+	const spent = repository('spent', 'dev');
+	git(spent, 'tag', 'v1.0.9', commit(spent, 'chore: stable'));
+	git(spent, 'tag', 'v1.0.10-dev.170', commit(spent, 'fix: published' + REQUEST));
+	noRelease(plan(spent, commit(spent, 'fix: later'), 'refs/heads/dev'), /No 'Dev-Prerelease: yes'/);
+});
+
+check('dev: an empty commit requests a prerelease of what dev already holds', () => {
+	const empty = repository('empty-request', 'dev');
+	git(empty, 'tag', 'v1.0.9', commit(empty, 'chore: stable'));
+	git(empty, 'tag', 'v1.0.10-dev.170', commit(empty, 'chore: last dev'));
+	commit(empty, 'fix: the field report correction');
+	releases(
+		plan(
+			empty,
+			commit(empty, 'chore(release): request a dev prerelease' + REQUEST),
+			'refs/heads/dev'
+		),
+		'v1.0.10-dev.171'
+	);
+});
+
+check('dev: a line inside prose or any other value is not a silent request', () => {
+	const prose = repository('request-prose', 'dev');
+	git(prose, 'tag', 'v1.0.10-dev.170', commit(prose, 'chore: last dev'));
+	noRelease(
+		plan(
+			prose,
+			commit(prose, 'docs: syntax\n\n  Dev-Prerelease: yes is the line'),
+			'refs/heads/dev'
+		),
+		/No 'Dev-Prerelease: yes'/
+	);
+	const wrong = repository('request-wrong', 'dev');
+	git(wrong, 'tag', 'v1.0.10-dev.170', commit(wrong, 'chore: last dev'));
+	refuses(
+		plan(wrong, commit(wrong, 'fix: one\n\nDev-Prerelease: true'), 'refs/heads/dev'),
+		/::error::Dev-Prerelease 'true' is not 'yes'/
+	);
+});
+
+check('main: a Dev-Prerelease line changes nothing on main', () => {
+	const result = mainBump('dev-request-on-main', ['fix: a bug' + REQUEST]);
+	releases(result, 'v1.2.4');
+	assert.match(result.stdout, /::notice::Dev-Prerelease applies to dev only/);
 });
 
 check('dev: a dev tag is a prerelease of the patch after the last stable tag', () => {
@@ -643,11 +711,14 @@ check('dev: a dev tag is a prerelease of the patch after the last stable tag', (
 	git(next, 'tag', 'v0.0.0-dev.168', commit(next, 'feat: a feature'));
 	// Up to the bridge, the counter keeps the legacy core installed builds
 	// still match, even after a stable tag.
-	releases(plan(next, commit(next, 'fix: the bridge'), 'refs/heads/dev'), 'v0.0.0-dev.169');
+	releases(
+		plan(next, commit(next, 'fix: the bridge' + REQUEST), 'refs/heads/dev'),
+		'v0.0.0-dev.169'
+	);
 	git(next, 'tag', 'v0.0.0-dev.169', 'HEAD');
 	// The legacy series' counter continues under the new core, whatever the
 	// subjects: the breaking and feat commits leave it at the next patch.
-	const first = plan(next, commit(next, 'fix: one'), 'refs/heads/dev');
+	const first = plan(next, commit(next, 'fix: one' + REQUEST), 'refs/heads/dev');
 	assert.deepEqual(first.outputs, {
 		release: 'true',
 		tag: 'v1.0.10-dev.170',
@@ -660,11 +731,11 @@ check('dev: a dev tag is a prerelease of the patch after the last stable tag', (
 	// The newest dev tag is the highest counter, not the highest core or the
 	// latest text order: v0.0.0-dev.99 sorts after v1.0.10-dev.170 as text.
 	git(next, 'tag', 'v0.0.0-dev.99', s1);
-	releases(plan(next, commit(next, 'fix: two'), 'refs/heads/dev'), 'v1.0.10-dev.171');
+	releases(plan(next, commit(next, 'fix: two' + REQUEST), 'refs/heads/dev'), 'v1.0.10-dev.171');
 	git(next, 'tag', 'v1.0.10-dev.171', 'HEAD');
 	// A new stable tag moves the core and never restarts the counter.
 	git(next, 'tag', 'v1.0.10', 'HEAD');
-	releases(plan(next, commit(next, 'fix: three'), 'refs/heads/dev'), 'v1.0.11-dev.172');
+	releases(plan(next, commit(next, 'fix: three' + REQUEST), 'refs/heads/dev'), 'v1.0.11-dev.172');
 });
 
 const main = repository('main', 'main');
@@ -892,7 +963,7 @@ check('dev: a Release-As, even a malformed one, is ignored with a notice', () =>
 	const work = repository('dev-release-as', 'dev');
 	const result = plan(
 		work,
-		commit(work, 'feat: diagnostics\n\nRelease-As: 1.2.4'),
+		commit(work, 'feat: diagnostics\n\nRelease-As: 1.2.4' + REQUEST),
 		'refs/heads/dev'
 	);
 	releases(result, 'v0.0.0-dev.1');
@@ -902,7 +973,11 @@ check('dev: a Release-As, even a malformed one, is ignored with a notice', () =>
 		/::notice::Release-As '1\.2\.4' in commit [0-9a-f]{12} applies to main only: dev keeps v0\.0\.0-dev\.1\./
 	);
 	git(work, 'tag', 'v0.0.0-dev.1', 'HEAD');
-	const malformed = plan(work, commit(work, 'fix: x\n\nRelease-As: v9'), 'refs/heads/dev');
+	const malformed = plan(
+		work,
+		commit(work, 'fix: x\n\nRelease-As: v9' + REQUEST),
+		'refs/heads/dev'
+	);
 	releases(malformed, 'v0.0.0-dev.2');
 	assert.match(
 		malformed.stdout,
@@ -921,7 +996,7 @@ check('a tag outside the series, even one the glob matches, does not count as pu
 	const hotfix = repository('hotfix', 'dev');
 	const h1 = commit(hotfix, 'chore: one');
 	git(hotfix, 'tag', 'v0.0.0-dev.1', h1);
-	const h2 = commit(hotfix, 'chore: two');
+	const h2 = commit(hotfix, 'chore: two' + REQUEST);
 	git(hotfix, 'tag', 'v0.0.0-dev.1-hotfix', h2);
 	releases(plan(hotfix, h2, 'refs/heads/dev'), 'v0.0.0-dev.2');
 });
