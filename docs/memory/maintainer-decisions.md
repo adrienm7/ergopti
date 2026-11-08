@@ -751,6 +751,7 @@ lower version (`Release-As`), and the updaters would keep offering the older
 build. The `v0.0.0-dev.N` tags before 2026-11-08 are the same series; the dev
 channel of `_shared/modules/updater/channels.json` matches any core since
 `v0.0.0-dev.169`, the bridge release that installed builds, which only know the
-old rule, still pick up. Action: never delete `v0.0.0-dev.169`; compute the dev
+old rule, still pick up; `ci.yml` keeps the `0.0.0` core for every counter up to 169, so a failed bridge run is
+published by the next push under the same legacy name. Action: never delete `v0.0.0-dev.169`; compute the dev
 tag in `ci.yml` (pinned by `test-ci-release-reruns.cjs`), and read the series
 with the general `-dev.N` pattern everywhere a dev tag is listed.

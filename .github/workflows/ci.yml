@@ -269,6 +269,14 @@ jobs:
                   next_n=$((last_n + 1))
                   request_range="${last_dev}..HEAD"
               fi
+              # Installed builds before the bridge match only v0.0.0-dev.N, so
+              # counters up to it keep that core: a bridge run that fails is
+              # published by the next push under the same legacy name, never
+              # skipped by a release those builds cannot see.
+              bridge_n=169
+              if [ "$next_n" -le "$bridge_n" ]; then
+                  maj=0; min=0; pat=-1
+              fi
               tag="v${maj}.${min}.$((pat + 1))-dev.${next_n}"
               prerelease="true"
 
