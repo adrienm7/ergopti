@@ -12,6 +12,11 @@
 # The pin is then applied with `remap_runtime_publish.py apply` in a commit:
 # this workflow publishes the file only, never the pin.
 #
+# A dispatch names the run. GitHub dispatches only workflows the default
+# branch already holds, so a push to dev or main that changes
+# .github/ci/remap-runtime-publication.json ({"run_id": "<id>"}) requests the
+# same publication.
+#
 # Only the repository owner can run it. The release is a prerelease that is
 # never "latest", so the application's update check keeps reading the app
 # releases. PAT_ERGOPTI creates the tag, which the repository's tag rule
@@ -26,6 +31,10 @@ on:
         description: Id of the green "Remap runtime build" run whose owned-remap-runtime artifact to publish
         type: string
         required: true
+  push:
+    branches: [dev, main]
+    paths:
+      - '.github/ci/remap-runtime-publication.json'
 
 permissions:
   contents: read
@@ -41,11 +50,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read the requested run
+        id: request
+        env:
+          DISPATCHED: ${{ inputs.run_id }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+              run_id="$DISPATCHED"
+          else
+              run_id=$(jq -er '.run_id | strings' .github/ci/remap-runtime-publication.json) \
+                  || { echo "::error::.github/ci/remap-runtime-publication.json names no run_id string."; exit 1; }
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
       - name: Admit the build run
         id: run
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ inputs.run_id }}
+          RUN_ID: ${{ steps.request.outputs.run_id }}
         run: |
           set -euo pipefail
           [[ "$RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]] || { echo "::error::run_id '$RUN_ID' is not a run id."; exit 1; }
@@ -62,7 +85,7 @@ jobs:
         id: artifact
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ inputs.run_id }}
+          RUN_ID: ${{ steps.request.outputs.run_id }}
         run: |
           set -euo pipefail
           work="$RUNNER_TEMP/runtime-artifact"
@@ -99,7 +122,7 @@ jobs:
       - name: Create the prerelease with the artifact
         env:
           GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
-          RUN_ID: ${{ inputs.run_id }}
+          RUN_ID: ${{ steps.request.outputs.run_id }}
           TAG: ${{ steps.artifact.outputs.tag }}
           VERSION: ${{ steps.artifact.outputs.version }}
           FILE: ${{ steps.artifact.outputs.file }}
