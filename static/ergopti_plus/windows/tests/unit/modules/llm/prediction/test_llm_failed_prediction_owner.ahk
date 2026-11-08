@@ -638,6 +638,11 @@ _LDP_PrivacyTraceState() {
 _LDP_Char(State, IH, Char) {
     if !State.InputActive
         return
+    ; The production callbacks this one stands for (_OnPrefixChar and
+    ; _LLM_Bridge_OnDispatcherChar) serialize from admission. Recording the
+    ; character first and forwarding it after interruptible checks let a later
+    ; callback overtake it: « allowed_cotext_b_canaryn » on a hosted runner.
+    EntryCritical := Critical("On")
     try {
         State.InputChars .= Char
         State.InputCallbacks += 1
@@ -673,7 +678,7 @@ _LDP_Char(State, IH, Char) {
             "before", Before, "after", After))
     } catch Any as Err {
         State.Failure := Err
-    }
+    } finally Critical(EntryCritical)
 }
 _LDP_Down(State, IH, VK, SC) {
     if !State.InputActive

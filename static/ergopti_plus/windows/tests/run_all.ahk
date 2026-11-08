@@ -1948,6 +1948,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/modules/llm/api/test_llm_api_no_entry_logged.ahk
 #Include meta/modules/llm/prediction/test_llm_cancel_not_under_critical.ahk
 #Include meta/modules/llm/prediction/test_llm_dispatch_not_under_critical.ahk
+#Include meta/modules/llm/prediction/test_llm_dispatcher_char_serialized.ahk
 #Include meta/modules/llm/servers/test_deps_fail_restores_priority.ahk
 #Include meta/modules/llm/navigation/test_tab_accept_invalidates_inflight.ahk
 #Include meta/modules/llm/navigation/test_llm_accept_suppress_balance.ahk

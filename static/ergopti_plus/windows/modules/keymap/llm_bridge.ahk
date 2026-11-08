@@ -1259,16 +1259,24 @@ _LLM_Bridge_UnregisterDispatcherFallback() {
 ; which left this path as the only unattributed candidate. Two QPC reads, and the
 ; line is gated by the profiler floor so ordinary typing logs nothing.
 _LLM_Bridge_OnDispatcherChar(ih, ch) {
-	if A_IsSuspended || (IsSet(_PrefixInputHook) && _PrefixInputHook)
-		return
-	if !IsObject(ih) || !IsObject(HookDispatcher._ih)
-		|| ObjPtr(ih) != ObjPtr(HookDispatcher._ih)
-		return
-	if _PrefixPrepareScalarContext(ch) < 0
-		return
-	_hpLlmChar := HotPath_Now()
-	LLM_Bridge_OnChar(ch)
-	HotPath_LogIfSlow("LLM.OnChar", _hpLlmChar, "")
+	; Serialize from admission, as _OnPrefixChar does. LLM_Bridge_OnChar leaves
+	; Critical between its entry snapshot and its append, so the callback of a
+	; later character could commit first: its generation check then dropped this
+	; character from the rolling context (a hosted runner typed « canary » and
+	; the context held « cnary »).
+	PreviousCritical := Critical("On")
+	try {
+		if A_IsSuspended || (IsSet(_PrefixInputHook) && _PrefixInputHook)
+			return
+		if !IsObject(ih) || !IsObject(HookDispatcher._ih)
+			|| ObjPtr(ih) != ObjPtr(HookDispatcher._ih)
+			return
+		if _PrefixPrepareScalarContext(ch) < 0
+			return
+		_hpLlmChar := HotPath_Now()
+		LLM_Bridge_OnChar(ch)
+		HotPath_LogIfSlow("LLM.OnChar", _hpLlmChar, "")
+	} finally Critical(PreviousCritical)
 }
 
 _LLM_Bridge_OnDispatcherKey(ih, vk, sc) {
