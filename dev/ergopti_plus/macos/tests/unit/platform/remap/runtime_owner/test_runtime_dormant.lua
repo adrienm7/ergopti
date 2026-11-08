@@ -198,6 +198,19 @@ helpers.describe("the remap bridge reaches the owned runtime only after an opt-i
 		helpers.assert_true(source:find("ManagedRuleRemoval.remove_managed_rules(path or KARABINER_OUT)", 1, true) ~= nil)
 	end)
 
+	helpers.it("stops the lease recovery instead of exhausting it while ours is not admitted", function()
+		-- Issue #106: three refused regenerations ended in "auto-recovery
+		-- exhausted", an error that hid the owner's named reason.
+		local source = init_source()
+		local attempt = source:find("local function finish_attempt(ok, reason)", 1, true)
+		local stop = source:find('if reason == "owned-runtime-not-admitted" then', attempt, true)
+		local cancel = source:find('cancel_lease_recovery("owned-runtime-not-admitted")', stop, true)
+		local failed = source:find('"Karabiner lease auto-recovery attempt %d failed: %s."', attempt, true)
+		helpers.assert_true(attempt ~= nil and stop ~= nil and cancel ~= nil and failed ~= nil
+			and stop < cancel and cancel < failed,
+			"the refusal before admission cancels the series before it counts as a failed attempt")
+	end)
+
 	helpers.it("saves a bulk edit for the admission instead of reverting it while ours is not admitted", function()
 		-- Restore recommended on a Mac without the runtime reverted its edit and
 		-- opened a blocking dialog (E2E, hardening-a/b, owned default).
