@@ -2523,6 +2523,16 @@ local function run_lease_recovery_attempt(recovery, guardian_proven_ready)
 			cancel_lease_recovery("recovered")
 			return
 		end
+		if reason == "owned-runtime-not-admitted" then
+			-- Not a lease failure: nothing can regenerate before Ergopti's own
+			-- runtime is admitted, and its admission regenerates by itself
+			-- (M._owned.reconcile). Retrying ended in "auto-recovery exhausted",
+			-- an error that hid the owner's named reason (issue #106).
+			Logger.info(LOG, "Karabiner lease auto-recovery stopped: Ergopti's own Karabiner "
+				.. "runtime is not admitted yet; its owner names why and regenerates once admitted.")
+			cancel_lease_recovery("owned-runtime-not-admitted")
+			return
+		end
 		Logger.warn(LOG, "Karabiner lease auto-recovery attempt %d failed: %s.",
 			attempt_number, tostring(reason))
 		if recovery.refund_current_attempt then
