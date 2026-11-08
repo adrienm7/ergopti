@@ -5,16 +5,19 @@
  * MODULE: macOS Owned Runtime Code Hash Rule
  * DESCRIPTION:
  * The published installer helper carries one SHA-256 code directory per slice.
- * OwnedRuntimeInstallMainOperation.codeDirectoryHashes admits one or two
+ * OwnedRuntimePublisherSignature.codeDirectoryHashes admits one or two
  * distinct hashes; every launcher source that reads a code's directory hashes
  * must go through it, so the install path and the helper's own report path
- * cannot drift apart again.
+ * cannot drift apart again. Its file is one every helper roster compiles.
  *
  * ROOT CAUSE ENCODED:
  * Field report 2026-11-05: the launcher's install check was relaxed to one
  * hash, but OwnedVirtualHIDDaemonReportStageOwner.admitImage, compiled into
  * the helper, still read kSecCodeInfoCdHashes itself and required exactly
- * two, so the helper's report path refused the published helper.
+ * two, so the helper's report path refused the published helper. The shared
+ * rule then lived in OwnedRuntimeInstallMainOperation.swift, which no helper
+ * roster compiles, and the signed artifact no longer built (remap runtime
+ * build 42524447885).
  * ==============================================================================
  */
 
@@ -26,7 +29,7 @@ const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SOURCES = 'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus';
-const OWNER = 'OwnedRuntimeInstallMainOperation.swift';
+const OWNER = 'OwnedRuntimePublisherIdentity.swift';
 let checks = 0;
 
 function check(name, run) {
@@ -66,8 +69,21 @@ check("the helper's report path admits its image through the same rule", () => {
 	const start = stage.text.indexOf('private func admitImage() -> Bool {');
 	assert.ok(start >= 0, 'admitImage must exist');
 	const body = stage.text.slice(start, stage.text.indexOf('\n\t}\n', start));
-	assert.match(body, /OwnedRuntimeInstallMainOperation\.codeDirectoryHashes\(info\)/);
+	assert.match(body, /OwnedRuntimePublisherSignature\.codeDirectoryHashes\(info\)/);
 	assert.doesNotMatch(body, /hashes\.count == 2/);
+});
+
+check('the admission rule is compiled into every installer helper roster', () => {
+	const build = fs.readFileSync(
+		path.join(ROOT, 'tools/build/owned_runtime_product_build.py'),
+		'utf8'
+	);
+	for (const roster of ['HELPER_SOURCES', 'VALIDATOR_SOURCES']) {
+		const start = build.indexOf(`${roster} = (`);
+		assert.ok(start >= 0, `${roster} must exist`);
+		const body = build.slice(start, build.indexOf('\n)', start));
+		assert.ok(body.includes(`SWIFT + "${OWNER}"`), `${roster} must compile ${OWNER}`);
+	}
 });
 
 console.log(`# passed: ${checks}/${checks}`);

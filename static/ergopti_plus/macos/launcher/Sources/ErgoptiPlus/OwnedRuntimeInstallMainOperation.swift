@@ -26,17 +26,6 @@ enum OwnedRuntimeInstallMainOperation {
 
 	static func handles(arguments: [String]) -> Bool { arguments.count == 2 && arguments[1] == flag }
 
-	/// The helper's code directory hashes: one per hash type, distinct, SHA-1 (20 bytes) or SHA-256 (32 bytes, as
-	/// signing information reports it). codesign writes only the SHA-256 directory for a macOS 11+ target, so the
-	/// published runtime carries one hash per slice; demanding two refused every install (field report 2026-11-05).
-	/// - Parameter fields: Signing information of the helper.
-	/// - Returns: The hashes, or nil when absent, duplicated, over two or of another length.
-	static func codeDirectoryHashes(_ fields: [String: Any]) -> [Data]? {
-		guard let hashes = fields[kSecCodeInfoCdHashes as String] as? [Data], (1...2).contains(hashes.count),
-			Set(hashes).count == hashes.count, hashes.allSatisfy({ $0.count == 20 || $0.count == 32 }) else { return nil }
-		return hashes
-	}
-
 	/// The `cdhash` of each architecture slice the helper carries, for the staged copy's requirement. The
 	/// requirement language compares the 20-byte truncated hash, and `codesign --all-architectures` checks every
 	/// slice: the full SHA-256 of the host slice alone matched neither, so the administrator shell refused every
@@ -158,7 +147,7 @@ enum OwnedRuntimeInstallMainOperation {
 			guard SecCertificateCopyData(certificate) as Data == publisher.leaf else {
 				return refuse("helper_signature", "the downloaded installer helper is not signed with this launcher's certificate")
 			}
-			guard codeDirectoryHashes(fields) != nil, let slices = sliceCodeHashes(helper) else {
+			guard OwnedRuntimePublisherSignature.codeDirectoryHashes(fields) != nil, let slices = sliceCodeHashes(helper) else {
 				return refuse("helper_code_hashes", "the downloaded installer helper's code hashes could not be read")
 			}
 			let bytes = try Data(contentsOf: helper.appendingPathComponent(installerExecutable))
