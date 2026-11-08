@@ -190,8 +190,8 @@ _BundledAppsNative_SplitIconLocation(Location, &IconFile, &IconNumber) {
 _BundledAppsNative_IconIndex(IconNumber) {
 	if IconNumber == ""
 		return 0
-	Number := Integer(IconNumber)
-	return Number > 0 ? Number - 1 : Number
+	Ordinal := Integer(IconNumber)
+	return Ordinal > 0 ? Ordinal - 1 : Ordinal
 }
 
 /**
