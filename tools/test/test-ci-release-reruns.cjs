@@ -433,10 +433,19 @@ const state = JSON.parse(fs.readFileSync(file, 'utf8'));
 if (args[0] === 'api') {
     if (state.mode === 'lookup-refusal') throw new Error('native inventory lookup refused');
     if (state.mode === 'malformed') { process.stdout.write('{invalid'); process.exit(0); }
-    if (args[1].includes('/releases/tags/')) {
-        assert.equal(args[1], 'repos/' + process.env.GH_STUB_REPO + '/releases/tags/' + process.env.GH_STUB_TAG);
+    // GitHub serves releases/tags/<tag> only for a published release, even
+    // when the tag exists; the draft this gate reads is in the release list.
+    assert.ok(!args[1].includes('/releases/tags/'), 'a draft release has no tag lookup');
+    const listPrefix = 'repos/' + process.env.GH_STUB_REPO + '/releases?per_page=100&page=';
+    if (args[1].startsWith(listPrefix)) {
+        const page = Number(args[1].slice(listPrefix.length));
+        assert.ok(Number.isInteger(page) && page > 0);
         if (state.mode === 'unexpected-published') state.isDraft = false;
-        process.stdout.write(JSON.stringify({ id: 17, tag_name: process.env.GH_STUB_TAG, draft: state.isDraft }));
+        const rows = [
+            { id: 16, tag_name: 'v0.0.0-older', draft: false },
+            { id: 17, tag_name: process.env.GH_STUB_TAG, draft: state.isDraft }
+        ];
+        process.stdout.write(JSON.stringify(page === 1 ? rows : []));
     } else {
         const prefix = 'repos/' + process.env.GH_STUB_REPO + '/releases/17/assets?per_page=100&page=';
         assert.ok(args[1].startsWith(prefix));
