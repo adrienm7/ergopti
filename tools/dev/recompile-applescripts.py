@@ -7,11 +7,14 @@ OS leaves the shipped .scpt stale. The macOS field report collector
 (tools/dev/collect-macos-field-report.sh) runs this on the maintainer's Mac.
 
 For each tracked .applescript with a tracked .scpt of the same name in the
-same folder, the .scpt is decompiled (osadecompile) and compared with the
-source; when they differ, the source is compiled into a temporary file, that
-file must decompile back to the source, and only then replaces the .scpt.
-The comparison ignores what osadecompile reformats: line endings, the
-indentation and the blank lines.
+same folder, the source is compiled into a temporary file, and both that file
+and the tracked .scpt are decompiled (osadecompile); when the two texts
+differ, the temporary file replaces the .scpt. Both sides pass through the
+same decompiler, so its own spelling (line continuations, keywords, escapes,
+indentation) never reads as a change. Comparing the decompiled .scpt with the
+source text instead failed on every script the decompiler respells
+(Encryptor, field report 2026-11-08: roundtrip_mismatch). The comparison
+still ignores line endings, the indentation and the blank lines.
 
 Prints one line per script (up_to_date, recompiled), then
 `scpt_recompiled:<n>`. A script that cannot be judged or rebuilt prints
@@ -72,13 +75,9 @@ def rebuild(root, source, compiled):
     """Judges one pair and rebuilds it when stale; returns (state, reason)."""
     source_path = os.path.join(root, source)
     compiled_path = os.path.join(root, compiled)
-    with open(source_path, encoding="utf-8") as handle:
-        expected = normalized(handle.read())
     current = decompile(compiled_path)
     if current is None:
         return "failed", "decompile_existing"
-    if normalized(current) == expected:
-        return "up_to_date", None
     descriptor, candidate = tempfile.mkstemp(
         suffix=COMPILED_SUFFIX, dir=os.path.dirname(compiled_path)
     )
@@ -97,8 +96,8 @@ def rebuild(root, source, compiled):
         rebuilt = decompile(candidate)
         if rebuilt is None:
             return "failed", "decompile_rebuilt"
-        if normalized(rebuilt) != expected:
-            return "failed", "roundtrip_mismatch"
+        if normalized(rebuilt) == normalized(current):
+            return "up_to_date", None
         os.replace(candidate, compiled_path)
         return "recompiled", None
     finally:
