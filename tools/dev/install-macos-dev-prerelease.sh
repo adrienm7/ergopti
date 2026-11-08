@@ -6,9 +6,9 @@
 # DESCRIPTION:
 # Installs or updates /Applications/ErgoptiPlus.app from the newest signed dev
 # prerelease on GitHub, verified, then quits the running copy and opens the new
-# one with this clone as its field-run root, so
-# tools/dev/collect-macos-field-report.sh --installed can drive every field
-# check with no click.
+# one with this clone as its field-run root. A field report never uses it: the
+# collector tests the branch's own developer app (maintainer decision
+# 2026-11-08); this stays to install a published prerelease by hand.
 #
 # USAGE:
 #   bash tools/dev/install-macos-dev-prerelease.sh

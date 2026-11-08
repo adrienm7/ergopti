@@ -58,6 +58,10 @@ const BUNDLED_SAMPLE = 'static/ergopti_plus/_shared/modules/hotstrings/french/au
 const FIELD_PATHS = 'tools/dev/field-report-paths.py';
 const APP_DIRS = 'static/ergopti_plus/_shared/modules/paths/app_dirs.toml';
 const SUB_FILES = 'static/ergopti_plus/_shared/modules/logger/sub_files.toml';
+// The signing requirement the owned runtime admits, which the developer app must carry.
+const RUNTIME_MANIFEST = 'static/ergopti_plus/macos/vendor/remap-runtime/manifest.json';
+const PINNED_REQUIREMENT = JSON.parse(fs.readFileSync(path.join(ROOT, RUNTIME_MANIFEST), 'utf8'))
+	.capture.requirement;
 // The readiness budget covers the boot's Accessibility wait, read from its owner.
 const ACCESSIBILITY_WAIT = 'static/ergopti_plus/macos/infra/accessibility_wait.lua';
 
@@ -131,6 +135,7 @@ function fixture(name, { onDev = false } = {}) {
 		FIELD_PATHS,
 		APP_DIRS,
 		SUB_FILES,
+		RUNTIME_MANIFEST,
 		ACCESSIBILITY_WAIT,
 		ANALYSER,
 		...ANALYSER_SOURCES
@@ -187,6 +192,15 @@ function fixture(name, { onDev = false } = {}) {
 	run('push', '-q', 'origin', 'dev');
 	if (!onDev) run('switch', '-q', '-c', 'field/mac-fixture');
 	shim(bin, 'uname', 'echo Darwin');
+	// codesign reads the developer app's designated requirement from a file the
+	// cases rewrite: signed with the stable certificate unless a case says not.
+	const designated = path.join(base, 'designated.txt');
+	fs.writeFileSync(designated, `designated => ${PINNED_REQUIREMENT}\n`);
+	shim(
+		bin,
+		'codesign',
+		`[ "$1" = -d ] && [ "$2" = -r- ] && [ -d "$3" ] && { cat "${designated}"; exit 0; }\nexit 1`
+	);
 	// The app is running: the collector must not try to start it
 	shim(bin, 'pgrep', 'exit 0');
 	const plutil = path.join(bin, 'plutil.cjs');
@@ -203,7 +217,7 @@ process.stdout.write(typeof value === 'object' ? JSON.stringify(value) : String(
 		'plutil',
 		`[ "$1" = -extract ] && [ "$3" = raw ] && [ "$4" = -o ] && [ "$5" = - ] || exit 9\nexec "${process.execPath}" "${plutil}" "$2" "$6"`
 	);
-	return { clone, bin, home, env, launcherSource, runnerLog, stagerLog };
+	return { clone, bin, home, env, launcherSource, runnerLog, stagerLog, designated };
 }
 
 /**
@@ -919,6 +933,51 @@ function reportFolder(paths) {
 				}
 			}
 		);
+
+		await check(
+			'an app without the stable signature is rebuilt, and a build still without it stops the run',
+			async () => {
+				const adhoc = fixture('adhoc');
+				const driver = startDriver(adhoc, 'done');
+				try {
+					await waitFor(driver.readyPath);
+					// Field report 2026-11-08: the owned runtime refuses an ad hoc app,
+					// so a run on it could never prove the install.
+					fs.writeFileSync(adhoc.designated, 'designated => cdhash H"00"\n');
+					const result = await runCollector(adhoc);
+					assert.match(
+						result.stdout,
+						/Building and opening the developer app \(the developer app is not signed with the stable certificate/
+					);
+					assert.equal(fs.readFileSync(adhoc.runnerLog, 'utf8'), 'run \n');
+					assert.match(
+						result.stdout,
+						/put ErgoptiPlus-signing\.p12\.base64 in ~\/ErgoptiPlus-signing/
+					);
+					assert(!fs.existsSync(driver.record), 'an unsigned app never receives the request');
+				} finally {
+					driver.child.kill();
+				}
+			}
+		);
+
+		await check('--installed is refused: the field run tests the branch, never a release', () => {
+			const retired = fixture('retired-installed');
+			const result = spawnSync(
+				bashExecutable(),
+				[path.join(retired.clone, SCRIPT), '--installed'],
+				{
+					cwd: retired.clone,
+					env: { ...retired.env, PATH: `${retired.bin}${path.delimiter}${process.env.PATH}` },
+					encoding: 'utf8'
+				}
+			);
+			assert.notEqual(result.status, 0);
+			assert.match(
+				result.stderr,
+				/--installed is retired: the field run tests this branch's developer app/
+			);
+		});
 
 		await check(
 			'the collector requests every step, waits for done and copies the results',
