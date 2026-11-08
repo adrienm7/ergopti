@@ -439,6 +439,10 @@ _LRNX_Receiver(Record, WParam, LParam, Message, Hwnd) {
 	Record["received"] += 1
 	if Record["received"] == 1 {
 		Shift := !!(DllCall("GetKeyState", "Int", 0x10, "Short") & 0x8000)
+		; What this keydown types under the Shift state it arrived with. The
+		; receiver's own TranslateMessage was seen to run under the later state
+		; (receipt Shift=1, Edit "q"), which proves nothing about the sender.
+		Record["typed"] := _LRN_HostCharacter(WParam, Shift, DllCall("GetKeyboardLayout", "UInt", 0, "Ptr"))
 		Extra := DllCall("GetMessageExtraInfo", "UPtr")
 		Payload := Shift . "|" . Extra . "|" . WParam . "|" . Hwnd . "|" . DllCall("GetCurrentProcessId", "UInt")
 		try {
@@ -456,7 +460,7 @@ _LRNX_Case(Mode) {
 	if IsObject(RetirementDebt)
 		throw Error("A prior external receiver probe retains its owned process/window retirement debt.")
 	Root := A_Temp . "\ergopti_external_row_flags_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
-	Record := Map("window", 0, "edit", 0, "vk", 0, "receipt", Root . "\received.txt", "received", 0, "failure", 0)
+	Record := Map("window", 0, "edit", 0, "vk", 0, "receipt", Root . "\received.txt", "received", 0, "typed", "", "failure", 0)
 	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}
 	Created := false, Handle := 0, Primary := 0, Receiver := _LRNX_Receiver.Bind(Record)
 	PreviousCritical := Critical("Off")
@@ -493,11 +497,13 @@ _LRNX_Case(Mode) {
 		ReceiverReceipt := ""
 		try ReceiverReceipt := FileRead(Record["receipt"], "UTF-8")
 		_TestPrint("# external-row-flags " . Mode . " code=" . State.Code . " received=" . Record["received"]
-			. " receipt=" . ReceiverReceipt . " edit=" . Record["edit"].Value
+			. " receipt=" . ReceiverReceipt . " typed=" . Record["typed"] . " edit=" . Record["edit"].Value
 			. " stdout=" . StrReplace(State.Output, "`n", " | ") . " stderr=" . StrReplace(State.ErrorText, "`n", " | "))
 		AssertEqual(1, State.Calls, "the external sender must settle exactly once")
 		AssertEqual(1, Record["received"], "the parent-owned receiver must actually observe exactly one keydown")
-		AssertEqual(ExpectedHost, Record["edit"].Value, "the separate receiving process must obtain the host character exactly once")
+		AssertEqual(ExpectedHost, Record["typed"], "the keydown the separate process receives must carry the host character's modifiers")
+		AssertEqual(1, StrLen(Record["edit"].Value), "the separate receiving process must obtain one character")
+		AssertTrue(Record["edit"].Value = ExpectedHost, "the separate receiving process must obtain the host letter")
 		if IsObject(Record["failure"])
 			throw Record["failure"]
 		AssertEqual(0, State.Code, "the native external row sender refused: " . State.ErrorText . State.Output)
