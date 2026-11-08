@@ -16,23 +16,23 @@ enum OwnedRuntimeCoreLaunchctl {
 			|| arguments == ["bootstrap", "system", "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosCore).plist"]
 			|| arguments == ["kickstart", "system/\(Identifiers.ServiceLabels.macosCore)"]
 			|| arguments == ["print", "system/\(Identifiers.ServiceLabels.macosVirtualHid)"]
-			|| arguments == ["bootstrap", "system", "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosVirtualHid).plist"] else { throw OwnedRuntimeInstallFailure.source }
+			|| arguments == ["bootstrap", "system", "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosVirtualHid).plist"] else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		let result = try child(path: "/bin/launchctl", arguments: arguments, timeout: 3)
-		guard !result.timedOut else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard !result.timedOut else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		return Observation(status: result.status, bytes: result.bytes)
 	}
 	private static func ownedDescriptor(_ original: Int32) throws -> Int32 {
-		guard original >= 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard original >= 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		let result = fcntl(original, F_DUPFD_CLOEXEC, STDERR_FILENO + 1)
 		Darwin.close(original)
-		guard result > STDERR_FILENO else { throw OwnedRuntimeInstallFailure.source }
+		guard result > STDERR_FILENO else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		return result
 	}
 	private static func raw(_ strings: [String]) throws -> [UnsafeMutablePointer<CChar>?] {
 		var output: [UnsafeMutablePointer<CChar>?] = []
 		for string in strings {
 			guard !string.contains("\0"), let value = strdup(string) else {
-				for case let pointer? in output { free(pointer) }; throw OwnedRuntimeInstallFailure.source
+				for case let pointer? in output { free(pointer) }; throw OwnedRuntimeInstallFailure.traced(.source)
 			}
 			output.append(value)
 		}; output.append(nil); return output
@@ -45,23 +45,23 @@ enum OwnedRuntimeCoreLaunchctl {
 			SecStaticCodeCreateWithPath(URL(fileURLWithPath: path) as CFURL, [], &code) == errSecSuccess, let code,
 			SecRequirementCreateWithString("anchor apple" as CFString, [], &requirement) == errSecSuccess, let requirement,
 			SecStaticCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSStrictValidate | kSecCSCheckAllArchitectures), requirement) == errSecSuccess else {
-			throw OwnedRuntimeInstallFailure.signature
+			throw OwnedRuntimeInstallFailure.traced(.signature)
 		}
 		errno = 0
 		if let acl = acl_get_fd_np(descriptor, ACL_TYPE_EXTENDED) {
 			defer { acl_free(UnsafeMutableRawPointer(acl)) }
 			var entry: acl_entry_t?; errno = 0
 			guard acl_valid(acl) == 0, acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) == -1, errno == EINVAL else {
-				throw OwnedRuntimeInstallFailure.protection
+				throw OwnedRuntimeInstallFailure.traced(.protection)
 			}
-		} else if errno != ENOENT { throw OwnedRuntimeInstallFailure.protection } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
+		} else if errno != ENOENT { throw OwnedRuntimeInstallFailure.traced(.protection) } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
 	}
 	private static func child(path: String, arguments: [String], timeout: TimeInterval) throws -> ChildObservation {
 		let parent = try OwnedRuntimeInstallTree(root: URL(fileURLWithPath: path).deletingLastPathComponent(), protected: true, includeChildren: false)
 		let image = try ownedDescriptor(open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK))
 		defer { Darwin.close(image) }; try systemCode(path: path, descriptor: image)
 		var pipeDescriptors: [Int32] = [-1, -1]
-		guard pipe(&pipeDescriptors) == 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard pipe(&pipeDescriptors) == 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		var readEnd: Int32 = -1, writeEnd: Int32 = -1
 		do { readEnd = try ownedDescriptor(pipeDescriptors[0]) } catch { Darwin.close(pipeDescriptors[1]); throw error }
 		defer { Darwin.close(readEnd) }
@@ -69,25 +69,25 @@ enum OwnedRuntimeCoreLaunchctl {
 		var writeClosed = false; defer { if !writeClosed { Darwin.close(writeEnd) } }
 		let null = try ownedDescriptor(open("/dev/null", O_RDWR | O_CLOEXEC)); defer { Darwin.close(null) }
 		let flags = fcntl(readEnd, F_GETFL)
-		guard flags >= 0, fcntl(readEnd, F_SETFL, flags | O_NONBLOCK) == 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard flags >= 0, fcntl(readEnd, F_SETFL, flags | O_NONBLOCK) == 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		var actions: posix_spawn_file_actions_t?
-		guard posix_spawn_file_actions_init(&actions) == 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard posix_spawn_file_actions_init(&actions) == 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		defer { posix_spawn_file_actions_destroy(&actions) }
 		guard posix_spawn_file_actions_adddup2(&actions, null, STDIN_FILENO) == 0,
 			posix_spawn_file_actions_adddup2(&actions, writeEnd, STDOUT_FILENO) == 0,
-			posix_spawn_file_actions_adddup2(&actions, null, STDERR_FILENO) == 0 else { throw OwnedRuntimeInstallFailure.source }
+			posix_spawn_file_actions_adddup2(&actions, null, STDERR_FILENO) == 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		for descriptor in [null, readEnd, writeEnd, image] {
-			guard posix_spawn_file_actions_addclose(&actions, descriptor) == 0 else { throw OwnedRuntimeInstallFailure.source }
+			guard posix_spawn_file_actions_addclose(&actions, descriptor) == 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		}
 		var attributes: posix_spawnattr_t?
-		guard posix_spawnattr_init(&attributes) == 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard posix_spawnattr_init(&attributes) == 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		defer { posix_spawnattr_destroy(&attributes) }
-		guard posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT)) == 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT)) == 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		var argv = try raw([path] + arguments); defer { for case let pointer? in argv { free(pointer) } }
 		var env = try raw(["PATH=/usr/bin:/bin:/usr/sbin:/sbin", "LC_ALL=C"]); defer { for case let pointer? in env { free(pointer) } }
 		// This isolated privileged worker restores zombie-producing semantics before its own spawn.
 		guard ergopti_owned_child_reaping_restore() == 0 else {
-			throw OwnedRuntimeInstallFailure.source
+			throw OwnedRuntimeInstallFailure.traced(.source)
 		}
 		try parent.verifyAnchor(); try systemCode(path: path, descriptor: image)
 		var pid: pid_t = 0
@@ -96,7 +96,7 @@ enum OwnedRuntimeCoreLaunchctl {
 				posix_spawn(&pid, path, &actions, &attributes, arguments.baseAddress, environment.baseAddress)
 			}
 		}
-		guard spawned == 0, pid > 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard spawned == 0, pid > 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		Darwin.close(writeEnd); writeClosed = true
 		let deadline = ProcessInfo.processInfo.systemUptime + timeout
 		var output = Data(), status: Int32 = 0, failure = false, eof = false
@@ -121,10 +121,10 @@ enum OwnedRuntimeCoreLaunchctl {
 			let result = waitpid(pid, &status, WNOHANG)
 			if result == pid {
 				consume()
-				guard !failure, eof, status & 0x7f == 0 else { throw OwnedRuntimeInstallFailure.source }
+				guard !failure, eof, status & 0x7f == 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 				return ChildObservation(status: (status >> 8) & 0xff, bytes: output, timedOut: false)
 			}
-			if result == -1 && errno != EINTR { throw OwnedRuntimeInstallFailure.cleanupPending }
+			if result == -1 && errno != EINTR { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 			var descriptor = pollfd(fd: readEnd, events: Int16(POLLIN | POLLHUP), revents: 0)
 			let resultPoll = poll(&descriptor, 1, 20)
 			if resultPoll < 0 && errno != EINTR { failure = true }
@@ -135,24 +135,24 @@ enum OwnedRuntimeCoreLaunchctl {
 		while ProcessInfo.processInfo.systemUptime < gracefulDeadline {
 			let result = waitpid(pid, &status, WNOHANG)
 			if result == pid { return ChildObservation(status: (status >> 8) & 0xff, bytes: output, timedOut: true) }
-			if result == -1 && errno != EINTR { throw OwnedRuntimeInstallFailure.cleanupPending }
+			if result == -1 && errno != EINTR { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 			usleep(LauncherTimings.ownedRuntimeChildReapPoll.microseconds)
 		}
 		_ = Darwin.kill(pid, SIGKILL)
 		// Dedicated worker retains this exact child debt until native reap; no successor generation is admitted.
 		var result: pid_t
 		repeat { result = waitpid(pid, &status, 0) } while result == -1 && errno == EINTR
-		guard result == pid else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard result == pid else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		return ChildObservation(status: (status >> 8) & 0xff, bytes: output, timedOut: true)
 	}
 	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
 	static func fixtureUnrelatedDescriptorWasClosed() throws -> Bool {
 		let source = open("/dev/null", O_RDONLY)
-		guard source >= 0 else { throw OwnedRuntimeInstallFailure.source }; defer { Darwin.close(source) }
+		guard source >= 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }; defer { Darwin.close(source) }
 		let inherited = fcntl(source, F_DUPFD, 196)
-		guard inherited >= 196 else { throw OwnedRuntimeInstallFailure.source }; defer { Darwin.close(inherited) }
+		guard inherited >= 196 else { throw OwnedRuntimeInstallFailure.traced(.source) }; defer { Darwin.close(inherited) }
 		let flags = fcntl(inherited, F_GETFD)
-		guard flags >= 0, flags & FD_CLOEXEC == 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard flags >= 0, flags & FD_CLOEXEC == 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		let observed = try child(path: "/bin/sh", arguments: ["-c", "test ! -e /dev/fd/" + String(inherited)], timeout: 1)
 		return observed.status == 0 && !observed.timedOut
 	}
@@ -160,7 +160,7 @@ enum OwnedRuntimeCoreLaunchctl {
 	/// Actual native child probes grant no launchd, Core PID or production principal capability.
 	static func fixtureEcho() throws -> Observation {
 		let result = try child(path: "/bin/echo", arguments: ["owned-child"], timeout: 3)
-		guard !result.timedOut else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard !result.timedOut else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		return Observation(status: result.status, bytes: result.bytes)
 	}
 	static func fixtureTimeoutWasReaped() throws -> Bool {

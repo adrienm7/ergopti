@@ -40,12 +40,12 @@ final class OwnedVirtualHIDDaemonReportStageOwner {
 		do {
 			owner.parentTree = try OwnedRuntimeInstallTree(root: stage.deletingLastPathComponent(), protected: true, includeChildren: false)
 			owner.snapshot = try OwnedRuntimeInstallTree(root: stage, protected: true)
-			guard let parentTree = owner.parentTree, let snapshot = owner.snapshot else { throw OwnedRuntimeInstallFailure.source }
+			guard let parentTree = owner.parentTree, let snapshot = owner.snapshot else { throw OwnedRuntimeInstallFailure.traced(.source) }
 			let raw = try parentTree.duplicateRootDescriptor(); let parent = OwnedVHDReportDescriptor(raw); owner.parent = parent
-			guard parent.capture(), try FileManager.default.contentsOfDirectory(atPath: stage.path).sorted() == ["Helper.app"] else { throw OwnedRuntimeInstallFailure.source }
+			guard parent.capture(), try FileManager.default.contentsOfDirectory(atPath: stage.path).sorted() == ["Helper.app"] else { throw OwnedRuntimeInstallFailure.traced(.source) }
 			try parentTree.verifyAnchor(); try snapshot.verify(); try owner.capture(parent: parent, name: stage.lastPathComponent, relative: "", ancestors: [])
 			try snapshot.verify(); try parentTree.verifyAnchor()
-			guard owner.admitImage(), request.stageCaptureCurrent(), owner.nativeCurrent() else { throw OwnedRuntimeInstallFailure.principal }; owner.complete = true
+			guard owner.admitImage(), request.stageCaptureCurrent(), owner.nativeCurrent() else { throw OwnedRuntimeInstallFailure.traced(.principal) }; owner.complete = true
 		} catch { owner.failed = true }
 		return owner
 	}
@@ -54,7 +54,7 @@ final class OwnedVirtualHIDDaemonReportStageOwner {
 	private func admitImage() -> Bool {
 		guard let sourceCode, publisher?.current() == true, imageWitness?.current() == true else { return false }; var code: SecStaticCode?
 		guard SecCodeCopyStaticCode(sourceCode, [], &code) == errSecSuccess, let code,
-			let info = OwnedRuntimePublisherSignature.information(code, role: .installer), let hashes = OwnedRuntimeInstallMainOperation.codeDirectoryHashes(info),
+			let info = OwnedRuntimePublisherSignature.information(code, role: .installer), let hashes = OwnedRuntimePublisherSignature.codeDirectoryHashes(info),
 			ergopti_vhd_report_self_image_capture(&image) == 0 else { return false }
 		let actual = withUnsafeBytes(of: &image.cdhash) { Data($0) }
 		guard hashes.contains(where: { Data($0.prefix(20)) == actual }), image.pid == creator, image.seconds == birth.start_seconds, image.microseconds == birth.start_microseconds else { return false }
@@ -81,41 +81,41 @@ final class OwnedVirtualHIDDaemonReportStageOwner {
 		return fd.current() && valid == 0 && result == -1 && saved == EINVAL
 	}
 	private func digest(_ held: OwnedVHDReportDescriptor, size: off_t) throws -> Data {
-		guard size >= 0, size <= 268_435_456 else { throw OwnedRuntimeInstallFailure.source }
+		guard size >= 0, size <= 268_435_456 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		var hash = SHA256(), offset: off_t = 0, buffer = [UInt8](repeating: 0, count: 65_536)
 		while offset < size {
-			guard held.current(), nativeCurrent() else { throw OwnedRuntimeInstallFailure.mutated }
+			guard held.current(), nativeCurrent() else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 			let count = pread(held.number, &buffer, min(buffer.count, Int(size - offset)), offset), saved = errno
-			guard held.current(), nativeCurrent() else { throw OwnedRuntimeInstallFailure.mutated }
-			if count < 0 && saved == EINTR { continue }; guard count > 0 else { throw OwnedRuntimeInstallFailure.source }
+			guard held.current(), nativeCurrent() else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
+			if count < 0 && saved == EINTR { continue }; guard count > 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 			hash.update(data: Data(buffer.prefix(count))); offset += off_t(count)
 		}
 		return Data(hash.finalize())
 	}
 	private func capture(parent: OwnedVHDReportDescriptor, name: String, relative: String, ancestors: [Anchor]) throws {
-		guard nodes.count < 4096, parent.current(), ancestors.allSatisfy({ $0.current() }), nativeCurrent(), let parentTree else { throw OwnedRuntimeInstallFailure.source }; try parentTree.verifyAnchor()
-		var named = stat(); guard fstatat(parent.number, name, &named, AT_SYMLINK_NOFOLLOW) == 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard nodes.count < 4096, parent.current(), ancestors.allSatisfy({ $0.current() }), nativeCurrent(), let parentTree else { throw OwnedRuntimeInstallFailure.traced(.source) }; try parentTree.verifyAnchor()
+		var named = stat(); guard fstatat(parent.number, name, &named, AT_SYMLINK_NOFOLLOW) == 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		let directory = named.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR)
-		guard directory || named.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) && named.st_nlink == 1 else { throw OwnedRuntimeInstallFailure.source }
+		guard directory || named.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) && named.st_nlink == 1 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		let raw = openat(parent.number, name, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK | (directory ? O_DIRECTORY : 0))
-		guard raw >= 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard raw >= 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		let held = OwnedVHDReportDescriptor(raw)
 		// Retain the actual descriptor BEFORE capture/protection/hash can fail.
 		nodes.append(Node(held: held, parent: parent, name: name, identity: named, directory: directory, digest: nil, ancestors: ancestors))
-		guard held.capture(), let observed = held.identity, same(named, observed, directory: directory), protected(held, observed) else { throw OwnedRuntimeInstallFailure.mutated }
+		guard held.capture(), let observed = held.identity, same(named, observed, directory: directory), protected(held, observed) else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 		if relative == "Helper.app/Contents/MacOS/ErgoptiPlus-Runtime-Installer" {
-			guard imageWitness == nil, held.current() else { throw OwnedRuntimeInstallFailure.source }
-			let raw = fcntl(held.number, F_DUPFD_CLOEXEC, 0); guard raw >= 0 else { throw OwnedRuntimeInstallFailure.source }
+			guard imageWitness == nil, held.current() else { throw OwnedRuntimeInstallFailure.traced(.source) }
+			let raw = fcntl(held.number, F_DUPFD_CLOEXEC, 0); guard raw >= 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 			let witness = OwnedVHDReportDescriptor(raw); imageWitness = witness
-			guard witness.capture(), let identity = witness.identity, OwnedVHDReportDescriptor.same(observed, identity), held.current() else { throw OwnedRuntimeInstallFailure.mutated }
+			guard witness.capture(), let identity = witness.identity, OwnedVHDReportDescriptor.same(observed, identity), held.current() else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 		}
 		let hash = directory ? nil : try digest(held, size: observed.st_size)
-		if !directory { bytesSeen += Int(observed.st_size); guard bytesSeen <= 536_870_912 else { throw OwnedRuntimeInstallFailure.source } }
+		if !directory { bytesSeen += Int(observed.st_size); guard bytesSeen <= 536_870_912 else { throw OwnedRuntimeInstallFailure.traced(.source) } }
 		let index = nodes.count - 1; nodes[index] = Node(held: held, parent: parent, name: name, identity: observed, directory: directory, digest: hash, ancestors: ancestors)
 		if directory {
-			guard let stage else { throw OwnedRuntimeInstallFailure.source }; let path = relative.isEmpty ? stage : stage.appendingPathComponent(relative)
+			guard let stage else { throw OwnedRuntimeInstallFailure.traced(.source) }; let path = relative.isEmpty ? stage : stage.appendingPathComponent(relative)
 			for child in try FileManager.default.contentsOfDirectory(atPath: path.path).sorted() {
-				guard !child.isEmpty, child != ".", child != "..", !child.contains("/"), !child.contains("\0") else { throw OwnedRuntimeInstallFailure.source }
+				guard !child.isEmpty, child != ".", child != "..", !child.contains("/"), !child.contains("\0") else { throw OwnedRuntimeInstallFailure.traced(.source) }
 				try capture(parent: held, name: child, relative: relative.isEmpty ? child : relative + "/" + child,
 					ancestors: ancestors + [Anchor(parent: parent, child: held, name: name, identity: observed)])
 			}

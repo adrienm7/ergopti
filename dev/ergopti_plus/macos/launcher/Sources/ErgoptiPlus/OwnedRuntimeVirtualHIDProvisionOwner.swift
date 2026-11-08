@@ -17,13 +17,13 @@ enum OwnedRuntimeVirtualHIDProvisionOwner {
 
 	/// Writes and bootstraps the owned daemon job once pqrs' daemon program is installed.
 	static func provision(within core: OwnedRuntimeCoreProvisionOwner) throws {
-		guard !Thread.isMainThread, getuid() == 0, geteuid() == 0 else { throw OwnedRuntimeInstallFailure.principal }
+		guard !Thread.isMainThread, getuid() == 0, geteuid() == 0 else { throw OwnedRuntimeInstallFailure.traced(.principal) }
 		try core.verifyForPlistCustody()
 		guard daemonInstalled() else {
-			OwnedRuntimeInstallTrail.note("vhid-daemon-absent"); throw OwnedRuntimeInstallFailure.source
+			OwnedRuntimeInstallTrail.note("vhid-daemon-absent"); throw OwnedRuntimeInstallFailure.traced(.source)
 		}
 		guard try OwnedRuntimeCoreLaunchctl.run(arguments: ["print", target]).status == unknownService else {
-			throw OwnedRuntimeInstallFailure.destination
+			throw OwnedRuntimeInstallFailure.traced(.destination)
 		}
 		let custody = try OwnedRuntimeCorePlistCustody.createProductionVirtualHID(owner: core, bytes: try jobBytes())
 		try custody.prepare()
@@ -31,11 +31,11 @@ enum OwnedRuntimeVirtualHIDProvisionOwner {
 		guard bootstrap.status == 0 else {
 			// A refused bootstrap registered nothing, so the plist and its ledger can go.
 			OwnedRuntimeInstallTrail.note("vhid-bootstrap-" + String(bootstrap.status))
-			_ = custody.rollbackUnregistered(); throw OwnedRuntimeInstallFailure.cleanupPending
+			_ = custody.rollbackUnregistered(); throw OwnedRuntimeInstallFailure.traced(.cleanupPending)
 		}
 		// KeepAlive starts the daemon at load; launchd answers print only for a loaded job.
 		guard custody.commitLoaded(try OwnedRuntimeCoreLaunchctl.run(arguments: ["print", target])) else {
-			throw OwnedRuntimeInstallFailure.cleanupPending
+			throw OwnedRuntimeInstallFailure.traced(.cleanupPending)
 		}
 	}
 

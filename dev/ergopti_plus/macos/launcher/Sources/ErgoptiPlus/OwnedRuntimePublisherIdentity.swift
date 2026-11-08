@@ -10,6 +10,19 @@ import Security
 
 /// Signature observations alone are not publisher, installation, consent or runtime readiness capabilities.
 enum OwnedRuntimePublisherSignature {
+	/// The helper's code directory hashes: one per hash type, distinct, SHA-1 (20 bytes) or SHA-256 (32 bytes, as
+	/// signing information reports it). codesign writes only the SHA-256 directory for a macOS 11+ target, so the
+	/// published runtime carries one hash per slice; demanding two refused every install (field report 2026-11-05).
+	/// It lives here, in a file every helper profile compiles: the helper's report path reads it too, and its
+	/// home in OwnedRuntimeInstallMainOperation broke the installer build (remap runtime build 42524447885).
+	/// - Parameter fields: Signing information of the helper.
+	/// - Returns: The hashes, or nil when absent, duplicated, over two or of another length.
+	static func codeDirectoryHashes(_ fields: [String: Any]) -> [Data]? {
+		guard let hashes = fields[kSecCodeInfoCdHashes as String] as? [Data], (1...2).contains(hashes.count),
+			Set(hashes).count == hashes.count, hashes.allSatisfy({ $0.count == 20 || $0.count == 32 }) else { return nil }
+		return hashes
+	}
+
 	enum Role: String {
 		case launcher = "com.ergoptiplus.app"
 		case hammerspoon = "com.ergoptiplus.app.hammerspoon"
@@ -96,12 +109,12 @@ final class OwnedRuntimePublisherIdentity {
 		do {
 			let tree = try OwnedRuntimeInstallTree(root: bundle, protected: protected, includeChildren: false)
 			let descriptor = open(executable.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
-			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.source }
+			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 			var admitted = false; defer { if !admitted { Darwin.close(descriptor); _ = tree.releaseOwnedDescriptors() } }
 			var identity = stat()
 			guard fstat(descriptor, &identity) == 0, identity.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
 				identity.st_nlink == 1, identity.st_size > 0, identity.st_size <= 268_435_456,
-				!protected || (identity.st_uid == 0 && identity.st_mode & 0o6022 == 0) else { throw OwnedRuntimeInstallFailure.protection }
+				!protected || (identity.st_uid == 0 && identity.st_mode & 0o6022 == 0) else { throw OwnedRuntimeInstallFailure.traced(.protection) }
 			let owner = OwnedRuntimePublisherIdentity(principal: principal, role: role, tree: tree, executable: executable,
 				descriptor: descriptor, identity: identity, bundle: bundle, leaf: leaf)
 			admitted = true
@@ -193,7 +206,7 @@ final class OwnedRuntimeInstalledPublisher {
 	static func fixtureObserveOriginalTree(root: URL, code: SecStaticCode, afterObservation: (() throws -> Void)? = nil) throws -> Bool {
 		let tree = try OwnedRuntimeInstallTree(root: root, protected: false)
 		defer { _ = tree.releaseOwnedDescriptors() }
-		guard let leaf = OwnedRuntimePublisherSignature.leaf(code, role: .launcher) else { throw OwnedRuntimeInstallFailure.signature }
+		guard let leaf = OwnedRuntimePublisherSignature.leaf(code, role: .launcher) else { throw OwnedRuntimeInstallFailure.traced(.signature) }
 		return try observeOriginalTree(tree, code: code, role: .launcher, expected: leaf, afterObservation: afterObservation)
 	}
 	#endif

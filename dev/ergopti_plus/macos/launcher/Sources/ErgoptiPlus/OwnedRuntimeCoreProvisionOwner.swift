@@ -49,18 +49,18 @@ final class OwnedRuntimeCoreProvisionOwner {
 		do {
 			let helper = try OwnedRuntimeInstallTree(root: Bundle.main.bundleURL, protected: true)
 			let runtime = try OwnedRuntimeInstallTree(root: runtimeURL, protected: true)
-			guard let resources = Bundle.main.resourceURL else { throw OwnedRuntimeInstallFailure.source }
+			guard let resources = Bundle.main.resourceURL else { throw OwnedRuntimeInstallFailure.traced(.source) }
 			let payload = try OwnedRuntimeInstallTree(root: resources.appendingPathComponent("OwnedRuntime"), protected: true)
 			step = "payload-match"
-			guard try payload.matchesBytes(of: runtime) else { throw OwnedRuntimeInstallFailure.source }
+			guard try payload.matchesBytes(of: runtime) else { throw OwnedRuntimeInstallFailure.traced(.source) }
 			step = "idle-revision"
-			guard idleRevision(try Data(contentsOf: runtimeURL.appendingPathComponent("ErgoptiPlus-Remap-Core.app/Contents/Info.plist"))) else { throw OwnedRuntimeInstallFailure.source }
+			guard idleRevision(try Data(contentsOf: runtimeURL.appendingPathComponent("ErgoptiPlus-Remap-Core.app/Contents/Info.plist"))) else { throw OwnedRuntimeInstallFailure.traced(.source) }
 			step = "signed-products"
 			try OwnedRuntimeInstallOwner.validateSignedProductsForBuild(at: runtimeURL, leaf: leaf)
 			step = "verify"
 			try helper.verify(); try runtime.verify(); try payload.verify()
 			guard publisher.current(), lifecycle.current(), lifecycle.permitsServiceProvision(), signingLeaf(principal) == leaf else {
-				throw OwnedRuntimeInstallFailure.principal
+				throw OwnedRuntimeInstallFailure.traced(.principal)
 			}
 			let result = OwnedRuntimeCoreProvisionOwner(publisher: publisher, principal: principal, leaf: leaf, helper: helper,
 				runtime: runtime, payload: payload, lifecycle: lifecycle, publicationParent: publicationParent)
@@ -73,9 +73,9 @@ final class OwnedRuntimeCoreProvisionOwner {
 	}
 	func verifyForPlistCustody() throws {
 		guard !closeAttempted, publisher.current(), getpid() == creator, getuid() == 0, geteuid() == 0, Self.signingLeaf(principal) == leaf,
-			lifecycle.current(), lifecycle.permitsServiceProvision() else { throw OwnedRuntimeInstallFailure.principal }
+			lifecycle.current(), lifecycle.permitsServiceProvision() else { throw OwnedRuntimeInstallFailure.traced(.principal) }
 		if let publicationParent {
-			guard try publicationParent.withPublishedNamespace({ $0 === lifecycle }) else { throw OwnedRuntimeInstallFailure.principal }
+			guard try publicationParent.withPublishedNamespace({ $0 === lifecycle }) else { throw OwnedRuntimeInstallFailure.traced(.principal) }
 		}
 		try helper.verify(); try runtime.verify(); try payload.verify()
 	}
@@ -99,7 +99,7 @@ final class OwnedRuntimeCoreProvisionOwner {
 		let fd = try tree.duplicateRootDescriptor(); defer { Darwin.close(fd) }
 		try tree.verifyAnchor(); var value = stat(); errno = 0
 		let absent = fstatat(fd, "core.json", &value, AT_SYMLINK_NOFOLLOW) == -1 && errno == ENOENT
-		try tree.verifyAnchor(); guard tree.releaseOwnedDescriptors() else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		try tree.verifyAnchor(); guard tree.releaseOwnedDescriptors() else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		return absent
 	}
 	private static func prepareDirectories(parent: URL, protected: Bool, admission: () throws -> Void) throws {
@@ -109,21 +109,21 @@ final class OwnedRuntimeCoreProvisionOwner {
 		func directory(parent: Int32, name: String) throws -> Int32 {
 			try admission(); try tree.verifyAnchor()
 			let created = mkdirat(parent, name, 0o700) == 0
-			if !created { guard errno == EEXIST else { throw OwnedRuntimeInstallFailure.copy } }
+			if !created { guard errno == EEXIST else { throw OwnedRuntimeInstallFailure.traced(.copy) } }
 			let fd = openat(parent, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-			guard fd >= 0 else { throw OwnedRuntimeInstallFailure.protection }
+			guard fd >= 0 else { throw OwnedRuntimeInstallFailure.traced(.protection) }
 			var owned = true; defer { if owned { Darwin.close(fd) } }
-			if created { guard fchmod(fd, 0o755) == 0, fsync(fd) == 0, fsync(parent) == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending } }
+			if created { guard fchmod(fd, 0o755) == 0, fsync(fd) == 0, fsync(parent) == 0 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) } }
 			var value = stat(), named = stat()
 			guard fstat(fd, &value) == 0, fstatat(parent, name, &named, AT_SYMLINK_NOFOLLOW) == 0,
 				value.st_dev == named.st_dev, value.st_ino == named.st_ino,
 				value.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR), value.st_mode & 0o6022 == 0,
-				!protected || value.st_uid == 0 else { throw OwnedRuntimeInstallFailure.protection }
+				!protected || value.st_uid == 0 else { throw OwnedRuntimeInstallFailure.traced(.protection) }
 			errno = 0
 			if let acl = acl_get_fd_np(fd, ACL_TYPE_EXTENDED) {
 				defer { acl_free(UnsafeMutableRawPointer(acl)) }; var entry: acl_entry_t?; errno = 0
-				guard acl_valid(acl) == 0, acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) == -1, errno == EINVAL else { throw OwnedRuntimeInstallFailure.protection }
-			} else if errno != ENOENT { throw OwnedRuntimeInstallFailure.protection } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
+				guard acl_valid(acl) == 0, acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) == -1, errno == EINVAL else { throw OwnedRuntimeInstallFailure.traced(.protection) }
+			} else if errno != ENOENT { throw OwnedRuntimeInstallFailure.traced(.protection) } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
 			owned = false; return fd
 		}
 		let data = try directory(parent: root, name: "RemapRuntime")
@@ -133,61 +133,61 @@ final class OwnedRuntimeCoreProvisionOwner {
 			try tree.verifyAnchor(); try dataTree.verifyAnchor(); try admission()
 			var held = stat(), named = stat()
 			guard fstat(data, &held) == 0, fstatat(root, "RemapRuntime", &named, AT_SYMLINK_NOFOLLOW) == 0,
-				held.st_dev == named.st_dev, held.st_ino == named.st_ino else { throw OwnedRuntimeInstallFailure.mutated }
+				held.st_dev == named.st_dev, held.st_ino == named.st_ino else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 		}
 		for name in ["config", "tmp", "log"] {
 			try verifyData()
 			let fd = try directory(parent: data, name: name)
-			guard Darwin.close(fd) == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			guard Darwin.close(fd) == 0 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		}
 		try verifyData()
-		guard dataTree.releaseOwnedDescriptors() else { throw OwnedRuntimeInstallFailure.cleanupPending }
-		dataOwned = false; guard Darwin.close(data) == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
-		rootOwned = false; guard Darwin.close(root) == 0, tree.releaseOwnedDescriptors() else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard dataTree.releaseOwnedDescriptors() else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
+		dataOwned = false; guard Darwin.close(data) == 0 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
+		rootOwned = false; guard Darwin.close(root) == 0, tree.releaseOwnedDescriptors() else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 	}
 	private func requireConfigurationAbsence() throws {
 		// Missing ancestors and denied observations refuse. They never become guessed ENOENT grants.
 		guard try Self.configurationAbsent(parent: Self.dataURL.appendingPathComponent("config"), protected: true) else {
-			throw OwnedRuntimeInstallFailure.source
+			throw OwnedRuntimeInstallFailure.traced(.source)
 		}
 	}
 	func provisionAndStartCore() throws -> OwnedRuntimeCoreServiceOwner {
-		guard !Thread.isMainThread else { throw OwnedRuntimeInstallFailure.principal }
+		guard !Thread.isMainThread else { throw OwnedRuntimeInstallFailure.traced(.principal) }
 		lock.lock(); defer { lock.unlock() }
-		guard !serviceTouched, !committed, custody == nil else { throw OwnedRuntimeInstallFailure.destination }
+		guard !serviceTouched, !committed, custody == nil else { throw OwnedRuntimeInstallFailure.traced(.destination) }
 		try verifyForPlistCustody()
 		let absent = try OwnedRuntimeCoreLaunchctl.run(arguments: ["print", Self.target])
-		guard absent.status == 113 else { OwnedRuntimeInstallTrail.note("core-print-" + String(absent.status)); throw OwnedRuntimeInstallFailure.destination }
+		guard absent.status == 113 else { OwnedRuntimeInstallTrail.note("core-print-" + String(absent.status)); throw OwnedRuntimeInstallFailure.traced(.destination) }
 		let custody = try OwnedRuntimeCorePlistCustody.createProduction(owner: self); self.custody = custody
 		try custody.prepare()
 		try Self.prepareDirectories(parent: Self.dataURL.deletingLastPathComponent(), protected: true, admission: { try self.verifyForPlistCustody() })
 		try verifyForPlistCustody(); try requireConfigurationAbsence()
-		guard custody.current() else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard custody.current() else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		serviceTouched = true
 		let bootstrap = try OwnedRuntimeCoreLaunchctl.run(arguments: ["bootstrap", "system", "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosCore).plist"])
-		guard bootstrap.status == 0 else { OwnedRuntimeInstallTrail.note("core-bootstrap-" + String(bootstrap.status)); throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard bootstrap.status == 0 else { OwnedRuntimeInstallTrail.note("core-bootstrap-" + String(bootstrap.status)); throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		try verifyForPlistCustody(); try requireConfigurationAbsence()
-		guard custody.current() else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard custody.current() else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		let start = try OwnedRuntimeCoreLaunchctl.run(arguments: ["kickstart", Self.target])
-		guard start.status == 0 else { OwnedRuntimeInstallTrail.note("core-kickstart-" + String(start.status)); throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard start.status == 0 else { OwnedRuntimeInstallTrail.note("core-kickstart-" + String(start.status)); throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		// Real dynamic code, kernel birth, launchd observation and native exit monitor are required separately.
 		let deadline = ProcessInfo.processInfo.systemUptime + 10
 		var observed: OwnedRuntimeCoreServiceOwner?
 		repeat {
-			try verifyForPlistCustody(); guard custody.current() else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			try verifyForPlistCustody(); guard custody.current() else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 			observed = OwnedRuntimeCoreServiceOwner.acquire(afterProvision: self)
 			if observed != nil { break }
-			if ProcessInfo.processInfo.systemUptime >= deadline { OwnedRuntimeInstallTrail.note("core-observation-timeout"); throw OwnedRuntimeInstallFailure.cleanupPending }
+			if ProcessInfo.processInfo.systemUptime >= deadline { OwnedRuntimeInstallTrail.note("core-observation-timeout"); throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 			usleep(LauncherTimings.ownedRuntimeCoreServicePoll.microseconds)
 		} while true
 		guard let core = observed, core.startedCoreObservation(forProvision: self),
-			custody.commitRegistered(core: core, owner: self) else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			custody.commitRegistered(core: core, owner: self) else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		committed = true; return core
 	}
 	/// A typed original owner supplies the same kernel EX custody; no second independent lock is acquired.
 	func withCoreNamespace<T>(_ body: (OwnedRuntimeServiceLifecycleLock) throws -> T) throws -> T {
 		lock.lock(); defer { lock.unlock() }
-		guard serviceTouched, !committed, let custody, custody.current() else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard serviceTouched, !committed, let custody, custody.current() else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		try verifyForPlistCustody(); return try body(lifecycle)
 	}
 	/// Releases only this helper's completed provision observations, never the persistent idle Core process.
