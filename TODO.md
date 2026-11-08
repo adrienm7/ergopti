@@ -17,9 +17,11 @@ the field-run step or the hand action that proves it and the commits it confirms
 - [x] **[TEST] layout-row-external-native-flags (released):** the receipt showed a test-side race: the receiving
       keydown carried Shift (receipt Shift=1) and the sender passed, but the receiver's own translation ran under
       the later state and wrote « q ». The probe now checks the character that keydown types under its own state.
-- [ ] **[TEST] llm-debounce-password-source-privacy (plain-stays):** the rolling context once lacked one unit
-      (« cnary ») while the Edit and the I1 callback held the whole canary. The test now prints
-      `LLM_DEBOUNCE_BUFFER_GAP` with the per-character trace; read it on the next failure.
+- [x] **[TEST] llm-debounce-password-source-privacy (plain-stays):** the rolling context once lacked one unit
+      (« cnary »). The `LLM_DEBOUNCE_BUFFER_GAP` trace of a second failure (« allowed_cotext_b_canaryn ») showed
+      the 11th callback entering at 10 units and completing last: a later callback overtook it. A real Windows
+      bug on the dispatcher path, which left Critical before its append and dropped the overtaken character,
+      and a test-side race in the probe's own callback; both now serialize from admission (6af10e197f).
 - [x] **[TEST] LLM debounce privacy probes:** the trace showed a real Windows bug: a late key-down of the last
       typed letter cancelled the debounce its character had just armed (66afcf12e3). Fixed by 679e279d19.
 
