@@ -30,8 +30,11 @@ final class OwnedRuntimeInstallSourceTrailTests: XCTestCase {
 
 	func testSourceRefusalNamesTheCheckThePathAndTheLine() throws {
 		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
-		// /var is a symlink on macOS and the tree refuses any symlinked ancestor.
-		let base = URL(fileURLWithPath: NSTemporaryDirectory()).resolvingSymlinksInPath()
+		// /var is a symlink on macOS and the tree refuses any symlinked ancestor. realpath, not
+		// resolvingSymlinksInPath: Foundation maps /private/var back to /var (CI run 42524217610).
+		guard let resolved = realpath(NSTemporaryDirectory(), nil) else { throw CaptureFailure(errno: errno) }
+		let temporary = String(cString: resolved); free(resolved)
+		let base = URL(fileURLWithPath: temporary, isDirectory: true)
 			.appendingPathComponent("ergopti-source-trail-" + UUID().uuidString, isDirectory: true)
 		let source = base.appendingPathComponent("source", isDirectory: true)
 		try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true,
