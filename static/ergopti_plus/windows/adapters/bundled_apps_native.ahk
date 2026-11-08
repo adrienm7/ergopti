@@ -179,7 +179,7 @@ BundledAppsNative_ReadShortcut(Path) {
 ; resource ID stays negative (both conventions mean a resource ID there).
 _BundledAppsNative_SplitIconLocation(Location, &IconFile, &IconNumber) {
 	if !RegExMatch(Location, "^(.*),(-?\d+)$", &Parts)
-		throw ValueError("The shortcut icon must be an IconLocation ""file,index"": " . Location, -1)
+		throw ValueError('The shortcut icon must be an IconLocation "file,index": ' . Location, -1)
 	IconFile := Parts[1]
 	Index := Integer(Parts[2])
 	IconNumber := Index >= 0 ? Index + 1 : Index
