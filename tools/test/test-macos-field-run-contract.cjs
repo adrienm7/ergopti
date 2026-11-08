@@ -576,6 +576,18 @@ function reportFolder(paths) {
 			// tag is the highest counter, never the highest core or the text order.
 			assert.match(installer, /awk -F'-dev\[\.\]' '\{ print \$2, \$0 \}' \| sort -n \| tail -n 1/);
 			assert.match(installer, /"\$REMOTE\/releases\/download\/\$tag\/\$ARCHIVE"/);
+			// A 504 during a GitHub outage was reported as a release without the file.
+			assert.match(
+				installer,
+				/curl -sSL --proto =https --retry 6 --retry-delay 5 --retry-all-errors \\\n\t\t-w '%\{http_code\}' "\$publication_url"/,
+				'the publication fetch retries transient failures'
+			);
+			assert.match(installer, /404\) fail "\$tag publishes no macos-publication\.json\." ;;/);
+			assert.match(installer, /could not be downloaded \(HTTP \$status\): GitHub failed/);
+			assert.match(
+				installer,
+				/000 \| ""\) fail "macos-publication\.json of \$tag could not be downloaded: GitHub did not answer/
+			);
 			// A second copy (a local build) would take the Accessibility grant and the boot would reset it
 			const open = installer.indexOf('open --env');
 			const unregister = installer.indexOf('"$LSREGISTER" -u "$other"');

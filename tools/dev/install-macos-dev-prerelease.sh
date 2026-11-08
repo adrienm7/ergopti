@@ -62,7 +62,17 @@ installed="$(plutil -extract CFBundleShortVersionString raw -o - "$APP/Contents/
 if [ "v$installed" = "$tag" ] && [ "${ERGOPTI_REINSTALL:-0}" != 1 ]; then
 	log "$APP is already $tag."
 else
-	curl -fsSL --proto =https "$publication_url" -o "$work/publication.json" || fail "$tag publishes no macos-publication.json."
+	# A GitHub outage answered 504 (field report 2026-11-08) and the run said the
+	# release had no such file: the fetch is retried like the archive's, and only
+	# a 404 means the file is missing; any other status is named as it is.
+	status="$(curl -sSL --proto =https --retry 6 --retry-delay 5 --retry-all-errors \
+		-w '%{http_code}' "$publication_url" -o "$work/publication.json")" || true
+	case "$status" in
+		200) ;;
+		404) fail "$tag publishes no macos-publication.json." ;;
+		000 | "") fail "macos-publication.json of $tag could not be downloaded: GitHub did not answer; run again later." ;;
+		*) fail "macos-publication.json of $tag could not be downloaded (HTTP $status): GitHub failed; run again later." ;;
+	esac
 	# A company proxy cut the 27 MB archive at 56% (curl 18, field report
 	# 2026-11-05): each retry resumes where the transfer stopped; the size and
 	# SHA-256 checks below still admit only the published archive.
