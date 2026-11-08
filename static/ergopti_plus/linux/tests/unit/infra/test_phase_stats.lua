@@ -99,9 +99,11 @@ helpers.describe("phase stats: child processes", function()
 	helpers.it("names the program, never the command line", function()
 		local stats, lines = fixture(20)
 		local runner = helpers.load_module("adapters.shell_runner")
-		runner.run("true --secret-argument-4711")
+		-- A marker without digits: the flushed lines carry durations and
+		-- timestamps, and "4711" once matched one of them on a CI runner.
+		runner.run("true --secret-argument-qzxwv")
 		stats.flush(300)
-		helpers.assert_true(not table.concat(lines, "\n"):find("4711", 1, true),
+		helpers.assert_true(not table.concat(lines, "\n"):find("qzxwv", 1, true),
 			"an argument must not reach a phase name")
 	end)
 end)
